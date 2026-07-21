@@ -1,313 +1,79 @@
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
+function PaymentContent() {
+  const searchParams = useSearchParams();
 
-export default function PaymentPage(){
+  const plan = searchParams.get("plan") || "Popular";
+  const data = searchParams.get("data") || "5GB";
+  const price = searchParams.get("price") || "10";
+  const validity = searchParams.get("validity") || "30 Days";
 
-const searchParams = useSearchParams();
+  return (
+    <main className="min-h-screen bg-[#020617] text-white px-6 py-16">
+      <section className="max-w-xl mx-auto">
 
+        <h1 className="text-5xl font-bold text-center">
+          Secure Checkout 🔒
+        </h1>
 
-const plan = searchParams.get("plan") || "Popular";
+        <p className="text-gray-400 text-center mt-4">
+          Complete your eSIM purchase
+        </p>
 
-const data = searchParams.get("data") || "5GB";
+        <div className="mt-12 bg-[#063047] border border-[#123b5a] rounded-3xl p-8">
 
-const price = searchParams.get("price") || "10";
+          <h2 className="text-2xl font-bold mb-6">
+            Order Summary
+          </h2>
 
-const validity = searchParams.get("validity") || "30 Days";
+          <div className="space-y-3 text-gray-200">
 
+            <p>
+              Plan: <span className="font-bold">{plan}</span>
+            </p>
 
+            <p>
+              Data: <span className="font-bold">{data}</span>
+            </p>
 
-return (
+            <p>
+              Validity: <span className="font-bold">{validity}</span>
+            </p>
 
-<main className="
-min-h-screen
-bg-[#020617]
-text-white
-px-6
-py-16
-">
+            <p>
+              Price: <span className="font-bold">${price}</span>
+            </p>
 
+          </div>
 
-<section className="
-max-w-5xl
-mx-auto
-">
+          <button className="w-full mt-8 bg-white text-black py-4 rounded-xl font-bold">
+            Pay Now
+          </button>
 
+        </div>
 
-<h1 className="
-text-5xl
-font-bold
-text-center
-">
 
-Secure Checkout 💳
+        <Link
+          href="/plans"
+          className="block text-center mt-8 text-gray-300 underline"
+        >
+          Back to Plans
+        </Link>
 
-</h1>
+      </section>
+    </main>
+  );
+}
 
 
-<p className="
-text-gray-400
-text-center
-mt-4
-">
-
-Complete your eSIM purchase
-
-</p>
-
-
-
-<div className="
-grid
-md:grid-cols-2
-gap-8
-mt-12
-">
-
-
-
-{/* CUSTOMER */}
-
-
-<div className="
-bg-[#063047]
-border
-border-[#123b5a]
-rounded-3xl
-p-8
-">
-
-
-<h2 className="
-text-2xl
-font-bold
-mb-6
-">
-
-Customer Details
-
-</h2>
-
-
-<input
-placeholder="Full Name"
-className="
-w-full
-bg-[#021d30]
-p-4
-rounded-xl
-mb-4
-outline-none
-"
-/>
-
-
-<input
-placeholder="Email Address"
-className="
-w-full
-bg-[#021d30]
-p-4
-rounded-xl
-mb-4
-outline-none
-"
-/>
-
-
-<input
-placeholder="Phone Number"
-className="
-w-full
-bg-[#021d30]
-p-4
-rounded-xl
-outline-none
-"
-/>
-
-
-
-</div>
-
-
-
-
-
-
-
-{/* ORDER */}
-
-
-<div className="
-bg-[#063047]
-border
-border-[#123b5a]
-rounded-3xl
-p-8
-">
-
-
-<h2 className="
-text-2xl
-font-bold
-mb-6
-">
-
-Order Summary
-
-</h2>
-
-
-
-<div className="
-bg-[#021d30]
-rounded-2xl
-p-6
-space-y-4
-">
-
-
-<p>
-📦 Plan:
-<b className="ml-2">
-{plan}
-</b>
-</p>
-
-
-<p>
-📶 Data:
-<b className="ml-2">
-{data}
-</b>
-</p>
-
-
-<p>
-⏳ Validity:
-<b className="ml-2">
-{validity}
-</b>
-</p>
-
-
-<div className="
-border-t
-border-gray-700
-pt-4
-text-3xl
-font-bold
-text-lime-400
-">
-
-${price}
-
-</div>
-
-
-</div>
-
-
-
-
-<h3 className="
-font-bold
-text-xl
-mt-8
-">
-
-Payment Method
-
-</h3>
-
-
-
-<div className="
-grid
-grid-cols-3
-gap-3
-mt-4
-">
-
-
-<div className="
-bg-[#021d30]
-p-4
-rounded-xl
-text-center
-">
-
-💳
-
-</div>
-
-
-<div className="
-bg-[#021d30]
-p-4
-rounded-xl
-text-center
-">
-
-🏦
-
-</div>
-
-
-<div className="
-bg-[#021d30]
-p-4
-rounded-xl
-text-center
-">
-
-📱
-
-</div>
-
-
-</div>
-
-
-
-<Link
-
-href="/success"
-
-className="
-block
-text-center
-mt-8
-bg-lime-400
-text-black
-py-4
-rounded-xl
-font-bold
-"
-
->
-
-Pay Now →
-
-</Link>
-
-
-
-</div>
-
-
-
-</div>
-
-
-</section>
-
-
-</main>
-
-)
-
+export default function PaymentPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <PaymentContent />
+    </Suspense>
+  );
 }
