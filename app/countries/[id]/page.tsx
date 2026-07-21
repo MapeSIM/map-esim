@@ -61,8 +61,7 @@ export default async function CountryDetail({
   ${country.startingPrice || "5"}
 </p>
           <p className="text-lime-400 text-3xl font-bold mt-4">
-            ${country.price || "5"}
-          </p>
+          {country.startingPrice || "5"}          </p>
 
 
           <Link
