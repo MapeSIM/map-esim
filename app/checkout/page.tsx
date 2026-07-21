@@ -1,9 +1,25 @@
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
 
-export default function Checkout() {
+function CheckoutContent() {
+  const searchParams = useSearchParams();
+
+  return (
+    <>
+      {/* yahan tumhara existing checkout code */}
+    </>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CheckoutContent />
+    </Suspense>
+  );
+}export default function Checkout() {
 
 
 const searchParams = useSearchParams();
