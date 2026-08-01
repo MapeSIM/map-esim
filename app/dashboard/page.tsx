@@ -2,107 +2,56 @@
 
 import Link from "next/link";
 
-export default function DashboardPage(){
-
+export default function DashboardPage() {
   return (
-    <main className="
-    min-h-screen
-    bg-[#020617]
-    text-white
-    px-6
-    py-16
-    ">
-
-      <section className="max-w-5xl mx-auto">
-
-        <h1 className="
-        text-5xl
-        font-bold
-        text-center
-        ">
+    <main className="min-h-screen bg-[var(--page-bg)] px-6 py-16 text-[var(--heading)]">
+      <section className="mx-auto max-w-5xl">
+        <h1 className="text-center text-5xl font-bold text-[var(--heading)]">
           My eSIMs
         </h1>
 
-        <p className="
-        text-gray-400
-        text-center
-        mt-4
-        ">
+        <p className="mt-4 text-center text-[var(--text-muted)]">
           Manage your purchased eSIM plans
         </p>
 
-
-        <div className="
-        mt-12
-        bg-[#003b52]
-        rounded-3xl
-        p-8
-        ">
-
-          <h2 className="text-3xl font-bold">
-            🇵🇰 Pakistan eSIM
+        <div className="mt-12 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-8 shadow-[var(--shadow)]">
+          <h2 className="text-3xl font-bold text-[var(--heading)]">
+            Pakistan eSIM
           </h2>
 
-
-          <div className="
-          bg-[#002b3d]
-          rounded-2xl
-          p-6
-          mt-6
-          space-y-4
-          ">
-
+          <div className="mt-6 space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-6 text-[var(--text)]">
             <p>
-              📶 Data:
-              <b> 5GB</b>
+              Data:
+              <b className="text-[var(--heading)]"> 5GB</b>
             </p>
 
             <p>
-              ⏳ Validity:
-              <b> 30 Days</b>
+              Validity:
+              <b className="text-[var(--heading)]"> 30 Days</b>
             </p>
 
             <p>
-              🆔 Order ID:
-              <b className="text-lime-400">
-                MAP-ESIM-58291
-              </b>
+              Order ID:
+              <b className="text-[var(--accent-soft)]"> MAP-ESIM-58291</b>
             </p>
 
             <p>
               Status:
-              <b className="text-lime-400">
-                Active ✅
-              </b>
+              <b className="text-[var(--accent-soft)]"> Active</b>
             </p>
-
-
           </div>
 
-
           <Link
-          href="/success"
-          className="
-          inline-block
-          mt-8
-          bg-lime-400
-          text-black
-          px-8
-          py-3
-          rounded-xl
-          font-bold
-          "
+            href="/success"
+            className="
+              mt-8 inline-block rounded-xl bg-[var(--accent)]
+              px-8 py-3 font-bold text-[var(--accent-ink)]
+            "
           >
             View QR Code →
           </Link>
-
-
         </div>
-
-
       </section>
-
-
     </main>
   );
 }

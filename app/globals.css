@@ -1,8 +1,107 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --page-bg: #f4f7fb;
+  --page-bg-soft: #eef3f8;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --surface-3: #eef3f8;
+  --surface-elevated: #ffffff;
+  --border: #d7e0ea;
+  --border-strong: #c3cfdb;
+  --border-hover: #9aafc2;
+  --heading: #0b1f33;
+  --text: #334155;
+  --text-muted: #64748b;
+  --text-soft: #7b8ea3;
+  --accent: #6de000;
+  --accent-strong: #7cff00;
+  --accent-soft: #9fe870;
+  --accent-ink: #06120a;
+  --nav-bg: rgba(244, 247, 251, 0.88);
+  --hero-glow: rgba(109, 224, 0, 0.08);
+  --hero-panel: #ffffff;
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+  --danger-text: #991b1b;
+  --warning-bg: #fffbeb;
+  --warning-border: #fde68a;
+  --warning-text: #92400e;
+  --shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  --shadow-strong: 0 20px 50px rgba(15, 23, 42, 0.12);
+  --grid-line: rgba(148, 163, 184, 0.28);
+  --background: var(--page-bg);
+  --foreground: var(--heading);
+}
+
+html.dark {
+  --page-bg: #020817;
+  --page-bg-soft: #071827;
+  --surface: #0a2838;
+  --surface-2: #071e2e;
+  --surface-3: #082433;
+  --surface-elevated: #0a2838;
+  --border: #1a4a63;
+  --border-strong: #1e5470;
+  --border-hover: #2f6f90;
+  --heading: #ffffff;
+  --text: #c5d5e4;
+  --text-muted: #9db2c7;
+  --text-soft: #8aa0b5;
+  --accent: #6de000;
+  --accent-strong: #7cff00;
+  --accent-soft: #9fe870;
+  --accent-ink: #06120a;
+  --nav-bg: rgba(2, 8, 23, 0.8);
+  --hero-glow: rgba(124, 255, 0, 0.08);
+  --hero-panel: #0a2838;
+  --danger-bg: rgba(42, 16, 20, 0.9);
+  --danger-border: rgba(127, 29, 29, 0.7);
+  --danger-text: #fecaca;
+  --warning-bg: rgba(66, 48, 10, 0.4);
+  --warning-border: #a16207;
+  --warning-text: #fde68a;
+  --shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+  --shadow-strong: 0 20px 50px rgba(0, 0, 0, 0.35);
+  --grid-line: rgba(30, 74, 102, 0.22);
+  --background: var(--page-bg);
+  --foreground: var(--heading);
+}
+
+html.light {
+  --page-bg: #f4f7fb;
+  --page-bg-soft: #eef3f8;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --surface-3: #eef3f8;
+  --surface-elevated: #ffffff;
+  --border: #d7e0ea;
+  --border-strong: #c3cfdb;
+  --border-hover: #9aafc2;
+  --heading: #0b1f33;
+  --text: #334155;
+  --text-muted: #64748b;
+  --text-soft: #7b8ea3;
+  --accent: #6de000;
+  --accent-strong: #7cff00;
+  --accent-soft: #5bb800;
+  --accent-ink: #06120a;
+  --nav-bg: rgba(244, 247, 251, 0.88);
+  --hero-glow: rgba(109, 224, 0, 0.08);
+  --hero-panel: #ffffff;
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+  --danger-text: #991b1b;
+  --warning-bg: #fffbeb;
+  --warning-border: #fde68a;
+  --warning-text: #92400e;
+  --shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  --shadow-strong: 0 20px 50px rgba(15, 23, 42, 0.12);
+  --grid-line: rgba(148, 163, 184, 0.28);
+  --background: var(--page-bg);
+  --foreground: var(--heading);
 }
 
 @theme inline {
@@ -12,15 +111,51 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--page-bg);
+  color: var(--text);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.destinations-grid {
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%);
+}
+
+.theme-hero {
+  background:
+    radial-gradient(ellipse at top, var(--hero-glow) 0%, transparent 45%),
+    linear-gradient(180deg, var(--page-bg-soft) 0%, var(--page-bg) 100%);
+}
+
+.theme-cta {
+  background: linear-gradient(
+    135deg,
+    var(--surface) 0%,
+    var(--surface-2) 55%,
+    color-mix(in srgb, var(--accent-strong) 18%, var(--surface-2)) 100%
+  );
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
