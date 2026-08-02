@@ -1,30 +1,25 @@
 import { NextResponse } from "next/server";
 
-export async function GET(){
-
-  const res = await fetch(
-    `${process.env.VESIM_BASE_URL}/api/auth/broker/token`,
+/**
+ * Broker tokens must never be exposed to the browser.
+ * Server routes obtain tokens via app/lib/vesim/server.ts instead.
+ */
+export async function GET() {
+  return NextResponse.json(
     {
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        Accept:"application/json"
-      },
-      body:JSON.stringify({
-        email:process.env.VESIM_EMAIL,
-        password:process.env.VESIM_PASSWORD
-      }),
-      cache:"no-store"
-    }
+      success: false,
+      error: "Not found",
+    },
+    { status: 404 }
   );
+}
 
-
-  const data = await res.json();
-
-
-  console.log("NEW TOKEN RESPONSE:", data);
-
-
-  return NextResponse.json(data);
-
+export async function POST() {
+  return NextResponse.json(
+    {
+      success: false,
+      error: "Not found",
+    },
+    { status: 404 }
+  );
 }

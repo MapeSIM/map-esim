@@ -60,6 +60,7 @@ function SuccessContent() {
           throw new Error(data.error || data.message || "Failed to load order");
         }
 
+        // Prefer the sanitized `order` payload from /api/vesim/order-details.
         const payload =
           (data.order as Record<string, unknown> | undefined) ||
           (data.data as Record<string, unknown> | undefined) ||
@@ -68,17 +69,17 @@ function SuccessContent() {
         setOrder({
           orderId:
             (typeof payload.orderId === "string" && payload.orderId) ||
-            (typeof payload.id === "string" && payload.id) ||
             orderId,
           offerId:
             typeof payload.offerId === "string" ? payload.offerId : undefined,
           offerName:
             typeof payload.offerName === "string"
               ? payload.offerName
-              : typeof payload.name === "string"
-                ? payload.name
-                : undefined,
-          name: typeof payload.name === "string" ? payload.name : undefined,
+              : undefined,
+          name:
+            typeof payload.offerName === "string"
+              ? payload.offerName
+              : undefined,
           countryName:
             typeof payload.countryName === "string"
               ? payload.countryName
@@ -87,19 +88,9 @@ function SuccessContent() {
             typeof payload.dataFormatted === "string"
               ? payload.dataFormatted
               : undefined,
-          data:
-            typeof payload.data === "string" || typeof payload.data === "number"
-              ? payload.data
-              : undefined,
           durationDays:
-            firstNumber(payload.durationDays, payload.validity) ?? undefined,
-          priceUSD:
-            firstNumber(
-              payload.priceUSD,
-              payload.price,
-              payload.amount,
-              payload.total
-            ) ?? undefined,
+            firstNumber(payload.durationDays) ?? undefined,
+          priceUSD: firstNumber(payload.priceUSD) ?? undefined,
           status: typeof payload.status === "string" ? payload.status : undefined,
         });
       } catch (err: unknown) {

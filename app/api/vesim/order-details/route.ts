@@ -1,135 +1,123 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  getBrokerToken,
+  getVesimBaseUrl,
+  publicErrorMessage,
+  readJsonSafe,
+} from "@/app/lib/vesim/server";
 
-type ApiData = {
-  success?: boolean;
-  access_token?: string;
-  token_type?: string;
-  error?: string;
-  message?: string;
-  [key: string]: unknown;
-};
-
-function getEnv(name: string): string {
-  const value = process.env[name]?.trim();
-
-  if (!value) {
-    throw new Error(`${name} is missing in .env.local`);
+function firstString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
   }
-
-  return value;
+  return undefined;
 }
 
-async function readJson(response: Response): Promise<ApiData> {
-  const text = await response.text();
-
-  if (!text) {
-    return {};
+function firstNumber(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() !== "") {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
   }
+  return undefined;
+}
 
-  try {
-    return JSON.parse(text) as ApiData;
-  } catch {
-    return {
-      success: false,
-      error: "VeSIM returned an invalid JSON response",
-      raw: text.slice(0, 500),
-    };
-  }
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 export async function GET(req: NextRequest) {
   try {
-    const orderId = req.nextUrl.searchParams.get("orderId")?.trim();
+    const orderId = req.nextUrl.searchParams.get("orderId")?.trim() || "";
 
-    if (!orderId) {
+    if (!orderId || orderId.length > 120) {
       return NextResponse.json(
         {
           success: false,
           error: "Order ID is required",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
-    const baseUrl = getEnv("VESIM_BASE_URL").replace(/\/+$/, "");
-    const email = getEnv("VESIM_EMAIL");
-    const password = getEnv("VESIM_PASSWORD");
+    const token = await getBrokerToken();
+    const baseUrl = getVesimBaseUrl();
 
-    // Generate fresh broker token
-    const tokenResponse = await fetch(
-      `${baseUrl}/api/auth/broker/token`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
-        cache: "no-store",
-      }
-    );
-
-    const tokenData = await readJson(tokenResponse);
-
-    if (!tokenResponse.ok || !tokenData.access_token) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: tokenData.error || "VeSIM token generation failed",
-          message: tokenData.message,
-        },
-        {
-          status: tokenResponse.status || 401,
-        }
-      );
-    }
-
-    const tokenType =
-      typeof tokenData.token_type === "string"
-        ? tokenData.token_type
-        : "Bearer";
-
-    // Fetch single order details
     const orderResponse = await fetch(
       `${baseUrl}/api/broker/orders/${encodeURIComponent(orderId)}`,
       {
         method: "GET",
         headers: {
           Accept: "application/json",
-          Authorization: `${tokenType} ${tokenData.access_token}`,
+          Authorization: `${token.tokenType} ${token.accessToken}`,
         },
         cache: "no-store",
       }
     );
 
-    const orderData = await readJson(orderResponse);
+    const orderData = await readJsonSafe(orderResponse);
 
-    console.log("VeSIM order details status:", orderResponse.status);
+    if (!orderResponse.ok) {
+      console.error("VeSIM order details failed:", orderResponse.status);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unable to load order details",
+        },
+        { status: orderResponse.status >= 400 ? orderResponse.status : 502 }
+      );
+    }
 
-    return NextResponse.json(orderData, {
-      status: orderResponse.status,
+    const payload =
+      asRecord(orderData.order) ||
+      asRecord(orderData.data) ||
+      orderData;
+
+    const safeOrder = {
+      orderId:
+        firstString(payload.orderId, payload.id, orderId) || orderId,
+      offerId: firstString(payload.offerId, payload.offer_id),
+      offerName: firstString(
+        payload.offerName,
+        payload.name,
+        payload.planName
+      ),
+      countryName: firstString(payload.countryName, payload.country),
+      dataFormatted: firstString(
+        payload.dataFormatted,
+        payload.data,
+        payload.dataAllowance
+      ),
+      durationDays: firstNumber(payload.durationDays, payload.validity),
+      priceUSD: firstNumber(
+        payload.priceUSD,
+        payload.price,
+        payload.amount,
+        payload.total
+      ),
+      status: firstString(payload.status),
+    };
+
+    return NextResponse.json({
+      success: true,
+      order: safeOrder,
     });
   } catch (error: unknown) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Unexpected server error";
-
-    console.error("VeSIM order details error:", message);
+    console.error(
+      "VeSIM order details error:",
+      error instanceof Error ? error.message : error
+    );
 
     return NextResponse.json(
       {
         success: false,
-        error: message,
+        error: publicErrorMessage(error, "Unable to load order details"),
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }

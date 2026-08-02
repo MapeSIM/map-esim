@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCurrency } from "@/app/components/currency/CurrencyProvider";
+import { buildCheckoutHref } from "@/app/lib/plans/plan-utils";
 import type { VesimOffer } from "@/app/lib/vesim/offers";
 
 export default function EsimPage() {
@@ -78,7 +79,7 @@ export default function EsimPage() {
             </p>
 
             <Link
-              href={`/checkout?offerId=${encodeURIComponent(offer.id)}&country=US`}
+              href={buildCheckoutHref(offer, "US")}
               className="
                 mt-6 block rounded-xl bg-[var(--accent)] py-3
                 text-center font-bold text-[var(--accent-ink)]

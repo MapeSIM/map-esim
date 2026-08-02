@@ -42,17 +42,14 @@ export function buildCheckoutHref(
   offer: VesimOffer,
   destinationCode: string
 ): string {
-  // Price is intentionally omitted — checkout verifies the offer by offerId.
+  // Only pass lookup hints. Price/name/data/validity are never trusted from the URL.
   const params = new URLSearchParams({
     offerId: offer.id,
-    name: offer.name,
-    data: offer.dataFormatted,
-    validity:
-      offer.durationDays != null
-        ? `${offer.durationDays} ${offer.validityUnit || "Days"}`
-        : "",
-    country: destinationCode,
   });
+
+  if (destinationCode.trim()) {
+    params.set("country", destinationCode.trim());
+  }
 
   return `/checkout?${params.toString()}`;
 }
