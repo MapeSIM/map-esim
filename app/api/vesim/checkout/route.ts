@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  deliverOrderEmailAfterCheckout,
+  getStoredEmailDelivery,
+} from "@/app/lib/email/deliverAfterCheckout";
+import {
   beginIdempotentCheckout,
   completeIdempotentCheckout,
   extractOrderId,
@@ -78,10 +82,13 @@ export async function POST(req: NextRequest) {
     const idempotency = beginIdempotentCheckout(idempotencyKey);
     if (!idempotency.ok) {
       if (idempotency.orderId) {
+        const stored = getStoredEmailDelivery(idempotency.orderId);
         return NextResponse.json({
           success: true,
           orderId: idempotency.orderId,
           replayed: true,
+          emailDelivery: stored.emailDelivery || "already_sent",
+          customerEmail: stored.customerEmail || customerEmail,
         });
       }
 
@@ -179,10 +186,20 @@ export async function POST(req: NextRequest) {
 
     completeIdempotentCheckout(idempotencyKey, orderId);
 
+    // Email is best-effort and never fails the verified VeSIM order.
+    const emailResult = await deliverOrderEmailAfterCheckout({
+      orderId,
+      customerEmail,
+      verifiedOffer,
+      checkoutPayload: checkoutData,
+    });
+
     return NextResponse.json({
       success: true,
       orderId,
       offerId: verifiedOffer.offerId,
+      emailDelivery: emailResult.emailDelivery,
+      customerEmail: emailResult.customerEmail,
     });
   } catch (error: unknown) {
     failIdempotentCheckout(idempotencyKey);

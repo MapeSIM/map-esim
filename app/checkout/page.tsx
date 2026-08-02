@@ -21,6 +21,8 @@ type CheckoutResponse = {
   error?: string;
   message?: string;
   replayed?: boolean;
+  emailDelivery?: string;
+  customerEmail?: string;
 };
 
 function CheckoutContent() {
@@ -148,9 +150,19 @@ function CheckoutContent() {
       const data: CheckoutResponse = await response.json();
 
       if (response.ok && data.success && data.orderId) {
-        router.push(
-          `/success?orderId=${encodeURIComponent(data.orderId)}`
-        );
+        const params = new URLSearchParams({
+          orderId: data.orderId,
+        });
+        if (data.emailDelivery) {
+          params.set("emailDelivery", data.emailDelivery);
+        }
+        if (data.customerEmail || cleanEmail) {
+          params.set(
+            "customerEmail",
+            data.customerEmail || cleanEmail
+          );
+        }
+        router.push(`/success?${params.toString()}`);
         return;
       }
 

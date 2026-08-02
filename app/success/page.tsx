@@ -1,10 +1,19 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { CheckCircle2, Smartphone } from "lucide-react";
+import { CheckCircle2, Copy, Mail, Smartphone } from "lucide-react";
 import { useCurrency } from "@/app/components/currency/CurrencyProvider";
+
+type EmailDeliveryStatus =
+  | "sent"
+  | "not_configured"
+  | "skipped_no_install_details"
+  | "invalid_email"
+  | "already_sent"
+  | "failed"
+  | string;
 
 type OrderDetails = {
   orderId?: string;
@@ -16,9 +25,15 @@ type OrderDetails = {
   data?: string | number;
   durationDays?: number;
   priceUSD?: number;
-  price?: number;
-  amount?: number;
   status?: string;
+  iccid?: string;
+  smdpAddress?: string;
+  activationCode?: string;
+  qrValue?: string;
+  hasInstallDetails?: boolean;
+  manualInstallText?: string;
+  emailDelivery?: EmailDeliveryStatus;
+  customerEmail?: string;
 };
 
 function firstNumber(...values: unknown[]): number | null {
@@ -32,14 +47,73 @@ function firstNumber(...values: unknown[]): number | null {
   return null;
 }
 
+function emailStatusMessage(
+  status: EmailDeliveryStatus | undefined,
+  customerEmail: string | undefined
+): { title: string; body: string; tone: "ok" | "warn" | "muted" } {
+  switch (status) {
+    case "sent":
+      return {
+        title: "Email delivery: sent",
+        body: customerEmail
+          ? `Installation details sent to ${customerEmail}`
+          : "Installation details were emailed to the customer.",
+        tone: "ok",
+      };
+    case "already_sent":
+      return {
+        title: "Email delivery: already sent",
+        body: customerEmail
+          ? `Installation details were previously sent to ${customerEmail}`
+          : "Installation details were previously emailed for this order.",
+        tone: "ok",
+      };
+    case "not_configured":
+      return {
+        title: "Email delivery: not configured",
+        body: "Your order succeeded. Email delivery is not configured on the server yet, so installation details were not emailed. Use the copy button below if details are available, or contact support.",
+        tone: "warn",
+      };
+    case "skipped_no_install_details":
+      return {
+        title: "Email delivery: pending details",
+        body: "Your order succeeded, but installation details were not available yet to email. Please check again shortly or contact support.",
+        tone: "warn",
+      };
+    case "invalid_email":
+      return {
+        title: "Email delivery: invalid address",
+        body: "Your order succeeded, but the customer email could not be used for delivery. Contact support with your Order ID.",
+        tone: "warn",
+      };
+    case "failed":
+      return {
+        title: "Email delivery: failed",
+        body: "Your order succeeded, but the installation email could not be sent. Use the copy button below if details are available, or contact support.",
+        tone: "warn",
+      };
+    default:
+      return {
+        title: "Email delivery: status unavailable",
+        body: "Your order succeeded. If you do not receive an email, use the installation details on this page or contact support.",
+        tone: "muted",
+      };
+  }
+}
+
 function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId")?.trim() || "";
+  const queryEmailDelivery =
+    searchParams.get("emailDelivery")?.trim() || undefined;
+  const queryCustomerEmail =
+    searchParams.get("customerEmail")?.trim() || undefined;
   const { formatPrice } = useCurrency();
 
   const [order, setOrder] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     async function loadOrder() {
@@ -60,7 +134,6 @@ function SuccessContent() {
           throw new Error(data.error || data.message || "Failed to load order");
         }
 
-        // Prefer the sanitized `order` payload from /api/vesim/order-details.
         const payload =
           (data.order as Record<string, unknown> | undefined) ||
           (data.data as Record<string, unknown> | undefined) ||
@@ -88,22 +161,73 @@ function SuccessContent() {
             typeof payload.dataFormatted === "string"
               ? payload.dataFormatted
               : undefined,
-          durationDays:
-            firstNumber(payload.durationDays) ?? undefined,
+          durationDays: firstNumber(payload.durationDays) ?? undefined,
           priceUSD: firstNumber(payload.priceUSD) ?? undefined,
-          status: typeof payload.status === "string" ? payload.status : undefined,
+          status:
+            typeof payload.status === "string" ? payload.status : undefined,
+          iccid: typeof payload.iccid === "string" ? payload.iccid : undefined,
+          smdpAddress:
+            typeof payload.smdpAddress === "string"
+              ? payload.smdpAddress
+              : undefined,
+          activationCode:
+            typeof payload.activationCode === "string"
+              ? payload.activationCode
+              : undefined,
+          qrValue:
+            typeof payload.qrValue === "string" ? payload.qrValue : undefined,
+          hasInstallDetails: Boolean(payload.hasInstallDetails),
+          manualInstallText:
+            typeof payload.manualInstallText === "string"
+              ? payload.manualInstallText
+              : undefined,
+          emailDelivery:
+            (typeof payload.emailDelivery === "string" &&
+              payload.emailDelivery) ||
+            queryEmailDelivery,
+          customerEmail:
+            (typeof payload.customerEmail === "string" &&
+              payload.customerEmail) ||
+            queryCustomerEmail,
         });
       } catch (err: unknown) {
         setError(
           err instanceof Error ? err.message : "Failed to load order details"
         );
+        setOrder({
+          orderId,
+          emailDelivery: queryEmailDelivery,
+          customerEmail: queryCustomerEmail,
+        });
       } finally {
         setLoading(false);
       }
     }
 
     loadOrder();
-  }, [orderId]);
+  }, [orderId, queryCustomerEmail, queryEmailDelivery]);
+
+  const emailInfo = useMemo(
+    () =>
+      emailStatusMessage(
+        order?.emailDelivery || queryEmailDelivery,
+        order?.customerEmail || queryCustomerEmail
+      ),
+    [order?.customerEmail, order?.emailDelivery, queryCustomerEmail, queryEmailDelivery]
+  );
+
+  const canCopyInstall = Boolean(order?.manualInstallText);
+
+  async function copyInstallDetails() {
+    if (!order?.manualInstallText) return;
+    try {
+      await navigator.clipboard.writeText(order.manualInstallText);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -113,6 +237,13 @@ function SuccessContent() {
     );
   }
 
+  const toneClass =
+    emailInfo.tone === "ok"
+      ? "border-[var(--accent-strong)]/35 bg-[var(--accent-strong)]/10"
+      : emailInfo.tone === "warn"
+        ? "border-amber-400/30 bg-amber-400/10"
+        : "border-[var(--border)] bg-[var(--surface-2)]";
+
   return (
     <main className="min-h-screen bg-[var(--page-bg)] px-4 py-16 text-[var(--heading)] sm:px-6">
       <div className="mx-auto max-w-xl rounded-3xl border border-[var(--border-strong)] bg-[var(--surface)] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.35)]">
@@ -121,18 +252,26 @@ function SuccessContent() {
         </div>
 
         <h1 className="mt-5 text-center text-3xl font-bold">
-          {error ? "Order received" : "Purchase successful"}
+          Order successful
         </h1>
         <p className="mt-3 text-center text-sm text-[var(--text-muted)]">
-          {error
-            ? "Your order was created. Full details could not be loaded right now."
-            : "Your eSIM order has been created successfully."}
+          Your eSIM order has been created successfully.
         </p>
 
-        <div className="mt-8 space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 text-sm">
+        <div className={`mt-6 flex items-start gap-3 rounded-2xl border p-4 text-sm ${toneClass}`}>
+          <Mail className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-strong)]" />
+          <div>
+            <p className="font-semibold text-[var(--heading)]">{emailInfo.title}</p>
+            <p className="mt-1 text-[var(--text)]">{emailInfo.body}</p>
+          </div>
+        </div>
+
+        <div className="mt-6 space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 text-sm">
           <p>
             Order ID:{" "}
-            <b className="text-[var(--accent-strong)]">{order?.orderId || orderId || "—"}</b>
+            <b className="text-[var(--accent-strong)]">
+              {order?.orderId || orderId || "—"}
+            </b>
           </p>
           {(order?.offerName || order?.name) && (
             <p>
@@ -164,16 +303,32 @@ function SuccessContent() {
               Status: <b>{order.status}</b>
             </p>
           )}
+          {order?.iccid && (
+            <p>
+              ICCID: <b className="break-all">{order.iccid}</b>
+            </p>
+          )}
           {error && <p className="text-amber-200">{error}</p>}
         </div>
 
         <div className="mt-6 flex items-start gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm text-[var(--text)]">
           <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-strong)]" />
           <p>
-            Install your eSIM from the QR code or activation details associated
-            with this order.
+            Install your eSIM using the QR / LPA value or SM-DP+ details from
+            your email, or copy them below when available.
           </p>
         </div>
+
+        {canCopyInstall && (
+          <button
+            type="button"
+            onClick={copyInstallDetails}
+            className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--surface-2)] text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40"
+          >
+            <Copy className="h-4 w-4" />
+            {copied ? "Copied installation details" : "Copy manual installation details"}
+          </button>
+        )}
 
         <div className="mt-8 grid gap-3 sm:grid-cols-2">
           <Link

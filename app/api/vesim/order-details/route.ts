@@ -1,4 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getStoredEmailDelivery } from "@/app/lib/email/deliverAfterCheckout";
+import {
+  buildManualInstallText,
+  extractInstallDetails,
+  hasInstallDetails,
+} from "@/app/lib/email/extract";
 import {
   getBrokerToken,
   getVesimBaseUrl,
@@ -77,6 +83,9 @@ export async function GET(req: NextRequest) {
       asRecord(orderData.data) ||
       orderData;
 
+    const install = extractInstallDetails(orderData);
+    const emailMeta = getStoredEmailDelivery(orderId);
+
     const safeOrder = {
       orderId:
         firstString(payload.orderId, payload.id, orderId) || orderId,
@@ -100,6 +109,20 @@ export async function GET(req: NextRequest) {
         payload.total
       ),
       status: firstString(payload.status),
+      iccid: install.iccid,
+      smdpAddress: install.smdpAddress,
+      activationCode: install.activationCode,
+      qrValue: install.qrValue,
+      hasInstallDetails: hasInstallDetails(install),
+      manualInstallText: hasInstallDetails(install)
+        ? buildManualInstallText({
+            orderId:
+              firstString(payload.orderId, payload.id, orderId) || orderId,
+            ...install,
+          })
+        : undefined,
+      emailDelivery: emailMeta.emailDelivery,
+      customerEmail: emailMeta.customerEmail,
     };
 
     return NextResponse.json({
