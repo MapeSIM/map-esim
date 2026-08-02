@@ -1,5 +1,10 @@
-import type { VerifiedCheckoutOffer } from "@/app/lib/vesim/server";
+import {
+  extractOfficialActivationLinks,
+  getAndroidInstallGuideUrl,
+  getIphoneInstallGuideUrl,
+} from "@/app/lib/email/activation";
 import type { OrderEmailPayload } from "@/app/lib/email/types";
+import type { VerifiedCheckoutOffer } from "@/app/lib/vesim/server";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -71,6 +76,29 @@ function extractFromContainers(
   return undefined;
 }
 
+function isLpaString(value?: string): boolean {
+  return Boolean(value && /^LPA:1\$/i.test(value.trim()));
+}
+
+/** Provider QR image payloads (base64 / data-URI) must not be used as LPA text. */
+function isLikelyImagePayload(value?: string): boolean {
+  if (!value) return false;
+  const v = value.trim();
+  if (/^data:image\//i.test(v)) return true;
+  if (/^iVBOR|^\/9j\//.test(v)) return true;
+  if (v.length > 200 && !isLpaString(v)) return true;
+  return false;
+}
+
+function parseLpa(lpa: string): { smdp?: string; matchingId?: string } {
+  const parts = lpa.trim().split("$");
+  if (parts.length < 3) return {};
+  return {
+    smdp: parts[1]?.trim() || undefined,
+    matchingId: parts[2]?.trim() || undefined,
+  };
+}
+
 export function extractInstallDetails(orderPayload: JsonRecord): {
   iccid?: string;
   qrValue?: string;
@@ -84,33 +112,25 @@ export function extractInstallDetails(orderPayload: JsonRecord): {
     "ICCID",
     "iccId",
     "icc_id",
+    "esim_iccid",
+    "esimIccid",
   ]);
 
-  const smdpAddress = extractFromContainers(containers, [
+  let smdpAddress = extractFromContainers(containers, [
     "smdpAddress",
     "smDpAddress",
     "sm_dp_address",
     "smdp",
     "smDp+",
     "sm_dp",
+    "esim_smdp_address",
+    "esimSmdpAddress",
   ]);
 
-  // Prefer LPA / matching ID style values for QR installation.
-  const qrValue = extractFromContainers(containers, [
-    "qrCode",
-    "qr_code",
-    "qr",
-    "qrValue",
-    "lpa",
-    "lpaString",
-    "lpa_string",
-    "universalLink",
-    "appleInstallUrl",
-    "installationUrl",
-    "installUrl",
-  ]);
-
-  const activationCode = extractFromContainers(containers, [
+  // VeSIM staging often returns the full LPA in esim_activation_code.
+  const activationRaw = extractFromContainers(containers, [
+    "esim_activation_code",
+    "esimActivationCode",
     "activationCode",
     "activation_code",
     "matchingId",
@@ -119,8 +139,45 @@ export function extractInstallDetails(orderPayload: JsonRecord): {
     "confirmation_code",
   ]);
 
-  // If SM-DP+ and activation exist but no QR, build a standard LPA string.
-  let resolvedQr = qrValue;
+  const lpaCandidate = extractFromContainers(containers, [
+    "lpa",
+    "lpaString",
+    "lpa_string",
+    "esim_activation_code",
+    "esimActivationCode",
+  ]);
+
+  const qrRaw = extractFromContainers(containers, [
+    "qrCode",
+    "qr_code",
+    "qr",
+    "qrValue",
+    "esim_qr_code",
+    "esimQrCode",
+    "universalLink",
+    "appleInstallUrl",
+    "installationUrl",
+    "installUrl",
+  ]);
+
+  let resolvedQr: string | undefined;
+  if (isLpaString(lpaCandidate)) resolvedQr = lpaCandidate!.trim();
+  else if (isLpaString(activationRaw)) resolvedQr = activationRaw!.trim();
+  else if (isLpaString(qrRaw) && !isLikelyImagePayload(qrRaw)) {
+    resolvedQr = qrRaw!.trim();
+  }
+
+  const parsed = resolvedQr ? parseLpa(resolvedQr) : {};
+  if (!smdpAddress && parsed.smdp) smdpAddress = parsed.smdp;
+
+  // Manual activation / matching ID (not the full LPA string, not image payloads).
+  let activationCode: string | undefined;
+  if (activationRaw && !isLpaString(activationRaw) && !isLikelyImagePayload(activationRaw)) {
+    activationCode = activationRaw;
+  } else if (parsed.matchingId) {
+    activationCode = parsed.matchingId;
+  }
+
   if (!resolvedQr && smdpAddress && activationCode) {
     resolvedQr = `LPA:1$${smdpAddress}$${activationCode}`;
   }
@@ -152,6 +209,7 @@ export function buildOrderEmailPayload(options: {
   orderId: string;
   verifiedOffer: VerifiedCheckoutOffer;
   orderPayload: JsonRecord;
+  orderAccessUrl?: string;
 }): OrderEmailPayload | null {
   const install = extractInstallDetails(options.orderPayload);
   if (!hasInstallDetails(install)) {
@@ -175,6 +233,8 @@ export function buildOrderEmailPayload(options: {
           dig(asRecord(options.orderPayload.order), "durationDays", "validity")
         ) || "—";
 
+  const officialLinks = extractOfficialActivationLinks(options.orderPayload);
+
   return {
     customerEmail: options.customerEmail.trim(),
     orderId: options.orderId.trim(),
@@ -186,6 +246,11 @@ export function buildOrderEmailPayload(options: {
     qrValue: install.qrValue,
     smdpAddress: install.smdpAddress,
     activationCode: install.activationCode,
+    iphoneActivationUrl: officialLinks.iphoneActivationUrl,
+    androidActivationUrl: officialLinks.androidActivationUrl,
+    androidGuideUrl: getAndroidInstallGuideUrl(),
+    iphoneGuideUrl: getIphoneInstallGuideUrl(),
+    orderAccessUrl: options.orderAccessUrl?.trim() || undefined,
   };
 }
 
@@ -207,7 +272,7 @@ export function buildManualInstallText(payload: {
     "Manual install (iOS): Settings → Mobile Service → Add eSIM → Use QR Code or Enter Details Manually.",
     "Manual install (Android): Settings → Network & internet → SIMs → Add eSIM → Scan QR or enter SM-DP+ details.",
     "",
-    "Support: admin@mapesim.com",
+    "Support: support@mapesim.com",
   ];
 
   return lines.filter((line, index, arr) => line !== "" || arr[index - 1] !== "").join("\n");

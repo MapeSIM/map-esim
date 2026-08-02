@@ -3,6 +3,7 @@ import {
   deliverOrderEmailAfterCheckout,
   getStoredEmailDelivery,
 } from "@/app/lib/email/deliverAfterCheckout";
+import { createOrderAccessToken } from "@/app/lib/vesim/orderAccess";
 import {
   beginIdempotentCheckout,
   completeIdempotentCheckout,
@@ -83,9 +84,20 @@ export async function POST(req: NextRequest) {
     if (!idempotency.ok) {
       if (idempotency.orderId) {
         const stored = getStoredEmailDelivery(idempotency.orderId);
+        const accessToken = createOrderAccessToken(idempotency.orderId);
+        if (!accessToken) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: "Unable to authorize order access. Please contact support.",
+            },
+            { status: 500 }
+          );
+        }
         return NextResponse.json({
           success: true,
           orderId: idempotency.orderId,
+          accessToken,
           replayed: true,
           emailDelivery: stored.emailDelivery || "already_sent",
           customerEmail: stored.customerEmail || customerEmail,
@@ -186,17 +198,34 @@ export async function POST(req: NextRequest) {
 
     completeIdempotentCheckout(idempotencyKey, orderId);
 
+    const accessToken = createOrderAccessToken(orderId);
+    if (!accessToken) {
+      // Order already exists at VeSIM — do not fail the purchase, but install
+      // APIs require a token so surface a clear server configuration error.
+      console.error("Order access token mint failed after checkout");
+      return NextResponse.json({
+        success: true,
+        orderId,
+        offerId: verifiedOffer.offerId,
+        emailDelivery: "failed",
+        customerEmail,
+        error: "Order created, but secure access could not be authorized.",
+      });
+    }
+
     // Email is best-effort and never fails the verified VeSIM order.
     const emailResult = await deliverOrderEmailAfterCheckout({
       orderId,
       customerEmail,
       verifiedOffer,
       checkoutPayload: checkoutData,
+      accessToken,
     });
 
     return NextResponse.json({
       success: true,
       orderId,
+      accessToken,
       offerId: verifiedOffer.offerId,
       emailDelivery: emailResult.emailDelivery,
       customerEmail: emailResult.customerEmail,

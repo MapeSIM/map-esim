@@ -5,6 +5,8 @@ import {
   extractInstallDetails,
   hasInstallDetails,
 } from "@/app/lib/email/extract";
+import { buildSafeInstallActions } from "@/app/lib/vesim/installActions";
+import { authorizeOrderAccess } from "@/app/lib/vesim/orderAccess";
 import {
   getBrokerToken,
   getVesimBaseUrl,
@@ -38,17 +40,25 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 export async function GET(req: NextRequest) {
   try {
-    const orderId = req.nextUrl.searchParams.get("orderId")?.trim() || "";
-
-    if (!orderId || orderId.length > 120) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Order ID is required",
-        },
-        { status: 400 }
-      );
+    for (const banned of [
+      "lpa",
+      "qrValue",
+      "activationCode",
+      "carddata",
+      "smdp",
+    ]) {
+      if (req.nextUrl.searchParams.has(banned)) {
+        return NextResponse.json(
+          { success: false, error: "Not found" },
+          { status: 404 }
+        );
+      }
     }
+
+    const auth = authorizeOrderAccess(req);
+    if (!auth.ok) return auth.response;
+
+    const { orderId, accessToken } = auth;
 
     const token = await getBrokerToken();
     const baseUrl = getVesimBaseUrl();
@@ -70,11 +80,8 @@ export async function GET(req: NextRequest) {
     if (!orderResponse.ok) {
       console.error("VeSIM order details failed:", orderResponse.status);
       return NextResponse.json(
-        {
-          success: false,
-          error: "Unable to load order details",
-        },
-        { status: orderResponse.status >= 400 ? orderResponse.status : 502 }
+        { success: false, error: "Not found" },
+        { status: 404 }
       );
     }
 
@@ -85,10 +92,16 @@ export async function GET(req: NextRequest) {
 
     const install = extractInstallDetails(orderData);
     const emailMeta = getStoredEmailDelivery(orderId);
+    const resolvedOrderId =
+      firstString(payload.orderId, payload.id, orderId) || orderId;
+    const installActions = buildSafeInstallActions(
+      resolvedOrderId,
+      orderData,
+      accessToken
+    );
 
     const safeOrder = {
-      orderId:
-        firstString(payload.orderId, payload.id, orderId) || orderId,
+      orderId: resolvedOrderId,
       offerId: firstString(payload.offerId, payload.offer_id),
       offerName: firstString(
         payload.offerName,
@@ -114,10 +127,11 @@ export async function GET(req: NextRequest) {
       activationCode: install.activationCode,
       qrValue: install.qrValue,
       hasInstallDetails: hasInstallDetails(install),
+      hasVerifiedLpa: installActions.hasVerifiedLpa,
+      installActions,
       manualInstallText: hasInstallDetails(install)
         ? buildManualInstallText({
-            orderId:
-              firstString(payload.orderId, payload.id, orderId) || orderId,
+            orderId: resolvedOrderId,
             ...install,
           })
         : undefined,
@@ -125,14 +139,21 @@ export async function GET(req: NextRequest) {
       customerEmail: emailMeta.customerEmail,
     };
 
-    return NextResponse.json({
-      success: true,
-      order: safeOrder,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        order: safeOrder,
+      },
+      {
+        headers: {
+          "Cache-Control": "private, no-store",
+        },
+      }
+    );
   } catch (error: unknown) {
     console.error(
       "VeSIM order details error:",
-      error instanceof Error ? error.message : error
+      error instanceof Error ? error.message : "unknown_error"
     );
 
     return NextResponse.json(

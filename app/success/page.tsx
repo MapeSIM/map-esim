@@ -3,8 +3,9 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { CheckCircle2, Copy, Mail, Smartphone } from "lucide-react";
+import { CheckCircle2, Mail } from "lucide-react";
 import { useCurrency } from "@/app/components/currency/CurrencyProvider";
+import OrderInstallActions from "@/app/components/install/OrderInstallActions";
 
 type EmailDeliveryStatus =
   | "sent"
@@ -14,6 +15,19 @@ type EmailDeliveryStatus =
   | "already_sent"
   | "failed"
   | string;
+
+type InstallActions = {
+  hasInstallDetails?: boolean;
+  hasVerifiedLpa?: boolean;
+  hasOfficialIphoneActivationUrl?: boolean;
+  hasOfficialAndroidActivationUrl?: boolean;
+  iphoneInstallHref?: string;
+  iphoneGuideHref?: string;
+  qrDownloadHref?: string;
+  qrViewHref?: string;
+  androidGuideHref?: string;
+  androidActivationUrl?: string;
+};
 
 type OrderDetails = {
   orderId?: string;
@@ -31,6 +45,8 @@ type OrderDetails = {
   activationCode?: string;
   qrValue?: string;
   hasInstallDetails?: boolean;
+  hasVerifiedLpa?: boolean;
+  installActions?: InstallActions;
   manualInstallText?: string;
   emailDelivery?: EmailDeliveryStatus;
   customerEmail?: string;
@@ -71,7 +87,7 @@ function emailStatusMessage(
     case "not_configured":
       return {
         title: "Email delivery: not configured",
-        body: "Your order succeeded. Email delivery is not configured on the server yet, so installation details were not emailed. Use the copy button below if details are available, or contact support.",
+        body: "Your order succeeded. Email delivery is not configured on the server yet, so installation details were not emailed. Use the installation actions below if details are available, or contact support.",
         tone: "warn",
       };
     case "skipped_no_install_details":
@@ -89,7 +105,7 @@ function emailStatusMessage(
     case "failed":
       return {
         title: "Email delivery: failed",
-        body: "Your order succeeded, but the installation email could not be sent. Use the copy button below if details are available, or contact support.",
+        body: "Your order succeeded, but the installation email could not be sent. Use the installation actions below if details are available, or contact support.",
         tone: "warn",
       };
     default:
@@ -104,6 +120,7 @@ function emailStatusMessage(
 function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId")?.trim() || "";
+  const accessToken = searchParams.get("access")?.trim() || "";
   const queryEmailDelivery =
     searchParams.get("emailDelivery")?.trim() || undefined;
   const queryCustomerEmail =
@@ -113,19 +130,27 @@ function SuccessContent() {
   const [order, setOrder] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     async function loadOrder() {
-      if (!orderId) {
-        setError("Order ID is missing");
+      if (!accessToken) {
+        setError(
+          "Secure order access is missing. Open the link from your checkout confirmation or order email."
+        );
+        setOrder({
+          orderId: orderId || undefined,
+          emailDelivery: queryEmailDelivery,
+          customerEmail: queryCustomerEmail,
+        });
         setLoading(false);
         return;
       }
 
       try {
+        const params = new URLSearchParams({ access: accessToken });
+        if (orderId) params.set("orderId", orderId);
         const response = await fetch(
-          `/api/vesim/order-details?orderId=${encodeURIComponent(orderId)}`,
+          `/api/vesim/order-details?${params.toString()}`,
           { cache: "no-store" }
         );
         const data = await response.json();
@@ -138,6 +163,13 @@ function SuccessContent() {
           (data.order as Record<string, unknown> | undefined) ||
           (data.data as Record<string, unknown> | undefined) ||
           (data as Record<string, unknown>);
+
+        const actions =
+          payload.installActions &&
+          typeof payload.installActions === "object" &&
+          !Array.isArray(payload.installActions)
+            ? (payload.installActions as InstallActions)
+            : undefined;
 
         setOrder({
           orderId:
@@ -177,6 +209,8 @@ function SuccessContent() {
           qrValue:
             typeof payload.qrValue === "string" ? payload.qrValue : undefined,
           hasInstallDetails: Boolean(payload.hasInstallDetails),
+          hasVerifiedLpa: Boolean(payload.hasVerifiedLpa),
+          installActions: actions,
           manualInstallText:
             typeof payload.manualInstallText === "string"
               ? payload.manualInstallText
@@ -205,7 +239,7 @@ function SuccessContent() {
     }
 
     loadOrder();
-  }, [orderId, queryCustomerEmail, queryEmailDelivery]);
+  }, [accessToken, orderId, queryCustomerEmail, queryEmailDelivery]);
 
   const emailInfo = useMemo(
     () =>
@@ -215,19 +249,6 @@ function SuccessContent() {
       ),
     [order?.customerEmail, order?.emailDelivery, queryCustomerEmail, queryEmailDelivery]
   );
-
-  const canCopyInstall = Boolean(order?.manualInstallText);
-
-  async function copyInstallDetails() {
-    if (!order?.manualInstallText) return;
-    try {
-      await navigator.clipboard.writeText(order.manualInstallText);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
-    }
-  }
 
   if (loading) {
     return (
@@ -243,6 +264,8 @@ function SuccessContent() {
       : emailInfo.tone === "warn"
         ? "border-amber-400/30 bg-amber-400/10"
         : "border-[var(--border)] bg-[var(--surface-2)]";
+
+  const actions = order?.installActions;
 
   return (
     <main className="min-h-screen bg-[var(--page-bg)] px-4 py-16 text-[var(--heading)] sm:px-6">
@@ -303,32 +326,27 @@ function SuccessContent() {
               Status: <b>{order.status}</b>
             </p>
           )}
-          {order?.iccid && (
-            <p>
-              ICCID: <b className="break-all">{order.iccid}</b>
-            </p>
-          )}
           {error && <p className="text-amber-200">{error}</p>}
         </div>
 
-        <div className="mt-6 flex items-start gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm text-[var(--text)]">
-          <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-strong)]" />
-          <p>
-            Install your eSIM using the QR / LPA value or SM-DP+ details from
-            your email, or copy them below when available.
-          </p>
-        </div>
-
-        {canCopyInstall && (
-          <button
-            type="button"
-            onClick={copyInstallDetails}
-            className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--surface-2)] text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40"
-          >
-            <Copy className="h-4 w-4" />
-            {copied ? "Copied installation details" : "Copy manual installation details"}
-          </button>
-        )}
+        <OrderInstallActions
+          hasInstallDetails={order?.hasInstallDetails}
+          hasVerifiedLpa={order?.hasVerifiedLpa || actions?.hasVerifiedLpa}
+          hasOfficialIphoneActivationUrl={
+            actions?.hasOfficialIphoneActivationUrl
+          }
+          iphoneInstallHref={actions?.iphoneInstallHref}
+          iphoneGuideHref={actions?.iphoneGuideHref || "/install/iphone"}
+          qrDownloadHref={actions?.qrDownloadHref}
+          qrViewHref={actions?.qrViewHref}
+          androidGuideHref={actions?.androidGuideHref || "/install/android"}
+          androidActivationUrl={actions?.androidActivationUrl}
+          manualInstallText={order?.manualInstallText}
+          smdpAddress={order?.smdpAddress}
+          activationCode={order?.activationCode}
+          qrValue={order?.qrValue}
+          iccid={order?.iccid}
+        />
 
         <div className="mt-8 grid gap-3 sm:grid-cols-2">
           <Link

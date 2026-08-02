@@ -7,6 +7,7 @@ import {
   releaseEmailSendClaim,
   wasEmailAlreadySent,
 } from "@/app/lib/email/deliveryStore";
+import { buildDownloadableQrFilename } from "@/app/lib/email/format";
 import {
   ESIM_QR_CID,
   generateEsimQrPngBuffer,
@@ -21,6 +22,8 @@ import type {
   SendOrderEmailResult,
 } from "@/app/lib/email/types";
 import { isValidEmail } from "@/app/lib/vesim/server";
+
+const INLINE_QR_FILENAME = "map-esim-qr-inline.png";
 
 /**
  * Sends a branded MAP-eSIM order email.
@@ -84,20 +87,31 @@ export async function sendOrderEmail(
     const attachments = qrPng
       ? [
           {
-            filename: "esim-qr.png",
+            filename: INLINE_QR_FILENAME,
             content: qrPng,
             contentType: "image/png",
             cid: ESIM_QR_CID,
             contentDisposition: "inline" as const,
           },
+          {
+            filename: buildDownloadableQrFilename(
+              payload.destination,
+              orderId
+            ),
+            content: qrPng,
+            contentType: "image/png",
+            contentDisposition: "attachment" as const,
+          },
         ]
       : undefined;
+
+    const destinationLabel = payload.destination.trim() || "eSIM";
 
     await transporter.sendMail({
       from: config.from,
       to: customerEmail,
-      subject: `MAP-eSIM order confirmed — ${orderId}`,
-      text: renderOrderEmailText(payload),
+      subject: `Your eSIM is Ready! — ${destinationLabel} | MAP-eSIM`,
+      text: renderOrderEmailText(payload, { hasQrAttachment: Boolean(qrPng) }),
       html: renderOrderEmailHtml(payload, {
         qrImageSrc: qrPng ? `cid:${ESIM_QR_CID}` : undefined,
       }),

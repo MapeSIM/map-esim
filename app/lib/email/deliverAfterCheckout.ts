@@ -11,6 +11,7 @@ import {
 import { getEmailConfig } from "@/app/lib/email/config";
 import { sendOrderEmail } from "@/app/lib/email/sendOrderEmail";
 import type { EmailDeliveryStatus } from "@/app/lib/email/types";
+import { getOrderAccessSuccessUrl } from "@/app/lib/vesim/orderAccess";
 import {
   getBrokerToken,
   getVesimBaseUrl,
@@ -62,12 +63,15 @@ export async function deliverOrderEmailAfterCheckout(options: {
   verifiedOffer: VerifiedCheckoutOffer;
   /** Optional checkout response body — may already include install fields. */
   checkoutPayload?: JsonRecord;
+  /** Server-minted opaque order access token for authorized website links. */
+  accessToken?: string;
 }): Promise<{
   emailDelivery: EmailDeliveryStatus;
   customerEmail: string;
 }> {
   const orderId = options.orderId.trim();
   const customerEmail = options.customerEmail.trim();
+  const accessToken = options.accessToken?.trim() || "";
 
   if (!orderId) {
     return { emailDelivery: "failed", customerEmail };
@@ -104,6 +108,9 @@ export async function deliverOrderEmailAfterCheckout(options: {
     orderId,
     verifiedOffer: options.verifiedOffer,
     orderPayload,
+    orderAccessUrl: accessToken
+      ? getOrderAccessSuccessUrl(orderId, accessToken)
+      : undefined,
   });
 
   if (!emailPayload) {

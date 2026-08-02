@@ -18,6 +18,7 @@ type VerifiedOffer = {
 type CheckoutResponse = {
   success?: boolean;
   orderId?: string;
+  accessToken?: string;
   error?: string;
   message?: string;
   replayed?: boolean;
@@ -149,9 +150,10 @@ function CheckoutContent() {
 
       const data: CheckoutResponse = await response.json();
 
-      if (response.ok && data.success && data.orderId) {
+      if (response.ok && data.success && data.orderId && data.accessToken) {
         const params = new URLSearchParams({
           orderId: data.orderId,
+          access: data.accessToken,
         });
         if (data.emailDelivery) {
           params.set("emailDelivery", data.emailDelivery);
@@ -163,6 +165,14 @@ function CheckoutContent() {
           );
         }
         router.push(`/success?${params.toString()}`);
+        return;
+      }
+
+      if (response.ok && data.success && data.orderId && !data.accessToken) {
+        setMessage(
+          data.error ||
+            "Order created, but secure access could not be authorized. Contact support with your Order ID."
+        );
         return;
       }
 

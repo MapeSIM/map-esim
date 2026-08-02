@@ -17,6 +17,25 @@ export type OrderEmailPayload = {
   qrValue?: string;
   smdpAddress?: string;
   activationCode?: string;
+  /**
+   * Exact official provider iPhone activation URL (validated server-side).
+   * Never invent from LPA for email buttons.
+   */
+  iphoneActivationUrl?: string;
+  /**
+   * Exact official provider Android activation URL (validated server-side).
+   * Omit when VeSIM does not supply one.
+   */
+  androidActivationUrl?: string;
+  /** Absolute URL to the MAP-eSIM Android installation guide. */
+  androidGuideUrl?: string;
+  /** Absolute URL to the MAP-eSIM iPhone installation guide. */
+  iphoneGuideUrl?: string;
+  /**
+   * Opaque authorized success-page URL (includes signed access token only).
+   * Never includes LPA / ICCID / activation secrets.
+   */
+  orderAccessUrl?: string;
 };
 
 export type SendOrderEmailResult = {
