@@ -13,19 +13,19 @@ export default function IphoneInstallGuidePage() {
           iPhone eSIM installation guide
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
-          Use the verified QR code or manual SM-DP+ details from your MAP-eSIM
+          Use the verified QR code or manual SM-DP+ details from your MAP eSIM
           order email or success page. A one-tap Install on iPhone button appears
           only when your order includes an official carrier activation link.
         </p>
 
         <ol className="mt-8 list-decimal space-y-4 pl-5 text-sm leading-relaxed text-[var(--text)]">
           <li>
-            Download or save the MAP-eSIM QR PNG from your order email attachment
+            Download or save the MAP eSIM QR PNG from your order email attachment
             or the success page download button.
           </li>
           <li>
-            Open <strong>Settings → Cellular</strong> (or{" "}
-            <strong>Mobile Service</strong>) → <strong>Add eSIM</strong>.
+            Open <strong>Settings â†’ Cellular</strong> (or{" "}
+            <strong>Mobile Service</strong>) â†’ <strong>Add eSIM</strong>.
           </li>
           <li>
             Choose <strong>Use QR Code</strong>. Scan the saved image from another
@@ -33,7 +33,7 @@ export default function IphoneInstallGuidePage() {
           </li>
           <li>
             On iOS 17.4 or later, you can also press and hold the QR code in Mail
-            or Safari and select <strong>Add eSIM</strong>, then follow Apple’s
+            or Safari and select <strong>Add eSIM</strong>, then follow Appleâ€™s
             Allow / Continue confirmation.
           </li>
           <li>

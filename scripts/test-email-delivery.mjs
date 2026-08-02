@@ -20,10 +20,20 @@ async function main() {
   for (const key of [
     "EMAIL_PROVIDER",
     "EMAIL_FROM",
+    "EMAIL_REPLY_TO",
     "SMTP_HOST",
     "SMTP_PORT",
+    "SMTP_SECURE",
     "SMTP_USER",
     "SMTP_PASSWORD",
+    "SMTP_SECURITY_USER",
+    "SMTP_SECURITY_PASSWORD",
+    "SMTP_ORDERS_USER",
+    "SMTP_ORDERS_PASSWORD",
+    "SMTP_BILLING_USER",
+    "SMTP_BILLING_PASSWORD",
+    "SMTP_SUPPORT_USER",
+    "SMTP_SUPPORT_PASSWORD",
   ]) {
     delete process.env[key];
   }
@@ -52,8 +62,8 @@ async function main() {
   } = await loadTs("app/lib/email/qr.ts");
 
   console.log("1) Email provider unavailable / not configured");
-  assert.equal(isEmailConfigured(), false);
-  assert.equal(getEmailConfig().configured, false);
+  assert.equal(isEmailConfigured("orders"), false);
+  assert.equal(getEmailConfig("orders").configured, false);
   const notConfigured = await sendOrderEmail({
     customerEmail: "customer@example.com",
     orderId: "TEST-ORDER-NC-1",
@@ -161,8 +171,10 @@ async function main() {
     activationCode: undefined,
   });
   assert.equal(htmlNoQr.includes("Scan to install your eSIM"), false);
-  assert.equal(htmlNoQr.includes("<img"), false);
-  console.log("   ok -> PNG QR + CID template; no broken QR without value");
+  assert.equal(htmlNoQr.includes("cid:mapesim-esim-qr@mapesim.com"), false);
+  // Brand logo footer may still include an <img>; QR CID must stay absent.
+  assert.equal(htmlNoQr.includes("cid:mapesim-brand-logo@mapesim.com"), true);
+  console.log("   ok -> PNG QR + CID template; logo footer without QR CID");
 
   // Prove install extraction works for common VeSIM-like shapes.
   const install = extractInstallDetails({

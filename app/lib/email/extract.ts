@@ -223,7 +223,7 @@ export function buildOrderEmailPayload(options: {
       dig(options.orderPayload, "countryName", "country"),
       dig(asRecord(options.orderPayload.order), "countryName", "country")
     ) ||
-    "—";
+    "â€”";
 
   const validity =
     options.verifiedOffer.durationDays != null
@@ -231,7 +231,7 @@ export function buildOrderEmailPayload(options: {
       : firstString(
           dig(options.orderPayload, "durationDays", "validity"),
           dig(asRecord(options.orderPayload.order), "durationDays", "validity")
-        ) || "—";
+        ) || "â€”";
 
   const officialLinks = extractOfficialActivationLinks(options.orderPayload);
 
@@ -240,7 +240,7 @@ export function buildOrderEmailPayload(options: {
     orderId: options.orderId.trim(),
     destination,
     planName: options.verifiedOffer.name,
-    dataAllowance: options.verifiedOffer.dataFormatted || "—",
+    dataAllowance: options.verifiedOffer.dataFormatted || "â€”",
     validity,
     iccid: install.iccid,
     qrValue: install.qrValue,
@@ -262,15 +262,15 @@ export function buildManualInstallText(payload: {
   activationCode?: string;
 }): string {
   const lines = [
-    "MAP-eSIM installation details",
+    "MAP eSIM installation details",
     payload.orderId ? `Order ID: ${payload.orderId}` : "",
     payload.iccid ? `ICCID: ${payload.iccid}` : "",
     payload.smdpAddress ? `SM-DP+ Address: ${payload.smdpAddress}` : "",
     payload.activationCode ? `Activation Code: ${payload.activationCode}` : "",
     payload.qrValue ? `QR / LPA: ${payload.qrValue}` : "",
     "",
-    "Manual install (iOS): Settings → Mobile Service → Add eSIM → Use QR Code or Enter Details Manually.",
-    "Manual install (Android): Settings → Network & internet → SIMs → Add eSIM → Scan QR or enter SM-DP+ details.",
+    "Manual install (iOS): Settings â†’ Mobile Service â†’ Add eSIM â†’ Use QR Code or Enter Details Manually.",
+    "Manual install (Android): Settings â†’ Network & internet â†’ SIMs â†’ Add eSIM â†’ Scan QR or enter SM-DP+ details.",
     "",
     "Support: support@mapesim.com",
   ];

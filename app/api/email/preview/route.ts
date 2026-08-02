@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
 
   const html = renderOrderEmailHtml(sample, {
     qrImageSrc: qrImageSrc || undefined,
+    logoImageSrc: "/brand/map-esim-logo.png",
   });
 
   const attachmentNote = qrImageSrc

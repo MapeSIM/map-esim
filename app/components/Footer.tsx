@@ -1,5 +1,12 @@
+import Image from "next/image";
 import Link from "next/link";
-import { CreditCard, Globe } from "lucide-react";
+import { CreditCard } from "lucide-react";
+import {
+  BRAND_LOGO_ALT,
+  BRAND_LOGO_PUBLIC_PATH,
+  BRAND_NAME,
+  BRAND_TAGLINE,
+} from "@/app/lib/brand";
 
 const columns = [
   {
@@ -35,13 +42,18 @@ export default function Footer() {
       <div className="mx-auto grid max-w-[1200px] gap-10 px-4 py-14 sm:px-6 md:grid-cols-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] text-[var(--accent-soft)]">
-              <Globe className="h-[18px] w-[18px]" />
-            </span>
-            <span className="text-xl font-semibold tracking-tight">
-              MAP-eSIM
-            </span>
+            <Image
+              src={BRAND_LOGO_PUBLIC_PATH}
+              alt={BRAND_LOGO_ALT}
+              width={160}
+              height={40}
+              className="h-9 w-auto max-w-[160px] object-contain"
+            />
           </div>
+          <p className="mt-2 text-sm font-semibold text-[var(--heading)]">
+            {BRAND_NAME}
+          </p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">{BRAND_TAGLINE}</p>
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-[var(--text-muted)]">
             Travel eSIM plans with clear destination browsing, verified offer
             checkout, and multi-currency price display.
@@ -71,7 +83,7 @@ export default function Footer() {
 
       <div className="border-t border-[var(--border)]">
         <div className="mx-auto flex max-w-[1200px] flex-col gap-3 px-4 py-5 text-sm text-[var(--text-soft)] sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <p>© 2026 MAP-eSIM. All rights reserved.</p>
+          <p>© 2026 {BRAND_NAME}. All rights reserved.</p>
           <p className="inline-flex items-center gap-2">
             <CreditCard className="h-4 w-4 text-[var(--accent-strong)]" />
             Visa · Mastercard

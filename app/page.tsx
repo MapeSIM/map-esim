@@ -65,7 +65,7 @@ const faqs = [
   {
     question: "How do I know if my phone supports eSIM?",
     answer:
-      "Check your phone settings for an eSIM or cellular plan option, or confirm with your device manufacturer. MAP-eSIM plans require an eSIM-capable unlocked device.",
+      "Check your phone settings for an eSIM or cellular plan option, or confirm with your device manufacturer. MAP eSIM plans require an eSIM-capable unlocked device.",
   },
   {
     question: "Can I buy a plan before I travel?",
@@ -107,14 +107,14 @@ export default function Home() {
         <div className="mx-auto grid max-w-[1200px] items-center gap-10 px-4 py-14 sm:px-6 lg:grid-cols-2 lg:gap-14 lg:py-20">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
-              MAP-eSIM travel connectivity
+              MAP eSIM travel connectivity
             </p>
             <h1 className="mt-4 text-4xl font-bold tracking-tight text-[var(--heading)] sm:text-5xl lg:text-[3.4rem] lg:leading-[1.08]">
               Stay connected abroad with travel eSIM plans
             </h1>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-[var(--text-muted)] sm:text-lg">
               Browse destination plans, compare data options, and checkout with
-              verified offer pricing — built for clear travel connectivity.
+              verified offer pricing â€” built for clear travel connectivity.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -274,8 +274,8 @@ export default function Home() {
               Compatible devices
             </h2>
             <p className="mt-4 max-w-xl text-[var(--text-muted)]">
-              MAP-eSIM plans require an unlocked phone that supports eSIM. We
-              do not list unverified model claims — check your device settings
+              MAP eSIM plans require an unlocked phone that supports eSIM. We
+              do not list unverified model claims â€” check your device settings
               or manufacturer documentation before purchase.
             </p>
             <ul className="mt-6 space-y-3 text-sm text-[var(--text)]">
@@ -298,7 +298,7 @@ export default function Home() {
               Quick compatibility check
             </h3>
             <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
-              Open your phone settings, search for “eSIM”, and verify that your
+              Open your phone settings, search for â€œeSIMâ€, and verify that your
               device can add a cellular plan digitally. If that option is
               missing, a physical SIM may still be required.
             </p>

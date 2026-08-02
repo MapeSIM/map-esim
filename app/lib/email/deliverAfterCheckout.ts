@@ -8,7 +8,7 @@ import {
   markEmailDelivery,
   wasEmailAlreadySent,
 } from "@/app/lib/email/deliveryStore";
-import { getEmailConfig } from "@/app/lib/email/config";
+import { isEmailConfigured } from "@/app/lib/email/config";
 import { sendOrderEmail } from "@/app/lib/email/sendOrderEmail";
 import type { EmailDeliveryStatus } from "@/app/lib/email/types";
 import { getOrderAccessSuccessUrl } from "@/app/lib/vesim/orderAccess";
@@ -87,8 +87,7 @@ export async function deliverOrderEmailAfterCheckout(options: {
     return { emailDelivery: "invalid_email", customerEmail };
   }
 
-  const config = getEmailConfig();
-  if (!config.configured) {
+  if (!isEmailConfigured("orders")) {
     markEmailDelivery(orderId, "not_configured", customerEmail);
     return { emailDelivery: "not_configured", customerEmail };
   }

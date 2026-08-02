@@ -3,6 +3,7 @@ import {
   deliverOrderEmailAfterCheckout,
   getStoredEmailDelivery,
 } from "@/app/lib/email/deliverAfterCheckout";
+import { persistGuestOrder } from "@/app/lib/orders/persistGuestOrder";
 import { createOrderAccessToken } from "@/app/lib/vesim/orderAccess";
 import {
   beginIdempotentCheckout,
@@ -197,6 +198,14 @@ export async function POST(req: NextRequest) {
     }
 
     completeIdempotentCheckout(idempotencyKey, orderId);
+
+    // Best-effort local order row for later verified claiming — never fails VeSIM.
+    await persistGuestOrder({
+      providerOrderId: orderId,
+      customerEmail,
+      verifiedOffer,
+      status: "COMPLETED",
+    });
 
     const accessToken = createOrderAccessToken(orderId);
     if (!accessToken) {

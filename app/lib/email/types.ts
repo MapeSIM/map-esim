@@ -27,9 +27,9 @@ export type OrderEmailPayload = {
    * Omit when VeSIM does not supply one.
    */
   androidActivationUrl?: string;
-  /** Absolute URL to the MAP-eSIM Android installation guide. */
+  /** Absolute URL to the MAP eSIM Android installation guide. */
   androidGuideUrl?: string;
-  /** Absolute URL to the MAP-eSIM iPhone installation guide. */
+  /** Absolute URL to the MAP eSIM iPhone installation guide. */
   iphoneGuideUrl?: string;
   /**
    * Opaque authorized success-page URL (includes signed access token only).

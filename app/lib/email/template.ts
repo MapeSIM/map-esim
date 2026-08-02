@@ -1,4 +1,10 @@
 import type { OrderEmailPayload } from "@/app/lib/email/types";
+import { BRAND_NAME } from "@/app/lib/brand";
+import {
+  renderEmailFooterHtml,
+  renderEmailFooterText,
+} from "@/app/lib/email/brand";
+import { getEmailLogoCidSrc } from "@/app/lib/email/logo";
 import {
   formatDestinationHeadline,
   maskOrderReference,
@@ -13,6 +19,10 @@ export type OrderEmailHtmlOptions = {
    * Omit when no valid QR should be shown.
    */
   qrImageSrc?: string;
+  /**
+   * Brand logo source. Nodemailer uses CID; preview may use `/brand/...`.
+   */
+  logoImageSrc?: string;
 };
 
 const BRAND_LIME = "#7cff00";
@@ -376,6 +386,7 @@ export function renderOrderEmailHtml(
   const hasQrImage = Boolean(options.qrImageSrc);
   const installSection = installQrSection(payload, options.qrImageSrc);
   const destinationHeadline = formatDestinationHeadline(payload.destination);
+  const logoSrc = options.logoImageSrc || getEmailLogoCidSrc();
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -383,7 +394,7 @@ export function renderOrderEmailHtml(
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <title>Your eSIM is Ready! — MAP-eSIM</title>
+    <title>Your eSIM is Ready! — ${BRAND_NAME}</title>
     <!--[if mso]>
     <noscript>
       <xml>
@@ -402,7 +413,7 @@ export function renderOrderEmailHtml(
             <tr>
               <td align="center" bgcolor="${BRAND_LIME}" style="padding:28px 24px;background-color:${BRAND_LIME};">
                 <p style="margin:0;color:${BRAND_INK};font-size:12px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-                  MAP-eSIM
+                  ${BRAND_NAME}
                 </p>
                 <h1 style="margin:10px 0 0;color:${BRAND_INK};font-size:28px;line-height:1.2;font-weight:800;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
                   Your eSIM is Ready!
@@ -429,12 +440,9 @@ export function renderOrderEmailHtml(
                 </p>`
                     : ""
                 }
-                <p style="margin:0 0 8px;color:${TEXT_PRIMARY};font-size:13px;line-height:1.55;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-                  Need help? Contact
-                  <a href="mailto:support@mapesim.com" style="color:#2f6b00;text-decoration:underline;">support@mapesim.com</a>
-                </p>
-                <p style="margin:0 0 8px;color:${TEXT_SECONDARY};font-size:12px;line-height:1.5;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-                  © 2026 MAP-eSIM. All rights reserved.
+                ${renderEmailFooterHtml("orders", logoSrc)}
+                <p style="margin:16px 0 8px;color:${TEXT_SECONDARY};font-size:12px;line-height:1.5;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+                  © 2026 ${BRAND_NAME}. All rights reserved.
                 </p>
               </td>
             </tr>
@@ -453,7 +461,7 @@ export function renderOrderEmailText(
   const destinationHeadline = formatDestinationHeadline(payload.destination);
   const hasQr = Boolean(options.hasQrAttachment);
   const lines = [
-    "MAP-eSIM — Your eSIM is Ready!",
+    `${BRAND_NAME} — Your eSIM is Ready!`,
     destinationHeadline,
     "",
     introCopy(hasQr),
@@ -526,8 +534,8 @@ export function renderOrderEmailText(
 
   lines.push(
     "",
-    "Need help? Contact support@mapesim.com",
-    "© 2026 MAP-eSIM. All rights reserved."
+    renderEmailFooterText("orders"),
+    `© 2026 ${BRAND_NAME}. All rights reserved.`
   );
 
   return lines.join("\n");

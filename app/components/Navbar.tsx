@@ -1,9 +1,15 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Globe, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
+import {
+  BRAND_LOGO_ALT,
+  BRAND_LOGO_PUBLIC_PATH,
+  BRAND_NAME,
+} from "@/app/lib/brand";
 import ThemeToggle from "./ThemeToggle";
 import CurrencySelector from "./currency/CurrencySelector";
 
@@ -14,7 +20,15 @@ const navLinks = [
   { href: "/support", label: "Support" },
 ];
 
-export default function Navbar() {
+type NavbarProps = {
+  authHref?: string;
+  authLabel?: string;
+};
+
+export default function Navbar({
+  authHref = "/signin",
+  authLabel = "Sign in",
+}: NavbarProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -61,20 +75,15 @@ export default function Navbar() {
             focus-visible:ring-offset-[var(--page-bg)]
           "
         >
-          <span
-            className="
-              flex h-9 w-9 items-center justify-center
-              rounded-[14px] border border-[var(--border-strong)]
-              bg-[var(--surface)] text-[var(--accent-soft)]
-              transition-colors group-hover:border-[var(--border-hover)]
-            "
-            aria-hidden="true"
-          >
-            <Globe className="h-[18px] w-[18px]" strokeWidth={1.75} />
-          </span>
-          <span className="text-lg font-semibold tracking-tight text-[var(--heading)] sm:text-xl">
-            MAP-eSIM
-          </span>
+          <Image
+            src={BRAND_LOGO_PUBLIC_PATH}
+            alt={BRAND_LOGO_ALT}
+            width={160}
+            height={40}
+            className="h-9 w-auto max-w-[160px] object-contain sm:h-10 sm:max-w-[180px]"
+            priority
+          />
+          <span className="sr-only">{BRAND_NAME}</span>
         </Link>
 
         <div className="hidden items-center gap-1 md:flex lg:gap-2">
@@ -114,6 +123,19 @@ export default function Navbar() {
           <div className="ml-2 flex items-center gap-3">
             <CurrencySelector />
             <ThemeToggle />
+
+            <Link
+              href={authHref}
+              className="
+                rounded-lg px-3 py-2 text-sm font-medium
+                text-[var(--text-muted)] transition-colors
+                hover:text-[var(--heading)]
+                focus-visible:outline-none focus-visible:ring-2
+                focus-visible:ring-[var(--accent-strong)]/60
+              "
+            >
+              {authLabel}
+            </Link>
 
             <Link
               href="/countries"
@@ -200,6 +222,18 @@ export default function Navbar() {
             <div className="mt-2 px-1">
               <CurrencySelector compact />
             </div>
+
+            <Link
+              href={authHref}
+              onClick={closeMenu}
+              className="
+                rounded-[14px] px-4 py-3 text-base font-medium
+                text-[var(--text-muted)] transition-colors
+                hover:bg-[var(--surface-2)] hover:text-[var(--heading)]
+              "
+            >
+              {authLabel}
+            </Link>
 
             <Link
               href="/countries"

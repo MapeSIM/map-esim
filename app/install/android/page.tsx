@@ -13,18 +13,18 @@ export default function AndroidInstallGuidePage() {
           Android eSIM installation guide
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
-          MAP-eSIM does not claim universal one-click Android installation.
+          MAP eSIM does not claim universal one-click Android installation.
           Use the downloadable QR code from your order email or success page,
           then follow the steps for your device.
         </p>
 
         <ol className="mt-8 list-decimal space-y-4 pl-5 text-sm leading-relaxed text-[var(--text)]">
           <li>
-            Download or save the MAP-eSIM QR PNG from your order email attachment
+            Download or save the MAP eSIM QR PNG from your order email attachment
             or the success page download button.
           </li>
           <li>
-            Open <strong>Settings → Network &amp; Internet → SIMs</strong> (wording
+            Open <strong>Settings â†’ Network &amp; Internet â†’ SIMs</strong> (wording
             may vary by manufacturer).
           </li>
           <li>Tap <strong>Add eSIM</strong> or <strong>Download a SIM instead</strong>.</li>

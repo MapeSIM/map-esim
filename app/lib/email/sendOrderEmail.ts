@@ -1,5 +1,4 @@
-import nodemailer from "nodemailer";
-import { getEmailConfig } from "@/app/lib/email/config";
+import { isEmailConfigured } from "@/app/lib/email/config";
 import {
   claimEmailSend,
   getEmailDeliveryRecord,
@@ -17,6 +16,7 @@ import {
   renderOrderEmailHtml,
   renderOrderEmailText,
 } from "@/app/lib/email/template";
+import { sendChannelMail } from "@/app/lib/email/transport";
 import type {
   OrderEmailPayload,
   SendOrderEmailResult,
@@ -26,7 +26,7 @@ import { isValidEmail } from "@/app/lib/vesim/server";
 const INLINE_QR_FILENAME = "map-esim-qr-inline.png";
 
 /**
- * Sends a branded MAP-eSIM order email.
+ * Sends a branded MAP eSIM order email via the ORDERS channel.
  * Never throws to callers for SMTP failures — returns a safe status.
  * Never logs credentials or raw provider payloads.
  */
@@ -50,8 +50,7 @@ export async function sendOrderEmail(
     return { emailDelivery: "already_sent" };
   }
 
-  const config = getEmailConfig();
-  if (!config.configured) {
+  if (!isEmailConfigured("orders")) {
     markEmailDelivery(orderId, "not_configured", customerEmail);
     return { emailDelivery: "not_configured" };
   }
@@ -68,16 +67,6 @@ export async function sendOrderEmail(
   }
 
   try {
-    const transporter = nodemailer.createTransport({
-      host: config.smtp.host,
-      port: config.smtp.port,
-      secure: config.smtp.secure,
-      auth: {
-        user: config.smtp.user,
-        pass: config.smtp.password,
-      },
-    });
-
     // QR is generated only from verified order payload fields — never client params.
     const installValue = resolveInstallQrValue(payload);
     const qrPng = installValue
@@ -107,16 +96,15 @@ export async function sendOrderEmail(
 
     const destinationLabel = payload.destination.trim() || "eSIM";
 
-    await transporter.sendMail({
-      from: config.from,
+    const result = await sendChannelMail({
+      channel: "orders",
       to: customerEmail,
-      subject: `Your eSIM is Ready! — ${destinationLabel} | MAP-eSIM`,
+      subject: `Your eSIM is Ready! — ${destinationLabel} | MAP eSIM`,
       text: renderOrderEmailText(payload, { hasQrAttachment: Boolean(qrPng) }),
       html: renderOrderEmailHtml(payload, {
         qrImageSrc: qrPng ? `cid:${ESIM_QR_CID}` : undefined,
       }),
       attachments,
-      // Use verified order ID as the stable email reference for dedupe/tracing.
       headers: {
         "X-Entity-Ref-ID": orderId,
         "X-MAP-ESIM-Order-ID": orderId,
@@ -124,10 +112,18 @@ export async function sendOrderEmail(
       messageId: `<order-${orderId.replace(/[^a-zA-Z0-9_-]/g, "")}@mapesim.com>`,
     });
 
+    if (!result.ok) {
+      if (result.reason === "not_configured") {
+        markEmailDelivery(orderId, "not_configured", customerEmail);
+        return { emailDelivery: "not_configured" };
+      }
+      markEmailDelivery(orderId, "failed", customerEmail);
+      return { emailDelivery: "failed" };
+    }
+
     markEmailDelivery(orderId, "sent", customerEmail);
     return { emailDelivery: "sent" };
   } catch (error: unknown) {
-    // Log only a safe message — never SMTP passwords or API keys.
     console.error(
       "Order email delivery failed:",
       error instanceof Error ? error.message : "unknown_error"
