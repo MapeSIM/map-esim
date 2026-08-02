@@ -42,8 +42,11 @@ export function destinationSlug(raw: {
   }
 
   if (raw.isRegional || code.toLowerCase().startsWith("region-")) {
-    const stripped = code.toLowerCase().replace(/^region-/, "");
-    return slugifyDestination(stripped || name);
+    // Keep API regional codes in the URL (e.g. /countries/region-asia).
+    if (code.toLowerCase().startsWith("region-")) {
+      return code.toLowerCase();
+    }
+    return `region-${slugifyDestination(name || code)}`;
   }
 
   return slugifyDestination(name || code);
@@ -164,16 +167,96 @@ export function findDestinationBySlug(
   destinations: VesimDestination[],
   slug: string
 ): VesimDestination | undefined {
+  const rawKey = slug.trim().toLowerCase();
   const key = slugifyDestination(slug);
-  if (!key) return undefined;
+  if (!rawKey && !key) return undefined;
 
   return destinations.find((destination) => {
-    if (destination.slug === key) return true;
-    if (destination.code.toLowerCase() === key) return true;
-    if (destination.code.toLowerCase() === `region-${key}`) return true;
+    const codeLower = destination.code.toLowerCase();
+    if (destination.slug === key || destination.slug === rawKey) return true;
+    if (codeLower === key || codeLower === rawKey) return true;
+    if (codeLower === `region-${key}`) return true;
     if (slugifyDestination(destination.name) === key) return true;
+    // Backward-compatible: /countries/asia → region-asia
+    if (
+      destination.kind === "regional" &&
+      codeLower === `region-${key}`
+    ) {
+      return true;
+    }
     return (destination.searchAliases || []).some(
-      (alias) => slugifyDestination(alias) === key
+      (alias) => slugifyDestination(alias) === key || alias.toLowerCase() === rawKey
     );
   });
+}
+
+/**
+ * Resolve the best matching regional destination for a country using
+ * real API region metadata (e.g. Pakistan "South Asia" → region-asia).
+ */
+export function findRelatedRegionalDestination(
+  country: VesimDestination,
+  destinations: VesimDestination[]
+): VesimDestination | undefined {
+  if (country.kind !== "country") return undefined;
+
+  const regionals = destinations.filter((item) => item.kind === "regional");
+  if (regionals.length === 0) return undefined;
+
+  const countryRegions = (country.regions || [])
+    .map((region) => region.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (countryRegions.length === 0) return undefined;
+
+  let best: { destination: VesimDestination; score: number } | null = null;
+
+  for (const regional of regionals) {
+    const name = regional.name.trim().toLowerCase();
+    const codeKey = regional.code
+      .toLowerCase()
+      .replace(/^region-/, "")
+      .replace(/-/g, " ");
+    const regionalLabels = Array.from(
+      new Set(
+        [name, codeKey, ...(regional.regions || []).map((r) => r.toLowerCase())]
+          .map((value) => value.trim())
+          .filter(Boolean)
+      )
+    );
+
+    let score = 0;
+
+    for (const countryRegion of countryRegions) {
+      for (const label of regionalLabels) {
+        if (!label) continue;
+        if (countryRegion === label) score += 20;
+        else if (countryRegion.includes(label) || label.includes(countryRegion)) {
+          score += 12;
+        } else {
+          const countryTokens = countryRegion.split(/[\s,/&-]+/).filter(Boolean);
+          const labelTokens = label.split(/[\s,/&-]+/).filter(Boolean);
+          if (
+            labelTokens.some((token) => token.length >= 4 && countryTokens.includes(token))
+          ) {
+            score += 8;
+          }
+        }
+      }
+    }
+
+    if (score > 0 && (!best || score > best.score)) {
+      best = { destination: regional, score };
+    }
+  }
+
+  return best?.destination;
+}
+
+export function destinationPath(destination: VesimDestination): string {
+  const id =
+    destination.kind === "regional" || destination.kind === "global"
+      ? destination.code.toLowerCase()
+      : destination.slug || slugifyDestination(destination.name);
+  return `/countries/${id}`;
 }

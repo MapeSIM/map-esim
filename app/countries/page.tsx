@@ -71,7 +71,10 @@ function parseUsdPrice(value?: string) {
 
 function toCard(destination: VesimDestination): DestinationCard {
   return {
-    id: destination.slug,
+    id:
+      destination.kind === "regional" || destination.kind === "global"
+        ? destination.code.toLowerCase()
+        : destination.slug,
     name: destination.name,
     code: destination.code,
     flag: destination.flag,

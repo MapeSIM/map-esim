@@ -9,6 +9,7 @@ import { normalizeOffers } from "@/app/lib/vesim/offers";
 import type { VesimDestination } from "@/app/lib/vesim/destinations";
 import {
   findDestinationBySlug,
+  findRelatedRegionalDestination,
   normalizeDestinations,
   slugifyDestination,
 } from "@/app/lib/vesim/destinations";
@@ -46,6 +47,8 @@ export default function CountryDetail() {
   const [destination, setDestination] = useState<VesimDestination | null>(
     null
   );
+  const [relatedRegional, setRelatedRegional] =
+    useState<VesimDestination | null>(null);
   const [countryNames, setCountryNames] = useState<Record<string, string>>({});
   const [offers, setOffers] = useState<VesimOffer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,13 +91,20 @@ export default function CountryDetail() {
           if (!cancelled) {
             setNotFound(true);
             setDestination(null);
+            setRelatedRegional(null);
             setOffers([]);
           }
           return;
         }
 
+        const related =
+          matched.kind === "country"
+            ? findRelatedRegionalDestination(matched, destinations) || null
+            : null;
+
         if (!cancelled) {
           setDestination(matched);
+          setRelatedRegional(related);
           setCountryNames(names);
         }
 
@@ -184,6 +194,7 @@ export default function CountryDetail() {
       loading={loading}
       error={error}
       countryNames={countryNames}
+      relatedRegional={relatedRegional}
     />
   );
 }

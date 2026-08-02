@@ -180,7 +180,7 @@ export function renderOrderEmailHtml(
                 </div>
                 <p style="margin:22px 0 0;color:#9fb0c9;font-size:13px;line-height:1.55;">
                   Need help? Contact
-                  <a href="mailto:admin@mapesim.com" style="color:#c6f26d;text-decoration:none;">admin@mapesim.com</a>
+                  <a href="mailto:support@mapesim.com" style="color:#c6f26d;text-decoration:none;">support@mapesim.com</a>
                 </p>
               </td>
             </tr>
@@ -221,7 +221,7 @@ export function renderOrderEmailText(payload: OrderEmailPayload): string {
     "",
     "Important: Install on Wi‑Fi when possible. Activate the line after arrival. Do not delete the profile unless support advises it.",
     "",
-    "Support: admin@mapesim.com"
+    "Support: support@mapesim.com"
   );
 
   return lines.join("\n");

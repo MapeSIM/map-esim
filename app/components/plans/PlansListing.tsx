@@ -1,11 +1,18 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Filter, Globe2 } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Filter,
+  Globe2,
+  MapPinned,
+} from "lucide-react";
 import type { VesimOffer } from "@/app/lib/vesim/offers";
 import type { VesimDestination } from "@/app/lib/vesim/destinations";
+import { destinationPath } from "@/app/lib/vesim/destinations";
 import PlanDetailsModal from "@/app/components/plans/PlanDetailsModal";
 import SortSelect from "@/app/components/plans/SortSelect";
 import { useCurrency } from "@/app/components/currency/CurrencyProvider";
@@ -15,6 +22,7 @@ import {
   formatValidityPhrase,
   formatValidityPill,
   groupOffersByDuration,
+  isUnlimitedOffer,
   sortOffers,
   summarizeCategories,
   summarizePlanTypes,
@@ -33,6 +41,7 @@ type PlansListingProps = {
   loading?: boolean;
   error?: string;
   countryNames?: Record<string, string>;
+  relatedRegional?: VesimDestination | null;
 };
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
@@ -53,21 +62,25 @@ function PillButton({
   active,
   onClick,
   children,
+  disabled = false,
 }: {
   active: boolean;
   onClick: () => void;
   children: ReactNode;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={`
         inline-flex h-10 items-center justify-center rounded-full
         border px-4 text-sm font-semibold transition
         focus-visible:outline-none focus-visible:ring-2
         focus-visible:ring-[var(--accent-strong)]/55 focus-visible:ring-offset-2
         focus-visible:ring-offset-[var(--page-bg)]
+        disabled:cursor-not-allowed disabled:opacity-45
         ${
           active
             ? "border-[var(--accent-strong)] bg-[var(--accent-strong)] text-[var(--accent-ink)] shadow-[0_0_0_1px_rgba(124,255,0,0.25)]"
@@ -97,7 +110,7 @@ function FilterChip({
         rounded-full border px-3.5 py-2 text-xs font-semibold transition
         ${
           active
-            ? "border-[var(--accent-strong)] bg-[var(--accent-strong)]/15 text-[var(--accent-strong)]"
+            ? "border-[var(--accent-strong)] bg-[var(--accent-strong)] text-[var(--accent-ink)] shadow-[0_0_0_1px_rgba(124,255,0,0.2)]"
             : "border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--text)] hover:border-[var(--border-hover)]"
         }
       `}
@@ -113,7 +126,11 @@ export default function PlansListing({
   loading = false,
   error = "",
   countryNames = {},
+  relatedRegional = null,
 }: PlansListingProps) {
+  const isRegionalOrGlobal =
+    destination.kind === "regional" || destination.kind === "global";
+
   const [planType, setPlanType] = useState<PlanTypeFilter>("data");
   const [category, setCategory] = useState<CategoryFilter>("standard");
   const [dataAmounts, setDataAmounts] = useState<string[]>([]);
@@ -128,22 +145,49 @@ export default function PlansListing({
   const categorySummary = useMemo(() => summarizeCategories(offers), [offers]);
   const showPlanTypeToggle =
     planTypeSummary.dataOnly > 0 && planTypeSummary.withVoice > 0;
-  const showCategoryToggle =
-    categorySummary.standard > 0 && categorySummary.unlimited > 0;
+
+  // Regional/global: always expose package tabs when offers exist.
+  // Country pages: only when real unlimited offers exist.
+  const showPackageTabs =
+    offers.length > 0 &&
+    (isRegionalOrGlobal || categorySummary.unlimited > 0);
+  const showUnlimitedTab =
+    categorySummary.unlimited > 0 || isRegionalOrGlobal;
+  const unlimitedTabEnabled = categorySummary.unlimited > 0;
+
+  useEffect(() => {
+    if (category === "unlimited" && !unlimitedTabEnabled) {
+      setCategory("standard");
+    }
+  }, [category, unlimitedTabEnabled]);
+
+  const activeCategory: CategoryFilter =
+    showPackageTabs && category === "unlimited" && unlimitedTabEnabled
+      ? "unlimited"
+      : "standard";
+
+  const categoryOffers = useMemo(
+    () =>
+      offers.filter((offer) =>
+        activeCategory === "unlimited"
+          ? isUnlimitedOffer(offer)
+          : !isUnlimitedOffer(offer)
+      ),
+    [offers, activeCategory]
+  );
 
   const filters: PlanFiltersState = useMemo(
     () => ({
       planType: showPlanTypeToggle ? planType : "data",
-      category: showCategoryToggle ? category : "standard",
+      category: activeCategory,
       dataAmounts,
       validities,
       coveredCountries,
     }),
     [
       showPlanTypeToggle,
-      showCategoryToggle,
       planType,
-      category,
+      activeCategory,
       dataAmounts,
       validities,
       coveredCountries,
@@ -159,13 +203,28 @@ export default function PlansListing({
     () => groupOffersByDuration(filtered, sort),
     [filtered, sort]
   );
-  const dataOptions = useMemo(() => uniqueDataAmounts(offers), [offers]);
-  const validityOptions = useMemo(() => uniqueValidities(offers), [offers]);
+  // Filter pills reflect the active package tab only.
+  const dataOptions = useMemo(
+    () => uniqueDataAmounts(categoryOffers),
+    [categoryOffers]
+  );
+  const validityOptions = useMemo(
+    () => uniqueValidities(categoryOffers),
+    [categoryOffers]
+  );
   const coverageOptions = useMemo(
     () =>
-      destination.kind === "country" ? [] : uniqueCoveredCountries(offers),
-    [destination.kind, offers]
+      isRegionalOrGlobal ? uniqueCoveredCountries(categoryOffers) : [],
+    [isRegionalOrGlobal, categoryOffers]
   );
+
+  function selectCategory(next: CategoryFilter) {
+    if (next === "unlimited" && !unlimitedTabEnabled) return;
+    setCategory(next);
+    setDataAmounts([]);
+    setValidities([]);
+    setCoveredCountries([]);
+  }
 
   const activeFilterCount =
     dataAmounts.length + validities.length + coveredCountries.length;
@@ -203,18 +262,23 @@ export default function PlansListing({
     setCoveredCountries([]);
   }
 
-  const heroSummary = showPlanTypeToggle
-    ? `${planTypeSummary.dataOnly} data-only · ${planTypeSummary.withVoice} with SMS & voice`
-    : `${offers.length} data plan${offers.length === 1 ? "" : "s"} available`;
+  const heading =
+    destination.kind === "country"
+      ? `${destination.name} eSIM Plans`
+      : `${destination.name} eSIM Plans`;
+
+  const heroSummary = loading
+    ? "Loading available plans..."
+    : `${offers.length} plan${offers.length === 1 ? "" : "s"} available`;
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[var(--page-bg)] text-[var(--heading)]">
       <section className="theme-hero border-b border-[var(--border)]">
-        <div className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6 sm:py-10">
+        <div className="mx-auto max-w-[1200px] px-4 py-6 sm:px-6 sm:py-8">
           <Link
             href="/countries"
             className="
-              mb-6 inline-flex items-center gap-2 text-sm font-medium
+              mb-5 inline-flex items-center gap-2 text-sm font-medium
               text-[var(--text-muted)] transition hover:text-[var(--accent-strong)]
             "
           >
@@ -222,71 +286,72 @@ export default function PlansListing({
             All Destinations
           </Link>
 
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-            <div className="flex items-start gap-4">
-              <div
-                className="
-                  flex h-16 w-16 shrink-0 items-center justify-center
-                  overflow-hidden rounded-2xl border border-[var(--border-strong)]
-                  bg-[var(--surface)] shadow-[0_10px_30px_rgba(0,0,0,0.25)]
-                "
-              >
-                {flagUrl ? (
-                  <Image
-                    src={flagUrl}
-                    alt={`${destination.name} flag`}
-                    width={64}
-                    height={64}
-                    className="h-full w-full object-cover"
-                  />
-                ) : destination.kind === "country" && destination.flag ? (
-                  <span className="text-3xl">{destination.flag}</span>
-                ) : (
-                  <Globe2 className="h-7 w-7 text-[var(--accent-strong)]" />
-                )}
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]/90">
-                  {destination.kind === "country"
-                    ? "Country plans"
-                    : destination.kind === "regional"
-                      ? "Regional plans"
-                      : "Global plans"}
-                </p>
-                <h1 className="mt-1 text-3xl font-bold tracking-tight text-[var(--heading)] sm:text-4xl md:text-[2.75rem]">
-                  {destination.kind === "country"
-                    ? `${destination.name} eSIM Plans`
-                    : destination.name}
-                </h1>
-                <p className="mt-2 text-sm text-[var(--text-muted)] sm:text-base">
-                  {loading ? "Loading available plans..." : heroSummary}
-                </p>
-              </div>
+          <div className="flex items-start gap-4">
+            <div
+              className="
+                flex h-14 w-14 shrink-0 items-center justify-center
+                overflow-hidden rounded-2xl border border-[var(--border-strong)]
+                bg-[var(--surface)] shadow-[0_10px_30px_rgba(0,0,0,0.25)]
+                sm:h-16 sm:w-16
+              "
+            >
+              {flagUrl ? (
+                <Image
+                  src={flagUrl}
+                  alt={`${destination.name} flag`}
+                  width={64}
+                  height={64}
+                  className="h-full w-full object-cover"
+                />
+              ) : destination.kind === "country" && destination.flag ? (
+                <span className="text-3xl">{destination.flag}</span>
+              ) : destination.kind === "regional" ? (
+                <span className="flex h-full w-full flex-col items-center justify-center bg-[var(--accent-strong)]/10 text-[var(--accent-strong)]">
+                  <MapPinned className="h-6 w-6" aria-hidden="true" />
+                </span>
+              ) : (
+                <Globe2 className="h-7 w-7 text-[var(--accent-strong)]" />
+              )}
             </div>
 
-            {!loading && !error && offers.length > 0 && (
-              <div className="whitespace-nowrap rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--text)]">
-                From{" "}
-                <span className="font-bold text-[var(--accent-strong)]">
-                  {formatPrice(
-                    destination.minPrice ??
-                      offers
-                        .map((offer) => offer.priceUSD)
-                        .filter((price): price is number => price != null)
-                        .sort((a, b) => a - b)[0] ??
-                      null
-                  )}
-                </span>
-              </div>
-            )}
+            <div className="min-w-0">
+              <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+                {destination.kind === "country"
+                  ? "Country plans"
+                  : destination.kind === "regional"
+                    ? "Regional plans"
+                    : "Global plans"}
+              </p>
+              <h1 className="mt-1 text-3xl font-bold tracking-tight text-[var(--heading)] sm:text-4xl">
+                {heading}
+              </h1>
+              <p className="mt-1.5 text-sm text-[var(--text-muted)] sm:text-base">
+                {heroSummary}
+              </p>
+            </div>
           </div>
 
-          {destination.kind === "country" && (
-            <div className="mt-5 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-3)] px-4 py-3 text-sm text-[var(--text)]">
-              Browse regional plans — sometimes regional eSIMs offer better
-              value across multiple countries.
-            </div>
+          {destination.kind === "country" && relatedRegional && (
+            <Link
+              href={destinationPath(relatedRegional)}
+              className="
+                mt-5 flex items-center justify-between gap-3 rounded-2xl
+                border border-[var(--border-strong)] bg-[var(--surface-3)]
+                px-4 py-3.5 text-sm text-[var(--text)] transition
+                hover:border-[var(--accent-strong)]/45 hover:bg-[var(--surface)]
+              "
+            >
+              <div className="min-w-0">
+                <p className="font-semibold text-[var(--heading)]">
+                  Browse regional plans
+                </p>
+                <p className="mt-0.5 text-[var(--text-muted)]">
+                  Explore {relatedRegional.name} multi-country eSIMs — sometimes
+                  better value across a trip.
+                </p>
+              </div>
+              <ArrowRight className="h-4 w-4 shrink-0 text-[var(--accent-strong)]" />
+            </Link>
           )}
         </div>
       </section>
@@ -337,20 +402,33 @@ export default function PlansListing({
                   </div>
                 )}
 
-                {showCategoryToggle && (
-                  <div className="flex flex-wrap gap-2">
-                    <PillButton
-                      active={category === "standard"}
-                      onClick={() => setCategory("standard")}
-                    >
-                      Standard ({categorySummary.standard})
-                    </PillButton>
-                    <PillButton
-                      active={category === "unlimited"}
-                      onClick={() => setCategory("unlimited")}
-                    >
-                      Unlimited ({categorySummary.unlimited})
-                    </PillButton>
+                {showPackageTabs && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      Package type
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <PillButton
+                        active={activeCategory === "standard"}
+                        onClick={() => selectCategory("standard")}
+                        disabled={categorySummary.standard === 0}
+                      >
+                        {`Standard · ${categorySummary.standard} plan${
+                          categorySummary.standard === 1 ? "" : "s"
+                        }`}
+                      </PillButton>
+                      {showUnlimitedTab && (
+                        <PillButton
+                          active={activeCategory === "unlimited"}
+                          onClick={() => selectCategory("unlimited")}
+                          disabled={!unlimitedTabEnabled}
+                        >
+                          {`Unlimited · ${categorySummary.unlimited} plan${
+                            categorySummary.unlimited === 1 ? "" : "s"
+                          }`}
+                        </PillButton>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -358,12 +436,15 @@ export default function PlansListing({
                   <button
                     type="button"
                     onClick={() => setFiltersOpen((open) => !open)}
-                    className="
+                    className={`
                       inline-flex h-11 items-center justify-center gap-2
-                      rounded-full border border-[var(--border-strong)] bg-[var(--surface)]
-                      px-5 text-sm font-semibold text-[var(--heading)] transition
-                      hover:border-[var(--border-hover)]
-                    "
+                      rounded-full border px-5 text-sm font-semibold transition
+                      ${
+                        filtersOpen || activeFilterCount > 0
+                          ? "border-[var(--accent-strong)] bg-[var(--accent-strong)]/12 text-[var(--heading)]"
+                          : "border-[var(--border-strong)] bg-[var(--surface)] text-[var(--heading)] hover:border-[var(--border-hover)]"
+                      }
+                    `}
                   >
                     <Filter className="h-4 w-4 text-[var(--accent-strong)]" />
                     Filters
@@ -439,7 +520,7 @@ export default function PlansListing({
                         <p className="mb-3 text-sm font-semibold text-[var(--heading)]">
                           Countries covered
                         </p>
-                        <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto">
+                        <div className="flex max-h-44 flex-wrap gap-2 overflow-y-auto">
                           {coverageOptions.map((code) => (
                             <FilterChip
                               key={code}
@@ -459,7 +540,12 @@ export default function PlansListing({
 
             <div className="mt-8 flex items-center justify-between gap-3">
               <p className="text-sm font-medium text-[var(--text-muted)]">
-                Showing {filtered.length} of {offers.length} plans
+                Showing {filtered.length} of {categoryOffers.length}{" "}
+                {activeCategory === "unlimited" ? "unlimited" : "standard"}{" "}
+                plans
+                {showPackageTabs && categoryOffers.length !== offers.length
+                  ? ` (${offers.length} total)`
+                  : ""}
               </p>
             </div>
 
@@ -467,7 +553,10 @@ export default function PlansListing({
               <div className="mt-6 rounded-3xl border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center">
                 <h3 className="text-lg font-semibold">No matching plans</h3>
                 <p className="mt-2 text-sm text-[var(--text-muted)]">
-                  Try clearing one or more filters to see more results.
+                  {activeCategory === "unlimited" &&
+                  categorySummary.unlimited === 0
+                    ? "This destination has no unlimited packages right now."
+                    : "Try clearing one or more filters to see more results."}
                 </p>
               </div>
             ) : (
@@ -507,9 +596,9 @@ export default function PlansListing({
 
                           <div className="mt-4 space-y-2 text-sm text-[var(--text)]">
                             <p>{formatValidityPhrase(offer.durationDays)}</p>
-                            {(destination.kind === "regional" ||
-                              destination.kind === "global") &&
-                              offer.coveredCountriesCount != null && (
+                            {isRegionalOrGlobal &&
+                              offer.coveredCountriesCount != null &&
+                              offer.coveredCountriesCount > 0 && (
                                 <p>
                                   {offer.coveredCountriesCount} countries
                                   covered
@@ -529,11 +618,13 @@ export default function PlansListing({
                               onClick={() => setSelectedOffer(offer)}
                               className="
                                 h-11 rounded-xl border border-[var(--border-strong)]
-                                bg-[var(--surface-2)] text-sm font-semibold text-[var(--heading)]
+                                bg-[var(--surface-2)] px-2 text-sm font-semibold text-[var(--heading)]
                                 transition hover:border-[var(--accent-strong)]/50
                               "
                             >
-                              Plan Details
+                              {isRegionalOrGlobal
+                                ? "See Coverage Details"
+                                : "Plan Details"}
                             </button>
                             <Link
                               href={buildCheckoutHref(offer, destination.code)}
@@ -562,6 +653,7 @@ export default function PlansListing({
         destination={destination}
         countryNames={countryNames}
         onClose={() => setSelectedOffer(null)}
+        coverageFocused={isRegionalOrGlobal}
       />
     </main>
   );

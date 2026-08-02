@@ -17,6 +17,8 @@ type PlanDetailsModalProps = {
   destination: VesimDestination;
   countryNames?: Record<string, string>;
   onClose: () => void;
+  /** Prefer coverage-first copy for regional/global destinations. */
+  coverageFocused?: boolean;
 };
 
 function DetailRow({
@@ -42,6 +44,7 @@ export default function PlanDetailsModal({
   destination,
   countryNames = {},
   onClose,
+  coverageFocused = false,
 }: PlanDetailsModalProps) {
   const { formatPrice } = useCurrency();
 
@@ -107,13 +110,15 @@ export default function PlanDetailsModal({
               </span>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)]/90">
-                  {destination.name}
+                  {coverageFocused ? "Coverage details" : destination.name}
                 </p>
                 <h2
                   id="plan-details-title"
                   className="truncate text-xl font-bold text-[var(--heading)] sm:text-2xl"
                 >
-                  {offer.name}
+                  {coverageFocused
+                    ? `${offer.dataFormatted} · ${formatValidityPhrase(offer.durationDays)}`
+                    : offer.name}
                 </h2>
               </div>
             </div>
@@ -208,14 +213,44 @@ export default function PlanDetailsModal({
             {offer.isRefundable && (
               <DetailRow label="Refundable" value="Yes" />
             )}
-            <DetailRow label="Offer ID" value={offer.id} />
           </div>
+
+          {isCoverageDestination && covered.length > 0 && (
+            <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-3)] p-4">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--heading)]">
+                <MapPinned className="h-4 w-4 text-[var(--accent-strong)]" />
+                Countries covered ({covered.length})
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {covered.map((code) => {
+                  const roamingEntry = (offer.roaming || []).find(
+                    (entry) => entry.country === code
+                  );
+                  const speeds =
+                    roamingEntry?.dataSpeeds?.filter(Boolean).slice(0, 4) || [];
+                  return (
+                    <span
+                      key={code}
+                      className="rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1 text-xs text-[var(--text)]"
+                      title={
+                        speeds.length > 0
+                          ? `${countryNames[code] || code}: ${speeds.join(", ")}`
+                          : undefined
+                      }
+                    >
+                      {countryNames[code] || code}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {networks.length > 0 && (
             <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-3)] p-4">
               <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--heading)]">
                 <Wifi className="h-4 w-4 text-[var(--accent-strong)]" />
-                Supported networks
+                Available networks
               </div>
               <div className="flex flex-wrap gap-2">
                 {networks.map((network) => (
@@ -230,26 +265,7 @@ export default function PlanDetailsModal({
             </div>
           )}
 
-          {isCoverageDestination && covered.length > 0 && (
-            <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-3)] p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--heading)]">
-                <MapPinned className="h-4 w-4 text-[var(--accent-strong)]" />
-                Countries covered ({covered.length})
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {covered.map((code) => (
-                  <span
-                    key={code}
-                    className="rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1 text-xs text-[var(--text)]"
-                  >
-                    {countryNames[code] || code}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {offer.description && (
+          {offer.description && !coverageFocused && (
             <p className="mt-4 text-sm leading-relaxed text-[var(--text-muted)]">
               {offer.description}
             </p>

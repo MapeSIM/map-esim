@@ -33,8 +33,13 @@ export function offerHasVoiceSms(offer: VesimOffer): boolean {
   return offer.hasVoiceSms === true;
 }
 
+/** Normalized offers only — relies on server-side unlimited detection. */
+export function isUnlimitedOffer(offer: VesimOffer): boolean {
+  return offer.dataUnlimited === true;
+}
+
 export function dataAmountKey(offer: VesimOffer): string {
-  if (offer.dataUnlimited) return "Unlimited";
+  if (isUnlimitedOffer(offer)) return "Unlimited";
   return offer.dataFormatted;
 }
 
@@ -61,7 +66,7 @@ export function summarizePlanTypes(offers: VesimOffer[]) {
 }
 
 export function summarizeCategories(offers: VesimOffer[]) {
-  const unlimited = offers.filter((offer) => offer.dataUnlimited).length;
+  const unlimited = offers.filter(isUnlimitedOffer).length;
   const standard = offers.length - unlimited;
   return { standard, unlimited };
 }
@@ -108,8 +113,12 @@ export function filterOffers(
     if (filters.planType === "voice" && !offerHasVoiceSms(offer)) return false;
     if (filters.planType === "data" && offerHasVoiceSms(offer)) return false;
 
-    if (filters.category === "unlimited" && !offer.dataUnlimited) return false;
-    if (filters.category === "standard" && offer.dataUnlimited) return false;
+    if (filters.category === "unlimited" && !isUnlimitedOffer(offer)) {
+      return false;
+    }
+    if (filters.category === "standard" && isUnlimitedOffer(offer)) {
+      return false;
+    }
 
     if (
       filters.dataAmounts.length > 0 &&

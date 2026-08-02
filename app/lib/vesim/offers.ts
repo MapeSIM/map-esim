@@ -112,6 +112,49 @@ function firstNumber(...values: unknown[]): number | null {
   return null;
 }
 
+/**
+ * Genuine unlimited detection only.
+ * Never treat a fixed allowance (e.g. 50 GB) as unlimited.
+ */
+export function detectDataUnlimited(item: Record<string, unknown>): boolean {
+  const dataGB = firstNumber(item.dataGB, item.data_gb);
+  const dataMB = firstNumber(item.dataMB, item.data_mb);
+  const hasFixedAllowance =
+    (dataGB != null && dataGB > 0) || (dataMB != null && dataMB > 0);
+
+  // Fixed numeric allowances are always standard packages.
+  if (hasFixedAllowance) {
+    return false;
+  }
+
+  if (item.dataUnlimited === true || item.unlimited === true) {
+    return true;
+  }
+
+  const formatted = firstString(item.dataFormatted, item.data_formatted) || "";
+  if (/\bunlimited\b/i.test(formatted)) {
+    return true;
+  }
+
+  const titleText = [
+    item.name,
+    item.title,
+    item.shortNotes,
+    item.offerName,
+    item.plan_name,
+    item.notes,
+  ]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ");
+
+  // Title/notes may say "unlimited", but never override a fixed GB/MB amount above.
+  if (/\bunlimited\b/i.test(titleText)) {
+    return true;
+  }
+
+  return false;
+}
+
 function formatDataAllowance(item: Record<string, unknown>): {
   dataFormatted: string;
   dataUnit?: string;
@@ -119,10 +162,7 @@ function formatDataAllowance(item: Record<string, unknown>): {
   dataMB: number | null;
   dataUnlimited: boolean;
 } {
-  const unlimited =
-    item.dataUnlimited === true ||
-    item.unlimited === true ||
-    String(item.dataFormatted || "").toLowerCase().includes("unlimited");
+  const unlimited = detectDataUnlimited(item);
 
   if (unlimited) {
     return {
