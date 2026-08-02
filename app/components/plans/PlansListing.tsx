@@ -63,11 +63,13 @@ function PillButton({
   onClick,
   children,
   disabled = false,
+  fullWidthOnMobile = false,
 }: {
   active: boolean;
   onClick: () => void;
   children: ReactNode;
   disabled?: boolean;
+  fullWidthOnMobile?: boolean;
 }) {
   return (
     <button
@@ -76,11 +78,13 @@ function PillButton({
       disabled={disabled}
       className={`
         inline-flex h-10 items-center justify-center rounded-full
-        border px-4 text-sm font-semibold transition
+        border px-3 text-xs font-semibold transition
         focus-visible:outline-none focus-visible:ring-2
         focus-visible:ring-[var(--accent-strong)]/55 focus-visible:ring-offset-2
         focus-visible:ring-offset-[var(--page-bg)]
         disabled:cursor-not-allowed disabled:opacity-45
+        sm:px-4 sm:text-sm
+        ${fullWidthOnMobile ? "w-full min-[400px]:w-auto" : ""}
         ${
           active
             ? "border-[var(--accent-strong)] bg-[var(--accent-strong)] text-[var(--accent-ink)] shadow-[0_0_0_1px_rgba(124,255,0,0.25)]"
@@ -272,25 +276,27 @@ export default function PlansListing({
     : `${offers.length} plan${offers.length === 1 ? "" : "s"} available`;
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[var(--page-bg)] text-[var(--heading)]">
+    <main className="min-h-screen overflow-x-clip bg-[var(--page-bg)] text-[var(--heading)]">
       <section className="theme-hero border-b border-[var(--border)]">
-        <div className="mx-auto max-w-[1200px] px-4 py-6 sm:px-6 sm:py-8">
+        {/* Extra mobile top padding keeps hero clear of the sticky 72px navbar. */}
+        <div className="mx-auto max-w-[1200px] px-4 pb-6 pt-10 sm:px-6 sm:py-8">
           <Link
             href="/countries"
             className="
-              mb-5 inline-flex items-center gap-2 text-sm font-medium
+              mb-4 inline-flex max-w-full items-center gap-2 text-sm font-medium
               text-[var(--text-muted)] transition hover:text-[var(--accent-strong)]
+              sm:mb-5
             "
           >
-            <ArrowLeft className="h-4 w-4" />
-            All Destinations
+            <ArrowLeft className="h-4 w-4 shrink-0" />
+            <span className="truncate">All Destinations</span>
           </Link>
 
-          <div className="flex items-start gap-4">
+          <div className="flex items-start gap-3 sm:gap-4">
             <div
               className="
-                flex h-14 w-14 shrink-0 items-center justify-center
-                overflow-hidden rounded-2xl border border-[var(--border-strong)]
+                flex h-12 w-12 shrink-0 items-center justify-center
+                rounded-2xl border border-[var(--border-strong)]
                 bg-[var(--surface)] shadow-[0_10px_30px_rgba(0,0,0,0.25)]
                 sm:h-16 sm:w-16
               "
@@ -301,28 +307,28 @@ export default function PlansListing({
                   alt={`${destination.name} flag`}
                   width={64}
                   height={64}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full rounded-2xl object-cover"
                 />
               ) : destination.kind === "country" && destination.flag ? (
-                <span className="text-3xl">{destination.flag}</span>
+                <span className="text-2xl sm:text-3xl">{destination.flag}</span>
               ) : destination.kind === "regional" ? (
-                <span className="flex h-full w-full flex-col items-center justify-center bg-[var(--accent-strong)]/10 text-[var(--accent-strong)]">
-                  <MapPinned className="h-6 w-6" aria-hidden="true" />
+                <span className="flex h-full w-full flex-col items-center justify-center rounded-2xl bg-[var(--accent-strong)]/10 text-[var(--accent-strong)]">
+                  <MapPinned className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
                 </span>
               ) : (
-                <Globe2 className="h-7 w-7 text-[var(--accent-strong)]" />
+                <Globe2 className="h-6 w-6 text-[var(--accent-strong)] sm:h-7 sm:w-7" />
               )}
             </div>
 
-            <div className="min-w-0">
-              <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)]">
                 {destination.kind === "country"
                   ? "Country plans"
                   : destination.kind === "regional"
                     ? "Regional plans"
                     : "Global plans"}
               </p>
-              <h1 className="mt-1 text-3xl font-bold tracking-tight text-[var(--heading)] sm:text-4xl">
+              <h1 className="mt-1 break-words text-[1.65rem] font-bold leading-tight tracking-tight text-[var(--heading)] sm:text-4xl sm:leading-none">
                 {heading}
               </h1>
               <p className="mt-1.5 text-sm text-[var(--text-muted)] sm:text-base">
@@ -407,11 +413,12 @@ export default function PlansListing({
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
                       Package type
                     </p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex w-full flex-col gap-2 min-[400px]:flex-row min-[400px]:flex-wrap">
                       <PillButton
                         active={activeCategory === "standard"}
                         onClick={() => selectCategory("standard")}
                         disabled={categorySummary.standard === 0}
+                        fullWidthOnMobile
                       >
                         {`Standard · ${categorySummary.standard} plan${
                           categorySummary.standard === 1 ? "" : "s"
@@ -422,6 +429,7 @@ export default function PlansListing({
                           active={activeCategory === "unlimited"}
                           onClick={() => selectCategory("unlimited")}
                           disabled={!unlimitedTabEnabled}
+                          fullWidthOnMobile
                         >
                           {`Unlimited · ${categorySummary.unlimited} plan${
                             categorySummary.unlimited === 1 ? "" : "s"
@@ -432,13 +440,14 @@ export default function PlansListing({
                   </div>
                 )}
 
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <button
                     type="button"
                     onClick={() => setFiltersOpen((open) => !open)}
                     className={`
-                      inline-flex h-11 items-center justify-center gap-2
+                      inline-flex h-11 w-full items-center justify-center gap-2
                       rounded-full border px-5 text-sm font-semibold transition
+                      sm:w-auto
                       ${
                         filtersOpen || activeFilterCount > 0
                           ? "border-[var(--accent-strong)] bg-[var(--accent-strong)]/12 text-[var(--heading)]"
