@@ -1,13 +1,26 @@
 import AuthCard from "@/app/components/auth/AuthCard";
+import AuthDivider from "@/app/components/auth/AuthDivider";
 import { AuthFooterLinks, AuthForm } from "@/app/components/auth/AuthForm";
+import GoogleSignInButton from "@/app/components/auth/GoogleSignInButton";
 import { signupAction } from "@/app/lib/auth/actions";
 
 export default function SignupPage() {
+  const googleEnabled = Boolean(
+    process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET
+  );
+
   return (
     <AuthCard
       title="Create your account"
       subtitle="Save your purchases and manage eSIMs in one place. Guest checkout still works without an account."
     >
+      {googleEnabled ? (
+        <>
+          <GoogleSignInButton callbackUrl="/account" />
+          <AuthDivider />
+        </>
+      ) : null}
+
       <AuthForm
         action={signupAction}
         submitLabel="Create account"

@@ -15,6 +15,7 @@
     "email:qa": "tsx scripts/qa-email-channels.ts",
     "qa:account-deletion": "tsx scripts/qa-account-deletion.ts",
     "qa:cookie-consent": "tsx scripts/qa-cookie-consent.ts",
+    "qa:google-oauth": "tsx scripts/qa-google-oauth.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

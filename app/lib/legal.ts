@@ -16,6 +16,7 @@ export const LEGAL_POLICY_VERSION = LEGAL_LAST_UPDATED;
 export const COOKIE_CONSENT_VERSION = LEGAL_POLICY_VERSION;
 
 export const LEGAL_CONSENT_SOURCE_SIGNUP = "signup" as const;
+export const LEGAL_CONSENT_SOURCE_GOOGLE = "google_oauth" as const;
 
 export const LEGAL_CONSENT_ERROR =
   "You must agree to the Terms & Conditions and acknowledge the Privacy Policy.";

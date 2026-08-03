@@ -27,6 +27,7 @@ const sections: LegalSection[] = [
       "Name and other profile details you choose to share",
       "Email address",
       "Account credentials (your password is stored only as a secure hash — we do not store your password in plain text)",
+      "When you choose Google Sign-In: your Google email address, display name, profile image (when supplied by Google), and Google OAuth account identifier. We do not receive or store your Google password.",
       "Support messages and related correspondence",
       "Order information needed to fulfil a purchase (for example destination, plan selection and order references)",
     ],
@@ -56,6 +57,7 @@ const sections: LegalSection[] = [
       "Sending password-change security alerts",
       "Sending account-deletion verification codes",
       "Storing passwords only as secure cryptographic hashes",
+      "Offering Google Sign-In as an optional authentication method for account access and security",
       "Recording limited security events to help detect fraud, abuse or unauthorized access",
     ],
   },
@@ -108,6 +110,7 @@ const sections: LegalSection[] = [
     title: "Sharing with service providers",
     paragraphs: [
       "We share personal information only as needed with service providers that help us operate the service, such as our third-party eSIM provider, email delivery infrastructure, hosting and security providers, and a payment provider once selected. We do not sell your personal information.",
+      "When you use Google Sign-In, Google acts as an identity provider. Google authenticates you and returns limited account identity details so we can create or sign you into your MAP eSIM account. The purpose is account authentication, account security and helping prevent unauthorized access — not marketing.",
     ],
   },
   {

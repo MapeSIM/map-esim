@@ -1,6 +1,12 @@
 import AuthCard from "@/app/components/auth/AuthCard";
+import AuthDivider from "@/app/components/auth/AuthDivider";
 import { AuthFooterLinks, AuthForm } from "@/app/components/auth/AuthForm";
+import GoogleSignInButton from "@/app/components/auth/GoogleSignInButton";
 import { signinAction } from "@/app/lib/auth/actions";
+import {
+  mapOAuthErrorParam,
+  publicOAuthErrorMessage,
+} from "@/app/lib/auth/googleOAuth";
 import { safeCallbackPath } from "@/app/lib/auth/redirects";
 
 export default async function SigninPage({
@@ -11,6 +17,7 @@ export default async function SigninPage({
     verified?: string;
     reset?: string;
     deleted?: string;
+    error?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -18,6 +25,12 @@ export default async function SigninPage({
   const verified = params.verified === "1";
   const reset = params.reset === "1";
   const deleted = params.deleted === "1";
+  const oauthError = publicOAuthErrorMessage(
+    mapOAuthErrorParam(params.error)
+  );
+  const googleEnabled = Boolean(
+    process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET
+  );
 
   return (
     <AuthCard
@@ -39,6 +52,22 @@ export default async function SigninPage({
           Password updated. Sign in with your new password.
         </p>
       ) : null}
+      {oauthError ? (
+        <p
+          className="mb-4 rounded-xl border border-[var(--danger-text)]/30 bg-[var(--danger-text)]/10 px-3 py-2 text-sm text-[var(--danger-text)]"
+          role="alert"
+        >
+          {oauthError}
+        </p>
+      ) : null}
+
+      {googleEnabled ? (
+        <>
+          <GoogleSignInButton callbackUrl={callbackUrl || "/account"} />
+          <AuthDivider />
+        </>
+      ) : null}
+
       <AuthForm
         action={signinAction}
         submitLabel="Sign in"
