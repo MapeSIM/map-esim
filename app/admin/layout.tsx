@@ -1,16 +1,7 @@
-import Link from "next/link";
+import AdminNav from "@/app/components/admin/AdminNav";
 import { requireRole } from "@/app/lib/auth/session";
-import { signOutAction } from "@/app/lib/auth/actions";
 
 export const dynamic = "force-dynamic";
-
-const links = [
-  { href: "/admin", label: "Dashboard" },
-  { href: "/admin/orders", label: "Orders" },
-  { href: "/admin/customers", label: "Customers" },
-  { href: "/admin/settings", label: "Settings" },
-  { href: "/admin/audit-logs", label: "Audit Logs" },
-];
 
 export default async function AdminLayout({
   children,
@@ -20,34 +11,12 @@ export default async function AdminLayout({
   const user = await requireRole("ADMIN");
 
   return (
-    <main className="min-h-screen bg-[var(--page-bg)] px-4 py-10 text-[var(--heading)] sm:px-6">
-      <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[220px_1fr]">
-        <aside className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4">
-          <p className="px-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
-            Admin
-          </p>
-          <p className="mt-2 truncate px-2 text-sm font-semibold">{user.name}</p>
-          <nav className="mt-4 flex flex-col gap-1" aria-label="Admin">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="rounded-xl px-3 py-2 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-2)] hover:text-[var(--heading)]"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-          <form action={signOutAction} className="mt-4 px-2">
-            <button
-              type="submit"
-              className="text-sm font-semibold text-[var(--danger-text)]"
-            >
-              Sign out
-            </button>
-          </form>
-        </aside>
-        <section className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-8">
+    <main className="min-h-screen bg-[var(--page-bg)] px-4 py-8 text-[var(--heading)] sm:px-6 sm:py-10">
+      <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[240px_1fr]">
+        <div className="lg:sticky lg:top-6 lg:self-start">
+          <AdminNav adminName={user.name || "Administrator"} />
+        </div>
+        <section className="min-w-0 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-8">
           {children}
         </section>
       </div>

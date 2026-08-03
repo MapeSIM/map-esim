@@ -1,10 +1,12 @@
+import AdminPlaceholder from "@/app/components/admin/AdminPlaceholder";
+
+export const dynamic = "force-dynamic";
+
 export default function AdminCustomersPage() {
   return (
-    <div>
-      <h1 className="text-2xl font-bold tracking-tight">Customers</h1>
-      <p className="mt-2 text-sm text-[var(--text-muted)]">
-        Customer administration arrives in a later phase.
-      </p>
-    </div>
+    <AdminPlaceholder
+      title="Customers"
+      description="Customer search and detail views arrive in Phase 3D. Password hashes and OAuth identifiers will never be displayed."
+    />
   );
 }

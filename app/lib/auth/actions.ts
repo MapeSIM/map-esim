@@ -26,7 +26,11 @@ import {
   issueResetAuthorization,
 } from "@/app/lib/auth/resetAuth";
 import { getSessionUser } from "@/app/lib/auth/session";
-import { prisma } from "@/app/lib/db";
+import {
+  isPrismaPoolTimeout,
+  PRISMA_TEMPORARY_UNAVAILABLE,
+  prisma,
+} from "@/app/lib/db";
 import { softDeleteCustomerAccount } from "@/app/lib/auth/accountDeletion";
 import {
   isSignupConsentAccepted,
@@ -225,16 +229,31 @@ export async function signinAction(
     return { ok: false, error: "Too many attempts. Please try again later." };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email },
-    select: {
-      id: true,
-      role: true,
-      passwordHash: true,
-      emailVerifiedAt: true,
-      deletedAt: true,
-    },
-  });
+  let user: {
+    id: string;
+    role: string;
+    passwordHash: string | null;
+    emailVerifiedAt: Date | null;
+    deletedAt: Date | null;
+  } | null;
+
+  try {
+    user = await prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        role: true,
+        passwordHash: true,
+        emailVerifiedAt: true,
+        deletedAt: true,
+      },
+    });
+  } catch (error) {
+    if (isPrismaPoolTimeout(error)) {
+      return { ok: false, error: PRISMA_TEMPORARY_UNAVAILABLE };
+    }
+    throw error;
+  }
 
   // Null passwordHash must look identical to unknown/wrong credentials.
   if (!user?.passwordHash || user.deletedAt) {
@@ -262,6 +281,9 @@ export async function signinAction(
       redirectTo,
     });
   } catch (error) {
+    if (isPrismaPoolTimeout(error)) {
+      return { ok: false, error: PRISMA_TEMPORARY_UNAVAILABLE };
+    }
     if (error instanceof AuthError) {
       return { ok: false, error: "Invalid email or password." };
     }

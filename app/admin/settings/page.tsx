@@ -1,10 +1,12 @@
+import AdminPlaceholder from "@/app/components/admin/AdminPlaceholder";
+
+export const dynamic = "force-dynamic";
+
 export default function AdminSettingsPage() {
   return (
-    <div>
-      <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-      <p className="mt-2 text-sm text-[var(--text-muted)]">
-        Admin settings arrive in a later phase.
-      </p>
-    </div>
+    <AdminPlaceholder
+      title="Settings"
+      description="Operational tools and controlled admin actions arrive in a later phase. Environment secrets are never shown in the admin UI."
+    />
   );
 }
