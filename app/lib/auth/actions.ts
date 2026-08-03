@@ -28,6 +28,11 @@ import {
 import { getSessionUser } from "@/app/lib/auth/session";
 import { prisma } from "@/app/lib/db";
 import { softDeleteCustomerAccount } from "@/app/lib/auth/accountDeletion";
+import {
+  isSignupConsentAccepted,
+  LEGAL_CONSENT_ERROR,
+  signupConsentRecord,
+} from "@/app/lib/auth/signupConsent";
 import { sendOtpEmail } from "@/app/lib/email/sendOtpEmail";
 import {
   sendAccountDeletedEmail,
@@ -43,6 +48,13 @@ const signupSchema = z
     termsAccepted: z.boolean(),
   })
   .superRefine((data, ctx) => {
+    if (!data.termsAccepted) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["terms"],
+        message: LEGAL_CONSENT_ERROR,
+      });
+    }
     if (!isPasswordValid(data.password, data.email)) {
       ctx.addIssue({
         code: "custom",
@@ -55,13 +67,6 @@ const signupSchema = z
         code: "custom",
         path: ["confirmPassword"],
         message: "Passwords do not match",
-      });
-    }
-    if (!data.termsAccepted) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["terms"],
-        message: "You must accept the terms to continue",
       });
     }
   });
@@ -99,12 +104,13 @@ export async function signupAction(
     return { ok: false, error: "Too many attempts. Please try again later." };
   }
 
+  const consentAccepted = isSignupConsentAccepted(formData.get("terms"));
   const parsed = signupSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
     confirmPassword: formData.get("confirmPassword"),
-    termsAccepted: formData.get("terms") === "on",
+    termsAccepted: consentAccepted,
   });
 
   if (!parsed.success) {
@@ -113,7 +119,21 @@ export async function signupAction(
       const key = String(issue.path[0] || "form");
       if (!fieldErrors[key]) fieldErrors[key] = issue.message;
     }
-    return { ok: false, fieldErrors, error: "Please fix the highlighted fields." };
+    const consentError = fieldErrors.terms;
+    return {
+      ok: false,
+      fieldErrors,
+      error: consentError || "Please fix the highlighted fields.",
+    };
+  }
+
+  // Consent must be valid before any User create or OTP issue.
+  if (!consentAccepted) {
+    return {
+      ok: false,
+      fieldErrors: { terms: LEGAL_CONSENT_ERROR },
+      error: LEGAL_CONSENT_ERROR,
+    };
   }
 
   const email = normalizeEmail(parsed.data.email);
@@ -123,6 +143,7 @@ export async function signupAction(
   }
 
   const passwordHash = await hashPassword(parsed.data.password);
+  const consent = signupConsentRecord();
   const user = await prisma.user.create({
     data: {
       name: parsed.data.name.trim(),
@@ -130,8 +151,17 @@ export async function signupAction(
       passwordHash,
       role: "CUSTOMER",
       emailVerifiedAt: null,
+      ...consent,
     },
-    select: { id: true, email: true },
+    select: {
+      id: true,
+      email: true,
+      termsAcceptedAt: true,
+      termsVersion: true,
+      privacyAcknowledgedAt: true,
+      privacyVersion: true,
+      legalConsentSource: true,
+    },
   });
 
   const issued = await issueEmailOtp({
@@ -153,7 +183,13 @@ export async function signupAction(
     action: "user.signup",
     targetType: "User",
     targetId: user.id,
-    metadata: { email: user.email, verification: "otp_pending" },
+    metadata: {
+      email: user.email,
+      verification: "otp_pending",
+      consentSource: user.legalConsentSource,
+      termsVersion: user.termsVersion,
+      privacyVersion: user.privacyVersion,
+    },
   });
 
   redirect(`/verify-email?email=${encodeURIComponent(user.email)}`);

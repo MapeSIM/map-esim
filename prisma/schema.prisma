@@ -40,6 +40,14 @@ model User {
   credentialsChangedAt   DateTime?
   /// Soft-delete timestamp. When set, the account cannot sign in.
   deletedAt              DateTime?
+  /// Signup (or future) consent to Terms & Conditions.
+  termsAcceptedAt        DateTime?
+  termsVersion           String?
+  /// Signup (or future) acknowledgement of Privacy Policy.
+  privacyAcknowledgedAt  DateTime?
+  privacyVersion         String?
+  /// Where consent was captured (e.g. "signup"). Null for legacy users.
+  legalConsentSource     String?
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @updatedAt
   accounts               Account[]

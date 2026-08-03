@@ -8,6 +8,10 @@ function subscribe() {
   return () => {};
 }
 
+/**
+ * Theme control always works immediately.
+ * Persistence is gated by the preference-storage guard (Preference consent).
+ */
 export default function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
   const mounted = useSyncExternalStore(subscribe, () => true, () => false);

@@ -11,6 +11,7 @@ export default function SignupPage() {
       <AuthForm
         action={signupAction}
         submitLabel="Create account"
+        legalConsent
         fields={[
           {
             name: "name",
@@ -39,19 +40,6 @@ export default function SignupPage() {
             matchWith: "password",
           },
         ]}
-        extras={
-          <label className="flex items-start gap-3 text-sm text-[var(--text)]">
-            <input
-              type="checkbox"
-              name="terms"
-              className="mt-1 h-4 w-4 rounded border-[var(--border-strong)]"
-              required
-            />
-            <span>
-              I agree to the MAP eSIM terms of service and privacy policy.
-            </span>
-          </label>
-        }
         footer={
           <AuthFooterLinks
             links={[

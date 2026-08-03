@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { CreditCard } from "lucide-react";
+import CookiePreferencesLink from "@/app/components/cookies/CookiePreferencesLink";
 import {
   BRAND_LOGO_ALT,
   BRAND_LOGO_PUBLIC_PATH,
@@ -34,12 +35,20 @@ const columns = [
       { label: "Dashboard", href: "/dashboard" },
     ],
   },
+  {
+    title: "Legal",
+    links: [
+      { label: "Privacy Policy", href: "/privacy-policy" },
+      { label: "Terms & Conditions", href: "/terms-and-conditions" },
+      { label: "Cookie Policy", href: "/cookie-policy" },
+    ],
+  },
 ];
 
 export default function Footer() {
   return (
     <footer className="border-t border-[var(--border)] bg-[var(--page-bg-soft)] text-[var(--heading)]">
-      <div className="mx-auto grid max-w-[1200px] gap-10 px-4 py-14 sm:px-6 md:grid-cols-4">
+      <div className="mx-auto grid max-w-[1200px] gap-10 px-4 py-14 sm:px-6 md:grid-cols-2 lg:grid-cols-5">
         <div>
           <div className="flex items-center gap-2.5">
             <Image
@@ -76,6 +85,11 @@ export default function Footer() {
                   </Link>
                 </li>
               ))}
+              {column.title === "Legal" ? (
+                <li>
+                  <CookiePreferencesLink />
+                </li>
+              ) : null}
             </ul>
           </div>
         ))}
