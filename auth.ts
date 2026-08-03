@@ -58,14 +58,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!rate.ok) return null;
 
         const user = await prisma.user.findUnique({ where: { email } });
+        // Null passwordHash (future OAuth-only) → same failure as unknown user.
         if (!user?.passwordHash) return null;
         if (user.deletedAt) return null;
         if (!user.emailVerifiedAt) return null;
 
-        const valid = await verifyPassword(
-          parsed.data.password,
-          user.passwordHash
-        );
+        const passwordHash = user.passwordHash;
+        const valid = await verifyPassword(parsed.data.password, passwordHash);
         if (!valid) return null;
 
         return {

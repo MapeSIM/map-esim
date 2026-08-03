@@ -160,7 +160,7 @@ async function main() {
   pass(
     "password_disabled",
     Boolean(after?.passwordHash) &&
-      !(await verifyPassword(password, after!.passwordHash))
+      !(await verifyPassword(password, after!.passwordHash as string))
   );
 
   const sessions = await p.session.count({ where: { userId: user.id } });

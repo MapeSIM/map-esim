@@ -32,38 +32,42 @@ export async function softDeleteCustomerAccount(options: {
     randomBytes(32).toString("hex")
   );
 
-  await prisma.$transaction(async (tx) => {
-    await tx.session.deleteMany({ where: { userId: user.id } });
-    await tx.account.deleteMany({ where: { userId: user.id } });
+  // Remote/Accelerate DBs need more than the default 5s interactive timeout.
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.session.deleteMany({ where: { userId: user.id } });
+      await tx.account.deleteMany({ where: { userId: user.id } });
 
-    await tx.emailOtp.updateMany({
-      where: { userId: user.id, usedAt: null },
-      data: { usedAt: now },
-    });
+      await tx.emailOtp.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { usedAt: now },
+      });
 
-    await tx.passwordResetToken.updateMany({
-      where: { userId: user.id, usedAt: null },
-      data: { usedAt: now },
-    });
+      await tx.passwordResetToken.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { usedAt: now },
+      });
 
-    // Keep order/payment rows; drop the account link only.
-    await tx.order.updateMany({
-      where: { userId: user.id },
-      data: { userId: null },
-    });
+      // Keep order/payment rows; drop the account link only.
+      await tx.order.updateMany({
+        where: { userId: user.id },
+        data: { userId: null },
+      });
 
-    await tx.user.update({
-      where: { id: user.id },
-      data: {
-        name: "Deleted User",
-        email: deletedAccountEmail(user.id),
-        passwordHash: disabledPasswordHash,
-        emailVerifiedAt: null,
-        credentialsChangedAt: now,
-        deletedAt: now,
-      },
-    });
-  });
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          name: "Deleted User",
+          email: deletedAccountEmail(user.id),
+          passwordHash: disabledPasswordHash,
+          emailVerifiedAt: null,
+          credentialsChangedAt: now,
+          deletedAt: now,
+        },
+      });
+    },
+    { maxWait: 10_000, timeout: 30_000 }
+  );
 
   return { ok: true };
 }

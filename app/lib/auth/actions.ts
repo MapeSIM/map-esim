@@ -75,6 +75,11 @@ export type AuthActionState = {
   ok: boolean;
   error?: string;
   fieldErrors?: Record<string, string>;
+  /**
+   * Internal machine code for authenticated flows (never used for public
+   * credential-enumeration messaging).
+   */
+  code?: "SET_PASSWORD_REQUIRED";
 };
 
 async function rateLimitPair(
@@ -231,11 +236,13 @@ export async function signinAction(
     },
   });
 
+  // Null passwordHash must look identical to unknown/wrong credentials.
   if (!user?.passwordHash || user.deletedAt) {
     return { ok: false, error: "Invalid email or password." };
   }
 
-  const valid = await verifyPassword(password, user.passwordHash);
+  const passwordHash = user.passwordHash;
+  const valid = await verifyPassword(password, passwordHash);
   if (!valid) {
     return { ok: false, error: "Invalid email or password." };
   }
@@ -677,11 +684,20 @@ export async function changePasswordAction(
     where: { id: sessionUser.id },
     select: { id: true, email: true, passwordHash: true, role: true },
   });
-  if (!dbUser?.passwordHash) {
-    return { ok: false, error: "Unable to update password." };
+  if (!dbUser) {
+    return { ok: false, error: "Please sign in again." };
+  }
+  // Authenticated OAuth-only users need Set Password (UI in a later phase).
+  if (!dbUser.passwordHash) {
+    return {
+      ok: false,
+      code: "SET_PASSWORD_REQUIRED",
+      error: "Set a password for this account before changing it.",
+    };
   }
 
-  const currentOk = await verifyPassword(currentPassword, dbUser.passwordHash);
+  const currentPasswordHash = dbUser.passwordHash;
+  const currentOk = await verifyPassword(currentPassword, currentPasswordHash);
   if (!currentOk) {
     return {
       ok: false,
@@ -780,6 +796,16 @@ export async function requestAccountDeletionOtpAction(
     return {
       ok: false,
       error: "Verify your email before deleting your account.",
+    };
+  }
+  // Do not weaken deletion: passwordless accounts cannot delete yet
+  // (Google re-auth will be added in a later phase).
+  if (!dbUser.passwordHash) {
+    return {
+      ok: false,
+      code: "SET_PASSWORD_REQUIRED",
+      error:
+        "Password confirmation is required to delete your account. Set a password first.",
     };
   }
   if (!currentPassword) {
@@ -914,6 +940,15 @@ export async function deleteAccountAction(
     return {
       ok: false,
       error: "Verify your email before deleting your account.",
+    };
+  }
+  // Do not allow passwordless deletion merely because passwordHash is null.
+  if (!dbUser.passwordHash) {
+    return {
+      ok: false,
+      code: "SET_PASSWORD_REQUIRED",
+      error:
+        "Password confirmation is required to delete your account. Set a password first.",
     };
   }
 

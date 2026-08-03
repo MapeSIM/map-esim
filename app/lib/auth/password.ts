@@ -118,7 +118,9 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function verifyPassword(
   password: string,
-  passwordHash: string
+  passwordHash: string | null | undefined
 ): Promise<boolean> {
+  // Never pass null/undefined into bcrypt (future OAuth-only users).
+  if (!passwordHash) return false;
   return bcrypt.compare(password, passwordHash);
 }

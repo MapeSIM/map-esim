@@ -33,7 +33,10 @@ model User {
   id                     String               @id @default(cuid())
   name                   String
   email                  String               @unique
-  passwordHash           String
+  /// Null for future OAuth-only accounts (no local password yet).
+  passwordHash           String?
+  /// Optional avatar URL (e.g. from an OAuth profile). Unused by Credentials.
+  image                  String?
   role                   Role                 @default(CUSTOMER)
   emailVerifiedAt        DateTime?
   /// JWT sessions issued before this timestamp are rejected after password reset.
