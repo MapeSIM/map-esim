@@ -9,6 +9,10 @@ import {
   serializeCookieConsent,
   type CookieConsentRecord,
 } from "@/app/lib/cookies/consent";
+import {
+  CURRENCY_PREFERENCE_COOKIE,
+  THEME_PREFERENCE_COOKIE,
+} from "@/app/lib/cookies/preferenceCookies";
 
 function cookieOptions() {
   return {
@@ -18,6 +22,13 @@ function cookieOptions() {
     path: "/",
     maxAge: COOKIE_CONSENT_MAX_AGE_SEC,
   };
+}
+
+function clearOptionalPreferenceCookies(
+  jar: Awaited<ReturnType<typeof cookies>>
+): void {
+  jar.delete(THEME_PREFERENCE_COOKIE);
+  jar.delete(CURRENCY_PREFERENCE_COOKIE);
 }
 
 export async function getServerCookieConsent(): Promise<CookieConsentRecord | null> {
@@ -38,5 +49,11 @@ export async function saveCookieConsentAction(input: {
 
   const jar = await cookies();
   jar.set(COOKIE_CONSENT_NAME, serializeCookieConsent(record), cookieOptions());
+
+  // Optional preference cookies may exist only with Preferences consent.
+  if (!record.preferences) {
+    clearOptionalPreferenceCookies(jar);
+  }
+
   return record;
 }

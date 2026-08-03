@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useTheme } from "next-themes";
 import { useCookieConsent } from "@/app/components/cookies/CookieConsentProvider";
+import { useTheme } from "@/app/components/theme/ThemeProvider";
+import {
+  clearOptionalPreferenceCookiesAction,
+  setThemePreferenceAction,
+} from "@/app/lib/cookies/preferenceActions";
 import {
   clearOptionalPreferenceStorage,
   DEFAULT_THEME,
@@ -10,12 +14,12 @@ import {
   notifyCurrencyReset,
   notifyPreferencesGranted,
   setPreferencePersistenceAllowed,
-  writeOptionalThemeStorage,
 } from "@/app/lib/cookies/preferenceStorage";
 
 /**
  * Consent controls persistence only.
- * Never continuously resets the user's in-session theme/currency choices.
+ * Legacy localStorage cleanup runs in effects (never via layout bootstrap scripts).
+ * Durable theme/currency state uses consent-gated cookies.
  */
 export default function PreferenceStorageSync() {
   const { canLoad } = useCookieConsent();
@@ -32,23 +36,22 @@ export default function PreferenceStorageSync() {
     const prev = previousPersist.current;
 
     if (prev === null) {
-      // First mount without Preference consent: clear leftover optional keys.
-      if (!persistPreferences) {
-        clearOptionalPreferenceStorage();
-      }
+      // First mount: clear legacy optional keys; never use them for init.
+      clearOptionalPreferenceStorage();
       previousPersist.current = persistPreferences;
       return;
     }
 
     if (prev && !persistPreferences) {
-      // Withdrawal once — reset to Dark + USD.
+      // Withdrawal once — reset to Dark + USD; drop cookies + legacy storage.
       clearOptionalPreferenceStorage();
+      void clearOptionalPreferenceCookiesAction();
       setTheme(DEFAULT_THEME);
       notifyCurrencyReset();
     } else if (!prev && persistPreferences) {
-      // Accept All / Preferences enabled — persist current session theme now.
+      // Preferences enabled — persist current in-memory theme via cookie.
       setPreferencePersistenceAllowed(true);
-      writeOptionalThemeStorage(themeRef.current || DEFAULT_THEME);
+      void setThemePreferenceAction(themeRef.current || DEFAULT_THEME);
       notifyPreferencesGranted();
     }
 

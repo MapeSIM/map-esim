@@ -1,18 +1,19 @@
 import { CURRENCY_STORAGE_KEY } from "@/app/lib/currency/currencies";
+import { DEFAULT_THEME } from "@/app/lib/cookies/preferenceCookies";
 
-/** next-themes storage key — single source of truth */
+export { DEFAULT_THEME };
+
+/** Legacy next-themes / prior localStorage keys — never used for initial state. */
 export const THEME_STORAGE_KEY = "theme";
-
-/** Default theme when no Preference consent / no stored preference. */
-export const DEFAULT_THEME = "dark";
+export const LEGACY_THEME_SESSION_KEY = "mapesim-theme-session";
 
 export const CURRENCY_RESET_EVENT = "map-esim-currency-reset";
 export const PREFERENCES_GRANTED_EVENT = "map-esim-preferences-granted";
 
-const OPTIONAL_STORAGE_KEYS = new Set([
+const LEGACY_OPTIONAL_STORAGE_KEYS = new Set([
   CURRENCY_STORAGE_KEY,
   THEME_STORAGE_KEY,
-  "mapesim-theme-session",
+  LEGACY_THEME_SESSION_KEY,
 ]);
 
 let preferencePersistenceAllowed = false;
@@ -27,8 +28,8 @@ export function isPreferencePersistenceAllowed(): boolean {
 }
 
 /**
- * Block durable theme/currency localStorage writes/reads until Preference consent.
- * next-themes can still update React state + the document class when setItem is a no-op.
+ * Block durable theme/currency localStorage writes/reads.
+ * Persistence is cookie-based; this only prevents legacy key revival.
  */
 export function installPreferenceStorageGuard(): void {
   if (typeof window === "undefined" || guardInstalled) return;
@@ -39,14 +40,15 @@ export function installPreferenceStorageGuard(): void {
   const rawRemoveItem = storage.removeItem.bind(storage);
 
   storage.setItem = (key: string, value: string) => {
-    if (OPTIONAL_STORAGE_KEYS.has(key) && !preferencePersistenceAllowed) {
+    if (LEGACY_OPTIONAL_STORAGE_KEYS.has(key)) {
+      // Never persist optional prefs to localStorage (consent-gated cookies only).
       return;
     }
     rawSetItem(key, value);
   };
 
   storage.getItem = (key: string) => {
-    if (OPTIONAL_STORAGE_KEYS.has(key) && !preferencePersistenceAllowed) {
+    if (LEGACY_OPTIONAL_STORAGE_KEYS.has(key)) {
       return null;
     }
     return rawGetItem(key);
@@ -60,46 +62,18 @@ export function installPreferenceStorageGuard(): void {
 }
 
 /**
- * Remove optional preference values from localStorage.
+ * Remove legacy optional preference values from localStorage.
  * Does not touch Auth.js, reset-auth, or mapesim_cookie_consent cookies.
+ * Call only from client effects — never via inline scripts.
  */
 export function clearOptionalPreferenceStorage(): void {
   if (typeof window === "undefined") return;
   try {
-    for (const key of OPTIONAL_STORAGE_KEYS) {
+    for (const key of LEGACY_OPTIONAL_STORAGE_KEYS) {
       window.localStorage.removeItem(key);
     }
   } catch {
     // Ignore storage access errors.
-  }
-}
-
-export function readOptionalCurrencyStorage(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem(CURRENCY_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function writeOptionalCurrencyStorage(value: string): void {
-  if (typeof window === "undefined") return;
-  if (!preferencePersistenceAllowed) return;
-  try {
-    window.localStorage.setItem(CURRENCY_STORAGE_KEY, value);
-  } catch {
-    // Ignore storage write errors.
-  }
-}
-
-export function writeOptionalThemeStorage(value: string): void {
-  if (typeof window === "undefined") return;
-  if (!preferencePersistenceAllowed) return;
-  try {
-    window.localStorage.setItem(THEME_STORAGE_KEY, value);
-  } catch {
-    // Ignore storage write errors.
   }
 }
 

@@ -1,8 +1,8 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { useTheme } from "next-themes";
 import { Moon, Sun } from "lucide-react";
+import { useTheme } from "@/app/components/theme/ThemeProvider";
 
 function subscribe() {
   return () => {};
@@ -10,7 +10,7 @@ function subscribe() {
 
 /**
  * Theme control always works immediately.
- * Persistence is gated by the preference-storage guard (Preference consent).
+ * Persistence uses consent-gated preference cookies (Preferences consent).
  */
 export default function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
@@ -19,7 +19,7 @@ export default function ThemeToggle() {
 
   function toggleTheme() {
     const current =
-      resolvedTheme ??
+      resolvedTheme ||
       (document.documentElement.classList.contains("dark") ? "dark" : "light");
     setTheme(current === "dark" ? "light" : "dark");
   }

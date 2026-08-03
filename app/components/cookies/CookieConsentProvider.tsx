@@ -81,16 +81,16 @@ export default function CookieConsentProvider({
   const persist = useCallback(async (record: CookieConsentRecord) => {
     setPending(true);
     try {
-      // Enable/disable optional persistence BEFORE saving + notifying children.
+      // Persist consent cookie first so preference cookie actions can verify it.
       setPreferencePersistenceAllowed(record.preferences);
-      setConsent(record);
-      setBannerVisible(false);
-      setPreferencesOpen(false);
       await saveCookieConsentAction({
         preferences: record.preferences,
         analytics: record.analytics,
         marketing: record.marketing,
       });
+      setConsent(record);
+      setBannerVisible(false);
+      setPreferencesOpen(false);
     } finally {
       setPending(false);
     }

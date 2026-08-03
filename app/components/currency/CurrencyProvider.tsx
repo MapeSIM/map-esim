@@ -14,15 +14,13 @@ import { useCookieConsent } from "@/app/components/cookies/CookieConsentProvider
 import {
   DEFAULT_CURRENCY,
   FALLBACK_USD_RATES,
-  isCurrencyCode,
   type CurrencyCode,
 } from "@/app/lib/currency/currencies";
 import { formatMoney, type CurrencyRates } from "@/app/lib/currency/format";
+import { setCurrencyPreferenceAction } from "@/app/lib/cookies/preferenceActions";
 import {
   CURRENCY_RESET_EVENT,
   PREFERENCES_GRANTED_EVENT,
-  readOptionalCurrencyStorage,
-  writeOptionalCurrencyStorage,
 } from "@/app/lib/cookies/preferenceStorage";
 
 type CurrencyContextValue = {
@@ -35,20 +33,20 @@ type CurrencyContextValue = {
 
 const CurrencyContext = createContext<CurrencyContextValue | null>(null);
 
-function readStoredCurrencyOrDefault(): CurrencyCode {
-  const stored = readOptionalCurrencyStorage();
-  if (isCurrencyCode(stored)) return stored;
-  return DEFAULT_CURRENCY;
-}
-
-export function CurrencyProvider({ children }: { children: ReactNode }) {
+export function CurrencyProvider({
+  children,
+  initialCurrency = DEFAULT_CURRENCY,
+}: {
+  children: ReactNode;
+  /** Server-resolved currency; must match first client render. */
+  initialCurrency?: CurrencyCode;
+}) {
   const { canLoad } = useCookieConsent();
   const persistPreferences = canLoad("preferences");
   const previousPersist = useRef<boolean | null>(null);
 
-  // Server + first client render must both be USD (no localStorage during render).
   const [currency, setCurrencyState] =
-    useState<CurrencyCode>(DEFAULT_CURRENCY);
+    useState<CurrencyCode>(initialCurrency);
   const [rates, setRates] = useState<CurrencyRates>(FALLBACK_USD_RATES);
   const currencyRef = useRef(currency);
   currencyRef.current = currency;
@@ -79,15 +77,11 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Post-hydration restore + consent transitions only (never during render).
+  // Consent transitions only — never restore from localStorage.
   useEffect(() => {
     const prev = previousPersist.current;
 
     if (prev === null) {
-      // First mount after hydration.
-      if (persistPreferences) {
-        setCurrencyState(readStoredCurrencyOrDefault());
-      }
       previousPersist.current = persistPreferences;
       return;
     }
@@ -95,7 +89,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     if (prev && !persistPreferences) {
       setCurrencyState(DEFAULT_CURRENCY);
     } else if (!prev && persistPreferences) {
-      writeOptionalCurrencyStorage(currencyRef.current);
+      void setCurrencyPreferenceAction(currencyRef.current);
     }
 
     previousPersist.current = persistPreferences;
@@ -106,7 +100,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       setCurrencyState(DEFAULT_CURRENCY);
     };
     const onGranted = () => {
-      writeOptionalCurrencyStorage(currencyRef.current);
+      void setCurrencyPreferenceAction(currencyRef.current);
     };
     window.addEventListener(CURRENCY_RESET_EVENT, onReset);
     window.addEventListener(PREFERENCES_GRANTED_EVENT, onGranted);
@@ -120,7 +114,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     (next: CurrencyCode) => {
       setCurrencyState(next);
       if (persistPreferences) {
-        writeOptionalCurrencyStorage(next);
+        void setCurrencyPreferenceAction(next);
       }
     },
     [persistPreferences]
