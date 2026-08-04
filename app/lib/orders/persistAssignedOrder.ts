@@ -7,12 +7,12 @@ import {
   Prisma,
 } from "@prisma/client";
 import { normalizeEmail } from "@/app/lib/auth/email";
-import { prisma } from "@/app/lib/db";
 import type { VerifiedCheckoutOffer } from "@/app/lib/vesim/server";
 
 /**
- * Persist a COMPANY_FUNDED order linked to a CUSTOMER.
- * Upserts on providerOrderId. Never stores QR/LPA/access tokens.
+ * Persist a customer-linked order after confirmed provider success.
+ * Supports COMPANY_FUNDED and CUSTOMER_WALLET. Upserts on providerOrderId.
+ * Never stores QR/LPA/access tokens.
  */
 export async function persistAssignedOrder(
   tx: Prisma.TransactionClient,
@@ -33,8 +33,11 @@ export async function persistAssignedOrder(
     throw new Error("Assigned order persistence requires complete identifiers.");
   }
 
-  if (options.fundingSource !== OrderFundingSource.COMPANY_FUNDED) {
-    throw new Error("Only COMPANY_FUNDED assignment is enabled in this phase.");
+  if (
+    options.fundingSource !== OrderFundingSource.COMPANY_FUNDED &&
+    options.fundingSource !== OrderFundingSource.CUSTOMER_WALLET
+  ) {
+    throw new Error("Unsupported order funding source for this flow.");
   }
 
   const validity =
@@ -62,7 +65,7 @@ export async function persistAssignedOrder(
       providerCurrency: options.verifiedOffer.currency || "USD",
       displayAmount: options.verifiedOffer.priceUSD,
       displayCurrency: options.verifiedOffer.currency || "USD",
-      fundingSource: OrderFundingSource.COMPANY_FUNDED,
+      fundingSource: options.fundingSource,
       status: options.status || OrderStatus.COMPLETED,
       claimStatus: OrderClaimStatus.CLAIMED,
       claimedAt: now,
@@ -81,7 +84,7 @@ export async function persistAssignedOrder(
       validity,
       providerAmount: options.verifiedOffer.priceUSD,
       providerCurrency: options.verifiedOffer.currency || "USD",
-      fundingSource: OrderFundingSource.COMPANY_FUNDED,
+      fundingSource: options.fundingSource,
       status: options.status || OrderStatus.COMPLETED,
       claimStatus: OrderClaimStatus.CLAIMED,
       claimedAt: now,

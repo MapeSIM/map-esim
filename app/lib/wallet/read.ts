@@ -177,9 +177,12 @@ export async function getCustomerWalletTransactions(
       directionLabel: walletDirectionLabel(row.direction),
       amountLabel: formatWalletTransactionAmount(row.amountCents, row.direction),
       statusLabel: walletStatusLabel(row.status),
-      // Admin manual credit/debit keeps reason/internal reference admin-only.
+      // Hide internal purchase/admin reference details from customer wallet UI.
       referenceLabel:
-        row.type === "ADMIN_CREDIT" || row.type === "ADJUSTMENT_DEBIT"
+        row.type === "ADMIN_CREDIT" ||
+        row.type === "ADJUSTMENT_DEBIT" ||
+        row.type === "PURCHASE_DEBIT" ||
+        row.type === "REFUND_CREDIT"
           ? null
           : formatWalletReference(row.referenceType, row.referenceId),
     })),

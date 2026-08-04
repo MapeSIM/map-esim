@@ -38,6 +38,16 @@ enum AdminPackageAssignmentStatus {
   RECONCILIATION_REQUIRED
 }
 
+enum WalletEsimPurchaseStatus {
+  DRAFT
+  READY
+  FUNDS_RESERVED
+  PROVIDER_PENDING
+  COMPLETED
+  FAILED_REFUNDED
+  RECONCILIATION_REQUIRED
+}
+
 enum OtpPurpose {
   EMAIL_VERIFICATION
   PASSWORD_RESET
@@ -105,6 +115,7 @@ model User {
   walletAccount          WalletAccount?
   packageAssignmentsAsCustomer AdminPackageAssignment[] @relation("AssignmentCustomer")
   packageAssignmentsAsAdmin    AdminPackageAssignment[] @relation("AssignmentAdmin")
+  walletEsimPurchases          WalletEsimPurchase[]
 
   @@index([deletedAt])
 }
@@ -186,7 +197,7 @@ model Order {
   providerCurrency String?             @default("USD")
   displayAmount    Decimal?            @db.Decimal(12, 2)
   displayCurrency  String?
-  /// Null for legacy guest checkout orders. Phase 5A writes COMPANY_FUNDED only.
+  /// Null for legacy guest checkout orders.
   fundingSource    OrderFundingSource?
   status           OrderStatus         @default(COMPLETED)
   iccidEncrypted   String?
@@ -196,6 +207,7 @@ model Order {
   updatedAt        DateTime            @updatedAt
   user             User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
   adminPackageAssignment AdminPackageAssignment?
+  walletEsimPurchase     WalletEsimPurchase?
 
   @@index([customerEmail])
   @@index([userId])
@@ -242,6 +254,47 @@ model AdminPackageAssignment {
   @@index([customerUserId, createdAt])
 }
 
+/// Durable CUSTOMER wallet-funded eSIM purchase attempt (provider write outside Prisma tx).
+model WalletEsimPurchase {
+  id                     String                   @id @default(cuid())
+  customerUserId         String
+  offerId                String
+  destinationCode        String?
+  destinationName        String?
+  planName               String?
+  dataAllowance          String?
+  validity               String?
+  /// Authoritative customer selling price in integer USD cents.
+  priceCents             Int
+  /// Provider/partner cost snapshot when safely available (ADMIN-only visibility).
+  providerCostCents      Int?
+  currency               String                   @default("USD")
+  fundingSource          OrderFundingSource       @default(CUSTOMER_WALLET)
+  status                 WalletEsimPurchaseStatus @default(DRAFT)
+  idempotencyKey         String                   @unique
+  debitTransactionId     String?                  @unique
+  refundTransactionId    String?                  @unique
+  orderId                String?                  @unique
+  /// Stored only when required for reconciliation; never shown to CUSTOMER.
+  providerOrderId        String?
+  failureCategory        String?
+  failureCode            String?
+  reconciliationState    String?
+  emailDeliveryStatus    String?
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  completedAt            DateTime?
+  customer               User                     @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+  order                  Order?                   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  debitTransaction       WalletTransaction?       @relation("PurchaseDebitTx", fields: [debitTransactionId], references: [id], onDelete: SetNull)
+  refundTransaction      WalletTransaction?       @relation("PurchaseRefundTx", fields: [refundTransactionId], references: [id], onDelete: SetNull)
+
+  @@index([customerUserId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([customerUserId, createdAt])
+}
+
 model AuditLog {
   id          String   @id @default(cuid())
   actorUserId String?
@@ -272,7 +325,7 @@ model WalletAccount {
   @@index([createdAt])
 }
 
-/// Append-only wallet ledger entry (writes arrive in later phases).
+/// Append-only wallet ledger entry.
 model WalletTransaction {
   id                String                  @id @default(cuid())
   walletId          String
@@ -287,6 +340,8 @@ model WalletTransaction {
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @updatedAt
   wallet            WalletAccount           @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  purchaseAsDebit   WalletEsimPurchase?     @relation("PurchaseDebitTx")
+  purchaseAsRefund  WalletEsimPurchase?     @relation("PurchaseRefundTx")
 
   @@index([walletId])
   @@index([createdAt])

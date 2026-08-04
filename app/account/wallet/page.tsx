@@ -61,11 +61,21 @@ export default async function AccountWalletPage({
 
   return (
     <div className="min-w-0 w-full max-w-full space-y-8">
-      <header className="min-w-0">
-        <h1 className="text-2xl font-bold tracking-tight">Wallet</h1>
-        <p className="mt-2 text-sm text-[var(--text-muted)] break-words">
-          Your MAP eSIM wallet balance and history. This view is read-only.
-        </p>
+      <header className="flex min-w-0 flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Wallet</h1>
+          <p className="mt-2 text-sm text-[var(--text-muted)] break-words">
+            Your MAP eSIM wallet balance and history.
+          </p>
+        </div>
+        {data.hasWallet ? (
+          <Link
+            href="/account/esim/buy"
+            className="inline-flex h-10 items-center justify-center rounded-[14px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+          >
+            Buy eSIM with wallet
+          </Link>
+        ) : null}
       </header>
 
       <div className="min-w-0 w-full max-w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">

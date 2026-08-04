@@ -90,7 +90,8 @@ function main() {
   assert.match(schema, /CUSTOMER_WALLET/);
   assert.match(schema, /DIRECT_PAYMENT/);
   assert.match(service, /OrderFundingSource\.COMPANY_FUNDED/);
-  assert.match(persist, /Only COMPANY_FUNDED assignment is enabled/);
+  assert.match(persist, /CUSTOMER_WALLET/);
+  assert.match(persist, /COMPANY_FUNDED/);
   assert.ok(!/CUSTOMER_WALLET/.test(service));
   assert.ok(!/DIRECT_PAYMENT/.test(service));
   console.log("PASS company_funded_only_enabled");
@@ -157,7 +158,8 @@ function main() {
 
   assert.match(schema, /model AdminPackageAssignment/);
   assert.match(schema, /orderId/);
-  assert.match(persist, /fundingSource:\s*OrderFundingSource\.COMPANY_FUNDED/);
+  assert.match(persist, /fundingSource:\s*options\.fundingSource/);
+  assert.match(service, /OrderFundingSource\.COMPANY_FUNDED/);
   assert.match(readSrc, /getAdminCompletedAssignment/);
   console.log("PASS assignment_order_customer_relationship_validated");
 
@@ -237,7 +239,7 @@ function main() {
 
   assert.ok(!/stripe|paypal|promo|reward|refund|webhook/i.test(service));
   assert.ok(!/stripe|paypal|promo|reward|refund|webhook/i.test(actions));
-  assert.ok(!/CUSTOMER_WALLET/.test(persist));
+  assert.ok(!/WalletEsimPurchase|walletPurchase/.test(service));
   console.log("PASS no_payment_gateway_refund_promo_reward");
 
   assert.ok(!/checkoutPayload/.test(persist));

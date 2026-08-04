@@ -24,6 +24,7 @@
     "qa:admin-wallet-credit": "tsx scripts/qa-admin-wallet-credit.ts",
     "qa:admin-wallet-debit": "tsx scripts/qa-admin-wallet-debit.ts",
     "qa:admin-package-assignment": "tsx scripts/qa-admin-package-assignment.ts",
+    "qa:customer-wallet-purchase": "tsx scripts/qa-customer-wallet-purchase.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

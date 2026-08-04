@@ -8,7 +8,7 @@ export const WALLET_TRANSACTIONS_PAGE_SIZE = 20;
 export type WalletTransactionTypeLabel =
   | "Admin credit"
   | "Top-up"
-  | "Purchase"
+  | "eSIM purchase"
   | "Refund"
   | "Adjustment credit"
   | "Admin adjustment"
@@ -68,7 +68,7 @@ export function walletTransactionTypeLabel(type: string): WalletTransactionTypeL
     case "TOPUP_CREDIT":
       return "Top-up";
     case "PURCHASE_DEBIT":
-      return "Purchase";
+      return "eSIM purchase";
     case "REFUND_CREDIT":
       return "Refund";
     case "ADJUSTMENT_CREDIT":

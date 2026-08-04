@@ -26,6 +26,9 @@ const METADATA_ALLOWLIST = new Set([
   "fundingSource",
   "providerCostCents",
   "failureCategory",
+  "failureCode",
+  "walletTransactionId",
+  "purchaseId",
 ]);
 
 export type AdminOrderStatusFilter = "ALL" | "COMPLETED" | "PENDING" | "FAILED";

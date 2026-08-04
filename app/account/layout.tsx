@@ -8,6 +8,7 @@ const links = [
   { href: "/account", label: "Overview" },
   { href: "/account/orders", label: "My Orders" },
   { href: "/account/wallet", label: "Wallet" },
+  { href: "/account/esim/buy", label: "Buy with wallet" },
   { href: "/account/profile", label: "Profile" },
   { href: "/account/security", label: "Security" },
 ];

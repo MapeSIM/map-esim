@@ -66,7 +66,7 @@ function fundingSourceLabel(
   fundingSource: string | null | undefined
 ): string {
   if (fundingSource === "COMPANY_FUNDED") return "Company-funded";
-  if (fundingSource === "CUSTOMER_WALLET") return "Customer wallet";
+  if (fundingSource === "CUSTOMER_WALLET") return "Wallet-funded";
   if (fundingSource === "DIRECT_PAYMENT") return "Direct payment";
   return "Not available";
 }
