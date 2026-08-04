@@ -119,11 +119,12 @@ export function formatWalletTransactionAmount(
   amountCents: number,
   direction: string
 ): string {
-  const signed =
-    direction === "DEBIT"
-      ? -Math.abs(amountCents)
-      : Math.abs(amountCents);
-  return formatUsdCents(signed);
+  if (direction === "DEBIT") {
+    return formatUsdCents(-Math.abs(amountCents));
+  }
+  const body = formatUsdCents(Math.abs(amountCents));
+  if (body === "$0.00") return body;
+  return `+${body}`;
 }
 
 export function formatWalletDateTime(date: Date): string {

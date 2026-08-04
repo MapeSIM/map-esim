@@ -151,17 +151,22 @@ function main() {
   assert.ok(!/migrate reset|db push/i.test(walletPage));
   console.log("PASS no_destructive_prisma_commands_in_wallet_code");
 
-  // Ensure no write helpers were added under wallet/
-  const walletLibDir = join(root, "app/lib/wallet");
-  const walletFiles = readdirSync(walletLibDir);
-  for (const file of walletFiles) {
+  // Read/display helpers remain mutation-free; Phase 4B writes live in adminCredit*.
+  const walletReadOnlyFiles = [
+    "read.ts",
+    "display.ts",
+    "amount.ts",
+    "adminCreditFormState.ts",
+  ];
+  for (const file of walletReadOnlyFiles) {
     const src = read(`app/lib/wallet/${file}`);
     assert.ok(
       !/\.create\(|\.upsert\(|\.update\(|\.delete\(|\.createMany\(/i.test(src),
       `${file} must not mutate wallet rows`
     );
   }
-  console.log("PASS no_topup_payment_admin_credit_mutation");
+  assert.ok(existsSync(join(root, "app/lib/wallet/adminCredit.ts")));
+  console.log("PASS read_helpers_remain_mutation_free");
 
   console.log("ALL_QA_PASSED=14");
 }

@@ -20,6 +20,9 @@ const METADATA_ALLOWLIST = new Set([
   "channel",
   "method",
   "role",
+  "amountCents",
+  "currency",
+  "reason",
 ]);
 
 export type AdminOrderStatusFilter = "ALL" | "COMPLETED" | "PENDING" | "FAILED";

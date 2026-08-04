@@ -177,7 +177,11 @@ export async function getCustomerWalletTransactions(
       directionLabel: walletDirectionLabel(row.direction),
       amountLabel: formatWalletTransactionAmount(row.amountCents, row.direction),
       statusLabel: walletStatusLabel(row.status),
-      referenceLabel: formatWalletReference(row.referenceType, row.referenceId),
+      // ADMIN_CREDIT keeps reason/internal reference admin-only.
+      referenceLabel:
+        row.type === "ADMIN_CREDIT"
+          ? null
+          : formatWalletReference(row.referenceType, row.referenceId),
     })),
     page,
     pageSize,

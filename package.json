@@ -21,6 +21,7 @@
     "qa:admin-customers": "tsx scripts/qa-admin-customers.ts",
     "qa:admin-single-session": "tsx scripts/qa-admin-single-session.ts",
     "qa:wallet-foundation": "tsx scripts/qa-wallet-foundation.ts",
+    "qa:admin-wallet-credit": "tsx scripts/qa-admin-wallet-credit.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
