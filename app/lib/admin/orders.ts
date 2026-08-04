@@ -24,6 +24,7 @@ export type AdminOrderListRow = {
   amountLabel: string;
   providerRefMasked: string;
   associationLabel: "Linked customer" | "Guest order";
+  fundingLabel: string;
 };
 
 export type AdminOrdersPageResult = {
@@ -52,6 +53,7 @@ export type AdminOrderDetail = {
   providerRefMasked: string;
   offerId: string;
   associationLabel: "Linked customer" | "Guest order";
+  fundingLabel: string;
   customerEmail: string;
   accountStatusLabel: string;
   claimStatusLabel: string;
@@ -59,6 +61,15 @@ export type AdminOrderDetail = {
   /** Never full ICCID — last-4 mask or Not available */
   iccidHint: string;
 };
+
+function fundingSourceLabel(
+  fundingSource: string | null | undefined
+): string {
+  if (fundingSource === "COMPANY_FUNDED") return "Company-funded";
+  if (fundingSource === "CUSTOMER_WALLET") return "Customer wallet";
+  if (fundingSource === "DIRECT_PAYMENT") return "Direct payment";
+  return "Not available";
+}
 
 function displayOrUnavailable(value: string | null | undefined): string {
   const trimmed = (value ?? "").trim();
@@ -217,6 +228,7 @@ export async function getAdminOrdersPage(
       providerCurrency: true,
       providerOrderId: true,
       userId: true,
+      fundingSource: true,
     },
   });
 
@@ -229,6 +241,7 @@ export async function getAdminOrdersPage(
     amountLabel: formatOrderAmount(row.providerAmount, row.providerCurrency),
     providerRefMasked: maskProviderOrderRef(row.providerOrderId),
     associationLabel: row.userId ? "Linked customer" : "Guest order",
+    fundingLabel: fundingSourceLabel(row.fundingSource),
   }));
 
   return {
@@ -275,6 +288,7 @@ export async function getAdminOrderDetail(
       claimStatus: true,
       claimedAt: true,
       iccidEncrypted: true,
+      fundingSource: true,
       user: {
         select: {
           deletedAt: true,
@@ -314,6 +328,7 @@ export async function getAdminOrderDetail(
     providerRefMasked: maskProviderOrderRef(row.providerOrderId),
     offerId: displayOrUnavailable(row.offerId),
     associationLabel: row.userId ? "Linked customer" : "Guest order",
+    fundingLabel: fundingSourceLabel(row.fundingSource),
     customerEmail: displayOrUnavailable(row.customerEmail),
     accountStatusLabel,
     claimStatusLabel: displayOrUnavailable(row.claimStatus),

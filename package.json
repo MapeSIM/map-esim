@@ -23,6 +23,7 @@
     "qa:wallet-foundation": "tsx scripts/qa-wallet-foundation.ts",
     "qa:admin-wallet-credit": "tsx scripts/qa-admin-wallet-credit.ts",
     "qa:admin-wallet-debit": "tsx scripts/qa-admin-wallet-debit.ts",
+    "qa:admin-package-assignment": "tsx scripts/qa-admin-package-assignment.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

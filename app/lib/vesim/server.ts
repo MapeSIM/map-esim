@@ -1,4 +1,8 @@
 import {
+  normalizeDestinations,
+  type VesimDestination,
+} from "@/app/lib/vesim/destinations";
+import {
   normalizeOffers,
   type VesimOffer,
 } from "@/app/lib/vesim/offers";
@@ -157,6 +161,28 @@ export async function getBrokerToken(): Promise<TokenResult> {
         ? data.token_type.trim()
         : "Bearer",
   };
+}
+
+export async function fetchDestinations(
+  token?: TokenResult
+): Promise<VesimDestination[]> {
+  const auth = token || (await getBrokerToken());
+  const baseUrl = getVesimBaseUrl();
+
+  const response = await fetch(`${baseUrl}/api/esim/destinations`, {
+    headers: {
+      Authorization: `${auth.tokenType} ${auth.accessToken}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  const data = await readJsonSafe(response);
+  if (!response.ok) {
+    return [];
+  }
+
+  return normalizeDestinations(data);
 }
 
 export async function fetchOffersForCountry(

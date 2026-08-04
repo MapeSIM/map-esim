@@ -161,6 +161,25 @@ export default async function AdminCustomerDetailPage({
       <section className="min-w-0 w-full max-w-full space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
+            <h2 className="text-lg font-semibold tracking-tight">eSIM packages</h2>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Company-funded provider assignment. Customer wallet is never charged.
+            </p>
+          </div>
+          {detail.accountStatusLabel === "Active" ? (
+            <Link
+              href={`/admin/customers/${encodeURIComponent(detail.id)}/esim/assign`}
+              className="inline-flex h-10 items-center justify-center rounded-[14px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+            >
+              Assign eSIM package
+            </Link>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="min-w-0 w-full max-w-full space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
             <h2 className="text-lg font-semibold tracking-tight">Wallet</h2>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
               Read-only balance and recent ledger activity. Viewing never creates

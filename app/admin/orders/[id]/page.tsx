@@ -79,6 +79,7 @@ export default async function AdminOrderDetailPage({
         <DetailRow label="Plan / data" value={detail.planPackage} />
         <DetailRow label="Validity" value={detail.validity} />
         <DetailRow label="Local status" value={detail.localStatus} />
+        <DetailRow label="Funding" value={detail.fundingLabel} />
         <DetailRow label="Provider amount" value={detail.amountLabel} />
         <DetailRow
           label="Provider reference"

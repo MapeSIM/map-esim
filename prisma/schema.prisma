@@ -23,6 +23,21 @@ enum OrderStatus {
   FAILED
 }
 
+enum OrderFundingSource {
+  COMPANY_FUNDED
+  CUSTOMER_WALLET
+  DIRECT_PAYMENT
+}
+
+enum AdminPackageAssignmentStatus {
+  DRAFT
+  READY
+  PROVIDER_PENDING
+  COMPLETED
+  FAILED
+  RECONCILIATION_REQUIRED
+}
+
 enum OtpPurpose {
   EMAIL_VERIFICATION
   PASSWORD_RESET
@@ -88,6 +103,8 @@ model User {
   emailOtps              EmailOtp[]
   auditLogs              AuditLog[]           @relation("AuditActor")
   walletAccount          WalletAccount?
+  packageAssignmentsAsCustomer AdminPackageAssignment[] @relation("AssignmentCustomer")
+  packageAssignmentsAsAdmin    AdminPackageAssignment[] @relation("AssignmentAdmin")
 
   @@index([deletedAt])
 }
@@ -156,8 +173,8 @@ model PasswordResetToken {
 }
 
 model Order {
-  id               String           @id @default(cuid())
-  providerOrderId  String           @unique
+  id               String              @id @default(cuid())
+  providerOrderId  String              @unique
   userId           String?
   customerEmail    String
   offerId          String
@@ -165,20 +182,64 @@ model Order {
   planName         String?
   dataAllowance    String?
   validity         String?
-  providerAmount   Decimal?         @db.Decimal(12, 2)
-  providerCurrency String?          @default("USD")
-  displayAmount    Decimal?         @db.Decimal(12, 2)
+  providerAmount   Decimal?            @db.Decimal(12, 2)
+  providerCurrency String?             @default("USD")
+  displayAmount    Decimal?            @db.Decimal(12, 2)
   displayCurrency  String?
-  status           OrderStatus      @default(COMPLETED)
+  /// Null for legacy guest checkout orders. Phase 5A writes COMPANY_FUNDED only.
+  fundingSource    OrderFundingSource?
+  status           OrderStatus         @default(COMPLETED)
   iccidEncrypted   String?
-  claimStatus      OrderClaimStatus @default(UNCLAIMED)
+  claimStatus      OrderClaimStatus    @default(UNCLAIMED)
   claimedAt        DateTime?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  user             User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  user             User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  adminPackageAssignment AdminPackageAssignment?
 
   @@index([customerEmail])
   @@index([userId])
+  @@index([fundingSource])
+}
+
+/// Durable ADMIN company-funded eSIM assignment attempt (provider write outside Prisma tx).
+model AdminPackageAssignment {
+  id                  String                        @id @default(cuid())
+  customerUserId      String
+  adminUserId         String
+  offerId             String
+  destinationCode     String?
+  destinationName     String?
+  planName            String?
+  dataAllowance       String?
+  validity            String?
+  fundingSource       OrderFundingSource            @default(COMPANY_FUNDED)
+  /// Provider/company cost snapshot in integer USD cents when reliably available.
+  providerCostCents   Int?
+  providerCurrency    String                        @default("USD")
+  status              AdminPackageAssignmentStatus  @default(DRAFT)
+  idempotencyKey      String                        @unique
+  orderId             String?                       @unique
+  /// Stored only when required for reconciliation; never shown to CUSTOMER.
+  providerOrderId     String?
+  reason              String
+  internalReference   String?
+  failureCategory     String?
+  failureCode         String?
+  reconciliationState String?
+  emailDeliveryStatus String?
+  createdAt           DateTime                      @default(now())
+  updatedAt           DateTime                      @updatedAt
+  completedAt         DateTime?
+  customer            User                          @relation("AssignmentCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
+  admin               User                          @relation("AssignmentAdmin", fields: [adminUserId], references: [id], onDelete: Restrict)
+  order               Order?                        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([customerUserId])
+  @@index([adminUserId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([customerUserId, createdAt])
 }
 
 model AuditLog {

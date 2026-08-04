@@ -23,6 +23,9 @@ const METADATA_ALLOWLIST = new Set([
   "amountCents",
   "currency",
   "reason",
+  "fundingSource",
+  "providerCostCents",
+  "failureCategory",
 ]);
 
 export type AdminOrderStatusFilter = "ALL" | "COMPLETED" | "PENDING" | "FAILED";

@@ -184,6 +184,7 @@ export default async function AdminOrdersPage({
                 <th className="px-3 py-3 font-semibold">Destination</th>
                 <th className="px-3 py-3 font-semibold">Plan / data</th>
                 <th className="px-3 py-3 font-semibold">Status</th>
+                <th className="px-3 py-3 font-semibold">Funding</th>
                 <th className="px-3 py-3 font-semibold">Amount</th>
                 <th className="px-3 py-3 font-semibold">Provider ref</th>
                 <th className="px-3 py-3 font-semibold">Association</th>
@@ -202,6 +203,7 @@ export default async function AdminOrdersPage({
                   <td className="px-3 py-3">{order.destination}</td>
                   <td className="px-3 py-3">{order.planPackage}</td>
                   <td className="px-3 py-3">{order.localStatus}</td>
+                  <td className="px-3 py-3">{order.fundingLabel}</td>
                   <td className="whitespace-nowrap px-3 py-3">
                     {order.amountLabel}
                   </td>
