@@ -69,12 +69,20 @@ export default async function AccountWalletPage({
           </p>
         </div>
         {data.hasWallet ? (
-          <Link
-            href="/account/esim/buy"
-            className="inline-flex h-10 items-center justify-center rounded-[14px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
-          >
-            Buy eSIM with wallet
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/account/wallet/top-up"
+              className="inline-flex h-10 items-center justify-center rounded-[14px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+            >
+              Add funds
+            </Link>
+            <Link
+              href="/account/esim/buy"
+              className="inline-flex h-10 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+            >
+              Buy eSIM with wallet
+            </Link>
+          </div>
         ) : null}
       </header>
 
@@ -87,7 +95,8 @@ export default async function AccountWalletPage({
         </p>
         <p className="mt-1 text-sm text-[var(--text-muted)]">USD</p>
         <p className="mt-4 max-w-full text-sm leading-relaxed text-[var(--text-muted)] break-words [overflow-wrap:anywhere]">
-          Wallet top-ups will become available after secure payment integration.
+          Add funds securely. Your PKR payment amount is confirmed at checkout,
+          and only a verified payment can credit this wallet.
         </p>
       </div>
 

@@ -107,15 +107,13 @@ function main() {
   assert.match(walletPage, /requireRole\("CUSTOMER"\)/);
   assert.match(walletPage, /getCustomerWalletTransactions/);
   assert.match(walletPage, /No wallet transactions yet\./);
+  assert.match(walletPage, /\/account\/wallet\/top-up/);
+  assert.match(walletPage, /Add funds/);
   assert.match(
     walletPage,
-    /Wallet top-ups will become available after secure payment integration/
+    /only a verified payment can credit this wallet/i
   );
-  assert.ok(!/top.?up|Top Up|pay now|Add funds/i.test(walletPage.replace(
-    /Wallet top-ups will become available after secure payment integration\./g,
-    ""
-  )));
-  assert.ok(!/create\(|upsert|creditWallet|debitWallet/i.test(walletPage));
+  assert.ok(!/create\(|upsert|creditWallet|debitWallet|applyVerifiedTopupPaymentEvent/i.test(walletPage));
   console.log("PASS customer_wallet_page_readonly_protection");
 
   const layoutSrc = read("app/account/layout.tsx");

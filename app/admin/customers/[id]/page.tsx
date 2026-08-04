@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAdminCustomerDetail } from "@/app/lib/admin/customers";
+import { getAdminCustomerRecentTopups } from "@/app/lib/admin/topups";
 import { getAdminCustomerWalletSummary } from "@/app/lib/admin/wallet";
 import { ADMIN_DEBIT_MIN_CENTS } from "@/app/lib/wallet/amount";
 
@@ -63,6 +64,15 @@ export default async function AdminCustomerDetailPage({
     wallet = await getAdminCustomerWalletSummary(detail.id);
   } catch {
     walletUnavailable = true;
+  }
+
+  let recentTopups: Awaited<ReturnType<typeof getAdminCustomerRecentTopups>> =
+    [];
+  let topupsUnavailable = false;
+  try {
+    recentTopups = await getAdminCustomerRecentTopups(detail.id, 5);
+  } catch {
+    topupsUnavailable = true;
   }
 
   return (
@@ -299,6 +309,71 @@ export default async function AdminCustomerDetailPage({
             </div>
           </>
         ) : null}
+      </section>
+
+      <section className="min-w-0 w-full max-w-full space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">
+              Wallet top-ups
+            </h2>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Read-only top-up attempts. No mark-paid or raw payload controls.
+            </p>
+          </div>
+          <Link
+            href="/admin/wallet-topups"
+            className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+          >
+            View all top-ups
+          </Link>
+        </div>
+
+        {topupsUnavailable ? (
+          <div
+            className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-6"
+            role="status"
+          >
+            <p className="text-sm font-medium text-[var(--heading)]">
+              Wallet top-up data is temporarily unavailable.
+            </p>
+          </div>
+        ) : recentTopups.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-5 text-sm text-[var(--text-muted)]">
+            No wallet top-ups for this customer.
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {recentTopups.map((row) => (
+              <li
+                key={row.id}
+                className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="font-semibold text-[var(--heading)]">
+                      {row.statusLabel}
+                    </p>
+                    <p className="mt-1 text-[var(--text-muted)]">
+                      {row.gatewayLabel} · {row.createdAtLabel}
+                    </p>
+                  </div>
+                  <p className="font-semibold tabular-nums text-[var(--heading)]">
+                    {row.creditAmountLabel} USD
+                  </p>
+                </div>
+                <p className="mt-3">
+                  <Link
+                    href={`/admin/wallet-topups/${encodeURIComponent(row.id)}`}
+                    className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+                  >
+                    View top-up
+                  </Link>
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   );

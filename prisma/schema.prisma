@@ -80,6 +80,28 @@ enum WalletTransactionStatus {
   REVERSED
 }
 
+enum WalletTopupStatus {
+  DRAFT
+  AWAITING_PAYMENT
+  PAYMENT_PENDING
+  PAYMENT_CONFIRMED
+  CREDITED
+  FAILED
+  EXPIRED
+  CANCELLED
+  RECONCILIATION_REQUIRED
+}
+
+/// Gateway providers for future Pakistan market adapters. None are active in Phase 6A.
+enum PaymentGatewayProvider {
+  SIMPAISA
+  PAYFAST
+  SAFEPAY
+  JAZZCASH
+  EASYPAISA
+  MANUAL_TEST
+}
+
 model User {
   id                     String               @id @default(cuid())
   name                   String
@@ -116,6 +138,7 @@ model User {
   packageAssignmentsAsCustomer AdminPackageAssignment[] @relation("AssignmentCustomer")
   packageAssignmentsAsAdmin    AdminPackageAssignment[] @relation("AssignmentAdmin")
   walletEsimPurchases          WalletEsimPurchase[]
+  walletTopups                 WalletTopup[]
 
   @@index([deletedAt])
 }
@@ -342,10 +365,49 @@ model WalletTransaction {
   wallet            WalletAccount           @relation(fields: [walletId], references: [id], onDelete: Cascade)
   purchaseAsDebit   WalletEsimPurchase?     @relation("PurchaseDebitTx")
   purchaseAsRefund  WalletEsimPurchase?     @relation("PurchaseRefundTx")
+  topupAsCredit     WalletTopup?            @relation("TopupCreditTx")
 
   @@index([walletId])
   @@index([createdAt])
   @@index([type])
   @@index([status])
   @@index([walletId, createdAt])
+}
+
+/// Gateway-independent CUSTOMER wallet top-up attempt.
+/// Wallet credit occurs only after a verified server-to-server payment event.
+model WalletTopup {
+  id                     String                  @id @default(cuid())
+  customerUserId         String
+  /// Desired USD wallet credit in integer cents.
+  creditAmountCents      Int
+  /// Charge currency (e.g. PKR) only when a verified gateway quote exists.
+  chargeCurrency         String?
+  /// Charge amount in minor units only when a verified gateway quote exists.
+  chargeAmountMinor      Int?
+  /// Opaque FX snapshot from a verified rate/gateway source only — never invented.
+  fxRateSnapshot         String?
+  gatewayProvider        PaymentGatewayProvider?
+  /// Stored only when required for reconciliation; masked in customer UI.
+  gatewayPaymentRef      String?
+  status                 WalletTopupStatus       @default(DRAFT)
+  checkoutIdempotencyKey String                  @unique
+  /// Unique verified webhook/event id when available.
+  webhookEventId         String?                 @unique
+  walletTransactionId    String?                 @unique
+  failureCategory        String?
+  failureCode            String?
+  expiresAt              DateTime?
+  paymentConfirmedAt     DateTime?
+  walletCreditedAt       DateTime?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  customer               User                    @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+  walletTransaction      WalletTransaction?      @relation("TopupCreditTx", fields: [walletTransactionId], references: [id], onDelete: SetNull)
+
+  @@index([customerUserId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([customerUserId, createdAt])
+  @@index([gatewayProvider])
 }

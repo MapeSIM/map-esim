@@ -10,6 +10,8 @@ export const ADMIN_DEBIT_MAX_CENTS = 50_000; // $500.00
 export const ADMIN_CREDIT_REASON_MIN = 5;
 export const ADMIN_CREDIT_REASON_MAX = 200;
 export const ADMIN_CREDIT_REFERENCE_MAX = 100;
+export const WALLET_TOPUP_MIN_CENTS = 1_000; // $10.00
+export const WALLET_TOPUP_MAX_CENTS = 50_000; // $500.00
 
 export type ParseUsdCentsResult =
   | { ok: true; cents: number }
@@ -177,4 +179,51 @@ export function parseAdminDebitInternalReference(
   raw: unknown
 ): { ok: true; reference: string | null } | { ok: false; error: string } {
   return parseAdminCreditInternalReference(raw);
+}
+
+/**
+ * Parse a USD decimal amount into positive integer cents for CUSTOMER wallet top-up.
+ * Min $10.00 / max $500.00. Rejects zero, negative, exponents, and >2 decimals.
+ */
+export function parseTopupUsdAmountToCents(raw: unknown): ParseUsdCentsResult {
+  const parsed = parsePositiveUsdCentsRaw(raw);
+  if (!parsed.ok) return parsed;
+
+  if (parsed.cents < WALLET_TOPUP_MIN_CENTS) {
+    return { ok: false, error: "Minimum wallet top-up is $10.00." };
+  }
+  if (parsed.cents > WALLET_TOPUP_MAX_CENTS) {
+    return { ok: false, error: "Maximum wallet top-up is $500.00." };
+  }
+  if (parsed.cents <= 0) {
+    return { ok: false, error: "Enter a valid USD amount." };
+  }
+
+  return parsed;
+}
+
+export function parseTopupCheckoutIdempotencyKey(
+  raw: unknown
+): { ok: true; value: string } | { ok: false; error: string } {
+  if (typeof raw !== "string") {
+    return {
+      ok: false,
+      error:
+        "This top-up request could not be processed. Please reload and try again.",
+    };
+  }
+  const key = raw.trim();
+  if (
+    !key ||
+    key.length < 8 ||
+    key.length > 128 ||
+    !/^[A-Za-z0-9_-]+$/.test(key)
+  ) {
+    return {
+      ok: false,
+      error:
+        "This top-up request could not be processed. Please reload and try again.",
+    };
+  }
+  return { ok: true, value: key };
 }
