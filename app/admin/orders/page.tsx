@@ -11,6 +11,7 @@ function buildOrdersHref(options: {
   status: string;
   association: string;
   currency: string;
+  userId: string;
   page: number;
 }): string {
   const params = new URLSearchParams();
@@ -22,6 +23,7 @@ function buildOrdersHref(options: {
     params.set("association", options.association);
   }
   if (options.currency) params.set("currency", options.currency);
+  if (options.userId) params.set("userId", options.userId);
   if (options.page > 1) params.set("page", String(options.page));
   const qs = params.toString();
   return qs ? `/admin/orders?${qs}` : "/admin/orders";
@@ -36,6 +38,7 @@ export default async function AdminOrdersPage({
     association?: string;
     currency?: string;
     page?: string;
+    userId?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -48,6 +51,7 @@ export default async function AdminOrdersPage({
       association: params.association,
       currency: params.currency,
       page: params.page,
+      userId: params.userId,
     });
   } catch {
     return (
@@ -72,6 +76,7 @@ export default async function AdminOrdersPage({
     status: data.status,
     association: data.association,
     currency: data.currency,
+    userId: data.userId,
   };
 
   return (
@@ -88,6 +93,9 @@ export default async function AdminOrdersPage({
         method="get"
         className="grid gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:grid-cols-2 lg:grid-cols-4"
       >
+        {data.userId ? (
+          <input type="hidden" name="userId" value={data.userId} />
+        ) : null}
         <label className="block text-sm sm:col-span-2 lg:col-span-2">
           <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
             Search

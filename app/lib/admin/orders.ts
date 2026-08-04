@@ -5,6 +5,7 @@ import {
   ADMIN_ORDERS_PAGE_SIZE,
   maskProviderOrderRef,
   normalizeAdminSearchQuery,
+  normalizeAdminUserIdFilter,
   parseAdminOrderAssociationFilter,
   parseAdminOrdersPage,
   parseAdminOrderStatusFilter,
@@ -35,6 +36,8 @@ export type AdminOrdersPageResult = {
   status: AdminOrderStatusFilter;
   association: AdminOrderAssociationFilter;
   currency: string;
+  /** Optional linked customer id filter (never email). */
+  userId: string;
 };
 
 export type AdminOrderDetail = {
@@ -117,6 +120,7 @@ function buildOrderWhere(options: {
   status: AdminOrderStatusFilter;
   association: AdminOrderAssociationFilter;
   currency: string;
+  userId: string;
 }): Prisma.OrderWhereInput {
   const where: Prisma.OrderWhereInput = {};
 
@@ -124,7 +128,10 @@ function buildOrderWhere(options: {
     where.status = options.status as OrderStatus;
   }
 
-  if (options.association === "LINKED") {
+  if (options.userId) {
+    // Specific customer deep-link takes precedence over association filter.
+    where.userId = options.userId;
+  } else if (options.association === "LINKED") {
     where.userId = { not: null };
   } else if (options.association === "GUEST") {
     where.userId = null;
@@ -162,6 +169,7 @@ export type AdminOrdersQueryInput = {
   association?: string | null;
   currency?: string | null;
   page?: string | null;
+  userId?: string | null;
 };
 
 /**
@@ -176,10 +184,17 @@ export async function getAdminOrdersPage(
   const status = parseAdminOrderStatusFilter(input.status);
   const association = parseAdminOrderAssociationFilter(input.association);
   const currency = normalizeCurrencyFilter(input.currency);
+  const userId = normalizeAdminUserIdFilter(input.userId);
   const pageSize = resolveAdminOrdersPageSize(ADMIN_ORDERS_PAGE_SIZE);
   let page = parseAdminOrdersPage(input.page);
 
-  const where = buildOrderWhere({ search, status, association, currency });
+  const where = buildOrderWhere({
+    search,
+    status,
+    association,
+    currency,
+    userId,
+  });
 
   const totalCount = await prisma.order.count({ where });
   const totalPages = totalCount === 0 ? 1 : Math.ceil(totalCount / pageSize);
@@ -226,6 +241,7 @@ export async function getAdminOrdersPage(
     status,
     association,
     currency,
+    userId,
   };
 }
 

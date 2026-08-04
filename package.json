@@ -18,6 +18,7 @@
     "qa:google-oauth": "tsx scripts/qa-google-oauth.ts",
     "qa:admin-overview": "tsx scripts/qa-admin-overview.ts",
     "qa:admin-orders": "tsx scripts/qa-admin-orders.ts",
+    "qa:admin-customers": "tsx scripts/qa-admin-customers.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

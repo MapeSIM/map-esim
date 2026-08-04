@@ -6,6 +6,8 @@ export const ADMIN_RECENT_ORDERS_LIMIT = 10;
 export const ADMIN_AUDIT_LOG_LIMIT = 50;
 export const ADMIN_ORDERS_PAGE_SIZE = 20;
 export const ADMIN_ORDERS_PAGE_SIZE_MAX = 100;
+export const ADMIN_CUSTOMERS_PAGE_SIZE = 20;
+export const ADMIN_CUSTOMERS_PAGE_SIZE_MAX = 100;
 export const ADMIN_SEARCH_MAX_LENGTH = 100;
 
 /** Harmless metadata keys only — never email, tokens, or identifiers. */
@@ -22,6 +24,10 @@ const METADATA_ALLOWLIST = new Set([
 
 export type AdminOrderStatusFilter = "ALL" | "COMPLETED" | "PENDING" | "FAILED";
 export type AdminOrderAssociationFilter = "ALL" | "LINKED" | "GUEST";
+
+export type AdminCustomerVerificationFilter = "ALL" | "VERIFIED" | "UNVERIFIED";
+export type AdminCustomerAuthFilter = "ALL" | "GOOGLE" | "CREDENTIALS";
+export type AdminCustomerAccountFilter = "ALL" | "ACTIVE" | "DELETED";
 
 /**
  * Safe short prefix/suffix of a provider order id for admin lists.
@@ -124,4 +130,71 @@ export function resolveAdminOrdersPageSize(
   const n = Math.floor(requested);
   if (n < 1) return ADMIN_ORDERS_PAGE_SIZE;
   return Math.min(n, ADMIN_ORDERS_PAGE_SIZE_MAX);
+}
+
+export function parseAdminCustomersPage(
+  raw: string | null | undefined
+): number {
+  return parseAdminOrdersPage(raw);
+}
+
+export function resolveAdminCustomersPageSize(
+  requested?: number | null
+): number {
+  if (requested == null || !Number.isFinite(requested)) {
+    return ADMIN_CUSTOMERS_PAGE_SIZE;
+  }
+  const n = Math.floor(requested);
+  if (n < 1) return ADMIN_CUSTOMERS_PAGE_SIZE;
+  return Math.min(n, ADMIN_CUSTOMERS_PAGE_SIZE_MAX);
+}
+
+export function parseAdminCustomerVerificationFilter(
+  raw: string | null | undefined
+): AdminCustomerVerificationFilter {
+  const v = (raw ?? "").trim().toUpperCase();
+  if (v === "VERIFIED" || v === "UNVERIFIED") return v;
+  return "ALL";
+}
+
+export function parseAdminCustomerAuthFilter(
+  raw: string | null | undefined
+): AdminCustomerAuthFilter {
+  const v = (raw ?? "").trim().toUpperCase();
+  if (v === "GOOGLE" || v === "CREDENTIALS") return v;
+  return "ALL";
+}
+
+export function parseAdminCustomerAccountFilter(
+  raw: string | null | undefined
+): AdminCustomerAccountFilter {
+  const v = (raw ?? "").trim().toUpperCase();
+  if (v === "ACTIVE" || v === "DELETED") return v;
+  return "ALL";
+}
+
+/**
+ * Mask email for admin list rows. Full address only on ADMIN detail.
+ * Example: rana@example.com → r***@example.com
+ */
+export function maskAdminEmail(email: string | null | undefined): string {
+  const raw = (email ?? "").trim();
+  if (!raw) return "Not available";
+  const at = raw.indexOf("@");
+  if (at <= 0 || at === raw.length - 1) return "***";
+  const local = raw.slice(0, at);
+  const domain = raw.slice(at + 1).trim();
+  if (!domain) return "***";
+  const first = local.charAt(0);
+  return `${first}***@${domain}`;
+}
+
+/** Normalize optional customer id filter for orders deep-link (never email). */
+export function normalizeAdminUserIdFilter(
+  raw: string | null | undefined
+): string {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed || trimmed.length > 64) return "";
+  if (!/^[A-Za-z0-9_-]+$/.test(trimmed)) return "";
+  return trimmed;
 }
