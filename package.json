@@ -19,6 +19,7 @@
     "qa:admin-overview": "tsx scripts/qa-admin-overview.ts",
     "qa:admin-orders": "tsx scripts/qa-admin-orders.ts",
     "qa:admin-customers": "tsx scripts/qa-admin-customers.ts",
+    "qa:admin-single-session": "tsx scripts/qa-admin-single-session.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

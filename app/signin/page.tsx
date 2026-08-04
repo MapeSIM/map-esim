@@ -4,6 +4,10 @@ import { AuthFooterLinks, AuthForm } from "@/app/components/auth/AuthForm";
 import GoogleSignInButton from "@/app/components/auth/GoogleSignInButton";
 import { signinAction } from "@/app/lib/auth/actions";
 import {
+  ADMIN_SESSION_ENDED_MESSAGE,
+  consumeAdminSessionEndedNotice,
+} from "@/app/lib/auth/adminSession";
+import {
   mapOAuthErrorParam,
   publicOAuthErrorMessage,
 } from "@/app/lib/auth/googleOAuth";
@@ -25,6 +29,7 @@ export default async function SigninPage({
   const verified = params.verified === "1";
   const reset = params.reset === "1";
   const deleted = params.deleted === "1";
+  const adminSessionEnded = await consumeAdminSessionEndedNotice();
   const oauthError = publicOAuthErrorMessage(
     mapOAuthErrorParam(params.error)
   );
@@ -40,6 +45,14 @@ export default async function SigninPage({
       {deleted ? (
         <p className="mb-4 rounded-xl border border-[var(--accent-strong)]/35 bg-[var(--accent-strong)]/10 px-3 py-2 text-sm text-[var(--heading)]">
           Your MAP eSIM account has been deleted.
+        </p>
+      ) : null}
+      {adminSessionEnded ? (
+        <p
+          className="mb-4 rounded-xl border border-[var(--accent-strong)]/35 bg-[var(--accent-strong)]/10 px-3 py-2 text-sm text-[var(--heading)]"
+          role="status"
+        >
+          {ADMIN_SESSION_ENDED_MESSAGE}
         </p>
       ) : null}
       {verified ? (

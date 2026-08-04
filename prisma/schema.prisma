@@ -43,6 +43,8 @@ model User {
   credentialsChangedAt   DateTime?
   /// Soft-delete timestamp. When set, the account cannot sign in.
   deletedAt              DateTime?
+  /// Incremented on each ADMIN credentials sign-in; JWT must match (single active admin session).
+  adminSessionVersion    Int                  @default(0)
   /// Signup (or future) consent to Terms & Conditions.
   termsAcceptedAt        DateTime?
   termsVersion           String?

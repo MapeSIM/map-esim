@@ -23,6 +23,8 @@ declare module "next-auth/jwt" {
   interface JWT {
     role?: "CUSTOMER" | "ADMIN";
     credentialsChangedAt?: number;
+    /** ADMIN-only single-session generation; never exposed on Session. */
+    adminSessionVersion?: number;
     needsLegalConsent?: boolean;
     authMethod?: "google" | "credentials";
   }

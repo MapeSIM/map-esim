@@ -20,6 +20,8 @@ import {
   loadConsentGateUser,
   resolveAuthMethod,
 } from "@/app/lib/auth/legalConsentGate";
+import { setAdminSessionEndedNotice } from "@/app/lib/auth/adminSession";
+import { writeAuditLog } from "@/app/lib/auth/audit";
 import { MapEsimPrismaAdapter } from "@/app/lib/auth/prismaAdapter";
 import { verifyPassword } from "@/app/lib/auth/password";
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
@@ -75,6 +77,21 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         const passwordHash = user.passwordHash;
         const valid = await verifyPassword(parsed.data.password, passwordHash);
         if (!valid) return null;
+
+        // Single active ADMIN session: rotate generation before JWT is issued.
+        if (user.role === "ADMIN") {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { adminSessionVersion: { increment: 1 } },
+          });
+          await writeAuditLog({
+            actorUserId: user.id,
+            action: "admin.session_rotated",
+            targetType: "User",
+            targetId: user.id,
+            metadata: { method: "credentials_signin" },
+          });
+        }
 
         return {
           id: user.id,
@@ -205,6 +222,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         sub: undefined,
         role: undefined,
         credentialsChangedAt: undefined,
+        adminSessionVersion: undefined,
         needsLegalConsent: false,
         authMethod: undefined,
         exp: Math.floor(Date.now() / 1000) - 30,
@@ -230,20 +248,32 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         token.authMethod = undefined;
         token.needsLegalConsent = false;
         token.credentialsChangedAt = undefined;
+        token.adminSessionVersion = undefined;
         // previousTokenUserReused ⇒ prior subject discarded (isolation).
         void previousTokenUserReused;
       }
 
-      const dbUser = await loadConsentGateUser(userId);
+      let dbUser: Awaited<ReturnType<typeof loadConsentGateUser>>;
+      try {
+        dbUser = await loadConsentGateUser(userId);
+      } catch {
+        // Fail closed — do not retain authorization when the user store is down.
+        return invalidate();
+      }
+
       if (!dbUser?.emailVerifiedAt || dbUser.deletedAt) {
         return invalidate();
       }
 
-      // Snapshot prior claim before overwrite — used for credential rotation checks.
+      // Snapshot prior claims before overwrite.
       const priorCredentialsChangedAt =
         typeof token.credentialsChangedAt === "number"
           ? token.credentialsChangedAt
           : 0;
+      const priorAdminSessionVersion =
+        typeof token.adminSessionVersion === "number"
+          ? token.adminSessionVersion
+          : null;
 
       const authMethod = resolveAuthMethod({
         accountProvider: account?.provider,
@@ -271,6 +301,12 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       token.needsLegalConsent = deriveNeedsLegalConsent(authMethod, dbUser);
 
       if (user?.id) {
+        // Fresh login: stamp ADMIN session generation from DB (after authorize rotation).
+        if (dbUser.role === "ADMIN") {
+          token.adminSessionVersion = dbUser.adminSessionVersion;
+        } else {
+          token.adminSessionVersion = undefined;
+        }
         // Credentials: honor remember-me. Google: intentional 30-day default.
         const maxAge =
           typeof user.remember === "boolean"
@@ -280,6 +316,20 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
             : SESSION_MAX_AGE_REMEMBER;
         token.exp = Math.floor(Date.now() / 1000) + maxAge;
         return token;
+      }
+
+      // Session refresh: ADMIN single-session — missing/mismatched generation fails closed.
+      if (dbUser.role === "ADMIN") {
+        if (
+          priorAdminSessionVersion === null ||
+          priorAdminSessionVersion !== dbUser.adminSessionVersion
+        ) {
+          await setAdminSessionEndedNotice();
+          return invalidate();
+        }
+        token.adminSessionVersion = dbUser.adminSessionVersion;
+      } else {
+        token.adminSessionVersion = undefined;
       }
 
       // Session refresh: invalidate JWT when credentials changed after issue.
