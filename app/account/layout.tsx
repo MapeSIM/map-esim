@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 const links = [
   { href: "/account", label: "Overview" },
   { href: "/account/orders", label: "My Orders" },
+  { href: "/account/wallet", label: "Wallet" },
   { href: "/account/profile", label: "Profile" },
   { href: "/account/security", label: "Security" },
 ];
@@ -19,9 +20,9 @@ export default async function AccountLayout({
   const user = await requireSession();
 
   return (
-    <main className="min-h-screen bg-[var(--page-bg)] px-4 py-10 text-[var(--heading)] sm:px-6">
-      <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-[220px_1fr]">
-        <aside className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4">
+    <main className="min-h-screen w-full max-w-full bg-[var(--page-bg)] px-3 py-10 text-[var(--heading)] sm:px-6">
+      <div className="mx-auto grid w-full min-w-0 max-w-5xl gap-6 lg:grid-cols-[220px_1fr]">
+        <aside className="min-w-0 max-w-full rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4">
           <p className="px-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
             Account
           </p>
@@ -49,7 +50,7 @@ export default async function AccountLayout({
             </button>
           </form>
         </aside>
-        <section className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-8">
+        <section className="min-w-0 w-full max-w-full rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-8">
           {children}
         </section>
       </div>

@@ -237,7 +237,7 @@ export default function CurrencySelector({
   return (
     <div
       ref={rootRef}
-      className={`relative inline-flex ${compact ? "w-full" : ""}`}
+      className={`relative inline-flex min-w-0 ${compact ? "w-full" : "max-w-full"}`}
     >
       <button
         ref={buttonRef}
@@ -256,21 +256,32 @@ export default function CurrencySelector({
         }}
         onKeyDown={handleButtonKeyDown}
         className={`
-          inline-flex items-center justify-between gap-2
+          inline-flex min-w-0 items-center justify-between gap-1.5
           rounded-[12px] border border-[var(--border-strong)] bg-[var(--surface)]
           text-sm font-semibold text-[var(--heading)] shadow-[0_6px_16px_rgba(0,0,0,0.18)]
           outline-none transition
           hover:border-[var(--border-hover)] hover:bg-[var(--surface-2)]
           focus-visible:border-[var(--accent-strong)]/60 focus-visible:ring-2
           focus-visible:ring-[var(--accent-strong)]/25
-          ${compact ? "h-11 w-full px-3" : "h-10 min-w-[112px] px-3"}
+          ${
+            compact
+              ? "h-11 w-full px-3"
+              : "h-10 max-w-[4.75rem] px-2 sm:max-w-none sm:min-w-[112px] sm:gap-2 sm:px-3"
+          }
           ${open ? "border-[var(--accent-strong)]/45" : ""}
         `}
       >
-        <span className="truncate">
-          {compact
-            ? formatOptionLabel(selectedOption)
-            : `${selectedOption.region} · ${selectedOption.code}`}
+        <span className="min-w-0 truncate">
+          {compact ? (
+            formatOptionLabel(selectedOption)
+          ) : (
+            <>
+              <span className="sm:hidden">{selectedOption.code}</span>
+              <span className="hidden sm:inline">
+                {selectedOption.region} · {selectedOption.code}
+              </span>
+            </>
+          )}
         </span>
         <ChevronDown
           className={`h-4 w-4 shrink-0 text-[var(--text-soft)] transition ${

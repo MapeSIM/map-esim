@@ -51,7 +51,7 @@ export default function Navbar({
   return (
     <header
       className="
-        sticky top-0 z-50
+        sticky top-0 z-50 w-full max-w-full
         border-b border-[var(--border)]
         bg-[var(--nav-bg)] backdrop-blur-md
         text-[var(--heading)]
@@ -59,8 +59,8 @@ export default function Navbar({
     >
       <nav
         className="
-          mx-auto flex h-[72px] max-w-[1200px] items-center
-          justify-between px-4 sm:px-6
+          mx-auto flex h-[72px] w-full min-w-0 max-w-[1200px] items-center
+          justify-between gap-2 px-3 sm:gap-3 sm:px-6
         "
         aria-label="Primary"
       >
@@ -68,7 +68,7 @@ export default function Navbar({
           href="/"
           onClick={closeMenu}
           className="
-            group flex items-center gap-2.5 rounded-lg
+            group flex min-w-0 shrink items-center gap-2.5 rounded-lg
             focus-visible:outline-none focus-visible:ring-2
             focus-visible:ring-[var(--accent-strong)]/60
             focus-visible:ring-offset-2
@@ -80,7 +80,7 @@ export default function Navbar({
             alt={BRAND_LOGO_ALT}
             width={160}
             height={40}
-            className="h-9 w-auto max-w-[160px] object-contain sm:h-10 sm:max-w-[180px]"
+            className="h-8 w-auto max-w-[118px] object-contain sm:h-9 sm:max-w-[160px] md:h-10 md:max-w-[180px]"
             priority
           />
           <span className="sr-only">{BRAND_NAME}</span>
@@ -157,7 +157,7 @@ export default function Navbar({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 md:hidden">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 md:hidden">
           <CurrencySelector />
           <ThemeToggle />
           <button
@@ -167,7 +167,7 @@ export default function Navbar({
             aria-expanded={open}
             aria-controls="mobile-nav"
             className="
-              inline-flex h-10 w-10 items-center justify-center
+              inline-flex h-10 w-10 shrink-0 items-center justify-center
               rounded-[14px] border border-[var(--border-strong)]
               bg-[var(--surface)] text-[var(--heading)]
               transition-colors hover:border-[var(--border-hover)]
