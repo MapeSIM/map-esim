@@ -157,6 +157,7 @@ function main() {
     "display.ts",
     "amount.ts",
     "adminCreditFormState.ts",
+    "adminDebitFormState.ts",
   ];
   for (const file of walletReadOnlyFiles) {
     const src = read(`app/lib/wallet/${file}`);

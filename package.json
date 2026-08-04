@@ -22,6 +22,7 @@
     "qa:admin-single-session": "tsx scripts/qa-admin-single-session.ts",
     "qa:wallet-foundation": "tsx scripts/qa-wallet-foundation.ts",
     "qa:admin-wallet-credit": "tsx scripts/qa-admin-wallet-credit.ts",
+    "qa:admin-wallet-debit": "tsx scripts/qa-admin-wallet-debit.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

@@ -94,6 +94,77 @@ export async function getAdminCompletedWalletCredit(
   };
 }
 
+export type AdminCompletedWalletDebitResult = {
+  transactionId: string;
+  customerId: string;
+  amountCents: number;
+  amountLabel: string;
+  balanceAfterCents: number;
+  balanceAfterLabel: string;
+  currency: "USD";
+};
+
+/**
+ * Read-only load of a completed ADJUSTMENT_DEBIT for the given CUSTOMER.
+ * Never creates/updates/deletes rows. Invalid/mismatched ids → null.
+ */
+export async function getAdminCompletedWalletDebit(
+  customerUserId: string,
+  transactionId: string
+): Promise<AdminCompletedWalletDebitResult | null> {
+  const customerId = (customerUserId ?? "").trim();
+  const txId = (transactionId ?? "").trim();
+  if (!customerId || customerId.length > 64) return null;
+  if (!txId || txId.length > 64) return null;
+  if (!/^[A-Za-z0-9_-]+$/.test(txId)) return null;
+
+  const customer = await prisma.user.findFirst({
+    where: { id: customerId, role: Role.CUSTOMER },
+    select: { id: true },
+  });
+  if (!customer) return null;
+
+  const row = await prisma.walletTransaction.findFirst({
+    where: {
+      id: txId,
+      type: WalletTransactionType.ADJUSTMENT_DEBIT,
+      direction: WalletDirection.DEBIT,
+      status: WalletTransactionStatus.COMPLETED,
+      wallet: { userId: customer.id },
+    },
+    select: {
+      id: true,
+      amountCents: true,
+      balanceAfterCents: true,
+      wallet: {
+        select: { userId: true },
+      },
+    },
+  });
+
+  if (!row) return null;
+  if (row.wallet.userId !== customer.id) return null;
+  if (
+    !Number.isInteger(row.amountCents) ||
+    row.amountCents <= 0 ||
+    typeof row.balanceAfterCents !== "number" ||
+    !Number.isInteger(row.balanceAfterCents) ||
+    row.balanceAfterCents < 0
+  ) {
+    return null;
+  }
+
+  return {
+    transactionId: row.id,
+    customerId: customer.id,
+    amountCents: row.amountCents,
+    amountLabel: formatUsdCents(row.amountCents),
+    balanceAfterCents: row.balanceAfterCents,
+    balanceAfterLabel: formatUsdCents(row.balanceAfterCents),
+    currency: "USD",
+  };
+}
+
 export type AdminCustomerWalletSummary = {
   customerId: string;
   customerName: string;

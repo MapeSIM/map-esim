@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAdminCustomerDetail } from "@/app/lib/admin/customers";
 import { getAdminCustomerWalletSummary } from "@/app/lib/admin/wallet";
+import { ADMIN_DEBIT_MIN_CENTS } from "@/app/lib/wallet/amount";
 
 export const dynamic = "force-dynamic";
 
@@ -167,12 +168,32 @@ export default async function AdminCustomerDetailPage({
             </p>
           </div>
           {wallet?.accountActive ? (
-            <Link
-              href={`/admin/customers/${encodeURIComponent(detail.id)}/wallet/credit`}
-              className="inline-flex h-10 items-center justify-center rounded-[14px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
-            >
-              Add wallet credit
-            </Link>
+            <div className="flex min-w-0 flex-col items-stretch gap-2 sm:items-end">
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={`/admin/customers/${encodeURIComponent(detail.id)}/wallet/credit`}
+                  className="inline-flex h-10 items-center justify-center rounded-[14px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+                >
+                  Add wallet credit
+                </Link>
+                {wallet.hasWallet &&
+                wallet.balanceCents >= ADMIN_DEBIT_MIN_CENTS ? (
+                  <Link
+                    href={`/admin/customers/${encodeURIComponent(detail.id)}/wallet/debit`}
+                    className="inline-flex h-10 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+                  >
+                    Deduct wallet funds
+                  </Link>
+                ) : null}
+              </div>
+              {!(
+                wallet.hasWallet && wallet.balanceCents >= ADMIN_DEBIT_MIN_CENTS
+              ) ? (
+                <p className="text-xs text-[var(--text-soft)] sm:text-right">
+                  No wallet funds are available to deduct.
+                </p>
+              ) : null}
+            </div>
           ) : null}
         </div>
 

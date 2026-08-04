@@ -1,10 +1,12 @@
 /**
- * Pure USD amount parsing for admin wallet credit (no DB I/O).
+ * Pure USD amount parsing for admin wallet credit/debit (no DB I/O).
  * Converts decimal USD strings to integer cents — never floating-point storage math.
  */
 
 export const ADMIN_CREDIT_MIN_CENTS = 10; // $0.10
 export const ADMIN_CREDIT_MAX_CENTS = 50_000; // $500.00
+export const ADMIN_DEBIT_MIN_CENTS = 10; // $0.10
+export const ADMIN_DEBIT_MAX_CENTS = 50_000; // $500.00
 export const ADMIN_CREDIT_REASON_MIN = 5;
 export const ADMIN_CREDIT_REASON_MAX = 200;
 export const ADMIN_CREDIT_REFERENCE_MAX = 100;
@@ -13,12 +15,7 @@ export type ParseUsdCentsResult =
   | { ok: true; cents: number }
   | { ok: false; error: string };
 
-/**
- * Parse a USD decimal amount into positive integer cents.
- * Accepts: "0.10", "0.11", "1", "1.00", "10.50", "500.00"
- * Rejects: empty, negative, below $0.10, NaN, exponents, >2 decimals, non-numeric.
- */
-export function parseUsdAmountToCents(raw: unknown): ParseUsdCentsResult {
+function parsePositiveUsdCentsRaw(raw: unknown): ParseUsdCentsResult {
   if (typeof raw !== "string" && typeof raw !== "number") {
     return { ok: false, error: "Enter a valid USD amount." };
   }
@@ -55,14 +52,59 @@ export function parseUsdAmountToCents(raw: unknown): ParseUsdCentsResult {
     return { ok: false, error: "Enter a valid USD amount." };
   }
 
-  if (cents < ADMIN_CREDIT_MIN_CENTS) {
+  return { ok: true, cents };
+}
+
+/**
+ * Parse a USD decimal amount into positive integer cents for ADMIN credit.
+ * Accepts: "0.10", "0.11", "1", "1.00", "10.50", "500.00"
+ * Rejects: empty, negative, below $0.10, NaN, exponents, >2 decimals, non-numeric.
+ */
+export function parseUsdAmountToCents(raw: unknown): ParseUsdCentsResult {
+  const parsed = parsePositiveUsdCentsRaw(raw);
+  if (!parsed.ok) return parsed;
+
+  if (parsed.cents < ADMIN_CREDIT_MIN_CENTS) {
     return { ok: false, error: "Minimum manual credit is $0.10." };
   }
-  if (cents > ADMIN_CREDIT_MAX_CENTS) {
+  if (parsed.cents > ADMIN_CREDIT_MAX_CENTS) {
     return { ok: false, error: "Maximum manual credit is $500.00." };
   }
 
-  return { ok: true, cents };
+  return parsed;
+}
+
+/**
+ * Parse a USD decimal amount into positive integer cents for ADMIN debit.
+ * Optional availableBalanceCents enforces cannot-exceed-balance at parse time.
+ */
+export function parseAdminDebitAmountToCents(
+  raw: unknown,
+  availableBalanceCents?: number
+): ParseUsdCentsResult {
+  const parsed = parsePositiveUsdCentsRaw(raw);
+  if (!parsed.ok) return parsed;
+
+  if (parsed.cents < ADMIN_DEBIT_MIN_CENTS) {
+    return { ok: false, error: "Minimum manual debit is $0.10." };
+  }
+  if (parsed.cents > ADMIN_DEBIT_MAX_CENTS) {
+    return { ok: false, error: "Maximum manual debit is $500.00." };
+  }
+
+  if (
+    typeof availableBalanceCents === "number" &&
+    Number.isInteger(availableBalanceCents) &&
+    availableBalanceCents >= 0 &&
+    parsed.cents > availableBalanceCents
+  ) {
+    return {
+      ok: false,
+      error: "Debit amount cannot exceed the available wallet balance.",
+    };
+  }
+
+  return parsed;
 }
 
 export function parseAdminCreditReason(
@@ -107,4 +149,32 @@ export function parseAdminCreditInternalReference(
     };
   }
   return { ok: true, reference };
+}
+
+export function parseAdminDebitReason(
+  raw: unknown
+): { ok: true; reason: string } | { ok: false; error: string } {
+  if (typeof raw !== "string") {
+    return { ok: false, error: "Enter a reason for this debit." };
+  }
+  const reason = raw.trim();
+  if (reason.length < ADMIN_CREDIT_REASON_MIN) {
+    return {
+      ok: false,
+      error: `Reason must be at least ${ADMIN_CREDIT_REASON_MIN} characters.`,
+    };
+  }
+  if (reason.length > ADMIN_CREDIT_REASON_MAX) {
+    return {
+      ok: false,
+      error: `Reason must be at most ${ADMIN_CREDIT_REASON_MAX} characters.`,
+    };
+  }
+  return { ok: true, reason };
+}
+
+export function parseAdminDebitInternalReference(
+  raw: unknown
+): { ok: true; reference: string | null } | { ok: false; error: string } {
+  return parseAdminCreditInternalReference(raw);
 }

@@ -177,9 +177,9 @@ export async function getCustomerWalletTransactions(
       directionLabel: walletDirectionLabel(row.direction),
       amountLabel: formatWalletTransactionAmount(row.amountCents, row.direction),
       statusLabel: walletStatusLabel(row.status),
-      // ADMIN_CREDIT keeps reason/internal reference admin-only.
+      // Admin manual credit/debit keeps reason/internal reference admin-only.
       referenceLabel:
-        row.type === "ADMIN_CREDIT"
+        row.type === "ADMIN_CREDIT" || row.type === "ADJUSTMENT_DEBIT"
           ? null
           : formatWalletReference(row.referenceType, row.referenceId),
     })),

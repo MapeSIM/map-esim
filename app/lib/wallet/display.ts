@@ -11,7 +11,7 @@ export type WalletTransactionTypeLabel =
   | "Purchase"
   | "Refund"
   | "Adjustment credit"
-  | "Adjustment debit"
+  | "Admin adjustment"
   | "Reversal"
   | "Transaction";
 
@@ -74,7 +74,7 @@ export function walletTransactionTypeLabel(type: string): WalletTransactionTypeL
     case "ADJUSTMENT_CREDIT":
       return "Adjustment credit";
     case "ADJUSTMENT_DEBIT":
-      return "Adjustment debit";
+      return "Admin adjustment";
     case "REVERSAL":
       return "Reversal";
     default:
