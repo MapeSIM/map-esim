@@ -1,5 +1,4 @@
 import {
-  BRAND_LOGO_ALT,
   BRAND_NAME,
   BRAND_SITE_HOST,
   BRAND_SITE_URL,
@@ -10,13 +9,16 @@ import type { EmailChannel } from "@/app/lib/email/channels";
 import { EMAIL_CHANNELS } from "@/app/lib/email/channels";
 import { EMAIL_LOGO_CID, getEmailLogoCidSrc } from "@/app/lib/email/logo";
 
-export const BRAND_LIME = "#7cff00";
+export const BRAND_LIME = "#7CFF00";
+export const BRAND_NAVY = "#020817";
 export const BRAND_INK = "#06120a";
 export const TEXT_PRIMARY = "#0d1524";
 export const TEXT_SECONDARY = "#4b5d78";
 export const BORDER = "#e2e8f0";
 export const PAGE_BG = "#eef2f7";
 export const CARD_BG = "#ffffff";
+/** Display width for brand logo images in HTML emails (190–220px). */
+export const EMAIL_LOGO_DISPLAY_WIDTH = 200;
 
 export { EMAIL_LOGO_CID };
 
@@ -43,7 +45,6 @@ export function renderEmailFooterHtml(
   const channelName = escapeHtml(def.displayName);
   const channelMail = escapeHtml(def.mailbox);
   const logo = escapeHtml(logoSrc);
-  const alt = escapeHtml(BRAND_LOGO_ALT);
 
   return `
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0;border-top:1px solid ${BORDER};">
@@ -55,9 +56,9 @@ export function renderEmailFooterHtml(
                 <a href="${BRAND_SITE_URL}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;border:0;outline:none;">
                   <img
                     src="${logo}"
-                    width="200"
-                    alt="${alt}"
-                    style="display:block;width:200px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;"
+                    width="${EMAIL_LOGO_DISPLAY_WIDTH}"
+                    alt="MAP eSIM"
+                    style="display:block;width:${EMAIL_LOGO_DISPLAY_WIDTH}px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;"
                   />
                 </a>
               </td>

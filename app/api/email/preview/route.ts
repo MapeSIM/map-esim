@@ -4,6 +4,7 @@ import {
   generateEsimQrDataUrl,
   resolveInstallQrValue,
 } from "@/app/lib/email/qr";
+import { EMAIL_LOGO_PUBLIC_PATH } from "@/app/lib/email/logo";
 import {
   getSampleOrderEmailPayload,
   renderOrderEmailHtml,
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
 
   const html = renderOrderEmailHtml(sample, {
     qrImageSrc: qrImageSrc || undefined,
-    logoImageSrc: "/brand/map-esim-logo.png",
+    logoImageSrc: EMAIL_LOGO_PUBLIC_PATH,
   });
 
   const attachmentNote = qrImageSrc

@@ -7,7 +7,8 @@ import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
 import {
   BRAND_LOGO_ALT,
-  BRAND_LOGO_PUBLIC_PATH,
+  BRAND_LOGO_DARK_PUBLIC_PATH,
+  BRAND_LOGO_LIGHT_PUBLIC_PATH,
   BRAND_NAME,
 } from "@/app/lib/brand";
 import ThemeToggle from "./ThemeToggle";
@@ -76,12 +77,23 @@ export default function Navbar({
           "
         >
           <Image
-            src={BRAND_LOGO_PUBLIC_PATH}
+            src={BRAND_LOGO_LIGHT_PUBLIC_PATH}
             alt={BRAND_LOGO_ALT}
-            width={160}
-            height={40}
-            className="h-8 w-auto max-w-[118px] object-contain sm:h-9 sm:max-w-[160px] md:h-10 md:max-w-[180px]"
+            width={184}
+            height={48}
+            className="h-8 w-[128px] max-w-[128px] object-contain object-left dark:hidden sm:h-9 sm:w-[150px] sm:max-w-[150px] md:h-10 md:w-[168px] md:max-w-[168px]"
             priority
+            unoptimized
+          />
+          <Image
+            src={BRAND_LOGO_DARK_PUBLIC_PATH}
+            alt=""
+            width={184}
+            height={48}
+            className="hidden h-8 w-[128px] max-w-[128px] object-contain object-left dark:block sm:h-9 sm:w-[150px] sm:max-w-[150px] md:h-10 md:w-[168px] md:max-w-[168px]"
+            priority
+            unoptimized
+            aria-hidden="true"
           />
           <span className="sr-only">{BRAND_NAME}</span>
         </Link>

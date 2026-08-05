@@ -114,7 +114,7 @@ export default function Home() {
             </h1>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-[var(--text-muted)] sm:text-lg">
               Browse destination plans, compare data options, and checkout with
-              verified offer pricing â€” built for clear travel connectivity.
+              verified offer pricing — built for clear travel connectivity.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -275,7 +275,7 @@ export default function Home() {
             </h2>
             <p className="mt-4 max-w-xl text-[var(--text-muted)]">
               MAP eSIM plans require an unlocked phone that supports eSIM. We
-              do not list unverified model claims â€” check your device settings
+              do not list unverified model claims — check your device settings
               or manufacturer documentation before purchase.
             </p>
             <ul className="mt-6 space-y-3 text-sm text-[var(--text)]">
@@ -298,7 +298,7 @@ export default function Home() {
               Quick compatibility check
             </h3>
             <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
-              Open your phone settings, search for â€œeSIMâ€, and verify that your
+              Open your phone settings, search for “eSIM”, and verify that your
               device can add a cellular plan digitally. If that option is
               missing, a physical SIM may still be required.
             </p>

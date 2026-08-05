@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 184 48" fill="none">
+  <g transform="translate(2 1.5) scale(0.8)">
+    <path
+      fill="#0D1B3A"
+      d="M32 4C20.954 4 12 12.954 12 24c0 14.5 16.8 32.4 18.95 34.7a1.5 1.5 0 0 0 2.1 0C35.2 56.4 52 38.5 52 24 52 12.954 43.046 4 32 4Z"
+    />
+    <circle cx="32" cy="23" r="11.5" fill="#1565FF" />
+    <circle cx="32" cy="28.5" r="2" fill="#7CFF00" />
+    <path
+      stroke="#7CFF00"
+      stroke-width="2.25"
+      stroke-linecap="round"
+      d="M26.2 24.2a8.2 8.2 0 0 1 11.6 0"
+    />
+    <path
+      stroke="#7CFF00"
+      stroke-width="2.25"
+      stroke-linecap="round"
+      d="M23.2 20.4a12.8 12.8 0 0 1 17.6 0"
+    />
+    <path
+      stroke="#7CFF00"
+      stroke-width="2.75"
+      stroke-linecap="round"
+      d="M17.5 38.5c6.5-5.5 14.5-6.2 22.5-2.2 3.2 1.6 6.2 2.2 9.5 1.6"
+    />
+  </g>
+  <text
+    x="50"
+    y="33"
+    fill="#0D1B3A"
+    font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+    font-size="28"
+    font-weight="800"
+    letter-spacing="-0.03em"
+  >MAP</text>
+  <text
+    x="118"
+    y="33"
+    fill="#7CFF00"
+    font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+    font-size="22.5"
+    font-weight="700"
+    letter-spacing="-0.02em"
+  >eSIM</text>
+</svg>

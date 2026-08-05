@@ -33,7 +33,7 @@ export default function IphoneInstallGuidePage() {
           </li>
           <li>
             On iOS 17.4 or later, you can also press and hold the QR code in Mail
-            or Safari and select <strong>Add eSIM</strong>, then follow Appleâ€™s
+            or Safari and select <strong>Add eSIM</strong>, then follow Apple’s
             Allow / Continue confirmation.
           </li>
           <li>

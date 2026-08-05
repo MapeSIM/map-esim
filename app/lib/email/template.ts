@@ -25,14 +25,18 @@ export type OrderEmailHtmlOptions = {
   logoImageSrc?: string;
 };
 
-const BRAND_LIME = "#7cff00";
+const BRAND_LIME = "#7CFF00";
+const BRAND_NAVY = "#020817";
 const BRAND_INK = "#06120a";
 const TEXT_PRIMARY = "#0d1524";
 const TEXT_SECONDARY = "#4b5d78";
+const TEXT_ON_NAVY = "#C5D5E4";
 const BORDER = "#e2e8f0";
 const NOTICE_BG = "#f4ffe6";
 const NOTICE_BORDER = "#b8e66b";
 const PAGE_BG = "#eef2f7";
+/** Display width for the horizontal brand logo in HTML emails (190–220px). */
+const EMAIL_LOGO_WIDTH = 200;
 
 function escapeHtml(value: string): string {
   return value
@@ -386,7 +390,15 @@ export function renderOrderEmailHtml(
   const hasQrImage = Boolean(options.qrImageSrc);
   const installSection = installQrSection(payload, options.qrImageSrc);
   const destinationHeadline = formatDestinationHeadline(payload.destination);
-  const logoSrc = options.logoImageSrc || getEmailLogoCidSrc();
+  /** Preview: public `/brand/...` URL. Real mail: CID (default). */
+  const logoSrc = escapeHtml(options.logoImageSrc || getEmailLogoCidSrc());
+  const logoImg = `
+                  <img
+                    src="${logoSrc}"
+                    width="${EMAIL_LOGO_WIDTH}"
+                    alt="MAP eSIM"
+                    style="display:block;margin:0 auto;width:${EMAIL_LOGO_WIDTH}px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;"
+                  />`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -411,14 +423,22 @@ export function renderOrderEmailHtml(
         <td align="center">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid ${BORDER};">
             <tr>
-              <td align="center" bgcolor="${BRAND_LIME}" style="padding:28px 24px;background-color:${BRAND_LIME};">
-                <p style="margin:0;color:${BRAND_INK};font-size:12px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+              <td align="center" bgcolor="#ffffff" style="padding:28px 24px 22px;background-color:#ffffff;">
+                ${logoImg}
+              </td>
+            </tr>
+            <tr>
+              <td height="3" bgcolor="${BRAND_LIME}" style="height:3px;line-height:3px;font-size:0;background-color:${BRAND_LIME};">&nbsp;</td>
+            </tr>
+            <tr>
+              <td align="center" bgcolor="${BRAND_NAVY}" style="padding:28px 24px;background-color:${BRAND_NAVY};">
+                <p style="margin:0 0 10px;color:${BRAND_LIME};font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
                   ${BRAND_NAME}
                 </p>
-                <h1 style="margin:10px 0 0;color:${BRAND_INK};font-size:28px;line-height:1.2;font-weight:800;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+                <h1 style="margin:0;color:#ffffff;font-size:28px;line-height:1.2;font-weight:800;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
                   Your eSIM is Ready!
                 </h1>
-                <p style="margin:10px 0 0;color:${BRAND_INK};font-size:16px;line-height:1.4;font-weight:600;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+                <p style="margin:12px 0 0;color:${TEXT_ON_NAVY};font-size:16px;line-height:1.4;font-weight:600;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
                   ${escapeHtml(destinationHeadline)}
                 </p>
               </td>
@@ -440,7 +460,7 @@ export function renderOrderEmailHtml(
                 </p>`
                     : ""
                 }
-                ${renderEmailFooterHtml("orders", logoSrc)}
+                ${renderEmailFooterHtml("orders", options.logoImageSrc || getEmailLogoCidSrc())}
                 <p style="margin:16px 0 8px;color:${TEXT_SECONDARY};font-size:12px;line-height:1.5;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
                   © 2026 ${BRAND_NAME}. All rights reserved.
                 </p>

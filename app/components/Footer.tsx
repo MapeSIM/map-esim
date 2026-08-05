@@ -4,7 +4,8 @@ import { CreditCard } from "lucide-react";
 import CookiePreferencesLink from "@/app/components/cookies/CookiePreferencesLink";
 import {
   BRAND_LOGO_ALT,
-  BRAND_LOGO_PUBLIC_PATH,
+  BRAND_LOGO_DARK_PUBLIC_PATH,
+  BRAND_LOGO_LIGHT_PUBLIC_PATH,
   BRAND_NAME,
   BRAND_TAGLINE,
 } from "@/app/lib/brand";
@@ -52,11 +53,21 @@ export default function Footer() {
         <div>
           <div className="flex items-center gap-2.5">
             <Image
-              src={BRAND_LOGO_PUBLIC_PATH}
+              src={BRAND_LOGO_LIGHT_PUBLIC_PATH}
               alt={BRAND_LOGO_ALT}
-              width={160}
-              height={40}
-              className="h-9 w-auto max-w-[160px] object-contain"
+              width={184}
+              height={48}
+              className="h-9 w-[150px] max-w-[150px] object-contain object-left dark:hidden"
+              unoptimized
+            />
+            <Image
+              src={BRAND_LOGO_DARK_PUBLIC_PATH}
+              alt=""
+              width={184}
+              height={48}
+              className="hidden h-9 w-[150px] max-w-[150px] object-contain object-left dark:block"
+              unoptimized
+              aria-hidden="true"
             />
           </div>
           <p className="mt-2 text-sm font-semibold text-[var(--heading)]">

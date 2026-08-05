@@ -5,6 +5,9 @@ import type { Attachment } from "nodemailer/lib/mailer";
 /** Distinct from order QR CID (`mapesim-esim-qr@mapesim.com`). */
 export const EMAIL_LOGO_CID = "mapesim-brand-logo@mapesim.com";
 
+/** Browser-preview / public URL path (never use CID in HTML preview). */
+export const EMAIL_LOGO_PUBLIC_PATH = "/brand/map-esim-logo.png";
+
 const LOGO_RELATIVE = path.join("public", "brand", "map-esim-logo.png");
 
 let cachedLogo: Buffer | null | undefined;

@@ -9,7 +9,7 @@ import { CurrencyProvider } from "./components/currency/CurrencyProvider";
 import ThemeProvider from "./components/theme/ThemeProvider";
 import { auth } from "@/auth";
 import { navAuthLink } from "@/app/lib/auth/redirects";
-import { BRAND_NAME, BRAND_TAGLINE } from "@/app/lib/brand";
+import { BRAND_NAME, BRAND_SITE_URL, BRAND_TAGLINE } from "@/app/lib/brand";
 import { getServerCookieConsent } from "@/app/lib/cookies/consentActions";
 import {
   CURRENCY_PREFERENCE_COOKIE,
@@ -20,8 +20,21 @@ import {
 } from "@/app/lib/cookies/preferenceCookies";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(BRAND_SITE_URL),
+  applicationName: BRAND_NAME,
   title: BRAND_NAME,
   description: BRAND_TAGLINE,
+  openGraph: {
+    title: BRAND_NAME,
+    description: BRAND_TAGLINE,
+    siteName: BRAND_NAME,
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: BRAND_NAME,
+    description: BRAND_TAGLINE,
+  },
 };
 
 export default async function RootLayout({

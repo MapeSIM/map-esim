@@ -223,7 +223,7 @@ export function buildOrderEmailPayload(options: {
       dig(options.orderPayload, "countryName", "country"),
       dig(asRecord(options.orderPayload.order), "countryName", "country")
     ) ||
-    "â€”";
+    "—";
 
   const validity =
     options.verifiedOffer.durationDays != null
@@ -231,7 +231,7 @@ export function buildOrderEmailPayload(options: {
       : firstString(
           dig(options.orderPayload, "durationDays", "validity"),
           dig(asRecord(options.orderPayload.order), "durationDays", "validity")
-        ) || "â€”";
+        ) || "—";
 
   const officialLinks = extractOfficialActivationLinks(options.orderPayload);
 
@@ -240,7 +240,7 @@ export function buildOrderEmailPayload(options: {
     orderId: options.orderId.trim(),
     destination,
     planName: options.verifiedOffer.name,
-    dataAllowance: options.verifiedOffer.dataFormatted || "â€”",
+    dataAllowance: options.verifiedOffer.dataFormatted || "—",
     validity,
     iccid: install.iccid,
     qrValue: install.qrValue,
