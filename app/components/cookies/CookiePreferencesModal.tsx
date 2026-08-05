@@ -76,22 +76,53 @@ export default function CookiePreferencesModal({
   const [analytics, setAnalytics] = useState(false);
   const [marketing, setMarketing] = useState(false);
 
-  useEffect(() => {
-    if (preferencesOpen) {
-      setPreferences(Boolean(consent?.preferences));
-      setAnalytics(Boolean(consent?.analytics));
-      setMarketing(Boolean(consent?.marketing));
-      const dialog = dialogRef.current;
-      if (dialog && !dialog.open) {
-        dialog.showModal();
-      }
-    } else {
-      const dialog = dialogRef.current;
-      if (dialog?.open) {
-        dialog.close();
-      }
+  const consentPreferences = Boolean(consent?.preferences);
+  const consentAnalytics = Boolean(consent?.analytics);
+  const consentMarketing = Boolean(consent?.marketing);
+
+  // Sync drafts when the modal opens or saved consent changes (render-time adjust).
+  const [draftSource, setDraftSource] = useState<{
+    open: boolean;
+    preferences: boolean;
+    analytics: boolean;
+    marketing: boolean;
+  }>({ open: false, preferences: false, analytics: false, marketing: false });
+
+  if (preferencesOpen) {
+    if (
+      !draftSource.open ||
+      draftSource.preferences !== consentPreferences ||
+      draftSource.analytics !== consentAnalytics ||
+      draftSource.marketing !== consentMarketing
+    ) {
+      setDraftSource({
+        open: true,
+        preferences: consentPreferences,
+        analytics: consentAnalytics,
+        marketing: consentMarketing,
+      });
+      setPreferences(consentPreferences);
+      setAnalytics(consentAnalytics);
+      setMarketing(consentMarketing);
     }
-  }, [preferencesOpen, consent]);
+  } else if (draftSource.open) {
+    setDraftSource({
+      open: false,
+      preferences: false,
+      analytics: false,
+      marketing: false,
+    });
+  }
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (preferencesOpen) {
+      if (!dialog.open) dialog.showModal();
+    } else if (dialog.open) {
+      dialog.close();
+    }
+  }, [preferencesOpen]);
 
   function handleCancel() {
     closePreferences();

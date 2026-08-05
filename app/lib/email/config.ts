@@ -154,7 +154,7 @@ export function getEmailConfig(channel: EmailChannel): EmailConfig {
     channel,
     provider: base.provider,
     from: formatChannelFrom(channel),
-    replyTo: formatChannelReplyTo(channel),
+    replyTo: formatChannelReplyTo(),
     mailbox: definition.mailbox,
     smtp: {
       host: base.host,

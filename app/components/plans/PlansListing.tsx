@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -159,12 +159,7 @@ export default function PlansListing({
     categorySummary.unlimited > 0 || isRegionalOrGlobal;
   const unlimitedTabEnabled = categorySummary.unlimited > 0;
 
-  useEffect(() => {
-    if (category === "unlimited" && !unlimitedTabEnabled) {
-      setCategory("standard");
-    }
-  }, [category, unlimitedTabEnabled]);
-
+  // Clamp via derived state so disabled Unlimited never filters/shows as active.
   const activeCategory: CategoryFilter =
     showPackageTabs && category === "unlimited" && unlimitedTabEnabled
       ? "unlimited"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { Copy, Download, Eye, Smartphone } from "lucide-react";
 
@@ -133,11 +134,12 @@ export default function OrderInstallActions({
 
           {showQr && qrViewHref && (
             <div className="rounded-2xl border border-[var(--border)] bg-white p-4">
-              <img
+              <Image
                 src={qrViewHref}
                 alt="eSIM installation QR code"
                 width={280}
                 height={280}
+                unoptimized
                 className="mx-auto h-auto w-[280px] max-w-full"
               />
             </div>

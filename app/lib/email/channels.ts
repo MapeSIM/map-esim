@@ -77,10 +77,10 @@ export function formatChannelFrom(channel: EmailChannel): string {
 }
 
 /**
- * Reply-To is always MAP eSIM Support.
+ * Reply-To is always MAP eSIM Support for every channel.
  * EMAIL_REPLY_TO may only confirm support@mapesim.com — never arbitrary addresses.
  */
-export function formatChannelReplyTo(_channel: EmailChannel): string {
+export function formatChannelReplyTo(): string {
   const configured = (process.env.EMAIL_REPLY_TO || SUPPORT_MAILBOX)
     .trim()
     .toLowerCase();

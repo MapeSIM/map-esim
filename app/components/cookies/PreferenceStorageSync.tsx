@@ -27,7 +27,10 @@ export default function PreferenceStorageSync() {
   const persistPreferences = canLoad("preferences");
   const previousPersist = useRef<boolean | null>(null);
   const themeRef = useRef(theme);
-  themeRef.current = theme;
+
+  useEffect(() => {
+    themeRef.current = theme;
+  }, [theme]);
 
   useEffect(() => {
     installPreferenceStorageGuard();

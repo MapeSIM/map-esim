@@ -62,7 +62,7 @@ function main() {
   console.log("2) Channel From / Reply-To mapping");
   for (const channel of EMAIL_CHANNEL_IDS) {
     const from = formatChannelFrom(channel);
-    const reply = formatChannelReplyTo(channel);
+    const reply = formatChannelReplyTo();
     assert.equal(from.includes(EMAIL_CHANNELS[channel].mailbox), true);
     assert.equal(from.startsWith("MAP eSIM "), true);
     assert.equal(from.includes("MAP-eSIM"), false);

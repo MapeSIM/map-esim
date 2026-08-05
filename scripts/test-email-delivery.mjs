@@ -3,12 +3,8 @@
  * Does not contact SMTP or VeSIM. Does not read .env.local secrets into logs.
  */
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-
-// Resolve compiled/TS via tsx when available.
-const require = createRequire(import.meta.url);
 
 async function loadTs(relPath) {
   const abs = path.resolve(process.cwd(), relPath);

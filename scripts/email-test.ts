@@ -106,7 +106,7 @@ async function main() {
   );
   console.log(`Channel credentials: configured`);
   console.log(`From header: ${formatChannelFrom(channel)}`);
-  console.log(`Reply-To header: ${formatChannelReplyTo(channel)}`);
+  console.log(`Reply-To header: ${formatChannelReplyTo()}`);
 
   if (dryRun) {
     void recipient.length;
@@ -121,7 +121,7 @@ async function main() {
     "",
     `Channel: ${channel}`,
     `From: ${formatChannelFrom(channel)}`,
-    `Reply-To: ${formatChannelReplyTo(channel)}`,
+    `Reply-To: ${formatChannelReplyTo()}`,
     `Sent at: ${stamp}`,
     "",
     "This message contains no OTPs, passwords, QR codes, LPA strings, or order data.",
@@ -133,7 +133,7 @@ async function main() {
   <p><strong>MAP eSIM channel SMTP test</strong></p>
   <p>Channel: <code>${channel}</code></p>
   <p>From: ${formatChannelFrom(channel)}</p>
-  <p>Reply-To: ${formatChannelReplyTo(channel)}</p>
+  <p>Reply-To: ${formatChannelReplyTo()}</p>
   <p>Sent at: ${stamp}</p>
   <p>This message contains no OTPs, passwords, QR codes, LPA strings, or order data.</p>
   ${renderEmailFooterHtml(channel)}

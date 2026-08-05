@@ -49,7 +49,10 @@ export function CurrencyProvider({
     useState<CurrencyCode>(initialCurrency);
   const [rates, setRates] = useState<CurrencyRates>(FALLBACK_USD_RATES);
   const currencyRef = useRef(currency);
-  currencyRef.current = currency;
+
+  useEffect(() => {
+    currencyRef.current = currency;
+  }, [currency]);
 
   useEffect(() => {
     let cancelled = false;
