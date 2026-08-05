@@ -109,8 +109,9 @@ const sections: LegalSection[] = [
     id: "sharing",
     title: "Sharing with service providers",
     paragraphs: [
-      "We share personal information only as needed with service providers that help us operate the service, such as our third-party eSIM provider, email delivery infrastructure, hosting and security providers, and a payment provider once selected. We do not sell your personal information.",
+      "We share personal information only as needed with service providers that help us operate the service, such as our third-party eSIM provider, email delivery infrastructure, hosting and security providers, an optional live-chat provider (Tawk.to) when you use chat after granting marketing cookie consent, and a payment provider once selected. We do not sell your personal information.",
       "When you use Google Sign-In, Google acts as an identity provider. Google authenticates you and returns limited account identity details so we can create or sign you into your MAP eSIM account. The purpose is account authentication, account security and helping prevent unauthorized access — not marketing.",
+      "If you use optional live chat, the chat provider may process the messages and technical data needed to operate the widget. We do not automatically send your account email, order references, QR codes, ICCIDs, activation codes or payment details to the chat provider through the website integration.",
     ],
   },
   {

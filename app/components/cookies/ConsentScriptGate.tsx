@@ -1,11 +1,11 @@
 "use client";
 
 import { useCookieConsent } from "@/app/components/cookies/CookieConsentProvider";
+import TawkChat from "@/app/components/support/TawkChat";
 
 /**
- * Central gate for future optional scripts.
- * No analytics/marketing/preference third-party scripts are loaded today.
- * Add integrations only inside the matching consent branch.
+ * Central gate for optional third-party scripts.
+ * Integrations load only inside the matching consent branch.
  */
 export default function ConsentScriptGate() {
   const { consent, canLoad } = useCookieConsent();
@@ -17,18 +17,19 @@ export default function ConsentScriptGate() {
   }
 
   if (canLoad("preferences")) {
-    // Future: preference-related optional scripts only.
+    // Preference cookies (theme/currency) are handled elsewhere — no scripts here.
   }
 
   if (canLoad("analytics")) {
     // Future: analytics scripts only after analytics consent.
-    // Do not add Google Analytics / similar until product confirms and Cookie Policy is updated.
   }
 
-  if (canLoad("marketing")) {
-    // Future: marketing pixels only after marketing consent.
-    // Do not add Meta Pixel / ads tags until product confirms and Cookie Policy is updated.
-  }
+  const marketingAllowed = canLoad("marketing");
 
-  return null;
+  return (
+    <>
+      {/* Live chat: marketing consent + public-route allowlist + env configuration. */}
+      <TawkChat enabledByConsent={marketingAllowed} />
+    </>
+  );
 }

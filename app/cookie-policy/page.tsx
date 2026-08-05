@@ -28,9 +28,9 @@ const sections: LegalSection[] = [
     id: "current-status",
     title: "Current cookie status",
     callout:
-      "At present, MAP eSIM uses essential cookies needed for authentication, sessions and security. We do not currently operate analytics or advertising/marketing cookie tools in the product codebase. If those tools are added later, this policy and a consent mechanism will be updated before non-essential cookies are enabled.",
+      "MAP eSIM uses essential cookies for authentication, sessions and security. Optional live-chat support (Tawk.to) may load only after you grant marketing cookie consent and only on selected public pages. Analytics advertising pixels are not claimed as active unless separately introduced and disclosed.",
     paragraphs: [
-      "The categories below describe both cookies we use now and categories that may be used in future.",
+      "The categories below describe cookies and similar technologies we use now and categories that may be used with consent.",
     ],
   },
   {
@@ -80,8 +80,8 @@ const sections: LegalSection[] = [
     id: "marketing",
     title: "Marketing cookies",
     paragraphs: [
-      "Marketing cookies are used to measure campaigns or deliver personalized advertising on our site or elsewhere. They are not required for purchasing an eSIM or using your account.",
-      `${BRAND_NAME} does not currently claim that marketing or advertising cookies are active. If such tools are introduced later, they will require consent before use where required by law, and this policy will be updated.`,
+      "Marketing cookies and similar technologies may be used for optional campaign measurement, advertising, or embedded live-chat support tools. They are not required for purchasing an eSIM or using your account.",
+      `When configured, ${BRAND_NAME} may load the Tawk.to live-chat widget after marketing consent on selected public pages (for example Support and destination browsing). Chat messages you send are processed by that provider to deliver support. You can reject or turn off marketing cookies in the consent tool; the widget will not load without that consent.`,
     ],
   },
   {

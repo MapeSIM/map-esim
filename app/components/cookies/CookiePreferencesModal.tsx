@@ -180,7 +180,7 @@ export default function CookiePreferencesModal({
           <CategoryRow
             id="cookie-marketing"
             title="Marketing cookies"
-            description="Support campaign measurement or advertising if marketing tools are introduced later."
+            description="Optional marketing or live-chat support tools (for example Tawk.to) when enabled. Not required for browsing, checkout or account login."
             checked={marketing}
             onChange={setMarketing}
           />
