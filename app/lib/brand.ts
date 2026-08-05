@@ -21,3 +21,30 @@ export const BRAND_MARK_PUBLIC_PATH = "/brand/map-esim-mark.svg";
  * Prefer BRAND_LOGO_DARK_PUBLIC_PATH / BRAND_LOGO_LIGHT_PUBLIC_PATH in UI.
  */
 export const BRAND_LOGO_PUBLIC_PATH = "/brand/map-esim-logo.png";
+
+/** Official social profiles — import these; do not hardcode URLs in JSX. */
+export const BRAND_SOCIAL_LINKS = [
+  {
+    id: "instagram",
+    label: "MAP eSIM on Instagram",
+    href: "https://www.instagram.com/map.esim/",
+  },
+  {
+    id: "facebook",
+    label: "MAP eSIM on Facebook",
+    href: "https://www.facebook.com/share/1EtvNuncnJ/?mibextid=wwXIfr",
+  },
+  {
+    id: "tiktok",
+    label: "MAP eSIM on TikTok",
+    href: "https://www.tiktok.com/@mapesim",
+  },
+] as const;
+
+export type BrandSocialLinkId = (typeof BRAND_SOCIAL_LINKS)[number]["id"];
+
+/**
+ * Footer payment-method badges. Keep false until a live gateway is approved.
+ * Flip to true (and restore badge UI) after payment-gateway go-live.
+ */
+export const SHOW_FOOTER_PAYMENT_METHODS = false;
