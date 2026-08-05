@@ -770,6 +770,7 @@ export async function confirmWalletEsimPurchase(
         verifiedOffer,
         fundingSource: OrderFundingSource.CUSTOMER_WALLET,
         status: OrderStatus.COMPLETED,
+        checkoutPayload: successCheckout.payload,
       });
 
       if (current.debitTransactionId) {

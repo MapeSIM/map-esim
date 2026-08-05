@@ -623,6 +623,7 @@ export async function confirmAdminPackageAssignment(
         verifiedOffer: offer,
         fundingSource: OrderFundingSource.COMPANY_FUNDED,
         status: OrderStatus.COMPLETED,
+        checkoutPayload: checkoutData,
       });
 
       await tx.adminPackageAssignment.update({

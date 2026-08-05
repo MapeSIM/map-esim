@@ -220,6 +220,7 @@ export async function POST(req: NextRequest) {
       customerEmail,
       verifiedOffer,
       status: "COMPLETED",
+      checkoutPayload: checkoutData,
     });
 
     const accessToken = createOrderAccessToken(orderId);

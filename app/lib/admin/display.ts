@@ -55,14 +55,24 @@ export function maskProviderOrderRef(
 }
 
 /**
- * Reduce any ICCID-like string to last 4 digits only.
- * Empty/short values become a full mask.
+ * Mask an ICCID-like value to last-4 only (admin list/detail safe).
+ * Empty → Pending from provider. Never returns plaintext body digits.
  */
 export function maskIccidLast4(value: string | null | undefined): string {
-  const raw = (value ?? "").replace(/\s+/g, "");
-  if (!raw) return "Not available";
-  if (raw.length <= 4) return "••••";
-  return `••••${raw.slice(-4)}`;
+  const digits = (value ?? "").replace(/\D+/g, "");
+  if (!digits) return "Pending from provider";
+  const last4 = digits.slice(-4);
+  if (last4.length < 4) return "••••••••••••••••";
+  return `•••••••••••••${last4}`;
+}
+
+/** Format stored iccidLast4 field for admin display. */
+export function formatStoredIccidLast4(
+  last4: string | null | undefined
+): string {
+  const digits = (last4 ?? "").replace(/\D+/g, "");
+  if (digits.length !== 4) return "Pending from provider";
+  return `•••••••••••••${digits}`;
 }
 
 /**

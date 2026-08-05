@@ -242,9 +242,9 @@ function main() {
   assert.ok(!/WalletEsimPurchase|walletPurchase/.test(service));
   console.log("PASS no_payment_gateway_refund_promo_reward");
 
-  assert.ok(!/checkoutPayload/.test(persist));
+  assert.match(persist, /captureIccidForProviderOrder/);
   assert.ok(!/qrValue|activationCode/.test(persist));
-  assert.match(persist, /iccidEncrypted:\s*null/);
+  assert.ok(!/iccidEncrypted:\s*null/.test(persist));
   assert.ok(!/accessToken|lpaString|qrPayload/.test(persist));
   assert.ok(!/VESIM_PASSWORD|VESIM_EMAIL/.test(selectForm));
   assert.ok(!/VESIM_PASSWORD|VESIM_EMAIL/.test(confirmForm));

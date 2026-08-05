@@ -5,6 +5,8 @@ import {
   extractInstallDetails,
   hasInstallDetails,
 } from "@/app/lib/email/extract";
+import { captureIccidForProviderOrder } from "@/app/lib/orders/iccidCapture";
+import { maskIccidLast4 } from "@/app/lib/orders/iccidCrypto";
 import { buildSafeInstallActions } from "@/app/lib/vesim/installActions";
 import { authorizeOrderAccess } from "@/app/lib/vesim/orderAccess";
 import {
@@ -46,6 +48,7 @@ export async function GET(req: NextRequest) {
       "activationCode",
       "carddata",
       "smdp",
+      "iccid",
     ]) {
       if (req.nextUrl.searchParams.has(banned)) {
         return NextResponse.json(
@@ -81,7 +84,10 @@ export async function GET(req: NextRequest) {
       console.error("VeSIM order details failed:", orderResponse.status);
       return NextResponse.json(
         { success: false, error: "Not found" },
-        { status: 404 }
+        {
+          status: 404,
+          headers: { "Cache-Control": "private, no-store" },
+        }
       );
     }
 
@@ -91,6 +97,18 @@ export async function GET(req: NextRequest) {
       orderData;
 
     const install = extractInstallDetails(orderData);
+
+    // Late fill-once into local Order — never fails this response.
+    try {
+      await captureIccidForProviderOrder({
+        providerOrderId: orderId,
+        checkoutPayload: orderData,
+        iccid: install.iccid,
+      });
+    } catch {
+      // ignore
+    }
+
     const emailMeta = getStoredEmailDelivery(orderId);
     const resolvedOrderId =
       firstString(payload.orderId, payload.id, orderId) || orderId;
@@ -99,6 +117,11 @@ export async function GET(req: NextRequest) {
       orderData,
       accessToken
     );
+
+    // Public/guest JSON: masked ICCID only — full value stays server-side (email).
+    const iccidMasked = install.iccid
+      ? maskIccidLast4(install.iccid)
+      : undefined;
 
     const safeOrder = {
       orderId: resolvedOrderId,
@@ -122,17 +145,20 @@ export async function GET(req: NextRequest) {
         payload.total
       ),
       status: firstString(payload.status),
-      iccid: install.iccid,
+      iccidMasked,
       smdpAddress: install.smdpAddress,
       activationCode: install.activationCode,
       qrValue: install.qrValue,
       hasInstallDetails: hasInstallDetails(install),
       hasVerifiedLpa: installActions.hasVerifiedLpa,
       installActions,
+      // Omit ICCID from client-copied manual text (email still has full value).
       manualInstallText: hasInstallDetails(install)
         ? buildManualInstallText({
             orderId: resolvedOrderId,
-            ...install,
+            smdpAddress: install.smdpAddress,
+            activationCode: install.activationCode,
+            qrValue: install.qrValue,
           })
         : undefined,
       emailDelivery: emailMeta.emailDelivery,
@@ -161,7 +187,10 @@ export async function GET(req: NextRequest) {
         success: false,
         error: publicErrorMessage(error, "Unable to load order details"),
       },
-      { status: 500 }
+      {
+        status: 500,
+        headers: { "Cache-Control": "private, no-store" },
+      }
     );
   }
 }

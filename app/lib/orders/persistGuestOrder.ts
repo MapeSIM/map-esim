@@ -1,5 +1,6 @@
 import { prisma } from "@/app/lib/db";
 import { normalizeEmail } from "@/app/lib/auth/email";
+import { captureIccidForProviderOrder } from "@/app/lib/orders/iccidCapture";
 import type { VerifiedCheckoutOffer } from "@/app/lib/vesim/server";
 
 /**
@@ -13,6 +14,8 @@ export async function persistGuestOrder(options: {
   status?: "PENDING" | "COMPLETED" | "FAILED";
   displayAmount?: number | null;
   displayCurrency?: string | null;
+  iccid?: string | null;
+  checkoutPayload?: Record<string, unknown> | null;
 }): Promise<void> {
   try {
     const providerOrderId = options.providerOrderId.trim();
@@ -45,7 +48,6 @@ export async function persistGuestOrder(options: {
           options.displayCurrency || options.verifiedOffer.currency || "USD",
         status: options.status || "COMPLETED",
         claimStatus: "UNCLAIMED",
-        iccidEncrypted: null,
       },
       update: {
         customerEmail,
@@ -61,6 +63,12 @@ export async function persistGuestOrder(options: {
         providerCurrency: options.verifiedOffer.currency || "USD",
         status: options.status || "COMPLETED",
       },
+    });
+
+    await captureIccidForProviderOrder({
+      providerOrderId,
+      iccid: options.iccid,
+      checkoutPayload: options.checkoutPayload,
     });
   } catch {
     console.error("Guest order persistence failed");

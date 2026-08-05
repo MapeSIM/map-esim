@@ -44,6 +44,7 @@ function main() {
   assert.equal(maskProviderOrderRef("short"), "••••");
   assert.equal(maskIccidLast4("8901234567890123456").endsWith("3456"), true);
   assert.ok(!maskIccidLast4("8901234567890123456").includes("890123456789"));
+  assert.equal(maskIccidLast4(""), "Pending from provider");
   console.log("PASS masking_helpers");
 
   const ordersSrc = readFileSync(join(root, "app/lib/admin/orders.ts"), "utf8");
@@ -54,7 +55,9 @@ function main() {
   assert.ok(!/orderAccess|createOrderAccessToken|broker\/orders/i.test(ordersSrc));
   assert.ok(!/qrValue|activationCode|smDpAddress|matchingId/i.test(ordersSrc));
   assert.match(ordersSrc, /customerEmail/);
-  assert.match(ordersSrc, /On file \(hidden\)/);
+  assert.match(ordersSrc, /Pending from provider/);
+  assert.match(ordersSrc, /iccidLast4/);
+  assert.ok(!/decryptIccid|iccidEncrypted/.test(ordersSrc));
   console.log("PASS orders_module_server_only_safe");
 
   const listSrc = readFileSync(join(root, "app/admin/orders/page.tsx"), "utf8");

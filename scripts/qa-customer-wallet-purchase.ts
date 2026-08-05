@@ -208,7 +208,8 @@ function main() {
   assert.ok(!/access_token|LPA:1\$|activationCode|qrValue/.test(persist));
   assert.ok(!/VESIM_PASSWORD|VESIM_EMAIL/.test(selectForm));
   assert.ok(!/VESIM_PASSWORD|VESIM_EMAIL/.test(confirmForm));
-  assert.ok(!/checkoutPayload/.test(persist));
+  assert.match(persist, /captureIccidForProviderOrder/);
+  assert.ok(!/iccidEncrypted:\s*null/.test(persist));
   console.log("PASS no_raw_provider_secrets_persisted_or_rendered");
 
   assert.ok(!/executeCreditCheckout\(/.test(read("scripts/qa-customer-wallet-purchase.ts")));

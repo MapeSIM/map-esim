@@ -7,12 +7,13 @@ import {
   Prisma,
 } from "@prisma/client";
 import { normalizeEmail } from "@/app/lib/auth/email";
+import { captureIccidForProviderOrder } from "@/app/lib/orders/iccidCapture";
 import type { VerifiedCheckoutOffer } from "@/app/lib/vesim/server";
 
 /**
  * Persist a customer-linked order after confirmed provider success.
  * Supports COMPANY_FUNDED and CUSTOMER_WALLET. Upserts on providerOrderId.
- * Never stores QR/LPA/access tokens.
+ * Never stores QR/LPA/access tokens. ICCID stored encrypted when present.
  */
 export async function persistAssignedOrder(
   tx: Prisma.TransactionClient,
@@ -23,6 +24,10 @@ export async function persistAssignedOrder(
     verifiedOffer: VerifiedCheckoutOffer;
     fundingSource: OrderFundingSource;
     status?: OrderStatus;
+    /** Raw ICCID when already extracted (preferred). */
+    iccid?: string | null;
+    /** Checkout/broker payload used to extract ICCID when needed. */
+    checkoutPayload?: Record<string, unknown> | null;
   }
 ): Promise<{ id: string; providerOrderId: string }> {
   const providerOrderId = options.providerOrderId.trim();
@@ -69,7 +74,6 @@ export async function persistAssignedOrder(
       status: options.status || OrderStatus.COMPLETED,
       claimStatus: OrderClaimStatus.CLAIMED,
       claimedAt: now,
-      iccidEncrypted: null,
     },
     update: {
       userId: customerUserId,
@@ -94,6 +98,16 @@ export async function persistAssignedOrder(
       providerOrderId: true,
     },
   });
+
+  // Same transaction when possible — never fails the order on ICCID issues.
+  await captureIccidForProviderOrder(
+    {
+      providerOrderId: order.providerOrderId,
+      iccid: options.iccid,
+      checkoutPayload: options.checkoutPayload,
+    },
+    tx
+  );
 
   return order;
 }

@@ -12,6 +12,7 @@ import { isEmailConfigured } from "@/app/lib/email/config";
 import { sendOrderEmail } from "@/app/lib/email/sendOrderEmail";
 import type { EmailDeliveryStatus } from "@/app/lib/email/types";
 import { getOrderAccessSuccessUrl } from "@/app/lib/vesim/orderAccess";
+import { captureIccidForProviderOrder } from "@/app/lib/orders/iccidCapture";
 import {
   getBrokerToken,
   getVesimBaseUrl,
@@ -100,6 +101,16 @@ export async function deliverOrderEmailAfterCheckout(options: {
     if (fetched) {
       orderPayload = fetched;
     }
+  }
+
+  // Late fill-once ICCID when provider returns it after checkout (never fails delivery).
+  try {
+    await captureIccidForProviderOrder({
+      providerOrderId: orderId,
+      checkoutPayload: orderPayload,
+    });
+  } catch {
+    // ICCID persistence must never block email delivery.
   }
 
   const emailPayload = buildOrderEmailPayload({

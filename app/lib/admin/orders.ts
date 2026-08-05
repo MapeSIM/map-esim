@@ -3,6 +3,7 @@ import "server-only";
 import { OrderStatus, Prisma } from "@prisma/client";
 import {
   ADMIN_ORDERS_PAGE_SIZE,
+  formatStoredIccidLast4,
   maskProviderOrderRef,
   normalizeAdminSearchQuery,
   normalizeAdminUserIdFilter,
@@ -23,6 +24,8 @@ export type AdminOrderListRow = {
   localStatus: string;
   amountLabel: string;
   providerRefMasked: string;
+  /** Masked last-4 only — never plaintext or ciphertext. */
+  iccidMasked: string;
   associationLabel: "Linked customer" | "Guest order";
   fundingLabel: string;
 };
@@ -58,9 +61,23 @@ export type AdminOrderDetail = {
   accountStatusLabel: string;
   claimStatusLabel: string;
   claimedAtLabel: string;
-  /** Never full ICCID — last-4 mask or Not available */
+  /** Never full ICCID — masked last-4, pending, or not provided */
   iccidHint: string;
 };
+
+function adminIccidDisplay(
+  last4: string | null | undefined,
+  status: string
+): string {
+  const digits = (last4 ?? "").replace(/\D+/g, "");
+  if (digits.length === 4) {
+    return formatStoredIccidLast4(digits);
+  }
+  if (status === OrderStatus.FAILED) {
+    return "Not provided";
+  }
+  return "Pending from provider";
+}
 
 function fundingSourceLabel(
   fundingSource: string | null | undefined
@@ -229,6 +246,7 @@ export async function getAdminOrdersPage(
       providerOrderId: true,
       userId: true,
       fundingSource: true,
+      iccidLast4: true,
     },
   });
 
@@ -240,6 +258,7 @@ export async function getAdminOrdersPage(
     localStatus: displayOrUnavailable(row.status),
     amountLabel: formatOrderAmount(row.providerAmount, row.providerCurrency),
     providerRefMasked: maskProviderOrderRef(row.providerOrderId),
+    iccidMasked: adminIccidDisplay(row.iccidLast4, row.status),
     associationLabel: row.userId ? "Linked customer" : "Guest order",
     fundingLabel: fundingSourceLabel(row.fundingSource),
   }));
@@ -287,7 +306,7 @@ export async function getAdminOrderDetail(
       userId: true,
       claimStatus: true,
       claimedAt: true,
-      iccidEncrypted: true,
+      iccidLast4: true,
       fundingSource: true,
       user: {
         select: {
@@ -311,10 +330,8 @@ export async function getAdminOrderDetail(
     accountStatusLabel = "Linked account unavailable";
   }
 
-  // Never decrypt or emit ICCID ciphertext on this page.
-  const iccidHint = row.iccidEncrypted
-    ? "On file (hidden)"
-    : "Not available";
+  // Never decrypt or emit ICCID ciphertext/plaintext on this page.
+  const iccidHint = adminIccidDisplay(row.iccidLast4, row.status);
 
   return {
     id: row.id,

@@ -32,6 +32,25 @@ This flag is **server-only**. Do not use a `NEXT_PUBLIC_*` variable to authorize
 
 Authenticated wallet purchase and admin package-assignment flows do **not** use this flag; they use separate server paths.
 
+## ICCID storage (server-only)
+
+Orders store ICCIDs encrypted at rest. Set `ICCID_ENCRYPTION_KEY` to a 32-byte secret (64-char hex or base64). Without a valid key, order flows still succeed but ICCID capture is skipped (fail closed for crypto).
+
+| Field | Purpose |
+|---|---|
+| `iccidEncrypted` | AES-256-GCM ciphertext (random IV) |
+| `iccidHash` | Deterministic HMAC for duplicate detection |
+| `iccidLast4` | Last four digits for masked admin display |
+
+Never put this key in `NEXT_PUBLIC_*` variables. Never log plaintext ICCIDs.
+
+Optional backfill (dry-run by default; requires `--apply` to write). Do not run against production casually:
+
+```bash
+npx tsx scripts/backfill-order-iccids.ts
+npx tsx scripts/backfill-order-iccids.ts --apply
+```
+
 ## Useful scripts
 
 ```bash
@@ -40,6 +59,7 @@ npm run start
 npm run db:migrate          # prisma migrate deploy (production)
 npm run admin:seed          # one-time admin bootstrap
 npm run qa:guest-checkout-gate
+npm run qa:iccid-persistence
 ```
 
 ## Learn More
