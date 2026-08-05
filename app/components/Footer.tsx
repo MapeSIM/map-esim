@@ -9,6 +9,7 @@ import {
   BRAND_NAME,
   BRAND_TAGLINE,
 } from "@/app/lib/brand";
+import { PAKISTAN_DESTINATION_PATH } from "@/app/lib/seo/siteGraph";
 
 const columns = [
   {
@@ -16,6 +17,7 @@ const columns = [
     links: [
       { label: "Home", href: "/" },
       { label: "Destinations", href: "/countries" },
+      { label: "How It Works", href: "/how-it-works" },
       { label: "Plans", href: "/plans" },
     ],
   },
@@ -23,6 +25,7 @@ const columns = [
     title: "Destinations",
     links: [
       { label: "All countries", href: "/countries?filter=Country" },
+      { label: "Pakistan", href: PAKISTAN_DESTINATION_PATH },
       { label: "Popular destinations", href: "/countries?filter=Popular" },
       { label: "Regional plans", href: "/countries?filter=Regional" },
       { label: "Global plans", href: "/countries?filter=Global" },
@@ -31,7 +34,8 @@ const columns = [
   {
     title: "Support",
     links: [
-      { label: "Help center", href: "/support" },
+      { label: "Support Center", href: "/support" },
+      { label: "Contact", href: "/contact" },
       { label: "FAQ", href: "/#faq" },
       { label: "Dashboard", href: "/dashboard" },
     ],

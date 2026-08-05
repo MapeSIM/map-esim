@@ -31,7 +31,6 @@ const ALLOWED_EXACT = new Set([
   "/privacy-policy",
   "/terms-and-conditions",
   "/cookie-policy",
-  // Reserved for future public pages (safe no-ops until they exist):
   "/how-it-works",
   "/contact",
 ]);

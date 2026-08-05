@@ -11,15 +11,52 @@ import {
   BRAND_LOGO_LIGHT_PUBLIC_PATH,
   BRAND_NAME,
 } from "@/app/lib/brand";
+import {
+  PAKISTAN_DESTINATION_PATH,
+  PAKISTAN_FLAG_PUBLIC_PATH,
+} from "@/app/lib/seo/siteGraph";
 import ThemeToggle from "./ThemeToggle";
 import CurrencySelector from "./currency/CurrencySelector";
 
-const navLinks = [
+type NavLink = {
+  href: string;
+  label: string;
+  flagSrc?: string;
+};
+
+/** Desktop order: Home → Pakistan → Destinations → Plans → guides → support. */
+const navLinks: NavLink[] = [
   { href: "/", label: "Home" },
+  {
+    href: PAKISTAN_DESTINATION_PATH,
+    label: "Pakistan",
+    flagSrc: PAKISTAN_FLAG_PUBLIC_PATH,
+  },
   { href: "/countries", label: "Destinations" },
   { href: "/plans", label: "Plans" },
+  { href: "/how-it-works", label: "How It Works" },
   { href: "/support", label: "Support" },
+  { href: "/contact", label: "Contact" },
 ];
+
+function NavLinkLabel({ link }: { link: NavLink }) {
+  if (!link.flagSrc) return <>{link.label}</>;
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <Image
+        src={link.flagSrc}
+        alt=""
+        width={18}
+        height={12}
+        className="h-3 w-[18px] shrink-0 rounded-[2px] object-cover ring-1 ring-[var(--border-strong)]"
+        unoptimized
+        aria-hidden="true"
+      />
+      <span>{link.label}</span>
+    </span>
+  );
+}
 
 type NavbarProps = {
   authHref?: string;
@@ -42,6 +79,13 @@ export default function Navbar({
 
   function isActive(href: string) {
     if (href === "/") return pathname === "/";
+    if (href === "/countries") {
+      return (
+        pathname === "/countries" ||
+        (pathname.startsWith("/countries/") &&
+          pathname !== PAKISTAN_DESTINATION_PATH)
+      );
+    }
     return pathname === href || pathname.startsWith(`${href}/`);
   }
 
@@ -98,7 +142,7 @@ export default function Navbar({
           <span className="sr-only">{BRAND_NAME}</span>
         </Link>
 
-        <div className="hidden items-center gap-1 md:flex lg:gap-2">
+        <div className="hidden items-center gap-0.5 lg:flex xl:gap-1">
           {navLinks.map((link) => {
             const active = isActive(link.href);
             return (
@@ -106,7 +150,8 @@ export default function Navbar({
                 key={link.href}
                 href={link.href}
                 className={`
-                  relative rounded-lg px-3 py-2 text-sm font-medium transition-colors
+                  relative whitespace-nowrap rounded-lg px-2 py-2 text-[13px]
+                  font-medium transition-colors xl:px-2.5 xl:text-sm
                   focus-visible:outline-none focus-visible:ring-2
                   focus-visible:ring-[var(--accent-strong)]/60
                   focus-visible:ring-offset-2
@@ -118,11 +163,11 @@ export default function Navbar({
                   }
                 `}
               >
-                {link.label}
+                <NavLinkLabel link={link} />
                 {active && (
                   <span
                     className="
-                      absolute bottom-0 left-3 right-3 h-0.5
+                      absolute bottom-0 left-2 right-2 h-0.5
                       rounded-full bg-[var(--accent-strong)]/90
                     "
                     aria-hidden="true"
@@ -132,15 +177,15 @@ export default function Navbar({
             );
           })}
 
-          <div className="ml-2 flex items-center gap-3">
+          <div className="ml-1.5 flex items-center gap-2 xl:ml-2 xl:gap-3">
             <CurrencySelector />
             <ThemeToggle />
 
             <Link
               href={authHref}
               className="
-                rounded-lg px-3 py-2 text-sm font-medium
-                text-[var(--text-muted)] transition-colors
+                rounded-lg px-2.5 py-2 text-[13px] font-medium
+                text-[var(--text-muted)] transition-colors xl:px-3 xl:text-sm
                 hover:text-[var(--heading)]
                 focus-visible:outline-none focus-visible:ring-2
                 focus-visible:ring-[var(--accent-strong)]/60
@@ -153,10 +198,10 @@ export default function Navbar({
               href="/countries"
               className="
                 inline-flex items-center justify-center
-                rounded-[14px] bg-[var(--accent)] px-5 py-2.5
-                text-sm font-semibold text-[var(--accent-ink)]
+                rounded-[14px] bg-[var(--accent)] px-4 py-2.5
+                text-[13px] font-semibold text-[var(--accent-ink)]
                 shadow-[0_0_0_1px_rgba(124,255,0,0.15)]
-                transition-all
+                transition-all xl:px-5 xl:text-sm
                 hover:bg-[var(--accent-strong)]
                 focus-visible:outline-none focus-visible:ring-2
                 focus-visible:ring-[var(--accent-strong)]/60
@@ -169,7 +214,7 @@ export default function Navbar({
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 md:hidden">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 lg:hidden">
           <CurrencySelector />
           <ThemeToggle />
           <button
@@ -203,7 +248,7 @@ export default function Navbar({
           id="mobile-nav"
           className="
             border-b border-[var(--border)]
-            bg-[var(--page-bg)]/98 backdrop-blur-md md:hidden
+            bg-[var(--page-bg)]/98 backdrop-blur-md lg:hidden
           "
         >
           <div className="mx-auto flex max-w-[1200px] flex-col gap-1 px-4 py-4 sm:px-6">
@@ -226,7 +271,7 @@ export default function Navbar({
                     }
                   `}
                 >
-                  {link.label}
+                  <NavLinkLabel link={link} />
                 </Link>
               );
             })}

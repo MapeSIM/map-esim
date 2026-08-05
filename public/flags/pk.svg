@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 30" role="img" aria-label="Flag of Pakistan">
+  <rect width="45" height="30" fill="#01411C"/>
+  <rect width="11.25" height="30" fill="#FFFFFF"/>
+  <circle cx="27.75" cy="15" r="8.25" fill="#FFFFFF"/>
+  <circle cx="30.375" cy="12.75" r="7.05" fill="#01411C"/>
+  <polygon
+    fill="#FFFFFF"
+    points="33.075,9.45 34.05,12.3 37.05,12.375 34.65,14.25 35.55,17.1 33.075,15.375 30.6,17.1 31.5,14.25 29.1,12.375 32.1,12.3"
+  />
+</svg>

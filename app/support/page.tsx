@@ -18,9 +18,24 @@ export const metadata: Metadata = {
   title: `Support Center | ${BRAND_NAME}`,
   description:
     "Get help with MAP eSIM installation, activation, orders, wallet balance and travel connectivity.",
+  alternates: { canonical: "/support" },
+  openGraph: {
+    title: `Support Center | ${BRAND_NAME}`,
+    description:
+      "Get help with MAP eSIM installation, activation, orders, wallet balance and travel connectivity.",
+    url: "/support",
+    siteName: BRAND_NAME,
+    type: "website",
+  },
 };
 
 const quickHelp = [
+  {
+    title: "How MAP eSIM works",
+    description: "Choose a plan, check out securely, then install and activate.",
+    href: "/how-it-works",
+    icon: HelpCircle,
+  },
   {
     title: "Install on iPhone",
     description: "Step-by-step guide for adding your eSIM on iOS.",
@@ -32,6 +47,12 @@ const quickHelp = [
     description: "Install using the QR code from your order details.",
     href: "/install/android",
     icon: Smartphone,
+  },
+  {
+    title: "Contact support",
+    description: "Send a message or email the MAP eSIM support team.",
+    href: "/contact",
+    icon: Mail,
   },
   {
     title: "View your orders",
@@ -123,7 +144,7 @@ export default function SupportPage() {
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--text-muted)] sm:text-base">
             Jump to installation guides, your orders, or common questions.
           </p>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {quickHelp.map((item) => {
               const Icon = item.icon;
               return (
@@ -223,13 +244,21 @@ export default function SupportPage() {
               Do not email passwords, full payment details, activation codes, QR
               images, ICCIDs, or other sensitive installation secrets.
             </p>
-            <a
-              href={mailtoHref}
-              className="mt-6 inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-6 text-sm font-bold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
-            >
-              <Mail className="h-4 w-4" aria-hidden="true" />
-              Email support
-            </a>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/contact"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-6 text-sm font-bold text-[var(--accent-ink)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+              >
+                Contact form
+              </Link>
+              <a
+                href={mailtoHref}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-6 text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--border-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+              >
+                <Mail className="h-4 w-4" aria-hidden="true" />
+                Email support
+              </a>
+            </div>
           </div>
 
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-8">

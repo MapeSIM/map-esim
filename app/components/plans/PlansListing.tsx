@@ -13,6 +13,7 @@ import {
 import type { VesimOffer } from "@/app/lib/vesim/offers";
 import type { VesimDestination } from "@/app/lib/vesim/destinations";
 import { destinationPath } from "@/app/lib/vesim/destinations";
+import { PAKISTAN_FLAG_PUBLIC_PATH } from "@/app/lib/seo/siteGraph";
 import PlanDetailsModal from "@/app/components/plans/PlanDetailsModal";
 import SortSelect from "@/app/components/plans/SortSelect";
 import { useCurrency } from "@/app/components/currency/CurrencyProvider";
@@ -55,6 +56,10 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
 
 function getFlagUrl(code?: string) {
   if (!code || code.length !== 2) return null;
+  // Local asset — avoids blank placeholder when remote/emoji flags fail.
+  if (code.toUpperCase() === "PK") {
+    return PAKISTAN_FLAG_PUBLIC_PATH;
+  }
   return `https://flagcdn.com/w80/${code.toLowerCase()}.png`;
 }
 

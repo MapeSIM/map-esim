@@ -225,13 +225,22 @@ export default function Home() {
       {/* How it works */}
       <section className="border-y border-[var(--border)] bg-[var(--page-bg-soft)]/70">
         <div className="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 sm:py-20">
-          <div className="max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)]">
-              How it works
-            </p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--heading)] sm:text-4xl">
-              Three clear steps to get online
-            </h2>
+          <div className="flex max-w-2xl flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:max-w-none">
+            <div className="max-w-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)]">
+                How it works
+              </p>
+              <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--heading)] sm:text-4xl">
+                Three clear steps to get online
+              </h2>
+            </div>
+            <Link
+              href="/how-it-works"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent-strong)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+            >
+              Full guide
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
           </div>
 
           <div className="mt-10 grid gap-5 md:grid-cols-3">
@@ -338,6 +347,29 @@ export default function Home() {
               </details>
             ))}
           </div>
+          <p className="mt-8 text-center text-sm text-[var(--text-muted)]">
+            Need more help?{" "}
+            <Link
+              href="/support"
+              className="font-semibold text-[var(--heading)] underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--accent-strong)]"
+            >
+              Support Center
+            </Link>
+            {" · "}
+            <Link
+              href="/contact"
+              className="font-semibold text-[var(--heading)] underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--accent-strong)]"
+            >
+              Contact
+            </Link>
+            {" · "}
+            <Link
+              href="/how-it-works"
+              className="font-semibold text-[var(--heading)] underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--accent-strong)]"
+            >
+              How It Works
+            </Link>
+          </p>
         </div>
       </section>
 

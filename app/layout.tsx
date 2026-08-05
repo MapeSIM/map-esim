@@ -6,6 +6,7 @@ import Footer from "./components/Footer";
 import CookieConsentProvider from "./components/cookies/CookieConsentProvider";
 import PreferenceStorageSync from "./components/cookies/PreferenceStorageSync";
 import { CurrencyProvider } from "./components/currency/CurrencyProvider";
+import JsonLd from "./components/seo/JsonLd";
 import ThemeProvider from "./components/theme/ThemeProvider";
 import { auth } from "@/auth";
 import { navAuthLink } from "@/app/lib/auth/redirects";
@@ -18,6 +19,7 @@ import {
   THEME_PREFERENCE_COOKIE,
   themePreferenceToHtmlClass,
 } from "@/app/lib/cookies/preferenceCookies";
+import { organizationNode, websiteNode } from "@/app/lib/seo/siteGraph";
 
 export const metadata: Metadata = {
   metadataBase: new URL(BRAND_SITE_URL),
@@ -70,9 +72,15 @@ export default async function RootLayout({
     role: sessionRole,
   });
 
+  const siteGraph = {
+    "@context": "https://schema.org",
+    "@graph": [organizationNode(), websiteNode()],
+  };
+
   return (
     <html lang="en" className={htmlThemeClass} suppressHydrationWarning>
       <body>
+        <JsonLd data={siteGraph} />
         <CookieConsentProvider
           initialConsent={initialCookieConsent}
           initialPreferencesAllowed={initialPreferencesAllowed}
