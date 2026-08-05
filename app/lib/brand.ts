@@ -32,7 +32,7 @@ export const BRAND_SOCIAL_LINKS = [
   {
     id: "facebook",
     label: "MAP eSIM on Facebook",
-    href: "https://www.facebook.com/share/1EtvNuncnJ/?mibextid=wwXIfr",
+    href: "https://www.facebook.com/mapesim",
   },
   {
     id: "tiktok",
