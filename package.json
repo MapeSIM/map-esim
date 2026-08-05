@@ -28,6 +28,7 @@
     "qa:wallet-topup-foundation": "tsx scripts/qa-wallet-topup-foundation.ts",
     "qa:guest-checkout-gate": "tsx scripts/qa-guest-checkout-gate.ts",
     "qa:iccid-persistence": "tsx scripts/qa-iccid-persistence.ts",
+    "qa:admin-wallet-purchase": "tsx scripts/qa-admin-wallet-purchase.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

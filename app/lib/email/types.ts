@@ -36,6 +36,11 @@ export type OrderEmailPayload = {
    * Never includes LPA / ICCID / activation secrets.
    */
   orderAccessUrl?: string;
+  /**
+   * Optional customer-facing notice (e.g. admin-assisted wallet purchase).
+   * Never includes secrets.
+   */
+  supportPurchaseNotice?: string;
 };
 
 export type SendOrderEmailResult = {

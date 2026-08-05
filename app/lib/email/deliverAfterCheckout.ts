@@ -66,6 +66,8 @@ export async function deliverOrderEmailAfterCheckout(options: {
   checkoutPayload?: JsonRecord;
   /** Server-minted opaque order access token for authorized website links. */
   accessToken?: string;
+  /** Adds the admin-assisted wallet purchase notice to the customer email. */
+  assistedWalletPurchaseNotice?: boolean;
 }): Promise<{
   emailDelivery: EmailDeliveryStatus;
   customerEmail: string;
@@ -121,6 +123,7 @@ export async function deliverOrderEmailAfterCheckout(options: {
     orderAccessUrl: accessToken
       ? getOrderAccessSuccessUrl(orderId, accessToken)
       : undefined,
+    assistedWalletPurchaseNotice: Boolean(options.assistedWalletPurchaseNotice),
   });
 
   if (!emailPayload) {

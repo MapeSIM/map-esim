@@ -40,6 +40,11 @@ export type PrepareWalletPurchaseInput = {
   offerId: string;
   countryHint: string | null;
   idempotencyKey: string;
+  /** When set, purchase is admin-assisted (CUSTOMER_WALLET still). */
+  assistedBy?: {
+    adminUserId: string;
+    reason: string;
+  };
 };
 
 export type PrepareWalletPurchaseResult = {
@@ -52,6 +57,8 @@ export type ConfirmWalletPurchaseInput = {
   customerUserId: string;
   purchaseId: string;
   idempotencyKey: string;
+  /** Required to confirm an admin-assisted attempt. */
+  assistedByAdminUserId?: string;
 };
 
 export type ConfirmWalletPurchaseResult = {
@@ -94,6 +101,11 @@ function verifiedSnapshot(offer: VerifiedCheckoutOffer) {
   if (priceCents == null || priceCents <= 0) {
     return null;
   }
+  const currency = (offer.currency || "USD").trim().toUpperCase() || "USD";
+  // Wallet ledger is USD-only.
+  if (currency !== "USD") {
+    return null;
+  }
   return {
     offerId: offer.offerId,
     destinationCode: offer.countryCode,
@@ -104,11 +116,31 @@ function verifiedSnapshot(offer: VerifiedCheckoutOffer) {
       offer.durationDays != null ? `${offer.durationDays} Days` : null,
     priceCents,
     providerCostCents: priceCents,
-    currency: offer.currency || "USD",
+    currency,
   };
 }
 
-async function assertActiveCustomer(customerUserId: string) {
+function purchaseAuditMethod(assisted: boolean): string {
+  return assisted
+    ? "admin_assisted_customer_wallet_esim_purchase"
+    : "customer_wallet_esim_purchase";
+}
+
+async function assertActiveAdmin(adminUserId: string) {
+  const admin = await prisma.user.findUnique({
+    where: { id: adminUserId },
+    select: { id: true, role: true, deletedAt: true },
+  });
+  if (!admin || admin.deletedAt || admin.role !== Role.ADMIN) {
+    throw new WalletEsimPurchaseError("FORBIDDEN", "Not authorized.");
+  }
+  return admin;
+}
+
+async function assertActiveCustomer(
+  customerUserId: string,
+  options?: { requireEmailVerified?: boolean; assisted?: boolean }
+) {
   const customer = await prisma.user.findUnique({
     where: { id: customerUserId },
     select: {
@@ -116,12 +148,23 @@ async function assertActiveCustomer(customerUserId: string) {
       role: true,
       deletedAt: true,
       email: true,
+      emailVerifiedAt: true,
     },
   });
   if (!customer || customer.deletedAt || customer.role !== Role.CUSTOMER) {
     throw new WalletEsimPurchaseError(
       "CUSTOMER_UNAVAILABLE",
-      "Your account is unavailable for wallet purchases."
+      options?.assisted
+        ? "Customer is unavailable for wallet purchases."
+        : "Your account is unavailable for wallet purchases."
+    );
+  }
+  if (options?.requireEmailVerified && !customer.emailVerifiedAt) {
+    throw new WalletEsimPurchaseError(
+      "CUSTOMER_UNAVAILABLE",
+      options?.assisted
+        ? "Customer email must be verified before an assisted wallet purchase."
+        : "Your account is unavailable for wallet purchases."
     );
   }
   return customer;
@@ -137,11 +180,28 @@ export async function prepareWalletEsimPurchase(
   const idempotencyKey = input.idempotencyKey.trim();
   const offerId = input.offerId.trim();
   const countryHint = sanitizeCountryHint(input.countryHint);
+  const assistedAdminUserId = input.assistedBy?.adminUserId.trim() || null;
+  const assistedReason = input.assistedBy?.reason.trim() || null;
+  const isAssisted = Boolean(assistedAdminUserId);
+
+  if (isAssisted) {
+    if (!assistedAdminUserId || assistedAdminUserId.length > 64) {
+      throw new WalletEsimPurchaseError("FORBIDDEN", "Not authorized.");
+    }
+    if (!assistedReason || assistedReason.length < 5) {
+      throw new WalletEsimPurchaseError(
+        "INVALID_STATE",
+        "A reason is required for assisted wallet purchases."
+      );
+    }
+  }
 
   if (!customerUserId || customerUserId.length > 64) {
     throw new WalletEsimPurchaseError(
       "CUSTOMER_UNAVAILABLE",
-      "Your account is unavailable for wallet purchases."
+      isAssisted
+        ? "Customer is unavailable for wallet purchases."
+        : "Your account is unavailable for wallet purchases."
     );
   }
   if (
@@ -162,14 +222,26 @@ export async function prepareWalletEsimPurchase(
     );
   }
 
-  await assertActiveCustomer(customerUserId);
+  if (isAssisted && assistedAdminUserId) {
+    await assertActiveAdmin(assistedAdminUserId);
+  }
+  await assertActiveCustomer(customerUserId, {
+    requireEmailVerified: isAssisted,
+    assisted: isAssisted,
+  });
 
   const existing = await prisma.walletEsimPurchase.findUnique({
     where: { idempotencyKey },
-    select: { id: true, customerUserId: true },
+    select: { id: true, customerUserId: true, adminUserId: true },
   });
   if (existing) {
     if (existing.customerUserId !== customerUserId) {
+      throw new WalletEsimPurchaseError(
+        "INVALID_IDEMPOTENCY",
+        "This purchase request could not be processed. Please reload and try again."
+      );
+    }
+    if ((existing.adminUserId || null) !== (assistedAdminUserId || null)) {
       throw new WalletEsimPurchaseError(
         "INVALID_IDEMPOTENCY",
         "This purchase request could not be processed. Please reload and try again."
@@ -182,6 +254,7 @@ export async function prepareWalletEsimPurchase(
     };
   }
 
+  // Offer verification before any wallet mutation or provider call.
   const verifiedOffer = await verifyOfferAuthoritative({
     offerId,
     countryHint,
@@ -207,13 +280,17 @@ export async function prepareWalletEsimPurchase(
   if (!wallet) {
     throw new WalletEsimPurchaseError(
       "WALLET_UNAVAILABLE",
-      "A wallet is required before purchasing with wallet funds."
+      isAssisted
+        ? "A customer wallet is required before an assisted purchase."
+        : "A wallet is required before purchasing with wallet funds."
     );
   }
   if (wallet.balanceCents < snapshot.priceCents) {
     throw new WalletEsimPurchaseError(
       "INSUFFICIENT_FUNDS",
-      "Your wallet balance is not enough for this package."
+      isAssisted
+        ? "Customer wallet balance is not enough for this package."
+        : "Your wallet balance is not enough for this package."
     );
   }
 
@@ -222,6 +299,8 @@ export async function prepareWalletEsimPurchase(
       const purchase = await tx.walletEsimPurchase.create({
         data: {
           customerUserId,
+          adminUserId: assistedAdminUserId,
+          assistedPurchaseReason: isAssisted ? assistedReason : null,
           offerId: snapshot.offerId,
           destinationCode: snapshot.destinationCode,
           destinationName: snapshot.destinationName,
@@ -240,17 +319,24 @@ export async function prepareWalletEsimPurchase(
 
       await tx.auditLog.create({
         data: {
-          actorUserId: customerUserId,
+          actorUserId: assistedAdminUserId || customerUserId,
           action: WALLET_PURCHASE_STARTED,
           targetType: "WalletEsimPurchase",
           targetId: purchase.id,
           metadata: {
-            method: "customer_wallet_esim_purchase",
+            method: purchaseAuditMethod(isAssisted),
             fundingSource: OrderFundingSource.CUSTOMER_WALLET,
             purchaseId: purchase.id,
             offerId: snapshot.offerId,
             amountCents: snapshot.priceCents,
             currency: snapshot.currency,
+            ...(isAssisted
+              ? {
+                  targetUserId: customerUserId,
+                  adminUserId: assistedAdminUserId,
+                  reason: assistedReason,
+                }
+              : {}),
           } satisfies Prisma.InputJsonValue,
         },
       });
@@ -267,9 +353,13 @@ export async function prepareWalletEsimPurchase(
     if (isUniqueViolation(error)) {
       const raced = await prisma.walletEsimPurchase.findUnique({
         where: { idempotencyKey },
-        select: { id: true, customerUserId: true },
+        select: { id: true, customerUserId: true, adminUserId: true },
       });
-      if (raced && raced.customerUserId === customerUserId) {
+      if (
+        raced &&
+        raced.customerUserId === customerUserId &&
+        (raced.adminUserId || null) === (assistedAdminUserId || null)
+      ) {
         return {
           purchaseId: raced.id,
           customerUserId,
@@ -287,6 +377,8 @@ export async function prepareWalletEsimPurchase(
 async function refundReservedFunds(options: {
   purchaseId: string;
   customerUserId: string;
+  actorUserId: string;
+  assisted: boolean;
   priceCents: number;
   debitTransactionId: string;
 }): Promise<void> {
@@ -407,18 +499,21 @@ async function refundReservedFunds(options: {
 
     await tx.auditLog.create({
       data: {
-        actorUserId: options.customerUserId,
+        actorUserId: options.actorUserId,
         action: WALLET_PURCHASE_FAILED_REFUNDED,
         targetType: "WalletEsimPurchase",
         targetId: purchase.id,
         metadata: {
-          method: "customer_wallet_esim_purchase",
+          method: purchaseAuditMethod(options.assisted),
           fundingSource: OrderFundingSource.CUSTOMER_WALLET,
           purchaseId: purchase.id,
           amountCents: options.priceCents,
           currency: "USD",
           failureCategory: "provider_declined",
           walletTransactionId: refundTx.id,
+          ...(options.assisted
+            ? { targetUserId: options.customerUserId }
+            : {}),
         } satisfies Prisma.InputJsonValue,
       },
     });
@@ -428,6 +523,8 @@ async function refundReservedFunds(options: {
 async function markReconciliationRequired(options: {
   purchaseId: string;
   customerUserId: string;
+  actorUserId: string;
+  assisted: boolean;
   category: string;
   code: string;
 }): Promise<never> {
@@ -443,16 +540,19 @@ async function markReconciliationRequired(options: {
     });
     await tx.auditLog.create({
       data: {
-        actorUserId: options.customerUserId,
+        actorUserId: options.actorUserId,
         action: WALLET_PURCHASE_RECONCILIATION,
         targetType: "WalletEsimPurchase",
         targetId: options.purchaseId,
         metadata: {
-          method: "customer_wallet_esim_purchase",
+          method: purchaseAuditMethod(options.assisted),
           fundingSource: OrderFundingSource.CUSTOMER_WALLET,
           purchaseId: options.purchaseId,
           failureCategory: options.category,
           failureCode: options.code,
+          ...(options.assisted
+            ? { targetUserId: options.customerUserId }
+            : {}),
         } satisfies Prisma.InputJsonValue,
       },
     });
@@ -460,7 +560,9 @@ async function markReconciliationRequired(options: {
 
   throw new WalletEsimPurchaseError(
     "RECONCILIATION_REQUIRED",
-    "Your purchase is under review. Do not buy again. Contact support for help."
+    options.assisted
+      ? "This purchase requires reconciliation. Do not retry. Review the attempt before taking further action."
+      : "Your purchase is under review. Do not buy again. Contact support for help."
   );
 }
 
@@ -474,14 +576,25 @@ export async function confirmWalletEsimPurchase(
   const customerUserId = input.customerUserId.trim();
   const purchaseId = input.purchaseId.trim();
   const idempotencyKey = input.idempotencyKey.trim();
+  const assistedAdminUserId = input.assistedByAdminUserId?.trim() || null;
+  const confirmAsAssisted = Boolean(assistedAdminUserId);
 
-  const customer = await assertActiveCustomer(customerUserId);
+  if (confirmAsAssisted && assistedAdminUserId) {
+    await assertActiveAdmin(assistedAdminUserId);
+  }
+
+  const customer = await assertActiveCustomer(customerUserId, {
+    requireEmailVerified: confirmAsAssisted,
+    assisted: confirmAsAssisted,
+  });
 
   const purchase = await prisma.walletEsimPurchase.findUnique({
     where: { id: purchaseId },
     select: {
       id: true,
       customerUserId: true,
+      adminUserId: true,
+      assistedPurchaseReason: true,
       offerId: true,
       destinationCode: true,
       priceCents: true,
@@ -510,6 +623,27 @@ export async function confirmWalletEsimPurchase(
     );
   }
 
+  const purchaseIsAssisted = Boolean(purchase.adminUserId);
+  if (purchaseIsAssisted !== confirmAsAssisted) {
+    throw new WalletEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is unavailable."
+    );
+  }
+  if (
+    purchaseIsAssisted &&
+    (purchase.adminUserId !== assistedAdminUserId ||
+      !purchase.assistedPurchaseReason)
+  ) {
+    throw new WalletEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is unavailable."
+    );
+  }
+
+  const actorUserId = assistedAdminUserId || customerUserId;
+  const isAssisted = purchaseIsAssisted;
+
   if (purchase.fundingSource !== OrderFundingSource.CUSTOMER_WALLET) {
     throw new WalletEsimPurchaseError(
       "INVALID_STATE",
@@ -530,7 +664,9 @@ export async function confirmWalletEsimPurchase(
   if (purchase.status === WalletEsimPurchaseStatus.FAILED_REFUNDED) {
     throw new WalletEsimPurchaseError(
       "PROVIDER_FAILED",
-      "This purchase failed and the wallet amount was restored."
+      isAssisted
+        ? "This purchase failed and the customer wallet amount was restored."
+        : "This purchase failed and the wallet amount was restored."
     );
   }
 
@@ -542,7 +678,9 @@ export async function confirmWalletEsimPurchase(
     // Already reserved / in flight — never blind-retry provider.
     throw new WalletEsimPurchaseError(
       "RECONCILIATION_REQUIRED",
-      "Your purchase is under review. Do not buy again. Contact support for help."
+      isAssisted
+        ? "This purchase requires reconciliation. Do not retry. Review the attempt before taking further action."
+        : "Your purchase is under review. Do not buy again. Contact support for help."
     );
   }
 
@@ -565,7 +703,11 @@ export async function confirmWalletEsimPurchase(
     );
   }
   const snapshot = verifiedSnapshot(verifiedOffer);
-  if (!snapshot || snapshot.priceCents !== purchase.priceCents) {
+  if (
+    !snapshot ||
+    snapshot.priceCents !== purchase.priceCents ||
+    snapshot.currency !== (purchase.currency || "USD").toUpperCase()
+  ) {
     throw new WalletEsimPurchaseError(
       "OFFER_UNAVAILABLE",
       "The selected package is no longer available at this price."
@@ -673,18 +815,25 @@ export async function confirmWalletEsimPurchase(
 
       await tx.auditLog.create({
         data: {
-          actorUserId: customerUserId,
+          actorUserId,
           action: WALLET_FUNDS_RESERVED,
           targetType: "WalletEsimPurchase",
           targetId: purchase.id,
           metadata: {
-            method: "customer_wallet_esim_purchase",
+            method: purchaseAuditMethod(isAssisted),
             fundingSource: OrderFundingSource.CUSTOMER_WALLET,
             purchaseId: purchase.id,
             offerId: snapshot.offerId,
             amountCents: snapshot.priceCents,
             currency: snapshot.currency,
             walletTransactionId: debitTx.id,
+            ...(isAssisted
+              ? {
+                  targetUserId: customerUserId,
+                  adminUserId: assistedAdminUserId,
+                  reason: purchase.assistedPurchaseReason,
+                }
+              : {}),
           } satisfies Prisma.InputJsonValue,
         },
       });
@@ -696,7 +845,9 @@ export async function confirmWalletEsimPurchase(
     if (isUniqueViolation(error)) {
       throw new WalletEsimPurchaseError(
         "RECONCILIATION_REQUIRED",
-        "Your purchase is under review. Do not buy again. Contact support for help."
+        isAssisted
+          ? "This purchase requires reconciliation. Do not retry. Review the attempt before taking further action."
+          : "Your purchase is under review. Do not buy again. Contact support for help."
       );
     }
     throw new WalletEsimPurchaseError(
@@ -715,12 +866,16 @@ export async function confirmWalletEsimPurchase(
     await refundReservedFunds({
       purchaseId: purchase.id,
       customerUserId,
+      actorUserId,
+      assisted: isAssisted,
       priceCents: snapshot.priceCents,
       debitTransactionId: reservedDebitTransactionId,
     });
     throw new WalletEsimPurchaseError(
       "PROVIDER_FAILED",
-      "The provider could not complete this purchase. Your wallet amount was restored."
+      isAssisted
+        ? "The provider could not complete this purchase. The customer wallet amount was restored."
+        : "The provider could not complete this purchase. Your wallet amount was restored."
     );
   }
 
@@ -728,6 +883,8 @@ export async function confirmWalletEsimPurchase(
     await markReconciliationRequired({
       purchaseId: purchase.id,
       customerUserId,
+      actorUserId,
+      assisted: isAssisted,
       category: checkout.category,
       code: checkout.code,
     });
@@ -795,12 +952,12 @@ export async function confirmWalletEsimPurchase(
 
       await tx.auditLog.create({
         data: {
-          actorUserId: customerUserId,
+          actorUserId,
           action: WALLET_PURCHASE_COMPLETED,
           targetType: "WalletEsimPurchase",
           targetId: purchase.id,
           metadata: {
-            method: "customer_wallet_esim_purchase",
+            method: purchaseAuditMethod(isAssisted),
             fundingSource: OrderFundingSource.CUSTOMER_WALLET,
             purchaseId: purchase.id,
             orderId: order.id,
@@ -808,6 +965,13 @@ export async function confirmWalletEsimPurchase(
             amountCents: snapshot.priceCents,
             currency: snapshot.currency,
             walletTransactionId: current.debitTransactionId,
+            ...(isAssisted
+              ? {
+                  targetUserId: customerUserId,
+                  adminUserId: assistedAdminUserId,
+                  reason: purchase.assistedPurchaseReason,
+                }
+              : {}),
           } satisfies Prisma.InputJsonValue,
         },
       });
@@ -820,6 +984,8 @@ export async function confirmWalletEsimPurchase(
     await markReconciliationRequired({
       purchaseId: purchase.id,
       customerUserId,
+      actorUserId,
+      assisted: isAssisted,
       category: "local_finalize_failed",
       code: "order_persist_error",
     });
@@ -834,6 +1000,7 @@ export async function confirmWalletEsimPurchase(
       verifiedOffer,
       checkoutPayload: successCheckout.payload,
       accessToken: accessToken || undefined,
+      assistedWalletPurchaseNotice: isAssisted,
     });
     await prisma.walletEsimPurchase.update({
       where: { id: purchase.id },
@@ -845,16 +1012,17 @@ export async function confirmWalletEsimPurchase(
     ) {
       await prisma.auditLog.create({
         data: {
-          actorUserId: customerUserId,
+          actorUserId,
           action: WALLET_DELIVERY_EMAIL_FAILED,
           targetType: "WalletEsimPurchase",
           targetId: purchase.id,
           metadata: {
-            method: "customer_wallet_esim_purchase",
+            method: purchaseAuditMethod(isAssisted),
             fundingSource: OrderFundingSource.CUSTOMER_WALLET,
             purchaseId: purchase.id,
             failureCategory: "email_delivery",
             failureCode: emailResult.emailDelivery,
+            ...(isAssisted ? { targetUserId: customerUserId } : {}),
           } satisfies Prisma.InputJsonValue,
         },
       });
@@ -867,16 +1035,17 @@ export async function confirmWalletEsimPurchase(
       });
       await prisma.auditLog.create({
         data: {
-          actorUserId: customerUserId,
+          actorUserId,
           action: WALLET_DELIVERY_EMAIL_FAILED,
           targetType: "WalletEsimPurchase",
           targetId: purchase.id,
           metadata: {
-            method: "customer_wallet_esim_purchase",
+            method: purchaseAuditMethod(isAssisted),
             fundingSource: OrderFundingSource.CUSTOMER_WALLET,
             purchaseId: purchase.id,
             failureCategory: "email_delivery",
             failureCode: "exception",
+            ...(isAssisted ? { targetUserId: customerUserId } : {}),
           } satisfies Prisma.InputJsonValue,
         },
       });

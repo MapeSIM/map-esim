@@ -204,12 +204,16 @@ export function hasInstallDetails(details: {
   );
 }
 
+export const ASSISTED_WALLET_PURCHASE_EMAIL_NOTICE =
+  "This eSIM was purchased for your account by MAP eSIM support using your available wallet balance.";
+
 export function buildOrderEmailPayload(options: {
   customerEmail: string;
   orderId: string;
   verifiedOffer: VerifiedCheckoutOffer;
   orderPayload: JsonRecord;
   orderAccessUrl?: string;
+  assistedWalletPurchaseNotice?: boolean;
 }): OrderEmailPayload | null {
   const install = extractInstallDetails(options.orderPayload);
   if (!hasInstallDetails(install)) {
@@ -251,6 +255,9 @@ export function buildOrderEmailPayload(options: {
     androidGuideUrl: getAndroidInstallGuideUrl(),
     iphoneGuideUrl: getIphoneInstallGuideUrl(),
     orderAccessUrl: options.orderAccessUrl?.trim() || undefined,
+    supportPurchaseNotice: options.assistedWalletPurchaseNotice
+      ? ASSISTED_WALLET_PURCHASE_EMAIL_NOTICE
+      : undefined,
   };
 }
 

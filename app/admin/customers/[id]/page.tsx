@@ -173,16 +173,25 @@ export default async function AdminCustomerDetailPage({
           <div>
             <h2 className="text-lg font-semibold tracking-tight">eSIM packages</h2>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Company-funded provider assignment. Customer wallet is never charged.
+              Company-funded assignment never charges the customer wallet.
+              Assisted wallet purchase uses the customer&apos;s available balance.
             </p>
           </div>
           {detail.accountStatusLabel === "Active" ? (
-            <Link
-              href={`/admin/customers/${encodeURIComponent(detail.id)}/esim/assign`}
-              className="inline-flex h-10 items-center justify-center rounded-[14px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
-            >
-              Assign eSIM package
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={`/admin/customers/${encodeURIComponent(detail.id)}/esim/assign`}
+                className="inline-flex h-10 items-center justify-center rounded-[14px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+              >
+                Assign eSIM package
+              </Link>
+              <Link
+                href={`/admin/customers/${encodeURIComponent(detail.id)}/esim/wallet-buy`}
+                className="inline-flex h-10 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+              >
+                Buy eSIM with wallet
+              </Link>
+            </div>
           ) : null}
         </div>
       </section>

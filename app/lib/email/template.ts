@@ -383,6 +383,22 @@ function introCopy(hasQrImage: boolean): string {
   return "Your eSIM purchase was successful. Use the verified manual installation details below on your device.";
 }
 
+function supportPurchaseNoticeSection(payload: OrderEmailPayload): string {
+  const notice = payload.supportPurchaseNotice?.trim();
+  if (!notice) return "";
+  return `
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 20px;">
+      <tr>
+        <td style="padding:14px 16px;border:1px solid ${NOTICE_BORDER};background:${NOTICE_BG};">
+          <p style="margin:0;color:${TEXT_PRIMARY};font-size:13px;line-height:1.55;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+            ${escapeHtml(notice)}
+          </p>
+        </td>
+      </tr>
+    </table>
+  `;
+}
+
 export function renderOrderEmailHtml(
   payload: OrderEmailPayload,
   options: OrderEmailHtmlOptions = {}
@@ -448,6 +464,7 @@ export function renderOrderEmailHtml(
                 <p style="margin:0 0 20px;color:${TEXT_PRIMARY};font-size:14px;line-height:1.6;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
                   ${escapeHtml(introCopy(hasQrImage))}
                 </p>
+                ${supportPurchaseNoticeSection(payload)}
                 ${installSection}
                 ${planDetailsSection(payload)}
                 ${howToInstallSection(hasQrImage)}
@@ -485,6 +502,11 @@ export function renderOrderEmailText(
     destinationHeadline,
     "",
     introCopy(hasQr),
+  ];
+  if (payload.supportPurchaseNotice?.trim()) {
+    lines.push("", payload.supportPurchaseNotice.trim());
+  }
+  lines.push(
     "",
     "Plan details",
     `Destination: ${payload.destination}`,
@@ -492,9 +514,9 @@ export function renderOrderEmailText(
     `Data allowance: ${payload.dataAllowance}`,
     `Validity: ${payload.validity}`,
     `Order ID: ${maskOrderReference(payload.orderId)}`,
-  ];
-
-  lines.push("", "Device installation actions");
+    "",
+    "Device installation actions"
+  );
   if (payload.iphoneActivationUrl) {
     lines.push(
       "Install on iPhone: use the official activation button/link in the HTML email.",
