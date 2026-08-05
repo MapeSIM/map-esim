@@ -4,6 +4,10 @@ import {
   getStoredEmailDelivery,
 } from "@/app/lib/email/deliverAfterCheckout";
 import { persistGuestOrder } from "@/app/lib/orders/persistGuestOrder";
+import {
+  GUEST_CHECKOUT_UNAVAILABLE_MESSAGE,
+  isGuestVesimCheckoutEnabled,
+} from "@/app/lib/vesim/guestCheckoutGate";
 import { createOrderAccessToken } from "@/app/lib/vesim/orderAccess";
 import {
   beginIdempotentCheckout,
@@ -22,6 +26,17 @@ import {
 } from "@/app/lib/vesim/server";
 
 export async function POST(req: NextRequest) {
+  // Fail closed before any VeSIM auth, offer verification, or order creation.
+  if (!isGuestVesimCheckoutEnabled()) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: GUEST_CHECKOUT_UNAVAILABLE_MESSAGE,
+      },
+      { status: 503 }
+    );
+  }
+
   let idempotencyKey = "";
 
   try {
