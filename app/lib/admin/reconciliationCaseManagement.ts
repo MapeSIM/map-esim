@@ -12,15 +12,21 @@ import { writeAuditLog } from "@/app/lib/auth/audit";
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
 import {
   canRaiseOrKeepEscalation,
+  canLowerEscalation,
   caseManagementStateLabel,
+  emailResendBlockerLabel,
+  evaluateEmailResendEligibility,
   evaluateResolutionEligibility,
   LOCK_CASE_PHRASE,
+  lowerEscalationPriorities,
   normalizeCaseManagementSourceType,
   parseCaseReason,
   parseConfirmPhrase,
   parseEscalationPriority,
+  parseKnownEscalationPriority,
   parseResolutionCode,
   resolutionBlockerLabel,
+  DEESCALATE_CASE_PHRASE,
   RESOLVE_CASE_PHRASE,
   UNLOCK_CASE_PHRASE,
   type CaseManagementSourceType,
@@ -33,6 +39,7 @@ import { PROVIDER_REFRESH_STALE_CLAIM_MS } from "@/app/lib/admin/providerRefresh
 export {
   CASE_REASON_MAX,
   CASE_REASON_MIN,
+  DEESCALATE_CASE_PHRASE,
   ESCALATION_PRIORITIES,
   LOCK_CASE_PHRASE,
   RESOLUTION_CODES,
@@ -49,6 +56,7 @@ export {
 export const CASE_LOCKED = "reconciliation.case_locked";
 export const CASE_UNLOCKED = "reconciliation.case_unlocked";
 export const CASE_ESCALATED = "reconciliation.case_escalated";
+export const CASE_DEESCALATED = "reconciliation.case_deescalated";
 export const CASE_RESOLVED = "reconciliation.case_resolved";
 export const CASE_ACTION_BLOCKED = "reconciliation.case_action_blocked";
 
@@ -100,8 +108,13 @@ export type CaseManagementUiState = {
   canLock: boolean;
   canUnlock: boolean;
   canEscalate: boolean;
+  canDeescalate: boolean;
+  deescalatePriorityOptions: EscalationPriority[];
   canResolve: boolean;
   refreshBlockedByCase: boolean;
+  emailResendSupported: boolean;
+  emailResendAllowed: boolean;
+  emailResendMessage: string;
 };
 
 const PUBLIC_ERROR = "Unable to update this case right now.";
@@ -232,7 +245,7 @@ function isRefreshInProgress(row: {
   return age < PROVIDER_REFRESH_STALE_CLAIM_MS && !completedAt;
 }
 
-type LoadedCase = CaseManagementFields & {
+  type LoadedCase = CaseManagementFields & {
   status?: string | null;
   providerResultKind?: string | null;
   providerOrderId?: string | null;
@@ -241,8 +254,12 @@ type LoadedCase = CaseManagementFields & {
   debitStatus?: string | null;
   refundTransactionId?: string | null;
   orderId?: string | null;
+  orderStatus?: string | null;
   emailDeliveryStatus?: string | null;
   emailNotificationStatus?: string | null;
+  customerEmail?: string | null;
+  amountCents?: number | null;
+  balanceAfterCents?: number | null;
   iccidHash?: string | null;
   iccidCapturedAt?: Date | null;
   providerRefreshResult?: string | null;
@@ -275,12 +292,16 @@ async function loadCaseRow(
         providerRefreshClaimedAt: true,
         providerRefreshCompletedAt: true,
         debitTransaction: { select: { status: true } },
+        customer: { select: { email: true, deletedAt: true } },
+        order: { select: { status: true } },
       },
     });
     if (!row) return null;
     return {
       ...row,
       debitStatus: row.debitTransaction?.status ?? null,
+      orderStatus: row.order?.status ?? null,
+      customerEmail: row.customer.deletedAt ? null : row.customer.email,
     };
   }
 
@@ -299,9 +320,16 @@ async function loadCaseRow(
         providerRefreshResult: true,
         providerRefreshClaimedAt: true,
         providerRefreshCompletedAt: true,
+        customer: { select: { email: true, deletedAt: true } },
+        order: { select: { status: true } },
       },
     });
-    return row;
+    if (!row) return null;
+    return {
+      ...row,
+      orderStatus: row.order?.status ?? null,
+      customerEmail: row.customer.deletedAt ? null : row.customer.email,
+    };
   }
 
   if (sourceType === "topup") {
@@ -325,10 +353,21 @@ async function loadCaseRow(
       select: {
         ...CASE_FIELD_SELECT,
         status: true,
+        amountCents: true,
+        balanceAfterCents: true,
         emailNotificationStatus: true,
+        wallet: {
+          select: {
+            user: { select: { email: true, deletedAt: true } },
+          },
+        },
       },
     });
-    return row;
+    if (!row) return null;
+    return {
+      ...row,
+      customerEmail: row.wallet.user?.deletedAt ? null : row.wallet.user?.email,
+    };
   }
 
   if (sourceType === "iccid") {
@@ -421,6 +460,31 @@ export async function getCaseManagementEligibility(options: {
   const escalated = Boolean(row.reconciliationEscalatedAt);
   const eligibility = eligibilityFromRow(ids.sourceType, row);
   const refreshInProgress = isRefreshInProgress(row);
+  const currentPriority = parseKnownEscalationPriority(
+    row.reconciliationEscalationPriority
+  );
+  const deescalatePriorityOptions = currentPriority
+    ? lowerEscalationPriorities(currentPriority)
+    : [];
+
+  const emailSupported =
+    ids.sourceType === "order_email" || ids.sourceType === "wallet_email";
+  const emailEligibility = emailSupported
+    ? evaluateEmailResendEligibility({
+        sourceType: ids.sourceType,
+        alreadyResolved: resolved,
+        status: row.status,
+        orderId: row.orderId,
+        orderStatus: row.orderStatus,
+        providerOrderId: row.providerOrderId,
+        customerEmail: row.customerEmail,
+        emailDeliveryStatus: row.emailDeliveryStatus,
+        emailNotificationStatus: row.emailNotificationStatus,
+        walletTransactionStatus: row.status,
+        amountCents: row.amountCents,
+        balanceAfterCents: row.balanceAfterCents,
+      })
+    : null;
 
   const eligibilityMessage = eligibility.allowed
     ? "Local evidence shows no active financial, provider, email, or ICCID risk."
@@ -452,8 +516,19 @@ export async function getCaseManagementEligibility(options: {
     canLock: !resolved && !locked,
     canUnlock: !resolved && locked,
     canEscalate: !resolved,
+    canDeescalate: !resolved && escalated && deescalatePriorityOptions.length > 0,
+    deescalatePriorityOptions,
     canResolve: !resolved && !locked && eligibility.allowed && !refreshInProgress,
     refreshBlockedByCase: resolved || locked,
+    emailResendSupported: emailSupported,
+    emailResendAllowed: Boolean(emailEligibility?.allowed),
+    emailResendMessage: emailEligibility
+      ? emailEligibility.allowed
+        ? emailEligibility.channel === "wallet_email"
+          ? "Local ledger evidence is complete. Safe to resend the wallet notification."
+          : "Local order evidence is complete. Safe to resend the order email."
+        : emailEligibility.blockers.map(emailResendBlockerLabel).join(" ")
+      : "Email resend is not available for this case type.",
   };
 }
 
@@ -998,6 +1073,208 @@ export async function escalateReconciliationCase(options: {
       sourceType: ids.sourceType,
       attemptId: ids.attemptId,
       action: "escalate",
+      reason: reasonParsed.reason.slice(0, 80),
+      priority: priorityParsed.priority,
+      previousPriority: currentKnown,
+      escalatedAt: now.toISOString(),
+    },
+  });
+
+  return { ok: true };
+}
+
+export async function deescalateReconciliationCase(options: {
+  adminUserId: string;
+  sourceType: string;
+  attemptId: string;
+  reason: string;
+  priority: string;
+  confirmPhrase: string;
+}): Promise<CaseActionResult> {
+  if (!(await assertSameOriginAdminRequest())) {
+    return { ok: false, error: PUBLIC_ERROR };
+  }
+  const admin = await assertActiveAdmin(options.adminUserId);
+  if (!admin) return { ok: false, error: PUBLIC_ERROR };
+
+  const sourceType = normalizeCaseManagementSourceType(options.sourceType);
+  if (!sourceType) return { ok: false, error: PUBLIC_ERROR };
+  const ids = resolveRecordIds(sourceType, options.attemptId);
+  if (!ids) return { ok: false, error: PUBLIC_ERROR };
+
+  const reasonParsed = parseCaseReason(options.reason);
+  if (!reasonParsed.ok) {
+    return {
+      ok: false,
+      error: reasonParsed.error,
+      fieldErrors: { reason: reasonParsed.error },
+    };
+  }
+  const priorityParsed = parseEscalationPriority(options.priority);
+  if (!priorityParsed.ok) {
+    return {
+      ok: false,
+      error: priorityParsed.error,
+      fieldErrors: { priority: priorityParsed.error },
+    };
+  }
+  const phrase = parseConfirmPhrase(
+    options.confirmPhrase,
+    DEESCALATE_CASE_PHRASE
+  );
+  if (!phrase.ok) {
+    return {
+      ok: false,
+      error: phrase.error,
+      fieldErrors: { confirmPhrase: phrase.error },
+    };
+  }
+
+  const limited = await rateLimitCaseAction({
+    adminId: admin.id,
+    sourceType: ids.sourceType,
+    attemptId: ids.attemptId,
+    action: "deescalate",
+  });
+  if (!limited.ok) return limited;
+
+  const row = await loadCaseRow(
+    ids.sourceType,
+    ids.recordId,
+    ids.orderEmailOnAssignment
+  );
+  if (!row) {
+    await auditBlocked({
+      adminId: admin.id,
+      sourceType: ids.sourceType,
+      attemptId: ids.attemptId,
+      targetType: ids.targetType,
+      recordId: ids.recordId,
+      action: "deescalate",
+      failureCode: "not_found",
+      reason: reasonParsed.reason,
+    });
+    return { ok: false, error: PUBLIC_ERROR };
+  }
+
+  if (row.reconciliationResolvedAt) {
+    await auditBlocked({
+      adminId: admin.id,
+      sourceType: ids.sourceType,
+      attemptId: ids.attemptId,
+      targetType: ids.targetType,
+      recordId: ids.recordId,
+      action: "deescalate",
+      failureCode: "already_resolved",
+      reason: reasonParsed.reason,
+    });
+    return { ok: false, error: "Resolved cases cannot be de-escalated." };
+  }
+
+  const currentKnown = parseKnownEscalationPriority(
+    row.reconciliationEscalationPriority
+  );
+  if (!currentKnown || !row.reconciliationEscalatedAt) {
+    await auditBlocked({
+      adminId: admin.id,
+      sourceType: ids.sourceType,
+      attemptId: ids.attemptId,
+      targetType: ids.targetType,
+      recordId: ids.recordId,
+      action: "deescalate",
+      failureCode: "not_escalated",
+      reason: reasonParsed.reason,
+    });
+    return {
+      ok: false,
+      error: "This case is not escalated.",
+      fieldErrors: { priority: "This case is not escalated." },
+    };
+  }
+
+  if (
+    currentKnown === priorityParsed.priority &&
+    (row.reconciliationEscalationReason ?? "").trim() === reasonParsed.reason
+  ) {
+    await writeAuditLog({
+      actorUserId: admin.id,
+      action: CASE_DEESCALATED,
+      targetType: ids.targetType,
+      targetId: ids.recordId,
+      metadata: {
+        sourceType: ids.sourceType,
+        attemptId: ids.attemptId,
+        action: "deescalate",
+        reason: reasonParsed.reason.slice(0, 80),
+        priority: priorityParsed.priority,
+        previousPriority: currentKnown,
+        idempotent: true,
+      },
+    });
+    return { ok: true, idempotent: true };
+  }
+
+  if (!canLowerEscalation(currentKnown, priorityParsed.priority)) {
+    await auditBlocked({
+      adminId: admin.id,
+      sourceType: ids.sourceType,
+      attemptId: ids.attemptId,
+      targetType: ids.targetType,
+      recordId: ids.recordId,
+      action: "deescalate",
+      failureCode: "priority_not_lower",
+      reason: reasonParsed.reason,
+    });
+    return {
+      ok: false,
+      error: "De-escalation requires a strictly lower priority.",
+      fieldErrors: {
+        priority: "De-escalation requires a strictly lower priority.",
+      },
+    };
+  }
+
+  const now = new Date();
+  const delegate = delegateFor(ids.sourceType, ids.orderEmailOnAssignment);
+  const updated = await delegate.updateMany({
+    where: {
+      id: ids.recordId,
+      reconciliationResolvedAt: null,
+      reconciliationEscalationPriority: currentKnown,
+    },
+    data: {
+      reconciliationEscalatedAt: now,
+      reconciliationEscalatedByAdminId: admin.id,
+      reconciliationEscalationReason: reasonParsed.reason,
+      reconciliationEscalationPriority: priorityParsed.priority,
+    },
+  });
+
+  if (updated.count === 0) {
+    const again = await loadCaseRow(
+      ids.sourceType,
+      ids.recordId,
+      ids.orderEmailOnAssignment
+    );
+    if (
+      again &&
+      parseKnownEscalationPriority(again.reconciliationEscalationPriority) ===
+        priorityParsed.priority
+    ) {
+      return { ok: true, idempotent: true };
+    }
+    return { ok: false, error: PUBLIC_ERROR };
+  }
+
+  await writeAuditLog({
+    actorUserId: admin.id,
+    action: CASE_DEESCALATED,
+    targetType: ids.targetType,
+    targetId: ids.recordId,
+    metadata: {
+      sourceType: ids.sourceType,
+      attemptId: ids.attemptId,
+      action: "deescalate",
       reason: reasonParsed.reason.slice(0, 80),
       priority: priorityParsed.priority,
       previousPriority: currentKnown,

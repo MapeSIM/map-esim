@@ -118,8 +118,8 @@ export default async function AdminReconciliationDetailPage({
           Reconciliation case
         </h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Sanitized timeline and controlled case management. Wallet refunds,
-          finalization and email resend are not available here.
+          Sanitized timeline and controlled case management. Wallet refunds and
+          order finalization are not available here.
         </p>
       </div>
 
@@ -182,7 +182,12 @@ export default async function AdminReconciliationDetailPage({
           canLock={caseUi.canLock}
           canUnlock={caseUi.canUnlock}
           canEscalate={caseUi.canEscalate}
+          canDeescalate={caseUi.canDeescalate}
+          deescalatePriorityOptions={caseUi.deescalatePriorityOptions}
           canResolve={caseUi.canResolve}
+          emailResendSupported={caseUi.emailResendSupported}
+          emailResendAllowed={caseUi.emailResendAllowed}
+          emailResendMessage={caseUi.emailResendMessage}
         />
       ) : null}
 

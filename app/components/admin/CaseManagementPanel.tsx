@@ -2,16 +2,20 @@
 
 import { useActionState } from "react";
 import {
+  deescalateReconciliationCaseAction,
   escalateReconciliationCaseAction,
   lockReconciliationCaseAction,
+  resendReconciliationEmailAction,
   resolveReconciliationCaseAction,
   unlockReconciliationCaseAction,
   type CaseManagementFormState,
 } from "@/app/lib/admin/reconciliationCaseActions";
 import {
   CASE_REASON_MAX,
+  DEESCALATE_CASE_PHRASE,
   ESCALATION_PRIORITIES,
   LOCK_CASE_PHRASE,
+  RESEND_EMAIL_PHRASE,
   RESOLUTION_CODES,
   RESOLVE_CASE_PHRASE,
   UNLOCK_CASE_PHRASE,
@@ -75,7 +79,12 @@ export default function CaseManagementPanel(props: {
   canLock: boolean;
   canUnlock: boolean;
   canEscalate: boolean;
+  canDeescalate: boolean;
+  deescalatePriorityOptions: string[];
   canResolve: boolean;
+  emailResendSupported: boolean;
+  emailResendAllowed: boolean;
+  emailResendMessage: string;
 }) {
   const [lockState, lockAction, lockPending] = useActionState(
     lockReconciliationCaseAction,
@@ -89,14 +98,27 @@ export default function CaseManagementPanel(props: {
     escalateReconciliationCaseAction,
     initial
   );
+  const [deescalateState, deescalateAction, deescalatePending] = useActionState(
+    deescalateReconciliationCaseAction,
+    initial
+  );
   const [resolveState, resolveAction, resolvePending] = useActionState(
     resolveReconciliationCaseAction,
+    initial
+  );
+  const [resendState, resendAction, resendPending] = useActionState(
+    resendReconciliationEmailAction,
     initial
   );
 
   const readOnly = props.resolved;
   const busy =
-    lockPending || unlockPending || escalatePending || resolvePending;
+    lockPending ||
+    unlockPending ||
+    escalatePending ||
+    deescalatePending ||
+    resolvePending ||
+    resendPending;
 
   return (
     <section className="space-y-5 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
@@ -338,6 +360,136 @@ export default function CaseManagementPanel(props: {
                 className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
               >
                 {escalatePending ? "Escalating…" : "Escalate case"}
+              </button>
+            </form>
+          ) : null}
+
+          {props.canDeescalate ? (
+            <form action={deescalateAction} className="space-y-3">
+              <h3 className="text-sm font-semibold text-[var(--heading)]">
+                De-escalate case
+              </h3>
+              <input type="hidden" name="sourceType" value={props.sourceType} />
+              <input type="hidden" name="attemptId" value={props.attemptId} />
+              <div>
+                <label
+                  htmlFor="deescalate-priority"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Lower priority
+                </label>
+                <select
+                  id="deescalate-priority"
+                  name="priority"
+                  required
+                  disabled={busy}
+                  defaultValue={props.deescalatePriorityOptions[0] || ""}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                >
+                  {props.deescalatePriorityOptions.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+                <FieldError state={deescalateState} field="priority" />
+              </div>
+              <div>
+                <label
+                  htmlFor="deescalate-reason"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Reason
+                </label>
+                <textarea
+                  id="deescalate-reason"
+                  name="reason"
+                  required
+                  maxLength={CASE_REASON_MAX}
+                  rows={2}
+                  disabled={busy}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                />
+                <FieldError state={deescalateState} field="reason" />
+              </div>
+              <div>
+                <label
+                  htmlFor="deescalate-confirm"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Type {DEESCALATE_CASE_PHRASE}
+                </label>
+                <input
+                  id="deescalate-confirm"
+                  name="confirmPhrase"
+                  required
+                  disabled={busy}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                />
+                <FieldError state={deescalateState} field="confirmPhrase" />
+              </div>
+              <ActionMessage state={deescalateState} />
+              <button
+                type="submit"
+                disabled={busy}
+                className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+              >
+                {deescalatePending ? "De-escalating…" : "De-escalate case"}
+              </button>
+            </form>
+          ) : null}
+
+          {props.emailResendSupported ? (
+            <form action={resendAction} className="space-y-3">
+              <h3 className="text-sm font-semibold text-[var(--heading)]">
+                Resend email
+              </h3>
+              <p className="text-sm text-[var(--text-muted)]">
+                {props.emailResendMessage}
+              </p>
+              <input type="hidden" name="sourceType" value={props.sourceType} />
+              <input type="hidden" name="attemptId" value={props.attemptId} />
+              <div>
+                <label
+                  htmlFor="resend-reason"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Reason
+                </label>
+                <textarea
+                  id="resend-reason"
+                  name="reason"
+                  required
+                  maxLength={CASE_REASON_MAX}
+                  rows={2}
+                  disabled={busy || !props.emailResendAllowed}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                />
+                <FieldError state={resendState} field="reason" />
+              </div>
+              <div>
+                <label
+                  htmlFor="resend-confirm"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Type {RESEND_EMAIL_PHRASE}
+                </label>
+                <input
+                  id="resend-confirm"
+                  name="confirmPhrase"
+                  required
+                  disabled={busy || !props.emailResendAllowed}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                />
+                <FieldError state={resendState} field="confirmPhrase" />
+              </div>
+              <ActionMessage state={resendState} />
+              <button
+                type="submit"
+                disabled={busy || !props.emailResendAllowed}
+                className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {resendPending ? "Resending…" : "Resend email"}
               </button>
             </form>
           ) : null}

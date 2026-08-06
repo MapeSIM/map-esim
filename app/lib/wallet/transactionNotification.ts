@@ -93,6 +93,47 @@ function shortOrderReference(orderId: string): string {
   return `${id.slice(0, 4)}…${id.slice(-4)}`;
 }
 
+export async function resendFailedWalletTransactionNotification(
+  walletTransactionId: string
+): Promise<WalletTxNotificationResult> {
+  const id = (walletTransactionId ?? "").trim();
+  if (!id || id.length > 64 || !/^[A-Za-z0-9_-]+$/.test(id)) {
+    return { status: "skipped", reason: "invalid_id" };
+  }
+
+  try {
+    const claimed = await prisma.walletTransaction.updateMany({
+      where: {
+        id,
+        status: WalletTransactionStatus.COMPLETED,
+        emailNotificationStatus: {
+          in: [WALLET_TX_EMAIL_FAILED, WALLET_TX_EMAIL_NOT_CONFIGURED],
+        },
+      },
+      data: {
+        emailNotificationStatus: WALLET_TX_EMAIL_SENDING,
+      },
+    });
+
+    if (claimed.count !== 1) {
+      return { status: "skipped", reason: "not_retryable_or_in_progress" };
+    }
+
+    return await dispatchWalletTransactionEmail(id);
+  } catch {
+    console.error("wallet_tx_email", "resend_error");
+    try {
+      await prisma.walletTransaction.updateMany({
+        where: { id, emailNotificationStatus: WALLET_TX_EMAIL_SENDING },
+        data: { emailNotificationStatus: WALLET_TX_EMAIL_FAILED },
+      });
+    } catch {
+      // ignore
+    }
+    return { status: "failed", reason: "dispatch_error" };
+  }
+}
+
 /**
  * Send at most one billing email for a completed wallet ledger movement.
  * Must be called AFTER the Prisma wallet mutation commits.
@@ -122,6 +163,25 @@ export async function notifyCompletedWalletTransaction(
       return { status: "skipped", reason: "already_handled_or_incomplete" };
     }
 
+    return await dispatchWalletTransactionEmail(id);
+  } catch {
+    console.error("wallet_tx_email", "dispatch_error");
+    try {
+      await prisma.walletTransaction.updateMany({
+        where: { id, emailNotificationStatus: WALLET_TX_EMAIL_SENDING },
+        data: { emailNotificationStatus: WALLET_TX_EMAIL_FAILED },
+      });
+    } catch {
+      // ignore
+    }
+    return { status: "failed", reason: "dispatch_error" };
+  }
+}
+
+async function dispatchWalletTransactionEmail(
+  id: string
+): Promise<WalletTxNotificationResult> {
+  try {
     const row = await prisma.walletTransaction.findUnique({
       where: { id },
       select: {
@@ -278,21 +338,23 @@ export async function notifyCompletedWalletTransaction(
 
     await markNotification(id, WALLET_TX_EMAIL_FAILED);
     console.error("wallet_tx_email", "send_failed", id);
-    await prisma.auditLog.create({
-      data: {
-        actorUserId: null,
-        action: "wallet.transaction_email_failed",
-        targetType: "WalletTransaction",
-        targetId: id,
-        metadata: {
-          notificationType: "wallet_balance_change",
-          deliveryStatus: WALLET_TX_EMAIL_FAILED,
-          errorCode: sendResult.reason,
-          walletTransactionId: id,
-          userId: user.id,
+    await prisma.auditLog
+      .create({
+        data: {
+          actorUserId: null,
+          action: "wallet.transaction_email_failed",
+          targetType: "WalletTransaction",
+          targetId: id,
+          metadata: {
+            notificationType: "wallet_balance_change",
+            deliveryStatus: WALLET_TX_EMAIL_FAILED,
+            errorCode: sendResult.reason,
+            walletTransactionId: id,
+            userId: user.id,
+          },
         },
-      },
-    }).catch(() => undefined);
+      })
+      .catch(() => undefined);
     return { status: "failed", reason: sendResult.reason };
   } catch {
     console.error("wallet_tx_email", "dispatch_error");

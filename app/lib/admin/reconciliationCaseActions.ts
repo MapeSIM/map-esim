@@ -3,12 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/app/lib/auth/session";
 import {
+  deescalateReconciliationCase,
   escalateReconciliationCase,
   lockReconciliationCase,
   resolveReconciliationCase,
   unlockReconciliationCase,
   type CaseActionResult,
 } from "@/app/lib/admin/reconciliationCaseManagement";
+import { resendReconciliationEmail } from "@/app/lib/admin/reconciliationEmailResend";
 
 export type CaseManagementFormState = CaseActionResult | null;
 
@@ -82,6 +84,28 @@ export async function escalateReconciliationCaseAction(
   return result;
 }
 
+export async function deescalateReconciliationCaseAction(
+  _prev: CaseManagementFormState,
+  formData: FormData
+): Promise<CaseManagementFormState> {
+  const admin = await requireRole("ADMIN");
+  const sourceType = String(formData.get("sourceType") ?? "").trim();
+  const attemptId = String(formData.get("attemptId") ?? "").trim();
+  void formData.get("caseStatus");
+  void formData.get("currentPriority");
+
+  const result = await deescalateReconciliationCase({
+    adminUserId: admin.id,
+    sourceType,
+    attemptId,
+    reason: String(formData.get("reason") ?? ""),
+    priority: String(formData.get("priority") ?? ""),
+    confirmPhrase: String(formData.get("confirmPhrase") ?? ""),
+  });
+  if (result.ok) revalidateCase(sourceType, attemptId);
+  return result;
+}
+
 export async function resolveReconciliationCaseAction(
   _prev: CaseManagementFormState,
   formData: FormData
@@ -98,6 +122,27 @@ export async function resolveReconciliationCaseAction(
     attemptId,
     reason: String(formData.get("reason") ?? ""),
     resolutionCode: String(formData.get("resolutionCode") ?? ""),
+    confirmPhrase: String(formData.get("confirmPhrase") ?? ""),
+  });
+  if (result.ok) revalidateCase(sourceType, attemptId);
+  return result;
+}
+
+export async function resendReconciliationEmailAction(
+  _prev: CaseManagementFormState,
+  formData: FormData
+): Promise<CaseManagementFormState> {
+  const admin = await requireRole("ADMIN");
+  const sourceType = String(formData.get("sourceType") ?? "").trim();
+  const attemptId = String(formData.get("attemptId") ?? "").trim();
+  void formData.get("caseStatus");
+  void formData.get("eligible");
+
+  const result = await resendReconciliationEmail({
+    adminUserId: admin.id,
+    sourceType,
+    attemptId,
+    reason: String(formData.get("reason") ?? ""),
     confirmPhrase: String(formData.get("confirmPhrase") ?? ""),
   });
   if (result.ok) revalidateCase(sourceType, attemptId);

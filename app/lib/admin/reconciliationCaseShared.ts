@@ -8,6 +8,8 @@ export const CASE_REASON_MAX = 200;
 export const LOCK_CASE_PHRASE = "LOCK CASE";
 export const UNLOCK_CASE_PHRASE = "UNLOCK CASE";
 export const RESOLVE_CASE_PHRASE = "RESOLVE CASE";
+export const DEESCALATE_CASE_PHRASE = "DE-ESCALATE CASE";
+export const RESEND_EMAIL_PHRASE = "RESEND EMAIL";
 
 export const ESCALATION_PRIORITIES = [
   "LOW",
@@ -129,6 +131,32 @@ export function canRaiseOrKeepEscalation(
   return escalationPriorityRank(next) >= escalationPriorityRank(current);
 }
 
+/** True only when next is strictly lower than an existing escalation priority. */
+export function canLowerEscalation(
+  current: EscalationPriority | null | undefined,
+  next: EscalationPriority
+): boolean {
+  if (!current) return false;
+  return escalationPriorityRank(next) < escalationPriorityRank(current);
+}
+
+export function lowerEscalationPriorities(
+  current: EscalationPriority
+): EscalationPriority[] {
+  const rank = escalationPriorityRank(current);
+  return ESCALATION_PRIORITIES.filter((p) => escalationPriorityRank(p) < rank);
+}
+
+export function parseKnownEscalationPriority(
+  raw: string | null | undefined
+): EscalationPriority | null {
+  const v = (raw ?? "").trim().toUpperCase();
+  if ((ESCALATION_PRIORITIES as readonly string[]).includes(v)) {
+    return v as EscalationPriority;
+  }
+  return null;
+}
+
 function isFailedEmail(status: string | null | undefined): boolean {
   const v = (status ?? "").trim().toLowerCase();
   return v === "failed" || v === "invalid_email";
@@ -137,6 +165,135 @@ function isFailedEmail(status: string | null | undefined): boolean {
 function isFailedWalletEmail(status: string | null | undefined): boolean {
   const v = (status ?? "").trim().toLowerCase();
   return v === "failed" || v === "not_configured";
+}
+
+/** Pure email-resend eligibility from local DB fields (no VeSIM). */
+export type EmailResendBlockInput = {
+  sourceType: CaseManagementSourceType;
+  alreadyResolved: boolean;
+  status?: string | null;
+  orderId?: string | null;
+  orderStatus?: string | null;
+  providerOrderId?: string | null;
+  customerEmail?: string | null;
+  emailDeliveryStatus?: string | null;
+  emailNotificationStatus?: string | null;
+  walletTransactionStatus?: string | null;
+  amountCents?: number | null;
+  balanceAfterCents?: number | null;
+};
+
+export type EmailResendEligibility = {
+  allowed: boolean;
+  blockers: string[];
+  channel: "order_email" | "wallet_email" | null;
+};
+
+export function evaluateEmailResendEligibility(
+  input: EmailResendBlockInput
+): EmailResendEligibility {
+  const blockers: string[] = [];
+  const source = input.sourceType;
+
+  if (source !== "order_email" && source !== "wallet_email") {
+    return { allowed: false, blockers: ["unsupported_source"], channel: null };
+  }
+
+  if (input.alreadyResolved) blockers.push("already_resolved");
+
+  if (source === "order_email") {
+    const emailStatus = (input.emailDeliveryStatus ?? "").trim().toLowerCase();
+    if (emailStatus !== "failed" && emailStatus !== "not_configured") {
+      // invalid_email is not safely resendable without correcting the address.
+      if (emailStatus === "invalid_email") blockers.push("invalid_email");
+      else if (emailStatus === "sent" || emailStatus === "already_sent") {
+        blockers.push("email_already_sent");
+      } else {
+        blockers.push("email_not_failed");
+      }
+    }
+    const status = (input.status ?? "").trim().toUpperCase();
+    if (status !== "COMPLETED") blockers.push("order_not_completed");
+    if (!(input.orderId ?? "").trim()) blockers.push("missing_local_order");
+    if ((input.orderStatus ?? "").trim().toUpperCase() === "FAILED") {
+      blockers.push("local_order_failed");
+    }
+    if (!(input.providerOrderId ?? "").trim()) {
+      blockers.push("missing_provider_reference");
+    }
+    const email = (input.customerEmail ?? "").trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      blockers.push("customer_email_unavailable");
+    }
+    return {
+      allowed: blockers.length === 0,
+      blockers,
+      channel: "order_email",
+    };
+  }
+
+  // wallet_email
+  const notify = (input.emailNotificationStatus ?? "").trim().toLowerCase();
+  if (notify !== "failed" && notify !== "not_configured") {
+    if (notify === "sent") blockers.push("email_already_sent");
+    else if (notify === "sending") blockers.push("email_send_in_progress");
+    else blockers.push("email_not_failed");
+  }
+  if ((input.walletTransactionStatus ?? "").trim().toUpperCase() !== "COMPLETED") {
+    blockers.push("ledger_not_completed");
+  }
+  if (
+    !Number.isInteger(input.amountCents) ||
+    (input.amountCents ?? 0) <= 0 ||
+    typeof input.balanceAfterCents !== "number" ||
+    !Number.isInteger(input.balanceAfterCents) ||
+    (input.balanceAfterCents ?? -1) < 0
+  ) {
+    blockers.push("incomplete_ledger_snapshot");
+  }
+  const email = (input.customerEmail ?? "").trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    blockers.push("customer_email_unavailable");
+  }
+
+  return {
+    allowed: blockers.length === 0,
+    blockers,
+    channel: "wallet_email",
+  };
+}
+
+export function emailResendBlockerLabel(code: string): string {
+  switch (code) {
+    case "unsupported_source":
+      return "This case type does not support email resend.";
+    case "already_resolved":
+      return "Resolved cases cannot resend email.";
+    case "invalid_email":
+      return "Customer email is invalid; correct it before resending.";
+    case "email_already_sent":
+      return "Email was already sent successfully.";
+    case "email_not_failed":
+      return "Email is not in a failed state.";
+    case "email_send_in_progress":
+      return "An email send is already in progress.";
+    case "order_not_completed":
+      return "Underlying purchase/assignment is not completed.";
+    case "missing_local_order":
+      return "Local order is missing.";
+    case "local_order_failed":
+      return "Local order is failed.";
+    case "missing_provider_reference":
+      return "Provider reference is missing.";
+    case "customer_email_unavailable":
+      return "Customer email is unavailable.";
+    case "ledger_not_completed":
+      return "Wallet ledger entry is not completed.";
+    case "incomplete_ledger_snapshot":
+      return "Wallet balance snapshot is incomplete.";
+    default:
+      return "Email cannot be resent for this case.";
+  }
 }
 
 function refreshInProgress(input: {
