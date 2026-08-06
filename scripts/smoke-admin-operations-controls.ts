@@ -167,7 +167,7 @@ async function main() {
     try {
       const snap = await getOperationalControlsHealthSnapshot();
       assert.equal(snap.readOk, true);
-      assert.equal(snap.controls.length, 5);
+      assert.equal(snap.controls.length, 6);
       assert.equal(snap.guestCheckoutStatus, "NOT_IMPLEMENTED / DISABLED");
       assert.equal(snap.overallTransactionsStatus, "ACTIVE");
       record(
@@ -270,7 +270,7 @@ async function main() {
       record(
         "pause and resume each allowlisted control",
         "PASS",
-        "all 5 keys pause/resume/idempotent; wrong phrase + short reason rejected"
+        "all allowlisted keys pause/resume/idempotent; wrong phrase + short reason rejected"
       );
     } catch (e) {
       record(

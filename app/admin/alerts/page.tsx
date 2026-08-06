@@ -12,6 +12,18 @@ import {
   type AlertSeverity,
   type MonitoringAlert,
 } from "@/app/lib/admin/monitoringAlertShared";
+import {
+  deriveDisplayStatus,
+  formatNotificationStatusLabel,
+  isAlertEligibleForNotification,
+  type DerivedNotificationDisplayStatus,
+  type SanitizedRecentDeliveryView,
+} from "@/app/lib/admin/alertNotificationShared";
+import {
+  loadNotificationViewsForAlerts,
+  loadRecentNotificationActivity,
+} from "@/app/lib/admin/alertNotificationState";
+import { formatUtcTimestamp } from "@/app/lib/admin/operationsHealthShared";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +82,17 @@ function Metric({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function AlertCard({ alert }: { alert: MonitoringAlert }) {
+function AlertCard({
+  alert,
+  notificationStatus,
+  lastAttemptLabel,
+  lastSuccessLabel,
+}: {
+  alert: MonitoringAlert;
+  notificationStatus: DerivedNotificationDisplayStatus;
+  lastAttemptLabel: string;
+  lastSuccessLabel: string;
+}) {
   const href =
     alert.href && isSafeAdminHref(alert.href) ? alert.href : undefined;
   return (
@@ -84,6 +106,9 @@ function AlertCard({ alert }: { alert: MonitoringAlert }) {
             <StatusPill value={alert.severity} />
             <StatusPill value={categoryLabel(alert.category)} />
             <StatusPill value={alert.state} />
+            <StatusPill
+              value={formatNotificationStatusLabel(notificationStatus)}
+            />
           </div>
           <h2
             id={`alert-${alert.id}`}
@@ -125,6 +150,18 @@ function AlertCard({ alert }: { alert: MonitoringAlert }) {
             {alert.code}
           </dd>
         </div>
+        <div>
+          <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+            Last notify attempt
+          </dt>
+          <dd className="mt-1 text-sm text-[var(--heading)]">{lastAttemptLabel}</dd>
+        </div>
+        <div>
+          <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+            Last notify success
+          </dt>
+          <dd className="mt-1 text-sm text-[var(--heading)]">{lastSuccessLabel}</dd>
+        </div>
       </dl>
       <p className="mt-4 text-sm text-[var(--heading)]">
         <span className="font-semibold">Recommended next step: </span>
@@ -153,11 +190,21 @@ export default async function AdminAlertsPage({
   const params = await searchParams;
 
   let data;
+  let notifyViews: Awaited<ReturnType<typeof loadNotificationViewsForAlerts>> =
+    new Map();
+  let recentActivity: SanitizedRecentDeliveryView[] = [];
   try {
     data = await getMonitoringAlertsDashboard({
       severity: params.severity,
       category: params.category,
     });
+    // Read-only notification status — never triggers sends on page render.
+    const checkedAt = new Date();
+    notifyViews = await loadNotificationViewsForAlerts({
+      alertIds: data.alerts.map((a) => a.id),
+      checkedAt,
+    });
+    recentActivity = await loadRecentNotificationActivity(20);
   } catch {
     return (
       <div className="space-y-6">
@@ -305,11 +352,76 @@ export default async function AdminAlertsPage({
         </div>
       ) : (
         <div className="space-y-4">
-          {data.alerts.map((alert) => (
-            <AlertCard key={alert.id} alert={alert} />
-          ))}
+          {data.alerts.map((alert) => {
+            const view = notifyViews.get(alert.id);
+            const checkedAt = new Date();
+            const notificationStatus = deriveDisplayStatus({
+              eligible: isAlertEligibleForNotification(alert),
+              latestDeliveryStatus: view?.latestDeliveryStatus ?? null,
+              lastNotifiedAt: view?.lastNotifiedAt ?? null,
+              checkedAt,
+            });
+            return (
+              <AlertCard
+                key={alert.id}
+                alert={alert}
+                notificationStatus={notificationStatus}
+                lastAttemptLabel={
+                  view?.lastAttemptAt
+                    ? formatUtcTimestamp(view.lastAttemptAt)
+                    : "—"
+                }
+                lastSuccessLabel={
+                  view?.lastSuccessAt
+                    ? formatUtcTimestamp(view.lastSuccessAt)
+                    : "—"
+                }
+              />
+            );
+          })}
         </div>
       )}
+
+      <section
+        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5"
+        aria-labelledby="recent-notification-activity-heading"
+      >
+        <h2
+          id="recent-notification-activity-heading"
+          className="text-base font-semibold tracking-tight text-[var(--heading)]"
+        >
+          Recent notification activity
+        </h2>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          Read-only delivery history (initial / reminder / recovery). No resend
+          or mute controls.
+        </p>
+        {recentActivity.length === 0 ? (
+          <p className="mt-4 text-sm text-[var(--text-muted)]" role="status">
+            No notification delivery events yet.
+          </p>
+        ) : (
+          <ul className="mt-4 space-y-2">
+            {recentActivity.map((row, idx) => (
+              <li
+                key={`${row.alertCode}-${row.eventType}-${row.atLabel}-${idx}`}
+                className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+              >
+                <span className="font-semibold text-[var(--heading)]">
+                  {row.eventType}
+                </span>{" "}
+                · {row.status} · {row.severity} ·{" "}
+                <span className="font-mono text-xs">{row.alertCode}</span>
+                <span className="mt-1 block text-[11px] text-[var(--text-soft)]">
+                  {row.atLabel}
+                  {row.sourceType ? ` · ${row.sourceType}` : ""}
+                  {row.sourceRecordRef ? ` · ${row.sourceRecordRef}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

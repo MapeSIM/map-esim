@@ -110,6 +110,21 @@ enum OperationalControlKey {
   ADMIN_WALLET_PURCHASES
   COMPANY_ASSIGNMENTS
   PROVIDER_ORDER_CREATION
+  /// Pauses alert-notification email delivery only. Aggregation/dashboard stay live.
+  ALERT_NOTIFICATIONS
+}
+
+enum AlertNotificationEventType {
+  INITIAL
+  REMINDER
+  RECOVERY
+}
+
+enum AlertNotificationDeliveryStatus {
+  PENDING
+  CLAIMED
+  SENT
+  FAILED
 }
 
 model User {
@@ -580,4 +595,77 @@ model OperationalControl {
 
   @@index([paused])
   @@index([updatedAt])
+}
+
+/// Lifecycle state per deterministic Part B1 alert ID (activation cycles).
+/// Display statuses like not-eligible / cooldown are derived, not stored.
+model AlertNotificationState {
+  id                 String    @id @default(cuid())
+  alertId            String    @unique
+  alertCode          String
+  severity           String
+  category           String
+  /// Sanitized source type token (e.g. wallet_purchase, config).
+  sourceType         String?
+  /// Masked/safe internal reference only — never full customer email or secrets.
+  sourceRecordRef    String?
+  isActive           Boolean   @default(true)
+  activationSequence Int       @default(1)
+  firstSeenAt        DateTime
+  lastSeenAt         DateTime
+  activatedAt        DateTime
+  resolvedAt         DateTime?
+  lastNotifiedAt     DateTime?
+  nextReminderAt     DateTime?
+  recoveryNotifiedAt DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  deliveries AlertNotificationDelivery[]
+
+  @@index([isActive])
+  @@index([lastSeenAt])
+  @@index([alertCode])
+  @@index([activationSequence])
+}
+
+/// Durable outbox row per deterministic delivery event (initial/reminder/recovery).
+/// SMTP is not perfect exactly-once if crash occurs after accept and before SENT update;
+/// unique eventKey + CAS claim minimize normal concurrent/restart duplication.
+model AlertNotificationDelivery {
+  id                 String                          @id @default(cuid())
+  eventKey           String                          @unique
+  alertId            String
+  activationSequence Int
+  eventType          AlertNotificationEventType
+  status             AlertNotificationDeliveryStatus @default(PENDING)
+  attemptCount       Int                             @default(0)
+  nextAttemptAt      DateTime?
+  claimToken         String?
+  claimedAt          DateTime?
+  claimExpiresAt     DateTime?
+  lastAttemptAt      DateTime?
+  sentAt             DateTime?
+  /// Allowlisted opaque code only — never raw SMTP text, recipients, or bodies.
+  lastErrorCode      String?
+  /// Deterministic sanitized Message-ID derived from eventKey when sent.
+  messageId          String?
+  createdAt          DateTime                        @default(now())
+  updatedAt          DateTime                        @updatedAt
+
+  state AlertNotificationState @relation(fields: [alertId], references: [alertId], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([alertId, activationSequence])
+  @@index([claimedAt])
+  @@index([eventType, status])
+}
+
+/// Singleton CAS lock so concurrent alert-notification runners do not overlap.
+model AlertNotificationRunnerLock {
+  id             String    @id @default("default")
+  claimToken     String?
+  claimedAt      DateTime?
+  claimExpiresAt DateTime?
+  updatedAt      DateTime  @updatedAt
 }

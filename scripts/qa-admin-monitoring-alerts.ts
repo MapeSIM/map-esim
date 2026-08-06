@@ -215,6 +215,7 @@ function main() {
     "CONTROL_ADMIN_PURCHASES_PAUSED",
     "CONTROL_COMPANY_ASSIGNMENTS_PAUSED",
     "CONTROL_PROVIDER_ORDERS_PAUSED",
+    "CONTROL_ALERT_NOTIFICATIONS_PAUSED",
     "CONTROL_STATE_UNAVAILABLE",
     "PAYMENT_GATEWAY_NOT_IMPLEMENTED",
     "PAYMENT_WEBHOOK_NOT_IMPLEMENTED",
@@ -436,6 +437,9 @@ function main() {
   assert.match(service, /dedupeMonitoringAlerts/);
   assert.match(shared, /a\.id < b\.id/);
   assert.match(pkg, /smoke:admin-monitoring-alerts/);
+  assert.match(service, /buildAggregationCompleteness\(/);
+  assert.match(service, /completeness,/);
+  assert.match(service, /CONTROL_ALERT_NOTIFICATIONS_PAUSED/);
   console.log("PASS probe_and_determinism_guards");
 
   // Empty state helpers

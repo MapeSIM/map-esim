@@ -7,6 +7,7 @@ import {
 } from "@/app/lib/admin/operationsHealth";
 import type { HealthStatus, OpsWarning } from "@/app/lib/admin/operationsHealthShared";
 import { OperationalControlsPanel } from "@/app/components/admin/OperationalControlsPanel";
+import { RunAlertNotificationsPanel } from "@/app/components/admin/RunAlertNotificationsPanel";
 import {
   getMonitoringAlertSummary,
   type MonitoringAlertSummary,
@@ -268,6 +269,8 @@ function DashboardBody({
         overallStatus={controls.overallTransactionsStatus}
         guestCheckoutStatus={controls.guestCheckoutStatus}
       />
+
+      <RunAlertNotificationsPanel />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <HealthCard

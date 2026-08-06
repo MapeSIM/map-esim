@@ -58,6 +58,13 @@ Module._load = function smokeStubLoad(request, parent, isMain) {
       useSearchParams: () => new URLSearchParams(),
     };
   }
+  if (request === "next/cache") {
+    return {
+      revalidatePath: () => {},
+      revalidateTag: () => {},
+      unstable_cache: (fn) => fn,
+    };
+  }
   if (process.env.SMOKE_SESSION_USER_ID && isAuthSessionRequest(request)) {
     return {
       getSessionUser: async () => {

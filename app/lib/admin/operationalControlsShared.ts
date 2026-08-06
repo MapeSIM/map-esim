@@ -9,10 +9,20 @@ export const OPERATIONAL_CONTROL_KEYS = [
   "ADMIN_WALLET_PURCHASES",
   "COMPANY_ASSIGNMENTS",
   "PROVIDER_ORDER_CREATION",
+  "ALERT_NOTIFICATIONS",
 ] as const;
 
 export type OperationalControlKeyName =
   (typeof OPERATIONAL_CONTROL_KEYS)[number];
+
+/** Keys that affect purchase/assignment/provider initiation status only. */
+export const TRANSACTION_OPERATIONAL_CONTROL_KEYS = [
+  "TRANSACTION_MAINTENANCE",
+  "CUSTOMER_WALLET_PURCHASES",
+  "ADMIN_WALLET_PURCHASES",
+  "COMPANY_ASSIGNMENTS",
+  "PROVIDER_ORDER_CREATION",
+] as const satisfies readonly OperationalControlKeyName[];
 
 export const OPERATIONAL_CONTROL_REASON_MIN = 5;
 export const OPERATIONAL_CONTROL_REASON_MAX = 240;
@@ -48,6 +58,10 @@ export const CONTROL_CONFIRM_PHRASES = {
     pause: "PAUSE PROVIDER ORDERS",
     resume: "RESUME PROVIDER ORDERS",
   },
+  ALERT_NOTIFICATIONS: {
+    pause: "PAUSE ALERT NOTIFICATIONS",
+    resume: "RESUME ALERT NOTIFICATIONS",
+  },
 } as const satisfies Record<
   OperationalControlKeyName,
   { pause: string; resume: string }
@@ -75,6 +89,11 @@ export const CONTROL_DISPLAY = {
     name: "Provider order creation",
     scope:
       "Pauses initiating new VeSIM/provider-backed orders on supported purchase paths. Never enables order creation when environment or other gates block it.",
+  },
+  ALERT_NOTIFICATIONS: {
+    name: "Alert notification emails",
+    scope:
+      "Pauses outbound admin alert notification emails only. Alert aggregation and the Alerts dashboard remain active. This pause is never emailed.",
   },
 } as const satisfies Record<
   OperationalControlKeyName,
@@ -196,7 +215,8 @@ export function overallTransactionsStatus(
     pausedByKey.TRANSACTION_MAINTENANCE ??
     OPERATIONAL_CONTROL_MISSING_DEFAULT_PAUSED;
   if (maint) return "PAUSED";
-  const others = OPERATIONAL_CONTROL_KEYS.filter(
+  // Alert-notification pause must not affect transactions status.
+  const others = TRANSACTION_OPERATIONAL_CONTROL_KEYS.filter(
     (k) => k !== "TRANSACTION_MAINTENANCE"
   );
   const pausedCount = others.filter(

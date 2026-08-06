@@ -67,7 +67,16 @@ function main() {
     "ADMIN_WALLET_PURCHASES",
     "COMPANY_ASSIGNMENTS",
     "PROVIDER_ORDER_CREATION",
+    "ALERT_NOTIFICATIONS",
   ]);
+  assert.equal(
+    CONTROL_CONFIRM_PHRASES.ALERT_NOTIFICATIONS.pause,
+    "PAUSE ALERT NOTIFICATIONS"
+  );
+  assert.equal(
+    CONTROL_CONFIRM_PHRASES.ALERT_NOTIFICATIONS.resume,
+    "RESUME ALERT NOTIFICATIONS"
+  );
   assert.equal(
     CONTROL_CONFIRM_PHRASES.TRANSACTION_MAINTENANCE.pause,
     "PAUSE ALL TRANSACTIONS"
@@ -183,6 +192,35 @@ function main() {
   assert.equal(
     overallTransactionsStatus({ CUSTOMER_WALLET_PURCHASES: true }),
     "PARTIALLY_PAUSED"
+  );
+  // Alert-notification pause must not affect transactions status or purchase flows.
+  assert.equal(
+    overallTransactionsStatus({ ALERT_NOTIFICATIONS: true }),
+    "ACTIVE"
+  );
+  assert.equal(
+    evaluateFlowControls("customer_wallet_purchase", {
+      ALERT_NOTIFICATIONS: true,
+    }).blocked,
+    false
+  );
+  assert.equal(
+    requiredControlsForFlow("customer_wallet_purchase").includes(
+      "ALERT_NOTIFICATIONS"
+    ),
+    false
+  );
+  assert.equal(
+    requiredControlsForFlow("admin_wallet_purchase", {
+      includeProviderOrder: true,
+    }).includes("ALERT_NOTIFICATIONS"),
+    false
+  );
+  assert.equal(
+    requiredControlsForFlow("company_assignment", {
+      includeProviderOrder: true,
+    }).includes("ALERT_NOTIFICATIONS"),
+    false
   );
   console.log("PASS effective_state_logic");
 

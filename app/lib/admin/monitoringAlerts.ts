@@ -62,6 +62,10 @@ import {
   type MonitoringAlert,
   type MonitoringAlertSummary,
 } from "@/app/lib/admin/monitoringAlertShared";
+import {
+  buildAggregationCompleteness,
+  type AggregationCompleteness,
+} from "@/app/lib/admin/alertNotificationShared";
 
 export type { MonitoringAlertSummary };
 
@@ -72,7 +76,8 @@ type MonitoringAlertCodeFromControl =
   | "CONTROL_CUSTOMER_PURCHASES_PAUSED"
   | "CONTROL_ADMIN_PURCHASES_PAUSED"
   | "CONTROL_COMPANY_ASSIGNMENTS_PAUSED"
-  | "CONTROL_PROVIDER_ORDERS_PAUSED";
+  | "CONTROL_PROVIDER_ORDERS_PAUSED"
+  | "CONTROL_ALERT_NOTIFICATIONS_PAUSED";
 
 export type MonitoringAlertsDashboard = {
   generatedAtLabel: string;
@@ -467,9 +472,18 @@ function buildConfigAlerts(input: {
           code: "CONTROL_PROVIDER_ORDERS_PAUSED",
           title: "Provider order creation paused",
         },
+        // Dashboard-visible WARNING only — never email-eligible.
+        ALERT_NOTIFICATIONS: {
+          code: "CONTROL_ALERT_NOTIFICATIONS_PAUSED",
+          title: "Alert notification emails paused",
+        },
       };
       const meta = map[c.key];
       if (!meta) continue;
+      const description =
+        c.key === "ALERT_NOTIFICATIONS"
+          ? `${c.name} is intentionally PAUSED. Alert aggregation and the Alerts dashboard remain active; outbound notification emails are suppressed.`
+          : `${c.name} is intentionally PAUSED. New initiation in this scope is blocked; recovery and reconciliation remain available.`;
       pushUnique(
         alerts,
         makeAlert({
@@ -477,7 +491,7 @@ function buildConfigAlerts(input: {
           code: meta.code,
           severity: c.key === "TRANSACTION_MAINTENANCE" ? "HIGH" : "WARNING",
           title: meta.title,
-          description: `${c.name} is intentionally PAUSED. New initiation in this scope is blocked; recovery and reconciliation remain available.`,
+          description,
           sourceType: "operational_control",
           recordId: c.key,
           sourceAt: now,
@@ -1468,6 +1482,7 @@ export async function collectMonitoringAlerts(options?: {
   alerts: MonitoringAlert[];
   sectionErrors: string[];
   checkedAt: Date;
+  completeness: AggregationCompleteness;
 }> {
   const now =
     options?.checkedAt instanceof Date &&
@@ -1476,6 +1491,7 @@ export async function collectMonitoringAlerts(options?: {
       : new Date();
   const sectionErrors: string[] = [];
   const alerts: MonitoringAlert[] = [];
+  let recordsEvaluated = false;
 
   let db = {
     status: "UNKNOWN" as HealthStatus,
@@ -1551,14 +1567,17 @@ export async function collectMonitoringAlerts(options?: {
   if (db.ok) {
     try {
       recordPart = await collectRecordAlerts(now);
+      recordsEvaluated = true;
       if (recordPart.truncated) {
         // truncated samples are still valid; mark degraded detection via summary later
       }
     } catch {
       sectionErrors.push("RECORDS");
+      recordsEvaluated = false;
     }
   } else {
     sectionErrors.push("RECORDS");
+    recordsEvaluated = false;
   }
 
   const authUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL || null;
@@ -1596,10 +1615,17 @@ export async function collectMonitoringAlerts(options?: {
   // Silence unused guest gate read — still consulted so enablement cannot drift unnoticed.
   void isGuestVesimCheckoutEnabled();
 
+  const completeness = buildAggregationCompleteness({
+    sectionErrors,
+    databaseOk: db.ok,
+    recordsEvaluated,
+  });
+
   return {
     alerts: sortMonitoringAlerts(dedupeMonitoringAlerts(alerts)),
     sectionErrors,
     checkedAt: now,
+    completeness,
   };
 }
 
