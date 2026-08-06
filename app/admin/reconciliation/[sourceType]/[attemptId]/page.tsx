@@ -60,7 +60,7 @@ export default async function AdminReconciliationDetailPage({
 }: {
   params: Promise<{ sourceType: string; attemptId: string }>;
 }) {
-  await requireActiveAdminForReconciliation();
+  const { admin } = await requireActiveAdminForReconciliation();
   const { sourceType, attemptId } = await params;
 
   let detail: Awaited<ReturnType<typeof getReconciliationDetail>>;
@@ -97,6 +97,7 @@ export default async function AdminReconciliationDetailPage({
     getCaseManagementEligibility({
       sourceType: detail.sourceType,
       attemptId: detail.attemptId,
+      adminUserId: admin.id,
     }),
   ]);
   const showRefreshSection =
@@ -188,6 +189,9 @@ export default async function AdminReconciliationDetailPage({
           emailResendSupported={caseUi.emailResendSupported}
           emailResendAllowed={caseUi.emailResendAllowed}
           emailResendMessage={caseUi.emailResendMessage}
+          iccidBackfillSupported={caseUi.iccidBackfillSupported}
+          iccidBackfillAllowed={caseUi.iccidBackfillAllowed}
+          iccidBackfillMessage={caseUi.iccidBackfillMessage}
         />
       ) : null}
 

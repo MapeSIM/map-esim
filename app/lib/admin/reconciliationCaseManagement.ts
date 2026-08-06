@@ -16,7 +16,10 @@ import {
   caseManagementStateLabel,
   emailResendBlockerLabel,
   evaluateEmailResendEligibility,
+  evaluateIccidBackfillLocalEligibility,
   evaluateResolutionEligibility,
+  iccidBackfillBlockerLabel,
+  isIccidBackfillSourceType,
   LOCK_CASE_PHRASE,
   lowerEscalationPriorities,
   normalizeCaseManagementSourceType,
@@ -61,7 +64,7 @@ export const CASE_RESOLVED = "reconciliation.case_resolved";
 export const CASE_ACTION_BLOCKED = "reconciliation.case_action_blocked";
 
 export type CaseActionResult =
-  | { ok: true; idempotent?: boolean }
+  | { ok: true; idempotent?: boolean; message?: string }
   | {
       ok: false;
       error: string;
@@ -115,6 +118,9 @@ export type CaseManagementUiState = {
   emailResendSupported: boolean;
   emailResendAllowed: boolean;
   emailResendMessage: string;
+  iccidBackfillSupported: boolean;
+  iccidBackfillAllowed: boolean;
+  iccidBackfillMessage: string;
 };
 
 const PUBLIC_ERROR = "Unable to update this case right now.";
@@ -255,6 +261,7 @@ function isRefreshInProgress(row: {
   refundTransactionId?: string | null;
   orderId?: string | null;
   orderStatus?: string | null;
+  orderProviderOrderId?: string | null;
   emailDeliveryStatus?: string | null;
   emailNotificationStatus?: string | null;
   customerEmail?: string | null;
@@ -293,7 +300,14 @@ async function loadCaseRow(
         providerRefreshCompletedAt: true,
         debitTransaction: { select: { status: true } },
         customer: { select: { email: true, deletedAt: true } },
-        order: { select: { status: true } },
+        order: {
+          select: {
+            status: true,
+            providerOrderId: true,
+            iccidHash: true,
+            iccidCapturedAt: true,
+          },
+        },
       },
     });
     if (!row) return null;
@@ -302,6 +316,9 @@ async function loadCaseRow(
       debitStatus: row.debitTransaction?.status ?? null,
       orderStatus: row.order?.status ?? null,
       customerEmail: row.customer.deletedAt ? null : row.customer.email,
+      iccidHash: row.order?.iccidHash ?? null,
+      iccidCapturedAt: row.order?.iccidCapturedAt ?? null,
+      orderProviderOrderId: row.order?.providerOrderId ?? null,
     };
   }
 
@@ -321,7 +338,14 @@ async function loadCaseRow(
         providerRefreshClaimedAt: true,
         providerRefreshCompletedAt: true,
         customer: { select: { email: true, deletedAt: true } },
-        order: { select: { status: true } },
+        order: {
+          select: {
+            status: true,
+            providerOrderId: true,
+            iccidHash: true,
+            iccidCapturedAt: true,
+          },
+        },
       },
     });
     if (!row) return null;
@@ -329,6 +353,9 @@ async function loadCaseRow(
       ...row,
       orderStatus: row.order?.status ?? null,
       customerEmail: row.customer.deletedAt ? null : row.customer.email,
+      iccidHash: row.order?.iccidHash ?? null,
+      iccidCapturedAt: row.order?.iccidCapturedAt ?? null,
+      orderProviderOrderId: row.order?.providerOrderId ?? null,
     };
   }
 
@@ -375,13 +402,20 @@ async function loadCaseRow(
       where: { id: recordId },
       select: {
         ...CASE_FIELD_SELECT,
+        id: true,
         status: true,
         providerOrderId: true,
         iccidHash: true,
         iccidCapturedAt: true,
       },
     });
-    return row;
+    if (!row) return null;
+    return {
+      ...row,
+      orderId: row.id,
+      orderStatus: row.status,
+      orderProviderOrderId: row.providerOrderId,
+    };
   }
 
   return null;
@@ -442,6 +476,7 @@ function eligibilityFromRow(
 export async function getCaseManagementEligibility(options: {
   sourceType: string;
   attemptId: string;
+  adminUserId?: string;
 }): Promise<CaseManagementUiState | null> {
   const sourceType = normalizeCaseManagementSourceType(options.sourceType);
   if (!sourceType) return null;
@@ -486,9 +521,42 @@ export async function getCaseManagementEligibility(options: {
       })
     : null;
 
+  const iccidSupported = isIccidBackfillSourceType(ids.sourceType);
+  const iccidEligibility = iccidSupported
+    ? evaluateIccidBackfillLocalEligibility({
+        sourceType: ids.sourceType,
+        alreadyResolved: resolved,
+        locked,
+        lockedByAdminId: row.reconciliationLockedByAdminId,
+        currentAdminId: (options.adminUserId ?? "").trim(),
+        providerOrderId: row.providerOrderId,
+        localOrderId: row.orderId,
+        orderProviderOrderId: row.orderProviderOrderId ?? row.providerOrderId,
+        orderStatus: row.orderStatus,
+        providerRefreshInProgress: refreshInProgress,
+        localIccidPresent: Boolean(row.iccidHash || row.iccidCapturedAt),
+      })
+    : null;
+
   const eligibilityMessage = eligibility.allowed
     ? "Local evidence shows no active financial, provider, email, or ICCID risk."
     : eligibility.blockers.map(resolutionBlockerLabel).join(" ");
+
+  let iccidBackfillMessage =
+    "ICCID backfill is not available for this case type.";
+  if (iccidEligibility) {
+    if (!iccidEligibility.allowed) {
+      iccidBackfillMessage = iccidEligibility.blockers
+        .map(iccidBackfillBlockerLabel)
+        .join(" ");
+    } else if (iccidEligibility.localIccidPresent) {
+      iccidBackfillMessage =
+        "Local ICCID is already present. Submit only to confirm identical provider evidence (idempotent).";
+    } else {
+      iccidBackfillMessage =
+        "Case is locked by you with a linked provider reference. Provider evidence will be verified on submit.";
+    }
+  }
 
   return {
     stateLabel: caseManagementStateLabel({
@@ -529,6 +597,9 @@ export async function getCaseManagementEligibility(options: {
           : "Local order evidence is complete. Safe to resend the order email."
         : emailEligibility.blockers.map(emailResendBlockerLabel).join(" ")
       : "Email resend is not available for this case type.",
+    iccidBackfillSupported: iccidSupported,
+    iccidBackfillAllowed: Boolean(iccidEligibility?.allowed),
+    iccidBackfillMessage,
   };
 }
 

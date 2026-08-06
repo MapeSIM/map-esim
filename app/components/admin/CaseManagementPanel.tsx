@@ -5,12 +5,14 @@ import {
   deescalateReconciliationCaseAction,
   escalateReconciliationCaseAction,
   lockReconciliationCaseAction,
+  backfillReconciliationIccidAction,
   resendReconciliationEmailAction,
   resolveReconciliationCaseAction,
   unlockReconciliationCaseAction,
   type CaseManagementFormState,
 } from "@/app/lib/admin/reconciliationCaseActions";
 import {
+  BACKFILL_ICCID_PHRASE,
   CASE_REASON_MAX,
   DEESCALATE_CASE_PHRASE,
   ESCALATION_PRIORITIES,
@@ -45,7 +47,9 @@ function ActionMessage({ state }: { state: CaseManagementFormState }) {
   if (state.ok) {
     return (
       <p className="text-sm font-medium text-[var(--heading)]" role="status">
-        Case updated.
+        {"message" in state && state.message
+          ? state.message
+          : "Case updated."}
       </p>
     );
   }
@@ -85,6 +89,9 @@ export default function CaseManagementPanel(props: {
   emailResendSupported: boolean;
   emailResendAllowed: boolean;
   emailResendMessage: string;
+  iccidBackfillSupported: boolean;
+  iccidBackfillAllowed: boolean;
+  iccidBackfillMessage: string;
 }) {
   const [lockState, lockAction, lockPending] = useActionState(
     lockReconciliationCaseAction,
@@ -110,6 +117,10 @@ export default function CaseManagementPanel(props: {
     resendReconciliationEmailAction,
     initial
   );
+  const [iccidState, iccidAction, iccidPending] = useActionState(
+    backfillReconciliationIccidAction,
+    initial
+  );
 
   const readOnly = props.resolved;
   const busy =
@@ -118,7 +129,8 @@ export default function CaseManagementPanel(props: {
     escalatePending ||
     deescalatePending ||
     resolvePending ||
-    resendPending;
+    resendPending ||
+    iccidPending;
 
   return (
     <section className="space-y-5 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
@@ -126,8 +138,9 @@ export default function CaseManagementPanel(props: {
         <h2 className="text-lg font-semibold tracking-tight">Case management</h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           Lock, escalate, or mark resolved when local evidence shows no active
-          risk. These actions do not change wallets, provider orders, emails, or
-          ICCIDs.
+          risk. Wallet balances, refunds, and provider order placement are never
+          changed here. ICCID backfill writes only a missing ICCID when provider
+          evidence confirms it.
         </p>
       </div>
 
@@ -490,6 +503,61 @@ export default function CaseManagementPanel(props: {
                 className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {resendPending ? "Resending…" : "Resend email"}
+              </button>
+            </form>
+          ) : null}
+
+          {props.iccidBackfillSupported ? (
+            <form action={iccidAction} className="space-y-3">
+              <h3 className="text-sm font-semibold text-[var(--heading)]">
+                Backfill ICCID
+              </h3>
+              <p className="text-sm text-[var(--text-muted)]">
+                {props.iccidBackfillMessage}
+              </p>
+              <input type="hidden" name="sourceType" value={props.sourceType} />
+              <input type="hidden" name="attemptId" value={props.attemptId} />
+              <div>
+                <label
+                  htmlFor="iccid-backfill-reason"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Reason
+                </label>
+                <textarea
+                  id="iccid-backfill-reason"
+                  name="reason"
+                  required
+                  maxLength={CASE_REASON_MAX}
+                  rows={2}
+                  disabled={busy || !props.iccidBackfillAllowed}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                />
+                <FieldError state={iccidState} field="reason" />
+              </div>
+              <div>
+                <label
+                  htmlFor="iccid-backfill-confirm"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Type {BACKFILL_ICCID_PHRASE}
+                </label>
+                <input
+                  id="iccid-backfill-confirm"
+                  name="confirmPhrase"
+                  required
+                  disabled={busy || !props.iccidBackfillAllowed}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                />
+                <FieldError state={iccidState} field="confirmPhrase" />
+              </div>
+              <ActionMessage state={iccidState} />
+              <button
+                type="submit"
+                disabled={busy || !props.iccidBackfillAllowed}
+                className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {iccidPending ? "Backfilling…" : "Backfill ICCID"}
               </button>
             </form>
           ) : null}

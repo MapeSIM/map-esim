@@ -11,6 +11,7 @@ import {
   type CaseActionResult,
 } from "@/app/lib/admin/reconciliationCaseManagement";
 import { resendReconciliationEmail } from "@/app/lib/admin/reconciliationEmailResend";
+import { backfillReconciliationIccid } from "@/app/lib/admin/reconciliationIccidBackfill";
 
 export type CaseManagementFormState = CaseActionResult | null;
 
@@ -139,6 +140,28 @@ export async function resendReconciliationEmailAction(
   void formData.get("eligible");
 
   const result = await resendReconciliationEmail({
+    adminUserId: admin.id,
+    sourceType,
+    attemptId,
+    reason: String(formData.get("reason") ?? ""),
+    confirmPhrase: String(formData.get("confirmPhrase") ?? ""),
+  });
+  if (result.ok) revalidateCase(sourceType, attemptId);
+  return result;
+}
+
+export async function backfillReconciliationIccidAction(
+  _prev: CaseManagementFormState,
+  formData: FormData
+): Promise<CaseManagementFormState> {
+  const admin = await requireRole("ADMIN");
+  const sourceType = String(formData.get("sourceType") ?? "").trim();
+  const attemptId = String(formData.get("attemptId") ?? "").trim();
+  void formData.get("caseStatus");
+  void formData.get("eligible");
+  void formData.get("iccid");
+
+  const result = await backfillReconciliationIccid({
     adminUserId: admin.id,
     sourceType,
     attemptId,

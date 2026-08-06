@@ -10,6 +10,24 @@ export const UNLOCK_CASE_PHRASE = "UNLOCK CASE";
 export const RESOLVE_CASE_PHRASE = "RESOLVE CASE";
 export const DEESCALATE_CASE_PHRASE = "DE-ESCALATE CASE";
 export const RESEND_EMAIL_PHRASE = "RESEND EMAIL";
+export const BACKFILL_ICCID_PHRASE = "BACKFILL ICCID";
+
+/** Reconciliation sources that can resolve to an Order capable of storing ICCID. */
+export const ICCID_BACKFILL_SOURCE_TYPES = [
+  "iccid",
+  "wallet_purchase",
+  "assignment",
+] as const;
+
+export type IccidBackfillSourceType =
+  (typeof ICCID_BACKFILL_SOURCE_TYPES)[number];
+
+export function isIccidBackfillSourceType(
+  raw: string | null | undefined
+): raw is IccidBackfillSourceType {
+  const v = (raw ?? "").trim();
+  return (ICCID_BACKFILL_SOURCE_TYPES as readonly string[]).includes(v);
+}
 
 export const ESCALATION_PRIORITIES = [
   "LOW",
@@ -293,6 +311,231 @@ export function emailResendBlockerLabel(code: string): string {
       return "Wallet balance snapshot is incomplete.";
     default:
       return "Email cannot be resent for this case.";
+  }
+}
+
+/** Pure local gates for ICCID backfill (no VeSIM call). */
+export type IccidBackfillLocalInput = {
+  sourceType: CaseManagementSourceType;
+  alreadyResolved: boolean;
+  locked: boolean;
+  lockedByAdminId?: string | null;
+  currentAdminId: string;
+  /** Attempt-level provider reference (purchase/assignment/order). */
+  providerOrderId?: string | null;
+  /** Linked local Order id (required for purchase/assignment). */
+  localOrderId?: string | null;
+  /** Order.providerOrderId — must match attempt reference when both set. */
+  orderProviderOrderId?: string | null;
+  orderStatus?: string | null;
+  providerRefreshInProgress?: boolean;
+  /** True when local Order already has an ICCID hash (idempotent path still allowed). */
+  localIccidPresent?: boolean;
+};
+
+export type IccidBackfillEligibility = {
+  allowed: boolean;
+  blockers: string[];
+  supported: boolean;
+  localIccidPresent: boolean;
+};
+
+export function evaluateIccidBackfillLocalEligibility(
+  input: IccidBackfillLocalInput
+): IccidBackfillEligibility {
+  const blockers: string[] = [];
+  const localIccidPresent = Boolean(input.localIccidPresent);
+
+  if (!isIccidBackfillSourceType(input.sourceType)) {
+    return {
+      allowed: false,
+      blockers: ["unsupported_source"],
+      supported: false,
+      localIccidPresent,
+    };
+  }
+
+  if (input.alreadyResolved) blockers.push("already_resolved");
+  if (!input.locked) blockers.push("case_unlocked");
+  if (input.locked) {
+    const owner = (input.lockedByAdminId ?? "").trim();
+    const actor = (input.currentAdminId ?? "").trim();
+    if (!owner || !actor || owner !== actor) {
+      blockers.push("lock_not_owned");
+    }
+  }
+  if (input.providerRefreshInProgress) {
+    blockers.push("provider_refresh_in_progress");
+  }
+
+  const attemptRef = (input.providerOrderId ?? "").trim();
+  if (!attemptRef) blockers.push("missing_provider_reference");
+
+  if (input.sourceType === "iccid") {
+    // attemptId is the Order id; localOrderId may be omitted or equal.
+    const orderRef = (input.orderProviderOrderId ?? attemptRef).trim();
+    if (!orderRef) blockers.push("missing_provider_reference");
+    if (
+      attemptRef &&
+      (input.orderProviderOrderId ?? "").trim() &&
+      attemptRef.toUpperCase() !==
+        (input.orderProviderOrderId ?? "").trim().toUpperCase()
+    ) {
+      blockers.push("provider_reference_mismatch");
+    }
+    if ((input.orderStatus ?? "").trim().toUpperCase() === "FAILED") {
+      blockers.push("local_order_failed");
+    }
+  } else {
+    if (!(input.localOrderId ?? "").trim()) {
+      blockers.push("missing_local_order");
+    }
+    const orderRef = (input.orderProviderOrderId ?? "").trim();
+    if (!orderRef) blockers.push("missing_order_provider_reference");
+    if (
+      attemptRef &&
+      orderRef &&
+      attemptRef.toUpperCase() !== orderRef.toUpperCase()
+    ) {
+      blockers.push("provider_reference_mismatch");
+    }
+    if ((input.orderStatus ?? "").trim().toUpperCase() === "FAILED") {
+      blockers.push("local_order_failed");
+    }
+  }
+
+  return {
+    allowed: blockers.length === 0,
+    blockers,
+    supported: true,
+    localIccidPresent,
+  };
+}
+
+/**
+ * Pure provider-evidence gate for ICCID backfill (offline QA safe).
+ * Does not accept or return full ICCID in audit — callers keep values ephemeral.
+ */
+export type ProviderIccidEvidenceInput = {
+  lookupKind: string;
+  orderExists: string;
+  offerMatch: string;
+  safeProviderState?: string | null;
+  /** Raw extracted ICCID — validated then discarded by caller after use. */
+  extractedIccid?: string | null;
+  hasExpectedOfferId: boolean;
+};
+
+export type ProviderIccidEvidenceResult =
+  | { ok: true; normalizedIccid: string }
+  | { ok: false; blocker: string };
+
+function normalizeIccidDigits(value: string | null | undefined): string {
+  if (typeof value !== "string") return "";
+  return value.replace(/\D+/g, "");
+}
+
+function isValidIccidShape(value: string | null | undefined): boolean {
+  return /^\d{18,22}$/.test(normalizeIccidDigits(value));
+}
+
+function isUnusableProviderState(state: string | null | undefined): boolean {
+  const s = (state ?? "").trim().toLowerCase();
+  if (!s) return false;
+  return /^(pending|processing|queued|failed|fail|cancelled|canceled|error|declined|rejected|unknown|void|expired|refunded)/.test(
+    s
+  );
+}
+
+export function evaluateProviderIccidEvidence(
+  input: ProviderIccidEvidenceInput
+): ProviderIccidEvidenceResult {
+  const kind = (input.lookupKind ?? "").trim().toUpperCase();
+  if (kind === "NOT_FOUND") return { ok: false, blocker: "provider_not_found" };
+  if (kind === "TIMEOUT") return { ok: false, blocker: "provider_uncertain" };
+  if (kind === "AUTH_FAILURE") return { ok: false, blocker: "provider_auth_failure" };
+  if (kind === "ENVIRONMENT_BLOCKED") {
+    return { ok: false, blocker: "provider_environment_blocked" };
+  }
+  if (kind === "PROVIDER_ERROR") {
+    return { ok: false, blocker: "provider_error" };
+  }
+  if (kind !== "FOUND") return { ok: false, blocker: "provider_uncertain" };
+
+  if ((input.orderExists ?? "").trim().toLowerCase() !== "yes") {
+    return { ok: false, blocker: "provider_order_not_confirmed" };
+  }
+
+  if (
+    input.hasExpectedOfferId &&
+    (input.offerMatch ?? "").trim().toLowerCase() === "no"
+  ) {
+    return { ok: false, blocker: "provider_offer_mismatch" };
+  }
+
+  if (isUnusableProviderState(input.safeProviderState)) {
+    return { ok: false, blocker: "provider_state_unusable" };
+  }
+
+  const normalized = normalizeIccidDigits(input.extractedIccid);
+  if (!normalized) return { ok: false, blocker: "provider_iccid_missing" };
+  if (!isValidIccidShape(normalized)) {
+    return { ok: false, blocker: "provider_iccid_malformed" };
+  }
+
+  return { ok: true, normalizedIccid: normalized };
+}
+
+export function iccidBackfillBlockerLabel(code: string): string {
+  switch (code) {
+    case "unsupported_source":
+      return "This case type does not support ICCID backfill.";
+    case "already_resolved":
+      return "Resolved cases cannot backfill ICCID.";
+    case "case_unlocked":
+      return "Lock this case before backfilling ICCID.";
+    case "lock_not_owned":
+      return "Only the admin who locked this case can backfill ICCID.";
+    case "provider_refresh_in_progress":
+      return "A provider status refresh is in progress.";
+    case "missing_provider_reference":
+      return "Provider reference is missing.";
+    case "missing_local_order":
+      return "Local order is missing.";
+    case "missing_order_provider_reference":
+      return "Linked order is missing a provider reference.";
+    case "provider_reference_mismatch":
+      return "Provider reference does not match the linked order.";
+    case "local_order_failed":
+      return "Local order is failed.";
+    case "provider_not_found":
+      return "Provider order was not found.";
+    case "provider_uncertain":
+      return "Provider evidence is uncertain.";
+    case "provider_auth_failure":
+      return "Provider authentication failed.";
+    case "provider_environment_blocked":
+      return "Provider environment is not available.";
+    case "provider_error":
+      return "Provider returned an error.";
+    case "provider_order_not_confirmed":
+      return "Provider order existence is not confirmed.";
+    case "provider_offer_mismatch":
+      return "Provider order does not match the expected offer.";
+    case "provider_state_unusable":
+      return "Provider order state is pending, failed, or cancelled.";
+    case "provider_iccid_missing":
+      return "Provider evidence does not include an ICCID.";
+    case "provider_iccid_malformed":
+      return "Provider ICCID is malformed.";
+    case "iccid_conflict":
+      return "A different ICCID is already stored for this order.";
+    case "iccid_duplicate_other_order":
+      return "This ICCID is already linked to another order.";
+    case "encryption_unavailable":
+      return "ICCID encryption is not available.";
+    default:
+      return "ICCID backfill is unavailable for this case.";
   }
 }
 
