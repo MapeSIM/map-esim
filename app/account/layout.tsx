@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 const links = [
   { href: "/account", label: "Overview" },
-  { href: "/account/orders", label: "My Orders" },
+  { href: "/account/orders", label: "My eSIMs" },
   { href: "/account/wallet", label: "Wallet" },
   { href: "/account/wallet/top-up", label: "Add funds" },
   { href: "/account/esim/buy", label: "Buy with wallet" },

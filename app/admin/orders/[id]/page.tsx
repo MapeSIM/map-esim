@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
 import { getAdminOrderDetail } from "@/app/lib/admin/orders";
 
 export const dynamic = "force-dynamic";
@@ -91,7 +92,12 @@ export default async function AdminOrderDetailPage({
         <DetailRow label="Account status" value={detail.accountStatusLabel} />
         <DetailRow label="Claim status" value={detail.claimStatusLabel} />
         <DetailRow label="Claimed at" value={detail.claimedAtLabel} />
-        <DetailRow label="ICCID" value={detail.iccidHint} />
+        <IccidRevealPanel
+          orderId={detail.id}
+          maskedLabel={detail.iccidHint}
+          revealable={detail.iccidRevealable}
+          revealPath={`/api/admin/orders/${encodeURIComponent(detail.id)}/iccid`}
+        />
       </dl>
     </div>
   );

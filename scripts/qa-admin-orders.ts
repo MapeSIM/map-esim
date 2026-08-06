@@ -57,7 +57,10 @@ function main() {
   assert.match(ordersSrc, /customerEmail/);
   assert.match(ordersSrc, /Pending from provider/);
   assert.match(ordersSrc, /iccidLast4/);
-  assert.ok(!/decryptIccid|iccidEncrypted/.test(ordersSrc));
+  assert.match(ordersSrc, /iccidRevealable/);
+  assert.match(ordersSrc, /getAdminCustomerRecentOrders/);
+  assert.match(ordersSrc, /userId:\s*customer\.id/);
+  assert.ok(!/decryptIccid/.test(ordersSrc));
   console.log("PASS orders_module_server_only_safe");
 
   const listSrc = readFileSync(join(root, "app/admin/orders/page.tsx"), "utf8");
@@ -78,8 +81,10 @@ function main() {
   );
   assert.match(detailSrc, /Customer email/);
   assert.match(detailSrc, /notFound/);
+  assert.match(detailSrc, /IccidRevealPanel/);
   assert.ok(!/JSON\.stringify/.test(detailSrc));
   assert.ok(!/createOrderAccessToken|checkout\/credit/i.test(detailSrc));
+  assert.ok(!/decryptIccid/.test(detailSrc));
   console.log("PASS detail_page_email_and_notfound");
 
   const authConfig = readFileSync(join(root, "auth.config.ts"), "utf8");

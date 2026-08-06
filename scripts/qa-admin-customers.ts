@@ -87,9 +87,14 @@ function main() {
   assert.match(detailSrc, /notFound/);
   assert.match(detailSrc, /Customer email|label="Email"/);
   assert.match(detailSrc, /userId=/);
+  assert.match(detailSrc, /Recent eSIM Orders/);
+  assert.match(detailSrc, /getAdminCustomerRecentOrders/);
+  assert.match(detailSrc, /No eSIM orders found for this customer/);
+  assert.match(detailSrc, /View related order/);
   assert.ok(!/passwordHash|access_token|refresh_token|providerAccountId|session_state/i.test(detailSrc));
   assert.ok(!/JSON\.stringify/.test(detailSrc));
   assert.ok(!/vesim\/checkout|sendOtp|resetPassword/i.test(detailSrc));
+  assert.ok(!/decryptIccid|iccidEncrypted/i.test(detailSrc));
   console.log("PASS detail_page_safe_notfound");
 
   const layoutSrc = readFileSync(join(root, "app/admin/layout.tsx"), "utf8");

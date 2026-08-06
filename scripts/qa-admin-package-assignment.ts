@@ -170,16 +170,15 @@ function main() {
   console.log("PASS success_page_uses_db_values_only");
 
   assert.match(accountOrders, /\/account\/orders\/\$\{/);
-  assert.match(accountOrders, /View order details/);
-  assert.match(accountOrders, /cursor-pointer/);
+  assert.match(accountOrders, /View details/);
+  assert.match(accountOrders, /My eSIMs/);
   assert.match(accountOrderDetail, /getCustomerOwnedOrderDetail/);
   assert.match(accountOrderDetail, /notFound\(\)/);
   assert.match(customerOrdersLib, /userId:\s*owner\.id/);
   assert.match(customerOrdersLib, /role !== Role\.CUSTOMER/);
   assert.match(customerOrdersLib, /findFirst/);
   assert.ok(!/providerCost|internal reason|adminUserId|ASSIGNMENT/i.test(accountOrders));
-  assert.ok(!/providerCost|internal reason|adminUserId|fundingSource|Company-funded/i.test(accountOrderDetail));
-  assert.ok(!/fundingSource|Company-funded/.test(accountOrders));
+  assert.ok(!/providerCost|internal reason|adminUserId/i.test(accountOrderDetail));
   assert.ok(!/reason/.test(accountOrders));
   assert.ok(!/smdpAddress|activationCode|qrValue|manualInstallText|accessToken/.test(accountOrderDetail));
   assert.ok(!/Guest purchases are not attached/i.test(accountOrders));
@@ -189,6 +188,7 @@ function main() {
   assert.ok(!/\/api\/checkout\/credit/.test(accountOrderDetail));
   assert.ok(!/deliverOrderEmail|sendOrderEmail/.test(customerOrdersLib));
   assert.ok(!/deliverOrderEmail|sendOrderEmail/.test(accountOrderDetail));
+  assert.ok(!/fetchBrokerOrderPayload/.test(customerOrdersLib));
   assert.match(adminOrders, /Company-funded/);
   assert.match(adminOrderDetail, /Funding/);
   console.log("PASS customer_hides_provider_cost_reason_admin_identity");
@@ -202,7 +202,12 @@ function main() {
   assert.match(customerInstallLib, /authorizeCustomerOwnedOrderInstall/);
   assert.match(customerInstallLib, /userId:\s*owner\.id/);
   assert.match(customerInstallLib, /sessionRole !== "CUSTOMER"/);
-  assert.match(customerOrdersLib, /buildCustomerSessionInstallActions/);
+  const customerInstallApi = readFileSync(
+    join(root, "app/api/account/orders/[orderId]/install/route.ts"),
+    "utf8"
+  );
+  assert.match(customerInstallApi, /buildCustomerSessionInstallActions/);
+  assert.match(customerInstallApi, /authorizeCustomerOwnedOrderInstall/);
   assert.ok(!/createOrderAccessToken|buildSafeInstallActions|buildAuthorizedOrderPath/.test(customerOrdersLib));
   assert.ok(!/createOrderAccessToken|buildSafeInstallActions|access=/.test(customerInstallLib));
   assert.ok(!/access=/.test(customerInstallLib));

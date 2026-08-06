@@ -80,10 +80,26 @@ export async function authorizeCustomerOwnedOrderInstall(
       providerOrderId: true,
       destination: true,
       status: true,
+      walletEsimPurchase: {
+        select: { status: true },
+      },
+      adminPackageAssignment: {
+        select: { status: true },
+      },
     },
   });
 
   if (!order || order.status !== OrderStatus.COMPLETED) {
+    return { ok: false, response: notFoundResponse() };
+  }
+
+  const purchaseStatus = order.walletEsimPurchase?.status;
+  const assignmentStatus = order.adminPackageAssignment?.status;
+  if (
+    purchaseStatus === "FAILED_REFUNDED" ||
+    purchaseStatus === "RECONCILIATION_REQUIRED" ||
+    assignmentStatus === "RECONCILIATION_REQUIRED"
+  ) {
     return { ok: false, response: notFoundResponse() };
   }
 

@@ -189,6 +189,11 @@ export type AdminCustomerWalletTransactionRow = {
   statusLabel: WalletStatusLabel;
   referenceLabel: string | null;
   balanceAfterLabel: string | null;
+  /**
+   * Local Order id linked via WalletEsimPurchase debit/refund relation.
+   * Null when no DB-linked order exists — never inferred from display text.
+   */
+  relatedOrderId: string | null;
 };
 
 /**
@@ -260,6 +265,12 @@ export async function getAdminCustomerWalletSummary(
       balanceAfterCents: true,
       referenceType: true,
       referenceId: true,
+      purchaseAsDebit: {
+        select: { orderId: true },
+      },
+      purchaseAsRefund: {
+        select: { orderId: true },
+      },
     },
   });
 
@@ -285,18 +296,31 @@ export async function getAdminCustomerWalletSummary(
     hasWallet: true,
     totalCompletedCreditsCents,
     totalCompletedCreditsLabel: formatUsdCents(totalCompletedCreditsCents),
-    recentTransactions: recent.map((row) => ({
-      id: row.id,
-      createdAtLabel: formatWalletDateTime(row.createdAt),
-      typeLabel: walletTransactionTypeLabel(row.type),
-      directionLabel: walletDirectionLabel(row.direction),
-      amountLabel: formatWalletTransactionAmount(row.amountCents, row.direction),
-      statusLabel: walletStatusLabel(row.status),
-      referenceLabel: formatWalletReference(row.referenceType, row.referenceId),
-      balanceAfterLabel:
-        typeof row.balanceAfterCents === "number"
-          ? formatUsdCents(row.balanceAfterCents)
-          : null,
-    })),
+    recentTransactions: recent.map((row) => {
+      const relatedOrderId =
+        row.purchaseAsDebit?.orderId?.trim() ||
+        row.purchaseAsRefund?.orderId?.trim() ||
+        null;
+      return {
+        id: row.id,
+        createdAtLabel: formatWalletDateTime(row.createdAt),
+        typeLabel: walletTransactionTypeLabel(row.type),
+        directionLabel: walletDirectionLabel(row.direction),
+        amountLabel: formatWalletTransactionAmount(
+          row.amountCents,
+          row.direction
+        ),
+        statusLabel: walletStatusLabel(row.status),
+        referenceLabel: formatWalletReference(
+          row.referenceType,
+          row.referenceId
+        ),
+        balanceAfterLabel:
+          typeof row.balanceAfterCents === "number"
+            ? formatUsdCents(row.balanceAfterCents)
+            : null,
+        relatedOrderId,
+      };
+    }),
   };
 }

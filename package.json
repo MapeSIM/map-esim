@@ -29,6 +29,9 @@
     "qa:guest-checkout-gate": "tsx scripts/qa-guest-checkout-gate.ts",
     "qa:iccid-persistence": "tsx scripts/qa-iccid-persistence.ts",
     "qa:admin-wallet-purchase": "tsx scripts/qa-admin-wallet-purchase.ts",
+    "qa:iccid-reveal": "tsx scripts/qa-iccid-reveal.ts",
+    "qa:admin-customer-orders": "tsx scripts/qa-admin-customer-orders.ts",
+    "qa:customer-my-esims": "tsx scripts/qa-customer-my-esims.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

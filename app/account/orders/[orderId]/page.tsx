@@ -1,8 +1,11 @@
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import OrderInstallActions from "@/app/components/install/OrderInstallActions";
+import CustomerEsimInstallPanel from "@/app/components/orders/CustomerEsimInstallPanel";
+import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
 import { requireSession } from "@/app/lib/auth/session";
 import { getCustomerOwnedOrderDetail } from "@/app/lib/orders/customerOrders";
+import type { CustomerEsimStatusBadge } from "@/app/lib/orders/customerOrderDisplay";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +20,22 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       </dd>
     </div>
   );
+}
+
+function statusBadgeClass(status: CustomerEsimStatusBadge): string {
+  switch (status) {
+    case "Completed":
+      return "bg-[var(--accent)]/15 text-[var(--heading)] border-[var(--accent-strong)]/40";
+    case "Processing":
+      return "bg-[var(--surface)] text-[var(--text)] border-[var(--border-hover)]";
+    case "Review needed":
+      return "bg-[var(--warning-bg)] text-[var(--warning-text)] border-[var(--warning-border)]";
+    case "Refunded":
+    case "Failed":
+      return "bg-[var(--danger-bg)] text-[var(--danger-text)] border-[var(--danger-border)]";
+    default:
+      return "bg-[var(--surface)] text-[var(--text-muted)] border-[var(--border)]";
+  }
 }
 
 export default async function AccountOrderDetailPage({
@@ -39,7 +58,7 @@ export default async function AccountOrderDetailPage({
           href="/account/orders"
           className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
         >
-          ← Back to orders
+          ← Back to My eSIMs
         </Link>
         <div
           className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
@@ -57,8 +76,6 @@ export default async function AccountOrderDetailPage({
     notFound();
   }
 
-  const actions = detail.installActions;
-
   return (
     <div className="space-y-8">
       <div>
@@ -66,45 +83,113 @@ export default async function AccountOrderDetailPage({
           href="/account/orders"
           className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
         >
-          ← Back to orders
+          ← Back to My eSIMs
         </Link>
-        <h1 className="mt-4 text-2xl font-bold tracking-tight">Order details</h1>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Package summary and secure installation options for this order.
-        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          {detail.flagUrl ? (
+            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-2)]">
+              <Image
+                src={detail.flagUrl}
+                alt=""
+                width={48}
+                height={36}
+                className="h-8 w-auto object-cover"
+                unoptimized
+              />
+            </div>
+          ) : null}
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {detail.destination}
+            </h1>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Order {detail.shortReference}
+            </p>
+          </div>
+          <span
+            className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass(detail.statusBadge)}`}
+          >
+            {detail.statusBadge}
+          </span>
+        </div>
       </div>
 
-      <dl className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 sm:px-5">
-        <DetailRow label="Destination" value={detail.destination} />
-        <DetailRow label="Package / data" value={detail.planPackage} />
-        <DetailRow label="Validity" value={detail.validity} />
-        <DetailRow label="Status" value={detail.statusLabel} />
-        <DetailRow label="Order date" value={detail.createdAtLabel} />
-      </dl>
-
-      {detail.installAvailable && actions ? (
-        <OrderInstallActions
-          hasInstallDetails={actions.hasInstallDetails}
-          hasVerifiedLpa={actions.hasVerifiedLpa}
-          hasOfficialIphoneActivationUrl={
-            actions.hasOfficialIphoneActivationUrl
-          }
-          iphoneInstallHref={actions.iphoneInstallHref}
-          iphoneGuideHref={actions.iphoneGuideHref}
-          qrDownloadHref={actions.qrDownloadHref}
-          qrViewHref={actions.qrViewHref}
-          androidGuideHref={actions.androidGuideHref}
-          androidActivationUrl={actions.androidActivationUrl}
-        />
-      ) : (
-        <div
-          className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-5 text-sm text-[var(--text-muted)]"
+      {detail.isRefunded ? (
+        <section
+          className="rounded-2xl border border-[var(--danger-border)] bg-[var(--danger-bg)] px-4 py-4 sm:px-5"
           role="status"
         >
-          Installation details are not available yet. Please check again shortly
-          or contact support if this order should already be ready to install.
-        </div>
-      )}
+          <h2 className="text-base font-bold text-[var(--heading)]">
+            Order refunded
+          </h2>
+          <dl className="mt-2 space-y-1 text-sm text-[var(--danger-text)]">
+            {detail.refundStatusLabel ? (
+              <div>
+                <dt className="inline font-semibold">Refund status: </dt>
+                <dd className="inline">{detail.refundStatusLabel}</dd>
+              </div>
+            ) : null}
+            {detail.refundedAtLabel ? (
+              <div>
+                <dt className="inline font-semibold">Refund date: </dt>
+                <dd className="inline">{detail.refundedAtLabel}</dd>
+              </div>
+            ) : null}
+            {detail.refundAmountLabel ? (
+              <div>
+                <dt className="inline font-semibold">Refunded amount: </dt>
+                <dd className="inline">{detail.refundAmountLabel}</dd>
+              </div>
+            ) : null}
+            <div>
+              <dt className="inline font-semibold">Order reference: </dt>
+              <dd className="inline">{detail.shortReference}</dd>
+            </div>
+          </dl>
+          <p className="mt-3 text-sm text-[var(--danger-text)]">
+            Installation may no longer be available. QR codes and activation
+            actions are disabled for this order.
+          </p>
+        </section>
+      ) : null}
+
+      <dl className="rounded-2xl border border-[var(--border-hover)] bg-[var(--surface-2)] px-4 sm:px-5">
+        <DetailRow label="Destination" value={detail.destination} />
+        <DetailRow label="Package / offer" value={detail.planName} />
+        <DetailRow label="Data allowance" value={detail.dataAllowance} />
+        <DetailRow label="Validity" value={detail.validity} />
+        <DetailRow label="Status" value={detail.statusLabel} />
+        <DetailRow label="Amount" value={detail.amountLabel} />
+        <DetailRow label="Currency" value={detail.currencyLabel} />
+        <DetailRow label="Funding" value={detail.fundingLabel} />
+        <DetailRow label="Purchased" value={detail.createdAtLabel} />
+        <DetailRow label="Order reference" value={detail.shortReference} />
+        <DetailRow
+          label="Installation"
+          value={
+            detail.installEligible
+              ? "Available after you open installation options"
+              : detail.isRefunded
+                ? "Disabled (refunded)"
+                : "Not available yet"
+          }
+        />
+        {detail.emailDeliveryLabel ? (
+          <DetailRow label="Email" value={detail.emailDeliveryLabel} />
+        ) : null}
+        <IccidRevealPanel
+          orderId={detail.id}
+          maskedLabel={detail.iccidMasked}
+          revealable={detail.iccidRevealable}
+          revealPath={`/api/account/orders/${encodeURIComponent(detail.id)}/iccid`}
+        />
+      </dl>
+
+      <CustomerEsimInstallPanel
+        orderId={detail.id}
+        installEligible={detail.installEligible}
+        isRefunded={detail.isRefunded}
+      />
     </div>
   );
 }

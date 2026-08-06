@@ -1,8 +1,9 @@
 import "server-only";
 
-import { OrderStatus, Prisma } from "@prisma/client";
+import { OrderStatus, Prisma, Role } from "@prisma/client";
 import {
   ADMIN_ORDERS_PAGE_SIZE,
+  ADMIN_RECENT_ORDERS_LIMIT,
   formatStoredIccidLast4,
   maskProviderOrderRef,
   normalizeAdminSearchQuery,
@@ -63,6 +64,8 @@ export type AdminOrderDetail = {
   claimedAtLabel: string;
   /** Never full ICCID — masked last-4, pending, or not provided */
   iccidHint: string;
+  /** True only when encrypted ICCID is stored (never includes ciphertext). */
+  iccidRevealable: boolean;
 };
 
 function adminIccidDisplay(
@@ -307,6 +310,7 @@ export async function getAdminOrderDetail(
       claimStatus: true,
       claimedAt: true,
       iccidLast4: true,
+      iccidEncrypted: true,
       fundingSource: true,
       user: {
         select: {
@@ -332,6 +336,7 @@ export async function getAdminOrderDetail(
 
   // Never decrypt or emit ICCID ciphertext/plaintext on this page.
   const iccidHint = adminIccidDisplay(row.iccidLast4, row.status);
+  const iccidRevealable = Boolean(row.iccidEncrypted?.trim());
 
   return {
     id: row.id,
@@ -353,5 +358,85 @@ export async function getAdminOrderDetail(
       ? formatCreatedAt(row.claimedAt)
       : "Not available",
     iccidHint,
+    iccidRevealable,
   };
+}
+
+export type AdminCustomerRecentOrderRow = {
+  id: string;
+  destination: string;
+  planName: string;
+  dataAllowance: string;
+  validity: string;
+  localStatus: string;
+  amountLabel: string;
+  currencyLabel: string;
+  fundingLabel: string;
+  purchasedAtLabel: string;
+  /** Masked last-4, pending, or not provided — never plaintext/ciphertext. */
+  iccidMasked: string;
+};
+
+/**
+ * Recent eSIM orders for a CUSTOMER profile. Call only after requireRole("ADMIN").
+ * Scoped strictly by Order.userId. Never returns ICCID ciphertext/plaintext,
+ * QR, activation codes, or provider payloads.
+ */
+export async function getAdminCustomerRecentOrders(
+  customerUserId: string,
+  limit = ADMIN_RECENT_ORDERS_LIMIT
+): Promise<AdminCustomerRecentOrderRow[]> {
+  const id = (customerUserId ?? "").trim();
+  if (!id || id.length > 64) return [];
+
+  const take =
+    Number.isInteger(limit) && limit > 0
+      ? Math.min(limit, ADMIN_RECENT_ORDERS_LIMIT)
+      : ADMIN_RECENT_ORDERS_LIMIT;
+
+  const customer = await prisma.user.findFirst({
+    where: { id, role: Role.CUSTOMER },
+    select: { id: true },
+  });
+  if (!customer) return [];
+
+  const rows = await prisma.order.findMany({
+    where: { userId: customer.id },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take,
+    select: {
+      id: true,
+      createdAt: true,
+      destination: true,
+      planName: true,
+      dataAllowance: true,
+      validity: true,
+      status: true,
+      displayAmount: true,
+      displayCurrency: true,
+      providerAmount: true,
+      providerCurrency: true,
+      fundingSource: true,
+      iccidLast4: true,
+    },
+  });
+
+  return rows.map((row) => {
+    const amount = row.displayAmount ?? row.providerAmount;
+    const currency = row.displayCurrency ?? row.providerCurrency;
+    const currencyCode = (currency ?? "").trim().toUpperCase() || "USD";
+    return {
+      id: row.id,
+      destination: displayOrUnavailable(row.destination),
+      planName: displayOrUnavailable(row.planName),
+      dataAllowance: displayOrUnavailable(row.dataAllowance),
+      validity: displayOrUnavailable(row.validity),
+      localStatus: displayOrUnavailable(row.status),
+      amountLabel: formatOrderAmount(amount, currencyCode),
+      currencyLabel: currencyCode,
+      fundingLabel: fundingSourceLabel(row.fundingSource),
+      purchasedAtLabel: formatCreatedAt(row.createdAt),
+      iccidMasked: adminIccidDisplay(row.iccidLast4, row.status),
+    };
+  });
 }

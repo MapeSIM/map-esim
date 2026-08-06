@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAdminCustomerDetail } from "@/app/lib/admin/customers";
+import { getAdminCustomerRecentOrders } from "@/app/lib/admin/orders";
 import { getAdminCustomerRecentTopups } from "@/app/lib/admin/topups";
 import { getAdminCustomerWalletSummary } from "@/app/lib/admin/wallet";
 import { ADMIN_DEBIT_MIN_CENTS } from "@/app/lib/wallet/amount";
@@ -73,6 +74,15 @@ export default async function AdminCustomerDetailPage({
     recentTopups = await getAdminCustomerRecentTopups(detail.id, 5);
   } catch {
     topupsUnavailable = true;
+  }
+
+  let recentOrders: Awaited<ReturnType<typeof getAdminCustomerRecentOrders>> =
+    [];
+  let ordersUnavailable = false;
+  try {
+    recentOrders = await getAdminCustomerRecentOrders(detail.id);
+  } catch {
+    ordersUnavailable = true;
   }
 
   return (
@@ -199,6 +209,103 @@ export default async function AdminCustomerDetailPage({
       <section className="min-w-0 w-full max-w-full space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
+            <h2 className="text-lg font-semibold tracking-tight">
+              Recent eSIM Orders
+            </h2>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Local orders linked to this customer. ICCID values stay masked;
+              open an order to use secure reveal when authorized.
+            </p>
+          </div>
+          {detail.localOrderCount > 0 ? (
+            <Link
+              href={`/admin/orders?userId=${encodeURIComponent(detail.id)}`}
+              className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+            >
+              View all linked orders
+            </Link>
+          ) : null}
+        </div>
+
+        {ordersUnavailable ? (
+          <div
+            className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-6"
+            role="status"
+          >
+            <p className="text-sm font-medium text-[var(--heading)]">
+              Order data is temporarily unavailable. Please refresh shortly.
+            </p>
+          </div>
+        ) : recentOrders.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-5 text-sm text-[var(--text-muted)]">
+            No eSIM orders found for this customer.
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {recentOrders.map((order) => (
+              <li
+                key={order.id}
+                className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm"
+              >
+                <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-[var(--heading)] break-words">
+                      {order.destination}
+                    </p>
+                    <p className="mt-1 text-[var(--text-muted)] break-words">
+                      {order.planName}
+                      {order.dataAllowance !== "Not available"
+                        ? ` · ${order.dataAllowance}`
+                        : ""}
+                    </p>
+                  </div>
+                  <p className="shrink-0 font-semibold tabular-nums text-[var(--heading)]">
+                    {order.amountLabel}
+                  </p>
+                </div>
+                <dl className="mt-3 grid gap-1 text-xs text-[var(--text-soft)] sm:grid-cols-2">
+                  <div>
+                    <dt className="inline font-semibold">Validity: </dt>
+                    <dd className="inline">{order.validity}</dd>
+                  </div>
+                  <div>
+                    <dt className="inline font-semibold">Status: </dt>
+                    <dd className="inline">{order.localStatus}</dd>
+                  </div>
+                  <div>
+                    <dt className="inline font-semibold">Currency: </dt>
+                    <dd className="inline">{order.currencyLabel}</dd>
+                  </div>
+                  <div>
+                    <dt className="inline font-semibold">Funding: </dt>
+                    <dd className="inline">{order.fundingLabel}</dd>
+                  </div>
+                  <div>
+                    <dt className="inline font-semibold">Purchased: </dt>
+                    <dd className="inline">{order.purchasedAtLabel}</dd>
+                  </div>
+                  <div>
+                    <dt className="inline font-semibold">ICCID: </dt>
+                    <dd className="inline">{order.iccidMasked}</dd>
+                  </div>
+                </dl>
+                <p className="mt-3">
+                  <Link
+                    href={`/admin/orders/${encodeURIComponent(order.id)}`}
+                    className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                  >
+                    View Order
+                  </Link>
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="min-w-0 w-full max-w-full space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
             <h2 className="text-lg font-semibold tracking-tight">Wallet</h2>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
               Read-only balance and recent ledger activity. Viewing never creates
@@ -306,6 +413,16 @@ export default async function AdminCustomerDetailPage({
                       {row.referenceLabel ? (
                         <p className="mt-1 text-xs text-[var(--text-soft)] break-words">
                           Ref {row.referenceLabel}
+                        </p>
+                      ) : null}
+                      {row.relatedOrderId ? (
+                        <p className="mt-2">
+                          <Link
+                            href={`/admin/orders/${encodeURIComponent(row.relatedOrderId)}`}
+                            className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                          >
+                            View related order
+                          </Link>
                         </p>
                       ) : null}
                     </li>
