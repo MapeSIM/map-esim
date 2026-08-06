@@ -15,6 +15,8 @@ export const RECONCILIATION_FILTERS = [
   "iccid_pending",
   "order_email_failed",
   "wallet_notification_failed",
+  "locked",
+  "escalated",
   "resolved",
 ] as const;
 
@@ -209,13 +211,20 @@ export function classifyReconciliationCase(
 
 export function categoryMatchesFilter(
   category: ReconciliationCategory,
-  filter: ReconciliationFilter
+  filter: ReconciliationFilter,
+  options?: { locked?: boolean; escalated?: boolean }
 ): boolean {
   if (filter === "needs_review") {
     return category !== "RESOLVED";
   }
   if (filter === "resolved") {
     return category === "RESOLVED";
+  }
+  if (filter === "locked") {
+    return Boolean(options?.locked) && category !== "RESOLVED";
+  }
+  if (filter === "escalated") {
+    return Boolean(options?.escalated) && category !== "RESOLVED";
   }
   if (filter === "provider_uncertain") {
     return (
@@ -297,6 +306,10 @@ export function filterLabel(filter: ReconciliationFilter): string {
       return "Order email failed";
     case "wallet_notification_failed":
       return "Wallet notification failed";
+    case "locked":
+      return "Locked";
+    case "escalated":
+      return "Escalated";
     case "resolved":
       return "Resolved";
     default:

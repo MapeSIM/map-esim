@@ -138,9 +138,10 @@ function main() {
   assert.match(detail, /ProviderRefreshForm/);
   assert.match(
     detail,
-    /Provider status observations do not automatically authorize a\s+refund or local finalization/
+    /Provider status observations do\s+not automatically authorize a\s+refund or local finalization/
   );
-  assert.doesNotMatch(detail, /Mark resolved|Refund now|Finalize order|Resend email/i);
+  // Case management may expose Mark resolved; financial recovery actions must stay absent.
+  assert.doesNotMatch(detail, /Refund now|Finalize order|Resend email|Run backfill/i);
   console.log("PASS ui_form_and_panel");
 
   assert.doesNotMatch(credit, /providerRefresh/);

@@ -76,7 +76,7 @@ function main() {
   assert.equal(RECONCILIATION_STUCK_AGE_MS, 15 * 60 * 1000);
   assert.equal(parseReconciliationFilter("funds_reserved"), "funds_reserved");
   assert.equal(parseReconciliationFilter("nope"), "needs_review");
-  assert.equal(RECONCILIATION_FILTERS.length, 10);
+  assert.equal(RECONCILIATION_FILTERS.length, 12);
 
   const observed = classifyReconciliationCase({
     sourceType: "wallet_purchase",
@@ -159,14 +159,10 @@ function main() {
   assert.match(detailPage, /notFound/);
   assert.match(detailPage, /Timeline/);
   assert.doesNotMatch(detailPage, /"use server"/);
+  // Phase 8G-B2 may add Mark resolved (case metadata only). Financial recovery stays forbidden.
   assert.doesNotMatch(
     detailPage,
-    /Mark resolved|Refund now|Finalize order|Resend email|Run backfill/i
-  );
-  // Phase 8G-B1 may add a GET-only provider refresh control; financial mutations remain forbidden.
-  assert.doesNotMatch(
-    detailPage,
-    /Refund now|Finalize order|Mark resolved|Resend email|ICCID backfill/i
+    /Refund now|Finalize order|Resend email|Run backfill|ICCID backfill/i
   );
   assert.match(nav, /Reconciliation/);
   assert.match(nav, /\/admin\/reconciliation/);

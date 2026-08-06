@@ -60,6 +60,7 @@ export type ReconciliationListRow = {
   updatedAtLabel: string;
   resolutionLabel: string;
   locked: boolean;
+  escalated: boolean;
 };
 
 export type ReconciliationTimelineEvent = {
@@ -89,6 +90,7 @@ export type ReconciliationDetail = {
   updatedAtLabel: string;
   resolutionLabel: string;
   locked: boolean;
+  escalated: boolean;
   timeline: ReconciliationTimelineEvent[];
   relatedLinks: { label: string; href: string }[];
 };
@@ -169,6 +171,8 @@ function failureLabel(
 function resolutionLabel(options: {
   resolvedAt?: Date | null;
   lockedAt?: Date | null;
+  escalatedAt?: Date | null;
+  escalationPriority?: string | null;
   reason?: string | null;
 }): string {
   if (options.resolvedAt) {
@@ -177,9 +181,15 @@ function resolutionLabel(options: {
       ? `Resolved ${formatTs(options.resolvedAt)} · ${reason.slice(0, 80)}`
       : `Resolved ${formatTs(options.resolvedAt)}`;
   }
+  const bits: string[] = [];
   if (options.lockedAt) {
-    return `Locked ${formatTs(options.lockedAt)}`;
+    bits.push(`Locked ${formatTs(options.lockedAt)}`);
   }
+  if (options.escalatedAt) {
+    const p = (options.escalationPriority ?? "").trim();
+    bits.push(p ? `Escalated ${p}` : "Escalated");
+  }
+  if (bits.length) return bits.join(" · ");
   return "Open";
 }
 
@@ -252,6 +262,8 @@ export async function getReconciliationListPage(options: {
           emailDeliveryStatus: true,
           reconciliationResolvedAt: true,
           reconciliationLockedAt: true,
+          reconciliationEscalatedAt: true,
+          reconciliationEscalationPriority: true,
           reconciliationResolutionReason: true,
           destinationName: true,
           destinationCode: true,
@@ -290,6 +302,8 @@ export async function getReconciliationListPage(options: {
           emailDeliveryStatus: true,
           reconciliationResolvedAt: true,
           reconciliationLockedAt: true,
+          reconciliationEscalatedAt: true,
+          reconciliationEscalationPriority: true,
           reconciliationResolutionReason: true,
           destinationName: true,
           destinationCode: true,
@@ -314,6 +328,11 @@ export async function getReconciliationListPage(options: {
           failureCode: true,
           creditAmountCents: true,
           walletTransactionId: true,
+          reconciliationResolvedAt: true,
+          reconciliationLockedAt: true,
+          reconciliationEscalatedAt: true,
+          reconciliationEscalationPriority: true,
+          reconciliationResolutionReason: true,
           createdAt: true,
           updatedAt: true,
           customer: { select: { id: true, name: true, email: true } },
@@ -338,6 +357,8 @@ export async function getReconciliationListPage(options: {
           emailDeliveryStatus: true,
           reconciliationResolvedAt: true,
           reconciliationLockedAt: true,
+          reconciliationEscalatedAt: true,
+          reconciliationEscalationPriority: true,
           reconciliationResolutionReason: true,
           destinationName: true,
           destinationCode: true,
@@ -369,6 +390,8 @@ export async function getReconciliationListPage(options: {
           emailDeliveryStatus: true,
           reconciliationResolvedAt: true,
           reconciliationLockedAt: true,
+          reconciliationEscalatedAt: true,
+          reconciliationEscalationPriority: true,
           reconciliationResolutionReason: true,
           destinationName: true,
           destinationCode: true,
@@ -394,6 +417,11 @@ export async function getReconciliationListPage(options: {
           type: true,
           amountCents: true,
           emailNotificationStatus: true,
+          reconciliationResolvedAt: true,
+          reconciliationLockedAt: true,
+          reconciliationEscalatedAt: true,
+          reconciliationEscalationPriority: true,
+          reconciliationResolutionReason: true,
           createdAt: true,
           updatedAt: true,
           wallet: {
@@ -421,6 +449,11 @@ export async function getReconciliationListPage(options: {
           validity: true,
           displayAmount: true,
           displayCurrency: true,
+          reconciliationResolvedAt: true,
+          reconciliationLockedAt: true,
+          reconciliationEscalatedAt: true,
+          reconciliationEscalationPriority: true,
+          reconciliationResolutionReason: true,
           createdAt: true,
           updatedAt: true,
           user: { select: { id: true, name: true, email: true } },
@@ -446,7 +479,7 @@ export async function getReconciliationListPage(options: {
         updatedAt: row.updatedAt,
         now,
       });
-      if (!categoryMatchesFilter(category, filter)) continue;
+      if (!categoryMatchesFilter(category, filter, { locked: Boolean(row.reconciliationLockedAt), escalated: Boolean(row.reconciliationEscalatedAt) })) continue;
       const purchaseType: ReconciliationPurchaseType = row.adminUserId
         ? "Admin-assisted wallet"
         : "Self-service wallet";
@@ -480,9 +513,12 @@ export async function getReconciliationListPage(options: {
         resolutionLabel: resolutionLabel({
           resolvedAt: row.reconciliationResolvedAt,
           lockedAt: row.reconciliationLockedAt,
+          escalatedAt: row.reconciliationEscalatedAt,
+          escalationPriority: row.reconciliationEscalationPriority,
           reason: row.reconciliationResolutionReason,
         }),
         locked: Boolean(row.reconciliationLockedAt),
+        escalated: Boolean(row.reconciliationEscalatedAt),
       });
     }
 
@@ -500,7 +536,7 @@ export async function getReconciliationListPage(options: {
         updatedAt: row.updatedAt,
         now,
       });
-      if (!categoryMatchesFilter(category, filter)) continue;
+      if (!categoryMatchesFilter(category, filter, { locked: Boolean(row.reconciliationLockedAt), escalated: Boolean(row.reconciliationEscalatedAt) })) continue;
       rows.push({
         sourceType: "assignment",
         attemptId: row.id,
@@ -529,9 +565,12 @@ export async function getReconciliationListPage(options: {
         resolutionLabel: resolutionLabel({
           resolvedAt: row.reconciliationResolvedAt,
           lockedAt: row.reconciliationLockedAt,
+          escalatedAt: row.reconciliationEscalatedAt,
+          escalationPriority: row.reconciliationEscalationPriority,
           reason: row.reconciliationResolutionReason,
         }),
         locked: Boolean(row.reconciliationLockedAt),
+        escalated: Boolean(row.reconciliationEscalatedAt),
       });
     }
 
@@ -544,7 +583,7 @@ export async function getReconciliationListPage(options: {
         updatedAt: row.updatedAt,
         now,
       });
-      if (!categoryMatchesFilter(category, filter)) continue;
+      if (!categoryMatchesFilter(category, filter, { locked: Boolean(row.reconciliationLockedAt), escalated: Boolean(row.reconciliationEscalatedAt) })) continue;
       rows.push({
         sourceType: "topup",
         attemptId: row.id,
@@ -569,8 +608,15 @@ export async function getReconciliationListPage(options: {
         categoryLabel: categoryLabel(category),
         createdAtLabel: formatTs(row.createdAt),
         updatedAtLabel: formatTs(row.updatedAt),
-        resolutionLabel: "Open",
-        locked: false,
+        resolutionLabel: resolutionLabel({
+          resolvedAt: row.reconciliationResolvedAt,
+          lockedAt: row.reconciliationLockedAt,
+          escalatedAt: row.reconciliationEscalatedAt,
+          escalationPriority: row.reconciliationEscalationPriority,
+          reason: row.reconciliationResolutionReason,
+        }),
+        locked: Boolean(row.reconciliationLockedAt),
+        escalated: Boolean(row.reconciliationEscalatedAt),
       });
     }
 
@@ -585,7 +631,7 @@ export async function getReconciliationListPage(options: {
         updatedAt: row.updatedAt,
         now,
       });
-      if (!categoryMatchesFilter(category, filter)) continue;
+      if (!categoryMatchesFilter(category, filter, { locked: Boolean(row.reconciliationLockedAt), escalated: Boolean(row.reconciliationEscalatedAt) })) continue;
       rows.push({
         sourceType: "order_email",
         attemptId: row.id,
@@ -611,9 +657,12 @@ export async function getReconciliationListPage(options: {
         resolutionLabel: resolutionLabel({
           resolvedAt: row.reconciliationResolvedAt,
           lockedAt: row.reconciliationLockedAt,
+          escalatedAt: row.reconciliationEscalatedAt,
+          escalationPriority: row.reconciliationEscalationPriority,
           reason: row.reconciliationResolutionReason,
         }),
         locked: Boolean(row.reconciliationLockedAt),
+        escalated: Boolean(row.reconciliationEscalatedAt),
       });
     }
 
@@ -628,7 +677,7 @@ export async function getReconciliationListPage(options: {
         updatedAt: row.updatedAt,
         now,
       });
-      if (!categoryMatchesFilter(category, filter)) continue;
+      if (!categoryMatchesFilter(category, filter, { locked: Boolean(row.reconciliationLockedAt), escalated: Boolean(row.reconciliationEscalatedAt) })) continue;
       rows.push({
         sourceType: "order_email",
         attemptId: `assignment:${row.id}`,
@@ -657,9 +706,12 @@ export async function getReconciliationListPage(options: {
         resolutionLabel: resolutionLabel({
           resolvedAt: row.reconciliationResolvedAt,
           lockedAt: row.reconciliationLockedAt,
+          escalatedAt: row.reconciliationEscalatedAt,
+          escalationPriority: row.reconciliationEscalationPriority,
           reason: row.reconciliationResolutionReason,
         }),
         locked: Boolean(row.reconciliationLockedAt),
+        escalated: Boolean(row.reconciliationEscalatedAt),
       });
     }
 
@@ -672,7 +724,7 @@ export async function getReconciliationListPage(options: {
         updatedAt: row.updatedAt,
         now,
       });
-      if (!categoryMatchesFilter(category, filter)) continue;
+      if (!categoryMatchesFilter(category, filter, { locked: Boolean(row.reconciliationLockedAt), escalated: Boolean(row.reconciliationEscalatedAt) })) continue;
       const user = row.wallet.user;
       rows.push({
         sourceType: "wallet_email",
@@ -694,8 +746,15 @@ export async function getReconciliationListPage(options: {
         categoryLabel: categoryLabel(category),
         createdAtLabel: formatTs(row.createdAt),
         updatedAtLabel: formatTs(row.updatedAt),
-        resolutionLabel: "Open",
-        locked: false,
+        resolutionLabel: resolutionLabel({
+          resolvedAt: row.reconciliationResolvedAt,
+          lockedAt: row.reconciliationLockedAt,
+          escalatedAt: row.reconciliationEscalatedAt,
+          escalationPriority: row.reconciliationEscalationPriority,
+          reason: row.reconciliationResolutionReason,
+        }),
+        locked: Boolean(row.reconciliationLockedAt),
+        escalated: Boolean(row.reconciliationEscalatedAt),
       });
     }
 
@@ -709,7 +768,7 @@ export async function getReconciliationListPage(options: {
         updatedAt: row.updatedAt,
         now,
       });
-      if (!categoryMatchesFilter(category, filter)) continue;
+      if (!categoryMatchesFilter(category, filter, { locked: Boolean(row.reconciliationLockedAt), escalated: Boolean(row.reconciliationEscalatedAt) })) continue;
       rows.push({
         sourceType: "iccid",
         attemptId: row.id,
@@ -738,8 +797,15 @@ export async function getReconciliationListPage(options: {
         categoryLabel: categoryLabel(category),
         createdAtLabel: formatTs(row.createdAt),
         updatedAtLabel: formatTs(row.updatedAt),
-        resolutionLabel: "Open",
-        locked: false,
+        resolutionLabel: resolutionLabel({
+          resolvedAt: row.reconciliationResolvedAt,
+          lockedAt: row.reconciliationLockedAt,
+          escalatedAt: row.reconciliationEscalatedAt,
+          escalationPriority: row.reconciliationEscalationPriority,
+          reason: row.reconciliationResolutionReason,
+        }),
+        locked: Boolean(row.reconciliationLockedAt),
+        escalated: Boolean(row.reconciliationEscalatedAt),
       });
     }
 
@@ -809,6 +875,8 @@ export async function getReconciliationDetail(
           reconciliationState: true,
           reconciliationResolvedAt: true,
           reconciliationLockedAt: true,
+          reconciliationEscalatedAt: true,
+          reconciliationEscalationPriority: true,
           reconciliationResolutionReason: true,
           destinationName: true,
           destinationCode: true,
@@ -847,8 +915,8 @@ export async function getReconciliationDetail(
       const isRecon =
         row.status === WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED;
 
-      if (sourceType === "order_email" && !isEmailCase) return null;
-      if (sourceType === "wallet_purchase" && !isRecon && !isStuck) {
+      if (sourceType === "order_email" && !isEmailCase && !row.reconciliationResolvedAt) return null;
+      if (sourceType === "wallet_purchase" && !isRecon && !isStuck && !row.reconciliationResolvedAt) {
         return null;
       }
 
@@ -975,10 +1043,12 @@ export async function getReconciliationDetail(
               ? "pending"
               : "unknown",
           resolutionLabel({
-            resolvedAt: row.reconciliationResolvedAt,
-            lockedAt: row.reconciliationLockedAt,
-            reason: row.reconciliationResolutionReason,
-          })
+          resolvedAt: row.reconciliationResolvedAt,
+          lockedAt: row.reconciliationLockedAt,
+          escalatedAt: row.reconciliationEscalatedAt,
+          escalationPriority: row.reconciliationEscalationPriority,
+          reason: row.reconciliationResolutionReason,
+        })
         ),
       ];
 
@@ -1042,9 +1112,12 @@ export async function getReconciliationDetail(
         resolutionLabel: resolutionLabel({
           resolvedAt: row.reconciliationResolvedAt,
           lockedAt: row.reconciliationLockedAt,
+          escalatedAt: row.reconciliationEscalatedAt,
+          escalationPriority: row.reconciliationEscalationPriority,
           reason: row.reconciliationResolutionReason,
         }),
         locked: Boolean(row.reconciliationLockedAt),
+        escalated: Boolean(row.reconciliationEscalatedAt),
         timeline,
         relatedLinks,
       };
@@ -1073,6 +1146,11 @@ export async function getReconciliationDetail(
         failureCode: true,
         creditAmountCents: true,
         walletTransactionId: true,
+        reconciliationResolvedAt: true,
+        reconciliationLockedAt: true,
+        reconciliationEscalatedAt: true,
+        reconciliationEscalationPriority: true,
+        reconciliationResolutionReason: true,
         createdAt: true,
         updatedAt: true,
         paymentConfirmedAt: true,
@@ -1081,12 +1159,18 @@ export async function getReconciliationDetail(
       },
     });
     if (!row) return null;
-    if (row.status !== WalletTopupStatus.RECONCILIATION_REQUIRED) return null;
+    if (
+      row.status !== WalletTopupStatus.RECONCILIATION_REQUIRED &&
+      !row.reconciliationResolvedAt
+    ) {
+      return null;
+    }
     const category = classifyReconciliationCase({
       sourceType: "topup",
       status: row.status,
       failureCategory: row.failureCategory,
       failureCode: row.failureCode,
+      reconciliationResolvedAt: row.reconciliationResolvedAt,
       updatedAt: row.updatedAt,
     });
     return {
@@ -1112,8 +1196,15 @@ export async function getReconciliationDetail(
       failureLabel: failureLabel(row.failureCategory, row.failureCode),
       createdAtLabel: formatTs(row.createdAt),
       updatedAtLabel: formatTs(row.updatedAt),
-      resolutionLabel: "Open",
-      locked: false,
+      resolutionLabel: resolutionLabel({
+        resolvedAt: row.reconciliationResolvedAt,
+        lockedAt: row.reconciliationLockedAt,
+        escalatedAt: row.reconciliationEscalatedAt,
+        escalationPriority: row.reconciliationEscalationPriority,
+        reason: row.reconciliationResolutionReason,
+      }),
+      locked: Boolean(row.reconciliationLockedAt),
+      escalated: Boolean(row.reconciliationEscalatedAt),
       timeline: [
         timelineEvent("Attempt prepared", "done", formatTs(row.createdAt)),
         timelineEvent(
@@ -1128,7 +1219,7 @@ export async function getReconciliationDetail(
         ),
         timelineEvent(
           "Reconciliation marked",
-          "pending",
+          row.reconciliationResolvedAt ? "done" : "pending",
           row.status
         ),
       ],
@@ -1157,6 +1248,11 @@ export async function getReconciliationDetail(
         amountCents: true,
         emailNotificationStatus: true,
         emailNotifiedAt: true,
+        reconciliationResolvedAt: true,
+        reconciliationLockedAt: true,
+        reconciliationEscalatedAt: true,
+        reconciliationEscalationPriority: true,
+        reconciliationResolutionReason: true,
         createdAt: true,
         updatedAt: true,
         wallet: {
@@ -1169,7 +1265,8 @@ export async function getReconciliationDetail(
     if (!row) return null;
     if (
       row.status !== WalletTransactionStatus.COMPLETED ||
-      !isFailedWalletNotification(row.emailNotificationStatus)
+      (!isFailedWalletNotification(row.emailNotificationStatus) &&
+        !row.reconciliationResolvedAt)
     ) {
       return null;
     }
@@ -1178,6 +1275,7 @@ export async function getReconciliationDetail(
       sourceType: "wallet_email",
       status: "COMPLETED",
       emailNotificationStatus: row.emailNotificationStatus,
+      reconciliationResolvedAt: row.reconciliationResolvedAt,
       updatedAt: row.updatedAt,
     });
     return {
@@ -1199,13 +1297,22 @@ export async function getReconciliationDetail(
       failureLabel: `wallet_email / ${row.emailNotificationStatus}`,
       createdAtLabel: formatTs(row.createdAt),
       updatedAtLabel: formatTs(row.updatedAt),
-      resolutionLabel: "Open",
-      locked: false,
+      resolutionLabel: resolutionLabel({
+        resolvedAt: row.reconciliationResolvedAt,
+        lockedAt: row.reconciliationLockedAt,
+        escalatedAt: row.reconciliationEscalatedAt,
+        escalationPriority: row.reconciliationEscalationPriority,
+        reason: row.reconciliationResolutionReason,
+      }),
+      locked: Boolean(row.reconciliationLockedAt),
+      escalated: Boolean(row.reconciliationEscalatedAt),
       timeline: [
         timelineEvent("Ledger completed", "done", formatTs(row.createdAt)),
         timelineEvent(
           "Wallet notification state",
-          "failed",
+          isFailedWalletNotification(row.emailNotificationStatus)
+            ? "failed"
+            : "done",
           (row.emailNotificationStatus ?? "—").slice(0, 40)
         ),
       ],
@@ -1233,25 +1340,27 @@ export async function getReconciliationDetail(
         displayCurrency: true,
         iccidHash: true,
         iccidCapturedAt: true,
-        createdAt: true,
+          reconciliationResolvedAt: true,
+          reconciliationLockedAt: true,
+          reconciliationEscalatedAt: true,
+          reconciliationEscalationPriority: true,
+          reconciliationResolutionReason: true,
+          createdAt: true,
         updatedAt: true,
         user: { select: { id: true, name: true, email: true } },
       },
     });
     if (!row) return null;
-    if (
-      row.status !== OrderStatus.COMPLETED ||
-      row.iccidHash ||
-      row.iccidCapturedAt
-    ) {
-      return null;
-    }
+    if (row.status !== OrderStatus.COMPLETED) return null;
+    const iccidPending = !row.iccidHash && !row.iccidCapturedAt;
+    if (!iccidPending && !row.reconciliationResolvedAt) return null;
     const category = classifyReconciliationCase({
       sourceType: "iccid",
       status: "COMPLETED",
       providerOrderId: row.providerOrderId,
       iccidHash: row.iccidHash,
       iccidCapturedAt: row.iccidCapturedAt,
+      reconciliationResolvedAt: row.reconciliationResolvedAt,
       updatedAt: row.updatedAt,
     });
     return {
@@ -1281,8 +1390,15 @@ export async function getReconciliationDetail(
       failureLabel: "iccid / pending_capture",
       createdAtLabel: formatTs(row.createdAt),
       updatedAtLabel: formatTs(row.updatedAt),
-      resolutionLabel: "Open",
-      locked: false,
+      resolutionLabel: resolutionLabel({
+        resolvedAt: row.reconciliationResolvedAt,
+        lockedAt: row.reconciliationLockedAt,
+        escalatedAt: row.reconciliationEscalatedAt,
+        escalationPriority: row.reconciliationEscalationPriority,
+        reason: row.reconciliationResolutionReason,
+      }),
+      locked: Boolean(row.reconciliationLockedAt),
+      escalated: Boolean(row.reconciliationEscalatedAt),
       timeline: [
         timelineEvent("Order completed", "done", formatTs(row.createdAt)),
         timelineEvent(
@@ -1292,8 +1408,8 @@ export async function getReconciliationDetail(
         ),
         timelineEvent(
           "ICCID capture state",
-          "pending",
-          "Pending from provider"
+          row.iccidHash || row.iccidCapturedAt ? "done" : "pending",
+          row.iccidHash || row.iccidCapturedAt ? "Captured" : "Pending from provider"
         ),
       ],
       relatedLinks: [
@@ -1327,6 +1443,8 @@ async function getAssignmentDetail(
       emailDeliveryStatus: true,
       reconciliationResolvedAt: true,
       reconciliationLockedAt: true,
+      reconciliationEscalatedAt: true,
+      reconciliationEscalationPriority: true,
       reconciliationResolutionReason: true,
       destinationName: true,
       destinationCode: true,
@@ -1348,8 +1466,9 @@ async function getAssignmentDetail(
 
   if (sourceType === "order_email") {
     if (
-      row.status !== AdminPackageAssignmentStatus.COMPLETED ||
-      !isFailedEmailDelivery(row.emailDeliveryStatus)
+      (row.status !== AdminPackageAssignmentStatus.COMPLETED ||
+        !isFailedEmailDelivery(row.emailDeliveryStatus)) &&
+      !row.reconciliationResolvedAt
     ) {
       return null;
     }
@@ -1359,7 +1478,8 @@ async function getAssignmentDetail(
       isStuckAttemptAge(row.updatedAt);
     if (
       row.status !== AdminPackageAssignmentStatus.RECONCILIATION_REQUIRED &&
-      !stuck
+      !stuck &&
+      !row.reconciliationResolvedAt
     ) {
       return null;
     }
@@ -1446,10 +1566,12 @@ async function getAssignmentDetail(
           ? "pending"
           : "unknown",
       resolutionLabel({
-        resolvedAt: row.reconciliationResolvedAt,
-        lockedAt: row.reconciliationLockedAt,
-        reason: row.reconciliationResolutionReason,
-      })
+          resolvedAt: row.reconciliationResolvedAt,
+          lockedAt: row.reconciliationLockedAt,
+          escalatedAt: row.reconciliationEscalatedAt,
+          escalationPriority: row.reconciliationEscalationPriority,
+          reason: row.reconciliationResolutionReason,
+        })
     ),
   ];
 
@@ -1479,11 +1601,14 @@ async function getAssignmentDetail(
     createdAtLabel: formatTs(row.createdAt),
     updatedAtLabel: formatTs(row.updatedAt),
     resolutionLabel: resolutionLabel({
-      resolvedAt: row.reconciliationResolvedAt,
-      lockedAt: row.reconciliationLockedAt,
-      reason: row.reconciliationResolutionReason,
-    }),
+          resolvedAt: row.reconciliationResolvedAt,
+          lockedAt: row.reconciliationLockedAt,
+          escalatedAt: row.reconciliationEscalatedAt,
+          escalationPriority: row.reconciliationEscalationPriority,
+          reason: row.reconciliationResolutionReason,
+        }),
     locked: Boolean(row.reconciliationLockedAt),
+    escalated: Boolean(row.reconciliationEscalatedAt),
     timeline,
     relatedLinks: [
       ...(row.customer

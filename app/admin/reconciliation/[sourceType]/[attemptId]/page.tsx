@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import CaseManagementPanel from "@/app/components/admin/CaseManagementPanel";
 import ProviderRefreshForm from "@/app/components/admin/ProviderRefreshForm";
 import {
   getReconciliationDetail,
   requireActiveAdminForReconciliation,
 } from "@/app/lib/admin/reconciliation";
+import { getCaseManagementEligibility } from "@/app/lib/admin/reconciliationCaseManagement";
 import { getProviderRefreshUiState } from "@/app/lib/admin/providerRefresh";
 
 export const dynamic = "force-dynamic";
@@ -87,13 +89,21 @@ export default async function AdminReconciliationDetailPage({
 
   if (!detail) notFound();
 
-  const refreshUi = await getProviderRefreshUiState({
-    sourceType: detail.sourceType,
-    attemptId: detail.attemptId,
-  });
+  const [refreshUi, caseUi] = await Promise.all([
+    getProviderRefreshUiState({
+      sourceType: detail.sourceType,
+      attemptId: detail.attemptId,
+    }),
+    getCaseManagementEligibility({
+      sourceType: detail.sourceType,
+      attemptId: detail.attemptId,
+    }),
+  ]);
   const showRefreshSection =
     detail.sourceType === "wallet_purchase" ||
     detail.sourceType === "assignment";
+  const refreshDisabled = !refreshUi.eligibility.eligible;
+  const refreshReasonCode = refreshUi.eligibility.reasonCode;
 
   return (
     <div className="space-y-8">
@@ -108,8 +118,8 @@ export default async function AdminReconciliationDetailPage({
           Reconciliation case
         </h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Sanitized timeline and controlled provider status checks only. Wallet
-          refunds, finalization and email resend are not available here.
+          Sanitized timeline and controlled case management. Wallet refunds,
+          finalization and email resend are not available here.
         </p>
       </div>
 
@@ -118,7 +128,8 @@ export default async function AdminReconciliationDetailPage({
         role="status"
       >
         Recovery actions will be available only after provider evidence and
-        financial safety checks are confirmed.
+        financial safety checks are confirmed. Provider status observations do
+        not automatically authorize a refund or local finalization.
       </div>
 
       <dl className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 sm:px-5">
@@ -147,6 +158,33 @@ export default async function AdminReconciliationDetailPage({
         <DetailRow label="Updated" value={detail.updatedAtLabel} />
         <DetailRow label="Resolution / lock" value={detail.resolutionLabel} />
       </dl>
+
+      {caseUi ? (
+        <CaseManagementPanel
+          sourceType={detail.sourceType}
+          attemptId={detail.attemptId}
+          stateLabel={caseUi.stateLabel}
+          locked={caseUi.locked}
+          escalated={caseUi.escalated}
+          resolved={caseUi.resolved}
+          lockedAtLabel={caseUi.lockedAtLabel}
+          lockedByLabel={caseUi.lockedByLabel}
+          lockReason={caseUi.lockReason}
+          escalatedAtLabel={caseUi.escalatedAtLabel}
+          escalatedByLabel={caseUi.escalatedByLabel}
+          escalationPriority={caseUi.escalationPriority}
+          escalationReason={caseUi.escalationReason}
+          resolvedAtLabel={caseUi.resolvedAtLabel}
+          resolvedByLabel={caseUi.resolvedByLabel}
+          resolutionReason={caseUi.resolutionReason}
+          resolutionCode={caseUi.resolutionCode}
+          resolutionEligibilityMessage={caseUi.resolutionEligibilityMessage}
+          canLock={caseUi.canLock}
+          canUnlock={caseUi.canUnlock}
+          canEscalate={caseUi.canEscalate}
+          canResolve={caseUi.canResolve}
+        />
+      ) : null}
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold tracking-tight">Timeline</h2>
@@ -181,11 +219,11 @@ export default async function AdminReconciliationDetailPage({
               refreshUi.eligibility.expectedProviderOrderId || ""
             }
             providerRefMasked={refreshUi.eligibility.providerRefMasked}
-            disabled={!refreshUi.eligibility.eligible}
+            disabled={refreshDisabled}
             disabledReason={
-              refreshUi.eligibility.eligible
-                ? undefined
-                : eligibilityDisabledReason(refreshUi.eligibility.reasonCode)
+              refreshDisabled
+                ? eligibilityDisabledReason(refreshReasonCode)
+                : undefined
             }
           />
 
@@ -205,7 +243,7 @@ export default async function AdminReconciliationDetailPage({
                 />
                 <DetailRow label="Result" value={refreshUi.panel.resultLabel} />
                 <DetailRow
-                  label="Safe provider state"
+                  label="Provider state"
                   value={refreshUi.panel.safeProviderStateLabel}
                 />
                 <DetailRow
@@ -217,18 +255,14 @@ export default async function AdminReconciliationDetailPage({
                   value={refreshUi.panel.offerMatchLabel}
                 />
                 <DetailRow
-                  label="Installation data available"
+                  label="Install data"
                   value={refreshUi.panel.installDataLabel}
                 />
                 <DetailRow
-                  label="Safe status code"
+                  label="Safe code"
                   value={refreshUi.panel.safeCodeLabel}
                 />
               </dl>
-              <p className="text-sm text-[var(--heading)]" role="status">
-                Provider status observations do not automatically authorize a
-                refund or local finalization.
-              </p>
             </section>
           ) : null}
         </>
@@ -236,9 +270,9 @@ export default async function AdminReconciliationDetailPage({
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold tracking-tight">Related</h2>
-        <ul className="flex flex-wrap gap-3">
+        <ul className="space-y-2">
           {detail.relatedLinks.map((link) => (
-            <li key={`${link.label}:${link.href}`}>
+            <li key={link.href}>
               <Link
                 href={link.href}
                 className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"

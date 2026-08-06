@@ -193,6 +193,23 @@ export default async function AdminReconciliationPage({
                     <span className="mt-1 block text-xs text-[var(--text-soft)] whitespace-nowrap">
                       {row.resolutionLabel}
                     </span>
+                    <span className="mt-1 flex flex-wrap gap-1">
+                      {row.locked ? (
+                        <span className="inline-block rounded-md border border-[var(--border)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--heading)]">
+                          Locked
+                        </span>
+                      ) : null}
+                      {row.escalated ? (
+                        <span className="inline-block rounded-md bg-[var(--accent-strong)]/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--accent-strong)]">
+                          Escalated
+                        </span>
+                      ) : null}
+                      {row.category === "RESOLVED" ? (
+                        <span className="inline-block rounded-md border border-[var(--border)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--text-soft)]">
+                          Resolved
+                        </span>
+                      ) : null}
+                    </span>
                   </td>
                   <td className="py-3 pr-3 whitespace-nowrap text-xs">
                     <div className="whitespace-nowrap">{row.updatedAtLabel}</div>
