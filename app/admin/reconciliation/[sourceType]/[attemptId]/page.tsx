@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import ProviderRefreshForm from "@/app/components/admin/ProviderRefreshForm";
 import {
   getReconciliationDetail,
   requireActiveAdminForReconciliation,
 } from "@/app/lib/admin/reconciliation";
+import { getProviderRefreshUiState } from "@/app/lib/admin/providerRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +30,27 @@ function timelineStateLabel(state: string): string {
   if (state === "failed") return "Failed";
   if (state === "pending") return "Pending";
   return "Unknown";
+}
+
+function eligibilityDisabledReason(code: string): string {
+  switch (code) {
+    case "missing_provider_ref":
+      return "Provider reference is missing. Status refresh is unavailable.";
+    case "resolved":
+      return "This case is resolved. Provider status refresh is closed.";
+    case "locked":
+      return "This case is locked against provider checks.";
+    case "conflict":
+      return "Provider reference conflicts with another attempt.";
+    case "in_progress":
+      return "A provider status refresh is already in progress.";
+    case "environment_blocked":
+      return "Provider environment is not available for status checks.";
+    case "unsupported_source":
+      return "This case type does not support provider status refresh.";
+    default:
+      return "Provider status refresh is unavailable for this case.";
+  }
 }
 
 export default async function AdminReconciliationDetailPage({
@@ -64,6 +87,14 @@ export default async function AdminReconciliationDetailPage({
 
   if (!detail) notFound();
 
+  const refreshUi = await getProviderRefreshUiState({
+    sourceType: detail.sourceType,
+    attemptId: detail.attemptId,
+  });
+  const showRefreshSection =
+    detail.sourceType === "wallet_purchase" ||
+    detail.sourceType === "assignment";
+
   return (
     <div className="space-y-8">
       <div>
@@ -77,7 +108,8 @@ export default async function AdminReconciliationDetailPage({
           Reconciliation case
         </h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Read-only sanitized timeline. No recovery actions in this phase.
+          Sanitized timeline and controlled provider status checks only. Wallet
+          refunds, finalization and email resend are not available here.
         </p>
       </div>
 
@@ -139,6 +171,68 @@ export default async function AdminReconciliationDetailPage({
           ))}
         </ol>
       </section>
+
+      {showRefreshSection ? (
+        <>
+          <ProviderRefreshForm
+            sourceType={detail.sourceType}
+            attemptId={detail.attemptId}
+            expectedProviderOrderId={
+              refreshUi.eligibility.expectedProviderOrderId || ""
+            }
+            providerRefMasked={refreshUi.eligibility.providerRefMasked}
+            disabled={!refreshUi.eligibility.eligible}
+            disabledReason={
+              refreshUi.eligibility.eligible
+                ? undefined
+                : eligibilityDisabledReason(refreshUi.eligibility.reasonCode)
+            }
+          />
+
+          {refreshUi.panel ? (
+            <section className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
+              <h2 className="text-lg font-semibold tracking-tight">
+                Last provider observation
+              </h2>
+              <dl className="space-y-0">
+                <DetailRow
+                  label="Last checked"
+                  value={refreshUi.panel.lastCheckedLabel}
+                />
+                <DetailRow
+                  label="Checked by"
+                  value={refreshUi.panel.checkedByLabel}
+                />
+                <DetailRow label="Result" value={refreshUi.panel.resultLabel} />
+                <DetailRow
+                  label="Safe provider state"
+                  value={refreshUi.panel.safeProviderStateLabel}
+                />
+                <DetailRow
+                  label="Order exists"
+                  value={refreshUi.panel.orderExistsLabel}
+                />
+                <DetailRow
+                  label="Offer match"
+                  value={refreshUi.panel.offerMatchLabel}
+                />
+                <DetailRow
+                  label="Installation data available"
+                  value={refreshUi.panel.installDataLabel}
+                />
+                <DetailRow
+                  label="Safe status code"
+                  value={refreshUi.panel.safeCodeLabel}
+                />
+              </dl>
+              <p className="text-sm text-[var(--heading)]" role="status">
+                Provider status observations do not automatically authorize a
+                refund or local finalization.
+              </p>
+            </section>
+          ) : null}
+        </>
+      ) : null}
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold tracking-tight">Related</h2>

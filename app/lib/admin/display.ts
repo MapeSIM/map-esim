@@ -30,6 +30,10 @@ const METADATA_ALLOWLIST = new Set([
   "walletTransactionId",
   "purchaseId",
   "topupId",
+  "sourceType",
+  "attemptId",
+  "refreshResult",
+  "providerRefMasked",
 ]);
 
 export type AdminOrderStatusFilter = "ALL" | "COMPLETED" | "PENDING" | "FAILED";

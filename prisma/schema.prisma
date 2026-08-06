@@ -275,6 +275,19 @@ model AdminPackageAssignment {
   reconciliationResolvedByAdminId String?
   reconciliationResolutionReason  String?
   reconciliationLockedAt          DateTime?
+  /// Durable provider-status refresh claim (single-flight). Null when idle.
+  providerRefreshClaimedAt        DateTime?
+  providerRefreshCompletedAt      DateTime?
+  providerRefreshByAdminId        String?
+  /// Sanitized lookup result: FOUND | NOT_FOUND | UNKNOWN | TIMEOUT | …
+  providerRefreshResult           String?
+  providerRefreshSafeCode         String?
+  /// yes | no | unknown
+  providerRefreshOrderExists      String?
+  providerRefreshOfferMatch       String?
+  providerRefreshInstallData      String?
+  /// Short non-secret provider state token only.
+  providerRefreshSafeState        String?
   reason                          String
   internalReference               String?
   failureCategory                 String?
@@ -297,6 +310,8 @@ model AdminPackageAssignment {
   @@index([providerResultKind])
   @@index([status, updatedAt])
   @@index([reconciliationResolvedAt])
+  @@index([providerRefreshClaimedAt])
+  @@index([providerRefreshResult])
 }
 
 /// Durable CUSTOMER wallet-funded eSIM purchase attempt (provider write outside Prisma tx).
@@ -335,6 +350,19 @@ model WalletEsimPurchase {
   reconciliationResolvedByAdminId String?
   reconciliationResolutionReason  String?
   reconciliationLockedAt          DateTime?
+  /// Durable provider-status refresh claim (single-flight). Null when idle.
+  providerRefreshClaimedAt        DateTime?
+  providerRefreshCompletedAt      DateTime?
+  providerRefreshByAdminId        String?
+  /// Sanitized lookup result: FOUND | NOT_FOUND | UNKNOWN | TIMEOUT | …
+  providerRefreshResult           String?
+  providerRefreshSafeCode         String?
+  /// yes | no | unknown
+  providerRefreshOrderExists      String?
+  providerRefreshOfferMatch       String?
+  providerRefreshInstallData      String?
+  /// Short non-secret provider state token only.
+  providerRefreshSafeState        String?
   failureCategory                 String?
   failureCode                     String?
   reconciliationState             String?
@@ -357,6 +385,8 @@ model WalletEsimPurchase {
   @@index([providerResultKind])
   @@index([status, updatedAt])
   @@index([reconciliationResolvedAt])
+  @@index([providerRefreshClaimedAt])
+  @@index([providerRefreshResult])
 }
 
 model AuditLog {

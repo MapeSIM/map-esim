@@ -163,7 +163,11 @@ function main() {
     detailPage,
     /Mark resolved|Refund now|Finalize order|Resend email|Run backfill/i
   );
-  assert.doesNotMatch(detailPage, /<button/i);
+  // Phase 8G-B1 may add a GET-only provider refresh control; financial mutations remain forbidden.
+  assert.doesNotMatch(
+    detailPage,
+    /Refund now|Finalize order|Mark resolved|Resend email|ICCID backfill/i
+  );
   assert.match(nav, /Reconciliation/);
   assert.match(nav, /\/admin\/reconciliation/);
   console.log("PASS readonly_ui_and_nav");
