@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local smoke harness CJS stubs (Module._load hooks; not app code).
+    "scripts/smoke-stubs/**",
   ]),
 ]);
 

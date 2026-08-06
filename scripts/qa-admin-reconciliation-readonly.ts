@@ -148,7 +148,19 @@ function main() {
   console.log("PASS reconciliation_service_readonly_no_vesim");
 
   assert.match(listPage, /requireActiveAdminForReconciliation/);
-  assert.match(listPage, /Recovery actions will be available only after provider evidence/);
+  assert.match(
+    listPage,
+    /Controlled recovery requires lock ownership, a confirmed reason/
+  );
+  assert.match(
+    listPage,
+    /Provider observations never auto-authorize refund/
+  );
+  assert.doesNotMatch(listPage, /Recovery actions are not available in this phase/);
+  assert.doesNotMatch(
+    listPage,
+    /Recovery actions will be available only after provider evidence/
+  );
   assert.doesNotMatch(listPage, /"use server"/);
   assert.doesNotMatch(
     listPage,

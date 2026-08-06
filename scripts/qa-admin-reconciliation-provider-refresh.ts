@@ -103,6 +103,7 @@ function main() {
   console.log("PASS reason_validation");
 
   assert.match(service, /import "server-only"/);
+  assert.match(service, /assertSameOriginAdminRequest/);
   assert.match(service, /assertActiveAdmin|role !== Role\.ADMIN/);
   assert.match(service, /consumeRateLimit/);
   assert.match(service, /updateMany/);
@@ -138,10 +139,14 @@ function main() {
   assert.match(detail, /ProviderRefreshForm/);
   assert.match(
     detail,
-    /Provider status observations do\s+not automatically authorize a\s+refund or local finalization/
+    /Provider status observations do\s+not automatically authorize a\s+refund or\s+local finalization/
   );
-  // Case management may expose Mark resolved; financial recovery actions must stay absent.
-  assert.doesNotMatch(detail, /Refund now|Finalize order|Resend email|Run backfill/i);
+  assert.match(
+    detail,
+    /Successful recoveries keep the case locked and open/
+  );
+  // Case management may expose Mark resolved; financial recovery button labels live in CaseManagementPanel.
+  assert.doesNotMatch(detail, /Refund now|Finalize order|Run backfill/i);
   console.log("PASS ui_form_and_panel");
 
   assert.doesNotMatch(credit, /providerRefresh/);

@@ -119,9 +119,10 @@ export default async function AdminReconciliationDetailPage({
           Reconciliation case
         </h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Sanitized timeline and controlled case management. Wallet refunds are
-          not available here. Local finalization recovery requires a locked case
-          and confirmed provider evidence.
+          Sanitized timeline and controlled case management. Recovery actions
+          require a locked case, confirmation phrases where applicable, and
+          conclusive provider or local evidence. They never auto-unlock or
+          auto-resolve.
         </p>
       </div>
 
@@ -129,9 +130,10 @@ export default async function AdminReconciliationDetailPage({
         className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--heading)]"
         role="status"
       >
-        Recovery actions will be available only after provider evidence and
-        financial safety checks are confirmed. Provider status observations do
-        not automatically authorize a refund or local finalization.
+        Provider status observations do not automatically authorize a refund or
+        local finalization. Unsupported source and action combinations remain
+        blocked. Successful recoveries keep the case locked and open for manual
+        review.
       </div>
 
       <dl className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 sm:px-5">

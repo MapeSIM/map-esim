@@ -18,6 +18,7 @@ import {
   type TriState,
 } from "@/app/lib/vesim/providerOrderStatus";
 
+import { assertSameOriginAdminRequest } from "@/app/lib/admin/reconciliationCaseManagement";
 import {
   isProviderRefreshSourceType,
   parseProviderRefreshReason,
@@ -552,6 +553,9 @@ export async function refreshProviderOrderStatus(options: {
 }): Promise<ProviderRefreshActionResult> {
   const publicError =
     "Provider status refresh is unavailable. Please try again shortly.";
+  if (!(await assertSameOriginAdminRequest())) {
+    return { ok: false, error: publicError };
+  }
   const admin = await assertActiveAdmin(options.adminUserId);
   if (!admin) {
     return { ok: false, error: "Not authorized." };

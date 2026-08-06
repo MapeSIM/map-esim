@@ -34,9 +34,8 @@ export default async function AdminReconciliationPage({
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Reconciliation</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Read-only review of stuck purchases, uncertain provider results, and
-          failed notifications. Recovery actions are not available in this
-          phase.
+          Review stuck purchases, uncertain provider results, and failed
+          notifications. Open a case for controlled, evidence-gated recovery.
         </p>
       </header>
 
@@ -44,8 +43,10 @@ export default async function AdminReconciliationPage({
         className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--heading)]"
         role="status"
       >
-        Recovery actions will be available only after provider evidence and
-        financial safety checks are confirmed.
+        Controlled recovery requires lock ownership, a confirmed reason, and
+        conclusive evidence. Provider observations never auto-authorize refund,
+        finalization, or resolution. Unsupported source and action combinations
+        remain blocked.
       </div>
 
       <nav
