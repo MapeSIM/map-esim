@@ -584,18 +584,24 @@ async function main() {
         `balanceSupport=${dashboard.provider.balanceSupport}`
       );
 
-      // Payment / guest
+      // Payment / guest — guest remains NOT_IMPLEMENTED / DISABLED (controls cannot enable it).
       assert.equal(dashboard.payment.integrationStatus, "NOT_IMPLEMENTED");
       assert.equal(dashboard.payment.webhookVerification, "NOT_IMPLEMENTED");
       const guestEnabled = isGuestVesimCheckoutEnabled();
       assert.equal(
         dashboard.payment.guestCheckout,
-        guestEnabled ? "ENABLED" : "DISABLED"
+        "NOT_IMPLEMENTED / DISABLED"
       );
       assert.equal(
         dashboard.security.guestCheckoutEnabled,
         guestEnabled ? "yes" : "no"
       );
+      assert.ok(dashboard.operationalControls);
+      assert.equal(
+        dashboard.operationalControls.guestCheckoutStatus,
+        "NOT_IMPLEMENTED / DISABLED"
+      );
+      assert.equal(dashboard.operationalControls.controls.length, 5);
       record(
         "payment reports NOT_IMPLEMENTED",
         "PASS",

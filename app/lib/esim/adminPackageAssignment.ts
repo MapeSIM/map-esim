@@ -27,6 +27,12 @@ import {
   verifyOfferAuthoritative,
   type VerifiedCheckoutOffer,
 } from "@/app/lib/vesim/server";
+import {
+  assertNewRiskyTransactionAllowed,
+  OperationalControlBlockedError,
+  OperationalControlUnavailableError,
+} from "@/app/lib/admin/operationalControlsPolicy";
+import { OPERATIONAL_CONTROL_UNAVAILABLE_MESSAGE } from "@/app/lib/admin/operationalControlsShared";
 
 export const ADMIN_ASSIGNMENT_STARTED = "esim.admin_assignment_started";
 export const ADMIN_ASSIGNMENT_COMPLETED = "esim.admin_assignment_completed";
@@ -140,6 +146,31 @@ async function assertActiveCustomer(customerUserId: string) {
   return customer;
 }
 
+function throwIfOperationalControlBlocksAssignment(error: unknown): never {
+  if (
+    error instanceof OperationalControlBlockedError ||
+    error instanceof OperationalControlUnavailableError
+  ) {
+    throw new AdminPackageAssignmentError(
+      "UNAVAILABLE",
+      OPERATIONAL_CONTROL_UNAVAILABLE_MESSAGE
+    );
+  }
+  throw error;
+}
+
+async function assertAssignmentInitiationAllowed(options?: {
+  includeProviderOrder?: boolean;
+}) {
+  try {
+    await assertNewRiskyTransactionAllowed("company_assignment", {
+      includeProviderOrder: options?.includeProviderOrder === true,
+    });
+  } catch (error) {
+    throwIfOperationalControlBlocksAssignment(error);
+  }
+}
+
 /**
  * Create or reuse a READY assignment after authoritative offer verification.
  * Never calls the provider checkout API.
@@ -207,6 +238,9 @@ export async function prepareAdminPackageAssignment(
       duplicate: true,
     };
   }
+
+  // Pause switches — before offer network work and before assignment create.
+  await assertAssignmentInitiationAllowed({ includeProviderOrder: false });
 
   // Never trust browser price/name/data — reload offer server-side.
   const verifiedOffer = await verifyOfferAuthoritative({
@@ -489,6 +523,9 @@ export async function confirmAdminPackageAssignment(
       "This assignment is not ready for confirmation."
     );
   }
+
+  // New durable initiation (READY → PROVIDER_PENDING + provider). Check before claim.
+  await assertAssignmentInitiationAllowed({ includeProviderOrder: true });
 
   // Atomic claim — prevents double provider checkout on concurrent submits.
   const claimed = await prisma.adminPackageAssignment.updateMany({

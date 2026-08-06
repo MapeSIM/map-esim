@@ -59,6 +59,10 @@ import {
   type ProviderModeLabel,
   type CspMode,
 } from "@/app/lib/admin/operationsHealthShared";
+import {
+  getOperationalControlsHealthSnapshot,
+  type OperationalControlsHealthSnapshot,
+} from "@/app/lib/admin/operationalControlsPolicy";
 
 const METRICS_TAKE = 500;
 
@@ -121,7 +125,7 @@ export type PaymentReadinessHealth = HealthCardMeta & {
   productionCredentials: HealthStatus;
   webhookVerification: HealthStatus;
   paymentReconciliation: HealthStatus;
-  guestCheckout: "DISABLED" | "ENABLED";
+  guestCheckout: "NOT_IMPLEMENTED / DISABLED" | "DISABLED" | "ENABLED";
 };
 
 export type SecurityReadinessHealth = HealthCardMeta & {
@@ -148,6 +152,7 @@ export type OperationsHealthDashboard = {
   provider: ProviderReadinessHealth;
   payment: PaymentReadinessHealth;
   security: SecurityReadinessHealth;
+  operationalControls: OperationalControlsHealthSnapshot;
   warnings: OpsWarning[];
 };
 
@@ -981,8 +986,11 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
     checkedAtLabel: nowLabel(checkedAt),
     freshness: "CONFIGURATION_DERIVED",
     ...paymentDefaults,
-    guestCheckout: guestEnabled ? "ENABLED" : "DISABLED",
+    // Guest checkout is not implemented — controls must never enable it.
+    guestCheckout: "NOT_IMPLEMENTED / DISABLED",
   };
+
+  const operationalControls = await getOperationalControlsHealthSnapshot();
 
   const authSecretConfigured = Boolean((process.env.AUTH_SECRET ?? "").trim());
   const iccidKeyConfigured = isIccidEncryptionConfigured();
@@ -1032,6 +1040,12 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
     deploymentVersion,
     authSecretConfigured,
     iccidKeyConfigured,
+    pausedOperationalControlCount:
+      operationalControls.pausedControlKeys.length,
+    transactionsMaintenancePaused:
+      operationalControls.pausedControlKeys.includes(
+        "TRANSACTION_MAINTENANCE"
+      ),
   });
 
   return {
@@ -1042,6 +1056,7 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
     provider,
     payment,
     security,
+    operationalControls,
     warnings,
   };
 }

@@ -27,6 +27,12 @@ import {
   verifyOfferAuthoritative,
   type VerifiedCheckoutOffer,
 } from "@/app/lib/vesim/server";
+import {
+  assertNewRiskyTransactionAllowed,
+  OperationalControlBlockedError,
+  OperationalControlUnavailableError,
+} from "@/app/lib/admin/operationalControlsPolicy";
+import { OPERATIONAL_CONTROL_UNAVAILABLE_MESSAGE } from "@/app/lib/admin/operationalControlsShared";
 
 export const WALLET_PURCHASE_STARTED = "esim.wallet_purchase_started";
 export const WALLET_FUNDS_RESERVED = "esim.wallet_funds_reserved";
@@ -175,6 +181,33 @@ async function assertActiveCustomer(
   return customer;
 }
 
+function throwIfOperationalControlBlocks(error: unknown): never {
+  if (
+    error instanceof OperationalControlBlockedError ||
+    error instanceof OperationalControlUnavailableError
+  ) {
+    throw new WalletEsimPurchaseError(
+      "UNAVAILABLE",
+      OPERATIONAL_CONTROL_UNAVAILABLE_MESSAGE
+    );
+  }
+  throw error;
+}
+
+async function assertWalletPurchaseInitiationAllowed(
+  isAssisted: boolean,
+  options?: { includeProviderOrder?: boolean }
+) {
+  try {
+    await assertNewRiskyTransactionAllowed(
+      isAssisted ? "admin_wallet_purchase" : "customer_wallet_purchase",
+      { includeProviderOrder: options?.includeProviderOrder === true }
+    );
+  } catch (error) {
+    throwIfOperationalControlBlocks(error);
+  }
+}
+
 /**
  * Create or reuse a READY purchase snapshot. Never touches wallet or provider.
  */
@@ -258,6 +291,11 @@ export async function prepareWalletEsimPurchase(
       duplicate: true,
     };
   }
+
+  // Pause switches — before offer network work and before purchase row create.
+  await assertWalletPurchaseInitiationAllowed(isAssisted, {
+    includeProviderOrder: false,
+  });
 
   // Offer verification before any wallet mutation or provider call.
   const verifiedOffer = await verifyOfferAuthoritative({
@@ -797,6 +835,11 @@ export async function confirmWalletEsimPurchase(
       "This purchase is not ready for confirmation."
     );
   }
+
+  // New durable initiation (claim + debit + provider). Check before reservation.
+  await assertWalletPurchaseInitiationAllowed(isAssisted, {
+    includeProviderOrder: true,
+  });
 
   // Re-validate offer and price before reserving funds.
   const verifiedOffer = await verifyOfferAuthoritative({

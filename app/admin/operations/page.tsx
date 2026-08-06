@@ -6,6 +6,7 @@ import {
   type OperationsHealthDashboard,
 } from "@/app/lib/admin/operationsHealth";
 import type { HealthStatus, OpsWarning } from "@/app/lib/admin/operationsHealthShared";
+import { OperationalControlsPanel } from "@/app/components/admin/OperationalControlsPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -18,21 +19,25 @@ function statusTone(status: string): string {
     case "yes":
     case "expected":
     case "ENABLED":
+    case "ACTIVE":
       return "bg-[var(--accent-strong)]/12 text-[var(--accent-strong)]";
     case "DEGRADED":
     case "NOT_CONFIGURED":
     case "DISABLED":
+    case "PARTIALLY_PAUSED":
     case "no":
     case "not_expected":
       return "bg-[var(--surface)] text-[var(--heading)] border border-[var(--border)]";
     case "UNAVAILABLE":
     case "CRITICAL":
+    case "PAUSED":
       return "bg-red-500/10 text-red-700 dark:text-red-300";
     case "NOT_IMPLEMENTED":
     case "NOT_AVAILABLE":
     case "NOT_VERIFIED":
     case "UNKNOWN":
     case "unknown":
+    case "NOT_IMPLEMENTED / DISABLED":
     default:
       return "bg-[var(--surface)] text-[var(--text-muted)] border border-[var(--border)]";
   }
@@ -139,14 +144,17 @@ function DashboardBody({ data }: { data: OperationsHealthDashboard }) {
   const provider = data.provider;
   const payment = data.payment;
   const security = data.security;
+  const controls = data.operationalControls;
 
   return (
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Operations</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Read-only system health and operational risk. This page never sends
-          email, places provider orders, or changes wallets, orders, or cases.
+          System health and safe runtime pause switches. Health cards are
+          read-only. Operational controls pause new transaction initiation only
+          — they never cancel in-flight work, refund, email, or mutate wallets,
+          orders, ICCIDs, or reconciliation cases.
         </p>
         <p className="mt-2 text-xs text-[var(--text-soft)]">
           Generated {data.generatedAtLabel}
@@ -167,6 +175,47 @@ function DashboardBody({ data }: { data: OperationsHealthDashboard }) {
           <WarningList warnings={data.warnings} />
         </div>
       </section>
+
+      <section
+        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4"
+        aria-labelledby="ops-control-status-heading"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h2
+            id="ops-control-status-heading"
+            className="text-base font-semibold tracking-tight text-[var(--heading)]"
+          >
+            Transaction controls status
+          </h2>
+          <StatusPill value={controls.overallTransactionsStatus} />
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {controls.controls.map((c) => (
+            <div key={c.key} className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                {c.name}
+              </p>
+              <p className="mt-1">
+                <StatusPill value={c.state} />
+              </p>
+            </div>
+          ))}
+          <Metric
+            label="Guest checkout"
+            value={controls.guestCheckoutStatus}
+          />
+        </div>
+        <p className="mt-4 text-[11px] text-[var(--text-soft)]">
+          Checked {controls.checkedAtLabel} ·{" "}
+          {controls.freshness.replaceAll("_", " ")}
+        </p>
+      </section>
+
+      <OperationalControlsPanel
+        controls={controls.controls}
+        overallStatus={controls.overallTransactionsStatus}
+        guestCheckoutStatus={controls.guestCheckoutStatus}
+      />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <HealthCard

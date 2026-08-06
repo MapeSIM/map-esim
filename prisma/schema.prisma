@@ -102,6 +102,16 @@ enum PaymentGatewayProvider {
   MANUAL_TEST
 }
 
+/// Allowlisted runtime pause switches only (Admin Operations Part A2).
+/// Never stores secrets, arbitrary JSON, or customer data.
+enum OperationalControlKey {
+  TRANSACTION_MAINTENANCE
+  CUSTOMER_WALLET_PURCHASES
+  ADMIN_WALLET_PURCHASES
+  COMPANY_ASSIGNMENTS
+  PROVIDER_ORDER_CREATION
+}
+
 model User {
   id                           String                   @id @default(cuid())
   name                         String
@@ -550,4 +560,24 @@ model WalletTopup {
   @@index([reconciliationResolvedAt])
   @@index([reconciliationLockedAt])
   @@index([reconciliationEscalatedAt])
+}
+
+/// Durable ADMIN-only runtime pause switches for new transaction initiation.
+/// Pausing never mutates wallets, purchases, assignments, orders, refunds, email, or ICCID.
+/// Default paused=false preserves current open behavior when rows are seeded.
+model OperationalControl {
+  id               String                @id @default(cuid())
+  key              OperationalControlKey @unique
+  /// When true, new initiation for this control scope is paused.
+  paused           Boolean               @default(false)
+  /// Optimistic concurrency / CAS token.
+  version          Int                   @default(0)
+  /// Last safe admin reason (truncated in UI/audits). Never secrets.
+  reason           String?
+  updatedByAdminId String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  @@index([paused])
+  @@index([updatedAt])
 }

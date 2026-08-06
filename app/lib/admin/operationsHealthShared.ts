@@ -72,7 +72,9 @@ export type OpsWarningCode =
   | "DATABASE_UNHEALTHY"
   | "DEPLOYMENT_VERSION_UNAVAILABLE"
   | "ICCID_KEY_MISSING"
-  | "AUTH_SECRET_MISSING";
+  | "AUTH_SECRET_MISSING"
+  | "OPERATIONAL_CONTROL_PAUSED"
+  | "TRANSACTIONS_PAUSED";
 
 export type OpsWarning = {
   code: OpsWarningCode;
@@ -217,6 +219,10 @@ export type OpsWarningInput = {
   deploymentVersion: string | null;
   authSecretConfigured: boolean;
   iccidKeyConfigured: boolean;
+  /** Number of allowlisted controls currently paused (0 if unknown). */
+  pausedOperationalControlCount?: number;
+  /** True when TRANSACTION_MAINTENANCE is paused. */
+  transactionsMaintenancePaused?: boolean;
 };
 
 export function buildOperationsWarnings(input: OpsWarningInput): OpsWarning[] {
@@ -315,7 +321,25 @@ export function buildOperationsWarnings(input: OpsWarningInput): OpsWarning[] {
     warnings.push({
       code: "GUEST_CHECKOUT_DISABLED",
       severity: "info",
-      message: "Guest VeSIM checkout is disabled.",
+      message: "Guest VeSIM checkout is NOT_IMPLEMENTED / DISABLED.",
+    });
+  }
+
+  if (input.transactionsMaintenancePaused) {
+    warnings.push({
+      code: "TRANSACTIONS_PAUSED",
+      severity: "critical",
+      message:
+        "All new purchase/assignment transactions are paused (TRANSACTION_MAINTENANCE).",
+    });
+  } else if (
+    typeof input.pausedOperationalControlCount === "number" &&
+    input.pausedOperationalControlCount > 0
+  ) {
+    warnings.push({
+      code: "OPERATIONAL_CONTROL_PAUSED",
+      severity: "high",
+      message: `${input.pausedOperationalControlCount} operational control(s) are paused for new transactions.`,
     });
   }
 
@@ -361,6 +385,6 @@ export function paymentGatewayCardDefaults() {
     productionCredentials: "NOT_CONFIGURED" as HealthStatus,
     webhookVerification: "NOT_IMPLEMENTED" as HealthStatus,
     paymentReconciliation: "NOT_IMPLEMENTED" as HealthStatus,
-    guestCheckout: "DISABLED" as const,
+    guestCheckout: "NOT_IMPLEMENTED / DISABLED" as const,
   };
 }

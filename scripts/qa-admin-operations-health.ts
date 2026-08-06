@@ -132,7 +132,7 @@ function main() {
   assert.equal(pay.integrationStatus, "NOT_IMPLEMENTED");
   assert.equal(pay.webhookVerification, "NOT_IMPLEMENTED");
   assert.equal(pay.paymentReconciliation, "NOT_IMPLEMENTED");
-  assert.equal(pay.guestCheckout, "DISABLED");
+  assert.equal(pay.guestCheckout, "NOT_IMPLEMENTED / DISABLED");
   assert.match(page, /NOT_IMPLEMENTED/);
   assert.match(service, /isGuestVesimCheckoutEnabled/);
   console.log("PASS payment_not_implemented");
