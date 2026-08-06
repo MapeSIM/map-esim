@@ -7,6 +7,10 @@ import {
 } from "@/app/lib/admin/operationsHealth";
 import type { HealthStatus, OpsWarning } from "@/app/lib/admin/operationsHealthShared";
 import { OperationalControlsPanel } from "@/app/components/admin/OperationalControlsPanel";
+import {
+  getMonitoringAlertSummary,
+  type MonitoringAlertSummary,
+} from "@/app/lib/admin/monitoringAlerts";
 
 export const dynamic = "force-dynamic";
 
@@ -137,7 +141,13 @@ function WarningList({ warnings }: { warnings: OpsWarning[] }) {
   );
 }
 
-function DashboardBody({ data }: { data: OperationsHealthDashboard }) {
+function DashboardBody({
+  data,
+  alertSummary,
+}: {
+  data: OperationsHealthDashboard;
+  alertSummary: MonitoringAlertSummary;
+}) {
   const app = data.applicationDatabase;
   const recon = data.reconciliation;
   const email = data.email;
@@ -160,6 +170,48 @@ function DashboardBody({ data }: { data: OperationsHealthDashboard }) {
           Generated {data.generatedAtLabel}
         </p>
       </header>
+
+      <section
+        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4"
+        aria-labelledby="ops-alerts-summary-heading"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h2
+            id="ops-alerts-summary-heading"
+            className="text-base font-semibold tracking-tight text-[var(--heading)]"
+          >
+            Active alerts summary
+          </h2>
+          <StatusPill value={alertSummary.detectionStatus} />
+        </div>
+        {alertSummary.detectionStatus === "UNAVAILABLE" ? (
+          <p className="mt-3 text-sm text-red-700 dark:text-red-300" role="status">
+            Alert detection is temporarily unavailable. Do not treat this as healthy.
+          </p>
+        ) : (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Metric label="Active alerts" value={alertSummary.totalActive} />
+            <Metric label="Critical" value={alertSummary.criticalCount} />
+            <Metric label="High" value={alertSummary.highCount} />
+            <Metric
+              label="Oldest active age"
+              value={alertSummary.oldestActiveAgeLabel}
+            />
+          </div>
+        )}
+        <p className="mt-4 text-[11px] text-[var(--text-soft)]">
+          Checked {alertSummary.checkedAtLabel} ·{" "}
+          {alertSummary.freshness.replaceAll("_", " ")}
+        </p>
+        <p className="mt-3">
+          <Link
+            href="/admin/alerts"
+            className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+          >
+            Open alert center
+          </Link>
+        </p>
+      </section>
 
       <section
         className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4"
@@ -419,15 +471,19 @@ export default async function AdminOperationsPage() {
   await requireActiveAdminForOperations();
 
   let data: OperationsHealthDashboard;
+  let alertSummary: MonitoringAlertSummary;
   try {
-    data = await getOperationsHealthDashboard();
+    [data, alertSummary] = await Promise.all([
+      getOperationsHealthDashboard(),
+      getMonitoringAlertSummary(),
+    ]);
   } catch {
     return (
       <div className="space-y-6">
         <header>
           <h1 className="text-2xl font-bold tracking-tight">Operations</h1>
           <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-            Read-only system health and operational risk.
+            System health and safe runtime pause switches.
           </p>
         </header>
         <div
@@ -442,5 +498,5 @@ export default async function AdminOperationsPage() {
     );
   }
 
-  return <DashboardBody data={data} />;
+  return <DashboardBody data={data} alertSummary={alertSummary} />;
 }
