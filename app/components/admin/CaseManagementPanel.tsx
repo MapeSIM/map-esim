@@ -7,6 +7,7 @@ import {
   lockReconciliationCaseAction,
   backfillReconciliationIccidAction,
   finalizeReconciliationLocalRecordAction,
+  refundReconciliationWalletPurchaseAction,
   resendReconciliationEmailAction,
   resolveReconciliationCaseAction,
   unlockReconciliationCaseAction,
@@ -19,6 +20,7 @@ import {
   ESCALATION_PRIORITIES,
   FINALIZE_LOCAL_RECORD_PHRASE,
   LOCK_CASE_PHRASE,
+  REFUND_WALLET_FUNDS_PHRASE,
   RESEND_EMAIL_PHRASE,
   RESOLUTION_CODES,
   RESOLVE_CASE_PHRASE,
@@ -97,6 +99,9 @@ export default function CaseManagementPanel(props: {
   localFinalizationSupported: boolean;
   localFinalizationAllowed: boolean;
   localFinalizationMessage: string;
+  walletRefundSupported: boolean;
+  walletRefundAllowed: boolean;
+  walletRefundMessage: string;
 }) {
   const [lockState, lockAction, lockPending] = useActionState(
     lockReconciliationCaseAction,
@@ -130,6 +135,10 @@ export default function CaseManagementPanel(props: {
     finalizeReconciliationLocalRecordAction,
     initial
   );
+  const [refundState, refundAction, refundPending] = useActionState(
+    refundReconciliationWalletPurchaseAction,
+    initial
+  );
 
   const readOnly = props.resolved;
   const busy =
@@ -140,7 +149,8 @@ export default function CaseManagementPanel(props: {
     resolvePending ||
     resendPending ||
     iccidPending ||
-    finalizePending;
+    finalizePending ||
+    refundPending;
 
   return (
     <section className="space-y-5 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
@@ -623,6 +633,65 @@ export default function CaseManagementPanel(props: {
                 className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {finalizePending ? "Finalizing…" : "Finalize local record"}
+              </button>
+            </form>
+          ) : null}
+
+          {props.walletRefundSupported ? (
+            <form action={refundAction} className="space-y-3">
+              <h3 className="text-sm font-semibold text-[var(--heading)]">
+                Refund wallet funds
+              </h3>
+              <p className="text-sm text-[var(--text-muted)]">
+                {props.walletRefundMessage}
+              </p>
+              <p className="text-sm font-medium text-[var(--danger-text)]">
+                Warning: this action changes financial state by restoring the
+                original reserved wallet amount exactly once.
+              </p>
+              <input type="hidden" name="sourceType" value={props.sourceType} />
+              <input type="hidden" name="attemptId" value={props.attemptId} />
+              <div>
+                <label
+                  htmlFor="wallet-refund-reason"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Reason
+                </label>
+                <textarea
+                  id="wallet-refund-reason"
+                  name="reason"
+                  required
+                  maxLength={CASE_REASON_MAX}
+                  rows={2}
+                  disabled={busy || !props.walletRefundAllowed}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                />
+                <FieldError state={refundState} field="reason" />
+              </div>
+              <div>
+                <label
+                  htmlFor="wallet-refund-confirm"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Type {REFUND_WALLET_FUNDS_PHRASE}
+                </label>
+                <input
+                  id="wallet-refund-confirm"
+                  name="confirmPhrase"
+                  required
+                  disabled={busy || !props.walletRefundAllowed}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                />
+                <FieldError state={refundState} field="confirmPhrase" />
+              </div>
+              <ActionMessage state={refundState} />
+              <button
+                type="submit"
+                disabled={busy || !props.walletRefundAllowed}
+                className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {refundPending ? "Refunding…" : "Refund wallet funds"}
               </button>
             </form>
           ) : null}

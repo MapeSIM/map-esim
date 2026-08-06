@@ -379,6 +379,207 @@ export async function prepareWalletEsimPurchase(
   }
 }
 
+/**
+ * Exact-once refund of reserved wallet purchase funds.
+ * Amount must come from durable purchase/debit records (never admin form).
+ * Safe to call from recovery when eligibility is already verified.
+ */
+export async function refundReservedFundsInTx(
+  tx: Prisma.TransactionClient,
+  options: {
+    purchaseId: string;
+    customerUserId: string;
+    actorUserId: string;
+    assisted: boolean;
+    priceCents: number;
+    currency?: string;
+  }
+): Promise<{
+  outcome: "created" | "already_refunded" | "linked_existing";
+  refundTransactionId: string | null;
+}> {
+  const refundKey = `refund_${options.purchaseId}`.slice(0, 128);
+  const priceCents = options.priceCents;
+  if (!Number.isInteger(priceCents) || priceCents <= 0) {
+    throw new WalletEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is unavailable."
+    );
+  }
+
+  const purchase = await tx.walletEsimPurchase.findUnique({
+    where: { id: options.purchaseId },
+    select: {
+      id: true,
+      status: true,
+      refundTransactionId: true,
+      debitTransactionId: true,
+      priceCents: true,
+      currency: true,
+      adminUserId: true,
+    },
+  });
+
+  if (!purchase) {
+    throw new WalletEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is unavailable."
+    );
+  }
+
+  if (purchase.priceCents !== priceCents) {
+    throw new WalletEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is unavailable."
+    );
+  }
+
+  if (
+    purchase.status === WalletEsimPurchaseStatus.FAILED_REFUNDED &&
+    purchase.refundTransactionId
+  ) {
+    return {
+      outcome: "already_refunded",
+      refundTransactionId: purchase.refundTransactionId,
+    };
+  }
+
+  if (purchase.refundTransactionId) {
+    await tx.walletEsimPurchase.update({
+      where: { id: purchase.id },
+      data: {
+        status: WalletEsimPurchaseStatus.FAILED_REFUNDED,
+        failureCategory: "provider_declined",
+        failureCode: "refunded",
+      },
+    });
+    return {
+      outcome: "linked_existing",
+      refundTransactionId: purchase.refundTransactionId,
+    };
+  }
+
+  const existingRefund = await tx.walletTransaction.findUnique({
+    where: { idempotencyKey: refundKey },
+    select: {
+      id: true,
+      amountCents: true,
+      type: true,
+      direction: true,
+      status: true,
+      walletId: true,
+    },
+  });
+  if (existingRefund) {
+    if (
+      existingRefund.amountCents !== priceCents ||
+      existingRefund.type !== WalletTransactionType.REFUND_CREDIT ||
+      existingRefund.direction !== WalletDirection.CREDIT ||
+      existingRefund.status !== WalletTransactionStatus.COMPLETED
+    ) {
+      throw new WalletEsimPurchaseError(
+        "INVALID_STATE",
+        "This purchase is unavailable."
+      );
+    }
+    await tx.walletEsimPurchase.update({
+      where: { id: purchase.id },
+      data: {
+        status: WalletEsimPurchaseStatus.FAILED_REFUNDED,
+        refundTransactionId: existingRefund.id,
+        failureCategory: "provider_declined",
+        failureCode: "refunded",
+      },
+    });
+    if (purchase.debitTransactionId) {
+      await tx.walletTransaction.update({
+        where: { id: purchase.debitTransactionId },
+        data: { status: WalletTransactionStatus.REVERSED },
+      });
+    }
+    return {
+      outcome: "linked_existing",
+      refundTransactionId: existingRefund.id,
+    };
+  }
+
+  const wallet = await tx.walletAccount.findUnique({
+    where: { userId: options.customerUserId },
+    select: { id: true, balanceCents: true },
+  });
+  if (!wallet) {
+    throw new WalletEsimPurchaseError(
+      "WALLET_UNAVAILABLE",
+      "Wallet purchase is temporarily unavailable. Please try again shortly."
+    );
+  }
+
+  const updated = await tx.walletAccount.update({
+    where: { id: wallet.id },
+    data: {
+      balanceCents: { increment: options.priceCents },
+      version: { increment: 1 },
+    },
+    select: { balanceCents: true },
+  });
+
+  const refundTx = await tx.walletTransaction.create({
+    data: {
+      walletId: wallet.id,
+      type: WalletTransactionType.REFUND_CREDIT,
+      direction: WalletDirection.CREDIT,
+      status: WalletTransactionStatus.COMPLETED,
+      amountCents: options.priceCents,
+      balanceBeforeCents: wallet.balanceCents,
+      balanceAfterCents: updated.balanceCents,
+      idempotencyKey: refundKey,
+      referenceType: WALLET_PURCHASE_REFUND_REF,
+      referenceId: purchase.id,
+    },
+    select: { id: true },
+  });
+
+  if (purchase.debitTransactionId) {
+    await tx.walletTransaction.update({
+      where: { id: purchase.debitTransactionId },
+      data: { status: WalletTransactionStatus.REVERSED },
+    });
+  }
+
+  await tx.walletEsimPurchase.update({
+    where: { id: purchase.id },
+    data: {
+      status: WalletEsimPurchaseStatus.FAILED_REFUNDED,
+      refundTransactionId: refundTx.id,
+      failureCategory: "provider_declined",
+      failureCode: "refunded",
+    },
+  });
+
+  await tx.auditLog.create({
+    data: {
+      actorUserId: options.actorUserId,
+      action: WALLET_PURCHASE_FAILED_REFUNDED,
+      targetType: "WalletEsimPurchase",
+      targetId: purchase.id,
+      metadata: {
+        method: purchaseAuditMethod(options.assisted),
+        fundingSource: OrderFundingSource.CUSTOMER_WALLET,
+        purchaseId: purchase.id,
+        amountCents: options.priceCents,
+        currency: (options.currency || purchase.currency || "USD").trim() || "USD",
+        failureCategory: "provider_declined",
+        walletTransactionId: refundTx.id,
+        ...(options.assisted
+          ? { targetUserId: options.customerUserId }
+          : {}),
+      } satisfies Prisma.InputJsonValue,
+    },
+  });
+
+  return { outcome: "created", refundTransactionId: refundTx.id };
+}
+
 async function refundReservedFunds(options: {
   purchaseId: string;
   customerUserId: string;
@@ -387,144 +588,20 @@ async function refundReservedFunds(options: {
   priceCents: number;
   debitTransactionId: string;
 }): Promise<string | null> {
-  const refundKey = `refund_${options.purchaseId}`.slice(0, 128);
+  void options.debitTransactionId;
   let createdRefundTransactionId: string | null = null;
 
   await prisma.$transaction(async (tx) => {
-    const purchase = await tx.walletEsimPurchase.findUnique({
-      where: { id: options.purchaseId },
-      select: {
-        id: true,
-        status: true,
-        refundTransactionId: true,
-        debitTransactionId: true,
-        priceCents: true,
-      },
+    const result = await refundReservedFundsInTx(tx, {
+      purchaseId: options.purchaseId,
+      customerUserId: options.customerUserId,
+      actorUserId: options.actorUserId,
+      assisted: options.assisted,
+      priceCents: options.priceCents,
     });
-
-    if (!purchase) {
-      throw new WalletEsimPurchaseError(
-        "INVALID_STATE",
-        "This purchase is unavailable."
-      );
+    if (result.outcome === "created") {
+      createdRefundTransactionId = result.refundTransactionId;
     }
-
-    if (
-      purchase.status === WalletEsimPurchaseStatus.FAILED_REFUNDED &&
-      purchase.refundTransactionId
-    ) {
-      return;
-    }
-
-    if (purchase.refundTransactionId) {
-      await tx.walletEsimPurchase.update({
-        where: { id: purchase.id },
-        data: {
-          status: WalletEsimPurchaseStatus.FAILED_REFUNDED,
-          failureCategory: "provider_declined",
-          failureCode: "refunded",
-        },
-      });
-      return;
-    }
-
-    const existingRefund = await tx.walletTransaction.findUnique({
-      where: { idempotencyKey: refundKey },
-      select: { id: true },
-    });
-    if (existingRefund) {
-      await tx.walletEsimPurchase.update({
-        where: { id: purchase.id },
-        data: {
-          status: WalletEsimPurchaseStatus.FAILED_REFUNDED,
-          refundTransactionId: existingRefund.id,
-          failureCategory: "provider_declined",
-          failureCode: "refunded",
-        },
-      });
-      if (purchase.debitTransactionId) {
-        await tx.walletTransaction.update({
-          where: { id: purchase.debitTransactionId },
-          data: { status: WalletTransactionStatus.REVERSED },
-        });
-      }
-      return;
-    }
-
-    const wallet = await tx.walletAccount.findUnique({
-      where: { userId: options.customerUserId },
-      select: { id: true, balanceCents: true },
-    });
-    if (!wallet) {
-      throw new WalletEsimPurchaseError(
-        "WALLET_UNAVAILABLE",
-        "Wallet purchase is temporarily unavailable. Please try again shortly."
-      );
-    }
-
-    const updated = await tx.walletAccount.update({
-      where: { id: wallet.id },
-      data: {
-        balanceCents: { increment: options.priceCents },
-        version: { increment: 1 },
-      },
-      select: { balanceCents: true },
-    });
-
-    const refundTx = await tx.walletTransaction.create({
-      data: {
-        walletId: wallet.id,
-        type: WalletTransactionType.REFUND_CREDIT,
-        direction: WalletDirection.CREDIT,
-        status: WalletTransactionStatus.COMPLETED,
-        amountCents: options.priceCents,
-        balanceBeforeCents: wallet.balanceCents,
-        balanceAfterCents: updated.balanceCents,
-        idempotencyKey: refundKey,
-        referenceType: WALLET_PURCHASE_REFUND_REF,
-        referenceId: purchase.id,
-      },
-      select: { id: true },
-    });
-    createdRefundTransactionId = refundTx.id;
-
-    if (purchase.debitTransactionId) {
-      await tx.walletTransaction.update({
-        where: { id: purchase.debitTransactionId },
-        data: { status: WalletTransactionStatus.REVERSED },
-      });
-    }
-
-    await tx.walletEsimPurchase.update({
-      where: { id: purchase.id },
-      data: {
-        status: WalletEsimPurchaseStatus.FAILED_REFUNDED,
-        refundTransactionId: refundTx.id,
-        failureCategory: "provider_declined",
-        failureCode: "refunded",
-      },
-    });
-
-    await tx.auditLog.create({
-      data: {
-        actorUserId: options.actorUserId,
-        action: WALLET_PURCHASE_FAILED_REFUNDED,
-        targetType: "WalletEsimPurchase",
-        targetId: purchase.id,
-        metadata: {
-          method: purchaseAuditMethod(options.assisted),
-          fundingSource: OrderFundingSource.CUSTOMER_WALLET,
-          purchaseId: purchase.id,
-          amountCents: options.priceCents,
-          currency: "USD",
-          failureCategory: "provider_declined",
-          walletTransactionId: refundTx.id,
-          ...(options.assisted
-            ? { targetUserId: options.customerUserId }
-            : {}),
-        } satisfies Prisma.InputJsonValue,
-      },
-    });
   });
 
   if (createdRefundTransactionId) {

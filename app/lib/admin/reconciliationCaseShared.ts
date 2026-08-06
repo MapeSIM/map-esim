@@ -12,6 +12,19 @@ export const DEESCALATE_CASE_PHRASE = "DE-ESCALATE CASE";
 export const RESEND_EMAIL_PHRASE = "RESEND EMAIL";
 export const BACKFILL_ICCID_PHRASE = "BACKFILL ICCID";
 export const FINALIZE_LOCAL_RECORD_PHRASE = "FINALIZE LOCAL RECORD";
+export const REFUND_WALLET_FUNDS_PHRASE = "REFUND WALLET FUNDS";
+
+/** Wallet-purchase-only refund recovery sources. */
+export const WALLET_REFUND_SOURCE_TYPES = ["wallet_purchase"] as const;
+
+export type WalletRefundSourceType = (typeof WALLET_REFUND_SOURCE_TYPES)[number];
+
+export function isWalletRefundSourceType(
+  raw: string | null | undefined
+): raw is WalletRefundSourceType {
+  const v = (raw ?? "").trim();
+  return (WALLET_REFUND_SOURCE_TYPES as readonly string[]).includes(v);
+}
 
 /** Sources that can recover incomplete local finalization after provider success. */
 export const LOCAL_FINALIZATION_SOURCE_TYPES = [
@@ -830,6 +843,314 @@ export function localFinalizationBlockerLabel(code: string): string {
       return "Local purchase or assignment attempt was not found.";
     default:
       return "Local finalization recovery is unavailable for this case.";
+  }
+}
+
+/** Pure local gates for confirmed-failure wallet refund recovery (no VeSIM). */
+export type WalletRefundLocalInput = {
+  sourceType: CaseManagementSourceType;
+  alreadyResolved: boolean;
+  locked: boolean;
+  lockedByAdminId?: string | null;
+  currentAdminId: string;
+  status?: string | null;
+  fundingSource?: string | null;
+  orderId?: string | null;
+  orderStatus?: string | null;
+  providerOrderId?: string | null;
+  offerId?: string | null;
+  customerUserId?: string | null;
+  priceCents?: number | null;
+  debitAmountCents?: number | null;
+  debitStatus?: string | null;
+  debitTransactionId?: string | null;
+  refundTransactionId?: string | null;
+  /** True when any linked/provider-matched order has ICCID capture evidence. */
+  fulfilmentIccidPresent?: boolean;
+  /** True when install/fulfilment evidence is present on provider observation. */
+  providerInstallDataPresent?: boolean;
+  providerRefreshInProgress?: boolean;
+};
+
+export type WalletRefundEligibility = {
+  allowed: boolean;
+  blockers: string[];
+  supported: boolean;
+  alreadyRefunded: boolean;
+};
+
+function isRefundRecoveryStatus(status: string): boolean {
+  return (
+    status === "RECONCILIATION_REQUIRED" ||
+    status === "PROVIDER_PENDING" ||
+    status === "FUNDS_RESERVED"
+  );
+}
+
+export function evaluateWalletRefundLocalEligibility(
+  input: WalletRefundLocalInput
+): WalletRefundEligibility {
+  const blockers: string[] = [];
+  const status = (input.status ?? "").trim().toUpperCase();
+  const hasRefund = Boolean((input.refundTransactionId ?? "").trim());
+  const alreadyRefunded = status === "FAILED_REFUNDED" && hasRefund;
+
+  if (!isWalletRefundSourceType(input.sourceType)) {
+    return {
+      allowed: false,
+      blockers: ["unsupported_source"],
+      supported: false,
+      alreadyRefunded: false,
+    };
+  }
+
+  if (input.alreadyResolved) blockers.push("already_resolved");
+  if (!input.locked) blockers.push("case_unlocked");
+  if (input.locked) {
+    const owner = (input.lockedByAdminId ?? "").trim();
+    const actor = (input.currentAdminId ?? "").trim();
+    if (!owner || !actor || owner !== actor) {
+      blockers.push("lock_not_owned");
+    }
+  }
+  if (input.providerRefreshInProgress) {
+    blockers.push("provider_refresh_in_progress");
+  }
+
+  const funding = (input.fundingSource ?? "").trim().toUpperCase();
+  if (funding && funding !== "CUSTOMER_WALLET") {
+    blockers.push("not_customer_wallet_funded");
+  }
+
+  if (!(input.providerOrderId ?? "").trim()) {
+    blockers.push("missing_provider_reference");
+  }
+  if (!(input.offerId ?? "").trim()) blockers.push("missing_package_evidence");
+  if (!(input.customerUserId ?? "").trim()) {
+    blockers.push("missing_customer_evidence");
+  }
+  if (
+    !Number.isInteger(input.priceCents) ||
+    (input.priceCents ?? 0) <= 0
+  ) {
+    blockers.push("missing_pricing_evidence");
+  }
+  if (!(input.debitTransactionId ?? "").trim()) {
+    blockers.push("missing_debit_reservation");
+  }
+  if (
+    Number.isInteger(input.debitAmountCents) &&
+    Number.isInteger(input.priceCents) &&
+    input.debitAmountCents !== input.priceCents
+  ) {
+    blockers.push("debit_amount_mismatch");
+  }
+
+  if (input.fulfilmentIccidPresent) {
+    blockers.push("fulfilment_iccid_present");
+  }
+  if (input.providerInstallDataPresent) {
+    blockers.push("fulfilment_install_evidence");
+  }
+
+  const orderId = (input.orderId ?? "").trim();
+  const orderStatus = (input.orderStatus ?? "").trim().toUpperCase();
+  if (orderId && orderStatus === "COMPLETED") {
+    blockers.push("usable_local_order_exists");
+  }
+  if (orderId && orderStatus && orderStatus !== "FAILED") {
+    blockers.push("usable_local_order_exists");
+  }
+  if (orderId && !orderStatus) {
+    blockers.push("usable_local_order_exists");
+  }
+
+  if (alreadyRefunded) {
+    return {
+      allowed: blockers.length === 0,
+      blockers,
+      supported: true,
+      alreadyRefunded: true,
+    };
+  }
+
+  if (hasRefund) blockers.push("incomplete_or_conflicting_refund");
+  if (!isRefundRecoveryStatus(status)) {
+    blockers.push("not_refund_recovery_state");
+  }
+  if (status === "COMPLETED") blockers.push("purchase_already_completed");
+
+  const debitStatus = (input.debitStatus ?? "").trim().toUpperCase();
+  if (
+    debitStatus &&
+    debitStatus !== "PENDING" &&
+    debitStatus !== "COMPLETED" &&
+    debitStatus !== "REVERSED"
+  ) {
+    blockers.push("debit_state_unusable");
+  }
+  if (!debitStatus) blockers.push("missing_debit_reservation");
+
+  return {
+    allowed: blockers.length === 0,
+    blockers,
+    supported: true,
+    alreadyRefunded: false,
+  };
+}
+
+/**
+ * Pure provider-evidence gate for confirmed-failure wallet refund.
+ * Fail closed: only FOUND orders with an explicit non-fulfilment failure state.
+ * Does not invent provider status values beyond existing token heuristics.
+ */
+export type ProviderRefundEvidenceInput = {
+  lookupKind: string;
+  orderExists: string;
+  offerMatch: string;
+  installDataPresent: string;
+  safeProviderState?: string | null;
+  hasExpectedOfferId: boolean;
+};
+
+export type ProviderRefundEvidenceResult =
+  | { ok: true }
+  | { ok: false; blocker: string };
+
+/** Existing non-fulfillment state tokens already used elsewhere in shared gates. */
+function isConclusiveProviderFailureState(
+  state: string | null | undefined
+): boolean {
+  const s = (state ?? "").trim().toLowerCase();
+  if (!s) return false;
+  return /^(failed|fail|cancelled|canceled|declined|rejected|error)$/.test(s) ||
+    /^(failed|fail|cancelled|canceled|declined|rejected|error)[._-]/.test(s);
+}
+
+function isProviderSuccessOrFulfilledState(
+  state: string | null | undefined
+): boolean {
+  const s = (state ?? "").trim().toLowerCase();
+  if (!s) return false;
+  return /^(completed|complete|success|successful|active|fulfilled|done|delivered|ok|ready)/.test(
+    s
+  );
+}
+
+export function evaluateProviderRefundEvidence(
+  input: ProviderRefundEvidenceInput
+): ProviderRefundEvidenceResult {
+  const kind = (input.lookupKind ?? "").trim().toUpperCase();
+  if (kind === "NOT_FOUND") {
+    // Fail closed: 404 alone is not treated as conclusive financial non-fulfilment.
+    return { ok: false, blocker: "provider_not_found" };
+  }
+  if (kind === "TIMEOUT") return { ok: false, blocker: "provider_uncertain" };
+  if (kind === "AUTH_FAILURE") {
+    return { ok: false, blocker: "provider_auth_failure" };
+  }
+  if (kind === "ENVIRONMENT_BLOCKED") {
+    return { ok: false, blocker: "provider_environment_blocked" };
+  }
+  if (kind === "PROVIDER_ERROR") return { ok: false, blocker: "provider_error" };
+  if (kind !== "FOUND") return { ok: false, blocker: "provider_uncertain" };
+
+  if ((input.orderExists ?? "").trim().toLowerCase() !== "yes") {
+    return { ok: false, blocker: "provider_order_not_confirmed" };
+  }
+
+  if (
+    input.hasExpectedOfferId &&
+    (input.offerMatch ?? "").trim().toLowerCase() === "no"
+  ) {
+    return { ok: false, blocker: "provider_offer_mismatch" };
+  }
+
+  if ((input.installDataPresent ?? "").trim().toLowerCase() === "yes") {
+    return { ok: false, blocker: "fulfilment_install_evidence" };
+  }
+
+  if (isProviderSuccessOrFulfilledState(input.safeProviderState)) {
+    return { ok: false, blocker: "provider_still_fulfilled" };
+  }
+
+  if (!isConclusiveProviderFailureState(input.safeProviderState)) {
+    return { ok: false, blocker: "provider_failure_not_conclusive" };
+  }
+
+  return { ok: true };
+}
+
+export function walletRefundBlockerLabel(code: string): string {
+  switch (code) {
+    case "unsupported_source":
+      return "This case type does not support wallet refund recovery.";
+    case "already_resolved":
+      return "Resolved cases cannot run wallet refund recovery.";
+    case "case_unlocked":
+      return "Lock this case before refunding wallet funds.";
+    case "lock_not_owned":
+      return "Only the admin who locked this case can refund wallet funds.";
+    case "provider_refresh_in_progress":
+      return "A provider status refresh is in progress.";
+    case "not_customer_wallet_funded":
+      return "Only customer-wallet purchases can be refunded here.";
+    case "missing_provider_reference":
+      return "Provider reference is missing.";
+    case "missing_package_evidence":
+      return "Package/offer evidence is missing on the purchase.";
+    case "missing_customer_evidence":
+      return "Customer evidence is missing on the purchase.";
+    case "missing_pricing_evidence":
+      return "Pricing evidence is missing on the purchase.";
+    case "missing_debit_reservation":
+      return "Wallet debit reservation is missing.";
+    case "debit_amount_mismatch":
+      return "Debit amount does not match the purchase price.";
+    case "fulfilment_iccid_present":
+      return "Fulfilment ICCID evidence exists; automatic refund is blocked.";
+    case "fulfilment_install_evidence":
+      return "Provider install/fulfilment evidence exists; automatic refund is blocked.";
+    case "usable_local_order_exists":
+      return "A usable local order exists; automatic refund is blocked.";
+    case "incomplete_or_conflicting_refund":
+      return "An incomplete or conflicting refund already exists.";
+    case "not_refund_recovery_state":
+      return "Case is not in a confirmed-failure refund recovery state.";
+    case "purchase_already_completed":
+      return "Purchase is already completed.";
+    case "debit_state_unusable":
+      return "Wallet debit is not in a recoverable state.";
+    case "provider_not_found":
+      return "Provider order was not found; refund remains blocked.";
+    case "provider_uncertain":
+      return "Provider evidence is uncertain; refund remains blocked.";
+    case "provider_auth_failure":
+      return "Provider authentication failed.";
+    case "provider_environment_blocked":
+      return "Provider environment is not available.";
+    case "provider_error":
+      return "Provider returned an error; refund remains blocked.";
+    case "provider_order_not_confirmed":
+      return "Provider order existence is not confirmed.";
+    case "provider_offer_mismatch":
+      return "Provider order does not match the expected offer.";
+    case "provider_still_fulfilled":
+      return "Provider evidence still indicates a fulfilled order.";
+    case "provider_failure_not_conclusive":
+      return "Provider failure is not conclusive enough to refund.";
+    case "cas_conflict":
+      return "The case changed concurrently. Refresh and try again.";
+    case "conflicting_refund":
+      return "A conflicting refund record exists.";
+    case "provider_reference_mismatch":
+      return "Provider reference changed concurrently.";
+    case "missing_local_attempt":
+      return "Local wallet purchase attempt was not found.";
+    case "transaction_failed":
+      return "Wallet refund could not be completed. Please try again.";
+    default:
+      return "Wallet refund recovery is unavailable for this case.";
   }
 }
 

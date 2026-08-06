@@ -19,10 +19,13 @@ import {
   evaluateIccidBackfillLocalEligibility,
   evaluateLocalFinalizationEligibility,
   evaluateResolutionEligibility,
+  evaluateWalletRefundLocalEligibility,
   iccidBackfillBlockerLabel,
   isIccidBackfillSourceType,
   isLocalFinalizationSourceType,
   localFinalizationBlockerLabel,
+  walletRefundBlockerLabel,
+  isWalletRefundSourceType,
   LOCK_CASE_PHRASE,
   lowerEscalationPriorities,
   normalizeCaseManagementSourceType,
@@ -127,6 +130,9 @@ export type CaseManagementUiState = {
   localFinalizationSupported: boolean;
   localFinalizationAllowed: boolean;
   localFinalizationMessage: string;
+  walletRefundSupported: boolean;
+  walletRefundAllowed: boolean;
+  walletRefundMessage: string;
 };
 
 const PUBLIC_ERROR = "Unable to update this case right now.";
@@ -272,6 +278,8 @@ function isRefreshInProgress(row: {
   customerUserId?: string | null;
   priceCents?: number | null;
   debitTransactionId?: string | null;
+  debitAmountCents?: number | null;
+  fundingSource?: string | null;
   emailDeliveryStatus?: string | null;
   emailNotificationStatus?: string | null;
   customerEmail?: string | null;
@@ -308,11 +316,12 @@ async function loadCaseRow(
         customerUserId: true,
         priceCents: true,
         debitTransactionId: true,
+        fundingSource: true,
         emailDeliveryStatus: true,
         providerRefreshResult: true,
         providerRefreshClaimedAt: true,
         providerRefreshCompletedAt: true,
-        debitTransaction: { select: { status: true } },
+        debitTransaction: { select: { status: true, amountCents: true } },
         customer: { select: { email: true, deletedAt: true } },
         order: {
           select: {
@@ -328,6 +337,7 @@ async function loadCaseRow(
     return {
       ...row,
       debitStatus: row.debitTransaction?.status ?? null,
+      debitAmountCents: row.debitTransaction?.amountCents ?? null,
       orderStatus: row.order?.status ?? null,
       customerEmail: row.customer.deletedAt ? null : row.customer.email,
       iccidHash: row.order?.iccidHash ?? null,
@@ -615,6 +625,47 @@ export async function getCaseManagementEligibility(options: {
     }
   }
 
+  const walletRefundSupported = isWalletRefundSourceType(ids.sourceType);
+  const walletRefundEligibility = walletRefundSupported
+    ? evaluateWalletRefundLocalEligibility({
+        sourceType: ids.sourceType,
+        alreadyResolved: resolved,
+        locked,
+        lockedByAdminId: row.reconciliationLockedByAdminId,
+        currentAdminId: (options.adminUserId ?? "").trim(),
+        status: row.status,
+        fundingSource: row.fundingSource,
+        orderId: row.orderId,
+        orderStatus: row.orderStatus,
+        providerOrderId: row.providerOrderId,
+        offerId: row.offerId,
+        customerUserId: row.customerUserId,
+        priceCents: row.priceCents,
+        debitAmountCents: row.debitAmountCents,
+        debitStatus: row.debitStatus,
+        debitTransactionId: row.debitTransactionId,
+        refundTransactionId: row.refundTransactionId,
+        fulfilmentIccidPresent: Boolean(row.iccidHash || row.iccidCapturedAt),
+        providerRefreshInProgress: refreshInProgress,
+      })
+    : null;
+
+  let walletRefundMessage =
+    "Wallet refund recovery is not available for this case type.";
+  if (walletRefundEligibility) {
+    if (!walletRefundEligibility.allowed) {
+      walletRefundMessage = walletRefundEligibility.blockers
+        .map(walletRefundBlockerLabel)
+        .join(" ");
+    } else if (walletRefundEligibility.alreadyRefunded) {
+      walletRefundMessage =
+        "Wallet funds already refunded. Submit only confirms idempotent success.";
+    } else {
+      walletRefundMessage =
+        "This action restores the original reserved wallet amount exactly once after confirmed provider failure. It changes financial state. Provider evidence will be re-verified on submit.";
+    }
+  }
+
   return {
     stateLabel: caseManagementStateLabel({
       resolvedAt: row.reconciliationResolvedAt,
@@ -660,6 +711,9 @@ export async function getCaseManagementEligibility(options: {
     localFinalizationSupported: localFinalizeSupported,
     localFinalizationAllowed: Boolean(localFinalizeEligibility?.allowed),
     localFinalizationMessage,
+    walletRefundSupported,
+    walletRefundAllowed: Boolean(walletRefundEligibility?.allowed),
+    walletRefundMessage,
   };
 }
 

@@ -13,6 +13,7 @@ import {
 import { resendReconciliationEmail } from "@/app/lib/admin/reconciliationEmailResend";
 import { backfillReconciliationIccid } from "@/app/lib/admin/reconciliationIccidBackfill";
 import { finalizeReconciliationLocalRecord } from "@/app/lib/admin/reconciliationLocalFinalization";
+import { refundReconciliationWalletPurchase } from "@/app/lib/admin/reconciliationWalletRefund";
 
 export type CaseManagementFormState = CaseActionResult | null;
 
@@ -186,6 +187,33 @@ export async function finalizeReconciliationLocalRecordAction(
   void formData.get("providerOrderId");
 
   const result = await finalizeReconciliationLocalRecord({
+    adminUserId: admin.id,
+    sourceType,
+    attemptId,
+    reason: String(formData.get("reason") ?? ""),
+    confirmPhrase: String(formData.get("confirmPhrase") ?? ""),
+  });
+  if (result.ok) revalidateCase(sourceType, attemptId);
+  return result;
+}
+
+export async function refundReconciliationWalletPurchaseAction(
+  _prev: CaseManagementFormState,
+  formData: FormData
+): Promise<CaseManagementFormState> {
+  const admin = await requireRole("ADMIN");
+  const sourceType = String(formData.get("sourceType") ?? "").trim();
+  const attemptId = String(formData.get("attemptId") ?? "").trim();
+  void formData.get("caseStatus");
+  void formData.get("eligible");
+  // Never trust admin-supplied financial fields.
+  void formData.get("amountCents");
+  void formData.get("amount");
+  void formData.get("currency");
+  void formData.get("customerUserId");
+  void formData.get("walletId");
+
+  const result = await refundReconciliationWalletPurchase({
     adminUserId: admin.id,
     sourceType,
     attemptId,

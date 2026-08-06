@@ -196,6 +196,9 @@ export default async function AdminReconciliationDetailPage({
           localFinalizationSupported={caseUi.localFinalizationSupported}
           localFinalizationAllowed={caseUi.localFinalizationAllowed}
           localFinalizationMessage={caseUi.localFinalizationMessage}
+          walletRefundSupported={caseUi.walletRefundSupported}
+          walletRefundAllowed={caseUi.walletRefundAllowed}
+          walletRefundMessage={caseUi.walletRefundMessage}
         />
       ) : null}
 
