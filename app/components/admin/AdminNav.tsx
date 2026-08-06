@@ -10,6 +10,7 @@ const links = [
   { href: "/admin/customers", label: "Customers", exact: false },
   { href: "/admin/wallet-topups", label: "Wallet top-ups", exact: false },
   { href: "/admin/reconciliation", label: "Reconciliation", exact: false },
+  { href: "/admin/operations", label: "Operations", exact: false },
   { href: "/admin/audit-logs", label: "Audit logs", exact: false },
   { href: "/admin/settings", label: "Settings", exact: false },
 ] as const;

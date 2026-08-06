@@ -42,6 +42,7 @@
     "qa:admin-reconciliation-local-finalization": "tsx scripts/qa-admin-reconciliation-local-finalization.ts",
     "qa:admin-reconciliation-wallet-refund": "tsx scripts/qa-admin-reconciliation-wallet-refund.ts",
     "qa:admin-reconciliation-final": "tsx scripts/qa-admin-reconciliation-final.ts",
+    "qa:admin-operations-health": "tsx scripts/qa-admin-operations-health.ts",
     "qa:security-headers": "tsx scripts/qa-security-headers.ts",
     "postinstall": "prisma generate"
   },
