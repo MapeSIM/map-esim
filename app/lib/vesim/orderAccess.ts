@@ -12,7 +12,7 @@ function readSecret(): string | null {
   const explicit = (process.env.ORDER_ACCESS_SECRET ?? "").trim();
   if (explicit.length >= 32) return explicit;
 
-  // Deterministic server-only fallback so staging works without a new env var.
+  // Deterministic server-only fallback when ORDER_ACCESS_SECRET is unset.
   // Still never exposed to the client.
   const email = (process.env.VESIM_EMAIL ?? "").trim();
   const password = (process.env.VESIM_PASSWORD ?? "").trim();

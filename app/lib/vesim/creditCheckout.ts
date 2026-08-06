@@ -1,5 +1,6 @@
 import "server-only";
 
+import { VesimEnvironmentError } from "@/app/lib/vesim/environment";
 import {
   extractOrderId,
   extractReturnedOfferId,
@@ -64,7 +65,14 @@ export async function executeCreditCheckout(options: {
       cache: "no-store",
     });
     payload = await readJsonSafe(response);
-  } catch {
+  } catch (error) {
+    if (error instanceof VesimEnvironmentError) {
+      return {
+        kind: "uncertain",
+        category: "provider_unavailable",
+        code: "vesim_env_invalid",
+      };
+    }
     return {
       kind: "uncertain",
       category: "provider_timeout",

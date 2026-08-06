@@ -27,6 +27,7 @@
     "qa:customer-wallet-purchase": "tsx scripts/qa-customer-wallet-purchase.ts",
     "qa:wallet-topup-foundation": "tsx scripts/qa-wallet-topup-foundation.ts",
     "qa:guest-checkout-gate": "tsx scripts/qa-guest-checkout-gate.ts",
+    "qa:vesim-environment": "tsx scripts/qa-vesim-environment.ts",
     "qa:iccid-persistence": "tsx scripts/qa-iccid-persistence.ts",
     "qa:admin-wallet-purchase": "tsx scripts/qa-admin-wallet-purchase.ts",
     "qa:iccid-reveal": "tsx scripts/qa-iccid-reveal.ts",

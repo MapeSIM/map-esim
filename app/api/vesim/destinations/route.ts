@@ -1,41 +1,32 @@
 import { NextResponse } from "next/server";
+import {
+  fetchDestinations,
+  publicErrorMessage,
+} from "@/app/lib/vesim/server";
+import { VesimEnvironmentError } from "@/app/lib/vesim/environment";
+import { VESIM_ENV_PUBLIC_ERROR } from "@/app/lib/vesim/environmentPolicy";
 
 export async function GET() {
   try {
-    const tokenRes = await fetch(
-      `${process.env.VESIM_BASE_URL}/api/auth/broker/token`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+    const destinations = await fetchDestinations();
+    return NextResponse.json({
+      success: true,
+      destinations,
+    });
+  } catch (error: unknown) {
+    if (error instanceof VesimEnvironmentError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: VESIM_ENV_PUBLIC_ERROR,
         },
-        body: JSON.stringify({
-          email: process.env.VESIM_EMAIL,
-          password: process.env.VESIM_PASSWORD,
-        }),
-      }
-    );
-
-    const tokenData = await tokenRes.json();
-
-    const res = await fetch(
-      `${process.env.VESIM_BASE_URL}/api/esim/destinations`,
-      {
-        headers: {
-          Authorization: `Bearer ${tokenData.access_token}`,
-        },
-      }
-    );
-
-    const data = await res.json();
-
-    return NextResponse.json(data);
-
-  } catch {
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       {
         success: false,
-        error: "Destination API failed",
+        error: publicErrorMessage(error, "Destination API failed"),
       },
       { status: 500 }
     );

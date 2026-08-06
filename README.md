@@ -13,16 +13,33 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Copy `.env.example` to `.env.local` and fill server-only secrets. Never commit real credentials.
 
+## VeSIM environment safety
+
+Provider orders require an explicit, matching environment configuration:
+
+| Variable | Behavior |
+|---|---|
+| `VESIM_ENVIRONMENT=staging` | Only confirmed staging broker hosts (`www.vesim.xyz`, `vesim.xyz`) |
+| `VESIM_ENVIRONMENT=live` | **Blocked** until VeSIM officially confirms the live broker/API host |
+| Missing or any other value | **Fail closed** — provider auth and orders are blocked |
+| Mode / `VESIM_BASE_URL` mismatch | **Fail closed** — no automatic fallback to live |
+
+Confirmed staging broker base URL: `https://www.vesim.xyz`.
+
+The live broker/API host is **not** confirmed yet. Do not treat activation-link domains (for example hosts used only for eSIM install URLs) as the live API host. Production live mode remains blocked until provider confirmation is recorded in the server-only live host allowlist.
+
+`VESIM_ENVIRONMENT` is **server-only**. Never use `NEXT_PUBLIC_*` for this value. Production never defaults automatically to live.
+
 ## Production safety — guest VeSIM checkout
 
 Public guest checkout (`POST /api/vesim/checkout` and `/checkout`) can create **real** VeSIM provider credit orders when enabled.
 
 | Variable | Behavior |
 |---|---|
-| `ENABLE_GUEST_VESIM_CHECKOUT=true` | Guest checkout allowed (local/staging only when intentionally testing) |
+| `ENABLE_GUEST_VESIM_CHECKOUT=true` | Guest checkout allowed only when intentionally enabled for controlled verification |
 | Missing, `false`, or any other value | **Disabled** — API returns HTTP 503; UI hides purchase |
 
-**Keep `ENABLE_GUEST_VESIM_CHECKOUT=false` in production** until:
+**Keep `ENABLE_GUEST_VESIM_CHECKOUT=false` in production** until public commerce hardening is complete:
 
 1. Payment integration is live and approved
 2. Durable (multi-instance) checkout idempotency exists
@@ -30,7 +47,7 @@ Public guest checkout (`POST /api/vesim/checkout` and `/checkout`) can create **
 
 This flag is **server-only**. Do not use a `NEXT_PUBLIC_*` variable to authorize provider orders. Client requests cannot override the gate.
 
-Authenticated wallet purchase and admin package-assignment flows do **not** use this flag; they use separate server paths.
+Authenticated wallet purchase and admin package-assignment flows do **not** use this flag; they use separate server paths. They still require a valid `VESIM_ENVIRONMENT` + matching `VESIM_BASE_URL`.
 
 ## ICCID storage (server-only)
 
@@ -59,6 +76,7 @@ npm run start
 npm run db:migrate          # prisma migrate deploy (production)
 npm run admin:seed          # one-time admin bootstrap
 npm run qa:guest-checkout-gate
+npm run qa:vesim-environment
 npm run qa:iccid-persistence
 ```
 

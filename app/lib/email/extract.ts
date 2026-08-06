@@ -127,7 +127,7 @@ export function extractInstallDetails(orderPayload: JsonRecord): {
     "esimSmdpAddress",
   ]);
 
-  // VeSIM staging often returns the full LPA in esim_activation_code.
+  // Some provider responses return the full LPA in esim_activation_code.
   const activationRaw = extractFromContainers(containers, [
     "esim_activation_code",
     "esimActivationCode",

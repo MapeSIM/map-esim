@@ -3,6 +3,10 @@ import {
   type VesimDestination,
 } from "@/app/lib/vesim/destinations";
 import {
+  VesimEnvironmentError,
+  resolveValidatedVesimBaseUrl,
+} from "@/app/lib/vesim/environment";
+import {
   normalizeOffers,
   type VesimOffer,
 } from "@/app/lib/vesim/offers";
@@ -44,7 +48,8 @@ function getRequiredEnv(name: string): string {
 }
 
 export function getVesimBaseUrl(): string {
-  return getRequiredEnv("VESIM_BASE_URL").replace(/\/+$/, "");
+  // Shared fail-closed boundary: mode + host must match before any provider call.
+  return resolveValidatedVesimBaseUrl();
 }
 
 export async function readJsonSafe(response: Response): Promise<JsonRecord> {
@@ -132,6 +137,7 @@ export function toVerifiedCheckoutOffer(
 }
 
 export async function getBrokerToken(): Promise<TokenResult> {
+  // Validates VESIM_ENVIRONMENT + VESIM_BASE_URL before credentials or network.
   const baseUrl = getVesimBaseUrl();
   const email = getRequiredEnv("VESIM_EMAIL");
   const password = getRequiredEnv("VESIM_PASSWORD");
@@ -314,6 +320,9 @@ export function failIdempotentCheckout(key: string) {
 }
 
 export function publicErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof VesimEnvironmentError) {
+    return error.message;
+  }
   if (error instanceof Error) {
     const message = error.message.trim();
     // Never expose env/config internals or provider auth details.

@@ -1,69 +1,31 @@
 import { NextResponse } from "next/server";
-import { normalizeOffers } from "@/app/lib/vesim/offers";
+import { VesimEnvironmentError } from "@/app/lib/vesim/environment";
+import { VESIM_ENV_PUBLIC_ERROR } from "@/app/lib/vesim/environmentPolicy";
+import {
+  fetchOffersForCountry,
+  publicErrorMessage,
+  sanitizeCountryHint,
+} from "@/app/lib/vesim/server";
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const country = (searchParams.get("country") || "US").toUpperCase();
+    const country =
+      sanitizeCountryHint(searchParams.get("country")) ||
+      (searchParams.get("country") || "US").trim().toUpperCase();
 
-    const tokenRes = await fetch(
-      `${process.env.VESIM_BASE_URL}/api/auth/broker/token`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: process.env.VESIM_EMAIL,
-          password: process.env.VESIM_PASSWORD,
-        }),
-      }
-    );
-
-    const tokenData = await tokenRes.json();
-
-    if (!tokenData.access_token) {
+    if (!country || country.length > 64) {
       return NextResponse.json(
         {
           success: false,
-          error: "Token failed",
-        },
-        {
-          status: 401,
-        }
-      );
-    }
-
-    const offersRes = await fetch(
-      `${process.env.VESIM_BASE_URL}/api/esim/offers?country=${country}`,
-      {
-        headers: {
-          Authorization: `Bearer ${tokenData.access_token}`,
-          Accept: "application/json",
-        },
-        cache: "no-store",
-      }
-    );
-
-    const offersData = await offersRes.json();
-
-    if (!offersRes.ok) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            offersData?.error ||
-            offersData?.message ||
-            "Failed to load offers from VeSIM",
+          error: "Invalid country",
           offers: [],
         },
-        {
-          status: offersRes.status || 502,
-        }
+        { status: 400 }
       );
     }
 
-    const offers = normalizeOffers(offersData);
+    const offers = await fetchOffersForCountry(country);
 
     return NextResponse.json({
       success: true,
@@ -72,18 +34,24 @@ export async function GET(req: Request) {
       offers,
     });
   } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Unexpected offers error";
+    if (error instanceof VesimEnvironmentError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: VESIM_ENV_PUBLIC_ERROR,
+          offers: [],
+        },
+        { status: 503 }
+      );
+    }
 
     return NextResponse.json(
       {
         success: false,
-        error: message,
+        error: publicErrorMessage(error, "Unable to load offers"),
         offers: [],
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
