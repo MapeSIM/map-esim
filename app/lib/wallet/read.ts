@@ -17,6 +17,7 @@ import {
   type WalletStatusLabel,
   type WalletTransactionTypeLabel,
 } from "@/app/lib/wallet/display";
+import { walletEmailNotificationLabel } from "@/app/lib/wallet/transactionNotification";
 
 export type CustomerWalletSummary = {
   balanceCents: number;
@@ -33,6 +34,8 @@ export type CustomerWalletTransactionRow = {
   amountLabel: string;
   statusLabel: WalletStatusLabel;
   referenceLabel: string | null;
+  /** Safe email delivery label — never exposes SMTP errors. */
+  notificationLabel: string | null;
 };
 
 export type CustomerWalletTransactionsPage = {
@@ -161,6 +164,7 @@ export async function getCustomerWalletTransactions(
       amountCents: true,
       referenceType: true,
       referenceId: true,
+      emailNotificationStatus: true,
     },
   });
 
@@ -185,6 +189,9 @@ export async function getCustomerWalletTransactions(
         row.type === "REFUND_CREDIT"
           ? null
           : formatWalletReference(row.referenceType, row.referenceId),
+      notificationLabel: walletEmailNotificationLabel(
+        row.emailNotificationStatus
+      ),
     })),
     page,
     pageSize,

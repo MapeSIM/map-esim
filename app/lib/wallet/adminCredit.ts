@@ -10,6 +10,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
 import { formatUsdCents } from "@/app/lib/wallet/display";
+import { scheduleWalletTransactionNotification } from "@/app/lib/wallet/transactionNotification";
 
 export const ADMIN_MANUAL_CREDIT_REFERENCE_TYPE = "ADMIN_MANUAL_CREDIT";
 export const ADMIN_WALLET_CREDIT_AUDIT_ACTION = "wallet.admin_credit_completed";
@@ -160,7 +161,7 @@ export async function creditCustomerWalletByAdmin(
   if (prior) return prior;
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const existingTx = await tx.walletTransaction.findUnique({
         where: { idempotencyKey },
         select: {
@@ -291,6 +292,7 @@ export async function creditCustomerWalletByAdmin(
           direction: WalletDirection.CREDIT,
           status: WalletTransactionStatus.COMPLETED,
           amountCents,
+          balanceBeforeCents: wallet.balanceCents,
           balanceAfterCents: updatedWallet.balanceCents,
           idempotencyKey,
           referenceType: ADMIN_MANUAL_CREDIT_REFERENCE_TYPE,
@@ -336,6 +338,11 @@ export async function creditCustomerWalletByAdmin(
         currency: "USD" as const,
       };
     });
+
+    if (!result.duplicate) {
+      scheduleWalletTransactionNotification(result.transactionId);
+    }
+    return result;
   } catch (error) {
     if (error instanceof AdminWalletCreditError) throw error;
 

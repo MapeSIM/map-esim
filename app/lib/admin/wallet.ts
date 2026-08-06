@@ -20,6 +20,7 @@ import {
   type WalletStatusLabel,
   type WalletTransactionTypeLabel,
 } from "@/app/lib/wallet/display";
+import { walletEmailNotificationLabel } from "@/app/lib/wallet/transactionNotification";
 
 export const ADMIN_CUSTOMER_RECENT_WALLET_TX_LIMIT = 10;
 
@@ -194,6 +195,8 @@ export type AdminCustomerWalletTransactionRow = {
    * Null when no DB-linked order exists — never inferred from display text.
    */
   relatedOrderId: string | null;
+  /** Safe email delivery label — never exposes SMTP errors. */
+  notificationLabel: string | null;
 };
 
 /**
@@ -265,6 +268,7 @@ export async function getAdminCustomerWalletSummary(
       balanceAfterCents: true,
       referenceType: true,
       referenceId: true,
+      emailNotificationStatus: true,
       purchaseAsDebit: {
         select: { orderId: true },
       },
@@ -320,6 +324,9 @@ export async function getAdminCustomerWalletSummary(
             ? formatUsdCents(row.balanceAfterCents)
             : null,
         relatedOrderId,
+        notificationLabel: walletEmailNotificationLabel(
+          row.emailNotificationStatus
+        ),
       };
     }),
   };

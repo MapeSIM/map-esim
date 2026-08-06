@@ -17,6 +17,7 @@ import { deliverOrderEmailAfterCheckout } from "@/app/lib/email/deliverAfterChec
 import { createOrderAccessToken } from "@/app/lib/vesim/orderAccess";
 import { executeCreditCheckout } from "@/app/lib/vesim/creditCheckout";
 import { formatUsdCents } from "@/app/lib/wallet/display";
+import { scheduleWalletTransactionNotification } from "@/app/lib/wallet/transactionNotification";
 import {
   sanitizeCountryHint,
   verifyOfferAuthoritative,
@@ -381,8 +382,9 @@ async function refundReservedFunds(options: {
   assisted: boolean;
   priceCents: number;
   debitTransactionId: string;
-}): Promise<void> {
+}): Promise<string | null> {
   const refundKey = `refund_${options.purchaseId}`.slice(0, 128);
+  let createdRefundTransactionId: string | null = null;
 
   await prisma.$transaction(async (tx) => {
     const purchase = await tx.walletEsimPurchase.findUnique({
@@ -472,6 +474,7 @@ async function refundReservedFunds(options: {
         direction: WalletDirection.CREDIT,
         status: WalletTransactionStatus.COMPLETED,
         amountCents: options.priceCents,
+        balanceBeforeCents: wallet.balanceCents,
         balanceAfterCents: updated.balanceCents,
         idempotencyKey: refundKey,
         referenceType: WALLET_PURCHASE_REFUND_REF,
@@ -479,6 +482,7 @@ async function refundReservedFunds(options: {
       },
       select: { id: true },
     });
+    createdRefundTransactionId = refundTx.id;
 
     if (purchase.debitTransactionId) {
       await tx.walletTransaction.update({
@@ -518,6 +522,11 @@ async function refundReservedFunds(options: {
       },
     });
   });
+
+  if (createdRefundTransactionId) {
+    scheduleWalletTransactionNotification(createdRefundTransactionId);
+  }
+  return createdRefundTransactionId;
 }
 
 async function markReconciliationRequired(options: {
@@ -797,6 +806,7 @@ export async function confirmWalletEsimPurchase(
           direction: WalletDirection.DEBIT,
           status: WalletTransactionStatus.PENDING,
           amountCents: snapshot.priceCents,
+          balanceBeforeCents: wallet.balanceCents,
           balanceAfterCents: walletAfter.balanceCents,
           idempotencyKey: debitKey,
           referenceType: WALLET_PURCHASE_DEBIT_REF,
@@ -898,6 +908,7 @@ export async function confirmWalletEsimPurchase(
   // Confirmed success — finalize local order + complete debit.
   let orderId: string | null = null;
   try {
+    let completedDebitTransactionId: string | null = null;
     const finalized = await prisma.$transaction(async (tx) => {
       const current = await tx.walletEsimPurchase.findUnique({
         where: { id: purchase.id },
@@ -935,6 +946,7 @@ export async function confirmWalletEsimPurchase(
           where: { id: current.debitTransactionId },
           data: { status: WalletTransactionStatus.COMPLETED },
         });
+        completedDebitTransactionId = current.debitTransactionId;
       }
 
       await tx.walletEsimPurchase.update({
@@ -979,6 +991,9 @@ export async function confirmWalletEsimPurchase(
       return order;
     });
     orderId = finalized.id;
+    if (completedDebitTransactionId) {
+      scheduleWalletTransactionNotification(completedDebitTransactionId);
+    }
   } catch (error) {
     if (error instanceof WalletEsimPurchaseError) throw error;
     await markReconciliationRequired({

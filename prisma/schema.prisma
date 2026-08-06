@@ -365,28 +365,34 @@ model WalletAccount {
 
 /// Append-only wallet ledger entry.
 model WalletTransaction {
-  id                String                  @id @default(cuid())
-  walletId          String
-  type              WalletTransactionType
-  direction         WalletDirection
-  status            WalletTransactionStatus
-  amountCents       Int
-  balanceAfterCents Int?
-  idempotencyKey    String?                 @unique
-  referenceType     String?
-  referenceId       String?
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
-  wallet            WalletAccount           @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  purchaseAsDebit   WalletEsimPurchase?     @relation("PurchaseDebitTx")
-  purchaseAsRefund  WalletEsimPurchase?     @relation("PurchaseRefundTx")
-  topupAsCredit     WalletTopup?            @relation("TopupCreditTx")
+  id                      String                  @id @default(cuid())
+  walletId                String
+  type                    WalletTransactionType
+  direction               WalletDirection
+  status                  WalletTransactionStatus
+  amountCents             Int
+  /// Balance before this ledger movement (null for legacy rows).
+  balanceBeforeCents      Int?
+  balanceAfterCents       Int?
+  idempotencyKey          String?                 @unique
+  referenceType           String?
+  referenceId             String?
+  /// Wallet balance-change email: null | sending | sent | failed | not_configured | skipped
+  emailNotificationStatus String?
+  emailNotifiedAt         DateTime?
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  wallet                  WalletAccount           @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  purchaseAsDebit         WalletEsimPurchase?     @relation("PurchaseDebitTx")
+  purchaseAsRefund        WalletEsimPurchase?     @relation("PurchaseRefundTx")
+  topupAsCredit           WalletTopup?            @relation("TopupCreditTx")
 
   @@index([walletId])
   @@index([createdAt])
   @@index([type])
   @@index([status])
   @@index([walletId, createdAt])
+  @@index([emailNotificationStatus])
 }
 
 /// Gateway-independent CUSTOMER wallet top-up attempt.

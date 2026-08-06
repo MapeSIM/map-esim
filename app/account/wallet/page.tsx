@@ -136,6 +136,11 @@ export default async function AccountWalletPage({
                       Ref {row.referenceLabel}
                     </p>
                   ) : null}
+                  {row.notificationLabel ? (
+                    <p className="mt-1 break-words text-xs text-[var(--text-soft)]">
+                      {row.notificationLabel}
+                    </p>
+                  ) : null}
                 </li>
               ))}
             </ul>

@@ -115,6 +115,16 @@ export function formatWalletReference(
   return `${type} · …${suffix}`;
 }
 
+/** Short masked wallet transaction id for customer emails/UI. */
+export function shortWalletTransactionReference(
+  transactionId: string | null | undefined
+): string {
+  const id = (transactionId ?? "").trim();
+  if (!id) return "—";
+  if (id.length <= 8) return "••••";
+  return `${id.slice(0, 4)}…${id.slice(-4)}`;
+}
+
 export function formatWalletTransactionAmount(
   amountCents: number,
   direction: string

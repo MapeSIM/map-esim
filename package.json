@@ -33,6 +33,7 @@
     "qa:iccid-reveal": "tsx scripts/qa-iccid-reveal.ts",
     "qa:admin-customer-orders": "tsx scripts/qa-admin-customer-orders.ts",
     "qa:customer-my-esims": "tsx scripts/qa-customer-my-esims.ts",
+    "qa:wallet-transaction-email": "tsx scripts/qa-wallet-transaction-email.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

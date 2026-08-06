@@ -17,6 +17,7 @@ import {
   WALLET_TOPUP_MIN_CENTS,
 } from "@/app/lib/wallet/amount";
 import { formatUsdCents } from "@/app/lib/wallet/display";
+import { scheduleWalletTransactionNotification } from "@/app/lib/wallet/transactionNotification";
 import {
   TOPUP_CREDIT_REFERENCE_TYPE,
   TOPUP_CREDITED,
@@ -684,7 +685,7 @@ export async function applyVerifiedTopupPaymentEvent(
   }
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const claimed = await tx.walletTopup.updateMany({
         where: {
           id: topup.id,
@@ -781,6 +782,7 @@ export async function applyVerifiedTopupPaymentEvent(
           direction: WalletDirection.CREDIT,
           status: WalletTransactionStatus.COMPLETED,
           amountCents: topup.creditAmountCents,
+          balanceBeforeCents: wallet.balanceCents,
           balanceAfterCents: updated.balanceCents,
           idempotencyKey: `topup_${topup.id}`,
           referenceType: TOPUP_CREDIT_REFERENCE_TYPE,
@@ -821,6 +823,15 @@ export async function applyVerifiedTopupPaymentEvent(
         creditAmountCents: topup.creditAmountCents,
       };
     });
+
+    if (
+      !result.duplicate &&
+      result.status === WalletTopupStatus.CREDITED &&
+      result.walletTransactionId
+    ) {
+      scheduleWalletTransactionNotification(result.walletTransactionId);
+    }
+    return result;
   } catch (error) {
     if (error instanceof WalletTopupError) throw error;
     if (isUniqueViolation(error)) {

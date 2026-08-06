@@ -19,7 +19,8 @@ export type BillingNoticeKind =
   | "payment_status"
   | "payment_failed"
   | "refund_status"
-  | "invoice";
+  | "invoice"
+  | "wallet_transaction";
 
 export type SendBillingEmailResult =
   | { ok: true }

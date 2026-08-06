@@ -415,6 +415,11 @@ export default async function AdminCustomerDetailPage({
                           Ref {row.referenceLabel}
                         </p>
                       ) : null}
+                      {row.notificationLabel ? (
+                        <p className="mt-1 text-xs text-[var(--text-soft)] break-words">
+                          {row.notificationLabel}
+                        </p>
+                      ) : null}
                       {row.relatedOrderId ? (
                         <p className="mt-2">
                           <Link

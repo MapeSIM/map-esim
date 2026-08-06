@@ -10,6 +10,7 @@ import {
 import { prisma } from "@/app/lib/db";
 import { ADMIN_DEBIT_MIN_CENTS } from "@/app/lib/wallet/amount";
 import { formatUsdCents } from "@/app/lib/wallet/display";
+import { scheduleWalletTransactionNotification } from "@/app/lib/wallet/transactionNotification";
 
 export const ADMIN_MANUAL_DEBIT_REFERENCE_TYPE = "ADMIN_MANUAL_DEBIT";
 export const ADMIN_WALLET_DEBIT_AUDIT_ACTION = "wallet.admin_debit_completed";
@@ -160,7 +161,7 @@ export async function debitCustomerWalletByAdmin(
   if (prior) return prior;
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const existingTx = await tx.walletTransaction.findUnique({
         where: { idempotencyKey },
         select: {
@@ -296,6 +297,7 @@ export async function debitCustomerWalletByAdmin(
           direction: WalletDirection.DEBIT,
           status: WalletTransactionStatus.COMPLETED,
           amountCents,
+          balanceBeforeCents: wallet.balanceCents,
           balanceAfterCents: walletAfter.balanceCents,
           idempotencyKey,
           referenceType: ADMIN_MANUAL_DEBIT_REFERENCE_TYPE,
@@ -339,6 +341,11 @@ export async function debitCustomerWalletByAdmin(
         currency: "USD" as const,
       };
     });
+
+    if (!result.duplicate) {
+      scheduleWalletTransactionNotification(result.transactionId);
+    }
+    return result;
   } catch (error) {
     if (error instanceof AdminWalletDebitError) throw error;
 
