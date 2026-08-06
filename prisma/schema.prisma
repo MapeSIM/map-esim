@@ -248,89 +248,115 @@ model Order {
 
 /// Durable ADMIN company-funded eSIM assignment attempt (provider write outside Prisma tx).
 model AdminPackageAssignment {
-  id                  String                       @id @default(cuid())
-  customerUserId      String
-  adminUserId         String
-  offerId             String
-  destinationCode     String?
-  destinationName     String?
-  planName            String?
-  dataAllowance       String?
-  validity            String?
-  fundingSource       OrderFundingSource           @default(COMPANY_FUNDED)
+  id                              String                       @id @default(cuid())
+  customerUserId                  String
+  adminUserId                     String
+  offerId                         String
+  destinationCode                 String?
+  destinationName                 String?
+  planName                        String?
+  dataAllowance                   String?
+  validity                        String?
+  fundingSource                   OrderFundingSource           @default(COMPANY_FUNDED)
   /// Provider/company cost snapshot in integer USD cents when reliably available.
-  providerCostCents   Int?
-  providerCurrency    String                       @default("USD")
-  status              AdminPackageAssignmentStatus @default(DRAFT)
-  idempotencyKey      String                       @unique
-  orderId             String?                      @unique
+  providerCostCents               Int?
+  providerCurrency                String                       @default("USD")
+  status                          AdminPackageAssignmentStatus @default(DRAFT)
+  idempotencyKey                  String                       @unique
+  orderId                         String?                      @unique
   /// Stored only when required for reconciliation; never shown to CUSTOMER.
-  providerOrderId     String?
-  reason              String
-  internalReference   String?
-  failureCategory     String?
-  failureCode         String?
-  reconciliationState String?
-  emailDeliveryStatus String?
-  createdAt           DateTime                     @default(now())
-  updatedAt           DateTime                     @updatedAt
-  completedAt         DateTime?
-  customer            User                         @relation("AssignmentCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
-  admin               User                         @relation("AssignmentAdmin", fields: [adminUserId], references: [id], onDelete: Restrict)
-  order               Order?                       @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  providerOrderId                 String?
+  /// Safe provider outcome snapshot: success | declined | uncertain | none
+  providerResultKind              String?
+  providerObservedAt              DateTime?
+  /// Non-secret provider status token (e.g. http_500). Never raw payload.
+  safeProviderStatusCode          String?
+  reconciliationResolvedAt        DateTime?
+  reconciliationResolvedByAdminId String?
+  reconciliationResolutionReason  String?
+  reconciliationLockedAt          DateTime?
+  reason                          String
+  internalReference               String?
+  failureCategory                 String?
+  failureCode                     String?
+  reconciliationState             String?
+  emailDeliveryStatus             String?
+  createdAt                       DateTime                     @default(now())
+  updatedAt                       DateTime                     @updatedAt
+  completedAt                     DateTime?
+  customer                        User                         @relation("AssignmentCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
+  admin                           User                         @relation("AssignmentAdmin", fields: [adminUserId], references: [id], onDelete: Restrict)
+  order                           Order?                       @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([customerUserId])
   @@index([adminUserId])
   @@index([status])
   @@index([createdAt])
   @@index([customerUserId, createdAt])
+  @@index([providerOrderId])
+  @@index([providerResultKind])
+  @@index([status, updatedAt])
+  @@index([reconciliationResolvedAt])
 }
 
 /// Durable CUSTOMER wallet-funded eSIM purchase attempt (provider write outside Prisma tx).
 model WalletEsimPurchase {
-  id                     String                   @id @default(cuid())
-  customerUserId         String
+  id                              String                   @id @default(cuid())
+  customerUserId                  String
   /// Null for self-service CUSTOMER purchases. Set for admin-assisted wallet buys.
-  adminUserId            String?
+  adminUserId                     String?
   /// Required when adminUserId is set. Never shown to CUSTOMER.
-  assistedPurchaseReason String?
-  offerId                String
-  destinationCode        String?
-  destinationName        String?
-  planName               String?
-  dataAllowance          String?
-  validity               String?
+  assistedPurchaseReason          String?
+  offerId                         String
+  destinationCode                 String?
+  destinationName                 String?
+  planName                        String?
+  dataAllowance                   String?
+  validity                        String?
   /// Authoritative customer selling price in integer USD cents.
-  priceCents             Int
+  priceCents                      Int
   /// Provider/partner cost snapshot when safely available (ADMIN-only visibility).
-  providerCostCents      Int?
-  currency               String                   @default("USD")
-  fundingSource          OrderFundingSource       @default(CUSTOMER_WALLET)
-  status                 WalletEsimPurchaseStatus @default(DRAFT)
-  idempotencyKey         String                   @unique
-  debitTransactionId     String?                  @unique
-  refundTransactionId    String?                  @unique
-  orderId                String?                  @unique
+  providerCostCents               Int?
+  currency                        String                   @default("USD")
+  fundingSource                   OrderFundingSource       @default(CUSTOMER_WALLET)
+  status                          WalletEsimPurchaseStatus @default(DRAFT)
+  idempotencyKey                  String                   @unique
+  debitTransactionId              String?                  @unique
+  refundTransactionId             String?                  @unique
+  orderId                         String?                  @unique
   /// Stored only when required for reconciliation; never shown to CUSTOMER.
-  providerOrderId        String?
-  failureCategory        String?
-  failureCode            String?
-  reconciliationState    String?
-  emailDeliveryStatus    String?
-  createdAt              DateTime                 @default(now())
-  updatedAt              DateTime                 @updatedAt
-  completedAt            DateTime?
-  customer               User                     @relation("WalletPurchaseCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
-  admin                  User?                    @relation("AssistedWalletPurchaseAdmin", fields: [adminUserId], references: [id], onDelete: SetNull)
-  order                  Order?                   @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  debitTransaction       WalletTransaction?       @relation("PurchaseDebitTx", fields: [debitTransactionId], references: [id], onDelete: SetNull)
-  refundTransaction      WalletTransaction?       @relation("PurchaseRefundTx", fields: [refundTransactionId], references: [id], onDelete: SetNull)
+  providerOrderId                 String?
+  /// Safe provider outcome snapshot: success | declined | uncertain | none
+  providerResultKind              String?
+  providerObservedAt              DateTime?
+  /// Non-secret provider status token (e.g. http_500). Never raw payload.
+  safeProviderStatusCode          String?
+  reconciliationResolvedAt        DateTime?
+  reconciliationResolvedByAdminId String?
+  reconciliationResolutionReason  String?
+  reconciliationLockedAt          DateTime?
+  failureCategory                 String?
+  failureCode                     String?
+  reconciliationState             String?
+  emailDeliveryStatus             String?
+  createdAt                       DateTime                 @default(now())
+  updatedAt                       DateTime                 @updatedAt
+  completedAt                     DateTime?
+  customer                        User                     @relation("WalletPurchaseCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
+  admin                           User?                    @relation("AssistedWalletPurchaseAdmin", fields: [adminUserId], references: [id], onDelete: SetNull)
+  order                           Order?                   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  debitTransaction                WalletTransaction?       @relation("PurchaseDebitTx", fields: [debitTransactionId], references: [id], onDelete: SetNull)
+  refundTransaction               WalletTransaction?       @relation("PurchaseRefundTx", fields: [refundTransactionId], references: [id], onDelete: SetNull)
 
   @@index([customerUserId])
   @@index([adminUserId])
   @@index([status])
   @@index([createdAt])
   @@index([customerUserId, createdAt])
+  @@index([providerOrderId])
+  @@index([providerResultKind])
+  @@index([status, updatedAt])
+  @@index([reconciliationResolvedAt])
 }
 
 model AuditLog {

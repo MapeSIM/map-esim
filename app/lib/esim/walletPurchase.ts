@@ -16,6 +16,10 @@ import { persistAssignedOrder } from "@/app/lib/orders/persistAssignedOrder";
 import { deliverOrderEmailAfterCheckout } from "@/app/lib/email/deliverAfterCheckout";
 import { createOrderAccessToken } from "@/app/lib/vesim/orderAccess";
 import { executeCreditCheckout } from "@/app/lib/vesim/creditCheckout";
+import {
+  persistWalletPurchaseProviderObservation,
+  type ProviderResultKind,
+} from "@/app/lib/esim/providerResultPersist";
 import { formatUsdCents } from "@/app/lib/wallet/display";
 import { scheduleWalletTransactionNotification } from "@/app/lib/wallet/transactionNotification";
 import {
@@ -536,7 +540,24 @@ async function markReconciliationRequired(options: {
   assisted: boolean;
   category: string;
   code: string;
+  /** Persist observed provider reference before status flip when available. */
+  providerObservation?: {
+    providerOrderId?: string | null;
+    providerResultKind: ProviderResultKind;
+    safeProviderStatusCode?: string | null;
+  };
 }): Promise<never> {
+  // Persist any observed providerOrderId before marking RECONCILIATION_REQUIRED.
+  // Never overwrites a different stored id; never stores raw payloads.
+  if (options.providerObservation) {
+    await persistWalletPurchaseProviderObservation(options.purchaseId, {
+      providerOrderId: options.providerObservation.providerOrderId,
+      providerResultKind: options.providerObservation.providerResultKind,
+      safeProviderStatusCode:
+        options.providerObservation.safeProviderStatusCode,
+    });
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.walletEsimPurchase.update({
       where: { id: options.purchaseId },
@@ -897,6 +918,11 @@ export async function confirmWalletEsimPurchase(
       assisted: isAssisted,
       category: checkout.category,
       code: checkout.code,
+      providerObservation: {
+        providerOrderId: checkout.providerOrderId ?? null,
+        providerResultKind: "uncertain",
+        safeProviderStatusCode: checkout.code,
+      },
     });
   }
 
@@ -955,6 +981,8 @@ export async function confirmWalletEsimPurchase(
           status: WalletEsimPurchaseStatus.COMPLETED,
           orderId: order.id,
           providerOrderId: order.providerOrderId,
+          providerResultKind: "success",
+          providerObservedAt: new Date(),
           completedAt: new Date(),
           failureCategory: null,
           failureCode: null,
@@ -1003,6 +1031,11 @@ export async function confirmWalletEsimPurchase(
       assisted: isAssisted,
       category: "local_finalize_failed",
       code: "order_persist_error",
+      providerObservation: {
+        providerOrderId: successCheckout.providerOrderId,
+        providerResultKind: "success",
+        safeProviderStatusCode: "local_finalize_failed",
+      },
     });
   }
 

@@ -24,6 +24,8 @@ export type CreditCheckoutResult =
       kind: "uncertain";
       category: string;
       code: string;
+      /** Present when the provider response included an order id (persist before recon). */
+      providerOrderId?: string;
       payload?: Record<string, unknown>;
     };
 
@@ -116,6 +118,7 @@ export async function executeCreditCheckout(options: {
       kind: "uncertain",
       category: "provider_uncertain",
       code: "offer_mismatch",
+      providerOrderId,
       payload,
     };
   }

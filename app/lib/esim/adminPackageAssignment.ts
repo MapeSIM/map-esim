@@ -12,6 +12,10 @@ import { usdPriceToCents } from "@/app/lib/esim/assignmentValidation";
 import { persistAssignedOrder } from "@/app/lib/orders/persistAssignedOrder";
 import { deliverOrderEmailAfterCheckout } from "@/app/lib/email/deliverAfterCheckout";
 import { createOrderAccessToken } from "@/app/lib/vesim/orderAccess";
+import {
+  persistAssignmentProviderObservation,
+  type ProviderResultKind,
+} from "@/app/lib/esim/providerResultPersist";
 import { formatUsdCents } from "@/app/lib/wallet/display";
 import {
   extractOrderId,
@@ -335,8 +339,22 @@ async function markReconciliationRequired(
   adminUserId: string,
   customerUserId: string,
   category: string,
-  code: string
+  code: string,
+  providerObservation?: {
+    providerOrderId?: string | null;
+    providerResultKind: ProviderResultKind;
+    safeProviderStatusCode?: string | null;
+  }
 ): Promise<never> {
+  // Persist any observed providerOrderId before marking RECONCILIATION_REQUIRED.
+  if (providerObservation) {
+    await persistAssignmentProviderObservation(assignmentId, {
+      providerOrderId: providerObservation.providerOrderId,
+      providerResultKind: providerObservation.providerResultKind,
+      safeProviderStatusCode: providerObservation.safeProviderStatusCode,
+    });
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.adminPackageAssignment.update({
       where: { id: assignmentId },
@@ -546,7 +564,11 @@ export async function confirmAdminPackageAssignment(
       adminUserId,
       customerUserId,
       "provider_timeout",
-      "checkout_transport_error"
+      "checkout_transport_error",
+      {
+        providerResultKind: "uncertain",
+        safeProviderStatusCode: "checkout_transport_error",
+      }
     );
   }
 
@@ -556,7 +578,11 @@ export async function confirmAdminPackageAssignment(
       adminUserId,
       customerUserId,
       "provider_timeout",
-      "checkout_missing_response"
+      "checkout_missing_response",
+      {
+        providerResultKind: "uncertain",
+        safeProviderStatusCode: "checkout_missing_response",
+      }
     );
   }
 
@@ -571,7 +597,11 @@ export async function confirmAdminPackageAssignment(
         adminUserId,
         customerUserId,
         "provider_uncertain",
-        `http_${status}`
+        `http_${status}`,
+        {
+          providerResultKind: "uncertain",
+          safeProviderStatusCode: `http_${status}`,
+        }
       );
     }
     await markFailed(
@@ -591,7 +621,11 @@ export async function confirmAdminPackageAssignment(
       adminUserId,
       customerUserId,
       "provider_uncertain",
-      "missing_provider_order_id"
+      "missing_provider_order_id",
+      {
+        providerResultKind: "uncertain",
+        safeProviderStatusCode: "missing_provider_order_id",
+      }
     );
   }
 
@@ -607,7 +641,12 @@ export async function confirmAdminPackageAssignment(
       adminUserId,
       customerUserId,
       "provider_uncertain",
-      "offer_mismatch"
+      "offer_mismatch",
+      {
+        providerOrderId: providerOrderId!,
+        providerResultKind: "uncertain",
+        safeProviderStatusCode: "offer_mismatch",
+      }
     );
   }
 
@@ -632,6 +671,8 @@ export async function confirmAdminPackageAssignment(
           status: AdminPackageAssignmentStatus.COMPLETED,
           orderId: order.id,
           providerOrderId: order.providerOrderId,
+          providerResultKind: "success",
+          providerObservedAt: new Date(),
           offerId: offer.offerId,
           destinationCode: offer.countryCode,
           destinationName: offer.countryName || offer.countryCode,
@@ -680,7 +721,12 @@ export async function confirmAdminPackageAssignment(
       adminUserId,
       customerUserId,
       "local_finalize_failed",
-      "order_persist_error"
+      "order_persist_error",
+      {
+        providerOrderId: providerOrderId!,
+        providerResultKind: "success",
+        safeProviderStatusCode: "local_finalize_failed",
+      }
     );
   }
 
@@ -690,7 +736,12 @@ export async function confirmAdminPackageAssignment(
       adminUserId,
       customerUserId,
       "local_finalize_failed",
-      "order_id_missing"
+      "order_id_missing",
+      {
+        providerOrderId: providerOrderId!,
+        providerResultKind: "success",
+        safeProviderStatusCode: "order_id_missing",
+      }
     );
   }
 
