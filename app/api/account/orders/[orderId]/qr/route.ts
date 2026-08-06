@@ -72,7 +72,7 @@ export async function GET(
       headers: {
         "Content-Type": "image/png",
         "Content-Disposition": `${disposition}; filename="${filename}"`,
-        "Cache-Control": "private, no-store",
+        "Cache-Control": "private, no-store, max-age=0",
         Pragma: "no-cache",
         "X-Content-Type-Options": "nosniff",
       },
@@ -90,7 +90,7 @@ export async function GET(
       {
         status: 500,
         headers: {
-          "Cache-Control": "private, no-store",
+          "Cache-Control": "private, no-store, max-age=0",
           Pragma: "no-cache",
         },
       }

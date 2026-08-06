@@ -74,7 +74,7 @@ export async function requireRole(role: "CUSTOMER" | "ADMIN") {
 
 export function privateNoStoreHeaders(): HeadersInit {
   return {
-    "Cache-Control": "private, no-store",
+    "Cache-Control": "private, no-store, max-age=0",
     Pragma: "no-cache",
   };
 }

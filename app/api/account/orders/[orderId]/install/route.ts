@@ -15,7 +15,7 @@ import {
 import { publicErrorMessage } from "@/app/lib/vesim/server";
 
 const NO_STORE = {
-  "Cache-Control": "private, no-store",
+  "Cache-Control": "private, no-store, max-age=0",
   Pragma: "no-cache",
 };
 

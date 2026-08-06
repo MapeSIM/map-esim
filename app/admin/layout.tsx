@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
 import AdminNav from "@/app/components/admin/AdminNav";
 import { requireRole } from "@/app/lib/auth/session";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false, nocache: true },
+};
 
 export default async function AdminLayout({
   children,

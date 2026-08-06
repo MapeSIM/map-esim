@@ -26,7 +26,7 @@ export async function GET() {
     return NextResponse.json(
       {
         success: false,
-        error: publicErrorMessage(error, "Destination API failed"),
+        error: publicErrorMessage(error, "Unable to load destinations"),
       },
       { status: 500 }
     );

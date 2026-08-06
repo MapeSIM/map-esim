@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
         { success: false, error: "Not found" },
         {
           status: 404,
-          headers: { "Cache-Control": "private, no-store" },
+          headers: { "Cache-Control": "private, no-store, max-age=0" },
         }
       );
     }
@@ -172,7 +172,7 @@ export async function GET(req: NextRequest) {
       },
       {
         headers: {
-          "Cache-Control": "private, no-store",
+          "Cache-Control": "private, no-store, max-age=0",
         },
       }
     );
@@ -189,7 +189,7 @@ export async function GET(req: NextRequest) {
       },
       {
         status: 500,
-        headers: { "Cache-Control": "private, no-store" },
+        headers: { "Cache-Control": "private, no-store, max-age=0" },
       }
     );
   }

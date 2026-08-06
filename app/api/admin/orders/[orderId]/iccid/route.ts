@@ -5,7 +5,7 @@ import { Role } from "@prisma/client";
 import { revealIccidForAdmin } from "@/app/lib/orders/iccidReveal";
 
 const NO_STORE = {
-  "Cache-Control": "private, no-store",
+  "Cache-Control": "private, no-store, max-age=0",
   Pragma: "no-cache",
 } as const;
 

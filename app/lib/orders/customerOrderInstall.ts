@@ -23,7 +23,7 @@ function notFoundResponse(): NextResponse {
     {
       status: 404,
       headers: {
-        "Cache-Control": "private, no-store",
+        "Cache-Control": "private, no-store, max-age=0",
         Pragma: "no-cache",
       },
     }

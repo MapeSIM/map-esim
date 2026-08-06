@@ -111,7 +111,7 @@ export async function GET(req: NextRequest) {
       headers: {
         "Content-Type": "image/png",
         "Content-Disposition": `${disposition}; filename="${filename}"`,
-        "Cache-Control": "private, no-store",
+        "Cache-Control": "private, no-store, max-age=0",
         "Pragma": "no-cache",
         "X-Content-Type-Options": "nosniff",
       },

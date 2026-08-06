@@ -210,7 +210,7 @@ async function main() {
     !/const safeOrder = \{[\s\S]*?\biccid:\s*install\.iccid/.test(orderDetails),
     "safeOrder must not expose full install.iccid"
   );
-  assert.match(orderDetails, /"Cache-Control":\s*"private, no-store"/);
+  assert.match(orderDetails, /"Cache-Control":\s*"private, no-store/);
   assert.match(adminOrders, /formatStoredIccidLast4|adminIccidDisplay/);
   assert.match(adminOrders, /Pending from provider/);
   assert.doesNotMatch(adminOrders, /On file \(hidden\)/);

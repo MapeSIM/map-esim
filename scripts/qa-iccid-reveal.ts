@@ -39,7 +39,7 @@ function main() {
   assert.match(adminApi, /auth\(\)/);
   assert.match(adminApi, /revealIccidForAdmin/);
   assert.match(adminApi, /Role\.ADMIN/);
-  assert.match(adminApi, /Cache-Control": "private, no-store"/);
+  assert.match(adminApi, /Cache-Control": "private, no-store/);
   assert.match(adminApi, /,\s*404\)/);
   assert.doesNotMatch(adminApi, /formData\.get\("userId"\)|searchParams\.get\("userId"\)/);
   console.log("PASS admin_api_auth");
@@ -47,7 +47,7 @@ function main() {
   assert.match(customerApi, /auth\(\)/);
   assert.match(customerApi, /revealIccidForCustomer/);
   assert.match(customerApi, /sessionRole !== "CUSTOMER"/);
-  assert.match(customerApi, /Cache-Control": "private, no-store"/);
+  assert.match(customerApi, /Cache-Control": "private, no-store/);
   assert.match(customerApi, /,\s*404\)/);
   assert.doesNotMatch(
     customerApi,

@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { buildNextConfigHeaderSources } from "./app/lib/security/headers";
 
 const nextConfig: NextConfig = {
   images: {
@@ -11,16 +12,7 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
-    const privateNoStore = [
-      { key: "Cache-Control", value: "private, no-store" },
-      { key: "Pragma", value: "no-cache" },
-    ];
-    return [
-      { source: "/account", headers: privateNoStore },
-      { source: "/account/:path*", headers: privateNoStore },
-      { source: "/admin", headers: privateNoStore },
-      { source: "/admin/:path*", headers: privateNoStore },
-    ];
+    return buildNextConfigHeaderSources(process.env);
   },
 };
 

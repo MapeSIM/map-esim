@@ -1,8 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requireSession } from "@/app/lib/auth/session";
 import { signOutAction } from "@/app/lib/auth/actions";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false, nocache: true },
+};
 
 const links = [
   { href: "/account", label: "Overview" },

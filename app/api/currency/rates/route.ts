@@ -4,6 +4,11 @@ import {
   FALLBACK_USD_RATES,
   type CurrencyCode,
 } from "@/app/lib/currency/currencies";
+import { PUBLIC_CURRENCY_RATES_CACHE } from "@/app/lib/security/headers";
+
+const PUBLIC_HEADERS = {
+  "Cache-Control": PUBLIC_CURRENCY_RATES_CACHE,
+} as const;
 
 export async function GET() {
   try {
@@ -33,18 +38,24 @@ export async function GET() {
       ])
     ) as Record<CurrencyCode, number>;
 
-    return NextResponse.json({
-      success: true,
-      base: "USD",
-      source: "exchangerate-api.com",
-      rates,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        base: "USD",
+        source: "exchangerate-api.com",
+        rates,
+      },
+      { headers: PUBLIC_HEADERS }
+    );
   } catch {
-    return NextResponse.json({
-      success: true,
-      base: "USD",
-      source: "fallback",
-      rates: FALLBACK_USD_RATES,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        base: "USD",
+        source: "fallback",
+        rates: FALLBACK_USD_RATES,
+      },
+      { headers: PUBLIC_HEADERS }
+    );
   }
 }

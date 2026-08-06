@@ -50,7 +50,7 @@ export async function GET(
     return NextResponse.redirect(redirectUrl, {
       status: 302,
       headers: {
-        "Cache-Control": "private, no-store",
+        "Cache-Control": "private, no-store, max-age=0",
         Pragma: "no-cache",
       },
     });
@@ -70,7 +70,7 @@ export async function GET(
       {
         status: 500,
         headers: {
-          "Cache-Control": "private, no-store",
+          "Cache-Control": "private, no-store, max-age=0",
           Pragma: "no-cache",
         },
       }

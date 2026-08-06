@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { PRIVATE_API_RESPONSE_HEADERS } from "@/app/lib/security/headers";
 
 /**
  * Broker tokens must never be exposed to the browser.
@@ -10,7 +11,7 @@ export async function GET() {
       success: false,
       error: "Not found",
     },
-    { status: 404 }
+    { status: 404, headers: PRIVATE_API_RESPONSE_HEADERS }
   );
 }
 
@@ -20,6 +21,6 @@ export async function POST() {
       success: false,
       error: "Not found",
     },
-    { status: 404 }
+    { status: 404, headers: PRIVATE_API_RESPONSE_HEADERS }
   );
 }

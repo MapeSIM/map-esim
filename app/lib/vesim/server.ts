@@ -319,20 +319,19 @@ export function failIdempotentCheckout(key: string) {
   idempotencyStore.delete(normalized);
 }
 
+/**
+ * Customer-facing API error text only.
+ * Production (and browser responses generally) use the provided fallback or the
+ * opaque VeSIM environment message — never Prisma/SQL/provider/config details.
+ * Server logs remain responsible for safe diagnostics.
+ */
 export function publicErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof VesimEnvironmentError) {
     return error.message;
   }
-  if (error instanceof Error) {
-    const message = error.message.trim();
-    // Never expose env/config internals or provider auth details.
-    if (
-      /password|token|authorization|vesim|env|configuration/i.test(message)
-    ) {
-      return fallback;
-    }
-    if (message) return message;
-  }
+  // Always fail closed for unknown errors — do not forward Error.message
+  // (may contain Prisma, SQL, hosts, or provider wording).
+  void error;
   return fallback;
 }
 
