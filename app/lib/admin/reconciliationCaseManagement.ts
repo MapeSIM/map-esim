@@ -17,9 +17,12 @@ import {
   emailResendBlockerLabel,
   evaluateEmailResendEligibility,
   evaluateIccidBackfillLocalEligibility,
+  evaluateLocalFinalizationEligibility,
   evaluateResolutionEligibility,
   iccidBackfillBlockerLabel,
   isIccidBackfillSourceType,
+  isLocalFinalizationSourceType,
+  localFinalizationBlockerLabel,
   LOCK_CASE_PHRASE,
   lowerEscalationPriorities,
   normalizeCaseManagementSourceType,
@@ -121,6 +124,9 @@ export type CaseManagementUiState = {
   iccidBackfillSupported: boolean;
   iccidBackfillAllowed: boolean;
   iccidBackfillMessage: string;
+  localFinalizationSupported: boolean;
+  localFinalizationAllowed: boolean;
+  localFinalizationMessage: string;
 };
 
 const PUBLIC_ERROR = "Unable to update this case right now.";
@@ -262,6 +268,10 @@ function isRefreshInProgress(row: {
   orderId?: string | null;
   orderStatus?: string | null;
   orderProviderOrderId?: string | null;
+  offerId?: string | null;
+  customerUserId?: string | null;
+  priceCents?: number | null;
+  debitTransactionId?: string | null;
   emailDeliveryStatus?: string | null;
   emailNotificationStatus?: string | null;
   customerEmail?: string | null;
@@ -294,6 +304,10 @@ async function loadCaseRow(
         failureCode: true,
         refundTransactionId: true,
         orderId: true,
+        offerId: true,
+        customerUserId: true,
+        priceCents: true,
+        debitTransactionId: true,
         emailDeliveryStatus: true,
         providerRefreshResult: true,
         providerRefreshClaimedAt: true,
@@ -333,6 +347,8 @@ async function loadCaseRow(
         failureCategory: true,
         failureCode: true,
         orderId: true,
+        offerId: true,
+        customerUserId: true,
         emailDeliveryStatus: true,
         providerRefreshResult: true,
         providerRefreshClaimedAt: true,
@@ -558,6 +574,47 @@ export async function getCaseManagementEligibility(options: {
     }
   }
 
+  const localFinalizeSupported = isLocalFinalizationSourceType(ids.sourceType);
+  const localFinalizeEligibility = localFinalizeSupported
+    ? evaluateLocalFinalizationEligibility({
+        sourceType: ids.sourceType,
+        alreadyResolved: resolved,
+        locked,
+        lockedByAdminId: row.reconciliationLockedByAdminId,
+        currentAdminId: (options.adminUserId ?? "").trim(),
+        status: row.status,
+        orderId: row.orderId,
+        providerOrderId: row.providerOrderId,
+        providerResultKind: row.providerResultKind,
+        failureCategory: row.failureCategory,
+        failureCode: row.failureCode,
+        offerId: row.offerId,
+        customerUserId: row.customerUserId,
+        customerEmail: row.customerEmail,
+        priceCents: row.priceCents,
+        debitStatus: row.debitStatus,
+        debitTransactionId: row.debitTransactionId,
+        refundTransactionId: row.refundTransactionId,
+        providerRefreshInProgress: refreshInProgress,
+      })
+    : null;
+
+  let localFinalizationMessage =
+    "Local finalization recovery is not available for this case type.";
+  if (localFinalizeEligibility) {
+    if (!localFinalizeEligibility.allowed) {
+      localFinalizationMessage = localFinalizeEligibility.blockers
+        .map(localFinalizationBlockerLabel)
+        .join(" ");
+    } else if (localFinalizeEligibility.alreadyFinalized) {
+      localFinalizationMessage =
+        "Local record already finalized. Submit only confirms idempotent success.";
+    } else {
+      localFinalizationMessage =
+        "Provider success is linked and local finalization is incomplete. Provider evidence will be re-verified on submit. No email is sent.";
+    }
+  }
+
   return {
     stateLabel: caseManagementStateLabel({
       resolvedAt: row.reconciliationResolvedAt,
@@ -600,6 +657,9 @@ export async function getCaseManagementEligibility(options: {
     iccidBackfillSupported: iccidSupported,
     iccidBackfillAllowed: Boolean(iccidEligibility?.allowed),
     iccidBackfillMessage,
+    localFinalizationSupported: localFinalizeSupported,
+    localFinalizationAllowed: Boolean(localFinalizeEligibility?.allowed),
+    localFinalizationMessage,
   };
 }
 

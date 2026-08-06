@@ -39,6 +39,7 @@
     "qa:admin-reconciliation-case-management": "tsx scripts/qa-admin-reconciliation-case-management.ts",
     "qa:admin-reconciliation-deescalate-email-resend": "tsx scripts/qa-admin-reconciliation-deescalate-email-resend.ts",
     "qa:admin-reconciliation-iccid-backfill": "tsx scripts/qa-admin-reconciliation-iccid-backfill.ts",
+    "qa:admin-reconciliation-local-finalization": "tsx scripts/qa-admin-reconciliation-local-finalization.ts",
     "qa:security-headers": "tsx scripts/qa-security-headers.ts",
     "postinstall": "prisma generate"
   },

@@ -11,6 +11,23 @@ export const RESOLVE_CASE_PHRASE = "RESOLVE CASE";
 export const DEESCALATE_CASE_PHRASE = "DE-ESCALATE CASE";
 export const RESEND_EMAIL_PHRASE = "RESEND EMAIL";
 export const BACKFILL_ICCID_PHRASE = "BACKFILL ICCID";
+export const FINALIZE_LOCAL_RECORD_PHRASE = "FINALIZE LOCAL RECORD";
+
+/** Sources that can recover incomplete local finalization after provider success. */
+export const LOCAL_FINALIZATION_SOURCE_TYPES = [
+  "wallet_purchase",
+  "assignment",
+] as const;
+
+export type LocalFinalizationSourceType =
+  (typeof LOCAL_FINALIZATION_SOURCE_TYPES)[number];
+
+export function isLocalFinalizationSourceType(
+  raw: string | null | undefined
+): raw is LocalFinalizationSourceType {
+  const v = (raw ?? "").trim();
+  return (LOCAL_FINALIZATION_SOURCE_TYPES as readonly string[]).includes(v);
+}
 
 /** Reconciliation sources that can resolve to an Order capable of storing ICCID. */
 export const ICCID_BACKFILL_SOURCE_TYPES = [
@@ -536,6 +553,283 @@ export function iccidBackfillBlockerLabel(code: string): string {
       return "ICCID encryption is not available.";
     default:
       return "ICCID backfill is unavailable for this case.";
+  }
+}
+
+function isLocalFinalizeFailureSignal(input: {
+  failureCategory?: string | null;
+  failureCode?: string | null;
+}): boolean {
+  const category = (input.failureCategory ?? "").trim().toLowerCase();
+  const code = (input.failureCode ?? "").trim().toLowerCase();
+  return (
+    category === "local_finalize_failed" ||
+    code === "order_persist_error" ||
+    code === "order_id_missing"
+  );
+}
+
+/** Pure local gates for controlled local finalization recovery (no VeSIM). */
+export type LocalFinalizationLocalInput = {
+  sourceType: CaseManagementSourceType;
+  alreadyResolved: boolean;
+  locked: boolean;
+  lockedByAdminId?: string | null;
+  currentAdminId: string;
+  status?: string | null;
+  orderId?: string | null;
+  providerOrderId?: string | null;
+  providerResultKind?: string | null;
+  failureCategory?: string | null;
+  failureCode?: string | null;
+  offerId?: string | null;
+  customerUserId?: string | null;
+  customerEmail?: string | null;
+  /** Wallet purchase selling price (cents). Required for wallet_purchase. */
+  priceCents?: number | null;
+  debitStatus?: string | null;
+  debitTransactionId?: string | null;
+  refundTransactionId?: string | null;
+  providerRefreshInProgress?: boolean;
+};
+
+export type LocalFinalizationEligibility = {
+  allowed: boolean;
+  blockers: string[];
+  supported: boolean;
+  /** True when attempt is already COMPLETED with a linked order (idempotent path). */
+  alreadyFinalized: boolean;
+};
+
+export function evaluateLocalFinalizationEligibility(
+  input: LocalFinalizationLocalInput
+): LocalFinalizationEligibility {
+  const blockers: string[] = [];
+  const status = (input.status ?? "").trim().toUpperCase();
+  const hasOrder = Boolean((input.orderId ?? "").trim());
+  const alreadyFinalized = status === "COMPLETED" && hasOrder;
+
+  if (!isLocalFinalizationSourceType(input.sourceType)) {
+    return {
+      allowed: false,
+      blockers: ["unsupported_source"],
+      supported: false,
+      alreadyFinalized: false,
+    };
+  }
+
+  if (input.alreadyResolved) blockers.push("already_resolved");
+  if (!input.locked) blockers.push("case_unlocked");
+  if (input.locked) {
+    const owner = (input.lockedByAdminId ?? "").trim();
+    const actor = (input.currentAdminId ?? "").trim();
+    if (!owner || !actor || owner !== actor) {
+      blockers.push("lock_not_owned");
+    }
+  }
+  if (input.providerRefreshInProgress) {
+    blockers.push("provider_refresh_in_progress");
+  }
+
+  const providerRef = (input.providerOrderId ?? "").trim();
+  if (!providerRef) blockers.push("missing_provider_reference");
+
+  const resultKind = (input.providerResultKind ?? "").trim().toLowerCase();
+  if (resultKind !== "success") {
+    blockers.push("provider_success_not_recorded");
+  }
+
+  if (!(input.offerId ?? "").trim()) blockers.push("missing_package_evidence");
+  if (!(input.customerUserId ?? "").trim()) {
+    blockers.push("missing_customer_evidence");
+  }
+  const email = (input.customerEmail ?? "").trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    blockers.push("missing_customer_evidence");
+  }
+
+  if (alreadyFinalized) {
+    // Idempotent path — still require lock ownership / not resolved above.
+    return {
+      allowed: blockers.length === 0,
+      blockers,
+      supported: true,
+      alreadyFinalized: true,
+    };
+  }
+
+  if (status !== "RECONCILIATION_REQUIRED") {
+    blockers.push("not_finalization_recovery_state");
+  }
+  if (hasOrder) blockers.push("conflicting_local_order_link");
+  if (!isLocalFinalizeFailureSignal(input)) {
+    blockers.push("not_local_finalize_failure");
+  }
+
+  if (input.sourceType === "wallet_purchase") {
+    if (
+      !Number.isInteger(input.priceCents) ||
+      (input.priceCents ?? 0) <= 0
+    ) {
+      blockers.push("missing_pricing_evidence");
+    }
+    if (!(input.debitTransactionId ?? "").trim()) {
+      blockers.push("missing_debit_reservation");
+    }
+    if ((input.refundTransactionId ?? "").trim()) {
+      blockers.push("refund_present");
+    }
+    const debitStatus = (input.debitStatus ?? "").trim().toUpperCase();
+    if (debitStatus && debitStatus !== "PENDING" && debitStatus !== "COMPLETED") {
+      blockers.push("debit_state_unusable");
+    }
+    if (!debitStatus) blockers.push("missing_debit_reservation");
+  }
+
+  return {
+    allowed: blockers.length === 0,
+    blockers,
+    supported: true,
+    alreadyFinalized: false,
+  };
+}
+
+/**
+ * Pure provider-evidence gate for local finalization (offline QA safe).
+ * Does not require ICCID — ICCID remains B3B1 when missing.
+ */
+export type ProviderFinalizationEvidenceInput = {
+  lookupKind: string;
+  orderExists: string;
+  offerMatch: string;
+  safeProviderState?: string | null;
+  hasExpectedOfferId: boolean;
+};
+
+export type ProviderFinalizationEvidenceResult =
+  | { ok: true }
+  | { ok: false; blocker: string };
+
+function isUnusableFinalizationProviderState(
+  state: string | null | undefined
+): boolean {
+  const s = (state ?? "").trim().toLowerCase();
+  if (!s) return false;
+  return /^(pending|processing|queued|failed|fail|cancelled|canceled|error|declined|rejected|unknown|void|expired|refunded)/.test(
+    s
+  );
+}
+
+function isConclusiveSuccessProviderState(
+  state: string | null | undefined
+): boolean {
+  const s = (state ?? "").trim().toLowerCase();
+  if (!s) return true; // FOUND + exists with no state token — treat as conclusive presence
+  return /^(completed|complete|success|successful|active|fulfilled|done|delivered|ok|ready)/.test(
+    s
+  );
+}
+
+export function evaluateProviderFinalizationEvidence(
+  input: ProviderFinalizationEvidenceInput
+): ProviderFinalizationEvidenceResult {
+  const kind = (input.lookupKind ?? "").trim().toUpperCase();
+  if (kind === "NOT_FOUND") return { ok: false, blocker: "provider_not_found" };
+  if (kind === "TIMEOUT") return { ok: false, blocker: "provider_uncertain" };
+  if (kind === "AUTH_FAILURE") {
+    return { ok: false, blocker: "provider_auth_failure" };
+  }
+  if (kind === "ENVIRONMENT_BLOCKED") {
+    return { ok: false, blocker: "provider_environment_blocked" };
+  }
+  if (kind === "PROVIDER_ERROR") return { ok: false, blocker: "provider_error" };
+  if (kind !== "FOUND") return { ok: false, blocker: "provider_uncertain" };
+
+  if ((input.orderExists ?? "").trim().toLowerCase() !== "yes") {
+    return { ok: false, blocker: "provider_order_not_confirmed" };
+  }
+
+  if (
+    input.hasExpectedOfferId &&
+    (input.offerMatch ?? "").trim().toLowerCase() === "no"
+  ) {
+    return { ok: false, blocker: "provider_offer_mismatch" };
+  }
+
+  if (isUnusableFinalizationProviderState(input.safeProviderState)) {
+    return { ok: false, blocker: "provider_state_unusable" };
+  }
+  if (!isConclusiveSuccessProviderState(input.safeProviderState)) {
+    return { ok: false, blocker: "provider_not_completed" };
+  }
+
+  return { ok: true };
+}
+
+export function localFinalizationBlockerLabel(code: string): string {
+  switch (code) {
+    case "unsupported_source":
+      return "This case type does not support local finalization recovery.";
+    case "already_resolved":
+      return "Resolved cases cannot run local finalization recovery.";
+    case "case_unlocked":
+      return "Lock this case before finalizing the local record.";
+    case "lock_not_owned":
+      return "Only the admin who locked this case can finalize the local record.";
+    case "provider_refresh_in_progress":
+      return "A provider status refresh is in progress.";
+    case "missing_provider_reference":
+      return "Provider reference is missing.";
+    case "provider_success_not_recorded":
+      return "Local records do not show confirmed provider success.";
+    case "missing_package_evidence":
+      return "Package/offer evidence is missing on the attempt.";
+    case "missing_customer_evidence":
+      return "Customer evidence is missing on the attempt.";
+    case "missing_pricing_evidence":
+      return "Pricing evidence is missing on the purchase.";
+    case "not_finalization_recovery_state":
+      return "Case is not in a local-finalization recovery state.";
+    case "conflicting_local_order_link":
+      return "A conflicting local order link already exists.";
+    case "not_local_finalize_failure":
+      return "Case is not classified as a local finalization failure.";
+    case "missing_debit_reservation":
+      return "Wallet debit reservation is missing.";
+    case "refund_present":
+      return "A refund is already linked; finalization recovery is blocked.";
+    case "debit_state_unusable":
+      return "Wallet debit is not in a recoverable state.";
+    case "provider_not_found":
+      return "Provider order was not found.";
+    case "provider_uncertain":
+      return "Provider evidence is uncertain.";
+    case "provider_auth_failure":
+      return "Provider authentication failed.";
+    case "provider_environment_blocked":
+      return "Provider environment is not available.";
+    case "provider_error":
+      return "Provider returned an error.";
+    case "provider_order_not_confirmed":
+      return "Provider order existence is not confirmed.";
+    case "provider_offer_mismatch":
+      return "Provider order does not match the expected offer.";
+    case "provider_state_unusable":
+      return "Provider order state is pending, failed, or cancelled.";
+    case "provider_not_completed":
+      return "Provider order is not conclusively completed.";
+    case "conflicting_order_record":
+      return "An existing order conflicts with this attempt.";
+    case "conflicting_attempt_link":
+      return "Another attempt is already linked to this provider order.";
+    case "cas_conflict":
+      return "The case changed concurrently. Refresh and try again.";
+    case "provider_reference_mismatch":
+      return "Provider reference changed concurrently.";
+    case "missing_local_attempt":
+      return "Local purchase or assignment attempt was not found.";
+    default:
+      return "Local finalization recovery is unavailable for this case.";
   }
 }
 

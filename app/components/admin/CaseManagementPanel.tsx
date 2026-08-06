@@ -6,6 +6,7 @@ import {
   escalateReconciliationCaseAction,
   lockReconciliationCaseAction,
   backfillReconciliationIccidAction,
+  finalizeReconciliationLocalRecordAction,
   resendReconciliationEmailAction,
   resolveReconciliationCaseAction,
   unlockReconciliationCaseAction,
@@ -16,6 +17,7 @@ import {
   CASE_REASON_MAX,
   DEESCALATE_CASE_PHRASE,
   ESCALATION_PRIORITIES,
+  FINALIZE_LOCAL_RECORD_PHRASE,
   LOCK_CASE_PHRASE,
   RESEND_EMAIL_PHRASE,
   RESOLUTION_CODES,
@@ -92,6 +94,9 @@ export default function CaseManagementPanel(props: {
   iccidBackfillSupported: boolean;
   iccidBackfillAllowed: boolean;
   iccidBackfillMessage: string;
+  localFinalizationSupported: boolean;
+  localFinalizationAllowed: boolean;
+  localFinalizationMessage: string;
 }) {
   const [lockState, lockAction, lockPending] = useActionState(
     lockReconciliationCaseAction,
@@ -121,6 +126,10 @@ export default function CaseManagementPanel(props: {
     backfillReconciliationIccidAction,
     initial
   );
+  const [finalizeState, finalizeAction, finalizePending] = useActionState(
+    finalizeReconciliationLocalRecordAction,
+    initial
+  );
 
   const readOnly = props.resolved;
   const busy =
@@ -130,7 +139,8 @@ export default function CaseManagementPanel(props: {
     deescalatePending ||
     resolvePending ||
     resendPending ||
-    iccidPending;
+    iccidPending ||
+    finalizePending;
 
   return (
     <section className="space-y-5 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
@@ -558,6 +568,61 @@ export default function CaseManagementPanel(props: {
                 className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {iccidPending ? "Backfilling…" : "Backfill ICCID"}
+              </button>
+            </form>
+          ) : null}
+
+          {props.localFinalizationSupported ? (
+            <form action={finalizeAction} className="space-y-3">
+              <h3 className="text-sm font-semibold text-[var(--heading)]">
+                Finalize local record
+              </h3>
+              <p className="text-sm text-[var(--text-muted)]">
+                {props.localFinalizationMessage}
+              </p>
+              <input type="hidden" name="sourceType" value={props.sourceType} />
+              <input type="hidden" name="attemptId" value={props.attemptId} />
+              <div>
+                <label
+                  htmlFor="local-finalize-reason"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Reason
+                </label>
+                <textarea
+                  id="local-finalize-reason"
+                  name="reason"
+                  required
+                  maxLength={CASE_REASON_MAX}
+                  rows={2}
+                  disabled={busy || !props.localFinalizationAllowed}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                />
+                <FieldError state={finalizeState} field="reason" />
+              </div>
+              <div>
+                <label
+                  htmlFor="local-finalize-confirm"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Type {FINALIZE_LOCAL_RECORD_PHRASE}
+                </label>
+                <input
+                  id="local-finalize-confirm"
+                  name="confirmPhrase"
+                  required
+                  disabled={busy || !props.localFinalizationAllowed}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                />
+                <FieldError state={finalizeState} field="confirmPhrase" />
+              </div>
+              <ActionMessage state={finalizeState} />
+              <button
+                type="submit"
+                disabled={busy || !props.localFinalizationAllowed}
+                className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {finalizePending ? "Finalizing…" : "Finalize local record"}
               </button>
             </form>
           ) : null}

@@ -119,8 +119,9 @@ export default async function AdminReconciliationDetailPage({
           Reconciliation case
         </h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Sanitized timeline and controlled case management. Wallet refunds and
-          order finalization are not available here.
+          Sanitized timeline and controlled case management. Wallet refunds are
+          not available here. Local finalization recovery requires a locked case
+          and confirmed provider evidence.
         </p>
       </div>
 
@@ -192,6 +193,9 @@ export default async function AdminReconciliationDetailPage({
           iccidBackfillSupported={caseUi.iccidBackfillSupported}
           iccidBackfillAllowed={caseUi.iccidBackfillAllowed}
           iccidBackfillMessage={caseUi.iccidBackfillMessage}
+          localFinalizationSupported={caseUi.localFinalizationSupported}
+          localFinalizationAllowed={caseUi.localFinalizationAllowed}
+          localFinalizationMessage={caseUi.localFinalizationMessage}
         />
       ) : null}
 
