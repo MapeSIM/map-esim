@@ -81,6 +81,11 @@ function main() {
   assert.match(confirmForm, /Continue to Secure Payment/);
   assert.match(confirmForm, /paymentGatewayConfigured/);
   assert.match(confirmForm, /gatewayReady/);
+  assert.match(confirmForm, /showGatewayUnavailable/);
+  assert.match(
+    confirmForm,
+    /showGatewayUnavailable \? \([\s\S]*CARD_PAYMENT_UNAVAILABLE_MESSAGE/
+  );
   assert.match(confirmForm, /CARD_PAYMENT_UNAVAILABLE_MESSAGE/);
   assert.match(confirmForm, /Buy eSIM with Wallet/);
   assert.match(confirmForm, /Continue to Payment/);

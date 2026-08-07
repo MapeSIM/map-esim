@@ -50,12 +50,24 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
   const gatewayRequired = preview.gatewayAmountCents > 0;
   const fullWallet = !gatewayRequired && preview.useWallet;
   const walletDisabled = review.balanceCents <= 0;
-  const gatewayReady =
-    gatewayRequired && review.paymentGatewayConfigured;
+  // Single source of truth: unavailable copy only when gateway money is due
+  // and the payment gateway is not actually configured.
+  const paymentGatewayConfigured = review.paymentGatewayConfigured === true;
+  const gatewayReady = gatewayRequired && paymentGatewayConfigured;
+  const showGatewayUnavailable = gatewayRequired && !paymentGatewayConfigured;
   const balanceAfterPreview = Math.max(
     0,
     review.balanceCents - preview.walletAppliedCents
   );
+  // Never surface the setup/unavailable string via action errors when the
+  // gateway is configured (stale/misleading after a prior failed attempt),
+  // and avoid duplicating it when the payment-method status already shows it.
+  const alertError =
+    errorState.ok === false && errorState.error
+      ? errorState.error === CARD_PAYMENT_UNAVAILABLE_MESSAGE
+        ? null
+        : errorState.error
+      : null;
 
   return (
     <form action={formAction} className="space-y-5" noValidate>
@@ -235,7 +247,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 : ""}
               . Your eSIM is created only after payment is verified.
             </p>
-          ) : (
+          ) : showGatewayUnavailable ? (
             <>
               <p className="mt-1 text-sm text-[var(--text-muted)]" role="status">
                 {CARD_PAYMENT_UNAVAILABLE_MESSAGE}
@@ -244,7 +256,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 Remaining due: {formatUsdCents(preview.gatewayAmountCents)}.
               </p>
             </>
-          )}
+          ) : null}
         </section>
       ) : null}
 
@@ -259,12 +271,12 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         </div>
       ) : null}
 
-      {errorState.ok === false && errorState.error ? (
+      {alertError ? (
         <div
           className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--heading)]"
           role="alert"
         >
-          {errorState.error}
+          {alertError}
         </div>
       ) : null}
 
