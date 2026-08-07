@@ -56,6 +56,10 @@ function main() {
   assert.match(gateway, /resumeSafepayHostedCheckout/);
   assert.match(gateway, /reserveSplitWalletBeforeGatewayCheckout/);
   assert.match(gateway, /releaseSplitReservationAfterSessionFailure/);
+  assert.match(
+    read("app/lib/esim/esimPurchasePaymentApply.ts"),
+    /splitReservationDebitIdempotencyKey/
+  );
   assert.doesNotMatch(gateway, /PARTIAL_WALLET_UNSUPPORTED/);
   assert.doesNotMatch(gateway, /confirmWalletEsimPurchase/);
   assert.doesNotMatch(gateway, /executeCreditCheckout/);

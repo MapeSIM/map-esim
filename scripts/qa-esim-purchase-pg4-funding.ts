@@ -117,6 +117,9 @@ function main() {
   assert.match(apply, /WalletEsimPurchaseStatus\.FUNDED/);
   assert.match(apply, /fulfillFundedEsimPurchase/);
   assert.match(apply, /reserveSplitWalletBeforeGatewayCheckout/);
+  assert.match(apply, /splitReservationDebitIdempotencyKey/);
+  assert.match(apply, /debit_\$\{purchaseId\}:\$\{priorCount \+ 1\}/);
+  assert.match(apply, /reuse_pending/);
   assert.match(apply, /releaseSplitReservationAfterSessionFailure/);
   assert.match(apply, /restoreReady:\s*true/);
   assert.match(apply, /executeCreditCheckout/);
@@ -146,6 +149,10 @@ function main() {
   assert.match(adapter, /verifySafepayCardWebhookSignature/);
   assert.match(adapter, /parseSafepayCardWebhookEvent/);
   assert.match(walletPurchase, /release_gw_/);
+  assert.match(
+    walletPurchase,
+    /release_gw_\$\{options\.purchaseId\}_\$\{purchase\.debitTransactionId\}/
+  );
   assert.match(walletPurchase, /restoreReady/);
   assert.match(persist, /CUSTOMER_SPLIT/);
   assert.match(persist, /DIRECT_PAYMENT/);

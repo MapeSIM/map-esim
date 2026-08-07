@@ -701,11 +701,6 @@ export async function refundReservedFundsInTx(
   refundTransactionId: string | null;
 }> {
   const restoreReady = Boolean(options.restoreReady);
-  const refundKey = (
-    restoreReady
-      ? `release_gw_${options.purchaseId}`
-      : `refund_${options.purchaseId}`
-  ).slice(0, 128);
   const expectedReservedCents = options.priceCents;
   if (!Number.isInteger(expectedReservedCents) || expectedReservedCents <= 0) {
     throw new WalletEsimPurchaseError(
@@ -783,6 +778,16 @@ export async function refundReservedFundsInTx(
       refundTransactionId: purchase.refundTransactionId,
     };
   }
+
+  // Gate release keys to the active debit so a later reserve→release cycle
+  // after restoreReady can credit again (legacy key: release_gw_${purchaseId}).
+  const refundKey = (
+    restoreReady
+      ? purchase.debitTransactionId
+        ? `release_gw_${options.purchaseId}_${purchase.debitTransactionId}`
+        : `release_gw_${options.purchaseId}`
+      : `refund_${options.purchaseId}`
+  ).slice(0, 128);
 
   const existingRefund = await tx.walletTransaction.findUnique({
     where: { idempotencyKey: refundKey },

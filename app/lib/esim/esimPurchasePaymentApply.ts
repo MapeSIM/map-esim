@@ -9,12 +9,14 @@ import {
   Role,
   WalletEsimPurchaseStatus,
   WalletTransactionStatus,
+  WalletTransactionType,
 } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
 import {
   refundReservedFundsInTx,
   reserveWalletPurchaseFundsInTx,
   WALLET_PURCHASE_COMPLETED,
+  WALLET_PURCHASE_DEBIT_REF,
   WALLET_PURCHASE_RECONCILIATION,
 } from "@/app/lib/esim/walletPurchase";
 import { persistWalletPurchaseProviderObservation } from "@/app/lib/esim/providerResultPersist";
@@ -867,6 +869,42 @@ export async function maybeReleasePendingGatewayReservation(options: {
   return { released: true };
 }
 
+/**
+ * Exact-once debit key for a split reservation.
+ * After a prior release, `debit_${purchaseId}` remains on the REVERSED row —
+ * allocate `debit_${purchaseId}:N` so READY retries can reserve again once.
+ */
+async function splitReservationDebitIdempotencyKey(
+  tx: Prisma.TransactionClient,
+  purchaseId: string
+): Promise<
+  | { kind: "create"; debitKey: string }
+  | { kind: "reuse_pending"; debitTransactionId: string }
+> {
+  const baseKey = `debit_${purchaseId}`.slice(0, 128);
+  const existing = await tx.walletTransaction.findUnique({
+    where: { idempotencyKey: baseKey },
+    select: { id: true, status: true },
+  });
+  if (!existing) {
+    return { kind: "create", debitKey: baseKey };
+  }
+  if (existing.status === WalletTransactionStatus.PENDING) {
+    return { kind: "reuse_pending", debitTransactionId: existing.id };
+  }
+  const priorCount = await tx.walletTransaction.count({
+    where: {
+      referenceType: WALLET_PURCHASE_DEBIT_REF,
+      referenceId: purchaseId,
+      type: WalletTransactionType.PURCHASE_DEBIT,
+    },
+  });
+  return {
+    kind: "create",
+    debitKey: `debit_${purchaseId}:${priorCount + 1}`.slice(0, 128),
+  };
+}
+
 /** Used by gateway checkout to reserve split wallet funds before redirect. */
 export async function reserveSplitWalletBeforeGatewayCheckout(options: {
   purchaseId: string;
@@ -882,8 +920,6 @@ export async function reserveSplitWalletBeforeGatewayCheckout(options: {
   if (walletAppliedCents === 0) {
     return { debitTransactionId: null, alreadyReserved: false };
   }
-
-  const debitKey = `debit_${options.purchaseId}`.slice(0, 128);
 
   return prisma.$transaction(async (tx) => {
     const current = await tx.walletEsimPurchase.findUnique({
@@ -916,6 +952,28 @@ export async function reserveSplitWalletBeforeGatewayCheckout(options: {
       current.status !== WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT
     ) {
       throw new Error("INVALID_PURCHASE_STATE");
+    }
+
+    const debitKeyPlan = await splitReservationDebitIdempotencyKey(
+      tx,
+      options.purchaseId
+    );
+    if (debitKeyPlan.kind === "reuse_pending") {
+      await tx.walletEsimPurchase.update({
+        where: { id: options.purchaseId },
+        data: {
+          status: WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+          debitTransactionId: debitKeyPlan.debitTransactionId,
+          useWallet: options.useWallet,
+          walletAppliedCents,
+          gatewayAmountCents: options.gatewayAmountCents,
+          fundingSource: OrderFundingSource.CUSTOMER_SPLIT,
+        },
+      });
+      return {
+        debitTransactionId: debitKeyPlan.debitTransactionId,
+        alreadyReserved: true,
+      };
     }
 
     const claimed = await tx.walletEsimPurchase.updateMany({
@@ -957,7 +1015,7 @@ export async function reserveSplitWalletBeforeGatewayCheckout(options: {
       purchaseId: options.purchaseId,
       customerUserId: options.customerUserId,
       amountCents: walletAppliedCents,
-      debitIdempotencyKey: debitKey,
+      debitIdempotencyKey: debitKeyPlan.debitKey,
     });
 
     await tx.walletEsimPurchase.update({
