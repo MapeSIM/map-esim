@@ -227,14 +227,13 @@ export async function confirmWalletEsimPurchaseAction(
         return { ok: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE };
       }
 
+      let checkout;
       try {
-        const checkout = await startEsimPurchaseHostedCheckout({
+        checkout = await startEsimPurchaseHostedCheckout({
           customerUserId: customer.id,
           purchaseId,
           useWallet,
         });
-        // External Safepay Hosted Checkout — never log checkoutUrl/tokens.
-        redirect(checkout.checkoutUrl);
       } catch (error) {
         if (error instanceof EsimPurchaseGatewayCheckoutError) {
           return { ok: false, error: error.message };
@@ -244,30 +243,39 @@ export async function confirmWalletEsimPurchaseAction(
           error: CARD_PAYMENT_UNAVAILABLE_MESSAGE,
         };
       }
+      // Must stay outside try/catch — redirect() throws NEXT_REDIRECT.
+      // External Safepay Hosted Checkout — never log checkoutUrl/tokens.
+      redirect(checkout.checkoutUrl);
     }
   } else {
     // READY funding persist failed (likely AWAITING_GATEWAY_PAYMENT).
     // Attempt gateway resume when card payment is still required.
+    let checkout;
+    let resumeInvalidState = false;
     try {
       if (!isPaymentGatewayConfigured()) {
         return { ok: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE };
       }
-      const checkout = await startEsimPurchaseHostedCheckout({
+      checkout = await startEsimPurchaseHostedCheckout({
         customerUserId: customer.id,
         purchaseId,
         useWallet,
       });
-      redirect(checkout.checkoutUrl);
     } catch (error) {
       if (error instanceof EsimPurchaseGatewayCheckoutError) {
         if (error.code === "INVALID_STATE") {
           // May be full-wallet after funding change while awaiting — fall through.
+          resumeInvalidState = true;
         } else {
           return { ok: false, error: error.message };
         }
       } else {
         return { ok: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE };
       }
+    }
+    if (!resumeInvalidState && checkout) {
+      // Must stay outside try/catch — redirect() throws NEXT_REDIRECT.
+      redirect(checkout.checkoutUrl);
     }
   }
   // Full wallet coverage only — existing secure confirm path.

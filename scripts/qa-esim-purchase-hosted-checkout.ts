@@ -72,6 +72,19 @@ function main() {
   assert.match(actions, /void formData\.get\("chargeAmount"\)/);
   assert.match(actions, /void formData\.get\("currency"\)/);
   assert.match(actions, /redirect\(checkout\.checkoutUrl\)/);
+  assert.match(actions, /Must stay outside try\/catch/);
+  assert.match(actions, /NEXT_REDIRECT/);
+  // redirect() must not be inside the startEsimPurchaseHostedCheckout try/catch.
+  {
+    const gatewayStart = actions.indexOf("startEsimPurchaseHostedCheckout({");
+    const firstRedirect = actions.indexOf("redirect(checkout.checkoutUrl)");
+    const catchAfterStart = actions.indexOf("} catch (error) {", gatewayStart);
+    assert.ok(gatewayStart >= 0 && firstRedirect >= 0 && catchAfterStart >= 0);
+    assert.ok(
+      firstRedirect > catchAfterStart,
+      "redirect(checkoutUrl) must follow the checkout try/catch, not sit inside it"
+    );
+  }
   assert.ok(
     actions.indexOf("startEsimPurchaseHostedCheckout") <
       actions.indexOf("confirmWalletEsimPurchase({")
