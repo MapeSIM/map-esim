@@ -75,10 +75,12 @@ function main() {
   console.log("PASS wallet_must_already_exist");
 
   assert.match(service, /INSUFFICIENT_FUNDS/);
-  assert.match(service, /balanceCents:\s*\{\s*gte:\s*snapshot\.priceCents/);
+  assert.match(service, /reserveWalletPurchaseFundsInTx/);
+  assert.match(service, /amountCents:\s*snapshot\.priceCents/);
+  assert.match(service, /balanceCents:\s*\{\s*gte:\s*amountCents/);
   assert.ok(
     service.indexOf("await executeCreditCheckout") >
-      service.indexOf('balanceCents: { gte: snapshot.priceCents }')
+      service.indexOf("reserveWalletPurchaseFundsInTx")
   );
   console.log("PASS insufficient_balance_before_provider");
 
@@ -99,8 +101,9 @@ function main() {
   console.log("PASS integer_cents_only");
 
   assert.match(service, /updateMany/);
-  assert.match(service, /balanceCents:\s*\{\s*decrement:\s*snapshot\.priceCents/);
+  assert.match(service, /balanceCents:\s*\{\s*decrement:\s*amountCents/);
   assert.match(service, /version:\s*\{\s*increment:\s*1/);
+  assert.match(service, /walletOnlyPurchaseFunding\(snapshot\.priceCents\)/);
   console.log("PASS conditional_atomic_balance_decrement");
 
   assert.match(service, /updated\.count !== 1/);
@@ -132,7 +135,7 @@ function main() {
   assert.match(service, /External provider write/);
   assert.ok(
     service.indexOf("await executeCreditCheckout") >
-      service.indexOf('return debitTx.id')
+      service.indexOf("return reserved.debitTransactionId")
   );
   console.log("PASS provider_call_outside_prisma_transaction");
 

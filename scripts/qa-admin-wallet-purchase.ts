@@ -87,7 +87,8 @@ function main() {
   assert.match(service, /admin_assisted_customer_wallet_esim_purchase/);
   assert.match(service, /OrderFundingSource\.CUSTOMER_WALLET/);
   assert.ok(!/COMPANY_FUNDED/.test(service));
-  assert.match(service, /balanceCents:\s*\{\s*gte:\s*snapshot\.priceCents/);
+  assert.match(service, /balanceCents:\s*\{\s*gte:\s*amountCents/);
+  assert.match(service, /amountCents:\s*snapshot\.priceCents/);
   assert.match(service, /executeCreditCheckout/);
   assert.match(service, /FAILED_REFUNDED/);
   assert.match(service, /RECONCILIATION_REQUIRED/);

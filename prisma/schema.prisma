@@ -26,6 +26,8 @@ enum OrderStatus {
 enum OrderFundingSource {
   COMPANY_FUNDED
   CUSTOMER_WALLET
+  /// Customer package funded by wallet contribution + gateway remainder.
+  CUSTOMER_SPLIT
   DIRECT_PAYMENT
 }
 
@@ -41,7 +43,11 @@ enum AdminPackageAssignmentStatus {
 enum WalletEsimPurchaseStatus {
   DRAFT
   READY
+  /// Waiting for verified gateway payment of gatewayAmountCents (future split path).
+  AWAITING_GATEWAY_PAYMENT
   FUNDS_RESERVED
+  /// Funding fully secured (wallet reserved + gateway confirmed when required).
+  FUNDED
   PROVIDER_PENDING
   COMPLETED
   FAILED_REFUNDED
@@ -89,6 +95,19 @@ enum WalletTopupStatus {
   FAILED
   EXPIRED
   CANCELLED
+  RECONCILIATION_REQUIRED
+}
+
+/// Gateway payment attempt for an eSIM purchase remainder (not wallet top-up).
+enum EsimPurchasePaymentAttemptStatus {
+  DRAFT
+  AWAITING_PAYMENT
+  PAYMENT_PENDING
+  PAYMENT_CONFIRMED
+  FAILED
+  CANCELLED
+  EXPIRED
+  REFUNDED
   RECONCILIATION_REQUIRED
 }
 
@@ -379,6 +398,12 @@ model WalletEsimPurchase {
   validity                         String?
   /// Authoritative customer selling price in integer USD cents.
   priceCents                       Int
+  /// Customer chose to apply wallet funds (server-persisted; never trust browser money).
+  useWallet                        Boolean                  @default(true)
+  /// Server-calculated wallet contribution in USD cents.
+  walletAppliedCents               Int
+  /// Server-calculated gateway remainder in USD cents.
+  gatewayAmountCents               Int                      @default(0)
   /// Provider/partner cost snapshot when safely available (ADMIN-only visibility).
   providerCostCents                Int?
   currency                         String                   @default("USD")
@@ -431,6 +456,7 @@ model WalletEsimPurchase {
   order                            Order?                   @relation(fields: [orderId], references: [id], onDelete: SetNull)
   debitTransaction                 WalletTransaction?       @relation("PurchaseDebitTx", fields: [debitTransactionId], references: [id], onDelete: SetNull)
   refundTransaction                WalletTransaction?       @relation("PurchaseRefundTx", fields: [refundTransactionId], references: [id], onDelete: SetNull)
+  paymentAttempts                  EsimPurchasePaymentAttempt[]
 
   @@index([customerUserId])
   @@index([adminUserId])
@@ -445,6 +471,45 @@ model WalletEsimPurchase {
   @@index([reconciliationEscalatedAt])
   @@index([providerRefreshClaimedAt])
   @@index([providerRefreshResult])
+}
+
+/// Gateway remainder payment attempt for a WalletEsimPurchase (not WalletTopup).
+/// Multiple attempts per purchase are allowed; webhookEventId is globally unique when set.
+model EsimPurchasePaymentAttempt {
+  id                     String                           @id @default(cuid())
+  purchaseId             String
+  /// Authoritative gateway charge in USD cents (matches purchase.gatewayAmountCents at create time).
+  gatewayAmountCents     Int
+  currency               String                           @default("USD")
+  /// Charge currency (e.g. PKR) only when a verified gateway quote exists.
+  chargeCurrency         String?
+  /// Charge amount in minor units only when a verified gateway quote exists.
+  chargeAmountMinor      Int?
+  fxRateSnapshot         String?
+  gatewayProvider        PaymentGatewayProvider?
+  /// Stored only when required for reconciliation; masked in customer UI.
+  gatewayPaymentRef      String?
+  status                 EsimPurchasePaymentAttemptStatus @default(DRAFT)
+  checkoutIdempotencyKey String                           @unique
+  /// Unique verified webhook/event id when available.
+  webhookEventId         String?                          @unique
+  failureCategory        String?
+  failureCode            String?
+  reconciliationState    String?
+  expiresAt              DateTime?
+  paymentConfirmedAt     DateTime?
+  cancelledAt            DateTime?
+  failedAt               DateTime?
+  refundedAt             DateTime?
+  createdAt              DateTime                         @default(now())
+  updatedAt              DateTime                         @updatedAt
+  purchase               WalletEsimPurchase               @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([purchaseId, createdAt])
+  @@index([gatewayProvider])
 }
 
 model AuditLog {

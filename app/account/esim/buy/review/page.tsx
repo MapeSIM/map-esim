@@ -59,7 +59,9 @@ export default async function AccountWalletBuyReviewPage({
   if (
     review.status === WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED ||
     review.status === WalletEsimPurchaseStatus.PROVIDER_PENDING ||
-    review.status === WalletEsimPurchaseStatus.FUNDS_RESERVED
+    review.status === WalletEsimPurchaseStatus.FUNDS_RESERVED ||
+    review.status === WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT ||
+    review.status === WalletEsimPurchaseStatus.FUNDED
   ) {
     redirect(
       `/account/esim/buy/review-needed?purchase=${encodeURIComponent(review.purchaseId)}`

@@ -33,6 +33,7 @@ import {
   OperationalControlUnavailableError,
 } from "@/app/lib/admin/operationalControlsPolicy";
 import { OPERATIONAL_CONTROL_UNAVAILABLE_MESSAGE } from "@/app/lib/admin/operationalControlsShared";
+import { walletOnlyPurchaseFunding } from "@/app/lib/esim/purchaseFunding";
 
 export const WALLET_PURCHASE_STARTED = "esim.wallet_purchase_started";
 export const WALLET_FUNDS_RESERVED = "esim.wallet_funds_reserved";
@@ -339,6 +340,8 @@ export async function prepareWalletEsimPurchase(
 
   try {
     const created = await prisma.$transaction(async (tx) => {
+      // PG1: wallet-only path — full package from wallet, gatewayAmount = 0.
+      const funding = walletOnlyPurchaseFunding(snapshot.priceCents);
       const purchase = await tx.walletEsimPurchase.create({
         data: {
           customerUserId,
@@ -351,6 +354,9 @@ export async function prepareWalletEsimPurchase(
           dataAllowance: snapshot.dataAllowance,
           validity: snapshot.validity,
           priceCents: snapshot.priceCents,
+          useWallet: funding.useWallet,
+          walletAppliedCents: funding.walletAppliedCents,
+          gatewayAmountCents: funding.gatewayAmountCents,
           providerCostCents: snapshot.providerCostCents,
           currency: snapshot.currency,
           fundingSource: OrderFundingSource.CUSTOMER_WALLET,
@@ -418,6 +424,99 @@ export async function prepareWalletEsimPurchase(
 }
 
 /**
+ * Atomic wallet reservation for a purchase contribution (full or partial).
+ * Decrements only `amountCents` when balanceCents >= amountCents.
+ * Does not change purchase status — caller owns the purchase state machine.
+ * PG1 callers still pass the full package price for wallet-only purchases.
+ */
+export async function reserveWalletPurchaseFundsInTx(
+  tx: Prisma.TransactionClient,
+  options: {
+    purchaseId: string;
+    customerUserId: string;
+    amountCents: number;
+    debitIdempotencyKey: string;
+  }
+): Promise<{
+  debitTransactionId: string;
+  balanceBeforeCents: number;
+  balanceAfterCents: number;
+}> {
+  const amountCents = options.amountCents;
+  if (!Number.isInteger(amountCents) || amountCents <= 0) {
+    throw new WalletEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is unavailable."
+    );
+  }
+
+  const wallet = await tx.walletAccount.findUnique({
+    where: { userId: options.customerUserId },
+    select: { id: true, balanceCents: true },
+  });
+  if (!wallet) {
+    throw new WalletEsimPurchaseError(
+      "WALLET_UNAVAILABLE",
+      "A wallet is required before purchasing with wallet funds."
+    );
+  }
+
+  const updated = await tx.walletAccount.updateMany({
+    where: {
+      id: wallet.id,
+      balanceCents: { gte: amountCents },
+    },
+    data: {
+      balanceCents: { decrement: amountCents },
+      version: { increment: 1 },
+    },
+  });
+  if (updated.count !== 1) {
+    throw new WalletEsimPurchaseError(
+      "INSUFFICIENT_FUNDS",
+      "Your wallet balance is not enough for this package."
+    );
+  }
+
+  const walletAfter = await tx.walletAccount.findUnique({
+    where: { id: wallet.id },
+    select: { balanceCents: true },
+  });
+  if (
+    !walletAfter ||
+    !Number.isInteger(walletAfter.balanceCents) ||
+    walletAfter.balanceCents < 0
+  ) {
+    throw new WalletEsimPurchaseError(
+      "UNAVAILABLE",
+      "Wallet purchase is temporarily unavailable. Please try again shortly."
+    );
+  }
+
+  const debitTx = await tx.walletTransaction.create({
+    data: {
+      walletId: wallet.id,
+      type: WalletTransactionType.PURCHASE_DEBIT,
+      direction: WalletDirection.DEBIT,
+      status: WalletTransactionStatus.PENDING,
+      amountCents,
+      balanceBeforeCents: wallet.balanceCents,
+      balanceAfterCents: walletAfter.balanceCents,
+      idempotencyKey: options.debitIdempotencyKey,
+      referenceType: WALLET_PURCHASE_DEBIT_REF,
+      referenceId: options.purchaseId,
+    },
+    select: { id: true },
+  });
+
+  return {
+    debitTransactionId: debitTx.id,
+    balanceBeforeCents: wallet.balanceCents,
+    balanceAfterCents: walletAfter.balanceCents,
+  };
+}
+
+/**
  * Exact-once refund of reserved wallet purchase funds.
  * Amount must come from durable purchase/debit records (never admin form).
  * Safe to call from recovery when eligibility is already verified.
@@ -429,6 +528,7 @@ export async function refundReservedFundsInTx(
     customerUserId: string;
     actorUserId: string;
     assisted: boolean;
+    /** Reserved wallet contribution (walletAppliedCents for wallet-only = priceCents). */
     priceCents: number;
     currency?: string;
   }
@@ -453,6 +553,7 @@ export async function refundReservedFundsInTx(
       refundTransactionId: true,
       debitTransactionId: true,
       priceCents: true,
+      walletAppliedCents: true,
       currency: true,
       adminUserId: true,
     },
@@ -465,7 +566,12 @@ export async function refundReservedFundsInTx(
     );
   }
 
-  if (purchase.priceCents !== priceCents) {
+  // Refund the reserved wallet contribution (wallet-only: equals priceCents).
+  const reservedWalletCents = purchase.walletAppliedCents;
+  if (
+    reservedWalletCents !== priceCents ||
+    purchase.priceCents < reservedWalletCents
+  ) {
     throw new WalletEsimPurchaseError(
       "INVALID_STATE",
       "This purchase is unavailable."
@@ -866,6 +972,8 @@ export async function confirmWalletEsimPurchase(
 
   const debitKey = `debit_${purchase.id}`.slice(0, 128);
   let reservedDebitTransactionId = "";
+  // PG1: wallet-only still reserves the full package price.
+  const walletOnlyFunding = walletOnlyPurchaseFunding(snapshot.priceCents);
 
   // Atomic claim + wallet reservation (provider call stays outside).
   try {
@@ -885,6 +993,9 @@ export async function confirmWalletEsimPurchase(
           dataAllowance: snapshot.dataAllowance,
           validity: snapshot.validity,
           priceCents: snapshot.priceCents,
+          useWallet: walletOnlyFunding.useWallet,
+          walletAppliedCents: walletOnlyFunding.walletAppliedCents,
+          gatewayAmountCents: walletOnlyFunding.gatewayAmountCents,
           providerCostCents: snapshot.providerCostCents,
           currency: snapshot.currency,
         },
@@ -897,70 +1008,18 @@ export async function confirmWalletEsimPurchase(
         );
       }
 
-      const wallet = await tx.walletAccount.findUnique({
-        where: { userId: customerUserId },
-        select: { id: true, balanceCents: true },
-      });
-      if (!wallet) {
-        throw new WalletEsimPurchaseError(
-          "WALLET_UNAVAILABLE",
-          "A wallet is required before purchasing with wallet funds."
-        );
-      }
-
-      const updated = await tx.walletAccount.updateMany({
-        where: {
-          id: wallet.id,
-          balanceCents: { gte: snapshot.priceCents },
-        },
-        data: {
-          balanceCents: { decrement: snapshot.priceCents },
-          version: { increment: 1 },
-        },
-      });
-      if (updated.count !== 1) {
-        throw new WalletEsimPurchaseError(
-          "INSUFFICIENT_FUNDS",
-          "Your wallet balance is not enough for this package."
-        );
-      }
-
-      const walletAfter = await tx.walletAccount.findUnique({
-        where: { id: wallet.id },
-        select: { balanceCents: true },
-      });
-      if (
-        !walletAfter ||
-        !Number.isInteger(walletAfter.balanceCents) ||
-        walletAfter.balanceCents < 0
-      ) {
-        throw new WalletEsimPurchaseError(
-          "UNAVAILABLE",
-          "Wallet purchase is temporarily unavailable. Please try again shortly."
-        );
-      }
-
-      const debitTx = await tx.walletTransaction.create({
-        data: {
-          walletId: wallet.id,
-          type: WalletTransactionType.PURCHASE_DEBIT,
-          direction: WalletDirection.DEBIT,
-          status: WalletTransactionStatus.PENDING,
-          amountCents: snapshot.priceCents,
-          balanceBeforeCents: wallet.balanceCents,
-          balanceAfterCents: walletAfter.balanceCents,
-          idempotencyKey: debitKey,
-          referenceType: WALLET_PURCHASE_DEBIT_REF,
-          referenceId: purchase.id,
-        },
-        select: { id: true },
+      const reserved = await reserveWalletPurchaseFundsInTx(tx, {
+        purchaseId: purchase.id,
+        customerUserId,
+        amountCents: snapshot.priceCents,
+        debitIdempotencyKey: debitKey,
       });
 
       await tx.walletEsimPurchase.update({
         where: { id: purchase.id },
         data: {
           status: WalletEsimPurchaseStatus.PROVIDER_PENDING,
-          debitTransactionId: debitTx.id,
+          debitTransactionId: reserved.debitTransactionId,
         },
       });
 
@@ -976,8 +1035,10 @@ export async function confirmWalletEsimPurchase(
             purchaseId: purchase.id,
             offerId: snapshot.offerId,
             amountCents: snapshot.priceCents,
+            walletAppliedCents: walletOnlyFunding.walletAppliedCents,
+            gatewayAmountCents: walletOnlyFunding.gatewayAmountCents,
             currency: snapshot.currency,
-            walletTransactionId: debitTx.id,
+            walletTransactionId: reserved.debitTransactionId,
             ...(isAssisted
               ? {
                   targetUserId: customerUserId,
@@ -989,7 +1050,7 @@ export async function confirmWalletEsimPurchase(
         },
       });
 
-      return debitTx.id;
+      return reserved.debitTransactionId;
     });
   } catch (error) {
     if (error instanceof WalletEsimPurchaseError) throw error;
