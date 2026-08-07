@@ -14,7 +14,6 @@ import {
 } from "@/app/lib/esim/walletPurchase";
 import {
   CARD_PAYMENT_UNAVAILABLE_MESSAGE,
-  SPLIT_PAYMENT_UNAVAILABLE_MESSAGE,
   type WalletPurchaseActionState,
 } from "@/app/lib/esim/walletPurchaseFormState";
 import {
@@ -223,10 +222,6 @@ export async function confirmWalletEsimPurchaseAction(
   }
 
   if (funding) {
-    if (funding.walletAppliedCents > 0 && funding.gatewayAmountCents > 0) {
-      return { ok: false, error: SPLIT_PAYMENT_UNAVAILABLE_MESSAGE };
-    }
-
     if (funding.gatewayAmountCents > 0) {
       if (!isPaymentGatewayConfigured()) {
         return { ok: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE };
@@ -265,9 +260,6 @@ export async function confirmWalletEsimPurchaseAction(
       redirect(checkout.checkoutUrl);
     } catch (error) {
       if (error instanceof EsimPurchaseGatewayCheckoutError) {
-        if (error.code === "PARTIAL_WALLET_UNSUPPORTED") {
-          return { ok: false, error: SPLIT_PAYMENT_UNAVAILABLE_MESSAGE };
-        }
         if (error.code === "INVALID_STATE") {
           // May be full-wallet after funding change while awaiting — fall through.
         } else {
@@ -278,7 +270,6 @@ export async function confirmWalletEsimPurchaseAction(
       }
     }
   }
-
   // Full wallet coverage only — existing secure confirm path.
   if (!confirmed) {
     return {

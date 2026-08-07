@@ -159,7 +159,8 @@ function main() {
   assert.match(disabled, /Never falls back to a fake/);
   assert.match(adapter, /tryCreateSafepayAdapter/);
   assert.match(adapter, /verifyWebhookSignature/);
-  assert.match(adapter, /No mutation path in PG3-A/);
+  assert.match(adapter, /verifySafepayCardWebhookSignature/);
+  assert.match(adapter, /parseSafepayCardWebhookEvent/);
   assert.match(http, /createPaymentSession/);
   assert.match(http, /createPassportToken/);
   assert.match(http, /buildHostedCheckoutUrl/);

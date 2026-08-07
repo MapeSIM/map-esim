@@ -40,7 +40,9 @@ export async function persistAssignedOrder(
 
   if (
     options.fundingSource !== OrderFundingSource.COMPANY_FUNDED &&
-    options.fundingSource !== OrderFundingSource.CUSTOMER_WALLET
+    options.fundingSource !== OrderFundingSource.CUSTOMER_WALLET &&
+    options.fundingSource !== OrderFundingSource.CUSTOMER_SPLIT &&
+    options.fundingSource !== OrderFundingSource.DIRECT_PAYMENT
   ) {
     throw new Error("Unsupported order funding source for this flow.");
   }

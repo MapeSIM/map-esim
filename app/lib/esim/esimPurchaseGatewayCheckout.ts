@@ -11,9 +11,11 @@ import {
 import { prisma } from "@/app/lib/db";
 import { calculatePurchaseFunding } from "@/app/lib/esim/purchaseFunding";
 import {
-  CARD_PAYMENT_UNAVAILABLE_MESSAGE,
-  SPLIT_PAYMENT_UNAVAILABLE_MESSAGE,
-} from "@/app/lib/esim/walletPurchaseFormState";
+  releaseSplitReservationAfterSessionFailure,
+  reserveSplitWalletBeforeGatewayCheckout,
+} from "@/app/lib/esim/esimPurchasePaymentApply";
+import { CARD_PAYMENT_UNAVAILABLE_MESSAGE } from "@/app/lib/esim/walletPurchaseFormState";
+import { WalletEsimPurchaseError } from "@/app/lib/esim/walletPurchase";
 import {
   getActivePaymentAdapter,
   isPaymentGatewayConfigured,
@@ -24,13 +26,11 @@ import {
 } from "@/app/lib/payments/safepayCheckoutPaths";
 import { resumeSafepayHostedCheckout } from "@/app/lib/payments/safepayAdapter";
 
-export { SPLIT_PAYMENT_UNAVAILABLE_MESSAGE };
-
 export class EsimPurchaseGatewayCheckoutError extends Error {
   readonly code:
     | "CUSTOMER_UNAVAILABLE"
     | "INVALID_STATE"
-    | "PARTIAL_WALLET_UNSUPPORTED"
+    | "INSUFFICIENT_FUNDS"
     | "GATEWAY_UNAVAILABLE"
     | "UNAVAILABLE";
 
@@ -233,14 +233,6 @@ export async function startEsimPurchaseHostedCheckout(
     );
   }
 
-  // Partial wallet + gateway remainder is blocked until reservation/release (PG4-B).
-  if (funding.walletAppliedCents > 0) {
-    throw new EsimPurchaseGatewayCheckoutError(
-      "PARTIAL_WALLET_UNSUPPORTED",
-      SPLIT_PAYMENT_UNAVAILABLE_MESSAGE
-    );
-  }
-
   const currency = (purchase.currency || "USD").trim().toUpperCase() || "USD";
   if (currency !== "USD") {
     throw new EsimPurchaseGatewayCheckoutError(
@@ -254,24 +246,51 @@ export async function startEsimPurchaseHostedCheckout(
       ? OrderFundingSource.CUSTOMER_SPLIT
       : OrderFundingSource.DIRECT_PAYMENT;
 
-  await prisma.walletEsimPurchase.updateMany({
-    where: {
-      id: purchase.id,
-      customerUserId,
-      status: {
-        in: [
-          WalletEsimPurchaseStatus.READY,
-          WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
-        ],
+  // Split: reserve walletAppliedCents before Safepay redirect (exact-once).
+  if (funding.walletAppliedCents > 0) {
+    try {
+      await reserveSplitWalletBeforeGatewayCheckout({
+        purchaseId: purchase.id,
+        customerUserId,
+        walletAppliedCents: funding.walletAppliedCents,
+        gatewayAmountCents: funding.gatewayAmountCents,
+        useWallet: funding.useWallet,
+      });
+    } catch (error) {
+      if (
+        error instanceof WalletEsimPurchaseError &&
+        error.code === "INSUFFICIENT_FUNDS"
+      ) {
+        throw new EsimPurchaseGatewayCheckoutError(
+          "INSUFFICIENT_FUNDS",
+          error.message
+        );
+      }
+      throw new EsimPurchaseGatewayCheckoutError(
+        "UNAVAILABLE",
+        "Wallet reservation failed. Please try again."
+      );
+    }
+  } else {
+    await prisma.walletEsimPurchase.updateMany({
+      where: {
+        id: purchase.id,
+        customerUserId,
+        status: {
+          in: [
+            WalletEsimPurchaseStatus.READY,
+            WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+          ],
+        },
       },
-    },
-    data: {
-      useWallet: funding.useWallet,
-      walletAppliedCents: funding.walletAppliedCents,
-      gatewayAmountCents: funding.gatewayAmountCents,
-      fundingSource,
-    },
-  });
+      data: {
+        useWallet: funding.useWallet,
+        walletAppliedCents: funding.walletAppliedCents,
+        gatewayAmountCents: funding.gatewayAmountCents,
+        fundingSource,
+      },
+    });
+  }
 
   const checkoutKey = gatewayCheckoutIdempotencyKey(purchase.idempotencyKey);
   let attempt = await prisma.esimPurchasePaymentAttempt.findUnique({
@@ -426,19 +445,41 @@ export async function startEsimPurchaseHostedCheckout(
   }
 
   const adapter = getActivePaymentAdapter();
-  const session = await adapter.createCheckoutSession({
-    purpose: "ESIM_PURCHASE",
-    customerUserId,
-    purchaseId: purchase.id,
-    paymentAttemptId: attempt.id,
-    chargeAmountMinor: funding.gatewayAmountCents,
-    chargeCurrency: currency,
-    checkoutIdempotencyKey: checkoutKey,
-    returnPath,
-    cancelPath,
-  });
+  let session;
+  try {
+    session = await adapter.createCheckoutSession({
+      purpose: "ESIM_PURCHASE",
+      customerUserId,
+      purchaseId: purchase.id,
+      paymentAttemptId: attempt.id,
+      chargeAmountMinor: funding.gatewayAmountCents,
+      chargeCurrency: currency,
+      checkoutIdempotencyKey: checkoutKey,
+      returnPath,
+      cancelPath,
+    });
+  } catch {
+    if (funding.walletAppliedCents > 0) {
+      await releaseSplitReservationAfterSessionFailure({
+        purchaseId: purchase.id,
+        customerUserId,
+        walletAppliedCents: funding.walletAppliedCents,
+      }).catch(() => undefined);
+    }
+    throw new EsimPurchaseGatewayCheckoutError(
+      "UNAVAILABLE",
+      CARD_PAYMENT_UNAVAILABLE_MESSAGE
+    );
+  }
 
   if (!session.ok) {
+    if (funding.walletAppliedCents > 0) {
+      await releaseSplitReservationAfterSessionFailure({
+        purchaseId: purchase.id,
+        customerUserId,
+        walletAppliedCents: funding.walletAppliedCents,
+      }).catch(() => undefined);
+    }
     throw new EsimPurchaseGatewayCheckoutError(
       session.code === "MISCONFIGURED" || session.code === "GATEWAY_UNAVAILABLE"
         ? "GATEWAY_UNAVAILABLE"
@@ -449,6 +490,13 @@ export async function startEsimPurchaseHostedCheckout(
 
   const providerRef = (session.providerPaymentRef ?? "").trim();
   if (!providerRef) {
+    if (funding.walletAppliedCents > 0) {
+      await releaseSplitReservationAfterSessionFailure({
+        purchaseId: purchase.id,
+        customerUserId,
+        walletAppliedCents: funding.walletAppliedCents,
+      }).catch(() => undefined);
+    }
     throw new EsimPurchaseGatewayCheckoutError(
       "UNAVAILABLE",
       CARD_PAYMENT_UNAVAILABLE_MESSAGE
@@ -479,6 +527,7 @@ export async function startEsimPurchaseHostedCheckout(
           in: [
             WalletEsimPurchaseStatus.READY,
             WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+            WalletEsimPurchaseStatus.FUNDS_RESERVED,
           ],
         },
       },

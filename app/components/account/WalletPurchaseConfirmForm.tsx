@@ -5,7 +5,6 @@ import { confirmWalletEsimPurchaseAction } from "@/app/lib/esim/walletPurchaseAc
 import { calculatePurchaseFunding } from "@/app/lib/esim/purchaseFunding";
 import {
   CARD_PAYMENT_UNAVAILABLE_MESSAGE,
-  SPLIT_PAYMENT_UNAVAILABLE_MESSAGE,
   initialWalletPurchaseState,
   type WalletPurchaseActionState,
 } from "@/app/lib/esim/walletPurchaseFormState";
@@ -50,13 +49,9 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
 
   const gatewayRequired = preview.gatewayAmountCents > 0;
   const fullWallet = !gatewayRequired && preview.useWallet;
-  const gatewayOnly =
-    gatewayRequired && preview.walletAppliedCents === 0;
-  const partialWalletSplit =
-    gatewayRequired && preview.walletAppliedCents > 0;
   const walletDisabled = review.balanceCents <= 0;
   const gatewayReady =
-    gatewayOnly && review.paymentGatewayConfigured;
+    gatewayRequired && review.paymentGatewayConfigured;
   const balanceAfterPreview = Math.max(
     0,
     review.balanceCents - preview.walletAppliedCents
@@ -231,15 +226,14 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
           <p className="mt-2 text-sm font-semibold text-[var(--heading)]">
             Online payment
           </p>
-          {partialWalletSplit ? (
-            <p className="mt-1 text-sm text-[var(--text-muted)]" role="status">
-              {SPLIT_PAYMENT_UNAVAILABLE_MESSAGE}
-            </p>
-          ) : gatewayReady ? (
+          {gatewayReady ? (
             <p className="mt-1 text-sm text-[var(--text-muted)]">
               Continue to our secure payment page to pay{" "}
-              {formatUsdCents(preview.gatewayAmountCents)}. Your eSIM is created
-              only after payment is verified.
+              {formatUsdCents(preview.gatewayAmountCents)}
+              {preview.walletAppliedCents > 0
+                ? ` after applying ${formatUsdCents(preview.walletAppliedCents)} from your wallet`
+                : ""}
+              . Your eSIM is created only after payment is verified.
             </p>
           ) : (
             <>

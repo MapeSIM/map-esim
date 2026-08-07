@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/app/lib/auth/session";
 import { getOwnedEsimPurchasePaymentAttempt } from "@/app/lib/esim/esimPurchaseGatewayCheckout";
+import { maybeReleasePendingGatewayReservation } from "@/app/lib/esim/esimPurchasePaymentApply";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,13 @@ export default async function EsimPurchasePaymentCancelPage({
 
   const attempt = await getOwnedEsimPurchasePaymentAttempt(user.id, attemptId);
   if (!attempt) notFound();
+
+  // Idempotent pending-reservation release only — never marks gateway paid/failed.
+  await maybeReleasePendingGatewayReservation({
+    customerUserId: user.id,
+    purchaseId: attempt.purchaseId,
+    attemptId: attempt.attemptId,
+  }).catch(() => undefined);
 
   const reviewHref = `/account/esim/buy/review?purchase=${encodeURIComponent(attempt.purchaseId)}`;
 

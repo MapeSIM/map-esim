@@ -682,17 +682,28 @@ export async function refundReservedFundsInTx(
     customerUserId: string;
     actorUserId: string;
     assisted: boolean;
-    /** Reserved wallet contribution (walletAppliedCents for wallet-only = priceCents). */
+    /**
+     * Expected reserved wallet contribution.
+     * Wallet-only: equals full priceCents.
+     * Split: equals walletAppliedCents (gateway remainder is separate).
+     */
     priceCents: number;
     currency?: string;
+    /** When true, restore purchase to READY after release (gateway fail before FUNDED). */
+    restoreReady?: boolean;
   }
 ): Promise<{
   outcome: "created" | "already_refunded" | "linked_existing";
   refundTransactionId: string | null;
 }> {
-  const refundKey = `refund_${options.purchaseId}`.slice(0, 128);
-  const priceCents = options.priceCents;
-  if (!Number.isInteger(priceCents) || priceCents <= 0) {
+  const restoreReady = Boolean(options.restoreReady);
+  const refundKey = (
+    restoreReady
+      ? `release_gw_${options.purchaseId}`
+      : `refund_${options.purchaseId}`
+  ).slice(0, 128);
+  const expectedReservedCents = options.priceCents;
+  if (!Number.isInteger(expectedReservedCents) || expectedReservedCents <= 0) {
     throw new WalletEsimPurchaseError(
       "INVALID_STATE",
       "This purchase is unavailable."
@@ -708,6 +719,7 @@ export async function refundReservedFundsInTx(
       debitTransactionId: true,
       priceCents: true,
       walletAppliedCents: true,
+      gatewayAmountCents: true,
       currency: true,
       adminUserId: true,
     },
@@ -720,19 +732,22 @@ export async function refundReservedFundsInTx(
     );
   }
 
-  // Refund the reserved wallet contribution (wallet-only: equals priceCents).
+  // Refund the reserved wallet contribution only (full or split share).
   const reservedWalletCents = purchase.walletAppliedCents;
   if (
-    reservedWalletCents !== priceCents ||
-    purchase.priceCents < reservedWalletCents
+    reservedWalletCents !== expectedReservedCents ||
+    purchase.priceCents < reservedWalletCents ||
+    reservedWalletCents <= 0
   ) {
     throw new WalletEsimPurchaseError(
       "INVALID_STATE",
       "This purchase is unavailable."
     );
   }
+  const priceCents = reservedWalletCents;
 
   if (
+    !restoreReady &&
     purchase.status === WalletEsimPurchaseStatus.FAILED_REFUNDED &&
     purchase.refundTransactionId
   ) {
@@ -742,7 +757,15 @@ export async function refundReservedFundsInTx(
     };
   }
 
-  if (purchase.refundTransactionId) {
+  if (
+    restoreReady &&
+    purchase.status === WalletEsimPurchaseStatus.READY &&
+    !purchase.debitTransactionId
+  ) {
+    return { outcome: "already_refunded", refundTransactionId: null };
+  }
+
+  if (!restoreReady && purchase.refundTransactionId) {
     await tx.walletEsimPurchase.update({
       where: { id: purchase.id },
       data: {
@@ -782,12 +805,20 @@ export async function refundReservedFundsInTx(
     }
     await tx.walletEsimPurchase.update({
       where: { id: purchase.id },
-      data: {
-        status: WalletEsimPurchaseStatus.FAILED_REFUNDED,
-        refundTransactionId: existingRefund.id,
-        failureCategory: "provider_declined",
-        failureCode: "refunded",
-      },
+      data: restoreReady
+        ? {
+            status: WalletEsimPurchaseStatus.READY,
+            refundTransactionId: null,
+            debitTransactionId: null,
+            failureCategory: null,
+            failureCode: null,
+          }
+        : {
+            status: WalletEsimPurchaseStatus.FAILED_REFUNDED,
+            refundTransactionId: existingRefund.id,
+            failureCategory: "provider_declined",
+            failureCode: "refunded",
+          },
     });
     if (purchase.debitTransactionId) {
       await tx.walletTransaction.update({
@@ -815,7 +846,7 @@ export async function refundReservedFundsInTx(
   const updated = await tx.walletAccount.update({
     where: { id: wallet.id },
     data: {
-      balanceCents: { increment: options.priceCents },
+      balanceCents: { increment: priceCents },
       version: { increment: 1 },
     },
     select: { balanceCents: true },
@@ -827,7 +858,7 @@ export async function refundReservedFundsInTx(
       type: WalletTransactionType.REFUND_CREDIT,
       direction: WalletDirection.CREDIT,
       status: WalletTransactionStatus.COMPLETED,
-      amountCents: options.priceCents,
+      amountCents: priceCents,
       balanceBeforeCents: wallet.balanceCents,
       balanceAfterCents: updated.balanceCents,
       idempotencyKey: refundKey,
@@ -846,27 +877,42 @@ export async function refundReservedFundsInTx(
 
   await tx.walletEsimPurchase.update({
     where: { id: purchase.id },
-    data: {
-      status: WalletEsimPurchaseStatus.FAILED_REFUNDED,
-      refundTransactionId: refundTx.id,
-      failureCategory: "provider_declined",
-      failureCode: "refunded",
-    },
+    data: restoreReady
+      ? {
+          status: WalletEsimPurchaseStatus.READY,
+          refundTransactionId: null,
+          debitTransactionId: null,
+          failureCategory: null,
+          failureCode: null,
+        }
+      : {
+          status: WalletEsimPurchaseStatus.FAILED_REFUNDED,
+          refundTransactionId: refundTx.id,
+          failureCategory: "provider_declined",
+          failureCode: "refunded",
+        },
   });
 
   await tx.auditLog.create({
     data: {
       actorUserId: options.actorUserId,
-      action: WALLET_PURCHASE_FAILED_REFUNDED,
+      action: restoreReady
+        ? WALLET_FUNDS_RESERVED
+        : WALLET_PURCHASE_FAILED_REFUNDED,
       targetType: "WalletEsimPurchase",
       targetId: purchase.id,
       metadata: {
         method: purchaseAuditMethod(options.assisted),
-        fundingSource: OrderFundingSource.CUSTOMER_WALLET,
+        fundingSource:
+          purchase.gatewayAmountCents > 0
+            ? OrderFundingSource.CUSTOMER_SPLIT
+            : OrderFundingSource.CUSTOMER_WALLET,
         purchaseId: purchase.id,
-        amountCents: options.priceCents,
+        amountCents: priceCents,
         currency: (options.currency || purchase.currency || "USD").trim() || "USD",
-        failureCategory: "provider_declined",
+        failureCategory: restoreReady
+          ? "gateway_reservation_released"
+          : "provider_declined",
         walletTransactionId: refundTx.id,
         ...(options.assisted
           ? { targetUserId: options.customerUserId }

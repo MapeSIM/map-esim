@@ -41,9 +41,6 @@ function main() {
   assert.match(gateway, /export async function startEsimPurchaseHostedCheckout/);
   assert.match(gateway, /isPaymentGatewayConfigured/);
   assert.match(gateway, /calculatePurchaseFunding/);
-  assert.match(gateway, /PARTIAL_WALLET_UNSUPPORTED/);
-  assert.match(gateway, /SPLIT_PAYMENT_UNAVAILABLE_MESSAGE/);
-  assert.match(gateway, /walletAppliedCents > 0/);
   assert.match(gateway, /gatewayAmountCents <= 0/);
   assert.match(gateway, /getActivePaymentAdapter/);
   assert.match(gateway, /createCheckoutSession/);
@@ -57,16 +54,17 @@ function main() {
   assert.match(gateway, /esimPurchasePaymentAttempt/);
   assert.match(gateway, /AWAITING_GATEWAY_PAYMENT/);
   assert.match(gateway, /resumeSafepayHostedCheckout/);
-  assert.match(gateway, /Does not reserve\/debit wallet/);
+  assert.match(gateway, /reserveSplitWalletBeforeGatewayCheckout/);
+  assert.match(gateway, /releaseSplitReservationAfterSessionFailure/);
+  assert.doesNotMatch(gateway, /PARTIAL_WALLET_UNSUPPORTED/);
   assert.doesNotMatch(gateway, /confirmWalletEsimPurchase/);
   assert.doesNotMatch(gateway, /executeCreditCheckout/);
-  assert.doesNotMatch(gateway, /reserveWalletPurchaseFunds/);
-  console.log("PASS gateway_checkout_server_authoritative_and_fail_closed_split");
+  console.log("PASS gateway_checkout_server_authoritative_and_split_reserve");
 
   assert.match(actions, /startEsimPurchaseHostedCheckout/);
   assert.match(actions, /isPaymentGatewayConfigured/);
   assert.match(actions, /CARD_PAYMENT_UNAVAILABLE_MESSAGE/);
-  assert.match(actions, /SPLIT_PAYMENT_UNAVAILABLE_MESSAGE/);
+  assert.doesNotMatch(actions, /SPLIT_PAYMENT_UNAVAILABLE_MESSAGE/);
   assert.match(actions, /void formData\.get\("walletAppliedCents"\)/);
   assert.match(actions, /void formData\.get\("gatewayAmountCents"\)/);
   assert.match(actions, /void formData\.get\("redirect_url"\)/);
@@ -82,8 +80,7 @@ function main() {
 
   assert.match(confirmForm, /Continue to Secure Payment/);
   assert.match(confirmForm, /paymentGatewayConfigured/);
-  assert.match(confirmForm, /partialWalletSplit/);
-  assert.match(confirmForm, /SPLIT_PAYMENT_UNAVAILABLE_MESSAGE/);
+  assert.match(confirmForm, /gatewayReady/);
   assert.match(confirmForm, /CARD_PAYMENT_UNAVAILABLE_MESSAGE/);
   assert.match(confirmForm, /Buy eSIM with Wallet/);
   assert.match(confirmForm, /Continue to Payment/);
@@ -107,8 +104,9 @@ function main() {
   assert.match(cancelPage, /Payment not completed/);
   assert.match(cancelPage, /Back to checkout/);
   assert.match(cancelPage, /getOwnedEsimPurchasePaymentAttempt/);
+  assert.match(cancelPage, /maybeReleasePendingGatewayReservation/);
   assert.doesNotMatch(cancelPage, /confirmWalletEsimPurchase|applyVerifiedTopup|executeCreditCheckout/);
-  assert.doesNotMatch(cancelPage, /prisma\.(wallet|order)|reserveWalletPurchaseFunds/);
+  assert.doesNotMatch(cancelPage, /reserveWalletPurchaseFundsInTx/);
   console.log("PASS return_cancel_informational_no_funding_mutation");
 
   assert.match(reviewPage, /AWAITING_GATEWAY_PAYMENT stays on checkout/);

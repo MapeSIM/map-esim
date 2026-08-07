@@ -12,6 +12,11 @@ import {
   SafepayHttpClient,
   SafepayHttpError,
 } from "@/app/lib/payments/safepayHttp";
+import {
+  normalizeSafepayHeader,
+  verifySafepayCardWebhookSignature,
+} from "@/app/lib/payments/safepayWebhookCrypto";
+import { parseSafepayCardWebhookEvent } from "@/app/lib/payments/safepayWebhookParse";
 import type {
   CreateCheckoutSessionInput,
   CreateCheckoutSessionResult,
@@ -173,25 +178,46 @@ function createSafepayAdapter(
     },
 
     async verifyWebhookSignature(
-      // PG4 will consume headers/rawBody for signature verification.
       input: WebhookVerificationInput
     ): Promise<WebhookVerificationResult> {
-      void input;
-      // PG4 will implement signature verification. Fail closed for now.
       const webhook = resolveSafepayWebhookConfig();
       if (!webhook.ok) {
         logSafepayConfigFailure(webhook.code);
         return { ok: false, code: "MISCONFIGURED" };
       }
-      return { ok: false, code: "GATEWAY_UNAVAILABLE" };
+
+      const signature = normalizeSafepayHeader(
+        input.headers["x-sfpy-signature"] ??
+          input.headers["X-SFPY-SIGNATURE"]
+      );
+      if (!signature || typeof input.rawBody !== "string") {
+        return { ok: false, code: "INVALID_SIGNATURE" };
+      }
+
+      const ok = verifySafepayCardWebhookSignature({
+        rawBody: input.rawBody,
+        signatureHeader: signature,
+        webhookSecret: webhook.config.webhookSecret,
+      });
+      return ok
+        ? { ok: true }
+        : { ok: false, code: "INVALID_SIGNATURE" };
     },
 
     async parseWebhookEvent(
       input: WebhookVerificationInput
     ): Promise<NormalizedPaymentEvent | null> {
-      void input;
-      // No mutation path in PG3-A.
-      return null;
+      const verified = await this.verifyWebhookSignature(input);
+      if (!verified.ok) return null;
+      try {
+        return parseSafepayCardWebhookEvent({
+          rawBody: input.rawBody,
+          headers: input.headers,
+        });
+      } catch {
+        console.error("safepay_adapter", "PARSE_WEBHOOK_FAILED");
+        return null;
+      }
     },
 
     async fetchPaymentStatus(
