@@ -13,6 +13,7 @@ import {
   startWalletTopupCheckout,
 } from "@/app/lib/wallet/topup";
 import { browserReturnMustNotCreditWallet } from "@/app/lib/wallet/topupConstants";
+import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
 
 function detailPath(topupId: string): string {
   return `/account/wallet/top-up/${encodeURIComponent(topupId)}`;
@@ -32,6 +33,14 @@ export async function createWalletTopupDraftAction(
   void formData.get("pkrAmount");
   void formData.get("fxRate");
   browserReturnMustNotCreditWallet();
+
+  if (!isPaymentGatewayConfigured()) {
+    return {
+      ok: false,
+      error:
+        "Adding funds online is not available yet. Payment provider setup is still in progress.",
+    };
+  }
 
   const amountParsed = parseTopupUsdAmountToCents(formData.get("amount"));
   const idempotencyParsed = parseTopupCheckoutIdempotencyKey(
@@ -87,6 +96,14 @@ export async function startWalletTopupCheckoutAction(
   void formData.get("status");
   void formData.get("gatewayStatus");
   browserReturnMustNotCreditWallet();
+
+  if (!isPaymentGatewayConfigured()) {
+    return {
+      ok: false,
+      error:
+        "Adding funds online is not available yet. Payment provider setup is still in progress.",
+    };
+  }
 
   if (!topupId || topupId.length > 64) {
     return { ok: false, error: "This top-up is unavailable." };

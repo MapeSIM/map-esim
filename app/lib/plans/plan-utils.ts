@@ -43,11 +43,16 @@ export function dataAmountKey(offer: VesimOffer): string {
   return offer.dataFormatted;
 }
 
+/**
+ * Soft-launch purchase entry: authenticated wallet buy (not guest checkout).
+ * Unauthenticated users are redirected to sign-in by /account middleware with
+ * this path as callbackUrl. Never creates a provider order by itself.
+ * offerId/country are lookup hints only — never trusted for price.
+ */
 export function buildCheckoutHref(
   offer: VesimOffer,
   destinationCode: string
 ): string {
-  // Only pass lookup hints. Price/name/data/validity are never trusted from the URL.
   const params = new URLSearchParams({
     offerId: offer.id,
   });
@@ -56,7 +61,7 @@ export function buildCheckoutHref(
     params.set("country", destinationCode.trim());
   }
 
-  return `/checkout?${params.toString()}`;
+  return `/account/esim/buy?${params.toString()}`;
 }
 
 export function summarizePlanTypes(offers: VesimOffer[]) {

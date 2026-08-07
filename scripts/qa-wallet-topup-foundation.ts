@@ -66,8 +66,11 @@ function main() {
 
   assert.match(adminList, /requireRole\("ADMIN"\)/);
   assert.match(adminDetail, /requireRole\("ADMIN"\)/);
-  assert.match(accountLayout, /\/account\/wallet\/top-up/);
-  assert.match(walletPage, /\/account\/wallet\/top-up/);
+  assert.match(accountLayout, /Buy with wallet/);
+  assert.match(walletPage, /\/account\/esim\/buy/);
+  // Soft-launch: Add funds nav/CTA only when gateway is configured.
+  assert.match(accountLayout, /isPaymentGatewayConfigured/);
+  assert.match(walletPage, /isPaymentGatewayConfigured/);
   assert.match(adminNav, /\/admin\/wallet-topups/);
   console.log("PASS admin_and_customer_entry_points");
 
@@ -260,6 +263,12 @@ function main() {
   assert.ok(existsSync(join(root, "prisma/migrations/20260805010000_add_wallet_topup_foundation/migration.sql")));
   assert.match(pkg, /qa:wallet-topup-foundation/);
   assert.match(form, /Payment provider setup in progress|gatewayStatusLabel/);
+  assert.match(topupPage, /isPaymentGatewayConfigured/);
+  assert.match(
+    topupPage,
+    /Adding funds online is not available yet|Payment provider ready/
+  );
+  assert.match(actionsSrc, /isPaymentGatewayConfigured/);
   assert.match(checkoutBtn, /startWalletTopupCheckoutAction/);
   assert.match(adminCustomer, /getAdminCustomerRecentTopups/);
   assert.match(qaSelf, /Does not call payment gateways/);

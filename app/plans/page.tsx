@@ -133,7 +133,7 @@ font-bold
 hover:opacity-90
 "
               >
-                Buy Now →
+                Buy with wallet →
               </Link>
             </div>
           ))}

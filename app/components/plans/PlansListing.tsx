@@ -643,7 +643,7 @@ export default function PlansListing({
                                 text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]
                               "
                             >
-                              Buy Now
+                              Buy with wallet
                             </Link>
                           </div>
                         </article>

@@ -281,7 +281,7 @@ export default function PlanDetailsModal({
               transition hover:bg-[var(--accent-strong)]
             "
           >
-            Buy Now
+            Buy with wallet
           </Link>
         </div>
       </div>

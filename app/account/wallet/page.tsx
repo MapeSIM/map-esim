@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireRole } from "@/app/lib/auth/session";
 import { getCustomerWalletTransactions } from "@/app/lib/wallet/read";
+import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export default async function AccountWalletPage({
 }) {
   const user = await requireRole("CUSTOMER");
   const params = await searchParams;
+  const gatewayReady = isPaymentGatewayConfigured();
 
   let data: Awaited<ReturnType<typeof getCustomerWalletTransactions>>;
   try {
@@ -71,17 +73,19 @@ export default async function AccountWalletPage({
         {data.hasWallet ? (
           <div className="flex flex-wrap gap-2">
             <Link
-              href="/account/wallet/top-up"
-              className="inline-flex h-10 items-center justify-center rounded-[14px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
-            >
-              Add funds
-            </Link>
-            <Link
               href="/account/esim/buy"
-              className="inline-flex h-10 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+              className="inline-flex h-10 items-center justify-center rounded-[14px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
             >
               Buy eSIM with wallet
             </Link>
+            {gatewayReady ? (
+              <Link
+                href="/account/wallet/top-up"
+                className="inline-flex h-10 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+              >
+                Add funds
+              </Link>
+            ) : null}
           </div>
         ) : null}
       </header>
@@ -95,8 +99,9 @@ export default async function AccountWalletPage({
         </p>
         <p className="mt-1 text-sm text-[var(--text-muted)]">USD</p>
         <p className="mt-4 max-w-full text-sm leading-relaxed text-[var(--text-muted)] break-words [overflow-wrap:anywhere]">
-          Add funds securely. Your PKR payment amount is confirmed at checkout,
-          and only a verified payment can credit this wallet.
+          {gatewayReady
+            ? "Add funds securely. Your payment amount is confirmed at checkout, and only a verified payment can credit this wallet."
+            : "Online funding is not available yet. Use your existing balance to buy an eSIM, or contact support if you need funds added."}
         </p>
       </div>
 

@@ -76,8 +76,9 @@ export const authConfig = {
         return isLoggedIn;
       }
 
-      // /checkout and /payment remain publicly reachable for guests, but
-      // consent-required Google customers are redirected above.
+      // /checkout (legacy guest) and /payment (future gateway reserved) stay
+      // publicly reachable, but consent-required Google customers are redirected above.
+      // Soft-launch Buy CTAs use /account/esim/buy instead of these routes.
       return true;
     },
     redirect({ url, baseUrl }) {

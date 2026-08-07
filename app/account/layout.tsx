@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireSession } from "@/app/lib/auth/session";
 import { signOutAction } from "@/app/lib/auth/actions";
+import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
 
 export const dynamic = "force-dynamic";
 
@@ -9,15 +10,14 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false, nocache: true },
 };
 
-const links = [
+const baseLinks = [
   { href: "/account", label: "Overview" },
   { href: "/account/orders", label: "My eSIMs" },
   { href: "/account/wallet", label: "Wallet" },
-  { href: "/account/wallet/top-up", label: "Add funds" },
   { href: "/account/esim/buy", label: "Buy with wallet" },
   { href: "/account/profile", label: "Profile" },
   { href: "/account/security", label: "Security" },
-];
+] as const;
 
 export default async function AccountLayout({
   children,
@@ -25,6 +25,13 @@ export default async function AccountLayout({
   children: React.ReactNode;
 }) {
   const user = await requireSession();
+  const links = isPaymentGatewayConfigured()
+    ? [
+        ...baseLinks.slice(0, 3),
+        { href: "/account/wallet/top-up", label: "Add funds" },
+        ...baseLinks.slice(3),
+      ]
+    : [...baseLinks];
 
   return (
     <main className="min-h-screen w-full max-w-full bg-[var(--page-bg)] px-3 py-10 text-[var(--heading)] sm:px-6">

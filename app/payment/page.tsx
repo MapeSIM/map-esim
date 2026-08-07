@@ -1,85 +1,36 @@
-  "use client";
+import Link from "next/link";
 
-  import { Suspense } from "react";
-  import { useSearchParams } from "next/navigation";
-  import Link from "next/link";
-  import { useCurrency } from "@/app/components/currency/CurrencyProvider";
-
-  function PaymentContent() {
-    const searchParams = useSearchParams();
-    const { formatPrice } = useCurrency();
-
-    const plan = searchParams.get("plan") || "Popular";
-    const data = searchParams.get("data") || "5GB";
-    const priceParam = searchParams.get("price") || "10";
-    const priceUsd = Number(priceParam.replace(/[^0-9.]/g, ""));
-    const validity = searchParams.get("validity") || "30 Days";
-
-    return (
-      <main className="min-h-screen bg-[var(--page-bg)] text-[var(--heading)] px-6 py-16">
-        <section className="max-w-xl mx-auto">
-
-          <h1 className="text-5xl font-bold text-center text-[var(--heading)]">
-            Secure Checkout
-          </h1>
-
-          <p className="text-[var(--text-muted)] text-center mt-4">
-            Complete your eSIM purchase
-          </p>
-
-          <div className="mt-12 bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-8 shadow-[var(--shadow)]">
-
-            <h2 className="text-2xl font-bold mb-6 text-[var(--heading)]">
-              Order Summary
-            </h2>
-
-            <div className="space-y-3 text-[var(--text)]">
-
-              <p>
-                Plan: <span className="font-bold">{plan}</span>
-              </p>
-
-              <p>
-                Data: <span className="font-bold">{data}</span>
-              </p>
-
-              <p>
-                Validity: <span className="font-bold">{validity}</span>
-              </p>
-
-              <p>
-                Price:{" "}
-                <span className="font-bold">
-                  {formatPrice(Number.isFinite(priceUsd) ? priceUsd : null)}
-                </span>
-              </p>
-
-            </div>
-
-            <button className="w-full mt-8 bg-[var(--accent)] text-[var(--accent-ink)] py-4 rounded-xl font-bold">
-              Pay Now
-            </button>
-
-          </div>
-
-
+/**
+ * Soft-launch: public card payment is not available.
+ * Keep this route as a reserved future gateway entry; do not present a fake checkout button.
+ * Normal purchase CTAs must not link here — they use wallet buy instead.
+ */
+export default function PaymentPage() {
+  return (
+    <main className="min-h-screen bg-[var(--page-bg)] px-6 py-16 text-[var(--heading)]">
+      <section className="mx-auto max-w-xl text-center">
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+          Card checkout unavailable
+        </h1>
+        <p className="mt-4 text-sm leading-relaxed text-[var(--text-muted)]">
+          Online card payment is not available yet. You can buy an eSIM with an
+          existing wallet balance after signing in.
+        </p>
+        <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
           <Link
-            href="/plans"
-            className="block text-center mt-8 text-[var(--text-muted)] underline"
+            href="/account/esim/buy"
+            className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]"
           >
-            Back to Plans
+            Buy with wallet
           </Link>
-
-        </section>
-      </main>
-    );
-  }
-
-
-  export default function PaymentPage() {
-    return (
-      <Suspense fallback={<div>Loading...</div>}>
-        <PaymentContent />
-      </Suspense>
-    );
-  }
+          <Link
+            href="/countries"
+            className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface-2)]"
+          >
+            Browse destinations
+          </Link>
+        </div>
+      </section>
+    </main>
+  );
+}

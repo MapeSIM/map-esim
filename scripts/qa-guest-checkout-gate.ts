@@ -94,6 +94,20 @@ function main() {
   assert.match(readme, /ENABLE_GUEST_VESIM_CHECKOUT/);
   assert.match(readme, /Keep `ENABLE_GUEST_VESIM_CHECKOUT=false` in production/);
 
+  console.log("7) Soft-launch Buy CTAs no longer target guest /checkout");
+  const planUtils = read("app/lib/plans/plan-utils.ts");
+  assert.match(planUtils, /\/account\/esim\/buy/);
+  assert.doesNotMatch(
+    planUtils,
+    /return\s+`\/checkout\?/
+  );
+  const navbar = read("app/components/Navbar.tsx");
+  assert.match(navbar, /href="\/account\/esim\/buy"/);
+  assert.match(navbar, /Get eSIM/);
+  const paymentPage = read("app/payment/page.tsx");
+  assert.doesNotMatch(paymentPage, />\s*Pay Now\s*</);
+  assert.match(paymentPage, /Card checkout unavailable|not available yet/i);
+
   console.log("qa-guest-checkout-gate: OK");
 }
 

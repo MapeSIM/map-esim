@@ -195,7 +195,7 @@ export default function Navbar({
             </Link>
 
             <Link
-              href="/countries"
+              href="/account/esim/buy"
               className="
                 inline-flex items-center justify-center
                 rounded-[14px] bg-[var(--accent)] px-4 py-2.5
@@ -293,7 +293,7 @@ export default function Navbar({
             </Link>
 
             <Link
-              href="/countries"
+              href="/account/esim/buy"
               onClick={closeMenu}
               className="
                 mt-2 inline-flex items-center justify-center
