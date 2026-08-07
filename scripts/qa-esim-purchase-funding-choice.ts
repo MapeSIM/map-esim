@@ -128,6 +128,9 @@ function main() {
   assert.match(service, /export async function setWalletPurchaseFundingChoice/);
   assert.match(service, /status:\s*WalletEsimPurchaseStatus\.READY/);
   assert.match(service, /calculatePurchaseFunding/);
+  assert.match(service, /OrderFundingSource\.DIRECT_PAYMENT/);
+  assert.match(service, /OrderFundingSource\.CUSTOMER_SPLIT/);
+  assert.match(service, /OrderFundingSource\.CUSTOMER_WALLET/);
   assert.ok(
     !/AWAITING_GATEWAY_PAYMENT/.test(
       service.split("setWalletPurchaseFundingChoice")[1]?.slice(0, 2500) ?? ""
@@ -222,7 +225,11 @@ function main() {
   assert.match(confirmForm, /Wallet applied/);
   assert.match(confirmForm, /Pay now/);
   assert.match(confirmForm, /calculatePurchaseFunding/);
+  assert.match(confirmForm, /previewPurchaseFunding/);
+  assert.match(confirmForm, /setWalletPurchaseFundingChoiceAction/);
   assert.match(confirmForm, /gatewayRequired/);
+  assert.match(confirmForm, /walletFundsApplied/);
+  assert.match(confirmForm, /fullWallet = !gatewayRequired && walletFundsApplied/);
   assert.match(confirmForm, /Payment method/);
   assert.match(confirmForm, /CARD_PAYMENT_UNAVAILABLE_MESSAGE/);
   assert.match(confirmForm, /Continue to Payment/);
@@ -233,6 +240,10 @@ function main() {
   assert.match(confirmForm, /type="button"/);
   assert.match(confirmForm, /Buy eSIM with Wallet/);
   assert.match(confirmForm, /\{gatewayRequired \?/);
+  assert.doesNotMatch(
+    confirmForm,
+    /walletAppliedCents:\s*0,\s*gatewayAmountCents:\s*review\.priceCents/
+  );
   assert.ok(!/createCheckoutSession|fake payment|Apple Pay|Google Pay|Promo Code|VReward/i.test(confirmForm));
   assert.ok(!/JazzCash|EasyPaisa/i.test(confirmForm));
   console.log("PASS checkout_structure_and_fail_closed_cta");

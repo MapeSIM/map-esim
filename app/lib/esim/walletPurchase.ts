@@ -541,10 +541,14 @@ export async function setWalletPurchaseFundingChoice(
     useWallet,
   });
 
+  // Keep fundingSource aligned with the authoritative breakdown:
+  // full wallet → CUSTOMER_WALLET, split → CUSTOMER_SPLIT, card-only → DIRECT_PAYMENT.
   const fundingSource =
-    funding.gatewayAmountCents > 0
-      ? OrderFundingSource.CUSTOMER_SPLIT
-      : OrderFundingSource.CUSTOMER_WALLET;
+    funding.gatewayAmountCents <= 0
+      ? OrderFundingSource.CUSTOMER_WALLET
+      : funding.walletAppliedCents > 0
+        ? OrderFundingSource.CUSTOMER_SPLIT
+        : OrderFundingSource.DIRECT_PAYMENT;
 
   const updated = await prisma.walletEsimPurchase.updateMany({
     where: {

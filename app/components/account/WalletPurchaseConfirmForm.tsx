@@ -1,8 +1,22 @@
 "use client";
 
-import { useActionState, useId, useMemo, useState } from "react";
-import { confirmWalletEsimPurchaseAction } from "@/app/lib/esim/walletPurchaseActions";
-import { calculatePurchaseFunding } from "@/app/lib/esim/purchaseFunding";
+import {
+  useActionState,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
+import { useRouter } from "next/navigation";
+import {
+  confirmWalletEsimPurchaseAction,
+  setWalletPurchaseFundingChoiceAction,
+} from "@/app/lib/esim/walletPurchaseActions";
+import {
+  calculatePurchaseFunding,
+  type PurchaseFundingBreakdown,
+} from "@/app/lib/esim/purchaseFunding";
 import {
   CARD_PAYMENT_UNAVAILABLE_MESSAGE,
   initialWalletPurchaseState,
@@ -15,13 +29,65 @@ type Props = {
   review: WalletPurchaseReview;
 };
 
+/**
+ * Live checkout funding preview from the same rules as the server.
+ * Never falls back to a fake gateway-only breakdown when the wallet is selected.
+ */
+function previewPurchaseFunding(
+  review: WalletPurchaseReview,
+  useWallet: boolean
+): PurchaseFundingBreakdown {
+  try {
+    return calculatePurchaseFunding({
+      priceCents: review.priceCents,
+      walletBalanceCents: review.balanceCents,
+      useWallet,
+    });
+  } catch {
+    // Same choice as the server review DTO — trust its live breakdown.
+    if (useWallet === review.useWallet) {
+      return {
+        useWallet: review.useWallet,
+        walletAppliedCents: review.walletAppliedCents,
+        gatewayAmountCents: review.gatewayAmountCents,
+      };
+    }
+    // Toggle ahead of a persisted refresh: coerce display cents only.
+    // Submit always re-validates with server balance/price.
+    const priceCents = Math.trunc(Number(review.priceCents));
+    const balanceCents = Math.max(0, Math.trunc(Number(review.balanceCents)));
+    if (
+      !Number.isFinite(priceCents) ||
+      priceCents <= 0 ||
+      !Number.isFinite(balanceCents)
+    ) {
+      return {
+        useWallet: review.useWallet,
+        walletAppliedCents: review.walletAppliedCents,
+        gatewayAmountCents: review.gatewayAmountCents,
+      };
+    }
+    const walletAppliedCents = useWallet
+      ? Math.min(balanceCents, priceCents)
+      : 0;
+    return {
+      useWallet,
+      walletAppliedCents,
+      gatewayAmountCents: priceCents - walletAppliedCents,
+    };
+  }
+}
+
 export default function WalletPurchaseConfirmForm({ review }: Props) {
+  const router = useRouter();
   const [state, formAction, pending] = useActionState(
     confirmWalletEsimPurchaseAction,
     initialWalletPurchaseState
   );
   const [confirmed, setConfirmed] = useState(false);
   const [useWallet, setUseWallet] = useState(review.useWallet);
+  const [fundingPending, startFundingTransition] = useTransition();
+  const fundingChoiceGen = useRef(0);
   const confirmId = useId();
   const useWalletId = useId();
   const planHeadingId = useId();
@@ -31,27 +97,16 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
   const paymentHeadingId = useId();
   const errorState = state as WalletPurchaseActionState;
 
-  const preview = useMemo(() => {
-    try {
-      return calculatePurchaseFunding({
-        priceCents: review.priceCents,
-        walletBalanceCents: review.balanceCents,
-        useWallet,
-      });
-    } catch {
-      return {
-        useWallet,
-        walletAppliedCents: 0,
-        gatewayAmountCents: review.priceCents,
-      };
-    }
-  }, [review.priceCents, review.balanceCents, useWallet]);
+  // Reset local choice only when navigating to a different purchase.
+  useEffect(() => {
+    setUseWallet(review.useWallet);
+  }, [review.purchaseId, review.useWallet]);
 
+  const preview = previewPurchaseFunding(review, useWallet);
   const gatewayRequired = preview.gatewayAmountCents > 0;
-  const fullWallet = !gatewayRequired && preview.useWallet;
+  const walletFundsApplied = preview.walletAppliedCents > 0;
+  const fullWallet = !gatewayRequired && walletFundsApplied;
   const walletDisabled = review.balanceCents <= 0;
-  // Single source of truth: unavailable copy only when gateway money is due
-  // and the payment gateway is not actually configured.
   const paymentGatewayConfigured = review.paymentGatewayConfigured === true;
   const gatewayReady = gatewayRequired && paymentGatewayConfigured;
   const showGatewayUnavailable = gatewayRequired && !paymentGatewayConfigured;
@@ -59,15 +114,30 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
     0,
     review.balanceCents - preview.walletAppliedCents
   );
-  // Never surface the setup/unavailable string via action errors when the
-  // gateway is configured (stale/misleading after a prior failed attempt),
-  // and avoid duplicating it when the payment-method status already shows it.
+  const busy = pending || fundingPending;
   const alertError =
     errorState.ok === false && errorState.error
       ? errorState.error === CARD_PAYMENT_UNAVAILABLE_MESSAGE
         ? null
         : errorState.error
       : null;
+
+  function onUseWalletChange(checked: boolean) {
+    setUseWallet(checked);
+    const gen = ++fundingChoiceGen.current;
+    startFundingTransition(async () => {
+      const fd = new FormData();
+      fd.set("purchaseId", review.purchaseId);
+      if (checked) fd.set("useWallet", "on");
+      const result = await setWalletPurchaseFundingChoiceAction(
+        initialWalletPurchaseState,
+        fd
+      );
+      if (result.ok === true && gen === fundingChoiceGen.current) {
+        router.refresh();
+      }
+    });
+  }
 
   return (
     <form action={formAction} className="space-y-5" noValidate>
@@ -162,8 +232,8 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
             type="checkbox"
             value="on"
             checked={useWallet && !walletDisabled}
-            onChange={(event) => setUseWallet(event.target.checked)}
-            disabled={pending || walletDisabled}
+            onChange={(event) => onUseWalletChange(event.target.checked)}
+            disabled={busy || walletDisabled}
             className="mt-1"
           />
           <span>Use wallet balance</span>
@@ -293,7 +363,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 type="checkbox"
                 checked={confirmed}
                 onChange={(event) => setConfirmed(event.target.checked)}
-                disabled={pending}
+                disabled={busy}
                 className="mt-1"
               />
               <span>
@@ -310,7 +380,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
 
           <button
             type="submit"
-            disabled={pending || !confirmed}
+            disabled={busy || !confirmed}
             className="inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] disabled:opacity-60"
           >
             {pending ? "Buying with wallet…" : "Buy eSIM with Wallet"}
@@ -319,7 +389,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
       ) : gatewayReady ? (
         <button
           type="submit"
-          disabled={pending}
+          disabled={busy}
           className="inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] disabled:opacity-60"
         >
           {pending ? "Starting secure payment…" : "Continue to Secure Payment"}
