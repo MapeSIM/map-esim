@@ -94,7 +94,13 @@ function main() {
     "app/components/account/WalletPurchaseConfirmForm.tsx"
   );
   const returnPage = read("app/account/esim/buy/payment/return/page.tsx");
+  const returnView = read(
+    "app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"
+  );
   const cancelPage = read("app/account/esim/buy/payment/cancel/page.tsx");
+  const cancelView = read(
+    "app/account/esim/buy/payment/cancel/EsimPurchasePaymentCancelView.tsx"
+  );
   const adapter = read("app/lib/payments/safepayAdapter.ts");
   const walletPurchase = read("app/lib/esim/walletPurchase.ts");
   const persist = read("app/lib/orders/persistAssignedOrder.ts");
@@ -140,10 +146,12 @@ function main() {
   assert.match(confirmForm, /Buy eSIM with Wallet/);
   console.log("PASS split_unblocked_full_wallet_unchanged_ui");
 
-  assert.match(returnPage, /Payment processing/);
+  assert.match(returnView, /Payment processing/);
+  assert.match(returnPage, /parsePaymentAttemptId/);
   assert.doesNotMatch(returnPage, /applyVerifiedEsimPurchasePaymentEvent/);
+  assert.doesNotMatch(returnView, /applyVerifiedEsimPurchasePaymentEvent/);
   assert.match(cancelPage, /maybeReleasePendingGatewayReservation/);
-  assert.match(cancelPage, /Payment not completed/);
+  assert.match(cancelView, /Payment not completed/);
   console.log("PASS browser_return_non_authoritative_cancel_safe_release");
 
   assert.match(adapter, /verifySafepayCardWebhookSignature/);

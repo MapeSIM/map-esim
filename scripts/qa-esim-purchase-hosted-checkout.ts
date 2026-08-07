@@ -12,6 +12,9 @@ import {
 import {
   ESIM_PURCHASE_PAYMENT_CANCEL_PATH,
   ESIM_PURCHASE_PAYMENT_RETURN_PATH,
+  esimPurchasePaymentCancelPath,
+  esimPurchasePaymentReturnPath,
+  parsePaymentAttemptId,
 } from "../app/lib/payments/safepayCheckoutPaths";
 
 const root = join(__dirname, "..");
@@ -28,7 +31,14 @@ function main() {
   );
   const reviewPage = read("app/account/esim/buy/review/page.tsx");
   const returnPage = read("app/account/esim/buy/payment/return/page.tsx");
+  const returnAttemptPage = read(
+    "app/account/esim/buy/payment/return/[attemptId]/page.tsx"
+  );
   const cancelPage = read("app/account/esim/buy/payment/cancel/page.tsx");
+  const cancelAttemptPage = read(
+    "app/account/esim/buy/payment/cancel/[attemptId]/page.tsx"
+  );
+  const pathsSrc = read("app/lib/payments/safepayCheckoutPaths.ts");
   const readSrc = read("app/lib/esim/walletPurchaseRead.ts");
   const adapter = read("app/lib/payments/safepayAdapter.ts");
   const http = read("app/lib/payments/safepayHttp.ts");
@@ -117,16 +127,51 @@ function main() {
     ESIM_PURCHASE_PAYMENT_CANCEL_PATH,
     "/account/esim/buy/payment/cancel"
   );
-  assert.match(returnPage, /Payment processing/);
-  assert.match(returnPage, /does not confirm payment/);
+  assert.equal(
+    esimPurchasePaymentReturnPath("cmsjdsxm2001rtti0bna3w66f"),
+    "/account/esim/buy/payment/return/cmsjdsxm2001rtti0bna3w66f"
+  );
+  assert.equal(
+    esimPurchasePaymentCancelPath("cmsjdsxm2001rtti0bna3w66f"),
+    "/account/esim/buy/payment/cancel/cmsjdsxm2001rtti0bna3w66f"
+  );
+  assert.equal(
+    parsePaymentAttemptId(
+      "cmsjdsxm2001rtti0bna3w66f?tracker=track_ec118420-b4a0-45fb-a6ac-2f44a8ad8347"
+    ),
+    "cmsjdsxm2001rtti0bna3w66f"
+  );
+  assert.match(pathsSrc, /parsePaymentAttemptId/);
+  assert.match(pathsSrc, /must not include a query string/);
+  assert.match(returnPage, /parsePaymentAttemptId/);
   assert.match(returnPage, /void query\.tracker/);
   assert.match(returnPage, /getOwnedEsimPurchasePaymentAttempt/);
+  assert.match(returnAttemptPage, /parsePaymentAttemptId/);
+  assert.match(returnAttemptPage, /getOwnedEsimPurchasePaymentAttempt/);
+  assert.match(
+    read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
+    /Payment processing/
+  );
+  assert.match(
+    read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
+    /does not confirm payment/
+  );
   assert.doesNotMatch(returnPage, /confirmWalletEsimPurchase|applyVerifiedTopup|executeCreditCheckout/);
+  assert.doesNotMatch(returnAttemptPage, /confirmWalletEsimPurchase|applyVerifiedTopup|executeCreditCheckout/);
   assert.doesNotMatch(returnPage, /prisma\.(wallet|order)|reserveWalletPurchaseFunds/);
-  assert.match(cancelPage, /Payment not completed/);
-  assert.match(cancelPage, /Back to checkout/);
+  assert.doesNotMatch(returnAttemptPage, /prisma\.(wallet|order)|reserveWalletPurchaseFunds/);
+  assert.match(cancelPage, /parsePaymentAttemptId/);
   assert.match(cancelPage, /getOwnedEsimPurchasePaymentAttempt/);
   assert.match(cancelPage, /maybeReleasePendingGatewayReservation/);
+  assert.match(cancelAttemptPage, /maybeReleasePendingGatewayReservation/);
+  assert.match(
+    read("app/account/esim/buy/payment/cancel/EsimPurchasePaymentCancelView.tsx"),
+    /Payment not completed/
+  );
+  assert.match(
+    read("app/account/esim/buy/payment/cancel/EsimPurchasePaymentCancelView.tsx"),
+    /Back to checkout/
+  );
   assert.doesNotMatch(cancelPage, /confirmWalletEsimPurchase|applyVerifiedTopup|executeCreditCheckout/);
   assert.doesNotMatch(cancelPage, /reserveWalletPurchaseFundsInTx/);
   console.log("PASS return_cancel_informational_no_funding_mutation");

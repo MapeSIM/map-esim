@@ -210,7 +210,10 @@ function main() {
     "/account/esim/buy/payment/cancel"
   );
   assert.match(paths, /ESIM_PURCHASE_PAYMENT_RETURN_PATH/);
+  assert.match(paths, /parsePaymentAttemptId/);
+  assert.match(paths, /\$\{ESIM_PURCHASE_PAYMENT_RETURN_PATH\}\/\$\{id\}/);
   assert.match(urls, /assertSafePaymentReturnPath/);
+  assert.match(urls, /isEsimPurchasePaymentReturnPath/);
   assert.match(urls, /safeCallbackPath/);
   console.log("PASS return_cancel_path_helpers");
 

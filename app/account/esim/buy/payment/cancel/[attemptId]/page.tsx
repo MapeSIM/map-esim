@@ -8,33 +8,29 @@ import { parsePaymentAttemptId } from "@/app/lib/payments/safepayCheckoutPaths";
 export const dynamic = "force-dynamic";
 
 /**
- * Informational cancel page after Safepay Hosted Checkout cancel.
- * Supports mangled `?attempt=id?tracker=...`. No funding / VeSIM creation.
+ * Preferred cancel route: path-based attempt id (no query on redirect_url).
  */
-export default async function EsimPurchasePaymentCancelPage({
+export default async function EsimPurchasePaymentCancelAttemptPage({
+  params,
   searchParams,
 }: {
-  searchParams: Promise<{
-    attempt?: string;
-    tracker?: string;
-    status?: string;
-    purchase?: string;
-  }>;
+  params: Promise<{ attemptId: string }>;
+  searchParams: Promise<{ tracker?: string; status?: string; purchase?: string }>;
 }) {
   const user = await requireRole("CUSTOMER");
+  const { attemptId: rawAttemptId } = await params;
   const query = await searchParams;
 
   void query.tracker;
   void query.status;
   void query.purchase;
 
-  const attemptId = parsePaymentAttemptId(query.attempt);
+  const attemptId = parsePaymentAttemptId(rawAttemptId);
   if (!attemptId) notFound();
 
   const attempt = await getOwnedEsimPurchasePaymentAttempt(user.id, attemptId);
   if (!attempt) notFound();
 
-  // Idempotent pending-reservation release only — never marks gateway paid/failed.
   await maybeReleasePendingGatewayReservation({
     customerUserId: user.id,
     purchaseId: attempt.purchaseId,

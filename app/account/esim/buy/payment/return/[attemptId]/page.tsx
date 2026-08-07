@@ -7,30 +7,25 @@ import { parsePaymentAttemptId } from "@/app/lib/payments/safepayCheckoutPaths";
 export const dynamic = "force-dynamic";
 
 /**
- * Informational return page after Safepay Hosted Checkout (query form).
- * Supports legacy/mangled `?attempt=id?tracker=...` from Safepay appending
- * `?tracker=` onto a redirect_url that already had a query string.
- * Does not mark paid, debit wallet, create VeSIM orders, or trust tracker.
+ * Preferred return route: path-based attempt id so Safepay can append
+ * `?tracker=` without mangling query params. Non-authoritative only.
  */
-export default async function EsimPurchasePaymentReturnPage({
+export default async function EsimPurchasePaymentReturnAttemptPage({
+  params,
   searchParams,
 }: {
-  searchParams: Promise<{
-    attempt?: string;
-    tracker?: string;
-    status?: string;
-    purchase?: string;
-  }>;
+  params: Promise<{ attemptId: string }>;
+  searchParams: Promise<{ tracker?: string; status?: string; purchase?: string }>;
 }) {
   const user = await requireRole("CUSTOMER");
+  const { attemptId: rawAttemptId } = await params;
   const query = await searchParams;
 
-  // Browser/query payment signals are never authoritative.
   void query.tracker;
   void query.status;
   void query.purchase;
 
-  const attemptId = parsePaymentAttemptId(query.attempt);
+  const attemptId = parsePaymentAttemptId(rawAttemptId);
   if (!attemptId) notFound();
 
   const attempt = await getOwnedEsimPurchasePaymentAttempt(user.id, attemptId);

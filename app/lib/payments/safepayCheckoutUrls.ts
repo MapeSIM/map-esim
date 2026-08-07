@@ -2,8 +2,8 @@ import "server-only";
 
 import { safeCallbackPath } from "@/app/lib/auth/redirects";
 import {
-  ESIM_PURCHASE_PAYMENT_CANCEL_PATH,
-  ESIM_PURCHASE_PAYMENT_RETURN_PATH,
+  isEsimPurchasePaymentCancelPath,
+  isEsimPurchasePaymentReturnPath,
 } from "@/app/lib/payments/safepayCheckoutPaths";
 
 export {
@@ -11,6 +11,7 @@ export {
   ESIM_PURCHASE_PAYMENT_RETURN_PATH,
   esimPurchasePaymentCancelPath,
   esimPurchasePaymentReturnPath,
+  parsePaymentAttemptId,
 } from "@/app/lib/payments/safepayCheckoutPaths";
 
 /**
@@ -22,10 +23,8 @@ export function assertSafePaymentReturnPath(path: string): string {
   if (
     !safe ||
     !(
-      safe === ESIM_PURCHASE_PAYMENT_RETURN_PATH ||
-      safe.startsWith(`${ESIM_PURCHASE_PAYMENT_RETURN_PATH}?`) ||
-      safe === ESIM_PURCHASE_PAYMENT_CANCEL_PATH ||
-      safe.startsWith(`${ESIM_PURCHASE_PAYMENT_CANCEL_PATH}?`) ||
+      isEsimPurchasePaymentReturnPath(safe) ||
+      isEsimPurchasePaymentCancelPath(safe) ||
       safe.startsWith("/account/wallet/top-up/")
     )
   ) {
