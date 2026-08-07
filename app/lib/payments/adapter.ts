@@ -15,7 +15,8 @@ import type {
 
 /**
  * Provider-neutral payment gateway adapter contract.
- * Real adapters must verify signatures server-side and never credit wallets directly.
+ * Real adapters must verify signatures server-side and never credit wallets
+ * or finalize eSIM purchases directly from browser returns.
  */
 export type PaymentGatewayAdapter = {
   readonly provider: PaymentGatewayProviderName;
@@ -38,9 +39,12 @@ export type PaymentGatewayAdapter = {
 export {
   type CreateCheckoutSessionInput,
   type CreateCheckoutSessionResult,
+  type CreateEsimPurchaseCheckoutInput,
+  type CreateWalletTopupCheckoutInput,
   type FetchPaymentStatusInput,
   type NormalizedPaymentEvent,
   type NormalizedPaymentStatus,
+  type PaymentCheckoutPurpose,
   type PaymentGatewayProviderName,
   type RequestRefundInput,
   type RequestRefundResult,

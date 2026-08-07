@@ -354,9 +354,11 @@ export async function startWalletTopupCheckout(options: {
 
   const adapter = getActivePaymentAdapter();
   const result = await adapter.createCheckoutSession({
+    purpose: "WALLET_TOPUP",
     localTopupId: topup.id,
     customerUserId,
-    creditAmountCents: topup.creditAmountCents,
+    chargeAmountMinor: topup.creditAmountCents,
+    chargeCurrency: "USD",
     checkoutIdempotencyKey: topup.checkoutIdempotencyKey,
     returnPath: `/account/wallet/top-up/${topup.id}`,
     cancelPath: `/account/wallet/top-up/${topup.id}`,
@@ -397,8 +399,14 @@ export async function applyVerifiedTopupPaymentEvent(
   }
 
   const eventId = event.eventId.trim();
-  const localTopupId = event.localTopupId.trim();
-  if (!eventId || eventId.length > 190 || !localTopupId || localTopupId.length > 64) {
+  const localTopupId = (event.localTopupId ?? "").trim();
+  if (
+    event.purpose !== "WALLET_TOPUP" ||
+    !eventId ||
+    eventId.length > 190 ||
+    !localTopupId ||
+    localTopupId.length > 64
+  ) {
     throw new WalletTopupError("TOPUP_UNAVAILABLE", "Payment event is invalid.");
   }
 

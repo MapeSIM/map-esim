@@ -227,7 +227,7 @@ function main() {
   console.log("PASS checkout_structure_and_fail_closed_cta");
 
   assert.ok(
-    /export function isPaymentGatewayConfigured\(\): boolean \{\r?\n\s*return false;\r?\n\}/.test(
+    /export function isPaymentGatewayConfigured\(\): boolean \{[\s\S]*PAYMENT_GATEWAY_ENABLED[\s\S]*tryCreateSafepayAdapter[\s\S]*return created\.ok;[\s\S]*\}/.test(
       disabledAdapter
     )
   );

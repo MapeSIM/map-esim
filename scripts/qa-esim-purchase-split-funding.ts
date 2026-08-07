@@ -198,11 +198,9 @@ function main() {
   );
   assert.ok(!/createCheckoutSession/.test(confirmForm));
   assert.ok(!/createCheckoutSession/.test(read("app/lib/esim/walletPurchaseActions.ts")));
-  assert.ok(
-    /export function isPaymentGatewayConfigured\(\): boolean \{\r?\n\s*return false;\r?\n\}/.test(
-      disabledAdapter
-    )
-  );
+  assert.match(disabledAdapter, /isPaymentGatewayEnabledFlag|PAYMENT_GATEWAY_ENABLED/);
+  assert.match(disabledAdapter, /tryCreateSafepayAdapter/);
+  assert.match(disabledAdapter, /return false/);
   assert.match(guestGate, /ENABLE_GUEST_VESIM_CHECKOUT === "true"/);
   assert.match(paymentPage, /Card checkout unavailable/);
   assert.match(pkg, /"qa:esim-purchase-split-funding"/);

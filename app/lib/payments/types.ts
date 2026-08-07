@@ -1,5 +1,5 @@
 /**
- * Provider-neutral payment types for wallet top-up adapters.
+ * Provider-neutral payment types for wallet top-up and eSIM purchase adapters.
  * Safe fields only — never card data, secrets, or raw gateway JSON.
  */
 
@@ -12,20 +12,43 @@ export type PaymentGatewayProviderName =
   | "MANUAL_TEST"
   | "UNCONFIGURED";
 
+export type PaymentCheckoutPurpose = "WALLET_TOPUP" | "ESIM_PURCHASE";
+
 export type NormalizedPaymentStatus =
   | "confirmed"
   | "pending"
   | "failed"
   | "uncertain";
 
-export type CreateCheckoutSessionInput = {
-  localTopupId: string;
+type CreateCheckoutSessionBase = {
   customerUserId: string;
-  creditAmountCents: number;
+  /** Server-authoritative charge amount in minor units (e.g. USD cents). */
+  chargeAmountMinor: number;
+  /** Server-authoritative ISO currency for the gateway charge (e.g. USD). */
+  chargeCurrency: string;
   checkoutIdempotencyKey: string;
+  /** Internal relative path only — never arbitrary absolute URLs. */
   returnPath: string;
   cancelPath: string;
 };
+
+export type CreateWalletTopupCheckoutInput = CreateCheckoutSessionBase & {
+  purpose: "WALLET_TOPUP";
+  localTopupId: string;
+};
+
+export type CreateEsimPurchaseCheckoutInput = CreateCheckoutSessionBase & {
+  purpose: "ESIM_PURCHASE";
+  paymentAttemptId: string;
+  purchaseId: string;
+  customerEmail?: string | null;
+  /** Safe internal metadata only (ids/status). Never secrets or card data. */
+  metadata?: Readonly<Record<string, string>>;
+};
+
+export type CreateCheckoutSessionInput =
+  | CreateWalletTopupCheckoutInput
+  | CreateEsimPurchaseCheckoutInput;
 
 export type CreateCheckoutSessionResult =
   | {
@@ -40,7 +63,11 @@ export type CreateCheckoutSessionResult =
     }
   | {
       ok: false;
-      code: "GATEWAY_UNAVAILABLE" | "INVALID_REQUEST" | "UNAVAILABLE";
+      code:
+        | "GATEWAY_UNAVAILABLE"
+        | "INVALID_REQUEST"
+        | "UNAVAILABLE"
+        | "MISCONFIGURED";
       message: string;
     };
 
@@ -51,18 +78,24 @@ export type WebhookVerificationInput = {
 
 export type WebhookVerificationResult =
   | { ok: true }
-  | { ok: false; code: "INVALID_SIGNATURE" | "GATEWAY_UNAVAILABLE" };
+  | {
+      ok: false;
+      code: "INVALID_SIGNATURE" | "GATEWAY_UNAVAILABLE" | "MISCONFIGURED";
+    };
 
 /**
  * Normalized payment event after adapter signature verification + parse.
- * Crediting requires signatureVerified === true and paid status confirmed.
+ * Crediting / purchase funding requires signatureVerified === true.
  */
 export type NormalizedPaymentEvent = {
   signatureVerified: boolean;
   provider: PaymentGatewayProviderName;
+  purpose: PaymentCheckoutPurpose;
   eventId: string;
   providerPaymentRef: string | null;
-  localTopupId: string;
+  localTopupId: string | null;
+  paymentAttemptId: string | null;
+  purchaseId: string | null;
   paymentStatus: NormalizedPaymentStatus;
   chargeCurrency: string;
   chargeAmountMinor: number;
@@ -72,16 +105,23 @@ export type NormalizedPaymentEvent = {
 
 export type FetchPaymentStatusInput = {
   providerPaymentRef: string;
-  localTopupId: string;
+  purpose: PaymentCheckoutPurpose;
+  localTopupId?: string;
+  paymentAttemptId?: string;
 };
 
 export type RequestRefundInput = {
   providerPaymentRef: string;
-  localTopupId: string;
+  purpose: PaymentCheckoutPurpose;
+  localTopupId?: string;
+  paymentAttemptId?: string;
   amountMinor: number;
   currency: string;
 };
 
 export type RequestRefundResult =
   | { ok: true; providerRefundRef: string | null }
-  | { ok: false; code: "GATEWAY_UNAVAILABLE" | "UNSUPPORTED" | "FAILED" };
+  | {
+      ok: false;
+      code: "GATEWAY_UNAVAILABLE" | "UNSUPPORTED" | "FAILED" | "MISCONFIGURED";
+    };
