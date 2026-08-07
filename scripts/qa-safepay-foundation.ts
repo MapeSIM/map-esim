@@ -209,9 +209,10 @@ function main() {
   assert.match(urls, /safeCallbackPath/);
   console.log("PASS return_cancel_path_helpers");
 
-  assert.ok(!/createCheckoutSession/.test(actions));
-  assert.ok(!/tryCreateSafepayAdapter\(/.test(actions));
+  // PG3-B wires checkout via startEsimPurchaseHostedCheckout (not raw Safepay HTTP in actions).
+  assert.match(actions, /startEsimPurchaseHostedCheckout/);
   assert.ok(!/SafepayHttpClient/.test(actions));
+  assert.ok(!/tryCreateSafepayAdapter\(/.test(actions));
   assert.ok(!/fetch\("https:\/\/sandbox\.api\.getsafepay\.com/.test(adapter));
   assert.match(guestGate, /ENABLE_GUEST_VESIM_CHECKOUT === "true"/);
   assert.doesNotMatch(pkg, /@sfpy\/node-core|@sfpy\/node-sdk/);

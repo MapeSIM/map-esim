@@ -111,9 +111,16 @@ function main() {
   assert.match(actions, /void formData\.get\("gatewayAmountCents"\)/);
   assert.match(actions, /void formData\.get\("priceCents"\)/);
   assert.match(actions, /CARD_PAYMENT_UNAVAILABLE_MESSAGE/);
+  assert.match(actions, /SPLIT_PAYMENT_UNAVAILABLE_MESSAGE/);
   assert.match(actions, /funding\.gatewayAmountCents > 0/);
+  assert.match(actions, /startEsimPurchaseHostedCheckout/);
+  assert.match(actions, /isPaymentGatewayConfigured/);
   assert.ok(
     actions.indexOf("funding.gatewayAmountCents > 0") <
+      actions.indexOf("confirmWalletEsimPurchase({")
+  );
+  assert.ok(
+    actions.indexOf("startEsimPurchaseHostedCheckout") <
       actions.indexOf("confirmWalletEsimPurchase({")
   );
   console.log("PASS server_accepts_useWallet_only_and_gates_gateway");
@@ -218,7 +225,12 @@ function main() {
   assert.match(confirmForm, /gatewayRequired/);
   assert.match(confirmForm, /Payment method/);
   assert.match(confirmForm, /CARD_PAYMENT_UNAVAILABLE_MESSAGE/);
+  assert.match(confirmForm, /SPLIT_PAYMENT_UNAVAILABLE_MESSAGE/);
   assert.match(confirmForm, /Continue to Payment/);
+  assert.match(confirmForm, /Continue to Secure Payment/);
+  assert.match(confirmForm, /paymentGatewayConfigured/);
+  assert.match(confirmForm, /partialWalletSplit/);
+  assert.match(confirmForm, /gatewayReady/);
   assert.match(confirmForm, /type="button"/);
   assert.match(confirmForm, /Buy eSIM with Wallet/);
   assert.match(confirmForm, /\{gatewayRequired \?/);

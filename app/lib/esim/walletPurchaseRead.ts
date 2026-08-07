@@ -82,7 +82,8 @@ export async function getWalletPurchaseReview(
     !row ||
     row.customerUserId !== owner.id ||
     (row.fundingSource !== OrderFundingSource.CUSTOMER_WALLET &&
-      row.fundingSource !== OrderFundingSource.CUSTOMER_SPLIT)
+      row.fundingSource !== OrderFundingSource.CUSTOMER_SPLIT &&
+      row.fundingSource !== OrderFundingSource.DIRECT_PAYMENT)
   ) {
     return null;
   }
@@ -139,7 +140,9 @@ export async function getWalletPurchaseReview(
     paymentGatewayConfigured: isPaymentGatewayConfigured(),
     idempotencyKey: row.idempotencyKey,
     status: row.status,
-    canConfirm: row.status === WalletEsimPurchaseStatus.READY,
+    canConfirm:
+      row.status === WalletEsimPurchaseStatus.READY ||
+      row.status === WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
   };
 }
 

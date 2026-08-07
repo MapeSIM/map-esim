@@ -241,3 +241,76 @@ export function tryCreateSafepayAdapter(
   }
   return { ok: true, adapter: createSafepayAdapter(resolved.config) };
 }
+
+/**
+ * Rebuild Hosted Checkout URL for an existing tracker (new passport only).
+ * Does not create a payment session/tracker. Never logs tokens or full URL.
+ */
+export async function resumeSafepayHostedCheckout(input: {
+  trackerToken: string;
+  returnPath: string;
+  cancelPath: string;
+}): Promise<
+  | { ok: true; checkoutUrl: string }
+  | {
+      ok: false;
+      code: "GATEWAY_UNAVAILABLE" | "INVALID_REQUEST" | "MISCONFIGURED";
+      message: string;
+    }
+> {
+  const trackerToken = input.trackerToken.trim();
+  if (!trackerToken || trackerToken.length > 190) {
+    return {
+      ok: false,
+      code: "INVALID_REQUEST",
+      message: "Invalid payment reference.",
+    };
+  }
+
+  let returnPath: string;
+  let cancelPath: string;
+  try {
+    returnPath = assertSafePaymentReturnPath(input.returnPath);
+    cancelPath = assertSafePaymentReturnPath(input.cancelPath);
+  } catch {
+    return {
+      ok: false,
+      code: "INVALID_REQUEST",
+      message: "Invalid return path.",
+    };
+  }
+
+  const resolved = resolveSafepayAdapterConfig();
+  if (!resolved.ok) {
+    if (resolved.code === "GATEWAY_DISABLED") {
+      return { ok: false, code: "GATEWAY_UNAVAILABLE", message: PUBLIC_UNAVAILABLE };
+    }
+    logSafepayConfigFailure(resolved.code);
+    return { ok: false, code: "MISCONFIGURED", message: PUBLIC_MISCONFIGURED };
+  }
+
+  try {
+    const client = new SafepayHttpClient(resolved.config);
+    const passport = await client.createPassportToken();
+    const checkoutUrl = client.buildHostedCheckoutUrl({
+      trackerToken,
+      passportToken: passport.token,
+      redirectUrl: absoluteAppUrl(returnPath),
+      cancelUrl: absoluteAppUrl(cancelPath),
+    });
+    return { ok: true, checkoutUrl };
+  } catch (error) {
+    if (error instanceof SafepayHttpError) {
+      return {
+        ok: false,
+        code:
+          error.code === "INVALID_REQUEST"
+            ? "INVALID_REQUEST"
+            : "GATEWAY_UNAVAILABLE",
+        message: error.message,
+      };
+    }
+    console.error("safepay_adapter", "RESUME_CHECKOUT_FAILED");
+    return { ok: false, code: "GATEWAY_UNAVAILABLE", message: PUBLIC_UNAVAILABLE };
+  }
+}

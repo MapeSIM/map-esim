@@ -3,6 +3,10 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/app/lib/auth/session";
 import {
+  EsimPurchaseGatewayCheckoutError,
+  startEsimPurchaseHostedCheckout,
+} from "@/app/lib/esim/esimPurchaseGatewayCheckout";
+import {
   WalletEsimPurchaseError,
   confirmWalletEsimPurchase,
   prepareWalletEsimPurchase,
@@ -10,6 +14,7 @@ import {
 } from "@/app/lib/esim/walletPurchase";
 import {
   CARD_PAYMENT_UNAVAILABLE_MESSAGE,
+  SPLIT_PAYMENT_UNAVAILABLE_MESSAGE,
   type WalletPurchaseActionState,
 } from "@/app/lib/esim/walletPurchaseFormState";
 import {
@@ -178,6 +183,10 @@ export async function confirmWalletEsimPurchaseAction(
   void formData.get("walletBalance");
   void formData.get("walletAppliedCents");
   void formData.get("gatewayAmountCents");
+  void formData.get("redirect_url");
+  void formData.get("cancel_url");
+  void formData.get("chargeAmount");
+  void formData.get("currency");
 
   if (!purchaseId || purchaseId.length > 64) {
     return { ok: false, error: "This purchase is unavailable." };
@@ -186,6 +195,7 @@ export async function confirmWalletEsimPurchaseAction(
     return { ok: false, error: idempotencyParsed.error };
   }
 
+  // Persist funding choice when purchase is still READY (no-op path for awaiting retry).
   let funding;
   try {
     funding = await setWalletPurchaseFundingChoice({
@@ -194,22 +204,79 @@ export async function confirmWalletEsimPurchaseAction(
       useWallet,
     });
   } catch (error) {
-    if (error instanceof WalletEsimPurchaseError) {
+    if (
+      error instanceof WalletEsimPurchaseError &&
+      error.code === "INVALID_STATE"
+    ) {
+      // Purchase may already be AWAITING_GATEWAY_PAYMENT — continue into gateway start,
+      // which recomputes funding server-side from useWallet + authoritative price/balance.
+      funding = null;
+    } else if (error instanceof WalletEsimPurchaseError) {
       return { ok: false, error: error.message };
+    } else {
+      return {
+        ok: false,
+        error:
+          "Wallet purchase is temporarily unavailable. Please try again shortly.",
+      };
     }
-    return {
-      ok: false,
-      error: "Wallet purchase is temporarily unavailable. Please try again shortly.",
-    };
   }
 
-  // Gateway remainder required — fail closed until PG3 (no reserve, no order).
-  if (funding.gatewayAmountCents > 0) {
-    void isPaymentGatewayConfigured();
-    return {
-      ok: false,
-      error: CARD_PAYMENT_UNAVAILABLE_MESSAGE,
-    };
+  if (funding) {
+    if (funding.walletAppliedCents > 0 && funding.gatewayAmountCents > 0) {
+      return { ok: false, error: SPLIT_PAYMENT_UNAVAILABLE_MESSAGE };
+    }
+
+    if (funding.gatewayAmountCents > 0) {
+      if (!isPaymentGatewayConfigured()) {
+        return { ok: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE };
+      }
+
+      try {
+        const checkout = await startEsimPurchaseHostedCheckout({
+          customerUserId: customer.id,
+          purchaseId,
+          useWallet,
+        });
+        // External Safepay Hosted Checkout — never log checkoutUrl/tokens.
+        redirect(checkout.checkoutUrl);
+      } catch (error) {
+        if (error instanceof EsimPurchaseGatewayCheckoutError) {
+          return { ok: false, error: error.message };
+        }
+        return {
+          ok: false,
+          error: CARD_PAYMENT_UNAVAILABLE_MESSAGE,
+        };
+      }
+    }
+  } else {
+    // READY funding persist failed (likely AWAITING_GATEWAY_PAYMENT).
+    // Attempt gateway resume when card payment is still required.
+    try {
+      if (!isPaymentGatewayConfigured()) {
+        return { ok: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE };
+      }
+      const checkout = await startEsimPurchaseHostedCheckout({
+        customerUserId: customer.id,
+        purchaseId,
+        useWallet,
+      });
+      redirect(checkout.checkoutUrl);
+    } catch (error) {
+      if (error instanceof EsimPurchaseGatewayCheckoutError) {
+        if (error.code === "PARTIAL_WALLET_UNSUPPORTED") {
+          return { ok: false, error: SPLIT_PAYMENT_UNAVAILABLE_MESSAGE };
+        }
+        if (error.code === "INVALID_STATE") {
+          // May be full-wallet after funding change while awaiting — fall through.
+        } else {
+          return { ok: false, error: error.message };
+        }
+      } else {
+        return { ok: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE };
+      }
+    }
   }
 
   // Full wallet coverage only — existing secure confirm path.

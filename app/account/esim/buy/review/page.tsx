@@ -61,13 +61,14 @@ export default async function AccountWalletBuyReviewPage({
     review.status === WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED ||
     review.status === WalletEsimPurchaseStatus.PROVIDER_PENDING ||
     review.status === WalletEsimPurchaseStatus.FUNDS_RESERVED ||
-    review.status === WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT ||
     review.status === WalletEsimPurchaseStatus.FUNDED
   ) {
     redirect(
       `/account/esim/buy/review-needed?purchase=${encodeURIComponent(review.purchaseId)}`
     );
   }
+
+  // AWAITING_GATEWAY_PAYMENT stays on checkout so the customer can resume/cancel safely.
 
   if (!review.canConfirm) notFound();
 

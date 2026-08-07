@@ -190,14 +190,22 @@ function main() {
   assert.match(service, /refund_\$\{options\.purchaseId\}/);
   console.log("PASS partial_reservation_primitive");
 
-  // --- Gateway still disabled; no checkout session creation ---
+  // --- Gateway remains env-gated; UI fail-closed when not configured ---
   assert.match(confirmForm, /Continue to Payment/);
   assert.match(
     confirmForm,
     /CARD_PAYMENT_UNAVAILABLE_MESSAGE|Online payment will be available once payment setup is completed/
   );
+  assert.match(confirmForm, /paymentGatewayConfigured/);
   assert.ok(!/createCheckoutSession/.test(confirmForm));
-  assert.ok(!/createCheckoutSession/.test(read("app/lib/esim/walletPurchaseActions.ts")));
+  assert.match(
+    read("app/lib/esim/walletPurchaseActions.ts"),
+    /isPaymentGatewayConfigured/
+  );
+  assert.match(
+    read("app/lib/esim/esimPurchaseGatewayCheckout.ts"),
+    /isPaymentGatewayConfigured/
+  );
   assert.match(disabledAdapter, /isPaymentGatewayEnabledFlag|PAYMENT_GATEWAY_ENABLED/);
   assert.match(disabledAdapter, /tryCreateSafepayAdapter/);
   assert.match(disabledAdapter, /return false/);

@@ -5,6 +5,7 @@ import { confirmWalletEsimPurchaseAction } from "@/app/lib/esim/walletPurchaseAc
 import { calculatePurchaseFunding } from "@/app/lib/esim/purchaseFunding";
 import {
   CARD_PAYMENT_UNAVAILABLE_MESSAGE,
+  SPLIT_PAYMENT_UNAVAILABLE_MESSAGE,
   initialWalletPurchaseState,
   type WalletPurchaseActionState,
 } from "@/app/lib/esim/walletPurchaseFormState";
@@ -49,7 +50,13 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
 
   const gatewayRequired = preview.gatewayAmountCents > 0;
   const fullWallet = !gatewayRequired && preview.useWallet;
+  const gatewayOnly =
+    gatewayRequired && preview.walletAppliedCents === 0;
+  const partialWalletSplit =
+    gatewayRequired && preview.walletAppliedCents > 0;
   const walletDisabled = review.balanceCents <= 0;
+  const gatewayReady =
+    gatewayOnly && review.paymentGatewayConfigured;
   const balanceAfterPreview = Math.max(
     0,
     review.balanceCents - preview.walletAppliedCents
@@ -224,13 +231,26 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
           <p className="mt-2 text-sm font-semibold text-[var(--heading)]">
             Online payment
           </p>
-          <p className="mt-1 text-sm text-[var(--text-muted)]" role="status">
-            {CARD_PAYMENT_UNAVAILABLE_MESSAGE}
-          </p>
-          <p className="mt-3 text-sm text-[var(--text-muted)]">
-            Remaining due: {formatUsdCents(preview.gatewayAmountCents)}. Wallet
-            funds are not reserved until online payment is available.
-          </p>
+          {partialWalletSplit ? (
+            <p className="mt-1 text-sm text-[var(--text-muted)]" role="status">
+              {SPLIT_PAYMENT_UNAVAILABLE_MESSAGE}
+            </p>
+          ) : gatewayReady ? (
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Continue to our secure payment page to pay{" "}
+              {formatUsdCents(preview.gatewayAmountCents)}. Your eSIM is created
+              only after payment is verified.
+            </p>
+          ) : (
+            <>
+              <p className="mt-1 text-sm text-[var(--text-muted)]" role="status">
+                {CARD_PAYMENT_UNAVAILABLE_MESSAGE}
+              </p>
+              <p className="mt-3 text-sm text-[var(--text-muted)]">
+                Remaining due: {formatUsdCents(preview.gatewayAmountCents)}.
+              </p>
+            </>
+          )}
         </section>
       ) : null}
 
@@ -290,6 +310,14 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
             {pending ? "Buying with wallet…" : "Buy eSIM with Wallet"}
           </button>
         </>
+      ) : gatewayReady ? (
+        <button
+          type="submit"
+          disabled={pending}
+          className="inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] disabled:opacity-60"
+        >
+          {pending ? "Starting secure payment…" : "Continue to Secure Payment"}
+        </button>
       ) : (
         <button
           type="button"

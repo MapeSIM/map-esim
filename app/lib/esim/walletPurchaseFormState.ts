@@ -17,3 +17,6 @@ export const initialWalletPurchaseState: WalletPurchaseActionState = {
 
 export const CARD_PAYMENT_UNAVAILABLE_MESSAGE =
   "Online payment will be available once payment setup is completed.";
+
+export const SPLIT_PAYMENT_UNAVAILABLE_MESSAGE =
+  "Split payment is being finalized. Please deselect wallet to continue with card payment.";

@@ -508,7 +508,8 @@ export async function setWalletPurchaseFundingChoice(
 
   if (
     purchase.fundingSource !== OrderFundingSource.CUSTOMER_WALLET &&
-    purchase.fundingSource !== OrderFundingSource.CUSTOMER_SPLIT
+    purchase.fundingSource !== OrderFundingSource.CUSTOMER_SPLIT &&
+    purchase.fundingSource !== OrderFundingSource.DIRECT_PAYMENT
   ) {
     throw new WalletEsimPurchaseError(
       "INVALID_STATE",
