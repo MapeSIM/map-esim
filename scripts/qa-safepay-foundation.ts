@@ -164,8 +164,12 @@ function main() {
   assert.match(http, /createPaymentSession/);
   assert.match(http, /createPassportToken/);
   assert.match(http, /buildHostedCheckoutUrl/);
+  assert.match(http, /params\.set\("environment", environment\)/);
+  assert.match(http, /params\.set\("source", "hosted"\)/);
+  assert.match(http, /this\.config\.environment/);
+  assert.match(policy, /\/embedded/);
+  assert.doesNotMatch(policy, /checkout\/pay/);
   assert.match(http, /fetchTrackerStatus/);
-  assert.match(http, /source:\s*"hosted"/);
   assert.match(http, /"x-sfpy-merchant-secret":\s*this\.config\.secretKey/);
   assert.doesNotMatch(http, /Authorization:\s*this\.config\.secretKey/);
   assert.doesNotMatch(http, /Authorization:\s*this\.config/);

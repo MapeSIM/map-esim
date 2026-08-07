@@ -144,12 +144,22 @@ function main() {
   assert.match(adapter, /assertSafePaymentReturnPath/);
   assert.match(adapter, /Never logs tokens or full URL/);
   assert.match(urls, /assertSafePaymentReturnPath/);
-  assert.match(http, /source:\s*"hosted"/);
+  assert.match(http, /params\.set\("source", "hosted"\)/);
+  assert.match(http, /params\.set\("environment", environment\)/);
+  assert.match(http, /this\.config\.environment/);
   assert.match(http, /source:\s*"map-esim"/);
   assert.match(http, /order_id:\s*orderId/);
   assert.match(http, /entry_mode:\s*"raw"/);
   assert.match(http, /include_fees:\s*false/);
   assert.match(http, /"x-sfpy-merchant-secret"/);
+  assert.match(
+    read("app/lib/payments/safepayPolicy.ts"),
+    /sandbox\.api\.getsafepay\.com\/embedded/
+  );
+  assert.match(
+    read("app/lib/payments/safepayPolicy.ts"),
+    /getsafepay\.com\/embedded/
+  );
   console.log("PASS safepay_session_and_hosted_url_contract");
 
   assert.match(disabled, /PAYMENT_GATEWAY_ENABLED/);

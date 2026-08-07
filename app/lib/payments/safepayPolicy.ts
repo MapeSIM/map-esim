@@ -42,12 +42,13 @@ export function safepayApiBaseUrl(environment: SafepayEnvironment): string {
 
 /**
  * Hosted Checkout redirect base (Express Checkout / hosted source).
- * Sandbox uses API host checkout path; production uses getsafepay.com.
+ * Matches official Safepay Checkout::constructURL hosts + `/embedded` path.
+ * Query must still include validated `environment` (sandbox|production).
  */
 export function safepayCheckoutBaseUrl(environment: SafepayEnvironment): string {
   return environment === "production"
-    ? "https://getsafepay.com/checkout/pay"
-    : "https://sandbox.api.getsafepay.com/checkout/pay";
+    ? "https://getsafepay.com/embedded"
+    : "https://sandbox.api.getsafepay.com/embedded";
 }
 
 export function isPaymentGatewayEnabledFlag(

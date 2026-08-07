@@ -153,14 +153,21 @@ export class SafepayHttpClient {
   }
 
   buildHostedCheckoutUrl(input: SafepayHostedCheckoutUrlInput): string {
-    const params = new URLSearchParams({
-      tracker: input.trackerToken,
-      tbt: input.passportToken,
-      environment: this.config.environment,
-      source: "hosted",
-      redirect_url: input.redirectUrl,
-      cancel_url: input.cancelUrl,
-    });
+    // Always from validated adapter config — never omit or invent environment.
+    const environment = this.config.environment;
+    if (environment !== "sandbox" && environment !== "production") {
+      throw new SafepayHttpError(
+        "INVALID_REQUEST",
+        "Invalid Safepay environment."
+      );
+    }
+    const params = new URLSearchParams();
+    params.set("environment", environment);
+    params.set("tracker", input.trackerToken);
+    params.set("tbt", input.passportToken);
+    params.set("source", "hosted");
+    params.set("redirect_url", input.redirectUrl);
+    params.set("cancel_url", input.cancelUrl);
     return `${this.config.checkoutBaseUrl}?${params.toString()}`;
   }
 
