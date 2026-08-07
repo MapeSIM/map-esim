@@ -165,9 +165,36 @@ function main() {
   assert.match(http, /buildHostedCheckoutUrl/);
   assert.match(http, /fetchTrackerStatus/);
   assert.match(http, /source:\s*"hosted"/);
+  assert.match(http, /"x-sfpy-merchant-secret":\s*this\.config\.secretKey/);
+  assert.doesNotMatch(http, /Authorization:\s*this\.config\.secretKey/);
+  assert.doesNotMatch(http, /Authorization:\s*this\.config/);
+  assert.match(http, /entry_mode:\s*"raw"/);
+  assert.match(http, /include_fees:\s*false/);
+  assert.match(http, /source:\s*"map-esim"/);
+  assert.match(http, /order_id:\s*orderId/);
+  assert.match(http, /Safepay accepts only a narrow metadata allowlist/);
+  assert.doesNotMatch(http, /checkout_idempotency_key/);
+  assert.doesNotMatch(http, /local_topup_id/);
+  assert.doesNotMatch(http, /payment_attempt_id/);
+  assert.doesNotMatch(http, /purchase_id/);
+  assert.doesNotMatch(http, /purpose:\s*input\.purpose/);
+  assert.doesNotMatch(http, /\.\.\.\(input\.metadata/);
+  assert.doesNotMatch(http, /customer_email|wallet_id|user_id/);
   assert.doesNotMatch(http, /console\.(log|info|debug)\([^)]*(secretKey|apiKey|passportToken|tbt)/i);
   assert.match(http, /never log request\/response bodies or tokens/);
+  // Internal adapter/input contract still carries idempotency + purpose locally.
+  assert.match(http, /checkoutIdempotencyKey:/);
+  assert.match(http, /purpose:\s*PaymentCheckoutPurpose/);
+  assert.match(adapter, /checkoutIdempotencyKey:\s*input\.checkoutIdempotencyKey/);
+  assert.match(adapter, /localTopupId:/);
+  assert.match(adapter, /paymentAttemptId:/);
+  assert.match(adapter, /purpose === "WALLET_TOPUP"/);
+  assert.match(adapter, /purpose === "ESIM_PURCHASE"/);
+  assert.match(topup, /checkoutIdempotencyKey/);
   console.log("PASS adapter_contract_and_hosted_checkout_helpers");
+  console.log("PASS safepay_merchant_secret_auth_header_contract");
+  console.log("PASS safepay_session_body_entry_mode_and_include_fees");
+  console.log("PASS safepay_metadata_allowlist_source_and_order_id_only");
 
   assert.equal(
     ESIM_PURCHASE_PAYMENT_RETURN_PATH,

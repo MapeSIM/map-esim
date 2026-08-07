@@ -17,6 +17,7 @@ export type SafepaySessionSetupInput = {
 
 export type SafepaySessionSetupResult = {
   trackerToken: string;
+  trackerState: string | null;
   quoteCurrency: string;
   quoteAmountMinor: number;
   baseCurrency: string | null;
@@ -79,23 +80,29 @@ export class SafepayHttpClient {
       throw new SafepayHttpError("INVALID_REQUEST", "Invalid charge currency.");
     }
 
-    const metadata: Record<string, string> = {
-      purpose: input.purpose,
-      checkout_idempotency_key: input.checkoutIdempotencyKey,
-      ...(input.metadata ?? {}),
-    };
-    if (input.localTopupId) metadata.local_topup_id = input.localTopupId;
-    if (input.paymentAttemptId) {
-      metadata.payment_attempt_id = input.paymentAttemptId;
+    // Safepay accepts only a narrow metadata allowlist (source + order_id).
+    // Keep MAP-internal refs (purpose, idempotency key, purchase/top-up/customer)
+    // in local persistence — do not serialize them to Safepay.
+    const orderId =
+      input.purpose === "ESIM_PURCHASE"
+        ? asString(input.paymentAttemptId)
+        : asString(input.localTopupId);
+    if (!orderId || orderId.length > 64) {
+      throw new SafepayHttpError("INVALID_REQUEST", "Invalid payment reference.");
     }
-    if (input.purchaseId) metadata.purchase_id = input.purchaseId;
+    const metadata = {
+      source: "map-esim",
+      order_id: orderId,
+    };
 
     const body: Record<string, unknown> = {
       merchant_api_key: this.config.apiKey,
       intent: this.config.intent,
       mode: "payment",
+      entry_mode: "raw",
       currency,
       amount: input.chargeAmountMinor,
+      include_fees: false,
       metadata,
     };
 
@@ -106,6 +113,7 @@ export class SafepayHttpClient {
     if (!trackerToken) {
       throw new SafepayHttpError("UNAVAILABLE", "Payment session incomplete.");
     }
+    const trackerState = asString(tracker?.state);
 
     const purchaseTotals = asRecord(tracker?.purchase_totals);
     const quote = asRecord(purchaseTotals?.quote_amount);
@@ -122,6 +130,7 @@ export class SafepayHttpClient {
 
     return {
       trackerToken,
+      trackerState,
       quoteCurrency,
       quoteAmountMinor,
       baseCurrency,
@@ -197,7 +206,7 @@ export class SafepayHttpClient {
       response = await fetch(url, {
         method,
         headers: {
-          Authorization: this.config.secretKey,
+          "x-sfpy-merchant-secret": this.config.secretKey,
           Accept: "application/json",
           ...(body ? { "Content-Type": "application/json" } : {}),
         },
