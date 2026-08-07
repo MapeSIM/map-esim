@@ -6,13 +6,21 @@ import {
   WalletEsimPurchaseError,
   confirmWalletEsimPurchase,
   prepareWalletEsimPurchase,
+  setWalletPurchaseFundingChoice,
 } from "@/app/lib/esim/walletPurchase";
-import type { WalletPurchaseActionState } from "@/app/lib/esim/walletPurchaseFormState";
-import { parseWalletPurchaseIdempotencyKey } from "@/app/lib/esim/walletPurchaseValidation";
+import {
+  CARD_PAYMENT_UNAVAILABLE_MESSAGE,
+  type WalletPurchaseActionState,
+} from "@/app/lib/esim/walletPurchaseFormState";
+import {
+  parseUseWalletChoice,
+  parseWalletPurchaseIdempotencyKey,
+} from "@/app/lib/esim/walletPurchaseValidation";
 import {
   listAdminAssignmentOffers,
   type AdminOfferOption,
 } from "@/app/lib/esim/adminPackageAssignmentRead";
+import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
 import {
   normalizeOfferId,
   sanitizeCountryHint,
@@ -110,6 +118,47 @@ export async function prepareWalletEsimPurchaseAction(
   redirect(reviewPath(result.purchaseId));
 }
 
+/**
+ * Persist READY purchase funding choice. Accepts useWallet only — never client money.
+ * Does not reserve wallet funds or create gateway sessions.
+ */
+export async function setWalletPurchaseFundingChoiceAction(
+  _prev: WalletPurchaseActionState,
+  formData: FormData
+): Promise<WalletPurchaseActionState> {
+  const customer = await requireRole("CUSTOMER");
+  const purchaseId = String(formData.get("purchaseId") ?? "").trim();
+  const useWallet = parseUseWalletChoice(formData.get("useWallet"));
+
+  void formData.get("walletAppliedCents");
+  void formData.get("gatewayAmountCents");
+  void formData.get("price");
+  void formData.get("priceCents");
+  void formData.get("walletBalance");
+
+  if (!purchaseId || purchaseId.length > 64) {
+    return { ok: false, error: "This purchase is unavailable." };
+  }
+
+  try {
+    await setWalletPurchaseFundingChoice({
+      customerUserId: customer.id,
+      purchaseId,
+      useWallet,
+    });
+  } catch (error) {
+    if (error instanceof WalletEsimPurchaseError) {
+      return { ok: false, error: error.message };
+    }
+    return {
+      ok: false,
+      error: "Wallet purchase is temporarily unavailable. Please try again shortly.",
+    };
+  }
+
+  return { ok: true };
+}
+
 export async function confirmWalletEsimPurchaseAction(
   _prev: WalletPurchaseActionState,
   formData: FormData
@@ -121,14 +170,49 @@ export async function confirmWalletEsimPurchaseAction(
     formData.get("idempotencyKey")
   );
   const confirmed = formData.get("confirm") === "on";
+  const useWallet = parseUseWalletChoice(formData.get("useWallet"));
 
+  // Never trust browser money fields.
   void formData.get("price");
   void formData.get("priceUSD");
   void formData.get("walletBalance");
+  void formData.get("walletAppliedCents");
+  void formData.get("gatewayAmountCents");
 
   if (!purchaseId || purchaseId.length > 64) {
     return { ok: false, error: "This purchase is unavailable." };
   }
+  if (!idempotencyParsed.ok) {
+    return { ok: false, error: idempotencyParsed.error };
+  }
+
+  let funding;
+  try {
+    funding = await setWalletPurchaseFundingChoice({
+      customerUserId: customer.id,
+      purchaseId,
+      useWallet,
+    });
+  } catch (error) {
+    if (error instanceof WalletEsimPurchaseError) {
+      return { ok: false, error: error.message };
+    }
+    return {
+      ok: false,
+      error: "Wallet purchase is temporarily unavailable. Please try again shortly.",
+    };
+  }
+
+  // Gateway remainder required — fail closed until PG3 (no reserve, no order).
+  if (funding.gatewayAmountCents > 0) {
+    void isPaymentGatewayConfigured();
+    return {
+      ok: false,
+      error: CARD_PAYMENT_UNAVAILABLE_MESSAGE,
+    };
+  }
+
+  // Full wallet coverage only — existing secure confirm path.
   if (!confirmed) {
     return {
       ok: false,
@@ -137,9 +221,6 @@ export async function confirmWalletEsimPurchaseAction(
       },
       error: "Confirmation is required before buying with wallet funds.",
     };
-  }
-  if (!idempotencyParsed.ok) {
-    return { ok: false, error: idempotencyParsed.error };
   }
 
   let result;

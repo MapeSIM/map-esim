@@ -76,7 +76,9 @@ export default function WalletPurchaseSelectForm({
         <p className="mt-2 font-semibold text-[var(--heading)]">
           Available balance {balanceLabel} USD
         </p>
-        <p className="mt-1 text-[var(--text-muted)]">Funding: Wallet</p>
+        <p className="mt-1 text-[var(--text-muted)]">
+          Wallet funding is optional at checkout.
+        </p>
       </div>
 
       {errorState.ok === false && errorState.error ? (
@@ -144,7 +146,7 @@ export default function WalletPurchaseSelectForm({
                       {offer.dataLabel} · {offer.validityLabel}
                     </p>
                     <p className="mt-1 text-[var(--text-muted)]">
-                      Wallet price {offer.costLabel}
+                      {offer.costLabel}
                     </p>
                   </button>
                 </li>
@@ -159,7 +161,7 @@ export default function WalletPurchaseSelectForm({
         disabled={pending || !selectedOfferId || !destinationCode}
         className="inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] disabled:opacity-60"
       >
-        {pending ? "Preparing review…" : "Continue to review"}
+        {pending ? "Preparing checkout…" : "Continue to checkout"}
       </button>
     </form>
   );

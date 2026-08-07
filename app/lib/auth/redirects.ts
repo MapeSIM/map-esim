@@ -16,7 +16,9 @@ export function safeCallbackPath(
 }
 
 export function postSignInPath(role: "CUSTOMER" | "ADMIN"): string {
-  return role === "ADMIN" ? "/admin" : "/account";
+  // Normal customer sign-in lands on public home. Protected flows still
+  // honor a safe internal callbackUrl via resolvePostSignInPath.
+  return role === "ADMIN" ? "/admin" : "/";
 }
 
 /**

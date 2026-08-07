@@ -41,7 +41,7 @@ export default async function OAuthConsentPage({
   const rawCallback = Array.isArray(params.callbackUrl)
     ? params.callbackUrl[0]
     : params.callbackUrl;
-  const next = safeCallbackPath(rawCallback, "/account");
+  const next = safeCallbackPath(rawCallback, "/");
 
   // Already consented (or not a Google consent subject) → leave this page.
   if (!deriveNeedsLegalConsent(authMethod, dbUser)) {

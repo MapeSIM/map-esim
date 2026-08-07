@@ -18,7 +18,7 @@ export default function OAuthConsentForm() {
   const searchParams = useSearchParams();
   const callbackUrl = safeCallbackPath(
     searchParams.get("callbackUrl"),
-    "/account"
+    "/"
   );
   const [state, formAction, pending] = useActionState(
     acceptGoogleOauthConsentAction,

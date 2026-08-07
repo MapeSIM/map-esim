@@ -171,14 +171,14 @@ function main() {
   assert.match(migration, /IF NEW\."walletAppliedCents" IS NULL THEN/);
   console.log("PASS migration_legacy_funding_compat_trigger");
 
-  // --- Current wallet-only path unchanged ---
+  // --- Current wallet-only confirm path unchanged ---
   assert.match(service, /walletOnlyPurchaseFunding\(snapshot\.priceCents\)/);
   assert.match(service, /amountCents:\s*snapshot\.priceCents/);
   assert.match(service, /fundingSource:\s*OrderFundingSource\.CUSTOMER_WALLET/);
   assert.match(service, /reserveWalletPurchaseFundsInTx/);
-  assert.ok(!/CUSTOMER_SPLIT/.test(service));
+  // CUSTOMER_SPLIT may be persisted for gateway-required READY rows (PG2); confirm path stays wallet-only.
+  assert.match(service, /OrderFundingSource\.CUSTOMER_SPLIT/);
   assert.ok(!/AWAITING_GATEWAY_PAYMENT/.test(service));
-  assert.ok(!/calculatePurchaseFunding\(/.test(service));
   console.log("PASS wallet_only_flow_still_full_price");
 
   // --- Partial reservation primitive ---
@@ -190,10 +190,14 @@ function main() {
   assert.match(service, /refund_\$\{options\.purchaseId\}/);
   console.log("PASS partial_reservation_primitive");
 
-  // --- No customer split UI / gateway ---
-  assert.ok(!/useWallet|gatewayAmount|split payment/i.test(confirmForm));
-  assert.ok(!/useWallet|gatewayAmount|split payment/i.test(buyPage));
-  assert.match(reviewPage, /Confirm before wallet funds are reserved/);
+  // --- Gateway still disabled; no checkout session creation ---
+  assert.match(confirmForm, /Continue to Payment/);
+  assert.match(
+    confirmForm,
+    /CARD_PAYMENT_UNAVAILABLE_MESSAGE|Online payment will be available once payment setup is completed/
+  );
+  assert.ok(!/createCheckoutSession/.test(confirmForm));
+  assert.ok(!/createCheckoutSession/.test(read("app/lib/esim/walletPurchaseActions.ts")));
   assert.ok(
     /export function isPaymentGatewayConfigured\(\): boolean \{\r?\n\s*return false;\r?\n\}/.test(
       disabledAdapter
@@ -202,7 +206,7 @@ function main() {
   assert.match(guestGate, /ENABLE_GUEST_VESIM_CHECKOUT === "true"/);
   assert.match(paymentPage, /Card checkout unavailable/);
   assert.match(pkg, /"qa:esim-purchase-split-funding"/);
-  console.log("PASS no_split_ui_gateway_still_disabled");
+  console.log("PASS no_gateway_session_gateway_still_disabled");
 
   assert.match(fundingSrc, /Math\.min\(walletBalanceCents, priceCents\)/);
   console.log("PASS funding_helper_pure_integer_cents");

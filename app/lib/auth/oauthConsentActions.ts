@@ -97,6 +97,6 @@ export async function acceptGoogleOauthConsentAction(
   });
 
   const rawCallback = String(formData.get("callbackUrl") || "");
-  const next = safeCallbackPath(rawCallback, "/account");
+  const next = safeCallbackPath(rawCallback, "/");
   redirect(next);
 }

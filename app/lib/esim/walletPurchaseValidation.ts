@@ -31,3 +31,9 @@ export function parseWalletPurchaseIdempotencyKey(
   }
   return { ok: true, value: key };
 }
+
+/** Checkbox / hidden boolean — never accepts money amounts. */
+export function parseUseWalletChoice(raw: unknown): boolean {
+  if (raw === true || raw === "true" || raw === "on" || raw === "1") return true;
+  return false;
+}

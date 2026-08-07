@@ -21,7 +21,7 @@ export default function PaymentPage() {
             href="/account/esim/buy"
             className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]"
           >
-            Buy with wallet
+            Buy Now
           </Link>
           <Link
             href="/countries"

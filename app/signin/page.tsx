@@ -76,7 +76,7 @@ export default async function SigninPage({
 
       {googleEnabled ? (
         <>
-          <GoogleSignInButton callbackUrl={callbackUrl || "/account"} />
+          <GoogleSignInButton callbackUrl={callbackUrl || "/"} />
           <AuthDivider />
         </>
       ) : null}

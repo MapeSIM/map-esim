@@ -101,7 +101,7 @@ export default async function AccountWalletTopUpPage() {
             href="/account/esim/buy"
             className="inline-flex h-10 items-center justify-center rounded-[14px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]"
           >
-            Buy eSIM with wallet
+            Buy eSIM
           </Link>
         </div>
       )}

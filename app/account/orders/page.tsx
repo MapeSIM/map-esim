@@ -155,7 +155,7 @@ export default async function AccountOrdersPage({
                   href="/account/esim/buy"
                   className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
                 >
-                  Buy with wallet
+                  Buy eSIM
                 </Link>
               </div>
             </>

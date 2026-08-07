@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import WalletPurchaseConfirmForm from "@/app/components/account/WalletPurchaseConfirmForm";
 import { requireRole } from "@/app/lib/auth/session";
 import { getWalletPurchaseReview } from "@/app/lib/esim/walletPurchaseRead";
+import { resolveCheckoutBackHref } from "@/app/lib/plans/checkoutBackHref";
 import { WalletEsimPurchaseStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -70,21 +71,23 @@ export default async function AccountWalletBuyReviewPage({
 
   if (!review.canConfirm) notFound();
 
+  const back = resolveCheckoutBackHref({
+    destinationCode: review.destinationCode,
+    destinationName: review.destinationName,
+  });
+
   return (
     <div className="mx-auto max-w-xl space-y-8">
       <div>
         <Link
-          href="/account/esim/buy"
+          href={back.href}
           className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
         >
-          ← Back to package selection
+          {back.label}
         </Link>
-        <h1 className="mt-4 text-2xl font-bold tracking-tight">
-          Review wallet purchase
-        </h1>
+        <h1 className="mt-4 text-2xl font-bold tracking-tight">Checkout</h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Confirm before wallet funds are reserved and the provider order is
-          created.
+          Review your plan and choose how to fund this purchase.
         </p>
       </div>
 

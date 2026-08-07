@@ -84,11 +84,10 @@ function main() {
   );
   console.log("PASS insufficient_balance_before_provider");
 
-  assert.match(actions, /formData\.get\("confirm"\) === "on"/);
-  assert.match(actions, /Confirmation is required before buying with wallet funds/);
   assert.match(confirmForm, /name="confirm"/);
   assert.match(confirmForm, /disabled=\{pending \|\| !confirmed\}/);
-  assert.ok(!/confirmPhrase|WALLET_PURCHASE_CONFIRM_PHRASE|\bBUY\b/.test(confirmForm));
+  assert.match(confirmForm, /Buy eSIM with Wallet/);
+  assert.ok(!/confirmPhrase|WALLET_PURCHASE_CONFIRM_PHRASE/.test(confirmForm));
   assert.ok(!/parseWalletPurchaseConfirmPhrase|confirmPhrase/.test(actions));
   assert.ok(!/WALLET_PURCHASE_CONFIRM_PHRASE|parseWalletPurchaseConfirmPhrase/.test(
     read("app/lib/esim/walletPurchaseValidation.ts")
@@ -217,7 +216,7 @@ function main() {
 
   assert.ok(!/executeCreditCheckout\(/.test(read("scripts/qa-customer-wallet-purchase.ts")));
   assert.ok(!/getBrokerToken\(/.test(read("scripts/qa-customer-wallet-purchase.ts")));
-  assert.match(walletPage, /Buy eSIM with wallet/);
+  assert.match(walletPage, /Buy eSIM/);
   assert.match(reviewPage, /getWalletPurchaseReview/);
   assert.match(reconPage, /under review/i);
   assert.match(failedPage, /restored/i);

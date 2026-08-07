@@ -13,7 +13,7 @@ import { safeCallbackPath } from "@/app/lib/auth/redirects";
  */
 export async function googleSignInAction(formData: FormData): Promise<void> {
   const rawCallback = String(formData.get("callbackUrl") || "");
-  const redirectTo = safeCallbackPath(rawCallback, "/account");
+  const redirectTo = safeCallbackPath(rawCallback, "/");
 
   if (!process.env.AUTH_GOOGLE_ID || !process.env.AUTH_GOOGLE_SECRET) {
     // Fall through to Auth.js Configuration error on the sign-in page.

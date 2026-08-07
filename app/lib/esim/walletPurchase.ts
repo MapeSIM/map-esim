@@ -33,7 +33,7 @@ import {
   OperationalControlUnavailableError,
 } from "@/app/lib/admin/operationalControlsPolicy";
 import { OPERATIONAL_CONTROL_UNAVAILABLE_MESSAGE } from "@/app/lib/admin/operationalControlsShared";
-import { walletOnlyPurchaseFunding } from "@/app/lib/esim/purchaseFunding";
+import { walletOnlyPurchaseFunding, calculatePurchaseFunding } from "@/app/lib/esim/purchaseFunding";
 
 export const WALLET_PURCHASE_STARTED = "esim.wallet_purchase_started";
 export const WALLET_FUNDS_RESERVED = "esim.wallet_funds_reserved";
@@ -329,19 +329,25 @@ export async function prepareWalletEsimPurchase(
         : "A wallet is required before purchasing with wallet funds."
     );
   }
-  if (wallet.balanceCents < snapshot.priceCents) {
+  // Assisted wallet buys remain full-wallet only. Self-service may prepare with
+  // partial/zero balance (gateway remainder is fail-closed until PG3).
+  if (isAssisted && wallet.balanceCents < snapshot.priceCents) {
     throw new WalletEsimPurchaseError(
       "INSUFFICIENT_FUNDS",
-      isAssisted
-        ? "Customer wallet balance is not enough for this package."
-        : "Your wallet balance is not enough for this package."
+      "Customer wallet balance is not enough for this package."
     );
   }
 
+  const funding = isAssisted
+    ? walletOnlyPurchaseFunding(snapshot.priceCents)
+    : calculatePurchaseFunding({
+        priceCents: snapshot.priceCents,
+        walletBalanceCents: wallet.balanceCents,
+        useWallet: true,
+      });
+
   try {
     const created = await prisma.$transaction(async (tx) => {
-      // PG1: wallet-only path — full package from wallet, gatewayAmount = 0.
-      const funding = walletOnlyPurchaseFunding(snapshot.priceCents);
       const purchase = await tx.walletEsimPurchase.create({
         data: {
           customerUserId,
@@ -359,7 +365,10 @@ export async function prepareWalletEsimPurchase(
           gatewayAmountCents: funding.gatewayAmountCents,
           providerCostCents: snapshot.providerCostCents,
           currency: snapshot.currency,
-          fundingSource: OrderFundingSource.CUSTOMER_WALLET,
+          fundingSource:
+            funding.gatewayAmountCents > 0
+              ? OrderFundingSource.CUSTOMER_SPLIT
+              : OrderFundingSource.CUSTOMER_WALLET,
           status: WalletEsimPurchaseStatus.READY,
           idempotencyKey,
         },
@@ -374,10 +383,16 @@ export async function prepareWalletEsimPurchase(
           targetId: purchase.id,
           metadata: {
             method: purchaseAuditMethod(isAssisted),
-            fundingSource: OrderFundingSource.CUSTOMER_WALLET,
+            fundingSource:
+              funding.gatewayAmountCents > 0
+                ? OrderFundingSource.CUSTOMER_SPLIT
+                : OrderFundingSource.CUSTOMER_WALLET,
             purchaseId: purchase.id,
             offerId: snapshot.offerId,
             amountCents: snapshot.priceCents,
+            useWallet: funding.useWallet,
+            walletAppliedCents: funding.walletAppliedCents,
+            gatewayAmountCents: funding.gatewayAmountCents,
             currency: snapshot.currency,
             ...(isAssisted
               ? {
@@ -421,6 +436,144 @@ export async function prepareWalletEsimPurchase(
       "Wallet purchase is temporarily unavailable. Please try again shortly."
     );
   }
+}
+
+export type SetWalletPurchaseFundingChoiceInput = {
+  customerUserId: string;
+  purchaseId: string;
+  useWallet: boolean;
+};
+
+export type SetWalletPurchaseFundingChoiceResult = {
+  purchaseId: string;
+  useWallet: boolean;
+  priceCents: number;
+  walletAppliedCents: number;
+  gatewayAmountCents: number;
+  balanceCents: number;
+};
+
+/**
+ * Persist customer wallet-funding choice on a READY purchase.
+ * Accepts only useWallet — price and balance are re-read server-side.
+ * Does not reserve wallet funds, create gateway sessions, or change status.
+ */
+export async function setWalletPurchaseFundingChoice(
+  input: SetWalletPurchaseFundingChoiceInput
+): Promise<SetWalletPurchaseFundingChoiceResult> {
+  const customerUserId = input.customerUserId.trim();
+  const purchaseId = input.purchaseId.trim();
+  const useWallet = Boolean(input.useWallet);
+
+  if (!customerUserId || customerUserId.length > 64) {
+    throw new WalletEsimPurchaseError(
+      "CUSTOMER_UNAVAILABLE",
+      "Your account is unavailable for wallet purchases."
+    );
+  }
+  if (!purchaseId || purchaseId.length > 64) {
+    throw new WalletEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is unavailable."
+    );
+  }
+
+  await assertActiveCustomer(customerUserId, {
+    requireEmailVerified: false,
+    assisted: false,
+  });
+
+  const purchase = await prisma.walletEsimPurchase.findUnique({
+    where: { id: purchaseId },
+    select: {
+      id: true,
+      customerUserId: true,
+      adminUserId: true,
+      priceCents: true,
+      status: true,
+      fundingSource: true,
+    },
+  });
+
+  if (
+    !purchase ||
+    purchase.customerUserId !== customerUserId ||
+    purchase.adminUserId
+  ) {
+    throw new WalletEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is unavailable."
+    );
+  }
+
+  if (
+    purchase.fundingSource !== OrderFundingSource.CUSTOMER_WALLET &&
+    purchase.fundingSource !== OrderFundingSource.CUSTOMER_SPLIT
+  ) {
+    throw new WalletEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is unavailable."
+    );
+  }
+
+  if (purchase.status !== WalletEsimPurchaseStatus.READY) {
+    throw new WalletEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is not ready for funding updates."
+    );
+  }
+
+  const wallet = await prisma.walletAccount.findUnique({
+    where: { userId: customerUserId },
+    select: { balanceCents: true },
+  });
+  if (!wallet) {
+    throw new WalletEsimPurchaseError(
+      "WALLET_UNAVAILABLE",
+      "A wallet is required before purchasing with wallet funds."
+    );
+  }
+
+  const funding = calculatePurchaseFunding({
+    priceCents: purchase.priceCents,
+    walletBalanceCents: wallet.balanceCents,
+    useWallet,
+  });
+
+  const fundingSource =
+    funding.gatewayAmountCents > 0
+      ? OrderFundingSource.CUSTOMER_SPLIT
+      : OrderFundingSource.CUSTOMER_WALLET;
+
+  const updated = await prisma.walletEsimPurchase.updateMany({
+    where: {
+      id: purchase.id,
+      customerUserId,
+      status: WalletEsimPurchaseStatus.READY,
+    },
+    data: {
+      useWallet: funding.useWallet,
+      walletAppliedCents: funding.walletAppliedCents,
+      gatewayAmountCents: funding.gatewayAmountCents,
+      fundingSource,
+    },
+  });
+
+  if (updated.count !== 1) {
+    throw new WalletEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is not ready for funding updates."
+    );
+  }
+
+  return {
+    purchaseId: purchase.id,
+    useWallet: funding.useWallet,
+    priceCents: purchase.priceCents,
+    walletAppliedCents: funding.walletAppliedCents,
+    gatewayAmountCents: funding.gatewayAmountCents,
+    balanceCents: wallet.balanceCents,
+  };
 }
 
 /**

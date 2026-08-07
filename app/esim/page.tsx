@@ -85,7 +85,7 @@ export default function EsimPage() {
                 text-center font-bold text-[var(--accent-ink)]
               "
             >
-              Buy with wallet →
+              Buy Now
             </Link>
           </div>
         ))}
