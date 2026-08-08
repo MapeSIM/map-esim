@@ -166,7 +166,6 @@ export default async function AccountOrderDetailPage({
         <DetailRow label="Status" value={detail.statusLabel} />
         <DetailRow label="Amount" value={detail.amountLabel} />
         <DetailRow label="Currency" value={detail.currencyLabel} />
-        <DetailRow label="Funding" value={detail.fundingLabel} />
         <DetailRow label="Purchased" value={detail.createdAtLabel} />
         <DetailRow label="Order reference" value={detail.shortReference} />
         <DetailRow

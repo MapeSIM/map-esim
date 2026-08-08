@@ -218,10 +218,6 @@ export default async function AccountOrdersPage({
                     <dd className="inline">{order.createdAtLabel}</dd>
                   </div>
                   <div>
-                    <dt className="inline font-semibold">Funding: </dt>
-                    <dd className="inline">{order.fundingLabel}</dd>
-                  </div>
-                  <div>
                     <dt className="inline font-semibold">ICCID: </dt>
                     <dd className="inline">{order.iccidMasked}</dd>
                   </div>
