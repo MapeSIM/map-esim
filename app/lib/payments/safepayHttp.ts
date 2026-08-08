@@ -1,6 +1,10 @@
 import "server-only";
 
 import type { SafepayValidatedConfig } from "@/app/lib/payments/safepayConfig";
+import {
+  parseSafepayReporterPaymentPayload,
+  type SafepayReporterEvidence,
+} from "@/app/lib/payments/safepayReporterParse";
 import type { PaymentCheckoutPurpose } from "@/app/lib/payments/types";
 
 export type SafepaySessionSetupInput = {
@@ -41,6 +45,8 @@ export type SafepayTrackerStatusResult = {
   state: string;
   status: "confirmed" | "pending" | "failed" | "uncertain";
 };
+
+export type { SafepayReporterEvidence };
 
 type SafepayJson = Record<string, unknown>;
 
@@ -174,6 +180,19 @@ export class SafepayHttpClient {
   async fetchTrackerStatus(
     trackerToken: string
   ): Promise<SafepayTrackerStatusResult> {
+    const evidence = await this.fetchTrackerEvidence(trackerToken);
+    const status: SafepayTrackerStatusResult["status"] =
+      evidence.status === "cancelled" ? "failed" : evidence.status;
+    return { state: evidence.state, status };
+  }
+
+  /**
+   * Authenticated reporter lookup with amount/currency/ownership fields.
+   * Never logs tokens or raw bodies. Does not fund purchases.
+   */
+  async fetchTrackerEvidence(
+    trackerToken: string
+  ): Promise<SafepayReporterEvidence> {
     const token = trackerToken.trim();
     if (!token || token.length > 190) {
       throw new SafepayHttpError("INVALID_REQUEST", "Invalid tracker reference.");
@@ -183,23 +202,11 @@ export class SafepayHttpClient {
       "GET",
       `/reporter/api/v1/payments/${encodeURIComponent(token)}`
     );
-    const data = asRecord(json.data);
-    const tracker = asRecord(data?.tracker);
-    const state = asString(tracker?.state) ?? "UNKNOWN";
-
-    let status: SafepayTrackerStatusResult["status"] = "uncertain";
-    if (state === "TRACKER_ENDED") status = "confirmed";
-    else if (
-      state === "TRACKER_STARTED" ||
-      state === "TRACKER_PENDING" ||
-      state.includes("PENDING")
-    ) {
-      status = "pending";
-    } else if (state.includes("FAIL") || state.includes("ERROR")) {
-      status = "failed";
+    const evidence = parseSafepayReporterPaymentPayload(json);
+    if (!evidence) {
+      throw new SafepayHttpError("UNAVAILABLE", "Payment provider unavailable.");
     }
-
-    return { state, status };
+    return evidence;
   }
 
   private async requestJson(

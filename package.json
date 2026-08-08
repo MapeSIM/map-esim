@@ -30,6 +30,7 @@
     "qa:safepay-foundation": "tsx scripts/qa-safepay-foundation.ts",
     "qa:esim-purchase-hosted-checkout": "tsx scripts/qa-esim-purchase-hosted-checkout.ts",
     "qa:esim-purchase-pg4-funding": "tsx scripts/qa-esim-purchase-pg4-funding.ts",
+    "qa:admin-pending-payment-verify": "tsx scripts/qa-admin-pending-payment-verify.ts",
     "qa:wallet-topup-foundation": "tsx scripts/qa-wallet-topup-foundation.ts",
     "qa:guest-checkout-gate": "tsx scripts/qa-guest-checkout-gate.ts",
     "qa:vesim-environment": "tsx scripts/qa-vesim-environment.ts",
