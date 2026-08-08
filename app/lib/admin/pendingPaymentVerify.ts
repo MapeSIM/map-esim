@@ -16,6 +16,7 @@ import { writeAuditLog } from "@/app/lib/auth/audit";
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
 import { prisma } from "@/app/lib/db";
 import { maybeReleasePendingGatewayReservation } from "@/app/lib/esim/esimPurchasePaymentApply";
+import { schedulePaymentFailureNotification } from "@/app/lib/esim/paymentFailureNotification";
 import {
   SafepayHttpClient,
   SafepayHttpError,
@@ -258,6 +259,59 @@ export async function verifyPendingGatewayPayment(options: {
     } catch {
       reservationReleased = false;
     }
+  }
+
+  // Mark durable terminal attempt status from authenticated reporter evidence,
+  // then schedule once-only customer failure email (never funds / never VeSIM).
+  const terminalFailure =
+    decided.decision === "VERIFIED_FAILED" ||
+    decided.decision === "VERIFIED_CANCELLED_OR_EXPIRED";
+  if (terminalFailure) {
+    const terminalStatus =
+      decided.decision === "VERIFIED_CANCELLED_OR_EXPIRED"
+        ? EsimPurchasePaymentAttemptStatus.CANCELLED
+        : EsimPurchasePaymentAttemptStatus.FAILED;
+    await prisma.esimPurchasePaymentAttempt
+      .updateMany({
+        where: {
+          id: attempt.id,
+          status: {
+            in: [
+              EsimPurchasePaymentAttemptStatus.DRAFT,
+              EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
+              EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING,
+              EsimPurchasePaymentAttemptStatus.RECONCILIATION_REQUIRED,
+            ],
+          },
+        },
+        data: {
+          status: terminalStatus,
+          failedAt:
+            terminalStatus === EsimPurchasePaymentAttemptStatus.FAILED
+              ? new Date()
+              : undefined,
+          cancelledAt:
+            terminalStatus === EsimPurchasePaymentAttemptStatus.CANCELLED
+              ? new Date()
+              : undefined,
+          failureCategory:
+            decided.decision === "VERIFIED_CANCELLED_OR_EXPIRED"
+              ? "payment_cancelled_or_expired"
+              : "payment_failed",
+          failureCode: "admin_reporter_verified",
+        },
+      })
+      .catch(() => undefined);
+
+    schedulePaymentFailureNotification(attempt.id, {
+      // Prefer this-call release; otherwise infer from durable REFUND_CREDIT ledger.
+      walletFundsReturned:
+        attempt.purchase.walletAppliedCents <= 0
+          ? false
+          : reservationReleased
+            ? true
+            : null,
+    });
   }
 
   const view = buildPendingPaymentEvidenceView({

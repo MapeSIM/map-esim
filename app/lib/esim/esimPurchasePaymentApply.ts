@@ -27,6 +27,7 @@ import {
   sanitizeCountryHint,
   verifyOfferAuthoritative,
 } from "@/app/lib/vesim/server";
+import { schedulePaymentFailureNotification } from "@/app/lib/esim/paymentFailureNotification";
 import { scheduleWalletTransactionNotification } from "@/app/lib/wallet/transactionNotification";
 
 export const ESIM_PAYMENT_WEBHOOK_DUPLICATE = "esim.payment_webhook_duplicate";
@@ -131,6 +132,11 @@ export async function applyVerifiedEsimPurchasePaymentEvent(
       byEvent.purchase.status === WalletEsimPurchaseStatus.FUNDED
     ) {
       await fulfillFundedEsimPurchase(byEvent.purchaseId).catch(() => undefined);
+    }
+
+    // Retry once-only failure email claim after duplicate signed failure events.
+    if (event.paymentStatus === "failed") {
+      schedulePaymentFailureNotification(byEvent.id);
     }
 
     return {
@@ -492,6 +498,7 @@ async function releaseOnGatewayFailure(options: {
   failureCategory: string;
 }): Promise<ApplyVerifiedEsimPaymentResult> {
   let releasedRefundId: string | null = null;
+  let walletFundsReturned = false;
 
   await prisma.$transaction(async (tx) => {
     await tx.esimPurchasePaymentAttempt.updateMany({
@@ -525,6 +532,12 @@ async function releaseOnGatewayFailure(options: {
       });
       if (release.outcome === "created") {
         releasedRefundId = release.refundTransactionId;
+        walletFundsReturned = true;
+      } else if (
+        release.outcome === "linked_existing" ||
+        release.outcome === "already_refunded"
+      ) {
+        walletFundsReturned = true;
       }
     } else {
       await tx.walletEsimPurchase.updateMany({
@@ -557,6 +570,11 @@ async function releaseOnGatewayFailure(options: {
   if (releasedRefundId) {
     scheduleWalletTransactionNotification(releasedRefundId);
   }
+
+  // Post-commit: durable once-only customer failure email (never from browser cancel).
+  schedulePaymentFailureNotification(options.attemptId, {
+    walletFundsReturned,
+  });
 
   return {
     duplicate: false,

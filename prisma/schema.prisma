@@ -501,6 +501,11 @@ model EsimPurchasePaymentAttempt {
   cancelledAt            DateTime?
   failedAt               DateTime?
   refundedAt             DateTime?
+  /// Customer payment-failure email: null | sending | sent | failed | not_configured | skipped
+  failureEmailNotificationStatus String?
+  failureEmailNotifiedAt         DateTime?
+  /// Snapshot at claim time: whether the email should mention wallet funds returned.
+  failureEmailWalletReturned     Boolean?
   createdAt              DateTime                         @default(now())
   updatedAt              DateTime                         @updatedAt
   purchase               WalletEsimPurchase               @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
@@ -510,6 +515,7 @@ model EsimPurchasePaymentAttempt {
   @@index([createdAt])
   @@index([purchaseId, createdAt])
   @@index([gatewayProvider])
+  @@index([failureEmailNotificationStatus])
 }
 
 model AuditLog {

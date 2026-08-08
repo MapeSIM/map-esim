@@ -245,6 +245,12 @@ function main() {
   assert.match(service, /fundingApplied:\s*false/);
   assert.match(shared, /fundingApplied:\s*false/);
   assert.doesNotMatch(service, /fulfillFundedEsimPurchase/);
+  assert.match(service, /schedulePaymentFailureNotification/);
+  assert.match(service, /VERIFIED_FAILED|VERIFIED_CANCELLED_OR_EXPIRED/);
+  assert.doesNotMatch(
+    service,
+    /applyVerifiedEsimPurchasePaymentEvent[\s\S]{0,40}schedulePaymentFailureNotification/
+  );
   console.log("PASS contracts_and_reporter_parse");
 
   console.log("ALL_PG5A_CHECKS_PASSED");

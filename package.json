@@ -43,6 +43,7 @@
     "qa:admin-customer-orders": "tsx scripts/qa-admin-customer-orders.ts",
     "qa:customer-my-esims": "tsx scripts/qa-customer-my-esims.ts",
     "qa:wallet-transaction-email": "tsx scripts/qa-wallet-transaction-email.ts",
+    "qa:payment-failure-email": "tsx scripts/qa-payment-failure-email.ts",
     "qa:admin-reconciliation-readonly": "tsx scripts/qa-admin-reconciliation-readonly.ts",
     "qa:admin-reconciliation-provider-refresh": "tsx scripts/qa-admin-reconciliation-provider-refresh.ts",
     "qa:admin-reconciliation-case-management": "tsx scripts/qa-admin-reconciliation-case-management.ts",

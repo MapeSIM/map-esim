@@ -142,6 +142,11 @@ function main() {
     apply,
     /releasedRefundId[\s\S]*scheduleWalletTransactionNotification/
   );
+  assert.match(apply, /schedulePaymentFailureNotification/);
+  assert.doesNotMatch(
+    apply,
+    /maybeReleasePendingGatewayReservation[\s\S]{0,200}schedulePaymentFailureNotification/
+  );
   console.log("PASS funding_dedup_amount_split_vesim_contracts");
 
   assert.match(gateway, /reserveSplitWalletBeforeGatewayCheckout/);
