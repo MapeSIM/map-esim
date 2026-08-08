@@ -24,7 +24,7 @@ export default function AndroidInstallGuidePage() {
             or the success page download button.
           </li>
           <li>
-            Open <strong>Settings â†’ Network &amp; Internet â†’ SIMs</strong> (wording
+            Open <strong>Settings → Network &amp; Internet → SIMs</strong> (wording
             may vary by manufacturer).
           </li>
           <li>Tap <strong>Add eSIM</strong> or <strong>Download a SIM instead</strong>.</li>

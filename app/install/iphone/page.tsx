@@ -24,8 +24,8 @@ export default function IphoneInstallGuidePage() {
             or the success page download button.
           </li>
           <li>
-            Open <strong>Settings â†’ Cellular</strong> (or{" "}
-            <strong>Mobile Service</strong>) â†’ <strong>Add eSIM</strong>.
+            Open <strong>Settings → Cellular</strong> (or{" "}
+            <strong>Mobile Service</strong>) → <strong>Add eSIM</strong>.
           </li>
           <li>
             Choose <strong>Use QR Code</strong>. Scan the saved image from another
