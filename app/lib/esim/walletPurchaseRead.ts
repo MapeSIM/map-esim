@@ -153,10 +153,31 @@ export type WalletPurchaseSuccess = {
   planName: string;
   dataAllowance: string;
   validity: string;
+  /** Total package price label (authoritative server cents). */
   amountChargedLabel: string;
-  balanceLabel: string;
+  walletAppliedLabel: string | null;
+  gatewayPaidLabel: string | null;
+  balanceLabel: string | null;
+  fundingSource:
+    | typeof OrderFundingSource.CUSTOMER_WALLET
+    | typeof OrderFundingSource.CUSTOMER_SPLIT
+    | typeof OrderFundingSource.DIRECT_PAYMENT;
   orderId: string;
 };
+
+/** Completed self-service purchases that may land on /account/esim/buy/success. */
+export function isCustomerCompletedPurchaseFundingSource(
+  fundingSource: OrderFundingSource
+): fundingSource is
+  | typeof OrderFundingSource.CUSTOMER_WALLET
+  | typeof OrderFundingSource.CUSTOMER_SPLIT
+  | typeof OrderFundingSource.DIRECT_PAYMENT {
+  return (
+    fundingSource === OrderFundingSource.CUSTOMER_WALLET ||
+    fundingSource === OrderFundingSource.CUSTOMER_SPLIT ||
+    fundingSource === OrderFundingSource.DIRECT_PAYMENT
+  );
+}
 
 export async function getCompletedWalletPurchase(
   customerUserId: string,
@@ -177,6 +198,8 @@ export async function getCompletedWalletPurchase(
       dataAllowance: true,
       validity: true,
       priceCents: true,
+      walletAppliedCents: true,
+      gatewayAmountCents: true,
       status: true,
       orderId: true,
       fundingSource: true,
@@ -197,11 +220,17 @@ export async function getCompletedWalletPurchase(
     row.customer.role !== Role.CUSTOMER ||
     row.customer.deletedAt ||
     row.status !== WalletEsimPurchaseStatus.COMPLETED ||
-    row.fundingSource !== OrderFundingSource.CUSTOMER_WALLET ||
+    !isCustomerCompletedPurchaseFundingSource(row.fundingSource) ||
     !row.orderId
   ) {
     return null;
   }
+
+  const walletApplied = Math.max(0, row.walletAppliedCents ?? 0);
+  const gatewayPaid = Math.max(0, row.gatewayAmountCents ?? 0);
+  const showWallet =
+    row.fundingSource === OrderFundingSource.CUSTOMER_WALLET ||
+    row.fundingSource === OrderFundingSource.CUSTOMER_SPLIT;
 
   return {
     purchaseId: row.id,
@@ -213,7 +242,18 @@ export async function getCompletedWalletPurchase(
     dataAllowance: displayOrUnavailable(row.dataAllowance),
     validity: displayOrUnavailable(row.validity),
     amountChargedLabel: formatWalletPurchasePriceLabel(row.priceCents),
-    balanceLabel: `${formatUsdCents(row.customer.walletAccount?.balanceCents ?? 0)} USD`,
+    walletAppliedLabel:
+      showWallet && walletApplied > 0
+        ? formatWalletPurchasePriceLabel(walletApplied)
+        : row.fundingSource === OrderFundingSource.CUSTOMER_WALLET
+          ? formatWalletPurchasePriceLabel(row.priceCents)
+          : null,
+    gatewayPaidLabel:
+      gatewayPaid > 0 ? formatWalletPurchasePriceLabel(gatewayPaid) : null,
+    balanceLabel: showWallet
+      ? `${formatUsdCents(row.customer.walletAccount?.balanceCents ?? 0)} USD`
+      : null,
+    fundingSource: row.fundingSource,
     orderId: row.orderId,
   };
 }

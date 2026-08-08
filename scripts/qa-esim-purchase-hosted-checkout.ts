@@ -183,6 +183,12 @@ function main() {
   );
   assert.match(readSrc, /AWAITING_GATEWAY_PAYMENT/);
   assert.match(readSrc, /DIRECT_PAYMENT/);
+  // Completed DIRECT_PAYMENT must resolve on success (no 404 after Back to checkout).
+  assert.match(readSrc, /isCustomerCompletedPurchaseFundingSource/);
+  assert.match(
+    read("app/account/esim/buy/success/page.tsx"),
+    /getCompletedWalletPurchase/
+  );
   console.log("PASS awaiting_gateway_can_resume_checkout");
 
   assert.match(adapter, /resumeSafepayHostedCheckout/);
