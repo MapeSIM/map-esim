@@ -15,6 +15,11 @@ const staticRoutes: StaticRoute[] = [
   { path: "/how-it-works", changeFrequency: "monthly", priority: 0.8 },
   { path: "/contact", changeFrequency: "monthly", priority: 0.8 },
   { path: "/support", changeFrequency: "monthly", priority: 0.75 },
+  {
+    path: "/device-compatibility",
+    changeFrequency: "monthly",
+    priority: 0.7,
+  },
   { path: "/install/iphone", changeFrequency: "monthly", priority: 0.7 },
   { path: "/install/android", changeFrequency: "monthly", priority: 0.7 },
   { path: "/privacy-policy", changeFrequency: "yearly", priority: 0.3 },

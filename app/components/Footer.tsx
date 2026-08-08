@@ -35,6 +35,7 @@ const columns = [
     title: "Support",
     links: [
       { label: "Support Center", href: "/support" },
+      { label: "Device Compatibility", href: "/device-compatibility" },
       { label: "iPhone Installation", href: "/install/iphone" },
       { label: "Android Installation", href: "/install/android" },
       { label: "Account Orders", href: "/account/orders" },

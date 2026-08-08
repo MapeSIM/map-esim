@@ -50,10 +50,20 @@ text-[var(--heading)]
         <p
           className="
 text-[var(--text-muted)]
-mb-12
+mb-4
 "
         >
           Affordable plans for worldwide travel
+        </p>
+        <p className="mb-12 text-sm text-[var(--text-muted)]">
+          Not sure your phone supports eSIM?{" "}
+          <Link
+            href="/device-compatibility"
+            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+          >
+            Check device compatibility
+          </Link>
+          .
         </p>
 
         <div

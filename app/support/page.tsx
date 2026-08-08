@@ -37,6 +37,13 @@ const quickHelp = [
     icon: HelpCircle,
   },
   {
+    title: "Device compatibility",
+    description:
+      "Check whether your phone is likely eSIM-compatible before you buy.",
+    href: "/device-compatibility",
+    icon: Smartphone,
+  },
+  {
     title: "Install on iPhone",
     description: "Step-by-step guide for adding your eSIM on iOS.",
     href: "/install/iphone",
@@ -72,7 +79,9 @@ const topics = [
   {
     title: "Device compatibility",
     icon: Smartphone,
-    body: "MAP eSIM plans require an unlocked phone that supports eSIM. Check Settings for an Add eSIM or cellular plan option, or confirm with your device manufacturer before purchase.",
+    body: "MAP eSIM plans require an unlocked phone that supports eSIM. Use the device compatibility checker before purchase, or confirm Add eSIM in Settings / manufacturer docs.",
+    href: "/device-compatibility",
+    linkLabel: "Open compatibility checker",
   },
   {
     title: "QR code and manual installation",
@@ -201,6 +210,15 @@ export default function SupportPage() {
                       <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
                         {topic.body}
                       </p>
+                      {"href" in topic && topic.href ? (
+                        <Link
+                          href={topic.href}
+                          className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+                        >
+                          {"linkLabel" in topic ? topic.linkLabel : "Learn more"}
+                          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                        </Link>
+                      ) : null}
                     </div>
                   </div>
                 </article>
