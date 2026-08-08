@@ -8,6 +8,7 @@ import {
   GUEST_CHECKOUT_UNAVAILABLE_MESSAGE,
   isGuestVesimCheckoutEnabled,
 } from "@/app/lib/vesim/guestCheckoutGate";
+import { VESIM_PROVIDER_CUSTOMER_EMAIL } from "@/app/lib/vesim/creditCheckout";
 import { createOrderAccessToken } from "@/app/lib/vesim/orderAccess";
 import {
   beginIdempotentCheckout,
@@ -158,7 +159,8 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         offerId: verifiedOffer.offerId,
-        customerEmail,
+        // VeSIM inbox only — MAP branded email still uses the real customerEmail.
+        customerEmail: VESIM_PROVIDER_CUSTOMER_EMAIL,
         platform: "api",
       }),
       cache: "no-store",

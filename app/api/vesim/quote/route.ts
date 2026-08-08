@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { VESIM_PROVIDER_CUSTOMER_EMAIL } from "@/app/lib/vesim/creditCheckout";
 import {
   getBrokerToken,
   getVesimBaseUrl,
@@ -88,7 +89,10 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           offerId: verifiedOffer.offerId,
-          ...(customerEmail ? { customerEmail } : {}),
+          // Never forward the end-customer address to VeSIM quote either.
+          ...(customerEmail
+            ? { customerEmail: VESIM_PROVIDER_CUSTOMER_EMAIL }
+            : {}),
         }),
         cache: "no-store",
       }

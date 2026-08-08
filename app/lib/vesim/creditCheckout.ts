@@ -9,6 +9,12 @@ import {
   readJsonSafe,
 } from "@/app/lib/vesim/server";
 
+/**
+ * Fixed VeSIM provider inbox. VeSIM emails this address only.
+ * MAP eSIM branded order email must still use the real customer address.
+ */
+export const VESIM_PROVIDER_CUSTOMER_EMAIL = "orders@mapesim.com";
+
 export type CreditCheckoutResult =
   | {
       kind: "success";
@@ -32,14 +38,20 @@ export type CreditCheckoutResult =
 /**
  * Single VeSIM credit checkout call.
  * Not wrapped in a Prisma transaction. No invented idempotency header.
+ * Always sends {@link VESIM_PROVIDER_CUSTOMER_EMAIL} to VeSIM.
  */
 export async function executeCreditCheckout(options: {
   offerId: string;
-  customerEmail: string;
+  /**
+   * Ignored for the VeSIM provider payload (kept for call-site compatibility).
+   * Callers must pass the real customer email to MAP branded delivery separately.
+   */
+  customerEmail?: string;
 }): Promise<CreditCheckoutResult> {
   const offerId = options.offerId.trim();
-  const customerEmail = options.customerEmail.trim();
-  if (!offerId || !customerEmail) {
+  // Intentionally unused — never forward the end-customer address to VeSIM.
+  void options.customerEmail;
+  if (!offerId) {
     return {
       kind: "uncertain",
       category: "invalid_request",
@@ -61,7 +73,7 @@ export async function executeCreditCheckout(options: {
       },
       body: JSON.stringify({
         offerId,
-        customerEmail,
+        customerEmail: VESIM_PROVIDER_CUSTOMER_EMAIL,
         platform: "api",
       }),
       cache: "no-store",

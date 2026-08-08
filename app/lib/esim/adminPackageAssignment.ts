@@ -11,6 +11,7 @@ import { prisma } from "@/app/lib/db";
 import { usdPriceToCents } from "@/app/lib/esim/assignmentValidation";
 import { persistAssignedOrder } from "@/app/lib/orders/persistAssignedOrder";
 import { deliverOrderEmailAfterCheckout } from "@/app/lib/email/deliverAfterCheckout";
+import { VESIM_PROVIDER_CUSTOMER_EMAIL } from "@/app/lib/vesim/creditCheckout";
 import { createOrderAccessToken } from "@/app/lib/vesim/orderAccess";
 import {
   persistAssignmentProviderObservation,
@@ -589,7 +590,8 @@ export async function confirmAdminPackageAssignment(
       },
       body: JSON.stringify({
         offerId: verifiedOffer!.offerId,
-        customerEmail: customer.email,
+        // VeSIM inbox only — MAP branded email still uses customer.email below.
+        customerEmail: VESIM_PROVIDER_CUSTOMER_EMAIL,
         platform: "api",
       }),
       cache: "no-store",
