@@ -233,14 +233,22 @@ export default async function AccountOrdersPage({
                   ) : null}
                 </dl>
 
-                <p className="mt-4">
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                   <Link
                     href={`/account/orders/${encodeURIComponent(order.id)}`}
-                    className="inline-flex h-10 items-center justify-center rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                    className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
                   >
                     View details
                   </Link>
-                </p>
+                  {order.statusBadge === "Completed" ? (
+                    <Link
+                      href={`/account/orders/${encodeURIComponent(order.id)}?usage=1`}
+                      className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-[var(--accent-strong)]/50 bg-[var(--accent-strong)]/10 px-4 text-sm font-bold text-[var(--heading)] transition hover:bg-[var(--accent-strong)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
+                    >
+                      View usage
+                    </Link>
+                  ) : null}
+                </div>
               </article>
             </li>
           ))}

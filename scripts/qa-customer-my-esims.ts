@@ -138,8 +138,26 @@ function main() {
   assert.match(installPanel, /Show installation options/);
   assert.match(installPanel, /Install the eSIM only when you are ready to use it/);
   assert.match(installPanel, /Order refunded/);
-  assert.doesNotMatch(installPanel, /Show usage|Add data to this eSIM/i);
+  assert.doesNotMatch(installPanel, /Add data to this eSIM/i);
   console.log("PASS install_on_demand_and_refund_guards");
+
+  const usageLib = read("app/lib/orders/customerEsimUsage.ts");
+  const usageApi = read("app/api/account/orders/[orderId]/usage/route.ts");
+  const usagePanel = read("app/components/orders/CustomerEsimUsagePanel.tsx");
+  assert.match(listPage, /View usage/);
+  assert.match(detailPage, /CustomerEsimUsagePanel/);
+  assert.match(usageLib, /import "server-only"/);
+  assert.match(usageLib, /authorizeCustomerOwnedOrderInstall/);
+  assert.match(usageLib, /\/api\/esim\/usage\//);
+  assert.match(usageLib, /usedDataGB = Math\.max\(initialDataGB - remainingDataGB, 0\)/);
+  assert.doesNotMatch(usageApi, /iccid:\s/);
+  assert.doesNotMatch(usageApi, /accessToken|bearer/i);
+  assert.match(usagePanel, /View usage/);
+  assert.match(usagePanel, /Refresh usage/);
+  assert.match(usagePanel, /Usage data may be delayed by up to 1 hour/);
+  assert.doesNotMatch(usagePanel, /setInterval|setTimeout\(\s*loadUsage/i);
+  assert.doesNotMatch(usagePanel, /\bimei\b|\beid\b|\btac\b|deviceModel/i);
+  console.log("PASS customer_usage_on_demand");
 
   assert.match(adminCustomerPage, /Recent eSIM Orders/);
   assert.match(adminCustomerPage, /getAdminCustomerRecentOrders/);

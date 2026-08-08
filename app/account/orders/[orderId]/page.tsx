@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import CustomerEsimInstallPanel from "@/app/components/orders/CustomerEsimInstallPanel";
+import CustomerEsimUsagePanel from "@/app/components/orders/CustomerEsimUsagePanel";
 import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
 import { requireSession } from "@/app/lib/auth/session";
 import { getCustomerOwnedOrderDetail } from "@/app/lib/orders/customerOrders";
@@ -40,10 +41,14 @@ function statusBadgeClass(status: CustomerEsimStatusBadge): string {
 
 export default async function AccountOrderDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ orderId: string }>;
+  searchParams: Promise<{ usage?: string }>;
 }) {
   const { orderId } = await params;
+  const query = await searchParams;
+  const autoOpenUsage = query.usage === "1" || query.usage === "true";
   const user = await requireSession(
     `/account/orders/${encodeURIComponent(orderId)}`
   );
@@ -184,6 +189,12 @@ export default async function AccountOrderDetailPage({
           revealPath={`/api/account/orders/${encodeURIComponent(detail.id)}/iccid`}
         />
       </dl>
+
+      <CustomerEsimUsagePanel
+        orderId={detail.id}
+        usageEligible={detail.installEligible && !detail.isRefunded}
+        autoOpen={autoOpenUsage}
+      />
 
       <CustomerEsimInstallPanel
         orderId={detail.id}
