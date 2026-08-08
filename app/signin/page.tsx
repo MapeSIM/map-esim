@@ -12,6 +12,7 @@ import {
   publicOAuthErrorMessage,
 } from "@/app/lib/auth/googleOAuth";
 import { safeCallbackPath } from "@/app/lib/auth/redirects";
+import { readRequestOrigin } from "@/app/lib/auth/requestOrigin";
 
 export default async function SigninPage({
   searchParams,
@@ -25,7 +26,11 @@ export default async function SigninPage({
   }>;
 }) {
   const params = await searchParams;
-  const callbackUrl = safeCallbackPath(params.callbackUrl, "");
+  const requestOrigin = await readRequestOrigin();
+  // Auth.js middleware often sets an absolute same-site callbackUrl.
+  const callbackUrl = safeCallbackPath(params.callbackUrl, "", {
+    requestOrigin,
+  });
   const verified = params.verified === "1";
   const reset = params.reset === "1";
   const deleted = params.deleted === "1";

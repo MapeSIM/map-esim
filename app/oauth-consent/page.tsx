@@ -9,6 +9,7 @@ import {
   resolveAuthMethod,
 } from "@/app/lib/auth/legalConsentGate";
 import { safeCallbackPath } from "@/app/lib/auth/redirects";
+import { readRequestOrigin } from "@/app/lib/auth/requestOrigin";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,8 @@ export default async function OAuthConsentPage({
   const rawCallback = Array.isArray(params.callbackUrl)
     ? params.callbackUrl[0]
     : params.callbackUrl;
-  const next = safeCallbackPath(rawCallback, "/");
+  const requestOrigin = await readRequestOrigin();
+  const next = safeCallbackPath(rawCallback, "/", { requestOrigin });
 
   // Already consented (or not a Google consent subject) → leave this page.
   if (!deriveNeedsLegalConsent(authMethod, dbUser)) {

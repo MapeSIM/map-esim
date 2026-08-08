@@ -6,6 +6,7 @@ import {
   resolveAuthMethod,
 } from "@/app/lib/auth/legalConsentGate";
 import { safeCallbackPath } from "@/app/lib/auth/redirects";
+import { readRequestOrigin } from "@/app/lib/auth/requestOrigin";
 
 export async function getSessionUser() {
   const session = await auth();
@@ -28,17 +29,20 @@ export async function getSessionUser() {
  * /oauth-consent for Google CUSTOMERS. Credentials users are unaffected.
  */
 export async function requireSession(callbackPath = "/account") {
+  const requestOrigin = await readRequestOrigin();
+  const safeCallback = safeCallbackPath(callbackPath, "/account", {
+    requestOrigin,
+  });
   const user = await getSessionUser();
   if (!user) {
-    const safe = callbackPath.startsWith("/") ? callbackPath : "/account";
-    redirect(`/signin?callbackUrl=${encodeURIComponent(safe)}`);
+    redirect(`/signin?callbackUrl=${encodeURIComponent(safeCallback)}`);
   }
 
   const dbUser = await loadConsentGateUser(user.id);
   if (!dbUser?.emailVerifiedAt || dbUser.deletedAt) {
-    redirect(`/signin?callbackUrl=${encodeURIComponent(
-      safeCallbackPath(callbackPath, "/account")
-    )}`);
+    redirect(
+      `/signin?callbackUrl=${encodeURIComponent(safeCallback)}`
+    );
   }
 
   const authMethod = resolveAuthMethod({
@@ -49,8 +53,7 @@ export async function requireSession(callbackPath = "/account") {
 
   const needsLegalConsent = deriveNeedsLegalConsent(authMethod, dbUser);
   if (needsLegalConsent) {
-    const safe = safeCallbackPath(callbackPath, "/account");
-    redirect(`/oauth-consent?callbackUrl=${encodeURIComponent(safe)}`);
+    redirect(`/oauth-consent?callbackUrl=${encodeURIComponent(safeCallback)}`);
   }
 
   return {
@@ -60,9 +63,14 @@ export async function requireSession(callbackPath = "/account") {
   };
 }
 
-export async function requireRole(role: "CUSTOMER" | "ADMIN") {
-  const callbackPath = role === "ADMIN" ? "/admin" : "/account";
-  const user = await requireSession(callbackPath);
+export async function requireRole(
+  role: "CUSTOMER" | "ADMIN",
+  /** Internal return path when unauthenticated (must stay same-site). */
+  callbackPath?: string
+) {
+  const path =
+    callbackPath ?? (role === "ADMIN" ? "/admin" : "/account");
+  const user = await requireSession(path);
   if (user.role !== role) {
     if (role === "ADMIN") {
       redirect("/account");

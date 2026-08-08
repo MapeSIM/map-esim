@@ -3,6 +3,7 @@
 import { AuthError } from "next-auth";
 import { auth, signIn, signOut } from "@/auth";
 import { safeCallbackPath } from "@/app/lib/auth/redirects";
+import { readRequestOrigin } from "@/app/lib/auth/requestOrigin";
 
 /**
  * Starts Google OAuth. Credentials stay in env; never logged.
@@ -13,7 +14,8 @@ import { safeCallbackPath } from "@/app/lib/auth/redirects";
  */
 export async function googleSignInAction(formData: FormData): Promise<void> {
   const rawCallback = String(formData.get("callbackUrl") || "");
-  const redirectTo = safeCallbackPath(rawCallback, "/");
+  const requestOrigin = await readRequestOrigin();
+  const redirectTo = safeCallbackPath(rawCallback, "/", { requestOrigin });
 
   if (!process.env.AUTH_GOOGLE_ID || !process.env.AUTH_GOOGLE_SECRET) {
     // Fall through to Auth.js Configuration error on the sign-in page.

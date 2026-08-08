@@ -20,6 +20,7 @@ import {
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
 import { resolvePostSignInPath } from "@/app/lib/auth/redirects";
 import { getRequestIpKey } from "@/app/lib/auth/requestMeta";
+import { readRequestOrigin } from "@/app/lib/auth/requestOrigin";
 import {
   consumeResetAuthorization,
   getResetAuthorizationUser,
@@ -271,7 +272,10 @@ export async function signinAction(
   }
 
   const role = user.role === "ADMIN" ? "ADMIN" : "CUSTOMER";
-  const redirectTo = resolvePostSignInPath(role, rawCallbackUrl);
+  const requestOrigin = await readRequestOrigin();
+  const redirectTo = resolvePostSignInPath(role, rawCallbackUrl, {
+    requestOrigin,
+  });
 
   try {
     await signIn("credentials", {

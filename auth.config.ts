@@ -1,5 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
 import { isAllowedDuringLegalConsent } from "@/app/lib/auth/legalConsentPolicy";
+import { safeCallbackPath } from "@/app/lib/auth/redirects";
 
 /**
  * Edge-safe Auth.js config (no Prisma / Node crypto imports).
@@ -82,14 +83,20 @@ export const authConfig = {
       return true;
     },
     redirect({ url, baseUrl }) {
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      // Only same-site/internal destinations. Absolute URLs are reduced to
+      // pathname+search when the origin is allowlisted (AUTH_URL / APP_BASE_URL
+      // / Auth.js baseUrl). Foreign origins fall back to home — no open redirect.
+      let baseOrigin: string;
       try {
-        const parsed = new URL(url);
-        if (parsed.origin === baseUrl) return url;
+        baseOrigin = new URL(baseUrl).origin;
       } catch {
-        // ignore
+        return baseUrl;
       }
-      return baseUrl;
+      const safe = safeCallbackPath(url, "", {
+        allowedOrigins: [baseOrigin],
+      });
+      if (!safe) return baseUrl;
+      return `${baseOrigin}${safe}`;
     },
   },
 } satisfies NextAuthConfig;

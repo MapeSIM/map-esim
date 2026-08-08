@@ -16,6 +16,7 @@ import {
 import { writeAuditLog } from "@/app/lib/auth/audit";
 import { prisma } from "@/app/lib/db";
 import { safeCallbackPath } from "@/app/lib/auth/redirects";
+import { readRequestOrigin } from "@/app/lib/auth/requestOrigin";
 import type { AuthActionState } from "@/app/lib/auth/actions";
 
 export type OAuthConsentActionState = AuthActionState;
@@ -97,6 +98,7 @@ export async function acceptGoogleOauthConsentAction(
   });
 
   const rawCallback = String(formData.get("callbackUrl") || "");
-  const next = safeCallbackPath(rawCallback, "/");
+  const requestOrigin = await readRequestOrigin();
+  const next = safeCallbackPath(rawCallback, "/", { requestOrigin });
   redirect(next);
 }

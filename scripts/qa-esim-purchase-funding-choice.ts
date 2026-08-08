@@ -187,9 +187,21 @@ function main() {
   );
   assert.equal(resolvePostSignInPath("CUSTOMER", "//evil.example"), "/");
   assert.equal(safeCallbackPath("https://evil.example", "/"), "/");
+  // Auth.js absolute same-site callbackUrl → internal path (+ offerId)
+  assert.equal(
+    safeCallbackPath(
+      "http://localhost:3000/account/esim/buy?offerId=abc",
+      "/",
+      { requestOrigin: "http://localhost:3000" }
+    ),
+    "/account/esim/buy?offerId=abc"
+  );
   assert.match(redirects, /return role === "ADMIN" \? "\/admin" : "\/"/);
   assert.match(signinPage, /callbackUrl \|\| "\/"/);
-  assert.match(googleSignIn, /safeCallbackPath\(rawCallback, "\/"\)/);
+  assert.match(signinPage, /readRequestOrigin/);
+  assert.match(googleSignIn, /safeCallbackPath\(rawCallback, "\/"/);
+  assert.match(googleSignIn, /readRequestOrigin/);
+  assert.match(buyPage, /buildWalletBuyReturnPath/);
   console.log("PASS normal_signin_home_and_callback_preserved");
 
   assert.match(reviewPage, />Checkout</);

@@ -123,6 +123,14 @@ function main() {
     safeCallbackPath("/account/orders", "/account"),
     "/account/orders"
   );
+  assert.equal(
+    safeCallbackPath(
+      "http://localhost:3000/account/esim/buy?offerId=abc",
+      "/account",
+      { requestOrigin: "http://localhost:3000" }
+    ),
+    "/account/esim/buy?offerId=abc"
+  );
   console.log("PASS external_callback_rejected");
 
   // Same-email unlinked / admin / deleted are enforced in auth.ts signIn

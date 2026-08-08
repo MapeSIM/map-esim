@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import WalletPurchaseSelectForm from "@/app/components/account/WalletPurchaseSelectForm";
+import { buildWalletBuyReturnPath } from "@/app/lib/auth/redirects";
 import { requireRole } from "@/app/lib/auth/session";
 import { listAdminAssignmentDestinations } from "@/app/lib/esim/adminPackageAssignmentRead";
 import {
@@ -31,8 +32,15 @@ export default async function AccountWalletBuyPage({
 }: {
   searchParams: Promise<{ offerId?: string; country?: string }>;
 }) {
-  const user = await requireRole("CUSTOMER");
   const query = await searchParams;
+  // Preserve package hints across sign-in when page-level auth runs.
+  const user = await requireRole(
+    "CUSTOMER",
+    buildWalletBuyReturnPath({
+      offerId: query.offerId,
+      country: query.country,
+    })
+  );
   const offerIdHint = normalizeOfferId(query.offerId);
   const countryHint = sanitizeCountryHint(query.country);
 

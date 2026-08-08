@@ -44,7 +44,7 @@ function main() {
   const pkg = read("package.json");
 
   assert.match(actions, /requireRole\("CUSTOMER"\)/);
-  assert.match(buyPage, /requireRole\("CUSTOMER"\)/);
+  assert.match(buyPage, /requireRole\(\s*"CUSTOMER"/);
   assert.match(successPage, /requireRole\("CUSTOMER"\)/);
   assert.ok(!/requireRole\("ADMIN"\)/.test(actions));
   assert.match(service, /role !== Role\.CUSTOMER/);
