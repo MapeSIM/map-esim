@@ -4,7 +4,7 @@
  * policies change after business/legal review.
  */
 
-export const LEGAL_LAST_UPDATED = "3 August 2026";
+export const LEGAL_LAST_UPDATED = "8 August 2026";
 
 /** Stable consent version stored on User records — same revision as legal pages. */
 export const LEGAL_POLICY_VERSION = LEGAL_LAST_UPDATED;

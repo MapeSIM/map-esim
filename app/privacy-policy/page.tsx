@@ -73,10 +73,10 @@ const sections: LegalSection[] = [
     id: "payments",
     title: "Payment processing",
     callout:
-      "Payment gateway not finalized — card-processing details will be updated after the selected provider is confirmed.",
+      "Payments are processed by an external payment provider under that provider’s own terms and privacy notices.",
     paragraphs: [
-      "Payments may be handled by an external payment provider. Card and payment credentials, if collected, are expected to be processed by that provider under its own terms and privacy notices.",
-      `${BRAND_NAME} does not claim to store full payment card numbers on its own systems. Until a payment gateway is finalized, payment-related wording remains provider-neutral.`,
+      "Payments may be handled by an external payment provider. Card and payment credentials, if collected, are processed by that provider under its own terms and privacy notices.",
+      `${BRAND_NAME} does not claim to store full payment card numbers on its own systems.`,
     ],
   },
   {

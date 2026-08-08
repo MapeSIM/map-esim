@@ -14,7 +14,6 @@ const sections: LegalSection[] = [
     title: "Agreement to these terms",
     paragraphs: [
       `These Terms & Conditions (“Terms”) govern your use of ${BRAND_NAME} websites, customer accounts and digital eSIM products offered via ${BRAND_SITE_HOST}. By creating an account, placing an order or using our services, you agree to these Terms.`,
-      "This page is a professional draft prepared for business and legal review.",
     ],
   },
   {
@@ -86,7 +85,7 @@ const sections: LegalSection[] = [
       "Failed payments may prevent fulfilment. Chargebacks or payment disputes may result in suspension of affected services while we investigate.",
     ],
     callout:
-      "Payment gateway not finalized — payment-provider-specific terms will be updated when the selected gateway is confirmed.",
+      "Payments are processed by an external payment provider. Card details and payment credentials are handled by that provider under its own terms.",
   },
   {
     id: "cancellation-refunds",
@@ -125,7 +124,13 @@ const sections: LegalSection[] = [
       "Our aggregate liability for claims relating to a specific order is limited to the amount you paid for that order, except where liability cannot be limited under applicable law (including liability for death or personal injury caused by negligence, or fraud).",
     ],
   },
-  // TODO: Add governing law and jurisdiction after the MAP eSIM legal entity and registration jurisdiction are confirmed.
+  {
+    id: "governing-law",
+    title: "Governing law",
+    paragraphs: [
+      `These Terms are governed by the laws of Pakistan. ${BRAND_NAME} operates from Pakistan. Nothing in this section limits any non-waivable consumer protections that may apply to you under mandatory local law.`,
+    ],
+  },
   {
     id: "updates",
     title: "Changes to these terms",
@@ -148,7 +153,7 @@ export default function TermsAndConditionsPage() {
   return (
     <LegalDocument
       title="Terms & Conditions"
-      summary={`These Terms govern use of ${BRAND_NAME} accounts, digital eSIM products and related services. They are a draft for final business and legal review.`}
+      summary={`These Terms govern use of ${BRAND_NAME} accounts, digital eSIM products and related services.`}
       sections={sections}
     />
   );
