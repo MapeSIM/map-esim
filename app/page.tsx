@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -13,6 +14,20 @@ import {
   Wifi,
   Zap,
 } from "lucide-react";
+import { BRAND_NAME, BRAND_TAGLINE } from "@/app/lib/brand";
+
+export const metadata: Metadata = {
+  title: BRAND_NAME,
+  description: BRAND_TAGLINE,
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: BRAND_NAME,
+    description: BRAND_TAGLINE,
+    url: "/",
+    siteName: BRAND_NAME,
+    type: "website",
+  },
+};
 
 const categories = [
   {

@@ -6,6 +6,7 @@ import { LEGAL_CONTACTS, type LegalSection } from "@/app/lib/legal";
 export const metadata: Metadata = {
   title: `Privacy Policy | ${BRAND_NAME}`,
   description: `How ${BRAND_NAME} collects, uses and protects personal information.`,
+  alternates: { canonical: "/privacy-policy" },
 };
 
 const sections: LegalSection[] = [

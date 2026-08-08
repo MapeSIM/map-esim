@@ -1,6 +1,7 @@
 import {
   BRAND_NAME,
   BRAND_SITE_URL,
+  BRAND_SOCIAL_LINKS,
   BRAND_SUPPORT_EMAIL,
   BRAND_TAGLINE,
 } from "@/app/lib/brand";
@@ -22,6 +23,7 @@ export function organizationNode() {
     url: BRAND_SITE_URL,
     email: BRAND_SUPPORT_EMAIL,
     description: BRAND_TAGLINE,
+    sameAs: BRAND_SOCIAL_LINKS.map((link) => link.href),
   };
 }
 

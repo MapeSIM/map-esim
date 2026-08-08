@@ -6,6 +6,7 @@ import { LEGAL_CONTACTS, type LegalSection } from "@/app/lib/legal";
 export const metadata: Metadata = {
   title: `Cookie Policy | ${BRAND_NAME}`,
   description: `How ${BRAND_NAME} uses cookies and similar technologies.`,
+  alternates: { canonical: "/cookie-policy" },
 };
 
 const sections: LegalSection[] = [

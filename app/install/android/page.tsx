@@ -1,5 +1,22 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Smartphone } from "lucide-react";
+import { BRAND_NAME } from "@/app/lib/brand";
+
+export const metadata: Metadata = {
+  title: `Android eSIM Install Guide | ${BRAND_NAME}`,
+  description:
+    "Install your MAP eSIM on Android using the QR code from your order email or success page.",
+  alternates: { canonical: "/install/android" },
+  openGraph: {
+    title: `Android eSIM Install Guide | ${BRAND_NAME}`,
+    description:
+      "Install your MAP eSIM on Android using the QR code from your order email or success page.",
+    url: "/install/android",
+    siteName: BRAND_NAME,
+    type: "website",
+  },
+};
 
 export default function AndroidInstallGuidePage() {
   return (

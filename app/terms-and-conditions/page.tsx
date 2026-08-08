@@ -6,6 +6,7 @@ import { LEGAL_CONTACTS, type LegalSection } from "@/app/lib/legal";
 export const metadata: Metadata = {
   title: `Terms & Conditions | ${BRAND_NAME}`,
   description: `Terms of use for ${BRAND_NAME} accounts, eSIM purchases and related services.`,
+  alternates: { canonical: "/terms-and-conditions" },
 };
 
 const sections: LegalSection[] = [

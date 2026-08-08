@@ -1,82 +1,42 @@
 import type { MetadataRoute } from "next";
 import { BRAND_SITE_URL } from "@/app/lib/brand";
-import { PAKISTAN_DESTINATION_PATH } from "@/app/lib/seo/siteGraph";
+import { getCanonicalDestinationPathsForSitemap } from "@/app/lib/seo/destinationCatalog";
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const lastModified = new Date();
+type StaticRoute = {
+  path: string;
+  changeFrequency: NonNullable<MetadataRoute.Sitemap[number]["changeFrequency"]>;
+  priority: number;
+};
 
-  return [
-    {
-      url: BRAND_SITE_URL,
-      lastModified,
-      changeFrequency: "weekly",
-      priority: 1,
-    },
-    {
-      url: `${BRAND_SITE_URL}/countries`,
-      lastModified,
-      changeFrequency: "daily",
-      priority: 0.9,
-    },
-    {
-      url: `${BRAND_SITE_URL}${PAKISTAN_DESTINATION_PATH}`,
-      lastModified,
-      changeFrequency: "weekly",
+const staticRoutes: StaticRoute[] = [
+  { path: "/", changeFrequency: "weekly", priority: 1 },
+  { path: "/countries", changeFrequency: "daily", priority: 0.9 },
+  { path: "/plans", changeFrequency: "daily", priority: 0.85 },
+  { path: "/how-it-works", changeFrequency: "monthly", priority: 0.8 },
+  { path: "/contact", changeFrequency: "monthly", priority: 0.8 },
+  { path: "/support", changeFrequency: "monthly", priority: 0.75 },
+  { path: "/install/iphone", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/install/android", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/privacy-policy", changeFrequency: "yearly", priority: 0.3 },
+  { path: "/terms-and-conditions", changeFrequency: "yearly", priority: 0.3 },
+  { path: "/cookie-policy", changeFrequency: "yearly", priority: 0.3 },
+];
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const marketingPages: MetadataRoute.Sitemap = staticRoutes.map((route) => ({
+    url: route.path === "/" ? BRAND_SITE_URL : `${BRAND_SITE_URL}${route.path}`,
+    changeFrequency: route.changeFrequency,
+    priority: route.priority,
+  }));
+
+  const destinationPaths = await getCanonicalDestinationPathsForSitemap();
+  const destinationPages: MetadataRoute.Sitemap = destinationPaths.map(
+    (path) => ({
+      url: `${BRAND_SITE_URL}${path}`,
+      changeFrequency: "weekly" as const,
       priority: 0.85,
-    },
-    {
-      url: `${BRAND_SITE_URL}/plans`,
-      lastModified,
-      changeFrequency: "daily",
-      priority: 0.85,
-    },
-    {
-      url: `${BRAND_SITE_URL}/how-it-works`,
-      lastModified,
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${BRAND_SITE_URL}/contact`,
-      lastModified,
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${BRAND_SITE_URL}/support`,
-      lastModified,
-      changeFrequency: "monthly",
-      priority: 0.75,
-    },
-    {
-      url: `${BRAND_SITE_URL}/install/iphone`,
-      lastModified,
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
-    {
-      url: `${BRAND_SITE_URL}/install/android`,
-      lastModified,
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
-    {
-      url: `${BRAND_SITE_URL}/privacy-policy`,
-      lastModified,
-      changeFrequency: "yearly",
-      priority: 0.3,
-    },
-    {
-      url: `${BRAND_SITE_URL}/terms-and-conditions`,
-      lastModified,
-      changeFrequency: "yearly",
-      priority: 0.3,
-    },
-    {
-      url: `${BRAND_SITE_URL}/cookie-policy`,
-      lastModified,
-      changeFrequency: "yearly",
-      priority: 0.3,
-    },
-  ];
+    })
+  );
+
+  return [...marketingPages, ...destinationPages];
 }
