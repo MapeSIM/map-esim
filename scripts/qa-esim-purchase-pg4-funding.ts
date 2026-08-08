@@ -133,6 +133,15 @@ function main() {
   assert.match(apply, /provider_declined_after_funding|local_finalize_failed/);
   assert.match(apply, /maybeReleasePendingGatewayReservation/);
   assert.doesNotMatch(apply, /requestRefund\(/);
+  // Completed split debit notifies post-commit; PENDING reservation must not.
+  assert.match(
+    apply,
+    /completedDebitTransactionId[\s\S]*scheduleWalletTransactionNotification/
+  );
+  assert.match(
+    apply,
+    /releasedRefundId[\s\S]*scheduleWalletTransactionNotification/
+  );
   console.log("PASS funding_dedup_amount_split_vesim_contracts");
 
   assert.match(gateway, /reserveSplitWalletBeforeGatewayCheckout/);

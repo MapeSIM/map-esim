@@ -37,19 +37,46 @@ function customerFacingTypeLabel(
 ): string {
   switch (type) {
     case WalletTransactionType.REFUND_CREDIT:
-      return "Refund";
+      return "Wallet funds returned";
     case WalletTransactionType.TOPUP_CREDIT:
-      return "Top-up";
     case WalletTransactionType.ADMIN_CREDIT:
     case WalletTransactionType.ADJUSTMENT_CREDIT:
-    case WalletTransactionType.ADJUSTMENT_DEBIT:
-      return "Admin adjustment";
+      return "Credit";
     case WalletTransactionType.PURCHASE_DEBIT:
-      return "Wallet debit";
+    case WalletTransactionType.ADJUSTMENT_DEBIT:
+      return "Debit";
     case WalletTransactionType.REVERSAL:
-      return direction === WalletDirection.CREDIT ? "Wallet credit" : "Wallet debit";
+      return direction === WalletDirection.CREDIT
+        ? "Wallet funds returned"
+        : "Debit";
     default:
-      return direction === WalletDirection.CREDIT ? "Wallet credit" : "Wallet debit";
+      return direction === WalletDirection.CREDIT ? "Credit" : "Debit";
+  }
+}
+
+function walletTransactionEmailSubject(
+  type: WalletTransactionType,
+  direction: WalletDirection
+): string {
+  switch (type) {
+    case WalletTransactionType.REFUND_CREDIT:
+      return "Funds returned to your MAP eSIM wallet";
+    case WalletTransactionType.PURCHASE_DEBIT:
+      return "MAP eSIM wallet payment completed";
+    case WalletTransactionType.TOPUP_CREDIT:
+    case WalletTransactionType.ADMIN_CREDIT:
+    case WalletTransactionType.ADJUSTMENT_CREDIT:
+      return "Your MAP eSIM wallet was credited";
+    case WalletTransactionType.ADJUSTMENT_DEBIT:
+      return "MAP eSIM wallet payment completed";
+    case WalletTransactionType.REVERSAL:
+      return direction === WalletDirection.CREDIT
+        ? "Funds returned to your MAP eSIM wallet"
+        : "MAP eSIM wallet payment completed";
+    default:
+      return direction === WalletDirection.CREDIT
+        ? "Your MAP eSIM wallet was credited"
+        : "MAP eSIM wallet payment completed";
   }
 }
 
@@ -62,9 +89,10 @@ function safeDescription(options: {
     case WalletTransactionType.PURCHASE_DEBIT:
       return options.hasOrder
         ? "eSIM package purchase"
-        : "Wallet debit for eSIM purchase";
+        : "eSIM purchase";
     case WalletTransactionType.REFUND_CREDIT:
-      return "Refund for an unsuccessful eSIM purchase";
+      // Customer-facing release/reversal — not a card/gateway refund claim.
+      return "Wallet funds returned. No eSIM was created for this attempt.";
     case WalletTransactionType.TOPUP_CREDIT:
       return "Wallet top-up credit";
     case WalletTransactionType.ADMIN_CREDIT:
@@ -293,7 +321,7 @@ async function dispatchWalletTransactionEmail(
     };
 
     const subject = sanitizeEmailHeaderValue(
-      `${payload.transactionTypeLabel}: ${payload.amountLabel}`,
+      walletTransactionEmailSubject(row.type, row.direction),
       160
     );
     const text = renderWalletTransactionEmailText(payload);
@@ -302,7 +330,7 @@ async function dispatchWalletTransactionEmail(
     const sendResult = await sendChannelMail({
       channel: "billing",
       to: user.email.trim(),
-      subject: `[MAP eSIM Billing] ${subject}`,
+      subject,
       text,
       html,
       headers: {

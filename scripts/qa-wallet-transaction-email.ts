@@ -102,17 +102,26 @@ function main() {
   console.log("   ok");
 
   console.log("3) Event wiring after durable commit");
+  const paymentApply = read("app/lib/esim/esimPurchasePaymentApply.ts");
   for (const [label, src] of [
     ["adminCredit", adminCredit],
     ["adminDebit", adminDebit],
     ["topup", topup],
     ["purchase", purchase],
+    ["paymentApply", paymentApply],
   ] as const) {
     assert.match(
       src,
       /scheduleWalletTransactionNotification/,
       `${label} missing schedule`
     );
+  }
+  for (const [label, src] of [
+    ["adminCredit", adminCredit],
+    ["adminDebit", adminDebit],
+    ["topup", topup],
+    ["purchase", purchase],
+  ] as const) {
     assert.match(src, /balanceBeforeCents/, `${label} missing before balance`);
   }
   assert.match(purchase, /status:\s*WalletTransactionStatus\.PENDING/);
@@ -128,6 +137,24 @@ function main() {
     !/WALLET_FUNDS_RESERVED[\s\S]{0,400}scheduleWalletTransactionNotification/.test(
       purchase
     )
+  );
+  // Split/gateway: capture debit id, COMPLETE pending debit on funding, notify post-commit.
+  assert.match(
+    paymentApply,
+    /completedDebitTransactionId[\s\S]*WalletTransactionStatus\.COMPLETED[\s\S]*scheduleWalletTransactionNotification/
+  );
+  assert.match(
+    paymentApply,
+    /releasedRefundId[\s\S]*scheduleWalletTransactionNotification/
+  );
+  assert.match(
+    notify,
+    /Your MAP eSIM wallet was credited|MAP eSIM wallet payment completed|Funds returned to your MAP eSIM wallet/
+  );
+  assert.match(notify, /Wallet funds returned/);
+  assert.doesNotMatch(
+    paymentApply,
+    /reserveWalletPurchaseFundsInTx[\s\S]{0,200}scheduleWalletTransactionNotification/
   );
   console.log("   ok");
 
@@ -152,7 +179,7 @@ function main() {
   console.log("5) Email content (no sensitive eSIM / secrets)");
   const payload = {
     customerName: "Ada Lovelace",
-    transactionTypeLabel: "Wallet debit",
+    transactionTypeLabel: "Debit",
     amountLabel: formatUsdCents(-1999),
     currencyLabel: "USD",
     description: "eSIM package purchase",
@@ -167,7 +194,7 @@ function main() {
   const html = renderWalletTransactionEmailHtml(payload);
   const text = renderWalletTransactionEmailText(payload);
   assert.match(html, /Ada Lovelace/);
-  assert.match(html, /Wallet debit/);
+  assert.match(html, /Debit/);
   assert.match(html, /Previous balance/);
   assert.match(html, /New balance/);
   assert.match(html, /Related order/);
@@ -178,7 +205,21 @@ function main() {
   assertNoSensitive(html);
   assertNoSensitive(text);
   assertNoSensitive(template);
+  assert.doesNotMatch(html, /VeSIM|SMTP_PASSWORD|providerPayload/i);
   assert.equal(shortWalletTransactionReference("abcdefghij"), "abcd…ghij");
+
+  const releasePayload = {
+    ...payload,
+    transactionTypeLabel: "Wallet funds returned",
+    amountLabel: formatUsdCents(1999),
+    description: "Wallet funds returned. No eSIM was created for this attempt.",
+    orderReference: null,
+    orderUrl: null,
+  };
+  const releaseHtml = renderWalletTransactionEmailHtml(releasePayload);
+  assert.match(releaseHtml, /Wallet funds returned/);
+  assert.doesNotMatch(releaseHtml, /card refund|gateway refund/i);
+  assertNoSensitive(releaseHtml);
   console.log("   ok");
 
   console.log("6) Failure / non-events / order emails unchanged");

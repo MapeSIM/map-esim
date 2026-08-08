@@ -72,10 +72,10 @@ export function renderWalletTransactionEmailHtml(
           <tr>
             <td style="padding:28px 24px 8px;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
               <h1 style="margin:0 0 12px;font-size:22px;color:${TEXT_PRIMARY};font-weight:700;">
-                Wallet balance update
+                ${escapeHtml(payload.transactionTypeLabel)}
               </h1>
               <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:${TEXT_SECONDARY};">
-                Hello ${name}, your ${escapeHtml(BRAND_NAME)} wallet balance has changed.
+                Hello ${name}, here is a summary of your ${escapeHtml(BRAND_NAME)} wallet activity.
               </p>
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 8px;">
                 ${detailRow("Transaction type", payload.transactionTypeLabel)}
@@ -112,11 +112,11 @@ export function renderWalletTransactionEmailText(
   payload: WalletTransactionEmailPayload
 ): string {
   const lines = [
-    `${BRAND_NAME} wallet balance update`,
+    `${BRAND_NAME}: ${payload.transactionTypeLabel}`,
     "",
     `Hello ${payload.customerName || "Customer"},`,
     "",
-    "Your wallet balance has changed.",
+    "Here is a summary of your wallet activity.",
     "",
     `Transaction type: ${payload.transactionTypeLabel}`,
     `Amount: ${payload.amountLabel} ${payload.currencyLabel}`,

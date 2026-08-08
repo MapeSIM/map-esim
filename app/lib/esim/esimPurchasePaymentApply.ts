@@ -349,6 +349,9 @@ export async function applyVerifiedEsimPurchasePaymentEvent(
     };
   }
 
+  const completedDebitTransactionId =
+    attempt.purchase.debitTransactionId?.trim() || null;
+
   try {
     await prisma.$transaction(async (tx) => {
       const claimed = await tx.esimPurchasePaymentAttempt.updateMany({
@@ -460,6 +463,12 @@ export async function applyVerifiedEsimPurchasePaymentEvent(
       attemptStatus: attempt.status,
       outcome: "reconciliation",
     };
+  }
+
+  // Post-commit only: notify completed split debit (never on PENDING reservation).
+  // Exact-once is enforced by WalletTransaction.emailNotificationStatus claim.
+  if (completedDebitTransactionId) {
+    scheduleWalletTransactionNotification(completedDebitTransactionId);
   }
 
   await fulfillFundedEsimPurchase(attempt.purchaseId).catch(() => undefined);
