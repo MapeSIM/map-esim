@@ -9,9 +9,12 @@ import { isValidEmailFormat, normalizeEmail } from "@/app/lib/auth/email";
 import {
   hashPassword,
   isPasswordValid,
+  PASSWORD_REQUIREMENT_MESSAGE,
+  validateAdminPassword,
   validatePassword,
   verifyPassword,
 } from "@/app/lib/auth/password";
+import { Role } from "@prisma/client";
 import {
   issueEmailOtp,
   OtpPurpose,
@@ -64,7 +67,7 @@ const signupSchema = z
       ctx.addIssue({
         code: "custom",
         path: ["password"],
-        message: "Please meet all password requirements.",
+        message: PASSWORD_REQUIREMENT_MESSAGE,
       });
     }
     if (data.password !== data.confirmPassword) {
@@ -625,7 +628,14 @@ export async function resetPasswordAction(
     };
   }
 
-  const policy = validatePassword(password, authUser.email);
+  const resetRole = await prisma.user.findUnique({
+    where: { id: authUser.userId },
+    select: { role: true },
+  });
+  const policy =
+    resetRole?.role === Role.ADMIN
+      ? validateAdminPassword(password, authUser.email)
+      : validatePassword(password, authUser.email);
   if (!policy.ok) {
     return {
       ok: false,
@@ -732,7 +742,10 @@ export async function changePasswordAction(
     };
   }
 
-  const policy = validatePassword(password, dbUser.email);
+  const policy =
+    dbUser.role === Role.ADMIN
+      ? validateAdminPassword(password, dbUser.email)
+      : validatePassword(password, dbUser.email);
   if (!policy.ok) {
     return {
       ok: false,

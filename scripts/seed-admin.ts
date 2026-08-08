@@ -15,7 +15,10 @@
  */
 import { loadEnvConfig } from "@next/env";
 import { PrismaClient, Role } from "@prisma/client";
-import { hashPassword, isPasswordValid } from "../app/lib/auth/password";
+import {
+  hashPassword,
+  isAdminPasswordValid,
+} from "../app/lib/auth/password";
 
 // Official Next.js loader — must run before reading process.env.
 loadEnvConfig(process.cwd());
@@ -46,9 +49,9 @@ async function main() {
     process.exit(1);
   }
 
-  if (!isPasswordValid(password, email)) {
+  if (!isAdminPasswordValid(password, email)) {
     console.error(
-      "INITIAL_ADMIN_PASSWORD must meet the MAP eSIM password policy (10–128 characters, upper, lower, number, special character, no leading/trailing spaces, must not equal the email)."
+      "INITIAL_ADMIN_PASSWORD must meet the ADMIN password policy (10–128 characters, upper, lower, number, special character, no leading/trailing spaces, must not equal the email)."
     );
     process.exit(1);
   }

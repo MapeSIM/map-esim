@@ -16,6 +16,7 @@
     "qa:account-deletion": "tsx scripts/qa-account-deletion.ts",
     "qa:cookie-consent": "tsx scripts/qa-cookie-consent.ts",
     "qa:google-oauth": "tsx scripts/qa-google-oauth.ts",
+    "qa:password-policy": "tsx scripts/qa-password-policy.ts",
     "qa:admin-overview": "tsx scripts/qa-admin-overview.ts",
     "qa:admin-orders": "tsx scripts/qa-admin-orders.ts",
     "qa:admin-customers": "tsx scripts/qa-admin-customers.ts",

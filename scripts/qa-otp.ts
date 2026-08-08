@@ -142,8 +142,9 @@ async function main() {
   });
   pass("expired_otp", expired.ok === false && expired.reason === "expired");
 
-  pass("password_policy_strong", passwordSchema.safeParse("NewPassword12!").success);
-  pass("password_policy_weak", passwordSchema.safeParse("NewPassword12").success === false);
+  pass("password_policy_min_ok", passwordSchema.safeParse("abcdef").success);
+  pass("password_policy_no_composition", passwordSchema.safeParse("NewPassword12").success);
+  pass("password_policy_too_short", passwordSchema.safeParse("abcde").success === false);
 
   await p.emailOtp.deleteMany({ where: { userId: user.id } });
   await p.user.delete({ where: { id: user.id } });
