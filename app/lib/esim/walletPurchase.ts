@@ -764,6 +764,17 @@ export async function refundReservedFundsInTx(
     return { outcome: "already_refunded", refundTransactionId: null };
   }
 
+  // Gateway reservation release is only valid before verified funding.
+  // FUNDED / fulfilled / reconciliation purchases must never be credited here.
+  if (restoreReady) {
+    const releasable =
+      purchase.status === WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT ||
+      purchase.status === WalletEsimPurchaseStatus.FUNDS_RESERVED;
+    if (!releasable) {
+      return { outcome: "already_refunded", refundTransactionId: null };
+    }
+  }
+
   if (!restoreReady && purchase.refundTransactionId) {
     await tx.walletEsimPurchase.update({
       where: { id: purchase.id },
@@ -812,33 +823,78 @@ export async function refundReservedFundsInTx(
         "This purchase is unavailable."
       );
     }
-    await tx.walletEsimPurchase.update({
-      where: { id: purchase.id },
-      data: restoreReady
-        ? {
-            status: WalletEsimPurchaseStatus.READY,
-            refundTransactionId: null,
-            debitTransactionId: null,
-            failureCategory: null,
-            failureCode: null,
-          }
-        : {
-            status: WalletEsimPurchaseStatus.FAILED_REFUNDED,
-            refundTransactionId: existingRefund.id,
-            failureCategory: "provider_declined",
-            failureCode: "refunded",
+    if (restoreReady) {
+      // Never downgrade FUNDED/fulfilled; only re-link READY from pre-fund states.
+      const relinked = await tx.walletEsimPurchase.updateMany({
+        where: {
+          id: purchase.id,
+          status: {
+            in: [
+              WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+              WalletEsimPurchaseStatus.FUNDS_RESERVED,
+            ],
           },
-    });
-    if (purchase.debitTransactionId) {
-      await tx.walletTransaction.update({
-        where: { id: purchase.debitTransactionId },
-        data: { status: WalletTransactionStatus.REVERSED },
+        },
+        data: {
+          status: WalletEsimPurchaseStatus.READY,
+          refundTransactionId: null,
+          debitTransactionId: null,
+          failureCategory: null,
+          failureCode: null,
+        },
       });
+      if (relinked.count === 1 && purchase.debitTransactionId) {
+        await tx.walletTransaction.update({
+          where: { id: purchase.debitTransactionId },
+          data: { status: WalletTransactionStatus.REVERSED },
+        });
+      }
+    } else {
+      await tx.walletEsimPurchase.update({
+        where: { id: purchase.id },
+        data: {
+          status: WalletEsimPurchaseStatus.FAILED_REFUNDED,
+          refundTransactionId: existingRefund.id,
+          failureCategory: "provider_declined",
+          failureCode: "refunded",
+        },
+      });
+      if (purchase.debitTransactionId) {
+        await tx.walletTransaction.update({
+          where: { id: purchase.debitTransactionId },
+          data: { status: WalletTransactionStatus.REVERSED },
+        });
+      }
     }
     return {
       outcome: "linked_existing",
       refundTransactionId: existingRefund.id,
     };
+  }
+
+  // CAS claim before credit so a concurrent FUND cannot lose to a late release.
+  if (restoreReady) {
+    const claimedRelease = await tx.walletEsimPurchase.updateMany({
+      where: {
+        id: purchase.id,
+        status: {
+          in: [
+            WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+            WalletEsimPurchaseStatus.FUNDS_RESERVED,
+          ],
+        },
+      },
+      data: {
+        status: WalletEsimPurchaseStatus.READY,
+        refundTransactionId: null,
+        debitTransactionId: null,
+        failureCategory: null,
+        failureCode: null,
+      },
+    });
+    if (claimedRelease.count !== 1) {
+      return { outcome: "already_refunded", refundTransactionId: null };
+    }
   }
 
   const wallet = await tx.walletAccount.findUnique({
@@ -884,23 +940,17 @@ export async function refundReservedFundsInTx(
     });
   }
 
-  await tx.walletEsimPurchase.update({
-    where: { id: purchase.id },
-    data: restoreReady
-      ? {
-          status: WalletEsimPurchaseStatus.READY,
-          refundTransactionId: null,
-          debitTransactionId: null,
-          failureCategory: null,
-          failureCode: null,
-        }
-      : {
-          status: WalletEsimPurchaseStatus.FAILED_REFUNDED,
-          refundTransactionId: refundTx.id,
-          failureCategory: "provider_declined",
-          failureCode: "refunded",
-        },
-  });
+  if (!restoreReady) {
+    await tx.walletEsimPurchase.update({
+      where: { id: purchase.id },
+      data: {
+        status: WalletEsimPurchaseStatus.FAILED_REFUNDED,
+        refundTransactionId: refundTx.id,
+        failureCategory: "provider_declined",
+        failureCode: "refunded",
+      },
+    });
+  }
 
   await tx.auditLog.create({
     data: {

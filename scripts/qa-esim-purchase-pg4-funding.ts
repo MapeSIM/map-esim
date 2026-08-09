@@ -149,6 +149,59 @@ function main() {
   );
   console.log("PASS funding_dedup_amount_split_vesim_contracts");
 
+  // --- Launch-blocking success vs failure/cancel race contracts ---
+  // A/B: funded/confirmed short-circuits before failure release path.
+  assert.match(
+    apply,
+    /paymentAlreadyConfirmed[\s\S]*purchaseAlreadyFunded[\s\S]*event\.paymentStatus === "failed"/
+  );
+  assert.match(
+    apply,
+    /PAYMENT_CONFIRMED[\s\S]*FUNDED[\s\S]*PROVIDER_PENDING[\s\S]*COMPLETED/
+  );
+  assert.match(
+    apply,
+    /event\.paymentStatus === "failed"\s*\?\s*"ignored"\s*:\s*"duplicate"/
+  );
+  // C/D: failure release requires atomic attempt CAS; failed claim → no release.
+  assert.match(
+    apply,
+    /async function releaseOnGatewayFailure[\s\S]*attemptClaim\.count !== 1[\s\S]*return;/
+  );
+  assert.match(
+    apply,
+    /releaseOnGatewayFailure[\s\S]*webhookEventId:\s*null[\s\S]*DRAFT[\s\S]*AWAITING_PAYMENT[\s\S]*PAYMENT_PENDING/
+  );
+  assert.match(apply, /if\s*\(\s*!claimed\s*\)/);
+  // E/F: cancel eligibility + release share one transaction; restoreReady CAS.
+  assert.match(
+    apply,
+    /maybeReleasePendingGatewayReservation[\s\S]*prisma\.\$transaction[\s\S]*findUnique[\s\S]*refundReservedFundsInTx/
+  );
+  assert.match(
+    apply,
+    /AWAITING_GATEWAY_PAYMENT[\s\S]*FUNDS_RESERVED[\s\S]*restoreReady:\s*true/
+  );
+  // Split late success after release → fund claim fails → reconciliation.
+  assert.match(
+    apply,
+    /walletAppliedCents > 0[\s\S]*PURCHASE_FUND_CLAIM_FAILED/
+  );
+  assert.match(
+    apply,
+    /debitTransactionId:\s*purchaseNow\.debitTransactionId/
+  );
+  // Defense in wallet primitive.
+  assert.match(
+    walletPurchase,
+    /restoreReady[\s\S]*AWAITING_GATEWAY_PAYMENT[\s\S]*FUNDS_RESERVED[\s\S]*already_refunded/
+  );
+  assert.match(
+    walletPurchase,
+    /claimedRelease\.count !== 1[\s\S]*already_refunded/
+  );
+  console.log("PASS success_failure_cancel_race_guards");
+
   assert.match(gateway, /reserveSplitWalletBeforeGatewayCheckout/);
   assert.match(gateway, /releaseSplitReservationAfterSessionFailure/);
   assert.doesNotMatch(gateway, /PARTIAL_WALLET_UNSUPPORTED/);

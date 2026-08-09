@@ -178,7 +178,16 @@ function main() {
   assert.match(service, /reserveWalletPurchaseFundsInTx/);
   // CUSTOMER_SPLIT may be persisted for gateway-required READY rows (PG2); confirm path stays wallet-only.
   assert.match(service, /OrderFundingSource\.CUSTOMER_SPLIT/);
-  assert.ok(!/AWAITING_GATEWAY_PAYMENT/.test(service));
+  // Wallet-only confirm must not transition into gateway-awaiting; restoreReady
+  // release may reference AWAITING_GATEWAY_PAYMENT as a CAS allow-list only.
+  assert.doesNotMatch(
+    service,
+    /status:\s*WalletEsimPurchaseStatus\.AWAITING_GATEWAY_PAYMENT/
+  );
+  assert.match(
+    service,
+    /restoreReady[\s\S]*AWAITING_GATEWAY_PAYMENT[\s\S]*FUNDS_RESERVED/
+  );
   console.log("PASS wallet_only_flow_still_full_price");
 
   // --- Partial reservation primitive ---

@@ -305,6 +305,32 @@ export async function applyVerifiedEsimPurchasePaymentEvent(
     };
   }
 
+  // Authoritative success/funded state must short-circuit failure release.
+  // A later signed failure must never unlock wallet after confirmed funding.
+  const purchaseAlreadyFunded =
+    attempt.purchase.status === WalletEsimPurchaseStatus.FUNDED ||
+    attempt.purchase.status === WalletEsimPurchaseStatus.PROVIDER_PENDING ||
+    attempt.purchase.status === WalletEsimPurchaseStatus.COMPLETED;
+  const paymentAlreadyConfirmed =
+    attempt.status === EsimPurchasePaymentAttemptStatus.PAYMENT_CONFIRMED;
+
+  if (paymentAlreadyConfirmed || purchaseAlreadyFunded) {
+    if (
+      event.paymentStatus === "confirmed" &&
+      attempt.purchase.status === WalletEsimPurchaseStatus.FUNDED
+    ) {
+      await fulfillFundedEsimPurchase(attempt.purchaseId).catch(() => undefined);
+    }
+    return {
+      duplicate: true,
+      purchaseId: attempt.purchaseId,
+      paymentAttemptId: attempt.id,
+      purchaseStatus: attempt.purchase.status,
+      attemptStatus: attempt.status,
+      outcome: event.paymentStatus === "failed" ? "ignored" : "duplicate",
+    };
+  }
+
   if (event.paymentStatus === "failed") {
     return releaseOnGatewayFailure({
       attemptId: attempt.id,
@@ -324,20 +350,6 @@ export async function applyVerifiedEsimPurchasePaymentEvent(
       purchaseStatus: attempt.purchase.status,
       attemptStatus: attempt.status,
       outcome: "ignored",
-    };
-  }
-
-  if (attempt.status === EsimPurchasePaymentAttemptStatus.PAYMENT_CONFIRMED) {
-    if (attempt.purchase.status === WalletEsimPurchaseStatus.FUNDED) {
-      await fulfillFundedEsimPurchase(attempt.purchaseId).catch(() => undefined);
-    }
-    return {
-      duplicate: true,
-      purchaseId: attempt.purchaseId,
-      paymentAttemptId: attempt.id,
-      purchaseStatus: attempt.purchase.status,
-      attemptStatus: attempt.status,
-      outcome: "duplicate",
     };
   }
 
@@ -384,10 +396,48 @@ export async function applyVerifiedEsimPurchasePaymentEvent(
         throw new Error("ATTEMPT_CLAIM_FAILED");
       }
 
-      if (attempt!.purchase.debitTransactionId) {
+      // Re-read purchase inside the claim tx — cancel/failure may have released
+      // the split reservation after the pre-tx snapshot.
+      const purchaseNow = await tx.walletEsimPurchase.findUnique({
+        where: { id: attempt!.purchaseId },
+        select: {
+          status: true,
+          walletAppliedCents: true,
+          debitTransactionId: true,
+        },
+      });
+      if (!purchaseNow) {
+        throw new Error("PURCHASE_FUND_CLAIM_FAILED");
+      }
+
+      // Split: never fund after reservation release (READY without held debit).
+      // Late success after release must reconcile — not fulfill underfunded.
+      if (purchaseNow.walletAppliedCents > 0) {
+        if (
+          !purchaseNow.debitTransactionId ||
+          (purchaseNow.status !==
+            WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT &&
+            purchaseNow.status !== WalletEsimPurchaseStatus.FUNDS_RESERVED)
+        ) {
+          throw new Error("PURCHASE_FUND_CLAIM_FAILED");
+        }
+      } else if (
+        purchaseNow.status !==
+          WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT &&
+        purchaseNow.status !== WalletEsimPurchaseStatus.FUNDS_RESERVED &&
+        purchaseNow.status !== WalletEsimPurchaseStatus.READY
+      ) {
+        throw new Error("PURCHASE_FUND_CLAIM_FAILED");
+      }
+
+      const debitId =
+        purchaseNow.debitTransactionId?.trim() ||
+        attempt!.purchase.debitTransactionId?.trim() ||
+        null;
+      if (debitId) {
         await tx.walletTransaction.updateMany({
           where: {
-            id: attempt!.purchase.debitTransactionId,
+            id: debitId,
             status: WalletTransactionStatus.PENDING,
           },
           data: { status: WalletTransactionStatus.COMPLETED },
@@ -395,16 +445,28 @@ export async function applyVerifiedEsimPurchasePaymentEvent(
       }
 
       const funded = await tx.walletEsimPurchase.updateMany({
-        where: {
-          id: attempt!.purchaseId,
-          status: {
-            in: [
-              WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
-              WalletEsimPurchaseStatus.FUNDS_RESERVED,
-              WalletEsimPurchaseStatus.READY,
-            ],
-          },
-        },
+        where:
+          purchaseNow.walletAppliedCents > 0
+            ? {
+                id: attempt!.purchaseId,
+                debitTransactionId: purchaseNow.debitTransactionId,
+                status: {
+                  in: [
+                    WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+                    WalletEsimPurchaseStatus.FUNDS_RESERVED,
+                  ],
+                },
+              }
+            : {
+                id: attempt!.purchaseId,
+                status: {
+                  in: [
+                    WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+                    WalletEsimPurchaseStatus.FUNDS_RESERVED,
+                    WalletEsimPurchaseStatus.READY,
+                  ],
+                },
+              },
         data: {
           status: WalletEsimPurchaseStatus.FUNDED,
           failureCategory: null,
@@ -499,11 +561,16 @@ async function releaseOnGatewayFailure(options: {
 }): Promise<ApplyVerifiedEsimPaymentResult> {
   let releasedRefundId: string | null = null;
   let walletFundsReturned = false;
+  let claimed = false;
+  let finalPurchaseStatus: WalletEsimPurchaseStatus | null = null;
+  let finalAttemptStatus: EsimPurchasePaymentAttemptStatus | null = null;
 
   await prisma.$transaction(async (tx) => {
-    await tx.esimPurchasePaymentAttempt.updateMany({
+    // Atomic CAS: only a still-pending attempt may enter failure release.
+    const attemptClaim = await tx.esimPurchasePaymentAttempt.updateMany({
       where: {
         id: options.attemptId,
+        webhookEventId: null,
         status: {
           in: [
             EsimPurchasePaymentAttemptStatus.DRAFT,
@@ -520,6 +587,19 @@ async function releaseOnGatewayFailure(options: {
         failureCode: "payment_failed",
       },
     });
+    if (attemptClaim.count !== 1) {
+      const current = await tx.esimPurchasePaymentAttempt.findUnique({
+        where: { id: options.attemptId },
+        select: {
+          status: true,
+          purchase: { select: { status: true } },
+        },
+      });
+      finalAttemptStatus = current?.status ?? null;
+      finalPurchaseStatus = current?.purchase.status ?? null;
+      return;
+    }
+    claimed = true;
 
     if (options.walletAppliedCents > 0) {
       const release = await refundReservedFundsInTx(tx, {
@@ -533,12 +613,11 @@ async function releaseOnGatewayFailure(options: {
       if (release.outcome === "created") {
         releasedRefundId = release.refundTransactionId;
         walletFundsReturned = true;
-      } else if (
-        release.outcome === "linked_existing" ||
-        release.outcome === "already_refunded"
-      ) {
+      } else if (release.outcome === "linked_existing") {
         walletFundsReturned = true;
       }
+      // already_refunded after a failed CAS claim inside restoreReady means
+      // success funded first — do not treat as wallet returned.
     } else {
       await tx.walletEsimPurchase.updateMany({
         where: {
@@ -565,7 +644,39 @@ async function releaseOnGatewayFailure(options: {
         },
       },
     });
+
+    const after = await tx.esimPurchasePaymentAttempt.findUnique({
+      where: { id: options.attemptId },
+      select: {
+        status: true,
+        purchase: { select: { status: true } },
+      },
+    });
+    finalAttemptStatus = after?.status ?? EsimPurchasePaymentAttemptStatus.FAILED;
+    finalPurchaseStatus =
+      after?.purchase.status ?? WalletEsimPurchaseStatus.READY;
   });
+
+  if (!claimed) {
+    return {
+      duplicate:
+        finalAttemptStatus === EsimPurchasePaymentAttemptStatus.FAILED ||
+        finalAttemptStatus ===
+          EsimPurchasePaymentAttemptStatus.PAYMENT_CONFIRMED,
+      purchaseId: options.purchaseId,
+      paymentAttemptId: options.attemptId,
+      purchaseStatus: finalPurchaseStatus,
+      attemptStatus: finalAttemptStatus,
+      outcome:
+        finalAttemptStatus ===
+          EsimPurchasePaymentAttemptStatus.PAYMENT_CONFIRMED ||
+        finalPurchaseStatus === WalletEsimPurchaseStatus.FUNDED ||
+        finalPurchaseStatus === WalletEsimPurchaseStatus.PROVIDER_PENDING ||
+        finalPurchaseStatus === WalletEsimPurchaseStatus.COMPLETED
+          ? "ignored"
+          : "duplicate",
+    };
+  }
 
   if (releasedRefundId) {
     scheduleWalletTransactionNotification(releasedRefundId);
@@ -580,8 +691,9 @@ async function releaseOnGatewayFailure(options: {
     duplicate: false,
     purchaseId: options.purchaseId,
     paymentAttemptId: options.attemptId,
-    purchaseStatus: WalletEsimPurchaseStatus.READY,
-    attemptStatus: EsimPurchasePaymentAttemptStatus.FAILED,
+    purchaseStatus: finalPurchaseStatus ?? WalletEsimPurchaseStatus.READY,
+    attemptStatus:
+      finalAttemptStatus ?? EsimPurchasePaymentAttemptStatus.FAILED,
     outcome: "failed_released",
   };
 }
@@ -833,51 +945,58 @@ export async function maybeReleasePendingGatewayReservation(options: {
     return { released: false };
   }
 
-  const attempt = await prisma.esimPurchasePaymentAttempt.findUnique({
-    where: { id: attemptId },
-    select: {
-      id: true,
-      status: true,
-      purchaseId: true,
-      purchase: {
-        select: {
-          id: true,
-          customerUserId: true,
-          status: true,
-          walletAppliedCents: true,
-          debitTransactionId: true,
+  let releasedRefundId: string | null = null;
+  let released = false;
+
+  await prisma.$transaction(async (tx) => {
+    // Ownership + eligibility must be decided inside the same tx as release.
+    const attempt = await tx.esimPurchasePaymentAttempt.findUnique({
+      where: { id: attemptId },
+      select: {
+        id: true,
+        status: true,
+        purchaseId: true,
+        purchase: {
+          select: {
+            id: true,
+            customerUserId: true,
+            status: true,
+            walletAppliedCents: true,
+            debitTransactionId: true,
+          },
         },
       },
-    },
-  });
+    });
 
-  if (
-    !attempt ||
-    attempt.purchaseId !== purchaseId ||
-    attempt.purchase.customerUserId !== customerUserId
-  ) {
-    return { released: false };
-  }
+    if (
+      !attempt ||
+      attempt.purchaseId !== purchaseId ||
+      attempt.purchase.customerUserId !== customerUserId
+    ) {
+      return;
+    }
 
-  if (
-    attempt.status === EsimPurchasePaymentAttemptStatus.PAYMENT_CONFIRMED ||
-    attempt.purchase.status === WalletEsimPurchaseStatus.FUNDED ||
-    attempt.purchase.status === WalletEsimPurchaseStatus.COMPLETED ||
-    attempt.purchase.status === WalletEsimPurchaseStatus.PROVIDER_PENDING
-  ) {
-    return { released: false };
-  }
+    if (
+      attempt.status === EsimPurchasePaymentAttemptStatus.PAYMENT_CONFIRMED ||
+      attempt.purchase.status === WalletEsimPurchaseStatus.FUNDED ||
+      attempt.purchase.status === WalletEsimPurchaseStatus.COMPLETED ||
+      attempt.purchase.status === WalletEsimPurchaseStatus.PROVIDER_PENDING ||
+      attempt.purchase.status ===
+        WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED
+    ) {
+      return;
+    }
 
-  if (
-    attempt.purchase.walletAppliedCents <= 0 ||
-    !attempt.purchase.debitTransactionId ||
-    attempt.purchase.status !== WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT
-  ) {
-    return { released: false };
-  }
+    if (
+      attempt.purchase.walletAppliedCents <= 0 ||
+      !attempt.purchase.debitTransactionId ||
+      (attempt.purchase.status !==
+        WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT &&
+        attempt.purchase.status !== WalletEsimPurchaseStatus.FUNDS_RESERVED)
+    ) {
+      return;
+    }
 
-  let releasedRefundId: string | null = null;
-  await prisma.$transaction(async (tx) => {
     const release = await refundReservedFundsInTx(tx, {
       purchaseId,
       customerUserId,
@@ -888,12 +1007,16 @@ export async function maybeReleasePendingGatewayReservation(options: {
     });
     if (release.outcome === "created") {
       releasedRefundId = release.refundTransactionId;
+      released = true;
+    } else if (release.outcome === "linked_existing") {
+      released = true;
     }
   });
+
   if (releasedRefundId) {
     scheduleWalletTransactionNotification(releasedRefundId);
   }
-  return { released: true };
+  return { released };
 }
 
 /**
