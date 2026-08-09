@@ -44,14 +44,16 @@ function main() {
   );
   console.log("PASS missing_environment_blocks");
 
+  // "production" aliases to live; staging host must still fail live allowlist.
   assert.equal(
     validateVesimEnvironmentConfig({
       environment: "production",
       baseUrl: "https://www.vesim.xyz",
+      liveBrokerHosts: ["www.vesim.world"],
     }).ok,
     false
   );
-  console.log("PASS invalid_environment_blocks");
+  console.log("PASS invalid_environment_host_pairing_blocks");
 
   assert.equal(
     validateVesimEnvironmentConfig({
@@ -153,13 +155,12 @@ function main() {
     }).ok,
     false
   );
-  // Unconfirmed guesses must not pass without an explicit server allowlist entry.
-  // The server-only VESIM_LIVE_BROKER_HOSTS list is empty (verified via source below).
+  // Unconfirmed guesses must not pass. Official live host is www.vesim.world only.
   assert.equal(
     validateVesimEnvironmentConfig({
       environment: "live",
       baseUrl: "https://vesim.com",
-      liveBrokerHosts: [],
+      liveBrokerHosts: ["www.vesim.world"],
     }).ok,
     false
   );
@@ -167,7 +168,7 @@ function main() {
     validateVesimEnvironmentConfig({
       environment: "live",
       baseUrl: "https://www.vesim.com",
-      liveBrokerHosts: [],
+      liveBrokerHosts: ["www.vesim.world"],
     }).ok,
     false
   );
@@ -175,11 +176,21 @@ function main() {
     validateVesimEnvironmentConfig({
       environment: "live",
       baseUrl: "https://vesim.world",
-      liveBrokerHosts: [],
+      liveBrokerHosts: ["www.vesim.world"],
     }).ok,
     false
   );
-  console.log("PASS vesim_com_and_world_not_accepted_as_live_api_host");
+  const liveOfficial = validateVesimEnvironmentConfig({
+    environment: "production",
+    baseUrl: "https://www.vesim.world",
+    liveBrokerHosts: ["www.vesim.world"],
+  });
+  assert.equal(liveOfficial.ok, true);
+  if (liveOfficial.ok) {
+    assert.equal(liveOfficial.mode, "live");
+    assert.equal(liveOfficial.host, "www.vesim.world");
+  }
+  console.log("PASS official_www_vesim_world_live_accepted");
 
   assert.ok(!JSON.stringify(liveEmpty).includes("vesim.com"));
   assert.ok(!JSON.stringify(liveEmpty).includes("vesim.world"));
@@ -207,21 +218,18 @@ function main() {
   const pkg = read("package.json");
 
   assert.match(envMod, /VESIM_LIVE_BROKER_HOSTS/);
-  assert.match(envMod, /readonly string\[\] = \[\]/);
+  assert.match(envMod, /resolveLiveBrokerHosts/);
+  assert.match(envMod, /"www\.vesim\.world"/);
   assert.match(envMod, /VESIM_LIVE_HOST_UNCONFIRMED/);
-  assert.match(envMod, /liveBrokerHosts:\s*VESIM_LIVE_BROKER_HOSTS/);
+  assert.match(envMod, /liveBrokerHosts:\s*resolveLiveBrokerHosts\(env\)/);
   assert.doesNotMatch(
     envMod,
     /VESIM_LIVE_BROKER_HOSTS[^=]*=\s*\[[^\]]*vesim\.com/
   );
-  assert.doesNotMatch(
-    envMod,
-    /VESIM_LIVE_BROKER_HOSTS[^=]*=\s*\[[^\]]*vesim\.world/
-  );
   assert.match(activation, /vesim\.com/);
   assert.match(activation, /vesim\.xyz/);
   assert.doesNotMatch(activation, /VESIM_LIVE_BROKER_HOSTS|getVesimBaseUrl/);
-  console.log("PASS live_allowlist_empty_activation_separate");
+  console.log("PASS live_allowlist_official_host_activation_separate");
 
   assert.match(server, /resolveValidatedVesimBaseUrl/);
   assert.match(envMod, /import "server-only"/);
@@ -241,10 +249,9 @@ function main() {
   console.log("PASS public_ui_no_environment_copy");
 
   assert.match(envExample, /VESIM_ENVIRONMENT=staging/);
-  assert.match(envExample, /Live broker\/API host is not confirmed/);
+  assert.match(envExample, /www\.vesim\.world/);
   assert.match(readme, /www\.vesim\.xyz/);
-  assert.match(readme, /not\*\* confirmed yet|not confirmed yet/i);
-  assert.match(readme, /live mode remains blocked/i);
+  assert.match(readme, /www\.vesim\.world/);
   assert.match(readme, /Keep `ENABLE_GUEST_VESIM_CHECKOUT=false` in production/);
   assert.match(pkg, /"qa:vesim-environment"/);
   console.log("PASS docs_and_package_script");

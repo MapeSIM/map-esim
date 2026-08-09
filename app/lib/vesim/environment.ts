@@ -24,14 +24,28 @@ export {
 export type { VesimEnvFailureCode, VesimEnvironmentMode };
 
 /**
- * Confirmed live VeSIM broker/API hosts.
- *
- * Empty until VeSIM officially confirms the production broker base URL.
+ * Confirmed live VeSIM broker/API hosts (official production docs).
+ * Production base: https://www.vesim.world
  * Do NOT copy hosts from eSIM activation URL allowlists (e.g. vesim.com).
- * Do NOT add vesim.world (or any other host) without provider confirmation.
- * Update this single list when the live API host is confirmed.
+ * Optional env override: comma-separated VESIM_LIVE_BROKER_HOSTS.
  */
-export const VESIM_LIVE_BROKER_HOSTS: readonly string[] = [];
+export const VESIM_LIVE_BROKER_HOSTS: readonly string[] = ["www.vesim.world"];
+
+/**
+ * Resolve live broker allowlist: env override when set, else code default.
+ * Never logs host values.
+ */
+export function resolveLiveBrokerHosts(
+  env: NodeJS.ProcessEnv = process.env
+): readonly string[] {
+  const raw = (env.VESIM_LIVE_BROKER_HOSTS ?? "").trim();
+  if (!raw) return VESIM_LIVE_BROKER_HOSTS;
+  const hosts = raw
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+  return hosts.length > 0 ? hosts : VESIM_LIVE_BROKER_HOSTS;
+}
 
 /**
  * Thrown when VESIM_ENVIRONMENT / VESIM_BASE_URL is missing, invalid,
@@ -56,7 +70,7 @@ function logEnvGuardFailure(code: VesimEnvFailureCode): void {
 /**
  * Resolve a validated VeSIM base URL for provider calls.
  * Fail closed before any authentication or network request.
- * Live mode fails closed while VESIM_LIVE_BROKER_HOSTS is empty.
+ * Live mode fails closed while the resolved live allowlist is empty.
  */
 export function resolveValidatedVesimBaseUrl(
   env: NodeJS.ProcessEnv = process.env
@@ -64,7 +78,7 @@ export function resolveValidatedVesimBaseUrl(
   const result = validateVesimEnvironmentConfig({
     environment: env.VESIM_ENVIRONMENT,
     baseUrl: env.VESIM_BASE_URL,
-    liveBrokerHosts: VESIM_LIVE_BROKER_HOSTS,
+    liveBrokerHosts: resolveLiveBrokerHosts(env),
   });
 
   if (!result.ok) {
@@ -82,6 +96,6 @@ export function isVesimEnvironmentConfigured(
   return validateVesimEnvironmentConfig({
     environment: env.VESIM_ENVIRONMENT,
     baseUrl: env.VESIM_BASE_URL,
-    liveBrokerHosts: VESIM_LIVE_BROKER_HOSTS,
+    liveBrokerHosts: resolveLiveBrokerHosts(env),
   }).ok;
 }

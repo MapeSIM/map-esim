@@ -19,7 +19,7 @@ import { isIccidEncryptionConfigured } from "@/app/lib/orders/iccidCrypto";
 import { isGuestVesimCheckoutEnabled } from "@/app/lib/vesim/guestCheckoutGate";
 import {
   isVesimEnvironmentConfigured,
-  VESIM_LIVE_BROKER_HOSTS,
+  resolveLiveBrokerHosts,
 } from "@/app/lib/vesim/environment";
 import {
   parseVesimBaseUrl,
@@ -197,7 +197,7 @@ function classifyBrokerHost(
   const result = validateVesimEnvironmentConfig({
     environment: env.VESIM_ENVIRONMENT,
     baseUrl: env.VESIM_BASE_URL,
-    liveBrokerHosts: VESIM_LIVE_BROKER_HOSTS,
+    liveBrokerHosts: resolveLiveBrokerHosts(env),
   });
   if (result.ok) {
     return {

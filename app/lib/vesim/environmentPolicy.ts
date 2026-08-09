@@ -49,7 +49,9 @@ export function parseVesimEnvironmentMode(
   raw: string | null | undefined
 ): VesimEnvironmentMode | null {
   const value = (raw ?? "").trim().toLowerCase();
-  if (value === "staging" || value === "live") return value;
+  if (value === "staging") return "staging";
+  // Official ops docs may say "production"; app mode remains "live".
+  if (value === "live" || value === "production") return "live";
   return null;
 }
 

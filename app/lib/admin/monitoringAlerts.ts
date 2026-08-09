@@ -19,7 +19,7 @@ import { isIccidEncryptionConfigured } from "@/app/lib/orders/iccidCrypto";
 import { isGuestVesimCheckoutEnabled } from "@/app/lib/vesim/guestCheckoutGate";
 import {
   isVesimEnvironmentConfigured,
-  VESIM_LIVE_BROKER_HOSTS,
+  resolveLiveBrokerHosts,
 } from "@/app/lib/vesim/environment";
 import {
   parseVesimBaseUrl,
@@ -1532,7 +1532,7 @@ export async function collectMonitoringAlerts(options?: {
     const result = validateVesimEnvironmentConfig({
       environment: process.env.VESIM_ENVIRONMENT,
       baseUrl: process.env.VESIM_BASE_URL,
-      liveBrokerHosts: VESIM_LIVE_BROKER_HOSTS,
+      liveBrokerHosts: resolveLiveBrokerHosts(),
     });
     vesimHostClass = result.ok
       ? "STAGING_APPROVED"
