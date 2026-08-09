@@ -10,16 +10,26 @@ import { normalizeEmail } from "@/app/lib/auth/email";
 export default async function VerifyEmailPage({
   searchParams,
 }: {
-  searchParams: Promise<{ email?: string }>;
+  searchParams: Promise<{ email?: string; delivery?: string }>;
 }) {
   const params = await searchParams;
   const email = normalizeEmail(params.email || "");
+  const deliveryFailed = params.delivery === "failed";
 
   return (
     <AuthCard
       title="Verify your email"
       subtitle="Enter the 6-digit code we sent to your inbox. The code expires in 10 minutes."
     >
+      {deliveryFailed ? (
+        <p
+          className="mb-4 rounded-xl border border-[var(--warning-border)] bg-[var(--warning-bg)] px-3 py-2 text-sm text-[var(--warning-text)]"
+          role="status"
+        >
+          We could not deliver the verification email automatically. Use Resend
+          code below, then check your inbox and spam folder.
+        </p>
+      ) : null}
       {!email ? (
         <div className="space-y-4">
           <p className="rounded-xl border border-[var(--warning-border)] bg-[var(--warning-bg)] px-3 py-2 text-sm text-[var(--warning-text)]">

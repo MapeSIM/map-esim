@@ -12,7 +12,7 @@ export default function SignupPage() {
   return (
     <AuthCard
       title="Create your account"
-      subtitle="Save your purchases and manage eSIMs in one place. Guest checkout still works without an account."
+      subtitle="Save your purchases and manage eSIMs in one place. Sign in is required for checkout."
     >
       {googleEnabled ? (
         <>

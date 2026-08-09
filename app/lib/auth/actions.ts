@@ -183,12 +183,19 @@ export async function signupAction(
     force: true,
   });
 
+  let otpDelivery: "sent" | "issue_failed" | "send_failed" = "issue_failed";
   if (issued.ok) {
-    await sendOtpEmail({
+    const sent = await sendOtpEmail({
       kind: "signup",
       to: user.email,
       code: issued.code,
     });
+    otpDelivery = sent.ok ? "sent" : "send_failed";
+    if (!sent.ok) {
+      console.error("Signup OTP email failed:", sent.reason);
+    }
+  } else {
+    console.error("Signup OTP issue failed:", issued.reason);
   }
 
   await writeAuditLog({
@@ -199,13 +206,18 @@ export async function signupAction(
     metadata: {
       email: user.email,
       verification: "otp_pending",
+      otpDelivery,
       consentSource: user.legalConsentSource,
       termsVersion: user.termsVersion,
       privacyVersion: user.privacyVersion,
     },
   });
 
-  redirect(`/verify-email?email=${encodeURIComponent(user.email)}`);
+  const deliveryQuery =
+    otpDelivery === "sent" ? "" : "&delivery=failed";
+  redirect(
+    `/verify-email?email=${encodeURIComponent(user.email)}${deliveryQuery}`
+  );
 }
 
 export async function signinAction(
@@ -419,11 +431,19 @@ export async function resendSignupOtpAction(
     };
   }
 
-  await sendOtpEmail({
+  const sent = await sendOtpEmail({
     kind: "signup",
     to: user.email,
     code: issued.code,
   });
+
+  if (!sent.ok) {
+    console.error("Signup OTP resend email failed:", sent.reason);
+    return {
+      ok: false,
+      error: "Unable to send verification code right now. Try again shortly.",
+    };
+  }
 
   return {
     ok: true,
@@ -466,11 +486,14 @@ export async function forgotPasswordAction(
       });
 
       if (issued.ok) {
-        await sendOtpEmail({
+        const sent = await sendOtpEmail({
           kind: "password_reset",
           to: user.email,
           code: issued.code,
         });
+        if (!sent.ok) {
+          console.error("Password-reset OTP email failed:", sent.reason);
+        }
       }
 
       await writeAuditLog({
@@ -592,11 +615,14 @@ export async function resendResetOtpAction(
     };
   }
 
-  await sendOtpEmail({
+  const sent = await sendOtpEmail({
     kind: "password_reset",
     to: user.email,
     code: issued.code,
   });
+  if (!sent.ok) {
+    console.error("Password-reset OTP resend email failed:", sent.reason);
+  }
 
   return { ...genericOk };
 }
