@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { countries as staticCountries } from "../data/countries";
 import {
-  normalizeDestinations,
+  parsePublicDestinations,
   type VesimDestination,
 } from "@/app/lib/vesim/destinations";
 import { useCurrency } from "@/app/components/currency/CurrencyProvider";
@@ -294,7 +294,8 @@ function CountriesPageContent() {
         // Short browser/CDN cache is fine for the destination catalog.
         const response = await fetch("/api/vesim/destinations");
         const data = await response.json();
-        const list = normalizeDestinations(data);
+        // Public API already returns MAP retail minPrice — do not re-normalize.
+        const list = parsePublicDestinations(data);
 
         if (!cancelled && list.length > 0) {
           setDestinations(list.map(toCard));

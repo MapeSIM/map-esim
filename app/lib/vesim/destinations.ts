@@ -75,7 +75,10 @@ export function extractDestinations(payload: unknown): unknown[] {
   return [];
 }
 
-export function normalizeDestination(raw: unknown): VesimDestination | null {
+function buildDestination(
+  raw: unknown,
+  options?: { applyEntryRetail?: boolean }
+): VesimDestination | null {
   if (!raw || typeof raw !== "object") return null;
   const item = raw as Record<string, unknown>;
 
@@ -129,17 +132,21 @@ export function normalizeDestination(raw: unknown): VesimDestination | null {
     isGlobal,
   });
 
-  const providerMin =
+  const rawMin =
     typeof item.minPrice === "number"
       ? item.minPrice
       : typeof item.minPriceUSD === "number"
         ? item.minPriceUSD
         : null;
-  // List APIs only expose VeSIM minPrice (no offer allowance). Entry-tier retail
-  // keeps "From" off raw supplier cost; country pages overwrite with true min retail.
+  // Raw VeSIM list minPrice is supplier cost (no offer allowance). Entry-tier
+  // retail keeps "From" off 1:1 supplier pricing. Public API responses already
+  // include this retail once — use parsePublicDestination there.
+  const applyEntryRetail = options?.applyEntryRetail !== false;
   const retailMin =
-    providerMin != null ? calculateEntryRetailPriceUsd(providerMin) : null;
-  const minPrice = retailMin ?? providerMin;
+    applyEntryRetail && rawMin != null
+      ? calculateEntryRetailPriceUsd(rawMin)
+      : null;
+  const minPrice = applyEntryRetail ? retailMin ?? rawMin : rawMin;
   const currency =
     typeof item.currency === "string" && item.currency.trim()
       ? item.currency.trim()
@@ -177,9 +184,28 @@ export function normalizeDestination(raw: unknown): VesimDestination | null {
   };
 }
 
+export function normalizeDestination(raw: unknown): VesimDestination | null {
+  return buildDestination(raw, { applyEntryRetail: true });
+}
+
+/**
+ * Parse already-normalized public `/api/vesim/destinations` JSON.
+ * Trusts `minPrice` as final MAP retail — do not re-apply entry markup.
+ * Raw VeSIM payloads must continue to use `normalizeDestinations`.
+ */
+export function parsePublicDestination(raw: unknown): VesimDestination | null {
+  return buildDestination(raw, { applyEntryRetail: false });
+}
+
 export function normalizeDestinations(payload: unknown): VesimDestination[] {
   return extractDestinations(payload)
     .map(normalizeDestination)
+    .filter((item): item is VesimDestination => item !== null);
+}
+
+export function parsePublicDestinations(payload: unknown): VesimDestination[] {
+  return extractDestinations(payload)
+    .map(parsePublicDestination)
     .filter((item): item is VesimDestination => item !== null);
 }
 

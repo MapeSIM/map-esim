@@ -22,11 +22,18 @@ import {
   roundUpToNextCent,
 } from "../app/lib/pricing/retailPrice";
 import {
+  normalizeDestination,
+  normalizeDestinations,
+  parsePublicDestination,
+  parsePublicDestinations,
+} from "../app/lib/vesim/destinations";
+import {
   normalizeOffer,
   parsePublicVesimOffers,
   toPublicVesimOffer,
   toPublicVesimOffers,
 } from "../app/lib/vesim/offers";
+import { convertFromUsd, formatMoney } from "../app/lib/currency/format";
 
 const root = join(__dirname, "..");
 
@@ -113,6 +120,7 @@ function main() {
   const persist = read("app/lib/orders/persistAssignedOrder.ts");
   const destinations = read("app/lib/vesim/destinations.ts");
   const countryDetail = read("app/countries/[id]/page.tsx");
+  const countriesList = read("app/countries/page.tsx");
   const currencyFormat = read("app/lib/currency/format.ts");
   const pkg = read("package.json");
 
@@ -230,6 +238,136 @@ function main() {
   assert.equal(leaked.priceUSD, 0.68);
   assert.equal(leaked.providerPriceUSD, undefined);
   console.log("PASS provider_price_stripped_from_public_parse");
+
+  // Destination "From" / Starting price: entry retail once on raw VeSIM, never twice on public JSON.
+  assert.match(countriesList, /parsePublicDestinations/);
+  assert.doesNotMatch(countriesList, /normalizeDestinations\(/);
+  assert.match(countryDetail, /parsePublicDestinations/);
+  assert.doesNotMatch(countryDetail, /normalizeDestinations\(/);
+  assert.match(destinations, /parsePublicDestinations/);
+  assert.match(destinations, /applyEntryRetail/);
+  console.log("PASS starting_price_public_destinations_no_second_normalize");
+
+  const rawDest = {
+    code: "PK",
+    name: "Pakistan",
+    minPrice: 0.66,
+    offerCount: 12,
+  };
+  const serverDest = normalizeDestination(rawDest);
+  assert.ok(serverDest);
+  assert.equal(serverDest!.minPrice, 0.68);
+  const publicDestPayload = {
+    success: true,
+    destinations: normalizeDestinations({ destinations: [rawDest] }),
+  };
+  const displayDest = parsePublicDestinations(publicDestPayload).find(
+    (d) => d.code === "PK"
+  );
+  assert.ok(displayDest);
+  assert.equal(displayDest!.minPrice, 0.68);
+  assert.notEqual(displayDest!.minPrice, 0.7);
+  // Second normalize would mark 0.68 → 0.70
+  const doubleBugged = normalizeDestination({
+    code: "PK",
+    name: "Pakistan",
+    minPrice: 0.68,
+  });
+  assert.equal(doubleBugged!.minPrice, 0.7);
+  assert.equal(
+    parsePublicDestination({
+      code: "PK",
+      name: "Pakistan",
+      minPrice: 0.68,
+    })!.minPrice,
+    0.68
+  );
+  console.log("PASS starting_price_no_double_entry_markup");
+
+  // Same destination: Starting from (catalog retail) matches cheapest public plan retail.
+  const cheapestPlan = normalizeOffer({
+    id: "pk-100mb",
+    name: "100MB",
+    price: 0.66,
+    dataMB: 100,
+  });
+  assert.ok(cheapestPlan);
+  assert.equal(cheapestPlan!.priceUSD, 0.68);
+  const publicPlan = parsePublicVesimOffers({
+    offers: [toPublicVesimOffer(cheapestPlan!)],
+  })[0];
+  assert.equal(publicPlan.priceUSD, displayDest!.minPrice);
+  console.log("PASS starting_price_matches_cheapest_public_plan_068");
+
+  // Additional destinations with distinct cheapest prices (entry-tier allowance
+  // so catalog Starting from matches cheapest plan retail).
+  const samples = [
+    { code: "FR", name: "France", provider: 1.0, dataMB: 500, retail: 1.02 },
+    { code: "US", name: "United States", provider: 2.0, dataMB: 200, retail: 2.04 },
+    { code: "AU", name: "Australia", provider: 3.0, dataMB: 100, retail: 3.06 },
+  ] as const;
+  for (const sample of samples) {
+    const dest = parsePublicDestinations({
+      destinations: normalizeDestinations({
+        destinations: [
+          {
+            code: sample.code,
+            name: sample.name,
+            minPrice: sample.provider,
+          },
+        ],
+      }),
+    })[0];
+    const plan = parsePublicVesimOffers({
+      offers: [
+        toPublicVesimOffer(
+          normalizeOffer({
+            id: `${sample.code}-plan`,
+            name: `${sample.code} plan`,
+            price: sample.provider,
+            dataMB: sample.dataMB,
+          })!
+        ),
+      ],
+    })[0];
+    assert.equal(dest.minPrice, sample.retail);
+    assert.equal(plan.priceUSD, sample.retail);
+    assert.equal(dest.minPrice, plan.priceUSD);
+  }
+  console.log("PASS starting_price_matches_cheapest_for_extra_countries");
+
+  // Regional catalog Starting from also uses single public retail.
+  const regional = parsePublicDestinations({
+    destinations: normalizeDestinations({
+      destinations: [
+        {
+          code: "region-asia",
+          name: "Asia",
+          minPrice: 0.66,
+          isRegional: true,
+        },
+      ],
+    }),
+  })[0];
+  assert.ok(regional);
+  assert.equal(regional.kind, "regional");
+  assert.equal(regional.minPrice, 0.68);
+  assert.notEqual(regional.minPrice, 0.7);
+  console.log("PASS regional_starting_price_no_double_markup");
+
+  // PKR conversion derives from the same final USD retail (0.68), not 0.70.
+  const pkrFrom068 = convertFromUsd(0.68, "PKR");
+  const pkrFrom070 = convertFromUsd(0.7, "PKR");
+  assert.ok(pkrFrom068 !== pkrFrom070);
+  assert.equal(
+    formatMoney(displayDest!.minPrice, "PKR"),
+    formatMoney(0.68, "PKR")
+  );
+  assert.notEqual(
+    formatMoney(displayDest!.minPrice, "PKR"),
+    formatMoney(0.7, "PKR")
+  );
+  console.log("PASS pkr_starting_price_uses_final_usd_retail");
 
   console.log("ALL_RETAIL_PRICING_CHECKS_PASSED");
 }

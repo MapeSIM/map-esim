@@ -10,7 +10,7 @@ import type { VesimDestination } from "@/app/lib/vesim/destinations";
 import {
   findDestinationBySlug,
   findRelatedRegionalDestination,
-  normalizeDestinations,
+  parsePublicDestinations,
   slugifyDestination,
 } from "@/app/lib/vesim/destinations";
 
@@ -88,7 +88,8 @@ export default function CountryDetail() {
 
         const destinationsRes = await destinationsPromise;
         const destinationsData = await destinationsRes.json();
-        const destinations = normalizeDestinations(destinationsData);
+        // Public API already returns MAP retail minPrice — do not re-normalize.
+        const destinations = parsePublicDestinations(destinationsData);
 
         const names: Record<string, string> = {};
         for (const item of destinations) {
