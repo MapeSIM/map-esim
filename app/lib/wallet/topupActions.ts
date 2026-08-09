@@ -109,8 +109,9 @@ export async function startWalletTopupCheckoutAction(
     return { ok: false, error: "This top-up is unavailable." };
   }
 
+  let checkout;
   try {
-    await startWalletTopupCheckout({
+    checkout = await startWalletTopupCheckout({
       customerUserId: customer.id,
       topupId,
     });
@@ -124,8 +125,6 @@ export async function startWalletTopupCheckoutAction(
     };
   }
 
-  return {
-    ok: false,
-    error: "Payment gateway is not available yet. Please try again later.",
-  };
+  // Hosted Checkout redirect — never treat browser return as paid.
+  redirect(checkout.checkoutUrl);
 }

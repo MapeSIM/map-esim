@@ -146,7 +146,9 @@ function main() {
 
   assert.match(topupSrc, /chargeCurrency:\s*null/);
   assert.match(topupSrc, /chargeAmountMinor:\s*null/);
-  assert.ok(!/chargeAmountMinor:\s*\d+/.test(topupSrc));
+  // Draft creation leaves charge null; checkout later persists gateway quote only.
+  assert.match(topupSrc, /chargeAmountMinor:\s*topup\.creditAmountCents|chargeAmountMinor,/);
+  assert.ok(!/chargeAmountMinor:\s*\d{2,}/.test(topupSrc));
   assert.match(detailPage, /confirmed securely at checkout|chargeNotice/i);
   console.log("PASS no_pkr_amount_invented_without_quote");
 

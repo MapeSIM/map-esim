@@ -10,8 +10,12 @@ import {
   WalletTransactionType,
 } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
-import type { NormalizedPaymentEvent } from "@/app/lib/payments/adapter";
+import type {
+  NormalizedPaymentEvent,
+  PaymentGatewayProviderName,
+} from "@/app/lib/payments/adapter";
 import { getActivePaymentAdapter } from "@/app/lib/payments/disabledAdapter";
+import { resumeSafepayHostedCheckout } from "@/app/lib/payments/safepayAdapter";
 import {
   WALLET_TOPUP_MAX_CENTS,
   WALLET_TOPUP_MIN_CENTS,
@@ -19,6 +23,7 @@ import {
 import { formatUsdCents } from "@/app/lib/wallet/display";
 import { scheduleWalletTransactionNotification } from "@/app/lib/wallet/transactionNotification";
 import {
+  TOPUP_CHECKOUT_CREATED,
   TOPUP_CREDIT_REFERENCE_TYPE,
   TOPUP_CREDITED,
   TOPUP_DRAFT_CREATED,
@@ -41,6 +46,14 @@ export {
   TOPUP_WEBHOOK_DUPLICATE,
   browserReturnMustNotCreditWallet,
 } from "@/app/lib/wallet/topupConstants";
+
+export type StartWalletTopupCheckoutResult = {
+  topupId: string;
+  checkoutUrl: string;
+  reusedTracker: boolean;
+  chargeCurrency: string;
+  chargeAmountMinor: number;
+};
 
 export type CreateWalletTopupDraftInput = {
   customerUserId: string;
@@ -88,8 +101,8 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
-function providerFromEvent(
-  name: NormalizedPaymentEvent["provider"]
+function providerFromName(
+  name: PaymentGatewayProviderName | NormalizedPaymentEvent["provider"]
 ): PaymentGatewayProvider | null {
   switch (name) {
     case "SIMPAISA":
@@ -107,6 +120,15 @@ function providerFromEvent(
     default:
       return null;
   }
+}
+
+function topupReturnPath(topupId: string): string {
+  return `/account/wallet/top-up/${topupId}`;
+}
+
+function isCancelFailureCategory(category: string | null | undefined): boolean {
+  const value = (category ?? "").toLowerCase();
+  return value.includes("cancel");
 }
 
 async function assertActiveCustomer(customerUserId: string) {
@@ -318,13 +340,14 @@ export async function expireWalletTopupCheckout(options: {
 }
 
 /**
- * Attempt gateway checkout for a DRAFT/AWAITING top-up.
- * Phase 6A always fails safely via the disabled adapter — no FX invention, no credit.
+ * Start gateway Hosted Checkout for a DRAFT/AWAITING top-up.
+ * Persists server-authoritative charge snapshot, then returns redirect URL.
+ * Never credits the wallet; browser return is never authoritative.
  */
 export async function startWalletTopupCheckout(options: {
   customerUserId: string;
   topupId: string;
-}): Promise<never> {
+}): Promise<StartWalletTopupCheckoutResult> {
   const customerUserId = options.customerUserId.trim();
   const topupId = options.topupId.trim();
   await assertActiveCustomer(customerUserId);
@@ -337,6 +360,11 @@ export async function startWalletTopupCheckout(options: {
       creditAmountCents: true,
       checkoutIdempotencyKey: true,
       status: true,
+      gatewayProvider: true,
+      gatewayPaymentRef: true,
+      chargeCurrency: true,
+      chargeAmountMinor: true,
+      expiresAt: true,
     },
   });
   if (!topup || topup.customerUserId !== customerUserId) {
@@ -351,28 +379,149 @@ export async function startWalletTopupCheckout(options: {
       "This top-up cannot start checkout in its current state."
     );
   }
+  if (topup.expiresAt && topup.expiresAt.getTime() <= Date.now()) {
+    await expireWalletTopupCheckout({ topupId: topup.id }).catch(() => undefined);
+    throw new WalletTopupError(
+      "TOPUP_UNAVAILABLE",
+      "This top-up checkout expired. Please start a new top-up."
+    );
+  }
+
+  const returnPath = topupReturnPath(topup.id);
+  const cancelPath = returnPath;
+  const existingRef = (topup.gatewayPaymentRef ?? "").trim();
+  const canResume =
+    Boolean(existingRef) &&
+    topup.status === WalletTopupStatus.AWAITING_PAYMENT &&
+    topup.gatewayProvider === PaymentGatewayProvider.SAFEPAY &&
+    typeof topup.chargeAmountMinor === "number" &&
+    Boolean(topup.chargeCurrency);
+
+  if (canResume && existingRef) {
+    const resumed = await resumeSafepayHostedCheckout({
+      trackerToken: existingRef,
+      returnPath,
+      cancelPath,
+    });
+    if (!resumed.ok) {
+      throw new WalletTopupError(
+        resumed.code === "MISCONFIGURED" ||
+          resumed.code === "GATEWAY_UNAVAILABLE"
+          ? "GATEWAY_UNAVAILABLE"
+          : "UNAVAILABLE",
+        resumed.message
+      );
+    }
+    return {
+      topupId: topup.id,
+      checkoutUrl: resumed.checkoutUrl,
+      reusedTracker: true,
+      chargeCurrency: (topup.chargeCurrency || "USD").toUpperCase(),
+      chargeAmountMinor: topup.chargeAmountMinor!,
+    };
+  }
 
   const adapter = getActivePaymentAdapter();
+  if (!adapter.enabled) {
+    throw new WalletTopupError(
+      "GATEWAY_UNAVAILABLE",
+      "Payment gateway is not available yet. Please try again after payment provider setup is complete."
+    );
+  }
+
+  const provider = providerFromName(adapter.provider);
+  if (!provider || provider === PaymentGatewayProvider.MANUAL_TEST) {
+    throw new WalletTopupError(
+      "GATEWAY_UNAVAILABLE",
+      "Payment gateway is not available yet. Please try again after payment provider setup is complete."
+    );
+  }
+
   const result = await adapter.createCheckoutSession({
     purpose: "WALLET_TOPUP",
     localTopupId: topup.id,
     customerUserId,
+    // Authoritative wallet credit amount — never taken from browser.
     chargeAmountMinor: topup.creditAmountCents,
     chargeCurrency: "USD",
     checkoutIdempotencyKey: topup.checkoutIdempotencyKey,
-    returnPath: `/account/wallet/top-up/${topup.id}`,
-    cancelPath: `/account/wallet/top-up/${topup.id}`,
+    returnPath,
+    cancelPath,
   });
 
   if (!result.ok) {
     throw new WalletTopupError("GATEWAY_UNAVAILABLE", result.message);
   }
 
-  // Real adapters would persist quote + AWAITING_PAYMENT here in a later phase.
-  throw new WalletTopupError(
-    "GATEWAY_UNAVAILABLE",
-    "Payment gateway is not available yet. Please try again after payment provider setup is complete."
-  );
+  const providerRef = (result.providerPaymentRef ?? "").trim();
+  const chargeCurrency = result.chargeCurrency.trim().toUpperCase();
+  const chargeAmountMinor = result.chargeAmountMinor;
+  if (
+    !providerRef ||
+    chargeCurrency !== "USD" ||
+    !Number.isInteger(chargeAmountMinor) ||
+    chargeAmountMinor !== topup.creditAmountCents
+  ) {
+    throw new WalletTopupError(
+      "GATEWAY_UNAVAILABLE",
+      "Payment checkout quote did not match the top-up amount. Please try again."
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const updated = await tx.walletTopup.updateMany({
+      where: {
+        id: topup.id,
+        customerUserId,
+        status: {
+          in: [WalletTopupStatus.DRAFT, WalletTopupStatus.AWAITING_PAYMENT],
+        },
+        walletTransactionId: null,
+      },
+      data: {
+        status: WalletTopupStatus.AWAITING_PAYMENT,
+        gatewayProvider: provider,
+        gatewayPaymentRef: providerRef,
+        chargeCurrency,
+        chargeAmountMinor,
+        fxRateSnapshot: result.fxRateSnapshot,
+        expiresAt: result.expiresAt,
+        failureCategory: null,
+        failureCode: null,
+      },
+    });
+    if (updated.count !== 1) {
+      throw new WalletTopupError(
+        "TOPUP_UNAVAILABLE",
+        "This top-up cannot start checkout in its current state."
+      );
+    }
+
+    await tx.auditLog.create({
+      data: {
+        actorUserId: customerUserId,
+        action: TOPUP_CHECKOUT_CREATED,
+        targetType: "WalletTopup",
+        targetId: topup.id,
+        metadata: {
+          method: "customer_wallet_topup",
+          amountCents: topup.creditAmountCents,
+          currency: "USD",
+          chargeCurrency,
+          chargeAmountMinor,
+          gatewayProvider: provider,
+        },
+      },
+    });
+  });
+
+  return {
+    topupId: topup.id,
+    checkoutUrl: result.checkoutUrl,
+    reusedTracker: false,
+    chargeCurrency,
+    chargeAmountMinor,
+  };
 }
 
 /**
@@ -390,7 +539,7 @@ export async function applyVerifiedTopupPaymentEvent(
     );
   }
 
-  const provider = providerFromEvent(event.provider);
+  const provider = providerFromName(event.provider);
   if (!provider || provider === PaymentGatewayProvider.MANUAL_TEST) {
     throw new WalletTopupError(
       "UNAVAILABLE",
@@ -474,7 +623,11 @@ export async function applyVerifiedTopupPaymentEvent(
     throw new WalletTopupError("TOPUP_UNAVAILABLE", "Top-up was not found.");
   }
 
-  if (topup.status === WalletTopupStatus.CREDITED) {
+  // Credited / confirmed funding always wins over later failure/cancel.
+  if (
+    topup.status === WalletTopupStatus.CREDITED ||
+    topup.walletTransactionId
+  ) {
     return {
       duplicate: true,
       topupId: topup.id,
@@ -495,20 +648,37 @@ export async function applyVerifiedTopupPaymentEvent(
     );
   }
 
-  const pendingAllowed =
+  const openForPending =
+    topup.status === WalletTopupStatus.DRAFT ||
+    topup.status === WalletTopupStatus.AWAITING_PAYMENT ||
+    topup.status === WalletTopupStatus.PAYMENT_PENDING;
+
+  // Late confirmed success may still credit after failed/cancelled (no wallet hold).
+  const openForConfirmedCredit =
     topup.status === WalletTopupStatus.AWAITING_PAYMENT ||
     topup.status === WalletTopupStatus.PAYMENT_PENDING ||
-    topup.status === WalletTopupStatus.PAYMENT_CONFIRMED;
+    topup.status === WalletTopupStatus.PAYMENT_CONFIRMED ||
+    topup.status === WalletTopupStatus.FAILED ||
+    topup.status === WalletTopupStatus.CANCELLED;
 
   if (event.paymentStatus === "pending") {
-    if (pendingAllowed || topup.status === WalletTopupStatus.DRAFT) {
-      await prisma.walletTopup.update({
-        where: { id: topup.id },
+    if (openForPending) {
+      await prisma.walletTopup.updateMany({
+        where: {
+          id: topup.id,
+          status: {
+            in: [
+              WalletTopupStatus.DRAFT,
+              WalletTopupStatus.AWAITING_PAYMENT,
+              WalletTopupStatus.PAYMENT_PENDING,
+            ],
+          },
+          walletTransactionId: null,
+        },
         data: {
           status: WalletTopupStatus.PAYMENT_PENDING,
           gatewayProvider: provider,
           gatewayPaymentRef: event.providerPaymentRef,
-          webhookEventId: eventId,
           failureCategory: null,
         },
       });
@@ -539,49 +709,86 @@ export async function applyVerifiedTopupPaymentEvent(
   }
 
   if (event.paymentStatus === "failed") {
-    await prisma.walletTopup.update({
-      where: { id: topup.id },
+    const failedStatus = isCancelFailureCategory(event.failureCategory)
+      ? WalletTopupStatus.CANCELLED
+      : WalletTopupStatus.FAILED;
+    // Never overwrite credited/confirmed rows; leave webhookEventId free for late success.
+    const failedUpdate = await prisma.walletTopup.updateMany({
+      where: {
+        id: topup.id,
+        status: {
+          in: [
+            WalletTopupStatus.DRAFT,
+            WalletTopupStatus.AWAITING_PAYMENT,
+            WalletTopupStatus.PAYMENT_PENDING,
+            WalletTopupStatus.FAILED,
+            WalletTopupStatus.CANCELLED,
+          ],
+        },
+        walletTransactionId: null,
+      },
       data: {
-        status: WalletTopupStatus.FAILED,
+        status: failedStatus,
         gatewayProvider: provider,
         gatewayPaymentRef: event.providerPaymentRef,
-        webhookEventId: eventId,
         failureCategory: event.failureCategory || "payment_failed",
       },
     });
-    await prisma.auditLog
-      .create({
-        data: {
-          actorUserId: null,
-          action: TOPUP_FAILED,
-          targetType: "WalletTopup",
-          targetId: topup.id,
-          metadata: {
-            method: "verified_webhook",
-            amountCents: topup.creditAmountCents,
-            currency: "USD",
-            failureCategory: event.failureCategory || "payment_failed",
+    if (failedUpdate.count === 1) {
+      await prisma.auditLog
+        .create({
+          data: {
+            actorUserId: null,
+            action: TOPUP_FAILED,
+            targetType: "WalletTopup",
+            targetId: topup.id,
+            metadata: {
+              method: "verified_webhook",
+              amountCents: topup.creditAmountCents,
+              currency: "USD",
+              failureCategory: event.failureCategory || "payment_failed",
+            },
           },
-        },
-      })
-      .catch(() => undefined);
+        })
+        .catch(() => undefined);
+    }
+    const current = await prisma.walletTopup.findUnique({
+      where: { id: topup.id },
+      select: {
+        id: true,
+        status: true,
+        walletTransactionId: true,
+        creditAmountCents: true,
+      },
+    });
     return {
-      duplicate: false,
+      duplicate: current?.status === WalletTopupStatus.CREDITED,
       topupId: topup.id,
-      status: WalletTopupStatus.FAILED,
-      walletTransactionId: null,
-      creditAmountCents: null,
+      status: current?.status ?? failedStatus,
+      walletTransactionId: current?.walletTransactionId ?? null,
+      creditAmountCents:
+        current?.status === WalletTopupStatus.CREDITED
+          ? current.creditAmountCents
+          : null,
     };
   }
 
   if (event.paymentStatus === "uncertain") {
-    await prisma.walletTopup.update({
-      where: { id: topup.id },
+    await prisma.walletTopup.updateMany({
+      where: {
+        id: topup.id,
+        status: {
+          notIn: [
+            WalletTopupStatus.CREDITED,
+            WalletTopupStatus.PAYMENT_CONFIRMED,
+          ],
+        },
+        walletTransactionId: null,
+      },
       data: {
         status: WalletTopupStatus.RECONCILIATION_REQUIRED,
         gatewayProvider: provider,
         gatewayPaymentRef: event.providerPaymentRef,
-        webhookEventId: eventId,
         failureCategory: event.failureCategory || "uncertain_payment",
       },
     });
@@ -611,19 +818,25 @@ export async function applyVerifiedTopupPaymentEvent(
   }
 
   // Confirmed payment path — exact charge snapshot match required.
+  // Credit amount is always the persisted top-up creditAmountCents (not webhook alone).
   if (
-    !pendingAllowed ||
+    !openForConfirmedCredit ||
     topup.chargeCurrency == null ||
     topup.chargeAmountMinor == null ||
-    topup.gatewayProvider == null
+    topup.gatewayProvider == null ||
+    topup.chargeAmountMinor !== topup.creditAmountCents ||
+    topup.chargeCurrency.toUpperCase() !== "USD"
   ) {
-    await prisma.walletTopup.update({
-      where: { id: topup.id },
+    await prisma.walletTopup.updateMany({
+      where: {
+        id: topup.id,
+        walletTransactionId: null,
+        status: { not: WalletTopupStatus.CREDITED },
+      },
       data: {
         status: WalletTopupStatus.RECONCILIATION_REQUIRED,
         gatewayProvider: provider,
         gatewayPaymentRef: event.providerPaymentRef,
-        webhookEventId: eventId,
         failureCategory: "missing_checkout_snapshot",
       },
     });
@@ -657,13 +870,16 @@ export async function applyVerifiedTopupPaymentEvent(
     topup.chargeCurrency !== event.chargeCurrency.trim().toUpperCase() ||
     topup.chargeAmountMinor !== event.chargeAmountMinor
   ) {
-    await prisma.walletTopup.update({
-      where: { id: topup.id },
+    await prisma.walletTopup.updateMany({
+      where: {
+        id: topup.id,
+        walletTransactionId: null,
+        status: { not: WalletTopupStatus.CREDITED },
+      },
       data: {
         status: WalletTopupStatus.RECONCILIATION_REQUIRED,
         gatewayProvider: provider,
         gatewayPaymentRef: event.providerPaymentRef,
-        webhookEventId: eventId,
         failureCategory: "charge_mismatch",
       },
     });
@@ -702,6 +918,8 @@ export async function applyVerifiedTopupPaymentEvent(
               WalletTopupStatus.AWAITING_PAYMENT,
               WalletTopupStatus.PAYMENT_PENDING,
               WalletTopupStatus.PAYMENT_CONFIRMED,
+              WalletTopupStatus.FAILED,
+              WalletTopupStatus.CANCELLED,
             ],
           },
           walletTransactionId: null,
@@ -711,6 +929,8 @@ export async function applyVerifiedTopupPaymentEvent(
           webhookEventId: eventId,
           gatewayPaymentRef: event.providerPaymentRef,
           paymentConfirmedAt: event.confirmedAt || new Date(),
+          failureCategory: null,
+          failureCode: null,
         },
       });
 

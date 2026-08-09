@@ -108,7 +108,10 @@ function main() {
   const pkg = read("package.json");
 
   assert.match(route, /verifySafepayCardWebhookSignature/);
-  assert.match(route, /applyVerifiedEsimPurchasePaymentEvent/);
+  assert.match(
+    route,
+    /applyVerifiedPaymentEvent|applyVerifiedEsimPurchasePaymentEvent/
+  );
   assert.match(route, /status: 401/);
   assert.match(route, /Never logs raw body/);
   assert.match(route, /resolveSafepayWebhookConfig/);

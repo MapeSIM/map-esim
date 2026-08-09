@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { applyVerifiedEsimPurchasePaymentEvent } from "@/app/lib/esim/esimPurchasePaymentApply";
+import { applyVerifiedPaymentEvent } from "@/app/lib/payments/applyVerifiedPaymentEvent";
 import { resolveSafepayWebhookConfig } from "@/app/lib/payments/safepayConfig";
 import {
   normalizeSafepayHeader,
@@ -14,6 +14,7 @@ export const runtime = "nodejs";
  * Safepay Card Payments webhook.
  * Uses SAFEPAY_WEBHOOK_SECRET independently of PAYMENT_GATEWAY_ENABLED.
  * Signature must verify before any mutation. Browser return is never authoritative.
+ * Dispatches to eSIM purchase or wallet top-up funding (never VeSIM from top-up).
  * Never logs raw body, secrets, or card data.
  */
 export async function POST(request: Request) {
@@ -62,12 +63,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await applyVerifiedEsimPurchasePaymentEvent(event);
+    const result = await applyVerifiedPaymentEvent(event);
     return NextResponse.json(
       {
         ok: true,
-        duplicate: result.duplicate,
-        outcome: result.outcome,
+        kind: result.kind,
+        duplicate: result.kind === "ignored" ? false : result.duplicate,
+        outcome:
+          result.kind === "ignored" ? result.reason : result.outcome,
       },
       { status: 200 }
     );

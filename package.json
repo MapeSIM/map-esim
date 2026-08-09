@@ -35,6 +35,7 @@
     "qa:esim-purchase-pg4-funding": "tsx scripts/qa-esim-purchase-pg4-funding.ts",
     "qa:admin-pending-payment-verify": "tsx scripts/qa-admin-pending-payment-verify.ts",
     "qa:wallet-topup-foundation": "tsx scripts/qa-wallet-topup-foundation.ts",
+    "qa:wallet-topup-funding": "tsx scripts/qa-wallet-topup-funding.ts",
     "qa:guest-checkout-gate": "tsx scripts/qa-guest-checkout-gate.ts",
     "qa:vesim-environment": "tsx scripts/qa-vesim-environment.ts",
     "qa:retail-pricing": "tsx scripts/qa-retail-pricing.ts",
