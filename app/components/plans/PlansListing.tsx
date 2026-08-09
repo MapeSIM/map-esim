@@ -307,6 +307,8 @@ export default function PlansListing({
                   alt={`${destination.name} flag`}
                   width={64}
                   height={64}
+                  sizes="64px"
+                  priority
                   className="h-full w-full rounded-2xl object-cover"
                 />
               ) : destination.kind === "country" && destination.flag ? (

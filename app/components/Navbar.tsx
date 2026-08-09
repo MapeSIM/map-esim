@@ -125,6 +125,7 @@ export default function Navbar({
             alt={BRAND_LOGO_ALT}
             width={184}
             height={48}
+            sizes="168px"
             className="h-8 w-[128px] max-w-[128px] object-contain object-left dark:hidden sm:h-9 sm:w-[150px] sm:max-w-[150px] md:h-10 md:w-[168px] md:max-w-[168px]"
             priority
             unoptimized
@@ -134,8 +135,8 @@ export default function Navbar({
             alt=""
             width={184}
             height={48}
+            sizes="168px"
             className="hidden h-8 w-[128px] max-w-[128px] object-contain object-left dark:block sm:h-9 sm:w-[150px] sm:max-w-[150px] md:h-10 md:w-[168px] md:max-w-[168px]"
-            priority
             unoptimized
             aria-hidden="true"
           />

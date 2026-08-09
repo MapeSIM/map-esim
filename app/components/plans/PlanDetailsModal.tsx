@@ -100,6 +100,7 @@ export default function PlanDetailsModal({
                     alt=""
                     width={44}
                     height={32}
+                    sizes="44px"
                     className="h-full w-full object-cover"
                   />
                 ) : destination.kind === "regional" ? (

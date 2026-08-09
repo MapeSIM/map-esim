@@ -44,8 +44,13 @@ export default function CountryDetail() {
   const params = useParams<{ id: string }>();
   const id = typeof params?.id === "string" ? params.id : "";
 
+  const fallbackDestination = useMemo(
+    () => (id ? staticToDestination(id) : undefined),
+    [id]
+  );
+
   const [destination, setDestination] = useState<VesimDestination | null>(
-    null
+    () => (id ? staticToDestination(id) ?? null : null)
   );
   const [relatedRegional, setRelatedRegional] =
     useState<VesimDestination | null>(null);
@@ -54,11 +59,6 @@ export default function CountryDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notFound, setNotFound] = useState(false);
-
-  const fallbackDestination = useMemo(
-    () => (id ? staticToDestination(id) : undefined),
-    [id]
-  );
 
   useEffect(() => {
     if (!id) return;
@@ -70,10 +70,23 @@ export default function CountryDetail() {
       setError("");
       setNotFound(false);
 
+      // Paint static country shell immediately when available.
+      if (fallbackDestination) {
+        setDestination(fallbackDestination);
+      }
+
       try {
-        const destinationsRes = await fetch("/api/vesim/destinations", {
-          cache: "no-store",
-        });
+        const earlyCode = fallbackDestination?.code?.trim();
+        const destinationsPromise = fetch("/api/vesim/destinations");
+        // Start offers in parallel when static catalog already knows the country code.
+        const earlyOffersPromise = earlyCode
+          ? fetch(
+              `/api/vesim/offers?country=${encodeURIComponent(earlyCode)}`,
+              { cache: "no-store" }
+            )
+          : null;
+
+        const destinationsRes = await destinationsPromise;
         const destinationsData = await destinationsRes.json();
         const destinations = normalizeDestinations(destinationsData);
 
@@ -108,10 +121,16 @@ export default function CountryDetail() {
           setCountryNames(names);
         }
 
-        const offersRes = await fetch(
-          `/api/vesim/offers?country=${encodeURIComponent(matched.code)}`,
-          { cache: "no-store" }
-        );
+        const matchedCode = matched.code.trim();
+        const offersRes =
+          earlyOffersPromise &&
+          earlyCode &&
+          matchedCode.toUpperCase() === earlyCode.toUpperCase()
+            ? await earlyOffersPromise
+            : await fetch(
+                `/api/vesim/offers?country=${encodeURIComponent(matchedCode)}`,
+                { cache: "no-store" }
+              );
         const offersData = await offersRes.json();
 
         if (!offersRes.ok || offersData.success === false) {

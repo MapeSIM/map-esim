@@ -200,6 +200,7 @@ function CompactDestinationCard({
             alt=""
             width={44}
             height={32}
+            sizes="44px"
             className="
               h-8 w-11 shrink-0 rounded-md
               border border-[var(--border-strong)] object-cover
@@ -290,9 +291,8 @@ function CountriesPageContent() {
 
     async function loadDestinations() {
       try {
-        const response = await fetch("/api/vesim/destinations", {
-          cache: "no-store",
-        });
+        // Short browser/CDN cache is fine for the destination catalog.
+        const response = await fetch("/api/vesim/destinations");
         const data = await response.json();
         const list = normalizeDestinations(data);
 
@@ -420,7 +420,6 @@ function CountriesPageContent() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by country or region"
-              disabled={loading}
               className="
                 w-full rounded-[16px]
                 border border-[var(--border-strong)]
@@ -432,7 +431,6 @@ function CountriesPageContent() {
                 hover:border-[var(--border-hover)]
                 focus:border-[var(--accent-strong)]/50 focus:outline-none
                 focus:ring-2 focus:ring-[var(--accent-strong)]/25
-                disabled:cursor-not-allowed disabled:opacity-60
                 sm:text-[15px]
               "
             />
@@ -505,17 +503,16 @@ function CountriesPageContent() {
                 : "Compare multi-country coverage options."}
             </p>
           </div>
-          {!loading && (
-            <p className="text-sm text-[var(--text-soft)]">
-              {filteredDestinations.length}{" "}
-              {filteredDestinations.length === 1
-                ? "destination"
-                : "destinations"}
-            </p>
-          )}
+          <p className="text-sm text-[var(--text-soft)]">
+            {filteredDestinations.length}{" "}
+            {filteredDestinations.length === 1
+              ? "destination"
+              : "destinations"}
+            {loading ? " · updating…" : ""}
+          </p>
         </div>
 
-        {loading ? (
+        {loading && destinations.length === 0 ? (
           <div
             className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3"
             aria-busy="true"
