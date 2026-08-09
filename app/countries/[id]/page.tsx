@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import PlansListing from "@/app/components/plans/PlansListing";
 import { countries as staticCountries } from "@/app/data/countries";
 import type { VesimOffer } from "@/app/lib/vesim/offers";
-import { normalizeOffers } from "@/app/lib/vesim/offers";
+import { parsePublicVesimOffers } from "@/app/lib/vesim/offers";
 import type { VesimDestination } from "@/app/lib/vesim/destinations";
 import {
   findDestinationBySlug,
@@ -141,7 +141,8 @@ export default function CountryDetail() {
           );
         }
 
-        const list = normalizeOffers(offersData);
+        // Public API already returns MAP retail — do not re-normalize/markup.
+        const list = parsePublicVesimOffers(offersData);
 
         if (!cancelled) {
           setOffers(list);

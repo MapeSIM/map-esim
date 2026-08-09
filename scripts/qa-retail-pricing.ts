@@ -21,6 +21,12 @@ import {
   markupRateForAllowance,
   roundUpToNextCent,
 } from "../app/lib/pricing/retailPrice";
+import {
+  normalizeOffer,
+  parsePublicVesimOffers,
+  toPublicVesimOffer,
+  toPublicVesimOffers,
+} from "../app/lib/vesim/offers";
 
 const root = join(__dirname, "..");
 
@@ -147,6 +153,83 @@ function main() {
   assert.match(actions, /Never trust browser money/);
   assert.match(actions, /void formData\.get\("price"\)/);
   console.log("PASS client_price_tampering_blocked");
+
+  // Country UI must trust public retail JSON — never second markup pass.
+  assert.match(countryDetail, /parsePublicVesimOffers/);
+  assert.doesNotMatch(countryDetail, /normalizeOffers\(/);
+  assert.match(offers, /parsePublicVesimOffers/);
+  assert.match(
+    offers,
+    /priceUSD is trusted as MAP retail|trusted as MAP retail/
+  );
+  console.log("PASS country_public_offers_no_second_normalize");
+
+  // provider ~$0.66 → server retail $0.68; public display must stay $0.68 (not $0.70).
+  const raw100 = {
+    id: "qa-100mb",
+    name: "100MB QA",
+    price: 0.66,
+    dataMB: 100,
+    durationDays: 7,
+  };
+  const server100 = normalizeOffer(raw100);
+  assert.ok(server100);
+  assert.equal(server100!.priceUSD, 0.68);
+  assert.equal(server100!.providerPriceUSD, 0.66);
+  const public100 = toPublicVesimOffer(server100!);
+  assert.equal(public100.providerPriceUSD, undefined);
+  assert.equal(public100.priceUSD, 0.68);
+  const display100 = parsePublicVesimOffers({
+    success: true,
+    offers: toPublicVesimOffers([server100!]),
+  })[0];
+  assert.ok(display100);
+  assert.equal(display100.priceUSD, 0.68);
+  assert.notEqual(display100.priceUSD, 0.7);
+  assert.equal(display100.providerPriceUSD, undefined);
+  // Wallet/checkout authoritative path = single normalizeOffers on raw VeSIM.
+  assert.equal(server100!.priceUSD, display100.priceUSD);
+  console.log("PASS no_double_markup_100mb_display_matches_authoritative");
+
+  // Larger package: provider $1.20 / 1GB → 3% → $1.24 (not second-marked to $1.27).
+  const raw1gb = {
+    id: "qa-1gb",
+    name: "1GB QA",
+    price: 1.2,
+    dataGB: 1,
+    durationDays: 30,
+  };
+  const server1gb = normalizeOffer(raw1gb);
+  assert.ok(server1gb);
+  assert.equal(server1gb!.priceUSD, 1.24);
+  assert.equal(server1gb!.providerPriceUSD, 1.2);
+  const display1gb = parsePublicVesimOffers({
+    offers: [toPublicVesimOffer(server1gb!)],
+  })[0];
+  assert.ok(display1gb);
+  assert.equal(display1gb.priceUSD, 1.24);
+  assert.notEqual(display1gb.priceUSD, 1.27);
+  assert.equal(display1gb.providerPriceUSD, undefined);
+  assert.equal(server1gb!.priceUSD, display1gb.priceUSD);
+  console.log("PASS no_double_markup_larger_plan_display_matches_authoritative");
+
+  // Accidental provider leak in public JSON must be stripped by parsePublic.
+  const leaked = parsePublicVesimOffers({
+    offers: [
+      {
+        id: "leak",
+        name: "Leak",
+        dataFormatted: "100 MB",
+        priceUSD: 0.68,
+        priceFormatted: "$0.68",
+        providerPriceUSD: 0.66,
+      },
+    ],
+  })[0];
+  assert.ok(leaked);
+  assert.equal(leaked.priceUSD, 0.68);
+  assert.equal(leaked.providerPriceUSD, undefined);
+  console.log("PASS provider_price_stripped_from_public_parse");
 
   console.log("ALL_RETAIL_PRICING_CHECKS_PASSED");
 }

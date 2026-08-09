@@ -289,6 +289,57 @@ export function toPublicVesimOffers(offers: VesimOffer[]): VesimOffer[] {
   return offers.map(toPublicVesimOffer);
 }
 
+/**
+ * Parse already-normalized public `/api/vesim/offers` JSON for country/plan UI.
+ *
+ * `priceUSD` is trusted as MAP retail — do NOT re-run retail markup here.
+ * Raw VeSIM payloads must continue to use `normalizeOffers` / `normalizeOffer`.
+ * Accidental `providerPriceUSD` is stripped before browser use.
+ */
+export function parsePublicVesimOffer(raw: unknown): VesimOffer | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  const item = { ...(raw as Record<string, unknown>) };
+  delete item.providerPriceUSD;
+
+  const id = firstString(item.id, item.offerId, item.offer_id, item.code);
+  if (!id) {
+    return null;
+  }
+
+  const priceUSD = firstNumber(item.priceUSD, item.displayPrice, item.price);
+  const currency = firstString(item.currency) || "USD";
+  const name = firstString(item.name, item.title) || id;
+  const dataFormatted =
+    typeof item.dataFormatted === "string" && item.dataFormatted.trim()
+      ? item.dataFormatted
+      : "—";
+  const priceFormatted =
+    typeof item.priceFormatted === "string" && item.priceFormatted.trim()
+      ? item.priceFormatted
+      : formatOfferPrice(priceUSD, currency);
+
+  return {
+    ...(item as unknown as VesimOffer),
+    id,
+    name,
+    dataFormatted,
+    currency,
+    priceUSD,
+    price: priceUSD,
+    displayPrice: priceUSD,
+    priceFormatted,
+  };
+}
+
+export function parsePublicVesimOffers(payload: unknown): VesimOffer[] {
+  return extractOffers(payload)
+    .map(parsePublicVesimOffer)
+    .filter((offer): offer is VesimOffer => offer !== null);
+}
+
 export function normalizeOffer(raw: unknown): VesimOffer | null {
   if (typeof raw === "string" && raw.trim()) {
     return {
