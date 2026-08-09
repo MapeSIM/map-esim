@@ -12,6 +12,7 @@ import {
   findRelatedRegionalDestination,
   parsePublicDestinations,
   slugifyDestination,
+  withLowestOfferRetailMinPrice,
 } from "@/app/lib/vesim/destinations";
 
 function staticToDestination(id: string): VesimDestination | undefined {
@@ -147,20 +148,12 @@ export default function CountryDetail() {
 
         if (!cancelled) {
           setOffers(list);
-          const lowestPrice =
-            list
-              .map((offer) => offer.priceUSD)
-              .filter((price): price is number => price != null)
-              .sort((a, b) => a - b)[0] ?? null;
-
           setDestination((current) =>
             current
-              ? {
-                  ...current,
-                  offerCount: list.length,
-                  // Authoritative "starting from" = lowest MAP retail among offers.
-                  minPrice: lowestPrice ?? current.minPrice,
-                }
+              ? withLowestOfferRetailMinPrice(
+                  { ...current, offerCount: list.length },
+                  list
+                )
               : current
           );
         }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import {
-  fetchDestinations,
+  fetchPublicDestinationCatalog,
   publicErrorMessage,
 } from "@/app/lib/vesim/server";
 import { VesimEnvironmentError } from "@/app/lib/vesim/environment";
@@ -8,16 +8,17 @@ import { VESIM_ENV_PUBLIC_ERROR } from "@/app/lib/vesim/environmentPolicy";
 
 export async function GET() {
   try {
-    const destinations = await fetchDestinations();
+    // Starting from = lowest buyable MAP retail (offer-derived), not entry-tier estimate.
+    const destinations = await fetchPublicDestinationCatalog();
     return NextResponse.json(
       {
         success: true,
         destinations,
       },
       {
-        // Catalog changes slowly; short cache cuts repeat VeSIM token/list work.
+        // Align with offer-min catalog revalidate; edge can serve stale while refresh runs.
         headers: {
-          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
         },
       }
     );

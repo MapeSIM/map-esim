@@ -22,10 +22,12 @@ import {
   roundUpToNextCent,
 } from "../app/lib/pricing/retailPrice";
 import {
+  lowestOfferRetailUsd,
   normalizeDestination,
   normalizeDestinations,
   parsePublicDestination,
   parsePublicDestinations,
+  withLowestOfferRetailMinPrice,
 } from "../app/lib/vesim/destinations";
 import {
   normalizeOffer,
@@ -152,10 +154,19 @@ function main() {
   );
   assert.match(persist, /displayAmount:\s*options\.verifiedOffer\.priceUSD/);
   assert.match(destinations, /calculateEntryRetailPriceUsd/);
-  assert.match(countryDetail, /lowestPrice \?\? current\.minPrice/);
+  assert.match(destinations, /withLowestOfferRetailMinPrice/);
+  assert.match(destinations, /lowestOfferRetailUsd/);
+  assert.match(countryDetail, /withLowestOfferRetailMinPrice/);
+  assert.match(server, /fetchPublicDestinationCatalog|enrichDestinationsWithOfferRetailMins/);
   assert.match(currencyFormat, /convertFromUsd/);
   assert.match(pkg, /"qa:retail-pricing"/);
   assert.doesNotMatch(offersRoute, /providerPriceUSD/);
+  const destinationsRoute = read("app/api/vesim/destinations/route.ts");
+  assert.match(destinationsRoute, /fetchPublicDestinationCatalog/);
+  assert.doesNotMatch(
+    destinationsRoute,
+    /const destinations = await fetchDestinations\(\)/
+  );
   console.log("PASS catalog_checkout_wallet_gateway_public_strip_contracts");
 
   assert.match(actions, /Never trust browser money/);
@@ -299,25 +310,47 @@ function main() {
   assert.equal(publicPlan.priceUSD, displayDest!.minPrice);
   console.log("PASS starting_price_matches_cheapest_public_plan_068");
 
-  // Additional destinations with distinct cheapest prices (entry-tier allowance
-  // so catalog Starting from matches cheapest plan retail).
+  // Entry-tier destination min understates when cheapest offer is 502MB (3% tier).
+  // Authoritative Starting from must use lowest offer retail, not entry estimate.
+  const rawDeMinProvider = 0.68; // 68¢ → entry 2% = 70¢; 502MB 3% = 71¢
+  const entryDe = normalizeDestination({
+    code: "DE",
+    name: "Germany",
+    minPrice: rawDeMinProvider,
+  });
+  assert.equal(entryDe!.minPrice, 0.7);
+  const de502 = normalizeOffer({
+    id: "de-502",
+    name: "Germany 500MB/Day",
+    price: rawDeMinProvider,
+    dataMB: 502,
+    durationDays: 1,
+  });
+  assert.ok(de502);
+  assert.equal(de502!.priceUSD, 0.71);
+  assert.notEqual(entryDe!.minPrice, de502!.priceUSD);
+  const dePublicPlan = parsePublicVesimOffers({
+    offers: [toPublicVesimOffer(de502!)],
+  })[0];
+  const deEnriched = withLowestOfferRetailMinPrice(entryDe!, [dePublicPlan]);
+  assert.equal(deEnriched.minPrice, 0.71);
+  assert.equal(deEnriched.minPrice, dePublicPlan.priceUSD);
+  assert.equal(lowestOfferRetailUsd([dePublicPlan]), 0.71);
+  console.log("PASS starting_from_uses_offer_retail_not_entry_for_502mb");
+
+  // Additional destinations: offer-derived Starting from matches cheapest plan retail.
   const samples = [
     { code: "FR", name: "France", provider: 1.0, dataMB: 500, retail: 1.02 },
     { code: "US", name: "United States", provider: 2.0, dataMB: 200, retail: 2.04 },
     { code: "AU", name: "Australia", provider: 3.0, dataMB: 100, retail: 3.06 },
+    { code: "IT", name: "Italy", provider: 0.68, dataMB: 502, retail: 0.71 },
   ] as const;
   for (const sample of samples) {
-    const dest = parsePublicDestinations({
-      destinations: normalizeDestinations({
-        destinations: [
-          {
-            code: sample.code,
-            name: sample.name,
-            minPrice: sample.provider,
-          },
-        ],
-      }),
-    })[0];
+    const entryDest = normalizeDestination({
+      code: sample.code,
+      name: sample.name,
+      minPrice: sample.provider,
+    });
     const plan = parsePublicVesimOffers({
       offers: [
         toPublicVesimOffer(
@@ -330,9 +363,14 @@ function main() {
         ),
       ],
     })[0];
-    assert.equal(dest.minPrice, sample.retail);
+    const dest = withLowestOfferRetailMinPrice(entryDest!, [plan]);
+    const publicDest = parsePublicDestinations({
+      destinations: [dest],
+    })[0];
     assert.equal(plan.priceUSD, sample.retail);
-    assert.equal(dest.minPrice, plan.priceUSD);
+    assert.equal(dest.minPrice, sample.retail);
+    assert.equal(publicDest.minPrice, sample.retail);
+    assert.equal(publicDest.minPrice, plan.priceUSD);
   }
   console.log("PASS starting_price_matches_cheapest_for_extra_countries");
 

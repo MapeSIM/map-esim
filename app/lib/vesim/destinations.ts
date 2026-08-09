@@ -139,8 +139,7 @@ function buildDestination(
         ? item.minPriceUSD
         : null;
   // Raw VeSIM list minPrice is supplier cost (no offer allowance). Entry-tier
-  // retail keeps "From" off 1:1 supplier pricing. Public API responses already
-  // include this retail once — use parsePublicDestination there.
+  // retail is a fallback only; public catalog replaces it with lowest offer retail.
   const applyEntryRetail = options?.applyEntryRetail !== false;
   const retailMin =
     applyEntryRetail && rawMin != null
@@ -207,6 +206,41 @@ export function parsePublicDestinations(payload: unknown): VesimDestination[] {
   return extractDestinations(payload)
     .map(parsePublicDestination)
     .filter((item): item is VesimDestination => item !== null);
+}
+
+/**
+ * Lowest MAP retail USD among buyable offers (already marked up once).
+ * Used for authoritative "Starting from" — never re-derive from provider minPrice.
+ */
+export function lowestOfferRetailUsd(
+  offers: Array<{ priceUSD?: number | null }>
+): number | null {
+  let min: number | null = null;
+  for (const offer of offers) {
+    const price = offer.priceUSD;
+    if (typeof price === "number" && Number.isFinite(price) && price > 0) {
+      if (min == null || price < min) min = price;
+    }
+  }
+  return min;
+}
+
+/**
+ * Replace destination list minPrice with the cheapest offer's MAP retail.
+ * Keeps entry-tier estimate only when no positive offer retail is available.
+ */
+export function withLowestOfferRetailMinPrice(
+  destination: VesimDestination,
+  offers: Array<{ priceUSD?: number | null }>
+): VesimDestination {
+  const lowest = lowestOfferRetailUsd(offers);
+  if (lowest == null) return destination;
+  return {
+    ...destination,
+    minPrice: lowest,
+    minPriceFormatted: formatOfferPrice(lowest, "USD"),
+    offerCount: offers.length > 0 ? offers.length : destination.offerCount,
+  };
 }
 
 export function findDestinationBySlug(

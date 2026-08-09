@@ -1,5 +1,6 @@
 import {
   normalizeDestinations,
+  withLowestOfferRetailMinPrice,
   type VesimDestination,
 } from "@/app/lib/vesim/destinations";
 import {
@@ -10,6 +11,7 @@ import {
   normalizeOffers,
   type VesimOffer,
 } from "@/app/lib/vesim/offers";
+import { unstable_cache } from "next/cache";
 
 export type VerifiedCheckoutOffer = {
   offerId: string;
@@ -213,6 +215,78 @@ export async function fetchDestinations(
 
   return normalizeDestinations(data);
 }
+
+/** Parallel offer lookups while building public Starting-from mins. */
+const PUBLIC_DESTINATION_OFFER_CONCURRENCY = 10;
+/** Revalidate offer-derived destination mins (seconds). */
+const PUBLIC_DESTINATION_CATALOG_REVALIDATE_SECONDS = 300;
+
+async function mapPool<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  if (items.length === 0) return [];
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index], index);
+    }
+  }
+
+  const workers = Math.min(Math.max(1, concurrency), items.length);
+  await Promise.all(Array.from({ length: workers }, () => worker()));
+  return results;
+}
+
+/**
+ * Replace entry-tier destination minPrice with the cheapest offer MAP retail.
+ * Entry-tier (2%) understates Starting from when the cheapest buyable plan is
+ * 502MB/1GB (3% tier) — public catalog must use offer retail once.
+ */
+export async function enrichDestinationsWithOfferRetailMins(
+  destinations: VesimDestination[],
+  token?: TokenResult
+): Promise<VesimDestination[]> {
+  if (destinations.length === 0) return destinations;
+  const auth = token || (await getBrokerToken());
+
+  return mapPool(
+    destinations,
+    PUBLIC_DESTINATION_OFFER_CONCURRENCY,
+    async (destination) => {
+      const code = destination.code?.trim();
+      if (!code) return destination;
+      try {
+        const offers = await fetchOffersForCountry(code, auth);
+        return withLowestOfferRetailMinPrice(destination, offers);
+      } catch {
+        // Keep entry-tier fallback when offers are unavailable for this code.
+        return destination;
+      }
+    }
+  );
+}
+
+async function loadPublicDestinationCatalog(): Promise<VesimDestination[]> {
+  const token = await getBrokerToken();
+  const destinations = await fetchDestinations(token);
+  return enrichDestinationsWithOfferRetailMins(destinations, token);
+}
+
+/**
+ * Public `/api/vesim/destinations` catalog: Starting from = lowest offer retail.
+ * Cached so offer enrichment is not paid on every listing request.
+ */
+export const fetchPublicDestinationCatalog = unstable_cache(
+  loadPublicDestinationCatalog,
+  ["public-destination-catalog-offer-mins-v1"],
+  { revalidate: PUBLIC_DESTINATION_CATALOG_REVALIDATE_SECONDS }
+);
 
 export async function fetchOffersForCountry(
   country: string,

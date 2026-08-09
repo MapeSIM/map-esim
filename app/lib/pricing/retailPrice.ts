@@ -100,9 +100,9 @@ export function calculateRetailPriceCents(
 }
 
 /**
- * Destination-list helper when only VeSIM minPrice is known (no offer allowance).
- * Applies entry-tier markup so "From" stays competitive and never uses supplier 1:1.
- * Country detail pages should replace this with the true min of retail offers.
+ * Fallback when only VeSIM destination minPrice is known (no offer allowance).
+ * Applies entry-tier markup so "From" never uses supplier 1:1.
+ * Public catalog / country pages must prefer lowest offer retail when offers load.
  */
 export function calculateEntryRetailPriceCents(
   providerCostCents: number
