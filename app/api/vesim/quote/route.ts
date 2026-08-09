@@ -8,6 +8,7 @@ import {
   publicErrorMessage,
   readJsonSafe,
   sanitizeCountryHint,
+  toPublicVerifiedCheckoutOffer,
   verifyOfferAuthoritative,
 } from "@/app/lib/vesim/server";
 
@@ -117,10 +118,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Prefer verified offer fields for customer-facing amounts.
+    // Prefer verified offer fields for customer-facing retail amounts.
     return NextResponse.json({
       success: true,
-      offer: verifiedOffer,
+      offer: toPublicVerifiedCheckoutOffer(verifiedOffer),
       quote: {
         offerId: verifiedOffer.offerId,
         priceUSD: verifiedOffer.priceUSD,

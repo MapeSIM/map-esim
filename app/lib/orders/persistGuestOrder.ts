@@ -41,7 +41,7 @@ export async function persistGuestOrder(options: {
         planName: options.verifiedOffer.name,
         dataAllowance: options.verifiedOffer.dataFormatted || null,
         validity,
-        providerAmount: options.verifiedOffer.priceUSD,
+        providerAmount: options.verifiedOffer.providerPriceUSD,
         providerCurrency: options.verifiedOffer.currency || "USD",
         displayAmount: options.displayAmount ?? options.verifiedOffer.priceUSD,
         displayCurrency:
@@ -59,8 +59,11 @@ export async function persistGuestOrder(options: {
         planName: options.verifiedOffer.name,
         dataAllowance: options.verifiedOffer.dataFormatted || null,
         validity,
-        providerAmount: options.verifiedOffer.priceUSD,
+        providerAmount: options.verifiedOffer.providerPriceUSD,
         providerCurrency: options.verifiedOffer.currency || "USD",
+        displayAmount: options.displayAmount ?? options.verifiedOffer.priceUSD,
+        displayCurrency:
+          options.displayCurrency || options.verifiedOffer.currency || "USD",
         status: options.status || "COMPLETED",
       },
     });

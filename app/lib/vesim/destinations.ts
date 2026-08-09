@@ -1,3 +1,6 @@
+import { calculateRetailPriceUsd } from "@/app/lib/pricing/retailPrice";
+import { formatOfferPrice } from "@/app/lib/vesim/offers";
+
 export type VesimDestination = {
   code: string;
   name: string;
@@ -122,6 +125,20 @@ export function normalizeDestination(raw: unknown): VesimDestination | null {
     isGlobal,
   });
 
+  const providerMin =
+    typeof item.minPrice === "number"
+      ? item.minPrice
+      : typeof item.minPriceUSD === "number"
+        ? item.minPriceUSD
+        : null;
+  const retailMin =
+    providerMin != null ? calculateRetailPriceUsd(providerMin) : null;
+  const minPrice = retailMin ?? providerMin;
+  const currency =
+    typeof item.currency === "string" && item.currency.trim()
+      ? item.currency.trim()
+      : "USD";
+
   return {
     code: resolvedCode,
     name: name || resolvedCode,
@@ -129,12 +146,7 @@ export function normalizeDestination(raw: unknown): VesimDestination | null {
     regions: asArray(item.regions).filter(
       (region): region is string => typeof region === "string"
     ),
-    minPrice:
-      typeof item.minPrice === "number"
-        ? item.minPrice
-        : typeof item.minPriceUSD === "number"
-          ? item.minPriceUSD
-          : null,
+    minPrice,
     offerCount:
       typeof item.offerCount === "number" ? item.offerCount : undefined,
     isPopular: item.isPopular === true,
@@ -149,9 +161,11 @@ export function normalizeDestination(raw: unknown): VesimDestination | null {
       (alias): alias is string => typeof alias === "string"
     ),
     minPriceFormatted:
-      typeof item.minPriceFormatted === "string"
-        ? item.minPriceFormatted
-        : undefined,
+      minPrice != null
+        ? formatOfferPrice(minPrice, currency)
+        : typeof item.minPriceFormatted === "string"
+          ? item.minPriceFormatted
+          : undefined,
     slug,
     kind,
   };

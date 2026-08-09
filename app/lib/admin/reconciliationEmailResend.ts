@@ -36,6 +36,7 @@ import {
   type EmailResendEligibility,
 } from "@/app/lib/admin/reconciliationCaseShared";
 import { createOrderAccessToken, getOrderAccessSuccessUrl } from "@/app/lib/vesim/orderAccess";
+import { calculateRetailPriceUsd } from "@/app/lib/pricing/retailPrice";
 import {
   getBrokerToken,
   getVesimBaseUrl,
@@ -132,10 +133,35 @@ function offerFromLocal(options: {
   destinationCode?: string | null;
   dataAllowance?: string | null;
   validity?: string | null;
+  /** Customer retail USD cents when available. */
   priceCents?: number | null;
+  /** VeSIM supplier cost USD cents when available. */
+  providerCostCents?: number | null;
   currency?: string | null;
 }): VerifiedCheckoutOffer {
   const durationMatch = (options.validity ?? "").match(/(\d+)/);
+  const retailUsd =
+    typeof options.priceCents === "number" &&
+    Number.isInteger(options.priceCents) &&
+    options.priceCents > 0
+      ? options.priceCents / 100
+      : 0;
+  const providerUsd =
+    typeof options.providerCostCents === "number" &&
+    Number.isInteger(options.providerCostCents) &&
+    options.providerCostCents > 0
+      ? options.providerCostCents / 100
+      : 0;
+  // Prefer stored retail; if only provider cost exists (company-funded), derive retail.
+  let priceUSD = retailUsd;
+  let providerPriceUSD = providerUsd;
+  if (priceUSD <= 0 && providerPriceUSD > 0) {
+    const derived = calculateRetailPriceUsd(providerPriceUSD);
+    priceUSD = derived ?? providerPriceUSD;
+  }
+  if (providerPriceUSD <= 0 && priceUSD > 0) {
+    providerPriceUSD = priceUSD;
+  }
   return {
     offerId: options.offerId,
     name: (options.planName ?? "").trim() || "eSIM",
@@ -143,10 +169,8 @@ function offerFromLocal(options: {
     countryName: (options.destinationName ?? "").trim() || null,
     dataFormatted: (options.dataAllowance ?? "").trim() || "—",
     durationDays: durationMatch ? Number(durationMatch[1]) : null,
-    priceUSD:
-      typeof options.priceCents === "number" && Number.isInteger(options.priceCents)
-        ? options.priceCents / 100
-        : 0,
+    priceUSD,
+    providerPriceUSD,
     currency: (options.currency ?? "USD").trim() || "USD",
   };
 }
@@ -552,6 +576,7 @@ async function resendPurchaseOrderEmail(
       dataAllowance: true,
       validity: true,
       priceCents: true,
+      providerCostCents: true,
       currency: true,
       providerOrderId: true,
       adminUserId: true,
@@ -678,7 +703,7 @@ async function resendAssignmentOrderEmail(
     destinationCode: row.destinationCode,
     dataAllowance: row.dataAllowance,
     validity: row.validity,
-    priceCents: row.providerCostCents,
+    providerCostCents: row.providerCostCents,
     currency: row.providerCurrency,
   });
   const accessToken = createOrderAccessToken(row.providerOrderId);

@@ -3,6 +3,7 @@ import {
   normalizeOfferId,
   publicErrorMessage,
   sanitizeCountryHint,
+  toPublicVerifiedCheckoutOffer,
   verifyOfferAuthoritative,
 } from "@/app/lib/vesim/server";
 
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      offer,
+      offer: toPublicVerifiedCheckoutOffer(offer),
     });
   } catch (error: unknown) {
     console.error(

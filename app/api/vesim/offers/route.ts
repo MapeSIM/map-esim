@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { VesimEnvironmentError } from "@/app/lib/vesim/environment";
 import { VESIM_ENV_PUBLIC_ERROR } from "@/app/lib/vesim/environmentPolicy";
+import { toPublicVesimOffers } from "@/app/lib/vesim/offers";
 import {
   fetchOffersForCountry,
   publicErrorMessage,
@@ -31,7 +32,7 @@ export async function GET(req: Request) {
       success: true,
       country,
       count: offers.length,
-      offers,
+      offers: toPublicVesimOffers(offers),
     });
   } catch (error: unknown) {
     if (error instanceof VesimEnvironmentError) {

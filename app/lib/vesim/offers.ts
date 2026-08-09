@@ -1,3 +1,5 @@
+import { calculateRetailPriceUsd } from "@/app/lib/pricing/retailPrice";
+
 export type VesimRoamingCountry = {
   country: string;
   networks: string[];
@@ -25,9 +27,17 @@ export type VesimOffer = {
   networks?: string[];
   regions?: string[];
   currency?: string;
+  /**
+   * MAP eSIM retail USD shown/charged to customers.
+   * Never equal to supplier cost once pricing is applied.
+   */
   priceUSD?: number | null;
   price?: number | null;
   displayPrice?: number | null;
+  /**
+   * Raw VeSIM supplier USD. Server/admin only — strip before public JSON.
+   */
+  providerPriceUSD?: number | null;
   priceFormatted: string;
   description?: string;
   notes?: string;
@@ -265,6 +275,16 @@ export function formatOfferPrice(
   return `${symbol}${amount.toFixed(2)}`;
 }
 
+/** Public JSON must never include supplier/provider cost fields. */
+export function toPublicVesimOffer(offer: VesimOffer): VesimOffer {
+  const { providerPriceUSD: _providerPriceUSD, ...publicOffer } = offer;
+  return publicOffer;
+}
+
+export function toPublicVesimOffers(offers: VesimOffer[]): VesimOffer[] {
+  return offers.map(toPublicVesimOffer);
+}
+
 export function normalizeOffer(raw: unknown): VesimOffer | null {
   if (typeof raw === "string" && raw.trim()) {
     return {
@@ -300,12 +320,18 @@ export function normalizeOffer(raw: unknown): VesimOffer | null {
     item.validityDays,
     item.days
   );
-  const priceUSD = firstNumber(
+  const providerPriceUSD = firstNumber(
     item.priceUSD,
     item.price_usd,
     item.displayPrice,
     item.price
   );
+  // Customer-facing amounts are MAP retail; supplier cost stays on providerPriceUSD.
+  const retailUsd =
+    providerPriceUSD != null
+      ? calculateRetailPriceUsd(providerPriceUSD)
+      : null;
+  const priceUSD = retailUsd ?? providerPriceUSD;
   const currency = firstString(item.currency) || "USD";
   const regions = asArray(item.regions)
     .map((region) => (typeof region === "string" ? region : ""))
@@ -391,7 +417,8 @@ export function normalizeOffer(raw: unknown): VesimOffer | null {
     currency,
     priceUSD,
     price: priceUSD,
-    displayPrice: firstNumber(item.displayPrice) ?? priceUSD,
+    displayPrice: priceUSD,
+    providerPriceUSD,
     priceFormatted: formatOfferPrice(priceUSD, currency),
     description: firstString(item.description),
     notes: firstString(item.notes, item.shortNotes),

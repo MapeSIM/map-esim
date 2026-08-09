@@ -108,7 +108,7 @@ function verifiedOfferSnapshot(offer: VerifiedCheckoutOffer) {
     planName: offer.name,
     dataAllowance: offer.dataFormatted || null,
     validity,
-    providerCostCents: usdPriceToCents(offer.priceUSD),
+    providerCostCents: usdPriceToCents(offer.providerPriceUSD),
     providerCurrency: offer.currency || "USD",
   };
 }
@@ -693,7 +693,7 @@ export async function confirmAdminPackageAssignment(
   let orderId: string | null = null;
   try {
     const finalized = await prisma.$transaction(async (tx) => {
-      const costCents = usdPriceToCents(offer.priceUSD);
+      const costCents = usdPriceToCents(offer.providerPriceUSD);
       const order = await persistAssignedOrder(tx, {
         providerOrderId: providerOrderId!,
         customerUserId: customer.id,

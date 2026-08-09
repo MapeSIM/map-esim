@@ -140,19 +140,26 @@ function buildOffer(ctx: AttemptContext): VerifiedCheckoutOffer | null {
   const offerId = ctx.offerId.trim();
   if (!offerId) return null;
   const durationMatch = (ctx.validity ?? "").match(/(\d+)/);
-  let priceUSD = 0;
-  if (ctx.fundingSource === OrderFundingSource.CUSTOMER_WALLET) {
-    if (!Number.isInteger(ctx.priceCents) || (ctx.priceCents ?? 0) <= 0) {
-      return null;
-    }
-    priceUSD = (ctx.priceCents as number) / 100;
-  } else if (
+  let retailUsd = 0;
+  let providerUsd = 0;
+  if (
+    Number.isInteger(ctx.priceCents) &&
+    (ctx.priceCents ?? 0) > 0
+  ) {
+    retailUsd = (ctx.priceCents as number) / 100;
+  }
+  if (
     typeof ctx.providerCostCents === "number" &&
     Number.isInteger(ctx.providerCostCents) &&
-    ctx.providerCostCents >= 0
+    ctx.providerCostCents > 0
   ) {
-    priceUSD = ctx.providerCostCents / 100;
+    providerUsd = ctx.providerCostCents / 100;
   }
+  if (retailUsd <= 0 && providerUsd <= 0) {
+    return null;
+  }
+  if (retailUsd <= 0) retailUsd = providerUsd;
+  if (providerUsd <= 0) providerUsd = retailUsd;
   return {
     offerId,
     name: (ctx.planName ?? "").trim() || "eSIM",
@@ -160,7 +167,8 @@ function buildOffer(ctx: AttemptContext): VerifiedCheckoutOffer | null {
     countryName: (ctx.destinationName ?? "").trim() || null,
     dataFormatted: (ctx.dataAllowance ?? "").trim() || "—",
     durationDays: durationMatch ? Number(durationMatch[1]) : null,
-    priceUSD,
+    priceUSD: retailUsd,
+    providerPriceUSD: providerUsd,
     currency: (ctx.currency ?? "USD").trim() || "USD",
   };
 }

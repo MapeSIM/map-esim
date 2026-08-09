@@ -18,9 +18,26 @@ export type VerifiedCheckoutOffer = {
   countryName: string | null;
   dataFormatted: string;
   durationDays: number | null;
+  /** MAP eSIM retail USD charged to the customer. */
   priceUSD: number;
+  /** Raw VeSIM supplier USD — server/admin only. */
+  providerPriceUSD: number;
   currency: string;
 };
+
+/** Public JSON for verified offers — retail only, never supplier cost. */
+export function toPublicVerifiedCheckoutOffer(offer: VerifiedCheckoutOffer) {
+  return {
+    offerId: offer.offerId,
+    name: offer.name,
+    countryCode: offer.countryCode,
+    countryName: offer.countryName,
+    dataFormatted: offer.dataFormatted,
+    durationDays: offer.durationDays,
+    priceUSD: offer.priceUSD,
+    currency: offer.currency,
+  };
+}
 
 type TokenResult = {
   accessToken: string;
@@ -110,14 +127,19 @@ export function toVerifiedCheckoutOffer(
   lookupCountry?: string | null
 ): VerifiedCheckoutOffer | null {
   const offerId = (offer.offerId || offer.id || "").trim();
-  const price =
+  const retail =
     typeof offer.priceUSD === "number" && Number.isFinite(offer.priceUSD)
       ? offer.priceUSD
       : typeof offer.price === "number" && Number.isFinite(offer.price)
         ? offer.price
         : null;
+  const provider =
+    typeof offer.providerPriceUSD === "number" &&
+    Number.isFinite(offer.providerPriceUSD)
+      ? offer.providerPriceUSD
+      : retail;
 
-  if (!offerId || price == null || price < 0) {
+  if (!offerId || retail == null || retail < 0 || provider == null || provider < 0) {
     return null;
   }
 
@@ -131,7 +153,8 @@ export function toVerifiedCheckoutOffer(
     countryName: offer.countryName || null,
     dataFormatted: offer.dataFormatted,
     durationDays: offer.durationDays ?? null,
-    priceUSD: price,
+    priceUSD: retail,
+    providerPriceUSD: provider,
     currency: offer.currency || "USD",
   };
 }

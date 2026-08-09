@@ -115,7 +115,7 @@ export async function listAdminAssignmentOffers(
           verified.durationDays != null
             ? `${verified.durationDays} Days`
             : "Not available",
-        costLabel: `${formatUsdCents(Math.round(verified.priceUSD * 100))} USD`,
+        costLabel: `${formatUsdCents(Math.round(verified.providerPriceUSD * 100))} USD`,
         destinationLabel:
           verified.countryName || verified.countryCode || code,
       });

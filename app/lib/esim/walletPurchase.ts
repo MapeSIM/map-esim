@@ -110,7 +110,13 @@ function isUniqueViolation(error: unknown): boolean {
 
 function verifiedSnapshot(offer: VerifiedCheckoutOffer) {
   const priceCents = usdPriceToCents(offer.priceUSD);
-  if (priceCents == null || priceCents <= 0) {
+  const providerCostCents = usdPriceToCents(offer.providerPriceUSD);
+  if (
+    priceCents == null ||
+    priceCents <= 0 ||
+    providerCostCents == null ||
+    providerCostCents <= 0
+  ) {
     return null;
   }
   const currency = (offer.currency || "USD").trim().toUpperCase() || "USD";
@@ -127,7 +133,7 @@ function verifiedSnapshot(offer: VerifiedCheckoutOffer) {
     validity:
       offer.durationDays != null ? `${offer.durationDays} Days` : null,
     priceCents,
-    providerCostCents: priceCents,
+    providerCostCents,
     currency,
   };
 }
