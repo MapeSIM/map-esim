@@ -52,11 +52,13 @@ export default async function AccountOrderDetailPage({
   searchParams,
 }: {
   params: Promise<{ orderId: string }>;
-  searchParams: Promise<{ usage?: string }>;
+  searchParams: Promise<{ usage?: string; refund?: string }>;
 }) {
   const { orderId } = await params;
   const query = await searchParams;
   const autoOpenUsage = query.usage === "1" || query.usage === "true";
+  const refundJustRequested =
+    query.refund === "requested" || query.refund === "1";
   const user = await requireSession(
     `/account/orders/${encodeURIComponent(orderId)}`
   );
@@ -89,10 +91,18 @@ export default async function AccountOrderDetailPage({
     notFound();
   }
 
-  const refundRequests = await listCustomerRefundRequestsForOrder({
-    customerUserId: user.id,
-    orderId: detail.id,
-  });
+  // Fail soft — never crash the order page if refund listing is unavailable.
+  let refundRequests: Awaited<
+    ReturnType<typeof listCustomerRefundRequestsForOrder>
+  > = [];
+  try {
+    refundRequests = await listCustomerRefundRequestsForOrder({
+      customerUserId: user.id,
+      orderId: detail.id,
+    });
+  } catch {
+    refundRequests = [];
+  }
   const openRefund = refundRequests.find((row) =>
     isOpenRefundStatus(row.status)
   );
@@ -217,6 +227,16 @@ export default async function AccountOrderDetailPage({
         installEligible={detail.installEligible}
         isRefunded={detail.isRefunded}
       />
+
+      {refundJustRequested ? (
+        <div
+          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--heading)]"
+          role="status"
+        >
+          Your refund request was submitted for review. No funds have been moved
+          yet.
+        </div>
+      ) : null}
 
       {refundRequests.length > 0 ? (
         <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 sm:px-5">

@@ -81,9 +81,16 @@ function main() {
   assert.doesNotMatch(service, /formData\.get\("amount"\)|input\.refundAmount/);
   assert.match(actions, /void formData\.get\("amount"\)/);
   assert.match(actions, /void formData\.get\("refundAmountCents"\)/);
-  assert.match(actions, /requireRole\("CUSTOMER"\)/);
+  assert.match(actions, /requireRole\("CUSTOMER"/);
+  assert.match(actions, /redirect\(orderDetailPath\(orderId\)\)/);
+  assert.match(actions, /refund=requested/);
+  assert.doesNotMatch(actions, /revalidatePath\s*\(/);
+  assert.match(service, /createdAt:\s*now/);
+  assert.match(service, /updatedAt:\s*now/);
   assert.match(orderPage, /CustomerRefundRequestForm/);
   assert.match(orderPage, /listCustomerRefundRequestsForOrder/);
+  assert.match(orderPage, /Fail soft/);
+  assert.match(orderPage, /refundJustRequested/);
   assert.match(customerForm, /Select a reason/);
   console.log("PASS customer_request_ownership_amount");
 

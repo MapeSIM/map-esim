@@ -111,10 +111,19 @@ export async function createCustomerRefundRequest(
     );
   }
 
-  const customer = await prisma.user.findUnique({
-    where: { id: customerUserId },
-    select: { id: true, role: true, deletedAt: true },
-  });
+  let customer;
+  let order;
+  try {
+    customer = await prisma.user.findUnique({
+      where: { id: customerUserId },
+      select: { id: true, role: true, deletedAt: true },
+    });
+  } catch {
+    throw new RefundRequestError(
+      "UNAVAILABLE",
+      "Refund requests are temporarily unavailable. Please try again shortly."
+    );
+  }
   if (!customer || customer.deletedAt || customer.role !== Role.CUSTOMER) {
     throw new RefundRequestError(
       "CUSTOMER_UNAVAILABLE",
@@ -122,27 +131,34 @@ export async function createCustomerRefundRequest(
     );
   }
 
-  const order = await prisma.order.findFirst({
-    where: { id: orderId, userId: customer.id },
-    select: {
-      id: true,
-      fundingSource: true,
-      displayAmount: true,
-      displayCurrency: true,
-      walletEsimPurchase: {
-        select: {
-          id: true,
-          status: true,
-          priceCents: true,
-          walletAppliedCents: true,
-          gatewayAmountCents: true,
-          fundingSource: true,
-          currency: true,
-          refundTransactionId: true,
+  try {
+    order = await prisma.order.findFirst({
+      where: { id: orderId, userId: customer.id },
+      select: {
+        id: true,
+        fundingSource: true,
+        displayAmount: true,
+        displayCurrency: true,
+        walletEsimPurchase: {
+          select: {
+            id: true,
+            status: true,
+            priceCents: true,
+            walletAppliedCents: true,
+            gatewayAmountCents: true,
+            fundingSource: true,
+            currency: true,
+            refundTransactionId: true,
+          },
         },
       },
-    },
-  });
+    });
+  } catch {
+    throw new RefundRequestError(
+      "UNAVAILABLE",
+      "Refund requests are temporarily unavailable. Please try again shortly."
+    );
+  }
   if (!order) {
     throw new RefundRequestError(
       "ORDER_UNAVAILABLE",
@@ -193,33 +209,42 @@ export async function createCustomerRefundRequest(
     .trim()
     .toUpperCase() || "USD";
 
-  const existingOpen = await prisma.refundRequest.findFirst({
-    where: {
-      orderId: order.id,
-      customerUserId: customer.id,
-      status: {
-        in: [
-          RefundRequestStatus.REQUESTED,
-          RefundRequestStatus.UNDER_REVIEW,
-          RefundRequestStatus.APPROVED_PENDING_EXECUTION,
-        ],
+  try {
+    const existingOpen = await prisma.refundRequest.findFirst({
+      where: {
+        orderId: order.id,
+        customerUserId: customer.id,
+        status: {
+          in: [
+            RefundRequestStatus.REQUESTED,
+            RefundRequestStatus.UNDER_REVIEW,
+            RefundRequestStatus.APPROVED_PENDING_EXECUTION,
+          ],
+        },
       },
-    },
-    select: {
-      id: true,
-      status: true,
-      refundAmountCents: true,
-    },
-  });
-  if (existingOpen) {
+      select: {
+        id: true,
+        status: true,
+        refundAmountCents: true,
+      },
+    });
+    if (existingOpen) {
+      throw new RefundRequestError(
+        "DUPLICATE_OPEN",
+        "A refund request is already open for this order."
+      );
+    }
+  } catch (error) {
+    if (error instanceof RefundRequestError) throw error;
     throw new RefundRequestError(
-      "DUPLICATE_OPEN",
-      "A refund request is already open for this order."
+      "UNAVAILABLE",
+      "Refund requests are temporarily unavailable. Please try again shortly."
     );
   }
 
   try {
     const created = await prisma.$transaction(async (tx) => {
+      const now = new Date();
       const row = await tx.refundRequest.create({
         data: {
           orderId: order.id,
@@ -234,6 +259,9 @@ export async function createCustomerRefundRequest(
           gatewayAmountCents,
           fundingSource: fundingSource as OrderFundingSource | null,
           openOrderKey: order.id,
+          // Explicit timestamps — migration column has no SQL default.
+          createdAt: now,
+          updatedAt: now,
         },
         select: {
           id: true,
