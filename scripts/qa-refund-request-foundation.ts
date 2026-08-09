@@ -94,6 +94,15 @@ function main() {
   assert.equal(CUSTOMER_REFUND_NOTE_MAX, REFUND_REQUEST_NOTE_MAX);
   assert.match(service, /createdAt:\s*now/);
   assert.match(service, /updatedAt:\s*now/);
+  assert.match(service, /scheduleRefundStatusNotification\(created\.id,\s*"received"\)/);
+  assert.match(
+    service,
+    /scheduleRefundStatusNotification\(current\.id,\s*"approved_pending_execution"\)/
+  );
+  assert.match(
+    service,
+    /scheduleRefundStatusNotification\(current\.id,\s*"rejected"\)/
+  );
   assert.match(orderPage, /CustomerRefundRequestForm/);
   assert.match(orderPage, /listCustomerRefundRequestsForOrder/);
   assert.match(orderPage, /Fail soft/);

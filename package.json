@@ -37,6 +37,7 @@
     "qa:wallet-topup-foundation": "tsx scripts/qa-wallet-topup-foundation.ts",
     "qa:wallet-topup-funding": "tsx scripts/qa-wallet-topup-funding.ts",
     "qa:refund-request-foundation": "tsx scripts/qa-refund-request-foundation.ts",
+    "qa:refund-status-email": "tsx scripts/qa-refund-status-email.ts",
     "qa:guest-checkout-gate": "tsx scripts/qa-guest-checkout-gate.ts",
     "qa:vesim-environment": "tsx scripts/qa-vesim-environment.ts",
     "qa:retail-pricing": "tsx scripts/qa-retail-pricing.ts",

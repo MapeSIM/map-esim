@@ -43,7 +43,20 @@ export const REFUND_AUDIT = {
   APPROVED_PENDING: "refund.request_approved_pending_execution",
   REJECTED: "refund.request_rejected",
   ACTION_BLOCKED: "refund.request_action_blocked",
+  EMAIL_RECEIVED: "refund.email_received",
+  EMAIL_APPROVED_PENDING: "refund.email_approved_pending_execution",
+  EMAIL_REJECTED: "refund.email_rejected",
 } as const;
+
+/** Customer refund-status email events (no COMPLETED in this phase). */
+export const REFUND_STATUS_EMAIL_EVENTS = [
+  "received",
+  "approved_pending_execution",
+  "rejected",
+] as const;
+
+export type RefundStatusEmailEvent =
+  (typeof REFUND_STATUS_EMAIL_EVENTS)[number];
 
 export function refundReasonLabel(reason: string): string {
   switch (reason) {

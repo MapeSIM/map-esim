@@ -18,6 +18,7 @@ import {
   parseRefundRequestReason,
   type RefundRequestReasonCode,
 } from "@/app/lib/refunds/refundRequestConstants";
+import { scheduleRefundStatusNotification } from "@/app/lib/refunds/refundRequestNotification";
 
 export class RefundRequestError extends Error {
   readonly code:
@@ -291,6 +292,9 @@ export async function createCustomerRefundRequest(
       return row;
     });
 
+    // After commit only — email failure must not undo the request.
+    scheduleRefundStatusNotification(created.id, "received");
+
     return {
       requestId: created.id,
       status: created.status,
@@ -513,6 +517,8 @@ export async function applyAdminRefundRequestDecision(options: {
         providerRefundCalled: false,
       },
     });
+    // After successful approve CAS — email failure must not undo status.
+    scheduleRefundStatusNotification(current.id, "approved_pending_execution");
     return {
       requestId: current.id,
       status: RefundRequestStatus.APPROVED_PENDING_EXECUTION,
@@ -569,6 +575,8 @@ export async function applyAdminRefundRequestDecision(options: {
       moneyMoved: false,
     },
   });
+  // After successful reject CAS — email failure must not undo status.
+  scheduleRefundStatusNotification(current.id, "rejected");
   return { requestId: current.id, status: RefundRequestStatus.REJECTED };
 }
 
