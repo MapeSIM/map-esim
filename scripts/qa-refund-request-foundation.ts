@@ -6,7 +6,9 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  CUSTOMER_REFUND_NOTE_MAX,
   REFUND_AUDIT,
+  REFUND_REQUEST_NOTE_MAX,
   REFUND_REQUEST_OPEN_STATUSES,
   REFUND_REQUEST_REASONS,
   isOpenRefundStatus,
@@ -28,6 +30,7 @@ function main() {
   const migration = read(migrationPath);
   const service = read("app/lib/refunds/refundRequest.ts");
   const actions = read("app/lib/refunds/refundRequestActions.ts");
+  const constants = read("app/lib/refunds/refundRequestConstants.ts");
   const admin = read("app/lib/refunds/refundRequestAdmin.ts");
   const adminActions = read("app/lib/refunds/refundRequestAdminActions.ts");
   const customerForm = read(
@@ -85,6 +88,10 @@ function main() {
   assert.match(actions, /redirect\(orderDetailPath\(orderId\)\)/);
   assert.match(actions, /refund=requested/);
   assert.doesNotMatch(actions, /revalidatePath\s*\(/);
+  // "use server" modules may only export async functions (not number constants).
+  assert.doesNotMatch(actions, /export const CUSTOMER_REFUND_NOTE_MAX/);
+  assert.match(constants, /export const CUSTOMER_REFUND_NOTE_MAX/);
+  assert.equal(CUSTOMER_REFUND_NOTE_MAX, REFUND_REQUEST_NOTE_MAX);
   assert.match(service, /createdAt:\s*now/);
   assert.match(service, /updatedAt:\s*now/);
   assert.match(orderPage, /CustomerRefundRequestForm/);

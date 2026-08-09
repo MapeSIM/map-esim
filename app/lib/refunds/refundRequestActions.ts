@@ -6,7 +6,6 @@ import {
   createCustomerRefundRequest,
   RefundRequestError,
 } from "@/app/lib/refunds/refundRequest";
-import { REFUND_REQUEST_NOTE_MAX } from "@/app/lib/refunds/refundRequestConstants";
 
 export type CustomerRefundRequestFormState =
   | null
@@ -118,5 +117,3 @@ export async function createCustomerRefundRequestAction(
   // Hard navigation after insert — avoids soft RSC refresh failures on success.
   redirect(orderDetailPath(orderId));
 }
-
-export const CUSTOMER_REFUND_NOTE_MAX = REFUND_REQUEST_NOTE_MAX;

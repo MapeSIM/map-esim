@@ -4,6 +4,8 @@
  */
 
 export const REFUND_REQUEST_NOTE_MAX = 500;
+/** Customer-facing alias for note max length (safe to import from client/UI). */
+export const CUSTOMER_REFUND_NOTE_MAX = REFUND_REQUEST_NOTE_MAX;
 export const REFUND_ADMIN_DECISION_NOTE_MAX = 1000;
 
 export const REFUND_REQUEST_REASONS = [
