@@ -239,10 +239,10 @@ function CompactDestinationCard({
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2.5">
-        <div className="text-right">
+      <div className="flex max-w-[42%] shrink-0 items-center gap-2 sm:max-w-none sm:gap-2.5">
+        <div className="min-w-0 text-right">
           <p className="text-[11px] font-medium text-[var(--text-soft)]">From</p>
-          <p className="mt-0.5 text-sm font-semibold text-[var(--accent-soft)]">
+          <p className="mt-0.5 truncate text-sm font-semibold text-[var(--accent-soft)]">
             {formatPrice(destination.minPriceUsd)}
           </p>
         </div>
@@ -361,10 +361,10 @@ function CountriesPageContent() {
     <main className="min-h-screen overflow-x-hidden bg-[var(--page-bg)] text-[var(--heading)]">
       <section
         className="
-          relative flex min-h-[300px] items-center justify-center
+          relative flex min-h-[240px] items-center justify-center
           border-b border-[var(--border)]
           theme-hero
-          px-4 py-10 sm:min-h-[340px] sm:px-6 sm:py-12
+          px-4 py-8 sm:min-h-[340px] sm:px-6 sm:py-12
         "
       >
         <div
@@ -442,7 +442,7 @@ function CountriesPageContent() {
 
       <div
         className="
-          sticky top-[72px] z-40
+          sticky top-16 z-40 sm:top-[72px]
           border-b border-[var(--border)]
           bg-[var(--page-bg)]/95 backdrop-blur-md
         "
@@ -450,8 +450,8 @@ function CountriesPageContent() {
         <div className="mx-auto max-w-[1200px] px-4 sm:px-6">
           <div
             className="
-              flex flex-wrap items-center justify-center gap-2.5
-              py-4
+              flex flex-wrap items-center justify-center gap-2
+              py-3 sm:gap-2.5 sm:py-4
             "
             role="group"
             aria-label="Destination filters"
@@ -465,9 +465,9 @@ function CountriesPageContent() {
                   onClick={() => setFilter(id)}
                   aria-pressed={active}
                   className={`
-                    inline-flex h-10 items-center gap-2
-                    rounded-full border px-4 text-sm font-medium
-                    transition-all
+                    inline-flex min-h-10 items-center gap-1.5
+                    rounded-full border px-3 text-xs font-medium
+                    transition-all sm:gap-2 sm:px-4 sm:text-sm
                     focus-visible:outline-none focus-visible:ring-2
                     focus-visible:ring-[var(--accent-strong)]/55 focus-visible:ring-offset-2
                     focus-visible:ring-offset-[var(--page-bg)]

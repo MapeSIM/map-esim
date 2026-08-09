@@ -97,8 +97,8 @@ const faqs = [
 export default function Home() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[var(--page-bg)] text-[var(--heading)]">
-      {/* Announcement */}
-      <div className="border-b border-[var(--border)]/60 bg-[var(--surface-2)]">
+      {/* Announcement — tablet/desktop only (stacked benefit lines crowd mobile). */}
+      <div className="hidden border-b border-[var(--border)]/60 bg-[var(--surface-2)] sm:block">
         <div className="mx-auto flex max-w-[1200px] flex-col items-center justify-center gap-2 px-4 py-2.5 text-center text-xs text-[var(--text)] sm:flex-row sm:gap-4 sm:px-6 sm:text-sm">
           <span className="inline-flex items-center gap-2">
             <Zap className="h-3.5 w-3.5 text-[var(--accent-strong)]" />
@@ -119,30 +119,30 @@ export default function Home() {
 
       {/* Hero */}
       <section className="border-b border-[var(--border)] bg-[radial-gradient(ellipse_at_top_left,var(--hero-glow)_0%,_transparent_45%),linear-gradient(180deg,var(--page-bg-soft)_0%,var(--page-bg)_100%)]">
-        <div className="mx-auto grid max-w-[1200px] items-center gap-10 px-4 py-14 sm:px-6 lg:grid-cols-2 lg:gap-14 lg:py-20">
+        <div className="mx-auto grid max-w-[1200px] items-center gap-8 px-4 py-10 sm:gap-10 sm:px-6 sm:py-14 lg:grid-cols-2 lg:gap-14 lg:py-20">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
               MAP eSIM travel connectivity
             </p>
-            <h1 className="mt-4 text-4xl font-bold tracking-tight text-[var(--heading)] sm:text-5xl lg:text-[3.4rem] lg:leading-[1.08]">
+            <h1 className="mt-3 text-[2rem] font-bold leading-tight tracking-tight text-[var(--heading)] sm:mt-4 sm:text-5xl lg:text-[3.4rem] lg:leading-[1.08]">
               Stay connected abroad with travel eSIM plans
             </h1>
-            <p className="mt-5 max-w-xl text-base leading-relaxed text-[var(--text-muted)] sm:text-lg">
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-[var(--text-muted)] sm:mt-5 sm:text-lg">
               Browse destination plans, compare data options, and checkout with
               verified offer pricing — built for clear travel connectivity.
             </p>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row">
               <Link
                 href="/countries"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-6 text-sm font-bold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]"
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-6 text-sm font-bold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] sm:w-auto"
               >
                 Browse destinations
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="h-4 w-4 shrink-0" />
               </Link>
               <Link
                 href="/countries/region-asia"
-                className="inline-flex h-12 items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-6 text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--border-hover)]"
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-6 text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--border-hover)] sm:w-auto"
               >
                 View regional plans
               </Link>

@@ -278,8 +278,8 @@ export default function PlansListing({
   return (
     <main className="min-h-screen overflow-x-clip bg-[var(--page-bg)] text-[var(--heading)]">
       <section className="theme-hero border-b border-[var(--border)]">
-        {/* Extra mobile top padding keeps hero clear of the sticky 72px navbar. */}
-        <div className="mx-auto max-w-[1200px] px-4 pb-6 pt-10 sm:px-6 sm:py-8">
+        {/* Extra mobile top padding keeps hero clear of the sticky navbar. */}
+        <div className="mx-auto max-w-[1200px] px-4 pb-5 pt-8 sm:px-6 sm:py-8">
           <Link
             href="/countries"
             className="
@@ -586,19 +586,20 @@ export default function PlansListing({
                         <article
                           key={offer.id}
                           className="
-                            group flex h-full flex-col rounded-[22px]
+                            group flex h-full min-w-0 flex-col rounded-[22px]
                             border border-[var(--border)] bg-[var(--surface)]
-                            p-5 shadow-[0_10px_28px_rgba(0,0,0,0.2)]
+                            p-4 shadow-[0_10px_28px_rgba(0,0,0,0.2)]
                             transition duration-200
                             hover:-translate-y-1 hover:border-[var(--border-hover)]
                             hover:shadow-[0_18px_40px_rgba(0,0,0,0.32)]
+                            sm:p-5
                           "
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <h3 className="text-2xl font-bold tracking-tight text-[var(--heading)]">
+                          <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-1">
+                            <h3 className="min-w-0 break-words text-xl font-bold tracking-tight text-[var(--heading)] sm:text-2xl">
                               {offer.dataFormatted}
                             </h3>
-                            <p className="text-2xl font-bold text-[var(--accent-strong)]">
+                            <p className="shrink-0 text-xl font-bold text-[var(--accent-strong)] sm:text-2xl">
                               {formatPrice(offer.priceUSD)}
                             </p>
                           </div>
@@ -615,35 +616,36 @@ export default function PlansListing({
                               )}
                             {destination.kind === "country" &&
                               (offer.packageInfo || offer.network) && (
-                                <p className="text-[var(--text-soft)]">
+                                <p className="break-words text-[var(--text-soft)]">
                                   {offer.packageInfo || offer.network}
                                 </p>
                               )}
                           </div>
 
-                          <div className="mt-auto grid grid-cols-2 gap-3 pt-6">
+                          <div className="mt-auto grid grid-cols-1 gap-3 pt-6 min-[400px]:grid-cols-2">
                             <button
                               type="button"
                               onClick={() => setSelectedOffer(offer)}
                               className="
-                                h-11 rounded-xl border border-[var(--border-strong)]
-                                bg-[var(--surface-2)] px-2 text-sm font-semibold text-[var(--heading)]
+                                inline-flex min-h-11 items-center justify-center
+                                rounded-xl border border-[var(--border-strong)]
+                                bg-[var(--surface-2)] px-3 text-sm font-semibold text-[var(--heading)]
                                 transition hover:border-[var(--accent-strong)]/50
                               "
                             >
                               {isRegionalOrGlobal
-                                ? "See Coverage Details"
-                                : "Plan Details"}
+                                ? "Coverage details"
+                                : "Plan details"}
                             </button>
                             <Link
                               href={buildCheckoutHref(offer, destination.code)}
                               className="
-                                inline-flex h-11 items-center justify-center
-                                rounded-xl bg-[var(--accent-strong)] text-sm font-bold
+                                inline-flex min-h-11 items-center justify-center
+                                rounded-xl bg-[var(--accent-strong)] px-3 text-sm font-bold
                                 text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]
                               "
                             >
-                              Buy Now
+                              Buy now
                             </Link>
                           </div>
                         </article>

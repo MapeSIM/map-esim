@@ -36,7 +36,7 @@ export default function ThemeToggle() {
             : "Switch to dark mode"
       }
       className="
-        inline-flex h-9 w-9 shrink-0 items-center justify-center
+        inline-flex h-10 w-10 shrink-0 items-center justify-center
         rounded-[14px] border border-[var(--border-strong)]
         bg-[var(--surface)] text-[var(--text-muted)]
         transition-colors

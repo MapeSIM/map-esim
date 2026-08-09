@@ -104,8 +104,8 @@ export default function Navbar({
     >
       <nav
         className="
-          mx-auto flex h-[72px] w-full min-w-0 max-w-[1200px] items-center
-          justify-between gap-2 px-3 sm:gap-3 sm:px-6
+          mx-auto flex h-16 w-full min-w-0 max-w-[1200px] items-center
+          justify-between gap-1.5 px-3 sm:h-[72px] sm:gap-3 sm:px-6
         "
         aria-label="Primary"
       >
@@ -214,7 +214,7 @@ export default function Navbar({
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 lg:hidden">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2 lg:hidden">
           <CurrencySelector />
           <ThemeToggle />
           <button

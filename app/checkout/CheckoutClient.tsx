@@ -29,15 +29,17 @@ type CheckoutResponse = {
 
 function CheckoutUnavailable() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-[var(--page-bg)] px-6 text-[var(--heading)]">
-      <h1 className="text-4xl font-bold">Checkout unavailable</h1>
-      <p className="mt-3 max-w-md text-center text-[var(--text-muted)]">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-[var(--page-bg)] px-4 text-[var(--heading)] sm:px-6">
+      <h1 className="text-center text-2xl font-bold sm:text-4xl">
+        Checkout unavailable
+      </h1>
+      <p className="mt-3 max-w-md text-center text-sm text-[var(--text-muted)] sm:text-base">
         Online checkout is temporarily unavailable. Please contact support for
         assistance.
       </p>
       <Link
         href="/contact"
-        className="mt-8 inline-flex h-12 items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-6 text-sm font-bold text-[var(--accent-ink)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+        className="mt-8 inline-flex min-h-12 w-full max-w-sm items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-6 text-sm font-bold text-[var(--accent-ink)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 sm:w-auto"
       >
         Contact support
       </Link>
@@ -227,9 +229,11 @@ function CheckoutContent() {
 
   if (unavailable || !offer) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-[var(--page-bg)] px-6 text-[var(--heading)]">
-        <h1 className="text-4xl font-bold">Plan unavailable</h1>
-        <p className="mt-3 max-w-md text-center text-[var(--text-muted)]">
+      <main className="flex min-h-screen flex-col items-center justify-center bg-[var(--page-bg)] px-4 text-[var(--heading)] sm:px-6">
+        <h1 className="text-center text-2xl font-bold sm:text-4xl">
+          Plan unavailable
+        </h1>
+        <p className="mt-3 max-w-md text-center text-sm text-[var(--text-muted)] sm:text-base">
           {message && message !== "Plan unavailable"
             ? message
             : "This eSIM plan could not be verified. Please choose another plan."}
@@ -239,39 +243,39 @@ function CheckoutContent() {
   }
 
   return (
-    <main className="min-h-screen bg-[var(--page-bg)] px-6 py-16 text-[var(--heading)]">
-      <div className="mx-auto max-w-xl rounded-3xl border border-[var(--border-strong)] bg-[var(--surface)] p-8">
-        <h1 className="text-center text-4xl font-bold">Checkout</h1>
-        <p className="mt-3 text-center text-[var(--text-muted)]">
+    <main className="min-h-screen overflow-x-hidden bg-[var(--page-bg)] px-4 py-10 text-[var(--heading)] sm:px-6 sm:py-16">
+      <div className="mx-auto w-full max-w-xl rounded-3xl border border-[var(--border-strong)] bg-[var(--surface)] p-5 sm:p-8">
+        <h1 className="text-center text-2xl font-bold sm:text-4xl">Checkout</h1>
+        <p className="mt-3 text-center text-sm text-[var(--text-muted)] sm:text-base">
           Review your eSIM plan
         </p>
 
-        <div className="mt-8 space-y-4 rounded-2xl bg-[var(--page-bg)] p-6">
-          <h2 className="text-2xl font-bold">
+        <div className="mt-6 space-y-3 rounded-2xl bg-[var(--page-bg)] p-4 sm:mt-8 sm:space-y-4 sm:p-6">
+          <h2 className="break-words text-xl font-bold sm:text-2xl">
             {offer.countryName || offer.name || "eSIM"}
           </h2>
 
-          <p>
+          <p className="break-words text-sm sm:text-base">
             Plan: <b>{offer.name}</b>
           </p>
 
-          <p>
+          <p className="text-sm sm:text-base">
             Data: <b>{offer.dataFormatted}</b>
           </p>
 
-          <p>
+          <p className="text-sm sm:text-base">
             Validity:{" "}
             <b>
               {offer.durationDays != null ? `${offer.durationDays} Days` : "—"}
             </b>
           </p>
 
-          <p className="text-3xl font-bold text-[var(--accent-strong)]">
+          <p className="text-2xl font-bold text-[var(--accent-strong)] sm:text-3xl">
             {formatPrice(offer.priceUSD)}
           </p>
         </div>
 
-        <div className="mt-7">
+        <div className="mt-6 sm:mt-7">
           <label htmlFor="customerEmail" className="mb-2 block font-semibold">
             Customer email
           </label>
@@ -284,7 +288,7 @@ function CheckoutContent() {
             placeholder="customer@example.com"
             autoComplete="email"
             disabled={payLoading}
-            className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-4 py-4 text-[var(--heading)] outline-none focus:border-[var(--accent-strong)] disabled:opacity-60"
+            className="min-h-12 w-full max-w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-4 py-3 text-[var(--heading)] outline-none focus:border-[var(--accent-strong)] disabled:opacity-60 sm:py-4"
           />
 
           <p className="mt-2 text-sm text-[var(--text-muted)]">
@@ -297,7 +301,7 @@ function CheckoutContent() {
           onClick={pay}
           disabled={payLoading}
           aria-busy={payLoading}
-          className="mt-8 w-full rounded-xl bg-[var(--accent-strong)] py-4 font-bold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:bg-[var(--accent)]"
+          className="mt-6 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 py-3 font-bold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:bg-[var(--accent)] sm:mt-8 sm:py-4"
         >
           {payLoading ? "Creating eSIM..." : "Purchase eSIM"}
         </button>
