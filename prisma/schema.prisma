@@ -121,6 +121,25 @@ enum PaymentGatewayProvider {
   MANUAL_TEST
 }
 
+/// Customer refund request workflow (review only — no money movement in this phase).
+enum RefundRequestStatus {
+  REQUESTED
+  UNDER_REVIEW
+  APPROVED_PENDING_EXECUTION
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+enum RefundRequestReason {
+  TECHNICAL_ISSUE
+  DUPLICATE_PAYMENT
+  ESIM_NOT_RECEIVED
+  WRONG_PLAN
+  UNUSED_PLAN
+  OTHER
+}
+
 /// Allowlisted runtime pause switches only (Admin Operations Part A2).
 /// Never stores secrets, arbitrary JSON, or customer data.
 enum OperationalControlKey {
@@ -184,6 +203,9 @@ model User {
   walletEsimPurchases          WalletEsimPurchase[]     @relation("WalletPurchaseCustomer")
   assistedWalletEsimPurchases  WalletEsimPurchase[]     @relation("AssistedWalletPurchaseAdmin")
   walletTopups                 WalletTopup[]
+  refundRequests               RefundRequest[]          @relation("RefundRequestCustomer")
+  refundRequestsReviewed       RefundRequest[]          @relation("RefundRequestReviewedBy")
+  refundRequestsDecided        RefundRequest[]          @relation("RefundRequestDecidedBy")
 
   @@index([deletedAt])
 }
@@ -294,6 +316,7 @@ model Order {
   user                             User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
   adminPackageAssignment           AdminPackageAssignment?
   walletEsimPurchase               WalletEsimPurchase?
+  refundRequests                   RefundRequest[]
 
   @@index([customerEmail])
   @@index([userId])
@@ -739,4 +762,45 @@ model AlertNotificationRunnerLock {
   claimedAt      DateTime?
   claimExpiresAt DateTime?
   updatedAt      DateTime  @updatedAt
+}
+
+/// Customer-initiated refund request for admin review.
+/// Approve/reject only — never credits wallet or calls gateway/provider refund APIs.
+model RefundRequest {
+  id                   String              @id @default(cuid())
+  orderId              String
+  customerUserId       String
+  /// Linked wallet purchase when present (payment composition source).
+  purchaseId           String?
+  reason               RefundRequestReason
+  /// Optional short customer explanation (never a refund amount).
+  customerNote         String?
+  status               RefundRequestStatus @default(REQUESTED)
+  /// Authoritative refundable USD cents from server records at request time.
+  refundAmountCents    Int
+  currency             String              @default("USD")
+  /// Payment composition snapshot for later execution (no money movement here).
+  walletAppliedCents   Int                 @default(0)
+  gatewayAmountCents   Int                 @default(0)
+  fundingSource        OrderFundingSource?
+  /// Equals orderId while open; null when terminal — at most one open request per order.
+  openOrderKey         String?             @unique
+  adminDecisionNote    String?
+  reviewedByAdminId    String?
+  reviewedAt           DateTime?
+  decidedByAdminId     String?
+  decidedAt            DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  order                Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customer             User                @relation("RefundRequestCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
+  reviewedByAdmin      User?               @relation("RefundRequestReviewedBy", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  decidedByAdmin       User?               @relation("RefundRequestDecidedBy", fields: [decidedByAdminId], references: [id], onDelete: SetNull)
+
+  @@index([customerUserId])
+  @@index([orderId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([customerUserId, createdAt])
+  @@index([status, createdAt])
 }

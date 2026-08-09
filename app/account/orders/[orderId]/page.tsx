@@ -3,10 +3,18 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import CustomerEsimInstallPanel from "@/app/components/orders/CustomerEsimInstallPanel";
 import CustomerEsimUsagePanel from "@/app/components/orders/CustomerEsimUsagePanel";
+import CustomerRefundRequestForm from "@/app/components/orders/CustomerRefundRequestForm";
 import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
 import { requireSession } from "@/app/lib/auth/session";
 import { getCustomerOwnedOrderDetail } from "@/app/lib/orders/customerOrders";
 import type { CustomerEsimStatusBadge } from "@/app/lib/orders/customerOrderDisplay";
+import { listCustomerRefundRequestsForOrder } from "@/app/lib/refunds/refundRequest";
+import {
+  isOpenRefundStatus,
+  refundReasonLabel,
+  refundStatusLabel,
+} from "@/app/lib/refunds/refundRequestConstants";
+import { formatUsdCents } from "@/app/lib/wallet/display";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +88,15 @@ export default async function AccountOrderDetailPage({
   if (!detail) {
     notFound();
   }
+
+  const refundRequests = await listCustomerRefundRequestsForOrder({
+    customerUserId: user.id,
+    orderId: detail.id,
+  });
+  const openRefund = refundRequests.find((row) =>
+    isOpenRefundStatus(row.status)
+  );
+  const canRequestRefund = !detail.isRefunded && !openRefund;
 
   return (
     <div className="space-y-8">
@@ -199,6 +216,43 @@ export default async function AccountOrderDetailPage({
         orderId={detail.id}
         installEligible={detail.installEligible}
         isRefunded={detail.isRefunded}
+      />
+
+      {refundRequests.length > 0 ? (
+        <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 sm:px-5">
+          <h2 className="text-base font-bold text-[var(--heading)]">
+            Refund request status
+          </h2>
+          <ul className="mt-3 space-y-3 text-sm">
+            {refundRequests.map((row) => (
+              <li
+                key={row.id}
+                className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3"
+              >
+                <p className="font-semibold text-[var(--heading)]">
+                  {refundStatusLabel(row.status)}
+                </p>
+                <p className="mt-1 text-[var(--text-muted)]">
+                  {refundReasonLabel(row.reason)} ·{" "}
+                  {formatUsdCents(row.refundAmountCents)} USD
+                </p>
+                {row.status === "REJECTED" && row.adminDecisionNote ? (
+                  <p className="mt-1 text-[var(--text-muted)]">
+                    Decision note: {row.adminDecisionNote}
+                  </p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      <CustomerRefundRequestForm
+        orderId={detail.id}
+        canRequest={canRequestRefund}
+        openStatusLabel={
+          openRefund ? refundStatusLabel(openRefund.status) : null
+        }
       />
     </div>
   );
