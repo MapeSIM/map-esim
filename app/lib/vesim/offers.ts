@@ -1,4 +1,8 @@
-import { calculateRetailPriceUsd } from "@/app/lib/pricing/retailPrice";
+import {
+  allowanceFromDataLabel,
+  calculateRetailPriceUsd,
+  type RetailAllowanceInput,
+} from "@/app/lib/pricing/retailPrice";
 
 export type VesimRoamingCountry = {
   country: string;
@@ -327,9 +331,23 @@ export function normalizeOffer(raw: unknown): VesimOffer | null {
     item.price
   );
   // Customer-facing amounts are MAP retail; supplier cost stays on providerPriceUSD.
+  let allowance: RetailAllowanceInput = {
+    dataUnlimited: data.dataUnlimited,
+    dataMB: data.dataMB,
+    dataGB: data.dataGB,
+  };
+  // If numeric fields are missing, use structured dataFormatted (not plan titles).
+  if (
+    !allowance.dataUnlimited &&
+    !(typeof allowance.dataMB === "number" && allowance.dataMB > 0) &&
+    !(typeof allowance.dataGB === "number" && allowance.dataGB > 0)
+  ) {
+    const fromLabel = allowanceFromDataLabel(data.dataFormatted);
+    if (fromLabel) allowance = { ...allowance, ...fromLabel };
+  }
   const retailUsd =
     providerPriceUSD != null
-      ? calculateRetailPriceUsd(providerPriceUSD)
+      ? calculateRetailPriceUsd(providerPriceUSD, allowance)
       : null;
   const priceUSD = retailUsd ?? providerPriceUSD;
   const currency = firstString(item.currency) || "USD";

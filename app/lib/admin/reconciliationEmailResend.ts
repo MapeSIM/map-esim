@@ -36,7 +36,10 @@ import {
   type EmailResendEligibility,
 } from "@/app/lib/admin/reconciliationCaseShared";
 import { createOrderAccessToken, getOrderAccessSuccessUrl } from "@/app/lib/vesim/orderAccess";
-import { calculateRetailPriceUsd } from "@/app/lib/pricing/retailPrice";
+import {
+  allowanceFromDataLabel,
+  calculateRetailPriceUsd,
+} from "@/app/lib/pricing/retailPrice";
 import {
   getBrokerToken,
   getVesimBaseUrl,
@@ -156,7 +159,11 @@ function offerFromLocal(options: {
   let priceUSD = retailUsd;
   let providerPriceUSD = providerUsd;
   if (priceUSD <= 0 && providerPriceUSD > 0) {
-    const derived = calculateRetailPriceUsd(providerPriceUSD);
+    const allowance = allowanceFromDataLabel(options.dataAllowance);
+    const derived =
+      allowance != null
+        ? calculateRetailPriceUsd(providerPriceUSD, allowance)
+        : null;
     priceUSD = derived ?? providerPriceUSD;
   }
   if (providerPriceUSD <= 0 && priceUSD > 0) {

@@ -137,7 +137,8 @@ export default function CountryDetail() {
               ? {
                   ...current,
                   offerCount: list.length,
-                  minPrice: current.minPrice ?? lowestPrice,
+                  // Authoritative "starting from" = lowest MAP retail among offers.
+                  minPrice: lowestPrice ?? current.minPrice,
                 }
               : current
           );

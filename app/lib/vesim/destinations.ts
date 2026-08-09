@@ -1,4 +1,4 @@
-import { calculateRetailPriceUsd } from "@/app/lib/pricing/retailPrice";
+import { calculateEntryRetailPriceUsd } from "@/app/lib/pricing/retailPrice";
 import { formatOfferPrice } from "@/app/lib/vesim/offers";
 
 export type VesimDestination = {
@@ -131,8 +131,10 @@ export function normalizeDestination(raw: unknown): VesimDestination | null {
       : typeof item.minPriceUSD === "number"
         ? item.minPriceUSD
         : null;
+  // List APIs only expose VeSIM minPrice (no offer allowance). Entry-tier retail
+  // keeps "From" off raw supplier cost; country pages overwrite with true min retail.
   const retailMin =
-    providerMin != null ? calculateRetailPriceUsd(providerMin) : null;
+    providerMin != null ? calculateEntryRetailPriceUsd(providerMin) : null;
   const minPrice = retailMin ?? providerMin;
   const currency =
     typeof item.currency === "string" && item.currency.trim()

@@ -1,18 +1,25 @@
 /**
- * Offline QA for authoritative MAP eSIM retail pricing.
+ * Offline QA for authoritative MAP eSIM retail pricing (allowance-based).
  * Does not call VeSIM, mutate DB, or place orders.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  calculateEntryRetailPriceCents,
+  calculateEntryRetailPriceUsd,
   calculateRetailPriceCents,
   calculateRetailPriceUsd,
-  MARKUP_10_TO_30,
-  MARKUP_OVER_30,
-  MARKUP_UNDER_10,
-  markupRateForProviderCostCents,
-  roundUpToRetailEndingCents,
+  MARKUP_100MB_TO_500MB,
+  MARKUP_1GB_TO_5GB,
+  MARKUP_500MB_TO_1GB,
+  MARKUP_5GB_TO_10GB,
+  MARKUP_ENTRY_UNKNOWN_ALLOWANCE,
+  MARKUP_OVER_10GB,
+  MARKUP_UNLIMITED,
+  MARKUP_UP_TO_100MB,
+  markupRateForAllowance,
+  roundUpToNextCent,
 } from "../app/lib/pricing/retailPrice";
 
 const root = join(__dirname, "..");
@@ -21,49 +28,72 @@ function read(rel: string): string {
   return readFileSync(join(root, rel), "utf8");
 }
 
-function endingOk(cents: number): boolean {
-  const rem = cents % 100;
-  return rem === 49 || rem === 99;
-}
-
 function main() {
-  assert.equal(MARKUP_UNDER_10, 0.2);
-  assert.equal(MARKUP_10_TO_30, 0.18);
-  assert.equal(MARKUP_OVER_30, 0.15);
-  assert.equal(markupRateForProviderCostCents(999), 0.2);
-  assert.equal(markupRateForProviderCostCents(1000), 0.18);
-  assert.equal(markupRateForProviderCostCents(3000), 0.18);
-  assert.equal(markupRateForProviderCostCents(3001), 0.15);
+  assert.equal(MARKUP_UP_TO_100MB, 0.02);
+  assert.equal(MARKUP_100MB_TO_500MB, 0.02);
+  assert.equal(MARKUP_500MB_TO_1GB, 0.03);
+  assert.equal(MARKUP_1GB_TO_5GB, 0.04);
+  assert.equal(MARKUP_5GB_TO_10GB, 0.05);
+  assert.equal(MARKUP_OVER_10GB, 0.06);
+  assert.equal(MARKUP_UNLIMITED, 0.06);
+  assert.equal(MARKUP_ENTRY_UNKNOWN_ALLOWANCE, 0.02);
+
+  assert.equal(markupRateForAllowance({ dataMB: 100 }), 0.02);
+  assert.equal(markupRateForAllowance({ dataMB: 101 }), 0.02);
+  assert.equal(markupRateForAllowance({ dataMB: 500 }), 0.02);
+  assert.equal(markupRateForAllowance({ dataMB: 501 }), 0.03);
+  assert.equal(markupRateForAllowance({ dataGB: 1 }), 0.03);
+  assert.equal(markupRateForAllowance({ dataMB: 1024 }), 0.03);
+  assert.equal(markupRateForAllowance({ dataMB: 1025 }), 0.04);
+  assert.equal(markupRateForAllowance({ dataGB: 5 }), 0.04);
+  assert.equal(markupRateForAllowance({ dataGB: 5.1 }), 0.05);
+  assert.equal(markupRateForAllowance({ dataGB: 10 }), 0.05);
+  assert.equal(markupRateForAllowance({ dataGB: 10.1 }), 0.06);
+  assert.equal(markupRateForAllowance({ dataUnlimited: true }), 0.06);
   console.log("PASS markup_tiers_and_boundaries");
 
-  // Live sample expectations from policy examples.
-  assert.equal(calculateRetailPriceCents(66), 99); // $0.66 → $0.99
-  assert.equal(calculateRetailPriceCents(1042), 1249); // $10.42 → $12.49
-  assert.equal(calculateRetailPriceCents(3276), 3799); // $32.76 → $37.99
-  assert.equal(calculateRetailPriceUsd(0.66), 0.99);
-  assert.equal(calculateRetailPriceUsd(10.42), 12.49);
-  assert.equal(calculateRetailPriceUsd(32.76), 37.99);
-  console.log("PASS live_sample_retail_targets");
+  // Representative provider costs → ceil-to-cent retail (no .49/.99).
+  assert.equal(calculateRetailPriceCents(66, { dataMB: 100 }), 68); // 2%
+  assert.equal(calculateRetailPriceCents(66, { dataMB: 500 }), 68); // 2%
+  assert.equal(calculateRetailPriceCents(120, { dataGB: 1 }), 124); // 3%
+  assert.equal(calculateRetailPriceCents(250, { dataGB: 3 }), 260); // 4%
+  assert.equal(calculateRetailPriceCents(400, { dataGB: 5 }), 416); // 4%
+  assert.equal(calculateRetailPriceCents(800, { dataGB: 10 }), 840); // 5%
+  assert.equal(calculateRetailPriceCents(1200, { dataGB: 20 }), 1272); // 6%
+  assert.equal(
+    calculateRetailPriceCents(1500, { dataUnlimited: true }),
+    1590
+  ); // 6%
+  assert.equal(calculateRetailPriceUsd(0.66, { dataMB: 100 }), 0.68);
+  assert.equal(calculateEntryRetailPriceCents(66), 68);
+  assert.equal(calculateEntryRetailPriceUsd(0.66), 0.68);
+  console.log("PASS sample_retail_targets");
 
-  // Exact boundaries.
-  const at10 = calculateRetailPriceCents(1000);
-  const at30 = calculateRetailPriceCents(3000);
-  assert.ok(at10 != null && endingOk(at10));
-  assert.ok(at30 != null && endingOk(at30));
-  assert.ok(at10! >= Math.ceil(1000 * 1.18));
-  assert.ok(at30! >= Math.ceil(3000 * 1.18));
-  console.log("PASS boundary_10_and_30");
-
-  // Rounding never reduces markup amount.
-  for (const provider of [1, 66, 500, 999, 1000, 1042, 2500, 3000, 3001, 3276, 9999]) {
-    const rate = markupRateForProviderCostCents(provider)!;
-    const markedUp = Math.ceil(provider * (1 + rate));
-    const retail = calculateRetailPriceCents(provider)!;
-    assert.ok(retail >= markedUp, `retail ${retail} < markedUp ${markedUp}`);
-    assert.ok(endingOk(retail), `ending not .49/.99 for ${retail}`);
-    assert.equal(roundUpToRetailEndingCents(markedUp), retail);
+  // Rounding: next cent only; never reduces marked-up amount.
+  const cases: Array<{
+    cents: number;
+    allowance: Parameters<typeof calculateRetailPriceCents>[1];
+  }> = [
+    { cents: 1, allowance: { dataMB: 100 } },
+    { cents: 66, allowance: { dataMB: 100 } },
+    { cents: 66, allowance: { dataMB: 500 } },
+    { cents: 99, allowance: { dataGB: 1 } },
+    { cents: 250, allowance: { dataGB: 3 } },
+    { cents: 999, allowance: { dataGB: 10 } },
+    { cents: 1500, allowance: { dataUnlimited: true } },
+    { cents: 3276, allowance: { dataGB: 20 } },
+  ];
+  for (const { cents, allowance } of cases) {
+    const rate = markupRateForAllowance(allowance)!;
+    const markedUp = roundUpToNextCent(cents * (1 + rate));
+    const retail = calculateRetailPriceCents(cents, allowance)!;
+    assert.equal(retail, markedUp);
+    assert.ok(retail >= markedUp);
+    assert.ok(retail >= cents);
   }
-  console.log("PASS rounding_never_reduces_and_ends_49_or_99");
+  assert.equal(roundUpToNextCent(67.01), 68);
+  assert.equal(roundUpToNextCent(67), 67);
+  console.log("PASS rounding_up_to_next_cent_never_reduces");
 
   const pricing = read("app/lib/pricing/retailPrice.ts");
   const offers = read("app/lib/vesim/offers.ts");
@@ -76,11 +106,16 @@ function main() {
   const quoteRoute = read("app/api/vesim/quote/route.ts");
   const persist = read("app/lib/orders/persistAssignedOrder.ts");
   const destinations = read("app/lib/vesim/destinations.ts");
+  const countryDetail = read("app/countries/[id]/page.tsx");
   const currencyFormat = read("app/lib/currency/format.ts");
   const pkg = read("package.json");
 
   assert.match(pricing, /calculateRetailPriceCents/);
+  assert.match(pricing, /markupRateForAllowance/);
+  assert.match(pricing, /roundUpToNextCent/);
+  assert.doesNotMatch(pricing, /roundUpToRetailEndingCents/);
   assert.match(offers, /calculateRetailPriceUsd/);
+  assert.match(offers, /dataUnlimited:\s*data\.dataUnlimited/);
   assert.match(offers, /providerPriceUSD/);
   assert.match(offers, /toPublicVesimOffers/);
   assert.match(server, /providerPriceUSD/);
@@ -97,15 +132,18 @@ function main() {
   assert.match(offersRoute, /toPublicVesimOffers/);
   assert.match(offerRoute, /toPublicVerifiedCheckoutOffer/);
   assert.match(quoteRoute, /toPublicVerifiedCheckoutOffer/);
-  assert.match(persist, /providerAmount:\s*options\.verifiedOffer\.providerPriceUSD/);
+  assert.match(
+    persist,
+    /providerAmount:\s*options\.verifiedOffer\.providerPriceUSD/
+  );
   assert.match(persist, /displayAmount:\s*options\.verifiedOffer\.priceUSD/);
-  assert.match(destinations, /calculateRetailPriceUsd/);
+  assert.match(destinations, /calculateEntryRetailPriceUsd/);
+  assert.match(countryDetail, /lowestPrice \?\? current\.minPrice/);
   assert.match(currencyFormat, /convertFromUsd/);
   assert.match(pkg, /"qa:retail-pricing"/);
   assert.doesNotMatch(offersRoute, /providerPriceUSD/);
   console.log("PASS catalog_checkout_wallet_gateway_public_strip_contracts");
 
-  // Client tampering: browser money fields ignored in wallet actions.
   assert.match(actions, /Never trust browser money/);
   assert.match(actions, /void formData\.get\("price"\)/);
   console.log("PASS client_price_tampering_blocked");
