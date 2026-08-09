@@ -343,22 +343,23 @@ export default function PlansListing({
             <Link
               href={destinationPath(relatedRegional)}
               className="
-                mt-5 flex items-center justify-between gap-3 rounded-2xl
+                mt-4 flex items-start justify-between gap-3 rounded-2xl
                 border border-[var(--border-strong)] bg-[var(--surface-3)]
-                px-4 py-3.5 text-sm text-[var(--text)] transition
+                px-3.5 py-3 text-sm text-[var(--text)] transition
                 hover:border-[var(--accent-strong)]/45 hover:bg-[var(--surface)]
+                sm:mt-5 sm:items-center sm:px-4 sm:py-3.5
               "
             >
               <div className="min-w-0">
-                <p className="font-semibold text-[var(--heading)]">
-                  Browse regional plans
+                <p className="font-semibold leading-snug text-[var(--heading)]">
+                  Need more options?
                 </p>
-                <p className="mt-0.5 text-[var(--text-muted)]">
-                  Explore {relatedRegional.name} multi-country eSIMs — sometimes
-                  better value across a trip.
+                <p className="mt-0.5 text-[13px] leading-snug text-[var(--text-muted)] sm:text-sm">
+                  Check {relatedRegional.name} regional plans — they may offer
+                  better value for your trip.
                 </p>
               </div>
-              <ArrowRight className="h-4 w-4 shrink-0 text-[var(--accent-strong)]" />
+              <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-strong)] sm:mt-0" />
             </Link>
           )}
         </div>

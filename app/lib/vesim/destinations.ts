@@ -1,4 +1,8 @@
 import { calculateEntryRetailPriceUsd } from "@/app/lib/pricing/retailPrice";
+import {
+  isRecommendableRegionalCode,
+  regionalCodeForCountryIso,
+} from "@/app/lib/vesim/countryRegionalMap";
 import { formatOfferPrice } from "@/app/lib/vesim/offers";
 
 export type VesimDestination = {
@@ -207,8 +211,11 @@ export function findDestinationBySlug(
 }
 
 /**
- * Resolve the best matching regional destination for a country using
- * real API region metadata (e.g. Pakistan "South Asia" → region-asia).
+ * Resolve the best matching regional destination for a country.
+ * 1) Prefer live destination.regions metadata when present
+ *    (e.g. Pakistan "South Asia" → region-asia).
+ * 2) Fall back to ISO → VeSIM regional catalog map when metadata is empty.
+ * Never invent a region when neither source resolves to a live regional.
  */
 export function findRelatedRegionalDestination(
   country: VesimDestination,
@@ -216,9 +223,27 @@ export function findRelatedRegionalDestination(
 ): VesimDestination | undefined {
   if (country.kind !== "country") return undefined;
 
-  const regionals = destinations.filter((item) => item.kind === "regional");
+  const regionals = destinations.filter(
+    (item) =>
+      item.kind === "regional" && isRecommendableRegionalCode(item.code)
+  );
   if (regionals.length === 0) return undefined;
 
+  const fromMetadata = matchRegionalByCountryRegions(country, regionals);
+  if (fromMetadata) return fromMetadata;
+
+  const mappedCode = regionalCodeForCountryIso(country.code);
+  if (!mappedCode) return undefined;
+
+  return regionals.find(
+    (item) => item.code.trim().toLowerCase() === mappedCode
+  );
+}
+
+function matchRegionalByCountryRegions(
+  country: VesimDestination,
+  regionals: VesimDestination[]
+): VesimDestination | undefined {
   const countryRegions = (country.regions || [])
     .map((region) => region.trim().toLowerCase())
     .filter(Boolean);
@@ -253,7 +278,9 @@ export function findRelatedRegionalDestination(
           const countryTokens = countryRegion.split(/[\s,/&-]+/).filter(Boolean);
           const labelTokens = label.split(/[\s,/&-]+/).filter(Boolean);
           if (
-            labelTokens.some((token) => token.length >= 4 && countryTokens.includes(token))
+            labelTokens.some(
+              (token) => token.length >= 4 && countryTokens.includes(token)
+            )
           ) {
             score += 8;
           }
