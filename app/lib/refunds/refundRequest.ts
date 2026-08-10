@@ -431,6 +431,7 @@ export async function applyAdminRefundRequestDecision(options: {
         "Only requested refunds can move to under review."
       );
     }
+    const fromStatus = current.status;
     const updated = await prisma.refundRequest.updateMany({
       where: {
         id: current.id,
@@ -458,11 +459,15 @@ export async function applyAdminRefundRequestDecision(options: {
       targetId: current.id,
       metadata: {
         orderId: current.orderId,
-        fromStatus: current.status,
+        fromStatus,
         toStatus: RefundRequestStatus.UNDER_REVIEW,
         refundAmountCents: current.refundAmountCents,
       },
     });
+    // Email only on authoritative REQUESTED → UNDER_REVIEW (not idempotent re-mark).
+    if (fromStatus === RefundRequestStatus.REQUESTED) {
+      scheduleRefundStatusNotification(current.id, "under_review");
+    }
     return {
       requestId: current.id,
       status: RefundRequestStatus.UNDER_REVIEW,

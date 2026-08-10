@@ -97,6 +97,10 @@ function main() {
   assert.match(service, /scheduleRefundStatusNotification\(created\.id,\s*"received"\)/);
   assert.match(
     service,
+    /fromStatus === RefundRequestStatus\.REQUESTED[\s\S]{0,120}scheduleRefundStatusNotification\(current\.id,\s*"under_review"\)/
+  );
+  assert.match(
+    service,
     /scheduleRefundStatusNotification\(current\.id,\s*"approved_pending_execution"\)/
   );
   assert.match(

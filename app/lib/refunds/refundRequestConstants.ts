@@ -44,6 +44,7 @@ export const REFUND_AUDIT = {
   REJECTED: "refund.request_rejected",
   ACTION_BLOCKED: "refund.request_action_blocked",
   EMAIL_RECEIVED: "refund.email_received",
+  EMAIL_UNDER_REVIEW: "refund.email_under_review",
   EMAIL_APPROVED_PENDING: "refund.email_approved_pending_execution",
   EMAIL_REJECTED: "refund.email_rejected",
 } as const;
@@ -51,6 +52,7 @@ export const REFUND_AUDIT = {
 /** Customer refund-status email events (no COMPLETED in this phase). */
 export const REFUND_STATUS_EMAIL_EVENTS = [
   "received",
+  "under_review",
   "approved_pending_execution",
   "rejected",
 ] as const;

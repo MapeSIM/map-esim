@@ -77,10 +77,14 @@ function main() {
   assert.match(pkg, /"qa:refund-status-email"/);
   console.log("   ok");
 
-  console.log("3) Hook after successful create / approve / reject only");
+  console.log("3) Hook after successful create / under_review / approve / reject only");
   assert.match(
     service,
     /scheduleRefundStatusNotification\(created\.id,\s*"received"\)/
+  );
+  assert.match(
+    service,
+    /fromStatus === RefundRequestStatus\.REQUESTED[\s\S]{0,120}scheduleRefundStatusNotification\(current\.id,\s*"under_review"\)/
   );
   assert.match(
     service,
@@ -94,10 +98,6 @@ function main() {
     service,
     /DUPLICATE_OPEN[\s\S]{0,200}scheduleRefundStatusNotification/
   );
-  assert.doesNotMatch(
-    service,
-    /UNDER_REVIEW[\s\S]{0,120}scheduleRefundStatusNotification/
-  );
   assert.doesNotMatch(actions, /scheduleRefundStatusNotification/);
   assert.doesNotMatch(adminActions, /scheduleRefundStatusNotification/);
   console.log("   ok");
@@ -106,17 +106,21 @@ function main() {
   assert.match(notify, /alreadyEmailed|already_emailed/);
   assert.match(notify, /inFlightClaims/);
   assert.match(notify, /REFUND_AUDIT\.EMAIL_RECEIVED|refund\.email_received/);
+  assert.match(notify, /REFUND_AUDIT\.EMAIL_UNDER_REVIEW|refund\.email_under_review/);
   assert.match(notify, /Never throws|never affects refund/i);
   assert.match(notify, /scheduleRefundStatusNotification/);
   assert.match(constants, /EMAIL_RECEIVED/);
+  assert.match(constants, /EMAIL_UNDER_REVIEW/);
   assert.match(constants, /EMAIL_APPROVED_PENDING/);
   assert.match(constants, /EMAIL_REJECTED/);
   assert.deepEqual([...REFUND_STATUS_EMAIL_EVENTS], [
     "received",
+    "under_review",
     "approved_pending_execution",
     "rejected",
   ]);
   assert.equal(REFUND_AUDIT.EMAIL_RECEIVED, "refund.email_received");
+  assert.equal(REFUND_AUDIT.EMAIL_UNDER_REVIEW, "refund.email_under_review");
   console.log("   ok");
 
   console.log("5) Customer-safe wording (no money-returned claim)");
@@ -139,6 +143,14 @@ function main() {
     ...sample,
     kind: "received",
   });
+  const htmlUnderReview = renderRefundStatusEmailHtml({
+    ...sample,
+    kind: "under_review",
+  });
+  const textUnderReview = renderRefundStatusEmailText({
+    ...sample,
+    kind: "under_review",
+  });
   const htmlRejected = renderRefundStatusEmailHtml({
     ...sample,
     kind: "rejected",
@@ -153,29 +165,42 @@ function main() {
     textApproved,
     htmlReceived,
     textReceived,
+    htmlUnderReview,
+    textUnderReview,
     htmlRejected,
     textRejected,
     template,
     notify,
   ]) {
-    assert.doesNotMatch(content, /Refund completed|Money refunded|funds have been returned|has been refunded/i);
+    assert.doesNotMatch(content, /Refund completed|Money refunded|has been refunded/i);
     assert.doesNotMatch(content, /adminDecisionNote/);
   }
   assert.match(textReceived, /not confirmation that a refund has been approved or issued/i);
-  assert.match(textReceived, /No funds have been moved yet/i);
+  assert.match(textReceived, /No refund has been completed yet/i);
+  assert.match(textUnderReview, /under review/i);
+  assert.match(textUnderReview, /no refund has been completed yet/i);
+  assert.match(textApproved, /has been approved/i);
+  assert.match(textApproved, /Actual funds have not yet been returned/i);
   assert.match(
     textApproved,
-    /Money has not necessarily been returned yet|not a refund-completed notice/i
+    /another confirmation only after refund execution succeeds/i
   );
   assert.match(textRejected, /not approved/i);
   assert.match(textRejected, /support@mapesim\.com|\/contact/i);
   assert.match(refundStatusEmailSubject("received"), /refund request/i);
+  assert.match(refundStatusEmailSubject("under_review"), /under review/i);
   assert.match(
     refundStatusEmailSubject("approved_pending_execution"),
-    /approved for execution/i
+    /approved/i
+  );
+  assert.match(
+    refundStatusEmailSubject("approved_pending_execution"),
+    /not returned yet|funds not returned/i
   );
   assertNoSensitive(htmlApproved);
   assertNoSensitive(textApproved);
+  assertNoSensitive(htmlUnderReview);
+  assertNoSensitive(textUnderReview);
   assertNoSensitive(htmlRejected);
   assertNoSensitive(textRejected);
   console.log("   ok");

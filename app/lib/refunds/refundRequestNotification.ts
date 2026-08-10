@@ -43,6 +43,8 @@ function auditActionFor(event: RefundStatusEmailEvent): string {
   switch (event) {
     case "received":
       return REFUND_AUDIT.EMAIL_RECEIVED;
+    case "under_review":
+      return REFUND_AUDIT.EMAIL_UNDER_REVIEW;
     case "approved_pending_execution":
       return REFUND_AUDIT.EMAIL_APPROVED_PENDING;
     case "rejected":
@@ -54,6 +56,8 @@ function expectedStatus(event: RefundStatusEmailEvent): RefundRequestStatus {
   switch (event) {
     case "received":
       return RefundRequestStatus.REQUESTED;
+    case "under_review":
+      return RefundRequestStatus.UNDER_REVIEW;
     case "approved_pending_execution":
       return RefundRequestStatus.APPROVED_PENDING_EXECUTION;
     case "rejected":
@@ -128,7 +132,7 @@ async function alreadyEmailed(
  * Never throws to callers. Email failure never undoes refund status.
  *
  * Idempotency (no new schema):
- * 1) Callers schedule only after successful create / approve / reject CAS.
+ * 1) Callers schedule only after successful create / under_review / approve / reject CAS.
  * 2) Process-local claim key.
  * 3) AuditLog prior-delivery check for the same request+event.
  */
@@ -162,6 +166,7 @@ export async function notifyRefundStatusEmail(
         refundAmountCents: true,
         currency: true,
         createdAt: true,
+        reviewedAt: true,
         decidedAt: true,
         customer: {
           select: {
@@ -234,7 +239,9 @@ export async function notifyRefundStatusEmail(
     const when =
       event === "received"
         ? row.createdAt
-        : row.decidedAt ?? row.createdAt;
+        : event === "under_review"
+          ? row.reviewedAt ?? row.createdAt
+          : row.decidedAt ?? row.createdAt;
 
     const payload = {
       kind,

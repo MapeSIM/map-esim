@@ -14,6 +14,7 @@ import {
 
 export type RefundStatusEmailKind =
   | "received"
+  | "under_review"
   | "approved_pending_execution"
   | "rejected";
 
@@ -38,6 +39,8 @@ function headlineFor(kind: RefundStatusEmailKind): string {
   switch (kind) {
     case "received":
       return "Refund request received";
+    case "under_review":
+      return "Refund request under review";
     case "approved_pending_execution":
       return "Refund approved — pending execution";
     case "rejected":
@@ -49,8 +52,10 @@ function introFor(kind: RefundStatusEmailKind, name: string): string {
   switch (kind) {
     case "received":
       return `Hello ${name}, we received your ${BRAND_NAME} refund request. Our team will review it. This is not confirmation that a refund has been approved or issued.`;
+    case "under_review":
+      return `Hello ${name}, your ${BRAND_NAME} refund request is now under review by our team. This update only confirms review has started — no refund has been completed yet.`;
     case "approved_pending_execution":
-      return `Hello ${name}, your ${BRAND_NAME} refund request has been approved for execution. Money has not necessarily been returned yet. You will receive another confirmation when the actual refund completes.`;
+      return `Hello ${name}, your ${BRAND_NAME} refund request has been approved. Actual funds have not yet been returned. You will receive another confirmation only after refund execution succeeds.`;
     case "rejected":
       return `Hello ${name}, your ${BRAND_NAME} refund request was reviewed and was not approved. If you need help, contact support using the details below.`;
   }
@@ -60,8 +65,10 @@ function subjectFor(kind: RefundStatusEmailKind): string {
   switch (kind) {
     case "received":
       return "We received your MAP eSIM refund request";
+    case "under_review":
+      return "Your MAP eSIM refund request is under review";
     case "approved_pending_execution":
-      return "Your MAP eSIM refund is approved for execution";
+      return "Your MAP eSIM refund is approved — funds not returned yet";
     case "rejected":
       return "Update on your MAP eSIM refund request";
   }
@@ -85,11 +92,11 @@ export function renderRefundStatusEmailHtml(
   const caution =
     payload.kind === "approved_pending_execution"
       ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.55;color:${TEXT_PRIMARY};font-weight:600;">
-          This is not a refund-completed notice. Funds may still be processing.
+          This is not a refund-completed notice. Actual funds have not yet been returned.
         </p>`
-      : payload.kind === "received"
+      : payload.kind === "received" || payload.kind === "under_review"
         ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.55;color:${TEXT_PRIMARY};font-weight:600;">
-            No funds have been moved yet.
+            No refund has been completed yet. No funds have been moved.
           </p>`
         : "";
 
@@ -156,12 +163,15 @@ export function renderRefundStatusEmailText(
     introFor(payload.kind, name),
     "",
   ];
-  if (payload.kind === "received") {
-    lines.push("No funds have been moved yet.", "");
+  if (payload.kind === "received" || payload.kind === "under_review") {
+    lines.push(
+      "No refund has been completed yet. No funds have been moved.",
+      ""
+    );
   }
   if (payload.kind === "approved_pending_execution") {
     lines.push(
-      "This is not a refund-completed notice. Funds may still be processing.",
+      "This is not a refund-completed notice. Actual funds have not yet been returned.",
       ""
     );
   }
