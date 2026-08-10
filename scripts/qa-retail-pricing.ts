@@ -123,6 +123,7 @@ function main() {
   const destinations = read("app/lib/vesim/destinations.ts");
   const countryDetail = read("app/countries/[id]/page.tsx");
   const countriesList = read("app/countries/page.tsx");
+  const countriesListing = read("app/components/countries/CountriesListing.tsx");
   const currencyFormat = read("app/lib/currency/format.ts");
   const pkg = read("package.json");
 
@@ -174,7 +175,8 @@ function main() {
   console.log("PASS client_price_tampering_blocked");
 
   // Country UI must trust public retail JSON — never second markup pass.
-  assert.match(countryDetail, /parsePublicVesimOffers/);
+  // Detail SSR sanitizes via toPublicVesimOffers; listing client uses parsePublicDestinations.
+  assert.match(countryDetail, /toPublicVesimOffers|parsePublicVesimOffers/);
   assert.doesNotMatch(countryDetail, /normalizeOffers\(/);
   assert.match(offers, /parsePublicVesimOffers/);
   assert.match(
@@ -251,9 +253,10 @@ function main() {
   console.log("PASS provider_price_stripped_from_public_parse");
 
   // Destination "From" / Starting price: entry retail once on raw VeSIM, never twice on public JSON.
-  assert.match(countriesList, /parsePublicDestinations/);
-  assert.doesNotMatch(countriesList, /normalizeDestinations\(/);
-  assert.match(countryDetail, /parsePublicDestinations/);
+  assert.match(countriesList, /fetchPublicDestinationCatalog/);
+  assert.match(countriesListing, /parsePublicDestinations/);
+  assert.doesNotMatch(countriesListing, /normalizeDestinations\(/);
+  assert.match(countryDetail, /fetchPublicDestinationCatalog|withLowestOfferRetailMinPrice/);
   assert.doesNotMatch(countryDetail, /normalizeDestinations\(/);
   assert.match(destinations, /parsePublicDestinations/);
   assert.match(destinations, /applyEntryRetail/);

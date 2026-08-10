@@ -208,6 +208,50 @@ export function parsePublicDestinations(payload: unknown): VesimDestination[] {
     .filter((item): item is VesimDestination => item !== null);
 }
 
+/** Marketing static list in `app/data/countries.ts` — never overwrite a full catalog with this size. */
+export const STATIC_DESTINATION_FALLBACK_MAX = 8;
+
+export type DestinationCatalogSource = "catalog" | "static";
+
+/**
+ * Soft-refresh accept policy for the public destination listing.
+ * - Empty/error results never replace existing data.
+ * - A tiny fallback-sized result must not overwrite a larger trusted catalog.
+ * - Static fallback is only acceptable when no trusted catalog is present.
+ */
+export function shouldAcceptPublicDestinationCatalog(options: {
+  currentLength: number;
+  currentSource: DestinationCatalogSource;
+  nextLength: number;
+  nextIsStaticFallback?: boolean;
+  staticFallbackMax?: number;
+}): boolean {
+  const staticMax =
+    typeof options.staticFallbackMax === "number" &&
+    Number.isFinite(options.staticFallbackMax)
+      ? Math.max(0, Math.trunc(options.staticFallbackMax))
+      : STATIC_DESTINATION_FALLBACK_MAX;
+
+  const nextLength = Math.max(0, Math.trunc(options.nextLength));
+  const currentLength = Math.max(0, Math.trunc(options.currentLength));
+
+  if (nextLength <= 0) return false;
+
+  if (options.nextIsStaticFallback) {
+    return options.currentSource !== "catalog" || currentLength === 0;
+  }
+
+  if (
+    options.currentSource === "catalog" &&
+    currentLength > staticMax &&
+    nextLength <= staticMax
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 /**
  * Lowest MAP retail USD among buyable offers (already marked up once).
  * Used for authoritative "Starting from" — never re-derive from provider minPrice.
