@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import LegalDocument from "@/app/components/legal/LegalDocument";
 import { BRAND_NAME, BRAND_SITE_HOST } from "@/app/lib/brand";
 import { LEGAL_CONTACTS, type LegalSection } from "@/app/lib/legal";
+import { absoluteCanonical } from "@/app/lib/seo/canonical";
 
 export const metadata: Metadata = {
   title: `Terms & Conditions | ${BRAND_NAME}`,
   description: `Terms of use for ${BRAND_NAME} accounts, eSIM purchases and related services.`,
-  alternates: { canonical: "/terms-and-conditions" },
+  alternates: { canonical: absoluteCanonical("/terms-and-conditions") },
 };
 
 const sections: LegalSection[] = [

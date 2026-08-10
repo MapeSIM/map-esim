@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import LegalDocument from "@/app/components/legal/LegalDocument";
 import { BRAND_NAME, BRAND_SITE_HOST } from "@/app/lib/brand";
 import { LEGAL_CONTACTS, type LegalSection } from "@/app/lib/legal";
+import { absoluteCanonical } from "@/app/lib/seo/canonical";
 
 export const metadata: Metadata = {
   title: `Cookie Policy | ${BRAND_NAME}`,
   description: `How ${BRAND_NAME} uses cookies and similar technologies.`,
-  alternates: { canonical: "/cookie-policy" },
+  alternates: { canonical: absoluteCanonical("/cookie-policy") },
 };
 
 const sections: LegalSection[] = [

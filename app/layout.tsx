@@ -29,7 +29,8 @@ export const metadata: Metadata = {
   openGraph: {
     title: BRAND_NAME,
     description: BRAND_TAGLINE,
-    url: BRAND_SITE_URL,
+    // Do not set openGraph.url here — a root homepage URL was leaking into
+    // child routes that omit their own og:url and confused crawler canonicals.
     siteName: BRAND_NAME,
     type: "website",
   },

@@ -6,9 +6,9 @@ import Breadcrumbs from "@/app/components/seo/Breadcrumbs";
 import JsonLd from "@/app/components/seo/JsonLd";
 import {
   BRAND_NAME,
-  BRAND_SITE_URL,
   BRAND_SUPPORT_EMAIL,
 } from "@/app/lib/brand";
+import { absoluteCanonical } from "@/app/lib/seo/canonical";
 import {
   breadcrumbList,
   SITE_ORG_ID,
@@ -18,12 +18,12 @@ import {
 const title = `Contact Support | ${BRAND_NAME}`;
 const description =
   "Contact MAP eSIM support for help with purchasing, installation, activation, connectivity, wallet activity, and orders.";
-const canonical = `${BRAND_SITE_URL}/contact`;
+const canonical = absoluteCanonical("/contact");
 
 export const metadata: Metadata = {
   title,
   description,
-  alternates: { canonical: "/contact" },
+  alternates: { canonical },
   openGraph: {
     title,
     description,

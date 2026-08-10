@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { BRAND_NAME } from "@/app/lib/brand";
+import { absoluteCanonical } from "@/app/lib/seo/canonical";
 import { resolveDestinationForSeo } from "@/app/lib/seo/destinationCatalog";
 import { destinationPath } from "@/app/lib/vesim/destinations";
 
@@ -30,17 +31,18 @@ export async function generateMetadata({
   }
 
   const path = destinationPath(destination);
+  const canonical = absoluteCanonical(path);
   const title = `${destination.name} eSIM | ${BRAND_NAME}`;
   const description = `Travel data eSIM plans for ${destination.name} from ${BRAND_NAME}.`;
 
   return {
     title,
     description,
-    alternates: { canonical: path },
+    alternates: { canonical },
     openGraph: {
       title,
       description,
-      url: path,
+      url: canonical,
       siteName: BRAND_NAME,
       type: "website",
     },

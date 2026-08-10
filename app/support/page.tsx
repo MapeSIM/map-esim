@@ -13,17 +13,20 @@ import {
   Wifi,
 } from "lucide-react";
 import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from "@/app/lib/brand";
+import { absoluteCanonical } from "@/app/lib/seo/canonical";
+
+const canonical = absoluteCanonical("/support");
 
 export const metadata: Metadata = {
   title: `Support Center | ${BRAND_NAME}`,
   description:
     "Get help with MAP eSIM installation, activation, orders, wallet balance and travel connectivity.",
-  alternates: { canonical: "/support" },
+  alternates: { canonical },
   openGraph: {
     title: `Support Center | ${BRAND_NAME}`,
     description:
       "Get help with MAP eSIM installation, activation, orders, wallet balance and travel connectivity.",
-    url: "/support",
+    url: canonical,
     siteName: BRAND_NAME,
     type: "website",
   },

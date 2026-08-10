@@ -3,19 +3,21 @@ import Link from "next/link";
 import DeviceCompatibilityChecker from "@/app/components/deviceCompatibility/DeviceCompatibilityChecker";
 import { BRAND_NAME } from "@/app/lib/brand";
 import { COMPATIBILITY_DISCLAIMER } from "@/app/lib/deviceCompatibility/catalog";
+import { absoluteCanonical } from "@/app/lib/seo/canonical";
 
 const title = `eSIM Device Compatibility Checker | ${BRAND_NAME}`;
 const description =
   "Check whether your Apple, Samsung, or Google Pixel phone is likely eSIM-compatible before buying a MAP eSIM. Guidance only — not a guarantee.";
+const canonical = absoluteCanonical("/device-compatibility");
 
 export const metadata: Metadata = {
   title,
   description,
-  alternates: { canonical: "/device-compatibility" },
+  alternates: { canonical },
   openGraph: {
     title,
     description,
-    url: "/device-compatibility",
+    url: canonical,
     siteName: BRAND_NAME,
     type: "website",
   },

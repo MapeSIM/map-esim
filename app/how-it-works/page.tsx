@@ -11,7 +11,8 @@ import {
 } from "lucide-react";
 import Breadcrumbs from "@/app/components/seo/Breadcrumbs";
 import JsonLd from "@/app/components/seo/JsonLd";
-import { BRAND_NAME, BRAND_SITE_URL } from "@/app/lib/brand";
+import { BRAND_NAME } from "@/app/lib/brand";
+import { absoluteCanonical } from "@/app/lib/seo/canonical";
 import {
   breadcrumbList,
   PAKISTAN_DESTINATION_PATH,
@@ -22,12 +23,12 @@ import {
 const title = `How It Works | ${BRAND_NAME}`;
 const description =
   "Learn how MAP eSIM works: choose a destination plan, complete checkout, then install and activate your travel eSIM on iPhone or Android.";
-const canonical = `${BRAND_SITE_URL}/how-it-works`;
+const canonical = absoluteCanonical("/how-it-works");
 
 export const metadata: Metadata = {
   title,
   description,
-  alternates: { canonical: "/how-it-works" },
+  alternates: { canonical },
   openGraph: {
     title,
     description,

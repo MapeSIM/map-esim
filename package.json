@@ -41,6 +41,8 @@
     "qa:guest-checkout-gate": "tsx scripts/qa-guest-checkout-gate.ts",
     "qa:vesim-environment": "tsx scripts/qa-vesim-environment.ts",
     "qa:retail-pricing": "tsx scripts/qa-retail-pricing.ts",
+    "qa:country-plans-ssr": "tsx scripts/qa-country-plans-ssr.ts",
+    "qa:seo-canonical": "tsx scripts/qa-seo-canonical.ts",
     "qa:vesim-provider-email": "tsx scripts/qa-vesim-provider-email.ts",
     "qa:iccid-persistence": "tsx scripts/qa-iccid-persistence.ts",
     "qa:admin-wallet-purchase": "tsx scripts/qa-admin-wallet-purchase.ts",

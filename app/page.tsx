@@ -15,15 +15,18 @@ import {
   Zap,
 } from "lucide-react";
 import { BRAND_NAME, BRAND_TAGLINE } from "@/app/lib/brand";
+import { absoluteCanonical } from "@/app/lib/seo/canonical";
+
+const homeCanonical = absoluteCanonical("/");
 
 export const metadata: Metadata = {
   title: BRAND_NAME,
   description: BRAND_TAGLINE,
-  alternates: { canonical: "/" },
+  alternates: { canonical: homeCanonical },
   openGraph: {
     title: BRAND_NAME,
     description: BRAND_TAGLINE,
-    url: "/",
+    url: homeCanonical,
     siteName: BRAND_NAME,
     type: "website",
   },

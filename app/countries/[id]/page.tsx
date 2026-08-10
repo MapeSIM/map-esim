@@ -1,19 +1,24 @@
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
 import PlansListing from "@/app/components/plans/PlansListing";
 import { countries as staticCountries } from "@/app/data/countries";
-import type { VesimOffer } from "@/app/lib/vesim/offers";
-import { parsePublicVesimOffers } from "@/app/lib/vesim/offers";
+import { toPublicVesimOffers, type VesimOffer } from "@/app/lib/vesim/offers";
 import type { VesimDestination } from "@/app/lib/vesim/destinations";
 import {
   findDestinationBySlug,
   findRelatedRegionalDestination,
-  parsePublicDestinations,
   slugifyDestination,
   withLowestOfferRetailMinPrice,
 } from "@/app/lib/vesim/destinations";
+import {
+  fetchOffersForCountry,
+  fetchPublicDestinationCatalog,
+} from "@/app/lib/vesim/server";
+
+/** Align with public destination catalog cache; keep crawlers on fresh plan HTML. */
+export const revalidate = 300;
+
+type CountryDetailPageProps = {
+  params: Promise<{ id: string }>;
+};
 
 function staticToDestination(id: string): VesimDestination | undefined {
   const match = staticCountries.find(
@@ -41,147 +46,39 @@ function staticToDestination(id: string): VesimDestination | undefined {
   };
 }
 
-export default function CountryDetail() {
-  const params = useParams<{ id: string }>();
-  const id = typeof params?.id === "string" ? params.id : "";
+async function loadPublicDestinations(): Promise<VesimDestination[]> {
+  try {
+    return await fetchPublicDestinationCatalog();
+  } catch {
+    // Provider/auth failures must not blank the SEO shell.
+    return [];
+  }
+}
 
-  const fallbackDestination = useMemo(
-    () => (id ? staticToDestination(id) : undefined),
-    [id]
-  );
-
-  const [destination, setDestination] = useState<VesimDestination | null>(
-    () => (id ? staticToDestination(id) ?? null : null)
-  );
-  const [relatedRegional, setRelatedRegional] =
-    useState<VesimDestination | null>(null);
-  const [countryNames, setCountryNames] = useState<Record<string, string>>({});
-  const [offers, setOffers] = useState<VesimOffer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [notFound, setNotFound] = useState(false);
-
-  useEffect(() => {
-    if (!id) return;
-
-    let cancelled = false;
-
-    async function load() {
-      setLoading(true);
-      setError("");
-      setNotFound(false);
-
-      // Paint static country shell immediately when available.
-      if (fallbackDestination) {
-        setDestination(fallbackDestination);
-      }
-
-      try {
-        const earlyCode = fallbackDestination?.code?.trim();
-        const destinationsPromise = fetch("/api/vesim/destinations");
-        // Start offers in parallel when static catalog already knows the country code.
-        const earlyOffersPromise = earlyCode
-          ? fetch(
-              `/api/vesim/offers?country=${encodeURIComponent(earlyCode)}`,
-              { cache: "no-store" }
-            )
-          : null;
-
-        const destinationsRes = await destinationsPromise;
-        const destinationsData = await destinationsRes.json();
-        // Public API already returns MAP retail minPrice — do not re-normalize.
-        const destinations = parsePublicDestinations(destinationsData);
-
-        const names: Record<string, string> = {};
-        for (const item of destinations) {
-          if (item.kind === "country") {
-            names[item.code.toUpperCase()] = item.name;
-          }
-        }
-
-        const matched =
-          findDestinationBySlug(destinations, id) || fallbackDestination;
-
-        if (!matched) {
-          if (!cancelled) {
-            setNotFound(true);
-            setDestination(null);
-            setRelatedRegional(null);
-            setOffers([]);
-          }
-          return;
-        }
-
-        const related =
-          matched.kind === "country"
-            ? findRelatedRegionalDestination(matched, destinations) || null
-            : null;
-
-        if (!cancelled) {
-          setDestination(matched);
-          setRelatedRegional(related);
-          setCountryNames(names);
-        }
-
-        const matchedCode = matched.code.trim();
-        const offersRes =
-          earlyOffersPromise &&
-          earlyCode &&
-          matchedCode.toUpperCase() === earlyCode.toUpperCase()
-            ? await earlyOffersPromise
-            : await fetch(
-                `/api/vesim/offers?country=${encodeURIComponent(matchedCode)}`,
-                { cache: "no-store" }
-              );
-        const offersData = await offersRes.json();
-
-        if (!offersRes.ok || offersData.success === false) {
-          throw new Error(
-            offersData.error ||
-              offersData.message ||
-              "Failed to load eSIM plans"
-          );
-        }
-
-        // Public API already returns MAP retail — do not re-normalize/markup.
-        const list = parsePublicVesimOffers(offersData);
-
-        if (!cancelled) {
-          setOffers(list);
-          setDestination((current) =>
-            current
-              ? withLowestOfferRetailMinPrice(
-                  { ...current, offerCount: list.length },
-                  list
-                )
-              : current
-          );
-        }
-      } catch (err: unknown) {
-        if (!cancelled) {
-          if (fallbackDestination) {
-            setDestination(fallbackDestination);
-          }
-          setOffers([]);
-          setError(
-            err instanceof Error ? err.message : "Failed to load eSIM plans"
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    load();
-
-    return () => {
-      cancelled = true;
+async function loadPublicOffers(countryCode: string): Promise<{
+  offers: VesimOffer[];
+  error: string;
+}> {
+  try {
+    const raw = await fetchOffersForCountry(countryCode);
+    return { offers: toPublicVesimOffers(raw), error: "" };
+  } catch {
+    return {
+      offers: [],
+      error:
+        "Plans are temporarily unavailable for this destination. Please try again shortly.",
     };
-  }, [id, fallbackDestination]);
+  }
+}
 
-  if (!id || (!loading && (notFound || !destination))) {
+export default async function CountryDetailPage({
+  params,
+}: CountryDetailPageProps) {
+  const { id: rawId } = await params;
+  const id = typeof rawId === "string" ? rawId.trim() : "";
+  const fallbackDestination = id ? staticToDestination(id) : undefined;
+
+  if (!id) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[var(--page-bg)] text-[var(--heading)]">
         <div className="text-center">
@@ -194,19 +91,46 @@ export default function CountryDetail() {
     );
   }
 
-  if (!destination) {
+  const destinations = await loadPublicDestinations();
+  const countryNames: Record<string, string> = {};
+  for (const item of destinations) {
+    if (item.kind === "country") {
+      countryNames[item.code.toUpperCase()] = item.name;
+    }
+  }
+
+  const matched =
+    findDestinationBySlug(destinations, id) || fallbackDestination || null;
+
+  if (!matched) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[var(--page-bg)] text-[var(--heading)]">
-        <p className="text-lg text-[var(--text)]">Loading destination...</p>
+        <div className="text-center">
+          <h1 className="text-3xl font-bold">Destination not found</h1>
+          <p className="mt-3 text-[var(--text-muted)]">
+            We couldn&apos;t find plans for this destination.
+          </p>
+        </div>
       </main>
     );
   }
+
+  const relatedRegional =
+    matched.kind === "country"
+      ? findRelatedRegionalDestination(matched, destinations) || null
+      : null;
+
+  const { offers, error } = await loadPublicOffers(matched.code.trim());
+  const destination = withLowestOfferRetailMinPrice(
+    { ...matched, offerCount: offers.length },
+    offers
+  );
 
   return (
     <PlansListing
       destination={destination}
       offers={offers}
-      loading={loading}
+      loading={false}
       error={error}
       countryNames={countryNames}
       relatedRegional={relatedRegional}
