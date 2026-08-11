@@ -24,7 +24,7 @@ type NavLink = {
   flagSrc?: string;
 };
 
-/** Desktop order: Home → Pakistan → Destinations → Plans → guides → support. */
+/** Desktop/mobile primary order (Plans stays at /plans but is not linked here). */
 const navLinks: NavLink[] = [
   { href: "/", label: "Home" },
   {
@@ -33,10 +33,10 @@ const navLinks: NavLink[] = [
     flagSrc: PAKISTAN_FLAG_PUBLIC_PATH,
   },
   { href: "/countries", label: "Destinations" },
-  { href: "/plans", label: "Plans" },
   { href: "/how-it-works", label: "How It Works" },
   { href: "/support", label: "Support" },
   { href: "/contact", label: "Contact" },
+  { href: "/affiliates-and-partnerships", label: "Affiliates & Partnerships" },
 ];
 
 function NavLinkLabel({ link }: { link: NavLink }) {
@@ -196,7 +196,7 @@ export default function Navbar({
             </Link>
 
             <Link
-              href="/account/esim/buy"
+              href="/countries"
               className="
                 inline-flex items-center justify-center
                 rounded-[14px] bg-[var(--accent)] px-4 py-2.5
@@ -294,7 +294,7 @@ export default function Navbar({
             </Link>
 
             <Link
-              href="/account/esim/buy"
+              href="/countries"
               onClick={closeMenu}
               className="
                 mt-2 inline-flex items-center justify-center

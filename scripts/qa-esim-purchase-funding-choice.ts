@@ -152,9 +152,10 @@ function main() {
   assert.match(buyPage, /That package is no longer available/);
   console.log("PASS direct_buy_now_prepare_and_redirect");
 
-  // Generic entry points keep package selection; navbar stays Get eSIM.
+  // Generic entry points keep package selection; navbar Get eSIM → destinations.
   assert.match(navbar, /Get eSIM/);
-  assert.match(navbar, /href="\/account\/esim\/buy"/);
+  assert.match(navbar, /href="\/countries"/);
+  assert.doesNotMatch(navbar, /Get eSIM[\s\S]{0,120}href="\/account\/esim\/buy"/);
   assert.match(accountLayout, /label: "Buy eSIM"/);
   assert.match(accountLayout, /AccountMenu/);
   assert.doesNotMatch(accountLayout, /Buy with wallet/);

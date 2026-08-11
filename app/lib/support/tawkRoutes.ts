@@ -33,6 +33,7 @@ const ALLOWED_EXACT = new Set([
   "/cookie-policy",
   "/how-it-works",
   "/contact",
+  "/affiliates-and-partnerships",
 ]);
 
 function matchesBlocked(pathname: string): boolean {

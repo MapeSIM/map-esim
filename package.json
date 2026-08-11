@@ -44,6 +44,7 @@
     "qa:country-plans-ssr": "tsx scripts/qa-country-plans-ssr.ts",
     "qa:destination-catalog-ssr": "tsx scripts/qa-destination-catalog-ssr.ts",
     "qa:plans-discovery": "tsx scripts/qa-plans-discovery.ts",
+    "qa:affiliates-partnerships": "tsx scripts/qa-affiliates-partnerships.ts",
     "qa:seo-canonical": "tsx scripts/qa-seo-canonical.ts",
     "qa:vesim-provider-email": "tsx scripts/qa-vesim-provider-email.ts",
     "qa:iccid-persistence": "tsx scripts/qa-iccid-persistence.ts",

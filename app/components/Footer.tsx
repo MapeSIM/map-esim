@@ -18,7 +18,10 @@ const columns = [
     links: [
       { label: "Home", href: "/" },
       { label: "How It Works", href: "/how-it-works" },
-      { label: "Plans", href: "/plans" },
+      {
+        label: "Affiliates & Partnerships",
+        href: "/affiliates-and-partnerships",
+      },
       { label: "Contact", href: "/contact" },
     ],
   },
