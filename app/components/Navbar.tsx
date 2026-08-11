@@ -105,7 +105,7 @@ export default function Navbar({
       <nav
         className="
           mx-auto flex h-16 w-full min-w-0 max-w-[1200px] items-center
-          justify-between gap-1.5 px-3 sm:h-[72px] sm:gap-3 sm:px-6
+          justify-between gap-3 px-3 sm:h-[72px] sm:gap-4 sm:px-6
         "
         aria-label="Primary"
       >
@@ -113,7 +113,8 @@ export default function Navbar({
           href="/"
           onClick={closeMenu}
           className="
-            group flex min-w-0 shrink items-center gap-2.5 rounded-lg
+            group mr-2 flex shrink-0 items-center gap-2.5 rounded-lg
+            lg:mr-4 xl:mr-6
             focus-visible:outline-none focus-visible:ring-2
             focus-visible:ring-[var(--accent-strong)]/60
             focus-visible:ring-offset-2
@@ -143,7 +144,7 @@ export default function Navbar({
           <span className="sr-only">{BRAND_NAME}</span>
         </Link>
 
-        <div className="hidden items-center gap-0.5 lg:flex xl:gap-1">
+        <div className="hidden min-w-0 flex-1 items-center justify-end gap-0.5 lg:flex xl:gap-1">
           {navLinks.map((link) => {
             const active = isActive(link.href);
             return (
@@ -151,8 +152,9 @@ export default function Navbar({
                 key={link.href}
                 href={link.href}
                 className={`
-                  relative whitespace-nowrap rounded-lg px-2 py-2 text-[13px]
-                  font-medium transition-colors xl:px-2.5 xl:text-sm
+                  relative shrink-0 whitespace-nowrap rounded-lg px-1.5 py-2
+                  text-xs font-medium transition-colors
+                  xl:px-2.5 xl:text-[13px] 2xl:px-3 2xl:text-sm
                   focus-visible:outline-none focus-visible:ring-2
                   focus-visible:ring-[var(--accent-strong)]/60
                   focus-visible:ring-offset-2
@@ -168,8 +170,9 @@ export default function Navbar({
                 {active && (
                   <span
                     className="
-                      absolute bottom-0 left-2 right-2 h-0.5
+                      absolute bottom-0 left-1.5 right-1.5 h-0.5
                       rounded-full bg-[var(--accent-strong)]/90
+                      xl:left-2 xl:right-2
                     "
                     aria-hidden="true"
                   />
@@ -178,15 +181,16 @@ export default function Navbar({
             );
           })}
 
-          <div className="ml-1.5 flex items-center gap-2 xl:ml-2 xl:gap-3">
+          <div className="ml-2 flex shrink-0 items-center gap-2 xl:ml-3 xl:gap-3">
             <CurrencySelector />
             <ThemeToggle />
 
             <Link
               href={authHref}
               className="
-                rounded-lg px-2.5 py-2 text-[13px] font-medium
-                text-[var(--text-muted)] transition-colors xl:px-3 xl:text-sm
+                shrink-0 whitespace-nowrap rounded-lg px-2 py-2 text-xs
+                font-medium text-[var(--text-muted)] transition-colors
+                xl:px-3 xl:text-[13px] 2xl:text-sm
                 hover:text-[var(--heading)]
                 focus-visible:outline-none focus-visible:ring-2
                 focus-visible:ring-[var(--accent-strong)]/60
@@ -198,11 +202,11 @@ export default function Navbar({
             <Link
               href="/countries"
               className="
-                inline-flex items-center justify-center
-                rounded-[14px] bg-[var(--accent)] px-4 py-2.5
-                text-[13px] font-semibold text-[var(--accent-ink)]
+                inline-flex shrink-0 items-center justify-center
+                whitespace-nowrap rounded-[14px] bg-[var(--accent)]
+                px-3.5 py-2.5 text-xs font-semibold text-[var(--accent-ink)]
                 shadow-[0_0_0_1px_rgba(124,255,0,0.15)]
-                transition-all xl:px-5 xl:text-sm
+                transition-all xl:px-5 xl:text-[13px] 2xl:text-sm
                 hover:bg-[var(--accent-strong)]
                 focus-visible:outline-none focus-visible:ring-2
                 focus-visible:ring-[var(--accent-strong)]/60
@@ -298,7 +302,7 @@ export default function Navbar({
               onClick={closeMenu}
               className="
                 mt-2 inline-flex items-center justify-center
-                rounded-[14px] bg-[var(--accent)] px-5 py-3
+                whitespace-nowrap rounded-[14px] bg-[var(--accent)] px-5 py-3
                 text-sm font-semibold text-[var(--accent-ink)]
                 transition-colors hover:bg-[var(--accent-strong)]
                 focus-visible:outline-none focus-visible:ring-2
