@@ -122,6 +122,18 @@ function main() {
   assert.match(csp, /form-action 'self' https:\/\/accounts\.google\.com/);
   assert.match(csp, /https:\/\/embed\.tawk\.to/);
   assert.match(csp, /https:\/\/\*\.tawk\.to/);
+  assert.match(
+    csp,
+    /style-src 'self' 'unsafe-inline' https:\/\/\*\.tawk\.to/
+  );
+  assert.match(
+    csp,
+    /script-src 'self' 'unsafe-inline' 'unsafe-eval' https:\/\/embed\.tawk\.to/
+  );
+  assert.ok(!/script-src[^;]*https:\/\/\*\.tawk\.to/.test(csp));
+  assert.ok(!csp.includes("fonts.googleapis.com"));
+  assert.ok(!csp.includes("cdn.jsdelivr.net"));
+  assert.ok(!csp.includes("tawk.link"));
   assert.match(csp, /wss:\/\/\*\.tawk\.to/);
   assert.match(csp, /https:\/\/flagcdn\.com/);
   assert.match(csp, /upgrade-insecure-requests/);
