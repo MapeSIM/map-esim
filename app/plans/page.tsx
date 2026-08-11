@@ -3,6 +3,7 @@ import { countries as staticCountries } from "@/app/data/countries";
 import {
   selectPlansDiscoveryDestinations,
   selectPlansDiscoverySelectorOptions,
+  selectPlansPriorityDestinations,
 } from "@/app/lib/plans/plansDiscovery";
 import {
   slugifyDestination,
@@ -46,13 +47,20 @@ async function loadCatalog(): Promise<VesimDestination[]> {
 
 export default async function PlansPage() {
   const destinations = await loadCatalog();
-  const featured = selectPlansDiscoveryDestinations(destinations);
+  const priorityDestinations = selectPlansPriorityDestinations(destinations);
+  const priorityCodes = new Set(
+    priorityDestinations.map((item) => item.code.trim().toUpperCase())
+  );
+  const featured = selectPlansDiscoveryDestinations(destinations, {
+    excludeCodes: priorityCodes,
+  });
   const selectorOptions = selectPlansDiscoverySelectorOptions(destinations);
 
   return (
     <PlansDiscovery
       featured={featured}
       selectorOptions={selectorOptions}
+      priorityDestinations={priorityDestinations}
     />
   );
 }
