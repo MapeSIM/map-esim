@@ -144,7 +144,7 @@ export default function Home() {
                 <ArrowRight className="h-4 w-4 shrink-0" />
               </Link>
               <Link
-                href="/countries/region-asia"
+                href="/countries?filter=Regional"
                 className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-6 text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--border-hover)] sm:w-auto"
               >
                 View regional plans
