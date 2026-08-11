@@ -21,6 +21,8 @@ import CurrencySelector from "./currency/CurrencySelector";
 type NavLink = {
   href: string;
   label: string;
+  /** Optional desktop-only two-line label (route/label string unchanged). */
+  labelLines?: readonly [string, string];
   flagSrc?: string;
 };
 
@@ -36,10 +38,29 @@ const navLinks: NavLink[] = [
   { href: "/how-it-works", label: "How It Works" },
   { href: "/support", label: "Support" },
   { href: "/contact", label: "Contact" },
-  { href: "/affiliates-and-partnerships", label: "Affiliates & Partnerships" },
+  {
+    href: "/affiliates-and-partnerships",
+    label: "Affiliates & Partnerships",
+    labelLines: ["Affiliates &", "Partnerships"],
+  },
 ];
 
-function NavLinkLabel({ link }: { link: NavLink }) {
+function NavLinkLabel({
+  link,
+  variant = "mobile",
+}: {
+  link: NavLink;
+  variant?: "desktop" | "mobile";
+}) {
+  if (variant === "desktop" && link.labelLines) {
+    return (
+      <span className="inline-flex flex-col items-center justify-center text-center leading-[1.05]">
+        <span>{link.labelLines[0]}</span>
+        <span>{link.labelLines[1]}</span>
+      </span>
+    );
+  }
+
   if (!link.flagSrc) return <>{link.label}</>;
 
   return (
@@ -147,18 +168,21 @@ export default function Navbar({
         <div className="hidden min-w-0 flex-1 items-center justify-end gap-0.5 lg:flex xl:gap-1">
           {navLinks.map((link) => {
             const active = isActive(link.href);
+            const stacked = Boolean(link.labelLines);
             return (
               <Link
                 key={link.href}
                 href={link.href}
                 className={`
-                  relative shrink-0 whitespace-nowrap rounded-lg px-1.5 py-2
-                  text-xs font-medium transition-colors
+                  relative inline-flex shrink-0 items-center justify-center
+                  rounded-lg px-1.5 py-1.5 text-center text-xs font-medium
+                  transition-colors
                   xl:px-2.5 xl:text-[13px] 2xl:px-3 2xl:text-sm
                   focus-visible:outline-none focus-visible:ring-2
                   focus-visible:ring-[var(--accent-strong)]/60
                   focus-visible:ring-offset-2
                   focus-visible:ring-offset-[var(--page-bg)]
+                  ${stacked ? "leading-none" : "whitespace-nowrap py-2"}
                   ${
                     active
                       ? "text-[var(--heading)]"
@@ -166,7 +190,7 @@ export default function Navbar({
                   }
                 `}
               >
-                <NavLinkLabel link={link} />
+                <NavLinkLabel link={link} variant="desktop" />
                 {active && (
                   <span
                     className="
@@ -276,7 +300,7 @@ export default function Navbar({
                     }
                   `}
                 >
-                  <NavLinkLabel link={link} />
+                  <NavLinkLabel link={link} variant="mobile" />
                 </Link>
               );
             })}

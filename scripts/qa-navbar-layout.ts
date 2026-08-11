@@ -25,6 +25,10 @@ function main() {
   assert.match(navbar, /label: "Support"/);
   assert.match(navbar, /label: "Contact"/);
   assert.match(navbar, /label: "Affiliates & Partnerships"/);
+  assert.match(navbar, /\["Affiliates &",\s*"Partnerships"\]/);
+  assert.match(navbar, /labelLines/);
+  assert.match(navbar, /variant="desktop"/);
+  assert.match(navbar, /variant="mobile"/);
   assert.match(navbar, /href=["']\/countries["']/);
   assert.match(navbar, /Get eSIM/);
   assert.doesNotMatch(navbar, /href=["']\/account\/esim\/buy["']/);
