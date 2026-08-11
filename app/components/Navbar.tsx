@@ -165,7 +165,7 @@ export default function Navbar({
           <span className="sr-only">{BRAND_NAME}</span>
         </Link>
 
-        <div className="hidden min-w-0 flex-1 items-center justify-end gap-0.5 lg:flex xl:gap-1">
+        <div className="hidden min-w-0 flex-1 items-center justify-end gap-0.5 lg:flex lg:pl-4 xl:gap-1">
           {navLinks.map((link) => {
             const active = isActive(link.href);
             const stacked = Boolean(link.labelLines);
