@@ -128,11 +128,18 @@ function main() {
   );
   assert.match(
     csp,
-    /script-src 'self' 'unsafe-inline' 'unsafe-eval' https:\/\/embed\.tawk\.to/
+    /script-src 'self' 'unsafe-inline' 'unsafe-eval' https:\/\/embed\.tawk\.to https:\/\/cdn\.jsdelivr\.net/
+  );
+  assert.match(
+    csp,
+    /img-src 'self' data: blob: https:\/\/flagcdn\.com https:\/\/\*\.tawk\.to https:\/\/cdn\.jsdelivr\.net/
   );
   assert.ok(!/script-src[^;]*https:\/\/\*\.tawk\.to/.test(csp));
+  assert.ok(!/style-src[^;]*cdn\.jsdelivr\.net/.test(csp));
+  assert.ok(!/font-src[^;]*cdn\.jsdelivr\.net/.test(csp));
+  assert.ok(!/connect-src[^;]*cdn\.jsdelivr\.net/.test(csp));
+  assert.ok(!/frame-src[^;]*cdn\.jsdelivr\.net/.test(csp));
   assert.ok(!csp.includes("fonts.googleapis.com"));
-  assert.ok(!csp.includes("cdn.jsdelivr.net"));
   assert.ok(!csp.includes("tawk.link"));
   assert.match(csp, /wss:\/\/\*\.tawk\.to/);
   assert.match(csp, /https:\/\/flagcdn\.com/);
