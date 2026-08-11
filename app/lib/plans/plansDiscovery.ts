@@ -3,6 +3,7 @@ import {
   slugifyDestination,
   type VesimDestination,
 } from "@/app/lib/vesim/destinations";
+import { destinationDisplayName } from "@/app/lib/vesim/destinationPresentation";
 
 /**
  * Preferred /plans quick destinations (ISO order).
@@ -143,6 +144,7 @@ export function filterPlansDiscoveryDestinations(
   return destinations.filter((item) => {
     const haystacks = [
       item.name,
+      destinationDisplayName(item),
       item.code,
       item.slug,
       ...(item.searchAliases || []),

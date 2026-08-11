@@ -1,6 +1,13 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -20,6 +27,10 @@ import {
   type DestinationCatalogSource,
   type VesimDestination,
 } from "@/app/lib/vesim/destinations";
+import {
+  destinationDisplayName,
+  resolveDestinationFlagVisual,
+} from "@/app/lib/vesim/destinationPresentation";
 
 const filters = [
   { id: "Country", label: "Country", icon: Flag },
@@ -59,23 +70,14 @@ function parseFilter(value: string | null): FilterId {
   return "Country";
 }
 
-function getFlagUrl(code?: string) {
-  if (!code || code.length !== 2) return null;
-  return `https://flagcdn.com/w80/${code.toLowerCase()}.png`;
-}
-
-function isEmojiFlag(flag?: string) {
-  if (!flag) return false;
-  return /\p{Regional_Indicator}/u.test(flag);
-}
-
 function toCard(destination: VesimDestination): DestinationCard {
   return {
     id:
       destination.kind === "regional" || destination.kind === "global"
         ? destination.code.toLowerCase()
         : destination.slug,
-    name: destination.name,
+    // Display label only — provider code/slug/path stay on the destination.
+    name: destinationDisplayName(destination),
     code: destination.code,
     flag: destination.flag,
     plans: destination.offerCount || 0,
@@ -83,6 +85,84 @@ function toCard(destination: VesimDestination): DestinationCard {
     kind: destination.kind,
     isPopular: destination.isPopular === true,
   };
+}
+
+function DestinationFlagBadge({
+  destination,
+  iconFallback,
+}: {
+  destination: Pick<DestinationCard, "code" | "name" | "flag" | "kind">;
+  iconFallback: ReactNode;
+}) {
+  const visual = resolveDestinationFlagVisual(destination);
+  const [imageFailed, setImageFailed] = useState(false);
+
+  if (destination.kind !== "country") {
+    return (
+      <span
+        className="
+          flex h-8 w-11 shrink-0 items-center justify-center
+          rounded-md border border-[var(--border-strong)]
+          bg-[var(--surface-2)] text-[var(--accent-soft)]
+        "
+        aria-hidden="true"
+      >
+        {iconFallback}
+      </span>
+    );
+  }
+
+  if (visual.type === "image" && !imageFailed) {
+    return (
+      <Image
+        src={visual.src}
+        alt=""
+        width={44}
+        height={32}
+        sizes="44px"
+        onError={() => setImageFailed(true)}
+        className="
+          h-8 w-11 shrink-0 rounded-md
+          border border-[var(--border-strong)] object-cover
+        "
+      />
+    );
+  }
+
+  if (visual.type === "emoji") {
+    return (
+      <span
+        className="
+          flex h-8 w-11 shrink-0 items-center justify-center
+          rounded-md border border-[var(--border-strong)]
+          bg-[var(--surface-2)] text-xl leading-none
+        "
+        aria-hidden="true"
+      >
+        {visual.emoji}
+      </span>
+    );
+  }
+
+  const initials =
+    visual.type === "initials"
+      ? visual.initials
+      : destination.code.trim().toUpperCase().slice(0, 4) || "?";
+
+  return (
+    <span
+      className="
+        flex h-8 w-11 shrink-0 items-center justify-center
+        rounded-md border border-[var(--border-strong)]
+        bg-[var(--surface-2)] text-[10px] font-bold tracking-wide
+        text-[var(--heading)]
+      "
+      aria-hidden="true"
+      title={destination.name}
+    >
+      {initials}
+    </span>
+  );
 }
 
 function matchesFilter(item: DestinationCard, filter: FilterId) {
@@ -165,8 +245,6 @@ function CompactDestinationCard({
   destination: DestinationCard;
   formatPrice: (amountUsd: number | null | undefined) => string;
 }) {
-  const flagUrl =
-    destination.kind === "country" ? getFlagUrl(destination.code) : null;
   const Icon =
     destination.kind === "global"
       ? Earth
@@ -192,41 +270,10 @@ function CompactDestinationCard({
       "
     >
       <div className="flex min-w-0 items-center gap-3">
-        {flagUrl ? (
-          <Image
-            src={flagUrl}
-            alt=""
-            width={44}
-            height={32}
-            sizes="44px"
-            className="
-              h-8 w-11 shrink-0 rounded-md
-              border border-[var(--border-strong)] object-cover
-            "
-          />
-        ) : destination.kind === "country" && isEmojiFlag(destination.flag) ? (
-          <span
-            className="
-              flex h-8 w-11 shrink-0 items-center justify-center
-              rounded-md border border-[var(--border-strong)]
-              bg-[var(--surface-2)] text-xl leading-none
-            "
-            aria-hidden="true"
-          >
-            {destination.flag}
-          </span>
-        ) : (
-          <span
-            className="
-              flex h-8 w-11 shrink-0 items-center justify-center
-              rounded-md border border-[var(--border-strong)]
-              bg-[var(--surface-2)] text-[var(--accent-soft)]
-            "
-            aria-hidden="true"
-          >
-            <Icon className="h-4 w-4" />
-          </span>
-        )}
+        <DestinationFlagBadge
+          destination={destination}
+          iconFallback={<Icon className="h-4 w-4" />}
+        />
 
         <div className="min-w-0 text-left">
           <h3 className="truncate text-[15px] font-semibold text-[var(--heading)]">

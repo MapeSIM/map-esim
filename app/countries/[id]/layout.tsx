@@ -3,6 +3,7 @@ import { BRAND_NAME } from "@/app/lib/brand";
 import { absoluteCanonical } from "@/app/lib/seo/canonical";
 import { resolveDestinationForSeo } from "@/app/lib/seo/destinationCatalog";
 import { destinationPath } from "@/app/lib/vesim/destinations";
+import { destinationDisplayName } from "@/app/lib/vesim/destinationPresentation";
 
 type CountryLayoutProps = {
   children: React.ReactNode;
@@ -32,8 +33,9 @@ export async function generateMetadata({
 
   const path = destinationPath(destination);
   const canonical = absoluteCanonical(path);
-  const title = `${destination.name} eSIM | ${BRAND_NAME}`;
-  const description = `Travel data eSIM plans for ${destination.name} from ${BRAND_NAME}.`;
+  const label = destinationDisplayName(destination);
+  const title = `${label} eSIM | ${BRAND_NAME}`;
+  const description = `Travel data eSIM plans for ${label} from ${BRAND_NAME}.`;
 
   return {
     title,

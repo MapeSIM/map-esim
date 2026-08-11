@@ -23,6 +23,10 @@ import {
   plansDestinationHref,
 } from "@/app/lib/plans/plansDiscovery";
 import type { VesimDestination } from "@/app/lib/vesim/destinations";
+import {
+  destinationDisplayName,
+  resolveDestinationFlagVisual,
+} from "@/app/lib/vesim/destinationPresentation";
 
 export type PlansDiscoveryProps = {
   featured: VesimDestination[];
@@ -30,14 +34,50 @@ export type PlansDiscoveryProps = {
   priorityDestinations: VesimDestination[];
 };
 
-function getFlagUrl(code?: string) {
-  if (!code || code.length !== 2) return null;
-  return `https://flagcdn.com/w80/${code.toLowerCase()}.png`;
-}
+function DestinationFlagMark({
+  destination,
+}: {
+  destination: VesimDestination;
+}) {
+  const visual = resolveDestinationFlagVisual(destination);
+  const [imageFailed, setImageFailed] = useState(false);
 
-function isEmojiFlag(flag?: string) {
-  if (!flag) return false;
-  return /\p{Regional_Indicator}/u.test(flag);
+  if (destination.kind !== "country") {
+    return (
+      <Globe2 className="h-4 w-4 text-[var(--accent-soft)]" aria-hidden="true" />
+    );
+  }
+
+  if (visual.type === "image" && !imageFailed) {
+    return (
+      <Image
+        src={visual.src}
+        alt=""
+        width={22}
+        height={16}
+        sizes="22px"
+        onError={() => setImageFailed(true)}
+        className="h-4 w-[22px] rounded-[3px] object-cover"
+      />
+    );
+  }
+
+  if (visual.type === "emoji") {
+    return (
+      <span className="text-base leading-none" aria-hidden="true">
+        {visual.emoji}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="text-[10px] font-bold tracking-wide text-[var(--heading)]"
+      aria-hidden="true"
+    >
+      {visual.type === "initials" ? visual.initials : destination.code}
+    </span>
+  );
 }
 
 function DestinationCard({
@@ -48,6 +88,7 @@ function DestinationCard({
   formatPrice: (amountUsd: number | null | undefined) => string;
 }) {
   const href = plansDestinationHref(destination);
+  const label = destinationDisplayName(destination);
   const kindLabel =
     destination.kind === "global"
       ? "Global"
@@ -72,7 +113,7 @@ function DestinationCard({
         {kindLabel}
       </p>
       <h2 className="mt-2 text-2xl font-bold text-[var(--heading)]">
-        {destination.name}
+        {label}
       </h2>
 
       <p className="mt-5 text-4xl font-bold text-[var(--accent)]">
@@ -114,8 +155,7 @@ function DestinationCard({
 
 function PriorityChip({ destination }: { destination: VesimDestination }) {
   const href = plansDestinationHref(destination);
-  const flagUrl =
-    destination.kind === "country" ? getFlagUrl(destination.code) : null;
+  const label = destinationDisplayName(destination);
 
   return (
     <Link
@@ -131,23 +171,8 @@ function PriorityChip({ destination }: { destination: VesimDestination }) {
         focus-visible:ring-[var(--accent-strong)]/60
       "
     >
-      {flagUrl ? (
-        <Image
-          src={flagUrl}
-          alt=""
-          width={22}
-          height={16}
-          sizes="22px"
-          className="h-4 w-[22px] rounded-[3px] object-cover"
-        />
-      ) : destination.kind === "country" && isEmojiFlag(destination.flag) ? (
-        <span className="text-base leading-none" aria-hidden="true">
-          {destination.flag}
-        </span>
-      ) : (
-        <Globe2 className="h-4 w-4 text-[var(--accent-soft)]" aria-hidden="true" />
-      )}
-      <span>{destination.name}</span>
+      <DestinationFlagMark destination={destination} />
+      <span>{label}</span>
     </Link>
   );
 }
@@ -183,7 +208,7 @@ function DestinationSearchCombobox({
 
   function navigateTo(destination: VesimDestination) {
     setOpen(false);
-    setQuery(destination.name);
+    setQuery(destinationDisplayName(destination));
     router.push(plansDestinationHref(destination));
   }
 
@@ -307,7 +332,7 @@ function DestinationSearchCombobox({
                     onClick={() => navigateTo(destination)}
                   >
                     <span className="min-w-0 flex-1 truncate font-medium">
-                      {destination.name}
+                      {destinationDisplayName(destination)}
                       <span className="font-normal text-[var(--text-soft)]">
                         {kindSuffix}
                       </span>

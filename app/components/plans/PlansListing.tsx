@@ -13,6 +13,10 @@ import {
 import type { VesimOffer } from "@/app/lib/vesim/offers";
 import type { VesimDestination } from "@/app/lib/vesim/destinations";
 import { destinationPath } from "@/app/lib/vesim/destinations";
+import {
+  destinationDisplayName,
+  resolveDestinationFlagVisual,
+} from "@/app/lib/vesim/destinationPresentation";
 import { PAKISTAN_FLAG_PUBLIC_PATH } from "@/app/lib/seo/siteGraph";
 import PlanDetailsModal from "@/app/components/plans/PlanDetailsModal";
 import SortSelect from "@/app/components/plans/SortSelect";
@@ -54,13 +58,78 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "validity-desc", label: "Validity: Longest" },
 ];
 
-function getFlagUrl(code?: string) {
-  if (!code || code.length !== 2) return null;
-  // Local asset — avoids blank placeholder when remote/emoji flags fail.
-  if (code.toUpperCase() === "PK") {
-    return PAKISTAN_FLAG_PUBLIC_PATH;
+function PlansListingFlag({
+  destination,
+  size = "hero",
+}: {
+  destination: VesimDestination;
+  size?: "hero" | "compact";
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const visual = resolveDestinationFlagVisual(destination);
+  const imageSrc =
+    destination.code.toUpperCase() === "PK"
+      ? PAKISTAN_FLAG_PUBLIC_PATH
+      : visual.type === "image"
+        ? visual.src
+        : null;
+
+  if (destination.kind === "regional") {
+    return (
+      <span className="flex h-full w-full flex-col items-center justify-center rounded-2xl bg-[var(--accent-strong)]/10 text-[var(--accent-strong)]">
+        <MapPinned className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
+      </span>
+    );
   }
-  return `https://flagcdn.com/w80/${code.toLowerCase()}.png`;
+
+  if (destination.kind === "global") {
+    return (
+      <Globe2 className="h-6 w-6 text-[var(--accent-strong)] sm:h-7 sm:w-7" />
+    );
+  }
+
+  if (imageSrc && !imageFailed) {
+    return (
+      <Image
+        src={imageSrc}
+        alt=""
+        width={size === "hero" ? 64 : 40}
+        height={size === "hero" ? 64 : 28}
+        sizes={size === "hero" ? "64px" : "40px"}
+        priority={size === "hero"}
+        onError={() => setImageFailed(true)}
+        className={
+          size === "hero"
+            ? "h-full w-full rounded-2xl object-cover"
+            : "h-7 w-10 rounded-md object-cover"
+        }
+      />
+    );
+  }
+
+  if (visual.type === "emoji") {
+    return (
+      <span
+        className={
+          size === "hero" ? "text-2xl sm:text-3xl" : "text-2xl leading-none"
+        }
+        aria-hidden="true"
+      >
+        {visual.emoji}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="text-xs font-bold tracking-wide text-[var(--heading)] sm:text-sm"
+      aria-hidden="true"
+    >
+      {visual.type === "initials"
+        ? visual.initials
+        : destination.code.trim().toUpperCase().slice(0, 4) || "?"}
+    </span>
+  );
 }
 
 function PillButton({
@@ -233,9 +302,6 @@ export default function PlansListing({
   const activeFilterCount =
     dataAmounts.length + validities.length + coveredCountries.length;
 
-  const flagUrl =
-    destination.kind === "country" ? getFlagUrl(destination.code) : null;
-
   function toggleDataAmount(value: string) {
     setDataAmounts((current) =>
       current.includes(value)
@@ -266,10 +332,8 @@ export default function PlansListing({
     setCoveredCountries([]);
   }
 
-  const heading =
-    destination.kind === "country"
-      ? `${destination.name} eSIM Plans`
-      : `${destination.name} eSIM Plans`;
+  const displayName = destinationDisplayName(destination);
+  const heading = `${displayName} eSIM Plans`;
 
   const heroSummary = loading
     ? "Loading available plans..."
@@ -301,25 +365,7 @@ export default function PlansListing({
                 sm:h-16 sm:w-16
               "
             >
-              {flagUrl ? (
-                <Image
-                  src={flagUrl}
-                  alt={`${destination.name} flag`}
-                  width={64}
-                  height={64}
-                  sizes="64px"
-                  priority
-                  className="h-full w-full rounded-2xl object-cover"
-                />
-              ) : destination.kind === "country" && destination.flag ? (
-                <span className="text-2xl sm:text-3xl">{destination.flag}</span>
-              ) : destination.kind === "regional" ? (
-                <span className="flex h-full w-full flex-col items-center justify-center rounded-2xl bg-[var(--accent-strong)]/10 text-[var(--accent-strong)]">
-                  <MapPinned className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
-                </span>
-              ) : (
-                <Globe2 className="h-6 w-6 text-[var(--accent-strong)] sm:h-7 sm:w-7" />
-              )}
+              <PlansListingFlag destination={destination} size="hero" />
             </div>
 
             <div className="min-w-0 flex-1">
@@ -355,7 +401,7 @@ export default function PlansListing({
                   Need more options?
                 </p>
                 <p className="mt-0.5 text-[13px] leading-snug text-[var(--text-muted)] sm:text-sm">
-                  Check {relatedRegional.name} regional plans — they may offer
+                  Check {destinationDisplayName(relatedRegional)} regional plans — they may offer
                   better value for your trip.
                 </p>
               </div>
