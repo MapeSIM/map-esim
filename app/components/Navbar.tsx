@@ -135,7 +135,7 @@ export default function Navbar({
           onClick={closeMenu}
           className="
             group mr-2 flex shrink-0 items-center gap-2.5 rounded-lg
-            lg:mr-4 xl:mr-6
+            lg:mr-5 xl:mr-6
             focus-visible:outline-none focus-visible:ring-2
             focus-visible:ring-[var(--accent-strong)]/60
             focus-visible:ring-offset-2
