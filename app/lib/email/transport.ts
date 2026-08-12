@@ -11,7 +11,7 @@ import {
   type EmailChannel,
 } from "@/app/lib/email/config";
 import { EMAIL_LOGO_CID, getEmailLogoAttachment } from "@/app/lib/email/logo";
-import { isValidEmail } from "@/app/lib/vesim/server";
+import { isValidEmail } from "@/app/lib/email/isValidEmail";
 
 type CachedTransporter = {
   fingerprint: string;
