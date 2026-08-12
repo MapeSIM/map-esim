@@ -90,6 +90,14 @@ function main() {
   assert.match(listPage, /iccidMasked/);
   assert.match(listPage, /View details/);
   assert.match(listPage, /View QR Code & Details/);
+  assert.match(
+    listPage,
+    /\/account\/orders\/\$\{encodeURIComponent\(order\.id\)\}#install/
+  );
+  assert.doesNotMatch(
+    listPage,
+    /#install\?|carddata=|activationCode=|lpa=|qrValue=/i
+  );
   assert.match(listPage, /name="status"/);
   assert.match(listPage, /name="q"/);
   assert.doesNotMatch(listPage, /Show full ICCID|decryptIccid|IccidRevealPanel/);
@@ -141,7 +149,20 @@ function main() {
   assert.match(installPanel, /Order refunded/);
   assert.match(installPanel, /EsimInstallExperience/);
   assert.doesNotMatch(installPanel, /Add data to this eSIM/i);
+  assert.match(installPanel, /hasInstallHashIntent|location\.hash/);
+  assert.match(installPanel, /autoOpenStarted/);
+  assert.match(installPanel, /loadInstall\(\)/);
+  // Auto-open only when hash intent is present — not on every mount.
+  assert.match(
+    installPanel,
+    /if \(!hasInstallHashIntent\(\)\) return;|hasInstallHashIntent\(\)/
+  );
+  assert.doesNotMatch(
+    installPanel,
+    /searchParams\.(get|has)\([`'"](lpa|qrValue|activationCode|carddata)/i
+  );
   console.log("PASS install_on_demand_and_refund_guards");
+  console.log("PASS install_hash_intent_auto_open_once");
 
   const usageLib = read("app/lib/orders/customerEsimUsage.ts");
   const usageApi = read("app/api/account/orders/[orderId]/usage/route.ts");

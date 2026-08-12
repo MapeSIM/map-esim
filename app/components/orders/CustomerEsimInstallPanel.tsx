@@ -1,9 +1,15 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { QrCode, Smartphone } from "lucide-react";
 import EsimInstallExperience from "@/app/components/install/EsimInstallExperience";
 import { useAppleOneTapInstallHref } from "@/app/components/install/AppleOneTapInstallButton";
+
+/** Hash-only install intent from My eSIMs — never carries secrets. */
+function hasInstallHashIntent(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.location.hash.replace(/^#/, "").toLowerCase() === "install";
+}
 
 type InstallPayload = {
   hasInstallDetails: boolean;
@@ -86,6 +92,19 @@ export default function CustomerEsimInstallPanel({
       setLoading(false);
     }
   }, [orderId]);
+
+  // My eSIMs "View QR Code & Details" lands on #install — auto-open once via the
+  // same secure on-demand fetch. Normal detail visits (no hash) stay lazy.
+  const autoOpenStarted = useRef(false);
+  useEffect(() => {
+    if (autoOpenStarted.current) return;
+    if (isRefunded || !installEligible || data || loading) return;
+    if (!hasInstallHashIntent()) return;
+    autoOpenStarted.current = true;
+    void loadInstall();
+    const section = document.getElementById("install");
+    section?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [isRefunded, installEligible, data, loading, loadInstall]);
 
   if (isRefunded) {
     return (
