@@ -253,7 +253,9 @@ export async function enrichDestinationsWithOfferRetailMins(
   token?: TokenResult
 ): Promise<VesimDestination[]> {
   if (destinations.length === 0) return destinations;
-  const auth = token || (await getBrokerToken());
+  // `token` retained for call-site compatibility; public offer snapshots
+  // authenticate internally on cache miss via fetchOffersForCountry.
+  void token;
 
   return mapPool(
     destinations,
@@ -262,7 +264,9 @@ export async function enrichDestinationsWithOfferRetailMins(
       const code = destination.code?.trim();
       if (!code) return destination;
       try {
-        const offers = await fetchOffersForCountry(code, auth);
+        // Reuse the public browsing offer snapshot so catalog mins and country
+        // pages agree within the same short revalidation window.
+        const offers = await fetchPublicOffersForCountry(code);
         return withLowestOfferRetailMinPrice(destination, offers);
       } catch {
         // Keep entry-tier fallback when offers are unavailable for this code.
@@ -288,6 +292,10 @@ export const fetchPublicDestinationCatalog = unstable_cache(
   { revalidate: PUBLIC_DESTINATION_CATALOG_REVALIDATE_SECONDS }
 );
 
+/**
+ * Live provider offer fetch (no-store).
+ * Purchase/checkout/admin validation must keep using this path.
+ */
 export async function fetchOffersForCountry(
   country: string,
   token?: TokenResult
@@ -312,6 +320,35 @@ export async function fetchOffersForCountry(
   }
 
   return normalizeOffers(data);
+}
+
+/** Align public browsing offer snapshots with destination catalog TTL. */
+const PUBLIC_OFFERS_REVALIDATE_SECONDS =
+  PUBLIC_DESTINATION_CATALOG_REVALIDATE_SECONDS;
+
+function publicOffersCountryKey(country: string): string {
+  const raw = country.trim();
+  if (!raw || raw.length > 64) return "";
+  return sanitizeCountryHint(raw) || raw;
+}
+
+const loadCachedPublicOffersForCountry = unstable_cache(
+  async (country: string) => fetchOffersForCountry(country),
+  ["public-country-offers-v1"],
+  { revalidate: PUBLIC_OFFERS_REVALIDATE_SECONDS }
+);
+
+/**
+ * Short-lived PUBLIC BROWSING snapshot of destination offers (~300s).
+ * Country plans page + `/api/vesim/offers` use this so soft refreshes do not
+ * flip between provider list variants. Never use for purchase validation.
+ */
+export async function fetchPublicOffersForCountry(
+  country: string
+): Promise<VesimOffer[]> {
+  const key = publicOffersCountryKey(country);
+  if (!key) return [];
+  return loadCachedPublicOffersForCountry(key);
 }
 
 export async function verifyOfferAuthoritative(options: {

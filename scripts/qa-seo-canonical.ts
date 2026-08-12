@@ -57,7 +57,7 @@ function main() {
   // SSR country page fix must remain untouched by this QA's expectations.
   const countryPage = read("app/countries/[id]/page.tsx");
   assert.doesNotMatch(countryPage, /^["']use client["']/m);
-  assert.match(countryPage, /fetchOffersForCountry/);
+  assert.match(countryPage, /fetchPublicOffersForCountry/);
 
   console.log("ALL_QA_PASSED=seo-canonical");
 }

@@ -3,7 +3,7 @@ import { VesimEnvironmentError } from "@/app/lib/vesim/environment";
 import { VESIM_ENV_PUBLIC_ERROR } from "@/app/lib/vesim/environmentPolicy";
 import { toPublicVesimOffers } from "@/app/lib/vesim/offers";
 import {
-  fetchOffersForCountry,
+  fetchPublicOffersForCountry,
   publicErrorMessage,
   sanitizeCountryHint,
 } from "@/app/lib/vesim/server";
@@ -26,7 +26,7 @@ export async function GET(req: Request) {
       );
     }
 
-    const offers = await fetchOffersForCountry(country);
+    const offers = await fetchPublicOffersForCountry(country);
 
     return NextResponse.json({
       success: true,

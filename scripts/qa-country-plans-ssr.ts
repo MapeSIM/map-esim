@@ -21,18 +21,32 @@ function main() {
   assert.doesNotMatch(page, /^["']use client["']/m);
   assert.match(page, /export default async function CountryDetailPage/);
   assert.match(page, /fetchPublicDestinationCatalog/);
-  assert.match(page, /fetchOffersForCountry/);
+  assert.match(page, /fetchPublicOffersForCountry/);
   assert.match(page, /toPublicVesimOffers/);
   assert.match(page, /loading=\{false\}/);
   assert.doesNotMatch(page, /fetch\(\s*["'`]\/api\/vesim\//);
   assert.doesNotMatch(page, /useEffect\s*\(/);
   assert.doesNotMatch(page, /useParams/);
 
-  // Browser must not call VeSIM; public API remains server-side.
-  assert.match(offersApi, /fetchOffersForCountry/);
+  // Browser must not call VeSIM; public API remains server-side browsing snapshot.
+  assert.match(offersApi, /fetchPublicOffersForCountry/);
   assert.match(offersApi, /toPublicVesimOffers/);
+  assert.doesNotMatch(offersApi, /fetchOffersForCountry\(/);
   assert.match(listing, /^["']use client["']/m);
   assert.match(listing, /useCurrency/);
+
+  // Purchase validation must stay on the live no-store offer fetch.
+  const server = read("app/lib/vesim/server.ts");
+  assert.match(server, /export async function fetchPublicOffersForCountry/);
+  assert.match(server, /public-country-offers-v1/);
+  assert.match(
+    server,
+    /export async function verifyOfferAuthoritative[\s\S]*fetchOffersForCountry\(/
+  );
+  assert.match(
+    server,
+    /cache:\s*["']no-store["']/
+  );
 
   // Metadata / canonical stay on layout.
   assert.match(layout, /generateMetadata/);

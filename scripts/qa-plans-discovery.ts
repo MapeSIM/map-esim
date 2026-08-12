@@ -148,7 +148,7 @@ function main() {
   console.log("   ok");
 
   console.log("4) Country detail + SEO canonical preserved");
-  assert.match(countryDetail, /fetchOffersForCountry/);
+  assert.match(countryDetail, /fetchPublicOffersForCountry/);
   assert.match(countryDetail, /PlansListing/);
   assert.match(layout, /absoluteCanonical\("\/plans"\)/);
   assert.match(helper, /Missing catalog entries are omitted/);

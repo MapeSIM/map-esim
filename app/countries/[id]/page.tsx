@@ -9,8 +9,8 @@ import {
   withLowestOfferRetailMinPrice,
 } from "@/app/lib/vesim/destinations";
 import {
-  fetchOffersForCountry,
   fetchPublicDestinationCatalog,
+  fetchPublicOffersForCountry,
 } from "@/app/lib/vesim/server";
 
 /** Align with public destination catalog cache; keep crawlers on fresh plan HTML. */
@@ -60,7 +60,7 @@ async function loadPublicOffers(countryCode: string): Promise<{
   error: string;
 }> {
   try {
-    const raw = await fetchOffersForCountry(countryCode);
+    const raw = await fetchPublicOffersForCountry(countryCode);
     return { offers: toPublicVesimOffers(raw), error: "" };
   } catch {
     return {

@@ -236,7 +236,7 @@ function main() {
   assert.match(credit, /VesimEnvironmentError/);
   assert.match(destinations, /fetchPublicDestinationCatalog|fetchDestinations/);
   assert.doesNotMatch(destinations, /process\.env\.VESIM_PASSWORD/);
-  assert.match(offers, /fetchOffersForCountry/);
+  assert.match(offers, /fetchPublicOffersForCountry/);
   console.log("PASS shared_boundary_wired");
 
   assert.match(guestGate, /ENABLE_GUEST_VESIM_CHECKOUT/);
