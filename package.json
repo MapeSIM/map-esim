@@ -42,6 +42,7 @@
     "qa:vesim-environment": "tsx scripts/qa-vesim-environment.ts",
     "qa:retail-pricing": "tsx scripts/qa-retail-pricing.ts",
     "qa:country-plans-ssr": "tsx scripts/qa-country-plans-ssr.ts",
+    "qa:plan-card-presentation": "tsx scripts/qa-plan-card-presentation.ts",
     "qa:destination-catalog-ssr": "tsx scripts/qa-destination-catalog-ssr.ts",
     "qa:destination-presentation": "tsx scripts/qa-destination-presentation.ts",
     "qa:plans-discovery": "tsx scripts/qa-plans-discovery.ts",

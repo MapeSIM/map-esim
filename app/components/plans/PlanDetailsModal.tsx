@@ -10,6 +10,14 @@ import {
   buildCheckoutHref,
   formatValidityPhrase,
 } from "@/app/lib/plans/plan-utils";
+import {
+  planDetailDescription,
+  planDetailFairUseOrTerms,
+  planDetailNetworkNames,
+  planDetailNetworkTechnology,
+  planDetailNotes,
+  planDetailOperatorLabel,
+} from "@/app/lib/plans/planOfferPresentation";
 import { useCurrency } from "@/app/components/currency/CurrencyProvider";
 
 type PlanDetailsModalProps = {
@@ -68,7 +76,12 @@ export default function PlanDetailsModal({
   if (!offer) return null;
 
   const covered = offer.coveredCountries || [];
-  const networks = (offer.networks || []).slice(0, 12);
+  const networks = planDetailNetworkNames(offer);
+  const operator = planDetailOperatorLabel(offer);
+  const networkTechnology = planDetailNetworkTechnology(offer);
+  const fairUseOrTerms = planDetailFairUseOrTerms(offer);
+  const description = planDetailDescription(offer);
+  const notes = planDetailNotes(offer);
   const isCoverageDestination =
     destination.kind === "regional" || destination.kind === "global";
 
@@ -177,23 +190,28 @@ export default function PlanDetailsModal({
                   : destination.name
               }
             />
-            {offer.packageInfo && (
+            {operator ? (
               <DetailRow
-                label="Network speed"
+                label="Operator"
                 value={
                   <span className="inline-flex items-center gap-1.5">
-                    <Signal className="h-3.5 w-3.5 text-[var(--accent-strong)]" />
-                    {offer.packageInfo}
+                    <Wifi className="h-3.5 w-3.5 text-[var(--accent-strong)]" />
+                    {operator}
                   </span>
                 }
               />
-            )}
-            {offer.dataSpeeds && offer.dataSpeeds.length > 0 && (
+            ) : null}
+            {networkTechnology ? (
               <DetailRow
-                label="Supported speeds"
-                value={offer.dataSpeeds.join(" · ")}
+                label="Network technology"
+                value={
+                  <span className="inline-flex items-center gap-1.5">
+                    <Signal className="h-3.5 w-3.5 text-[var(--accent-strong)]" />
+                    {networkTechnology}
+                  </span>
+                }
               />
-            )}
+            ) : null}
             {offer.apn && <DetailRow label="APN" value={offer.apn} />}
             {offer.hasVoiceSms && (
               <DetailRow
@@ -266,11 +284,28 @@ export default function PlanDetailsModal({
             </div>
           )}
 
-          {offer.description && !coverageFocused && (
+          {fairUseOrTerms ? (
+            <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-3)] p-4">
+              <p className="text-sm font-semibold text-[var(--heading)]">
+                Fair use & speed terms
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
+                {fairUseOrTerms}
+              </p>
+            </div>
+          ) : null}
+
+          {description ? (
             <p className="mt-4 text-sm leading-relaxed text-[var(--text-muted)]">
-              {offer.description}
+              {description}
             </p>
-          )}
+          ) : null}
+
+          {notes ? (
+            <p className="mt-3 text-sm leading-relaxed text-[var(--text-soft)]">
+              {notes}
+            </p>
+          ) : null}
         </div>
 
         <div className="border-t border-[var(--border)] px-5 py-4 sm:px-6">

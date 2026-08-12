@@ -39,6 +39,7 @@ import {
   type PlanTypeFilter,
   type SortOption,
 } from "@/app/lib/plans/plan-utils";
+import { planCardOperatorLabel } from "@/app/lib/plans/planOfferPresentation";
 
 type PlansListingProps = {
   destination: VesimDestination;
@@ -631,11 +632,13 @@ export default function PlansListing({
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                      {group.plans.map((offer) => (
+                      {group.plans.map((offer) => {
+                        const operatorLabel = planCardOperatorLabel(offer);
+                        return (
                         <article
                           key={offer.id}
                           className="
-                            group flex h-full min-w-0 flex-col rounded-[22px]
+                            group flex h-full min-h-[220px] min-w-0 flex-col rounded-[22px]
                             border border-[var(--border)] bg-[var(--surface)]
                             p-4 shadow-[0_10px_28px_rgba(0,0,0,0.2)]
                             transition duration-200
@@ -653,7 +656,7 @@ export default function PlansListing({
                             </p>
                           </div>
 
-                          <div className="mt-4 space-y-2 text-sm text-[var(--text)]">
+                          <div className="mt-4 flex flex-1 flex-col gap-2 text-sm text-[var(--text)]">
                             <p>{formatValidityPhrase(offer.durationDays)}</p>
                             {isRegionalOrGlobal &&
                               offer.coveredCountriesCount != null &&
@@ -663,12 +666,11 @@ export default function PlansListing({
                                   covered
                                 </p>
                               )}
-                            {destination.kind === "country" &&
-                              (offer.packageInfo || offer.network) && (
-                                <p className="break-words text-[var(--text-soft)]">
-                                  {offer.packageInfo || offer.network}
-                                </p>
-                              )}
+                            {operatorLabel ? (
+                              <p className="truncate text-[var(--text-soft)]">
+                                {operatorLabel}
+                              </p>
+                            ) : null}
                           </div>
 
                           <div className="mt-auto grid grid-cols-1 gap-3 pt-6 min-[400px]:grid-cols-2">
@@ -698,7 +700,8 @@ export default function PlansListing({
                             </Link>
                           </div>
                         </article>
-                      ))}
+                        );
+                      })}
                     </div>
                   </section>
                 ))}
