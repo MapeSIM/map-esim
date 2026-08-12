@@ -3,29 +3,50 @@
 import { useEffect, useState } from "react";
 import {
   buildAppleEsimInstallUrl,
+  shouldShowAppleOneTapSafariGuidance,
   supportsAppleOneTapEsimInstall,
 } from "@/app/lib/install/appleEsimInstall";
 
+export type AppleOneTapClientState = {
+  /** Direct Apple install URL — only set for supported iPhone Safari. */
+  href: string | null;
+  /** Supported iPhone OS in a non-Safari browser — guide user to Safari. */
+  showSafariGuidance: boolean;
+};
+
 /**
- * Client-only: resolve Apple's official one-tap install URL when the device
- * is a supported iPhone and a complete LPA string is available.
- * Builds the URL locally — never via a MAP redirect or query param.
+ * Client-only one-tap state from an authorized LPA string.
+ * Builds the Apple URL locally — never via a MAP redirect or query param.
+ * Never returns an Apple href outside supported iPhone Safari.
  */
-export function useAppleOneTapInstallHref(
+export function useAppleOneTapInstallState(
   activationLpa: string | null | undefined
-): string | null {
-  const [href, setHref] = useState<string | null>(null);
+): AppleOneTapClientState {
+  const [state, setState] = useState<AppleOneTapClientState>({
+    href: null,
+    showSafariGuidance: false,
+  });
 
   useEffect(() => {
     if (typeof navigator === "undefined") return;
-    if (!supportsAppleOneTapEsimInstall(navigator.userAgent)) {
-      setHref(null);
+    const ua = navigator.userAgent;
+    const url = buildAppleEsimInstallUrl(activationLpa);
+    if (!url) {
+      setState({ href: null, showSafariGuidance: false });
       return;
     }
-    setHref(buildAppleEsimInstallUrl(activationLpa));
+    if (supportsAppleOneTapEsimInstall(ua)) {
+      setState({ href: url, showSafariGuidance: false });
+      return;
+    }
+    if (shouldShowAppleOneTapSafariGuidance(ua)) {
+      setState({ href: null, showSafariGuidance: true });
+      return;
+    }
+    setState({ href: null, showSafariGuidance: false });
   }, [activationLpa]);
 
-  return href;
+  return state;
 }
 
 type Props = {
@@ -46,8 +67,25 @@ export default function AppleOneTapInstallButton({
         {label}
       </a>
       <p className="text-xs leading-relaxed text-[var(--text-muted)]">
-        Available on iPhone with iOS 17.5 or later. Apple will ask you to
-        confirm before installing.
+        Available on iPhone with iOS 17.4 or later. Apple will ask you to
+        confirm before installing. Use Safari for one-tap install.
+      </p>
+    </div>
+  );
+}
+
+export function AppleOneTapSafariGuidance() {
+  return (
+    <div
+      className="rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3"
+      role="status"
+    >
+      <p className="text-sm font-semibold text-[var(--heading)]">
+        Open this page in Safari for One-Tap Install
+      </p>
+      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+        Available on iPhone with iOS 17.4 or later. You can still install with
+        the QR code or manual details below.
       </p>
     </div>
   );

@@ -11,7 +11,9 @@ import {
   Smartphone,
   Wifi,
 } from "lucide-react";
-import AppleOneTapInstallButton from "@/app/components/install/AppleOneTapInstallButton";
+import AppleOneTapInstallButton, {
+  AppleOneTapSafariGuidance,
+} from "@/app/components/install/AppleOneTapInstallButton";
 
 const INSTALL_STEPS = [
   "Tap Install eSIM / One-Tap Install",
@@ -30,6 +32,8 @@ const INSTALL_TIPS = [
 
 export type EsimInstallExperienceProps = {
   appleOneTapHref: string | null;
+  /** Supported iPhone OS in non-Safari — show open-in-Safari guidance, no Apple href. */
+  showSafariOneTapGuidance?: boolean;
   hasOfficialIphoneActivationUrl?: boolean;
   iphoneInstallHref?: string | null;
   iphoneGuideHref?: string;
@@ -48,6 +52,7 @@ export type EsimInstallExperienceProps = {
 
 export default function EsimInstallExperience({
   appleOneTapHref,
+  showSafariOneTapGuidance = false,
   hasOfficialIphoneActivationUrl,
   iphoneInstallHref,
   iphoneGuideHref = "/install/iphone",
@@ -74,8 +79,12 @@ export default function EsimInstallExperience({
     }
   }
 
+  // Never launch Apple activation URLs outside supported iPhone Safari.
   const showOfficialIphone = Boolean(
-    !appleOneTapHref && hasOfficialIphoneActivationUrl && iphoneInstallHref
+    !appleOneTapHref &&
+      !showSafariOneTapGuidance &&
+      hasOfficialIphoneActivationUrl &&
+      iphoneInstallHref
   );
   const showQr = Boolean(hasVerifiedLpa && qrViewHref);
   const hasManual = Boolean(smdpAddress || activationCode || lpa || iccid);
@@ -104,6 +113,10 @@ export default function EsimInstallExperience({
           />
         ) : null}
 
+        {showSafariOneTapGuidance && !appleOneTapHref ? (
+          <AppleOneTapSafariGuidance />
+        ) : null}
+
         {showOfficialIphone ? (
           <div className="space-y-2">
             <a
@@ -118,7 +131,9 @@ export default function EsimInstallExperience({
           </div>
         ) : null}
 
-        {!appleOneTapHref && !showOfficialIphone ? (
+        {!appleOneTapHref &&
+        !showOfficialIphone &&
+        !showSafariOneTapGuidance ? (
           <Link
             href={iphoneGuideHref}
             className="inline-flex h-12 w-full items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"

@@ -29,20 +29,20 @@ export function buildAppleEsimInstallUrl(
   return url.toString();
 }
 
-/**
- * UX-only: whether this user agent is an iPhone on iOS 17.5+.
- * Apple introduced the eSIM Universal Link in iOS/iPadOS 17.5.
- * Fail closed on unknown / malformed UAs. Not a security boundary.
- */
-export function supportsAppleOneTapEsimInstall(
+function isIphoneUserAgent(ua: string): boolean {
+  if (!/\biPhone\b/i.test(ua)) return false;
+  if (/\biPad\b/i.test(ua)) return false;
+  if (/Android/i.test(ua)) return false;
+  return true;
+}
+
+/** iOS 17.4+ on iPhone. Fail closed. UX-only — not a security boundary. */
+export function isAppleOneTapIosVersionSupported(
   userAgent: string | null | undefined
 ): boolean {
   if (typeof userAgent !== "string") return false;
   const ua = userAgent.trim();
-  if (!ua) return false;
-  if (!/\biPhone\b/i.test(ua)) return false;
-  if (/\biPad\b/i.test(ua)) return false;
-  if (/Android/i.test(ua)) return false;
+  if (!ua || !isIphoneUserAgent(ua)) return false;
 
   const match = ua.match(/iPhone OS (\d+)[._](\d+)/i);
   if (!match) return false;
@@ -50,6 +50,57 @@ export function supportsAppleOneTapEsimInstall(
   const minor = Number(match[2]);
   if (!Number.isFinite(major) || !Number.isFinite(minor)) return false;
   if (major > 17) return true;
-  if (major === 17 && minor >= 5) return true;
+  if (major === 17 && minor >= 4) return true;
   return false;
+}
+
+/**
+ * Conservative Mobile Safari detection on iPhone.
+ * Rejects known non-Safari iOS browsers (Chrome/Firefox/Edge/Opera/etc.).
+ * Fail closed when identity is unclear. UX-only.
+ */
+export function isIphoneSafariBrowser(
+  userAgent: string | null | undefined
+): boolean {
+  if (typeof userAgent !== "string") return false;
+  const ua = userAgent.trim();
+  if (!ua || !isIphoneUserAgent(ua)) return false;
+
+  // Non-Safari iOS browsers inject identifiable tokens.
+  if (
+    /CriOS|FxiOS|EdgiOS|EdgA|OPiOS|OPT\/|DuckDuckGo|Brave|GSA\//i.test(ua)
+  ) {
+    return false;
+  }
+
+  // Mobile Safari typically includes both Version/ and Safari/.
+  if (!/Safari\//i.test(ua)) return false;
+  if (!/Version\/\d+/i.test(ua)) return false;
+  return true;
+}
+
+/**
+ * Direct Apple one-tap is only safe on supported iPhone Safari.
+ * Fail closed otherwise. UX-only — not a security boundary.
+ */
+export function supportsAppleOneTapEsimInstall(
+  userAgent: string | null | undefined
+): boolean {
+  return (
+    isAppleOneTapIosVersionSupported(userAgent) &&
+    isIphoneSafariBrowser(userAgent)
+  );
+}
+
+/**
+ * Supported iPhone OS, but not Safari — show “open in Safari” instead of
+ * launching the Apple URL (Chrome iOS WebView fails).
+ */
+export function shouldShowAppleOneTapSafariGuidance(
+  userAgent: string | null | undefined
+): boolean {
+  return (
+    isAppleOneTapIosVersionSupported(userAgent) &&
+    !isIphoneSafariBrowser(userAgent)
+  );
 }

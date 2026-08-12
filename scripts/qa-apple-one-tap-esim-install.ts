@@ -1,5 +1,5 @@
 /**
- * Offline QA for Apple one-tap eSIM install helpers (iPhone / iOS 17.5+).
+ * Offline QA for Apple one-tap eSIM install helpers (iPhone Safari / iOS 17.4+).
  * Pure static checks — never logs activation credentials, never calls providers.
  */
 import assert from "node:assert/strict";
@@ -7,6 +7,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   buildAppleEsimInstallUrl,
+  isIphoneSafariBrowser,
+  shouldShowAppleOneTapSafariGuidance,
   supportsAppleOneTapEsimInstall,
 } from "../app/lib/install/appleEsimInstall";
 
@@ -15,6 +17,19 @@ const root = join(__dirname, "..");
 function read(rel: string): string {
   return readFileSync(join(root, rel), "utf8");
 }
+
+const safari174 =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1";
+const safari175 =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
+const safari180 =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+const safari173 =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Mobile/15E148 Safari/604.1";
+const chrome174 =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/124.0.6367.111 Mobile/15E148 Safari/604.1";
+const chrome180 =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/125.0.6422.80 Mobile/15E148 Safari/604.1";
 
 function assertUrlRoundTrip(lpa: string) {
   const href = buildAppleEsimInstallUrl(lpa);
@@ -72,44 +87,26 @@ function main() {
   );
   console.log("PASS helper_no_logs_uses_url_api");
 
+  assert.equal(supportsAppleOneTapEsimInstall(safari174), true);
+  assert.equal(supportsAppleOneTapEsimInstall(safari175), true);
+  assert.equal(supportsAppleOneTapEsimInstall(safari180), true);
+  assert.equal(supportsAppleOneTapEsimInstall(safari173), false);
+  assert.equal(isIphoneSafariBrowser(safari174), true);
+  assert.equal(isIphoneSafariBrowser(chrome174), false);
+  assert.equal(supportsAppleOneTapEsimInstall(chrome174), false);
+  assert.equal(supportsAppleOneTapEsimInstall(chrome180), false);
+  assert.equal(shouldShowAppleOneTapSafariGuidance(chrome174), true);
+  assert.equal(shouldShowAppleOneTapSafariGuidance(chrome180), true);
+  assert.equal(shouldShowAppleOneTapSafariGuidance(safari174), false);
+  assert.equal(shouldShowAppleOneTapSafariGuidance(safari173), false);
   assert.equal(
     supportsAppleOneTapEsimInstall(
-      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
+      "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
     ),
     false
   );
   assert.equal(
-    supportsAppleOneTapEsimInstall(
-      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Version/17.5 Mobile/15E148 Safari/604.1"
-    ),
-    true
-  );
-  assert.equal(
-    supportsAppleOneTapEsimInstall(
-      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 Version/17.6 Mobile/15E148 Safari/604.1"
-    ),
-    true
-  );
-  assert.equal(
-    supportsAppleOneTapEsimInstall(
-      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1"
-    ),
-    true
-  );
-  assert.equal(
-    supportsAppleOneTapEsimInstall(
-      "Mozilla/5.0 (iPhone; CPU iPhone OS 19_1 like Mac OS X) AppleWebKit/605.1.15 Version/19.1 Mobile/15E148 Safari/604.1"
-    ),
-    true
-  );
-  assert.equal(
-    supportsAppleOneTapEsimInstall(
-      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 Version/17.3 Mobile/15E148 Safari/604.1"
-    ),
-    false
-  );
-  assert.equal(
-    supportsAppleOneTapEsimInstall(
+    shouldShowAppleOneTapSafariGuidance(
       "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
     ),
     false
@@ -136,7 +133,7 @@ function main() {
     ),
     false
   );
-  console.log("PASS ios_support_detection");
+  console.log("PASS ios_safari_support_detection");
 
   const oneTapUi = read("app/components/install/AppleOneTapInstallButton.tsx");
   const experience = read("app/components/install/EsimInstallExperience.tsx");
@@ -144,12 +141,15 @@ function main() {
   const successActions = read("app/components/install/OrderInstallActions.tsx");
   assert.match(oneTapUi, /buildAppleEsimInstallUrl/);
   assert.match(oneTapUi, /supportsAppleOneTapEsimInstall/);
+  assert.match(oneTapUi, /shouldShowAppleOneTapSafariGuidance/);
   assert.match(oneTapUi, /Install eSIM/);
-  assert.match(oneTapUi, /Available on iPhone with iOS 17\.5 or later/);
+  assert.match(oneTapUi, /Available on iPhone with iOS 17\.4 or later/);
+  assert.match(oneTapUi, /Open this page in Safari for One-Tap Install/);
   assert.doesNotMatch(oneTapUi, /console\.(log|info|warn|debug)/);
   assert.doesNotMatch(oneTapUi, /gtag|analytics|trackEvent|dataLayer/i);
 
   assert.match(experience, /One-Tap Install eSIM|AppleOneTapInstallButton/);
+  assert.match(experience, /AppleOneTapSafariGuidance|showSafariOneTapGuidance/);
   assert.match(experience, /Or install using QR code \/ manual details/);
   assert.match(experience, /If one-tap does not work, use manual install or the QR code/);
   assert.match(experience, /Download QR Code/);
@@ -160,21 +160,22 @@ function main() {
   assert.doesNotMatch(experience, /console\.(log|info|warn|debug)/);
   assert.doesNotMatch(experience, /mapesim\.com.*carddata|carddata=.*mapesim/i);
 
-  assert.match(panel, /useAppleOneTapInstallHref|EsimInstallExperience/);
+  assert.match(panel, /useAppleOneTapInstallState|EsimInstallExperience/);
+  assert.match(panel, /showSafariOneTapGuidance/);
   assert.match(panel, /View QR Code & Details/);
   assert.doesNotMatch(panel, /console\.(log|info|warn|debug)/);
   assert.doesNotMatch(panel, /mapesim\.com.*carddata|carddata=.*mapesim/i);
 
-  assert.match(successActions, /useAppleOneTapInstallHref\(qrValue\)/);
+  assert.match(successActions, /useAppleOneTapInstallState\(qrValue\)/);
+  assert.match(successActions, /showSafariOneTapGuidance/);
   assert.match(successActions, /EsimInstallExperience/);
   assert.doesNotMatch(successActions, /console\.(log|info|warn|debug)/);
-  console.log("PASS ui_surfaces_one_tap_and_fallback");
+  console.log("PASS ui_surfaces_one_tap_safari_and_fallback");
 
   const iphoneApi = read("app/api/account/orders/[orderId]/iphone/route.ts");
   const vesimIphone = read("app/api/vesim/install/iphone/route.ts");
   assert.doesNotMatch(iphoneApi, /buildAppleEsimInstallUrl/);
   assert.doesNotMatch(vesimIphone, /buildAppleEsimInstallUrl/);
-  // Existing routes must keep rejecting client-supplied carddata query params.
   assert.match(iphoneApi, /"carddata"/);
   assert.doesNotMatch(
     read("prisma/schema.prisma"),
@@ -186,7 +187,6 @@ function main() {
   assert.match(pkg, /"qa:apple-one-tap-esim-install"/);
   console.log("PASS package_script");
 
-  // `/success` qrValue must be extractInstallDetails().qrValue (GSMA LPA only).
   const extractSrc = read("app/lib/email/extract.ts");
   const orderDetails = read("app/api/vesim/order-details/route.ts");
   const successPage = read("app/success/page.tsx");

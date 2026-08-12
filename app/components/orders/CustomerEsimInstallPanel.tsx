@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QrCode, Smartphone } from "lucide-react";
 import EsimInstallExperience from "@/app/components/install/EsimInstallExperience";
-import { useAppleOneTapInstallHref } from "@/app/components/install/AppleOneTapInstallButton";
+import { useAppleOneTapInstallState } from "@/app/components/install/AppleOneTapInstallButton";
 
 /** Hash-only install intent from My eSIMs — never carries secrets. */
 function hasInstallHashIntent(): boolean {
@@ -41,7 +41,7 @@ export default function CustomerEsimInstallPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<InstallPayload | null>(null);
-  const appleOneTapHref = useAppleOneTapInstallHref(data?.lpa);
+  const appleOneTap = useAppleOneTapInstallState(data?.lpa);
 
   const loadInstall = useCallback(async () => {
     setLoading(true);
@@ -179,7 +179,8 @@ export default function CustomerEsimInstallPanel({
         ) : (
           <div className="mt-5">
             <EsimInstallExperience
-              appleOneTapHref={appleOneTapHref}
+              appleOneTapHref={appleOneTap.href}
+              showSafariOneTapGuidance={appleOneTap.showSafariGuidance}
               hasOfficialIphoneActivationUrl={
                 data.hasOfficialIphoneActivationUrl
               }
