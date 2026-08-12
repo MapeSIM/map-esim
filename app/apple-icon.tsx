@@ -14,7 +14,7 @@ export default function AppleIcon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#020817",
+          background: "#0D1B3A",
         }}
       >
         <svg
@@ -24,31 +24,81 @@ export default function AppleIcon() {
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
+          <defs>
+            <linearGradient
+              id="applePinStroke"
+              x1="32"
+              y1="2"
+              x2="32"
+              y2="56"
+              gradientUnits="userSpaceOnUse"
+            >
+              <stop offset="0%" stopColor="#7CFF00" />
+              <stop offset="45%" stopColor="#3DB8FF" />
+              <stop offset="100%" stopColor="#1565FF" />
+            </linearGradient>
+          </defs>
+          {/* Outlined location pin */}
           <path
-            fill="#0D1B3A"
-            stroke="#1565FF"
-            strokeWidth="1.25"
-            d="M32 4C20.954 4 12 12.954 12 24c0 14.5 16.8 32.4 18.95 34.7a1.5 1.5 0 0 0 2.1 0C35.2 56.4 52 38.5 52 24 52 12.954 43.046 4 32 4Z"
-          />
-          <circle cx="32" cy="23" r="11.5" fill="#1565FF" />
-          <circle cx="32" cy="28.5" r="2.25" fill="#7CFF00" />
-          <path
-            stroke="#7CFF00"
-            strokeWidth="2.75"
-            strokeLinecap="round"
-            d="M26.2 24.2a8.2 8.2 0 0 1 11.6 0"
-          />
-          <path
-            stroke="#7CFF00"
-            strokeWidth="2.75"
-            strokeLinecap="round"
-            d="M23.2 20.4a12.8 12.8 0 0 1 17.6 0"
-          />
-          <path
-            stroke="#7CFF00"
+            d="M32 5.5c-9.665 0-17.5 7.72-17.5 17.25 0 12.1 14.35 27.85 16.7 30.3a1.15 1.15 0 0 0 1.6 0c2.35-2.45 16.7-18.2 16.7-30.3C49.5 13.22 41.665 5.5 32 5.5Z"
+            stroke="url(#applePinStroke)"
             strokeWidth="3.25"
-            strokeLinecap="round"
-            d="M17.5 38.5c6.5-5.5 14.5-6.2 22.5-2.2 3.2 1.6 6.2 2.2 9.5 1.6"
+            strokeLinejoin="round"
+          />
+          {/* Flat ground ring — no glow */}
+          <ellipse
+            cx="32"
+            cy="56.5"
+            rx="11"
+            ry="2.4"
+            fill="#1565FF"
+            opacity="0.85"
+          />
+          {/* M — white for contrast on navy Apple-icon background */}
+          <path
+            fill="#FFFFFF"
+            d="M22.2 34.8V15.6h3.9l5.9 12.55L37.9 15.6h3.9v19.2h-3.35V22.05L33.4 33.9h-2.8L25.55 22.05V34.8H22.2Z"
+          />
+          {/* eSIM chip cue (2x2 pads) */}
+          <rect
+            x="28.6"
+            y="36.1"
+            width="6.8"
+            height="5.4"
+            rx="1.15"
+            fill="#7CFF00"
+          />
+          <rect
+            x="29.55"
+            y="36.85"
+            width="2.05"
+            height="1.7"
+            rx="0.35"
+            fill="#0D1B3A"
+          />
+          <rect
+            x="32.4"
+            y="36.85"
+            width="2.05"
+            height="1.7"
+            rx="0.35"
+            fill="#0D1B3A"
+          />
+          <rect
+            x="29.55"
+            y="39.05"
+            width="2.05"
+            height="1.7"
+            rx="0.35"
+            fill="#0D1B3A"
+          />
+          <rect
+            x="32.4"
+            y="39.05"
+            width="2.05"
+            height="1.7"
+            rx="0.35"
+            fill="#0D1B3A"
           />
         </svg>
       </div>
