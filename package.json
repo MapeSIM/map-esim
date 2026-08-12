@@ -46,6 +46,7 @@
     "qa:destination-catalog-ssr": "tsx scripts/qa-destination-catalog-ssr.ts",
     "qa:destination-presentation": "tsx scripts/qa-destination-presentation.ts",
     "qa:destination-routing": "tsx scripts/qa-destination-routing.ts",
+    "qa:destination-seo-metadata": "tsx scripts/qa-destination-seo-metadata.ts",
     "qa:plans-discovery": "tsx scripts/qa-plans-discovery.ts",
     "qa:affiliates-partnerships": "tsx scripts/qa-affiliates-partnerships.ts",
     "qa:navbar-layout": "tsx scripts/qa-navbar-layout.ts",
@@ -73,6 +74,7 @@
     "qa:admin-alert-notifications": "tsx scripts/qa-admin-alert-notifications.ts",
     "smoke:admin-alert-notifications": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/smoke-admin-alert-notifications.ts",
     "qa:security-headers": "tsx scripts/qa-security-headers.ts",
+    "qa:prelaunch": "tsx scripts/qa-prelaunch.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

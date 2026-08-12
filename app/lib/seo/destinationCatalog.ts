@@ -5,7 +5,10 @@ import {
   findDestinationBySlug,
   type VesimDestination,
 } from "@/app/lib/vesim/destinations";
-import { fetchDestinations } from "@/app/lib/vesim/server";
+import {
+  fetchDestinations,
+  fetchPublicDestinationCatalog,
+} from "@/app/lib/vesim/server";
 
 /** Revalidate SEO destination reads hourly — avoids per-request provider calls. */
 const SEO_DESTINATION_REVALIDATE_SECONDS = 60 * 60;
@@ -46,12 +49,12 @@ async function loadDestinationsForSeo(): Promise<VesimDestination[]> {
 }
 
 /**
- * Cached destination catalog for sitemap + destination metadata.
- * Primary source: VeSIM destinations. Fallback: last success, then static emergency list.
+ * Cached destination catalog for sitemap paths (identity only, no offer mins).
+ * Cache key bumped so a poisoned pre-USPR route snapshot cannot linger.
  */
 export const getCachedDestinationsForSeo = unstable_cache(
   loadDestinationsForSeo,
-  ["seo-destination-catalog-v1"],
+  ["seo-destination-catalog-v2"],
   { revalidate: SEO_DESTINATION_REVALIDATE_SECONDS }
 );
 
@@ -73,12 +76,32 @@ export async function getCanonicalDestinationPathsForSitemap(): Promise<
   return paths;
 }
 
+/**
+ * Resolve `/countries/[id]` for metadata using the same public catalog +
+ * `findDestinationBySlug` semantics as the country page body.
+ * Prevents false "Destination not found" / noindex when the page itself
+ * can resolve provider variants (e.g. USPR vs PR).
+ */
 export async function resolveDestinationForSeo(
   rawId: string
 ): Promise<VesimDestination | null> {
   const id = rawId.trim();
   if (!id) return null;
 
-  const destinations = await getCachedDestinationsForSeo();
-  return findDestinationBySlug(destinations, id) ?? null;
+  // Primary: same catalog the country detail page uses.
+  try {
+    const publicCatalog = await fetchPublicDestinationCatalog();
+    const fromPublic = findDestinationBySlug(publicCatalog, id);
+    if (fromPublic) return fromPublic;
+  } catch {
+    // Fall through to lighter SEO catalog.
+  }
+
+  // Secondary: identity-only SEO cache (no offer enrichment).
+  try {
+    const seoCatalog = await getCachedDestinationsForSeo();
+    return findDestinationBySlug(seoCatalog, id) ?? null;
+  } catch {
+    return null;
+  }
 }

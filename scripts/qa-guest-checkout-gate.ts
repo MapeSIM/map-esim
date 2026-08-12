@@ -94,16 +94,20 @@ function main() {
   assert.match(readme, /ENABLE_GUEST_VESIM_CHECKOUT/);
   assert.match(readme, /Keep `ENABLE_GUEST_VESIM_CHECKOUT=false` in production/);
 
-  console.log("7) Soft-launch Buy CTAs no longer target guest /checkout");
+  console.log("7) Soft-launch public Get eSIM CTA → /countries (not guest /checkout)");
   const planUtils = read("app/lib/plans/plan-utils.ts");
+  // Authenticated/internal buy path remains available for signed-in purchases.
   assert.match(planUtils, /\/account\/esim\/buy/);
   assert.doesNotMatch(
     planUtils,
     /return\s+`\/checkout\?/
   );
   const navbar = read("app/components/Navbar.tsx");
-  assert.match(navbar, /href="\/account\/esim\/buy"/);
+  // Public Get eSIM CTA routes to destinations; guest checkout stays disabled.
   assert.match(navbar, /Get eSIM/);
+  assert.match(navbar, /href="\/countries"/);
+  assert.doesNotMatch(navbar, /href="\/account\/esim\/buy"/);
+  assert.doesNotMatch(navbar, /href="\/checkout"/);
   const paymentPage = read("app/payment/page.tsx");
   assert.doesNotMatch(paymentPage, />\s*Pay Now\s*</);
   assert.match(paymentPage, /Card checkout unavailable|not available yet/i);
