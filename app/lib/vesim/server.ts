@@ -11,6 +11,11 @@ import {
   normalizeOffers,
   type VesimOffer,
 } from "@/app/lib/vesim/offers";
+import {
+  buildVesimOffersQuery,
+  collectAllOfferPagePayloads,
+  mergeOfferPageItems,
+} from "@/app/lib/vesim/offersPagination";
 import { unstable_cache } from "next/cache";
 
 export type VerifiedCheckoutOffer = {
@@ -288,13 +293,14 @@ async function loadPublicDestinationCatalog(): Promise<VesimDestination[]> {
  */
 export const fetchPublicDestinationCatalog = unstable_cache(
   loadPublicDestinationCatalog,
-  ["public-destination-catalog-offer-mins-v1"],
+  ["public-destination-catalog-offer-mins-v2"],
   { revalidate: PUBLIC_DESTINATION_CATALOG_REVALIDATE_SECONDS }
 );
 
 /**
- * Live provider offer fetch (no-store).
+ * Live provider offer fetch (no-store), all pages.
  * Purchase/checkout/admin validation must keep using this path.
+ * Uses ?page=&limit=1024 — never fullCatalog=1.
  */
 export async function fetchOffersForCountry(
   country: string,
@@ -302,24 +308,32 @@ export async function fetchOffersForCountry(
 ): Promise<VesimOffer[]> {
   const auth = token || (await getBrokerToken());
   const baseUrl = getVesimBaseUrl();
+  const destination = country.trim();
+  if (!destination) return [];
 
-  const response = await fetch(
-    `${baseUrl}/api/esim/offers?country=${encodeURIComponent(country)}`,
-    {
-      headers: {
-        Authorization: `${auth.tokenType} ${auth.accessToken}`,
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    }
-  );
+  const collected = await collectAllOfferPagePayloads(async (page) => {
+    const query = buildVesimOffersQuery(destination, page);
+    const response = await fetch(
+      `${baseUrl}/api/esim/offers?${query.toString()}`,
+      {
+        headers: {
+          Authorization: `${auth.tokenType} ${auth.accessToken}`,
+          Accept: "application/json",
+        },
+        cache: "no-store",
+      }
+    );
+    const payload = await readJsonSafe(response);
+    return { httpOk: response.ok, payload };
+  });
 
-  const data = await readJsonSafe(response);
-  if (!response.ok) {
+  // Fail closed: incomplete pagination must not look like a full catalog.
+  if (!collected.ok) {
     return [];
   }
 
-  return normalizeOffers(data);
+  const allRawOffers = mergeOfferPageItems(collected.payloads);
+  return normalizeOffers({ offers: allRawOffers });
 }
 
 /** Align public browsing offer snapshots with destination catalog TTL. */
@@ -334,7 +348,8 @@ function publicOffersCountryKey(country: string): string {
 
 const loadCachedPublicOffersForCountry = unstable_cache(
   async (country: string) => fetchOffersForCountry(country),
-  ["public-country-offers-v1"],
+  // v2: complete multi-page lists (invalidates prior single-page snapshots).
+  ["public-country-offers-v2"],
   { revalidate: PUBLIC_OFFERS_REVALIDATE_SECONDS }
 );
 

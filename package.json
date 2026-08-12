@@ -40,6 +40,7 @@
     "qa:refund-status-email": "tsx scripts/qa-refund-status-email.ts",
     "qa:guest-checkout-gate": "tsx scripts/qa-guest-checkout-gate.ts",
     "qa:vesim-environment": "tsx scripts/qa-vesim-environment.ts",
+    "qa:vesim-offers-pagination": "tsx scripts/qa-vesim-offers-pagination.ts",
     "qa:retail-pricing": "tsx scripts/qa-retail-pricing.ts",
     "qa:country-plans-ssr": "tsx scripts/qa-country-plans-ssr.ts",
     "qa:plan-card-presentation": "tsx scripts/qa-plan-card-presentation.ts",

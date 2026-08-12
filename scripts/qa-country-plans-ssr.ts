@@ -38,7 +38,10 @@ function main() {
   // Purchase validation must stay on the live no-store offer fetch.
   const server = read("app/lib/vesim/server.ts");
   assert.match(server, /export async function fetchPublicOffersForCountry/);
-  assert.match(server, /public-country-offers-v1/);
+  assert.match(server, /public-country-offers-v2/);
+  assert.match(server, /collectAllOfferPagePayloads|buildVesimOffersQuery/);
+  assert.doesNotMatch(server, /params\.set\(\s*["']fullCatalog["']/);
+  assert.doesNotMatch(server, /[?&]fullCatalog=/);
   assert.match(
     server,
     /export async function verifyOfferAuthoritative[\s\S]*fetchOffersForCountry\(/
