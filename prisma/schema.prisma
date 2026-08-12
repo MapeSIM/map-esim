@@ -471,6 +471,9 @@ model WalletEsimPurchase {
   failureCode                      String?
   reconciliationState              String?
   emailDeliveryStatus              String?
+  /// Durable once-only customer "order under review" email (RECONCILIATION_REQUIRED).
+  reconRequiredEmailNotificationStatus String?
+  reconRequiredEmailNotifiedAt     DateTime?
   createdAt                        DateTime                 @default(now())
   updatedAt                        DateTime                 @updatedAt
   completedAt                      DateTime?
@@ -494,6 +497,7 @@ model WalletEsimPurchase {
   @@index([reconciliationEscalatedAt])
   @@index([providerRefreshClaimedAt])
   @@index([providerRefreshResult])
+  @@index([reconRequiredEmailNotificationStatus])
 }
 
 /// Gateway remainder payment attempt for a WalletEsimPurchase (not WalletTopup).

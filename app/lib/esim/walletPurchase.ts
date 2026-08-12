@@ -16,6 +16,7 @@ import { persistAssignedOrder } from "@/app/lib/orders/persistAssignedOrder";
 import { deliverOrderEmailAfterCheckout } from "@/app/lib/email/deliverAfterCheckout";
 import { createOrderAccessToken } from "@/app/lib/vesim/orderAccess";
 import { executeCreditCheckout } from "@/app/lib/vesim/creditCheckout";
+import { scheduleReconciliationRequiredNotification } from "@/app/lib/esim/reconciliationRequiredNotification";
 import {
   persistWalletPurchaseProviderObservation,
   type ProviderResultKind,
@@ -1073,6 +1074,9 @@ async function markReconciliationRequired(options: {
       },
     });
   });
+
+  // Post-commit: customer "under review" email only when funds are still held.
+  scheduleReconciliationRequiredNotification(options.purchaseId);
 
   throw new WalletEsimPurchaseError(
     "RECONCILIATION_REQUIRED",
