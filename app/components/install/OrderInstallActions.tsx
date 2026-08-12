@@ -4,6 +4,9 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Copy, Download, Eye, Smartphone } from "lucide-react";
+import AppleOneTapInstallButton, {
+  useAppleOneTapInstallHref,
+} from "@/app/components/install/AppleOneTapInstallButton";
 
 export type OrderInstallActionsProps = {
   hasInstallDetails?: boolean;
@@ -40,6 +43,7 @@ export default function OrderInstallActions({
 }: OrderInstallActionsProps) {
   const [copied, setCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  const appleOneTapHref = useAppleOneTapInstallHref(qrValue);
 
   if (!hasInstallDetails) {
     return null;
@@ -56,9 +60,9 @@ export default function OrderInstallActions({
     }
   }
 
-  // Official provider activation URL only — never from LPA alone.
+  // Provider official URL via MAP redirect — only when one-tap LPA path is unavailable.
   const showIphoneButton = Boolean(
-    hasOfficialIphoneActivationUrl && iphoneInstallHref
+    !appleOneTapHref && hasOfficialIphoneActivationUrl && iphoneInstallHref
   );
   const showQrActions = Boolean(hasVerifiedLpa && (qrDownloadHref || qrViewHref));
 
@@ -73,13 +77,20 @@ export default function OrderInstallActions({
             </h2>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
               Actions below use verified server-side order data only. One-tap
-              Install on iPhone appears only when an official activation link is
-              supplied for the order.
+              Install eSIM appears on supported iPhones when a complete
+              activation value is available.
             </p>
           </div>
         </div>
 
         <div className="mt-5 grid gap-3">
+          {appleOneTapHref ? (
+            <AppleOneTapInstallButton
+              href={appleOneTapHref}
+              className="inline-flex h-12 items-center justify-center rounded-xl bg-[var(--accent-strong)] text-sm font-bold text-[var(--accent-ink)] transition hover:brightness-105"
+            />
+          ) : null}
+
           {showIphoneButton && (
             <>
               <a
@@ -95,7 +106,7 @@ export default function OrderInstallActions({
             </>
           )}
 
-          {!showIphoneButton && (
+          {!appleOneTapHref && !showIphoneButton && (
             <Link
               href={iphoneGuideHref}
               className="inline-flex h-12 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40"
@@ -104,7 +115,13 @@ export default function OrderInstallActions({
             </Link>
           )}
 
-          {showQrActions && (
+          {appleOneTapHref ? (
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              Or install using QR code / manual details
+            </p>
+          ) : null}
+
+          {showQrActions && !appleOneTapHref && (
             <p className="text-xs leading-relaxed text-[var(--text-muted)]">
               On iOS 17.4 or later, you can also press and hold the QR code in
               Mail or Safari and select Add eSIM.

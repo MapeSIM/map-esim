@@ -4,6 +4,9 @@ import { useCallback, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Copy, Download, Eye, Smartphone, X } from "lucide-react";
+import AppleOneTapInstallButton, {
+  useAppleOneTapInstallHref,
+} from "@/app/components/install/AppleOneTapInstallButton";
 
 type InstallPayload = {
   hasInstallDetails: boolean;
@@ -37,6 +40,7 @@ export default function CustomerEsimInstallPanel({
   const [data, setData] = useState<InstallPayload | null>(null);
   const [showQrModal, setShowQrModal] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const appleOneTapHref = useAppleOneTapInstallHref(data?.lpa);
 
   const loadInstall = useCallback(async () => {
     setLoading(true);
@@ -167,7 +171,10 @@ export default function CustomerEsimInstallPanel({
           </div>
         ) : (
           <div className="mt-5 grid gap-3">
-            {data.hasOfficialIphoneActivationUrl && data.iphoneInstallHref ? (
+            {appleOneTapHref ? (
+              <AppleOneTapInstallButton href={appleOneTapHref} />
+            ) : data.hasOfficialIphoneActivationUrl &&
+              data.iphoneInstallHref ? (
               <a
                 href={data.iphoneInstallHref}
                 className="inline-flex h-12 items-center justify-center rounded-xl bg-[var(--accent)] text-sm font-bold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
@@ -182,6 +189,12 @@ export default function CustomerEsimInstallPanel({
                 View iPhone installation guide
               </Link>
             )}
+
+            {appleOneTapHref ? (
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                Or install using QR code / manual details
+              </p>
+            ) : null}
 
             {data.hasVerifiedLpa && data.qrViewHref ? (
               <button
