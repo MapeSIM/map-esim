@@ -139,6 +139,7 @@ function main() {
   console.log("PASS ios_support_detection");
 
   const oneTapUi = read("app/components/install/AppleOneTapInstallButton.tsx");
+  const experience = read("app/components/install/EsimInstallExperience.tsx");
   const panel = read("app/components/orders/CustomerEsimInstallPanel.tsx");
   const successActions = read("app/components/install/OrderInstallActions.tsx");
   assert.match(oneTapUi, /buildAppleEsimInstallUrl/);
@@ -148,17 +149,24 @@ function main() {
   assert.doesNotMatch(oneTapUi, /console\.(log|info|warn|debug)/);
   assert.doesNotMatch(oneTapUi, /gtag|analytics|trackEvent|dataLayer/i);
 
-  assert.match(panel, /useAppleOneTapInstallHref|AppleOneTapInstallButton/);
-  assert.match(panel, /Or install using QR code \/ manual details/);
-  assert.match(panel, /View QR Code|Download QR Code/);
-  assert.match(panel, /Manual installation details/);
+  assert.match(experience, /One-Tap Install eSIM|AppleOneTapInstallButton/);
+  assert.match(experience, /Or install using QR code \/ manual details/);
+  assert.match(experience, /If one-tap does not work, use manual install or the QR code/);
+  assert.match(experience, /Download QR Code/);
+  assert.match(experience, /Manual installation details/);
+  assert.match(experience, /Installation guide/);
+  assert.match(experience, /Important tips/);
+  assert.doesNotMatch(experience, /Add data to this eSIM/i);
+  assert.doesNotMatch(experience, /console\.(log|info|warn|debug)/);
+  assert.doesNotMatch(experience, /mapesim\.com.*carddata|carddata=.*mapesim/i);
+
+  assert.match(panel, /useAppleOneTapInstallHref|EsimInstallExperience/);
+  assert.match(panel, /View QR Code & Details/);
   assert.doesNotMatch(panel, /console\.(log|info|warn|debug)/);
   assert.doesNotMatch(panel, /mapesim\.com.*carddata|carddata=.*mapesim/i);
 
   assert.match(successActions, /useAppleOneTapInstallHref\(qrValue\)/);
-  assert.match(successActions, /Or install using QR code \/ manual details/);
-  assert.match(successActions, /View QR Code|Download QR Code/);
-  assert.match(successActions, /Manual installation fallback/);
+  assert.match(successActions, /EsimInstallExperience/);
   assert.doesNotMatch(successActions, /console\.(log|info|warn|debug)/);
   console.log("PASS ui_surfaces_one_tap_and_fallback");
 

@@ -30,18 +30,20 @@ export function useAppleOneTapInstallHref(
 
 type Props = {
   href: string;
+  label?: string;
   className?: string;
 };
 
 /** Presentational Install eSIM control; parent supplies a direct Apple href. */
 export default function AppleOneTapInstallButton({
   href,
+  label = "Install eSIM",
   className = "inline-flex h-12 w-full items-center justify-center rounded-xl bg-[var(--accent)] text-sm font-bold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]",
 }: Props) {
   return (
     <div className="space-y-2">
       <a href={href} className={className}>
-        Install eSIM
+        {label}
       </a>
       <p className="text-xs leading-relaxed text-[var(--text-muted)]">
         Available on iPhone with iOS 17.5 or later. Apple will ask you to

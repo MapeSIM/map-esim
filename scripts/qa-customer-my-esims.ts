@@ -89,6 +89,7 @@ function main() {
   assert.match(listPage, /requireSession/);
   assert.match(listPage, /iccidMasked/);
   assert.match(listPage, /View details/);
+  assert.match(listPage, /View QR Code & Details/);
   assert.match(listPage, /name="status"/);
   assert.match(listPage, /name="q"/);
   assert.doesNotMatch(listPage, /Show full ICCID|decryptIccid|IccidRevealPanel/);
@@ -135,9 +136,10 @@ function main() {
   );
   assert.match(installLib, /FAILED_REFUNDED/);
   assert.match(installLib, /RECONCILIATION_REQUIRED/);
-  assert.match(installPanel, /Show installation options/);
+  assert.match(installPanel, /View QR Code & Details/);
   assert.match(installPanel, /Install the eSIM only when you are ready to use it/);
   assert.match(installPanel, /Order refunded/);
+  assert.match(installPanel, /EsimInstallExperience/);
   assert.doesNotMatch(installPanel, /Add data to this eSIM/i);
   console.log("PASS install_on_demand_and_refund_guards");
 
