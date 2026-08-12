@@ -35,6 +35,15 @@ export function slugifyDestination(value: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+/**
+ * ISO 3166-1 alpha-2 style codes keep SEO name slugs (e.g. PR → puerto-rico).
+ * Longer provider product codes (e.g. USPR) must use the code in the URL so
+ * they never collide with a same-named ISO destination.
+ */
+export function isIso2CountryCode(code: string | null | undefined): boolean {
+  return /^[A-Za-z]{2}$/.test((code || "").trim());
+}
+
 export function destinationSlug(raw: {
   code?: string;
   name?: string;
@@ -54,6 +63,12 @@ export function destinationSlug(raw: {
       return code.toLowerCase();
     }
     return `region-${slugifyDestination(name || code)}`;
+  }
+
+  // Provider variants that share a customer name (PR vs USPR) need distinct
+  // route identity — use the provider code, never rename or merge products.
+  if (code && !isIso2CountryCode(code)) {
+    return code.toLowerCase();
   }
 
   return slugifyDestination(name || code);
@@ -287,6 +302,22 @@ export function withLowestOfferRetailMinPrice(
   };
 }
 
+function destinationMatchesAlias(
+  destination: VesimDestination,
+  rawKey: string,
+  key: string
+): boolean {
+  return (destination.searchAliases || []).some(
+    (alias) =>
+      slugifyDestination(alias) === key || alias.toLowerCase() === rawKey
+  );
+}
+
+/**
+ * Resolve a public `/countries/[id]` segment to a provider destination.
+ * Provider `code` is the source of truth for offers. Shared display names
+ * (PR / USPR) must not steal each other's routes.
+ */
 export function findDestinationBySlug(
   destinations: VesimDestination[],
   slug: string
@@ -295,23 +326,62 @@ export function findDestinationBySlug(
   const key = slugifyDestination(slug);
   if (!rawKey && !key) return undefined;
 
-  return destinations.find((destination) => {
+  // 1) Exact provider code — strongest identity (e.g. /countries/uspr).
+  const byCode = destinations.find((destination) => {
     const codeLower = destination.code.toLowerCase();
-    if (destination.slug === key || destination.slug === rawKey) return true;
-    if (codeLower === key || codeLower === rawKey) return true;
-    if (codeLower === `region-${key}`) return true;
-    if (slugifyDestination(destination.name) === key) return true;
-    // Backward-compatible: /countries/asia → region-asia
-    if (
-      destination.kind === "regional" &&
-      codeLower === `region-${key}`
-    ) {
-      return true;
-    }
-    return (destination.searchAliases || []).some(
-      (alias) => slugifyDestination(alias) === key || alias.toLowerCase() === rawKey
-    );
+    return codeLower === rawKey || codeLower === key;
   });
+  if (byCode) return byCode;
+
+  // 2) Exact stored route slug (unique after non-ISO code slugging).
+  const bySlug = destinations.filter(
+    (destination) =>
+      destination.slug === key || destination.slug === rawKey
+  );
+  if (bySlug.length === 1) return bySlug[0];
+  if (bySlug.length > 1) {
+    const pathOwner = bySlug.find(
+      (destination) => destinationRouteId(destination) === key ||
+        destinationRouteId(destination) === rawKey
+    );
+    if (pathOwner) return pathOwner;
+    const isoOwner = bySlug.find((destination) =>
+      isIso2CountryCode(destination.code)
+    );
+    if (isoOwner) return isoOwner;
+    return bySlug[0];
+  }
+
+  // 3) Regional shortcuts: /countries/asia → region-asia.
+  const byRegionalCode = destinations.find((destination) => {
+    if (destination.kind !== "regional") return false;
+    const codeLower = destination.code.toLowerCase();
+    return codeLower === `region-${key}` || codeLower === `region-${rawKey}`;
+  });
+  if (byRegionalCode) return byRegionalCode;
+
+  // 4) Name / alias fallback. When several destinations share a name, prefer
+  // the one that owns this SEO path (ISO-2 name slug), never the first row.
+  const byNameOrAlias = destinations.filter((destination) => {
+    if (slugifyDestination(destination.name) === key) return true;
+    return destinationMatchesAlias(destination, rawKey, key);
+  });
+  if (byNameOrAlias.length === 1) return byNameOrAlias[0];
+  if (byNameOrAlias.length > 1) {
+    const pathOwner = byNameOrAlias.find(
+      (destination) =>
+        destinationRouteId(destination) === key ||
+        destinationRouteId(destination) === rawKey
+    );
+    if (pathOwner) return pathOwner;
+    const isoOwner = byNameOrAlias.find((destination) =>
+      isIso2CountryCode(destination.code)
+    );
+    if (isoOwner) return isoOwner;
+    return byNameOrAlias[0];
+  }
+
+  return undefined;
 }
 
 /**
@@ -400,10 +470,38 @@ function matchRegionalByCountryRegions(
   return best?.destination;
 }
 
-export function destinationPath(destination: VesimDestination): string {
-  const id =
-    destination.kind === "regional" || destination.kind === "global"
-      ? destination.code.toLowerCase()
-      : destination.slug || slugifyDestination(destination.name);
-  return `/countries/${id}`;
+/**
+ * Public route segment for `/countries/[id]`.
+ * Regional/global keep provider codes; ISO countries keep SEO name slugs;
+ * non-ISO country products (USPR) use the provider code.
+ */
+export function destinationRouteId(
+  destination: Pick<VesimDestination, "code" | "name" | "slug" | "kind">
+): string {
+  if (destination.kind === "regional" || destination.kind === "global") {
+    return destination.code.toLowerCase();
+  }
+
+  const code = destination.code.trim();
+  // Defensive: even if an older slug still mirrors a shared name, non-ISO
+  // provider codes must never collide with the ISO destination's SEO URL.
+  if (code && !isIso2CountryCode(code)) {
+    return code.toLowerCase();
+  }
+
+  return (
+    destination.slug ||
+    destinationSlug({
+      code,
+      name: destination.name,
+      isRegional: false,
+      isGlobal: false,
+    })
+  );
+}
+
+export function destinationPath(
+  destination: Pick<VesimDestination, "code" | "name" | "slug" | "kind">
+): string {
+  return `/countries/${destinationRouteId(destination)}`;
 }

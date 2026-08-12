@@ -84,12 +84,52 @@ function main() {
     slug: "puerto-rico",
     kind: "country",
   });
-  // Presentation must not rewrite destinationPath / slug identity.
+  // Presentation labels only — routing identity lives in destinations.ts.
+  // Stale shared slug must not collapse USPR onto the PR SEO URL.
   assert.equal(prPath, "/countries/puerto-rico");
-  assert.equal(usprPath, "/countries/puerto-rico");
+  assert.equal(usprPath, "/countries/uspr");
+  assert.notEqual(prPath, usprPath);
   assert.equal(slugifyDestination("Puerto Rico"), "puerto-rico");
   assert.doesNotMatch(presentation, /mergeDestinations|dedupeDestinations/);
   assert.doesNotMatch(listing, /filter\(\s*\(.*unique.*code/i);
+  console.log("   ok");
+
+  console.log("2b) React keys distinct for PR vs USPR (no catalog removal)");
+  // Mirrors CountriesListing destinationReactKey / toCard id rules.
+  function destinationReactKey(kind: string, code: string, id: string): string {
+    return `${kind}-${code}-${id}`;
+  }
+  const prId = "puerto-rico";
+  const usprId = "uspr";
+  const prKey = destinationReactKey("country", "PR", prId);
+  const usprKey = destinationReactKey("country", "USPR", usprId);
+  assert.equal(prKey, "country-PR-puerto-rico");
+  assert.equal(usprKey, "country-USPR-uspr");
+  assert.notEqual(prKey, usprKey);
+  // Old key shape collided — keep asserting the bug class is gone.
+  const oldPrKey = `country-${prId}`;
+  const oldUsprKey = `country-puerto-rico`;
+  assert.equal(oldPrKey, oldUsprKey);
+  assert.match(listing, /destinationReactKey/);
+  assert.match(
+    listing,
+    /\$\{destination\.kind\}-\$\{destination\.code\}-\$\{destination\.id\}/
+  );
+  assert.doesNotMatch(
+    listing,
+    /key=\{`\$\{destination\.kind\}-\$\{destination\.id\}`\}/
+  );
+  assert.match(listing, /destinationRouteId/);
+  // Both entries remain representable; listing must not drop by code uniqueness.
+  const catalogPair = [
+    { code: "PR", id: prId, kind: "country" as const },
+    { code: "USPR", id: usprId, kind: "country" as const },
+  ];
+  assert.equal(catalogPair.length, 2);
+  const keys = catalogPair.map((item) =>
+    destinationReactKey(item.kind, item.code, item.id)
+  );
+  assert.equal(new Set(keys).size, catalogPair.length);
   console.log("   ok");
 
   console.log("3) Flag fallback — no broken flagcdn / wrong national flag");

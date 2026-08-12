@@ -53,6 +53,7 @@ export function isConciseOperatorLabel(
 /**
  * Card-only operator line. Prefers dedicated concise network names.
  * Never returns Fair Use paragraphs or data/validity duplicates.
+ * Never falls back to packageInfo / description / notes.
  */
 export function planCardOperatorLabel(offer: VesimOffer): string | null {
   const fromNetworks = (offer.networks || []).find((item) =>
@@ -64,8 +65,73 @@ export function planCardOperatorLabel(offer: VesimOffer): string | null {
     return (offer.network || "").trim();
   }
 
-  // packageInfo is often FUP / "N GB • N Days" — never use it on cards.
+  // packageInfo / description / notes are often FUP or "N GB • N Days".
   return null;
+}
+
+export type PlanCardSecondaryLine =
+  | { kind: "validity"; text: string }
+  | { kind: "coverage"; text: string }
+  | { kind: "operator"; text: string };
+
+/**
+ * Sole secondary-text contract for shared plan cards (below data + price).
+ * Callers must not also render packageInfo, description, notes, or raw network.
+ */
+export function planCardSecondaryLines(
+  offer: VesimOffer,
+  options: {
+    isRegionalOrGlobal: boolean;
+    formatValidity: (days: number | null | undefined) => string;
+  }
+): PlanCardSecondaryLine[] {
+  const lines: PlanCardSecondaryLine[] = [
+    { kind: "validity", text: options.formatValidity(offer.durationDays) },
+  ];
+
+  if (
+    options.isRegionalOrGlobal &&
+    offer.coveredCountriesCount != null &&
+    offer.coveredCountriesCount > 0
+  ) {
+    lines.push({
+      kind: "coverage",
+      text: `${offer.coveredCountriesCount} countries covered`,
+    });
+  }
+
+  const operator = planCardOperatorLabel(offer);
+  if (operator) {
+    lines.push({ kind: "operator", text: operator });
+  }
+
+  return lines;
+}
+
+/** Flattened card secondary copy — used by QA against production FUP payloads. */
+export function planCardSecondaryText(
+  offer: VesimOffer,
+  options: {
+    isRegionalOrGlobal: boolean;
+    formatValidity: (days: number | null | undefined) => string;
+  }
+): string {
+  return planCardSecondaryLines(offer, options)
+    .map((line) => line.text)
+    .join("\n");
+}
+
+/** True when text must never appear on a plan card. */
+export function isForbiddenPlanCardText(
+  value: string | null | undefined
+): boolean {
+  const v = (value ?? "").trim();
+  if (!v) return false;
+  if (looksLikeFairUseOrThrottleText(v)) return true;
+  if (looksLikeDataValidityDuplicate(v)) return true;
+  if (VERBOSE_NETWORK_BLURB_RE.test(v)) return true;
+  if (v.length > CONCISE_OPERATOR_MAX_LEN && /\s/.test(v)) return true;
+  return false;
 }
 
 /** Modal operator row — same concise preference as the card. */

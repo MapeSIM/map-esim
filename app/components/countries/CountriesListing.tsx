@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useCurrency } from "@/app/components/currency/CurrencyProvider";
 import {
+  destinationRouteId,
   parsePublicDestinations,
   shouldAcceptPublicDestinationCatalog,
   type DestinationCatalogSource,
@@ -72,10 +73,8 @@ function parseFilter(value: string | null): FilterId {
 
 function toCard(destination: VesimDestination): DestinationCard {
   return {
-    id:
-      destination.kind === "regional" || destination.kind === "global"
-        ? destination.code.toLowerCase()
-        : destination.slug,
+    // Route segment from provider identity (ISO SEO slug vs code for USPR).
+    id: destinationRouteId(destination),
     // Display label only — provider code/slug/path stay on the destination.
     name: destinationDisplayName(destination),
     code: destination.code,
@@ -85,6 +84,13 @@ function toCard(destination: VesimDestination): DestinationCard {
     kind: destination.kind,
     isPopular: destination.isPopular === true,
   };
+}
+
+/** Stable React list key — includes provider code so PR/USPR stay distinct. */
+function destinationReactKey(
+  destination: Pick<DestinationCard, "kind" | "code" | "id">
+): string {
+  return `${destination.kind}-${destination.code}-${destination.id}`;
 }
 
 function DestinationFlagBadge({
@@ -633,7 +639,7 @@ function CountriesListingContent({
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                   {group.items.map((destination) => (
                     <CompactDestinationCard
-                      key={`${destination.kind}-${destination.id}`}
+                      key={destinationReactKey(destination)}
                       destination={destination}
                       formatPrice={formatPrice}
                     />
@@ -646,7 +652,7 @@ function CountriesListingContent({
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
             {gridItems.map((destination) => (
               <CompactDestinationCard
-                key={`${destination.kind}-${destination.id}`}
+                key={destinationReactKey(destination)}
                 destination={destination}
                 formatPrice={formatPrice}
               />

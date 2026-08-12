@@ -39,7 +39,7 @@ import {
   type PlanTypeFilter,
   type SortOption,
 } from "@/app/lib/plans/plan-utils";
-import { planCardOperatorLabel } from "@/app/lib/plans/planOfferPresentation";
+import { planCardSecondaryLines } from "@/app/lib/plans/planOfferPresentation";
 
 type PlansListingProps = {
   destination: VesimDestination;
@@ -633,73 +633,82 @@ export default function PlansListing({
 
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                       {group.plans.map((offer) => {
-                        const operatorLabel = planCardOperatorLabel(offer);
+                        const secondaryLines = planCardSecondaryLines(offer, {
+                          isRegionalOrGlobal,
+                          formatValidity: formatValidityPhrase,
+                        });
                         return (
-                        <article
-                          key={offer.id}
-                          className="
-                            group flex h-full min-h-[220px] min-w-0 flex-col rounded-[22px]
-                            border border-[var(--border)] bg-[var(--surface)]
-                            p-4 shadow-[0_10px_28px_rgba(0,0,0,0.2)]
-                            transition duration-200
-                            hover:-translate-y-1 hover:border-[var(--border-hover)]
-                            hover:shadow-[0_18px_40px_rgba(0,0,0,0.32)]
-                            sm:p-5
-                          "
-                        >
-                          <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-1">
-                            <h3 className="min-w-0 break-words text-xl font-bold tracking-tight text-[var(--heading)] sm:text-2xl">
-                              {offer.dataFormatted}
-                            </h3>
-                            <p className="shrink-0 text-xl font-bold text-[var(--accent-strong)] sm:text-2xl">
-                              {formatPrice(offer.priceUSD)}
-                            </p>
-                          </div>
-
-                          <div className="mt-4 flex flex-1 flex-col gap-2 text-sm text-[var(--text)]">
-                            <p>{formatValidityPhrase(offer.durationDays)}</p>
-                            {isRegionalOrGlobal &&
-                              offer.coveredCountriesCount != null &&
-                              offer.coveredCountriesCount > 0 && (
-                                <p>
-                                  {offer.coveredCountriesCount} countries
-                                  covered
-                                </p>
-                              )}
-                            {operatorLabel ? (
-                              <p className="truncate text-[var(--text-soft)]">
-                                {operatorLabel}
+                          <article
+                            key={offer.id}
+                            className="
+                              group flex h-full min-h-[220px] min-w-0 flex-col rounded-[22px]
+                              border border-[var(--border)] bg-[var(--surface)]
+                              p-4 shadow-[0_10px_28px_rgba(0,0,0,0.2)]
+                              transition duration-200
+                              hover:-translate-y-1 hover:border-[var(--border-hover)]
+                              hover:shadow-[0_18px_40px_rgba(0,0,0,0.32)]
+                              sm:p-5
+                            "
+                          >
+                            <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-1">
+                              <h3 className="min-w-0 break-words text-xl font-bold tracking-tight text-[var(--heading)] sm:text-2xl">
+                                {offer.dataFormatted}
+                              </h3>
+                              <p className="shrink-0 text-xl font-bold text-[var(--accent-strong)] sm:text-2xl">
+                                {formatPrice(offer.priceUSD)}
                               </p>
-                            ) : null}
-                          </div>
+                            </div>
 
-                          <div className="mt-auto grid grid-cols-1 gap-3 pt-6 min-[400px]:grid-cols-2">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedOffer(offer)}
-                              className="
-                                inline-flex min-h-11 items-center justify-center
-                                rounded-xl border border-[var(--border-strong)]
-                                bg-[var(--surface-2)] px-3 text-sm font-semibold text-[var(--heading)]
-                                transition hover:border-[var(--accent-strong)]/50
-                              "
-                            >
-                              {isRegionalOrGlobal
-                                ? "Coverage details"
-                                : "Plan details"}
-                            </button>
-                            <Link
-                              href={buildCheckoutHref(offer, destination.code)}
-                              className="
-                                inline-flex min-h-11 items-center justify-center
-                                rounded-xl bg-[var(--accent-strong)] px-3 text-sm font-bold
-                                text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]
-                              "
-                            >
-                              Buy now
-                            </Link>
-                          </div>
-                        </article>
+                            {/*
+                              Card secondary copy MUST come only from
+                              planCardSecondaryLines — never packageInfo,
+                              description, notes, or raw network.
+                            */}
+                            <div className="mt-4 flex flex-1 flex-col gap-2 text-sm text-[var(--text)]">
+                              {secondaryLines.map((line) => (
+                                <p
+                                  key={`${offer.id}-${line.kind}`}
+                                  className={
+                                    line.kind === "operator"
+                                      ? "truncate text-[var(--text-soft)]"
+                                      : undefined
+                                  }
+                                >
+                                  {line.text}
+                                </p>
+                              ))}
+                            </div>
+
+                            <div className="mt-auto grid grid-cols-1 gap-3 pt-6 min-[400px]:grid-cols-2">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedOffer(offer)}
+                                className="
+                                  inline-flex min-h-11 items-center justify-center
+                                  rounded-xl border border-[var(--border-strong)]
+                                  bg-[var(--surface-2)] px-3 text-sm font-semibold text-[var(--heading)]
+                                  transition hover:border-[var(--accent-strong)]/50
+                                "
+                              >
+                                {isRegionalOrGlobal
+                                  ? "Coverage details"
+                                  : "Plan details"}
+                              </button>
+                              <Link
+                                href={buildCheckoutHref(
+                                  offer,
+                                  destination.code
+                                )}
+                                className="
+                                  inline-flex min-h-11 items-center justify-center
+                                  rounded-xl bg-[var(--accent-strong)] px-3 text-sm font-bold
+                                  text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]
+                                "
+                              >
+                                Buy now
+                              </Link>
+                            </div>
+                          </article>
                         );
                       })}
                     </div>
