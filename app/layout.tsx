@@ -11,6 +11,8 @@ import ThemeProvider from "./components/theme/ThemeProvider";
 import { auth } from "@/auth";
 import { navAuthLink } from "@/app/lib/auth/redirects";
 import { BRAND_NAME, BRAND_SITE_URL, BRAND_TAGLINE } from "@/app/lib/brand";
+import { getCustomerWalletSummary } from "@/app/lib/wallet/read";
+import type { NavbarCustomerSummary } from "./components/Navbar";
 import { getServerCookieConsent } from "@/app/lib/cookies/consentActions";
 import {
   CURRENCY_PREFERENCE_COOKIE,
@@ -74,6 +76,28 @@ export default async function RootLayout({
     role: sessionRole,
   });
 
+  let customerNav: NavbarCustomerSummary | null = null;
+  if (sessionRole === "CUSTOMER" && session?.user?.id) {
+    const name = (session.user.name ?? "").trim() || "Customer";
+    const email = (session.user.email ?? "").trim();
+    try {
+      const summary = await getCustomerWalletSummary(session.user.id);
+      customerNav = {
+        name,
+        email,
+        walletBalanceLabel: summary?.balanceLabel ?? "$0.00",
+        walletCurrency: summary?.currency ?? "USD",
+      };
+    } catch {
+      customerNav = {
+        name,
+        email,
+        walletBalanceLabel: null,
+        walletCurrency: "USD",
+      };
+    }
+  }
+
   const siteGraph = {
     "@context": "https://schema.org",
     "@graph": [organizationNode(), websiteNode()],
@@ -90,7 +114,11 @@ export default async function RootLayout({
           <ThemeProvider initialTheme={initialTheme}>
             <PreferenceStorageSync />
             <CurrencyProvider initialCurrency={initialCurrency}>
-              <Navbar authHref={authHref} authLabel={authLabel} />
+              <Navbar
+                authHref={authHref}
+                authLabel={authLabel}
+                customer={customerNav}
+              />
               {children}
               <Footer />
             </CurrencyProvider>

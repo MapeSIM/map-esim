@@ -67,6 +67,7 @@ export default function AccountMenu({ userName, userEmail, links }: Props) {
         <p className="truncate text-xs text-[var(--text-muted)]">{userEmail}</p>
       </div>
 
+      {/* Mobile uses the global Navbar drawer — hide this duplicate Account control below lg. */}
       <button
         ref={buttonRef}
         type="button"
@@ -74,7 +75,7 @@ export default function AccountMenu({ userName, userEmail, links }: Props) {
         aria-label={open ? "Close account menu" : "Open account menu"}
         aria-expanded={open}
         aria-controls={panelId}
-        className="inline-flex h-10 shrink-0 items-center gap-2 rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--border-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+        className="hidden h-10 shrink-0 items-center gap-2 rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--border-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] lg:inline-flex"
       >
         {open ? (
           <X className="h-4 w-4" aria-hidden="true" />

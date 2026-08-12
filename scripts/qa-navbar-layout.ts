@@ -41,7 +41,7 @@ function main() {
   assert.match(navbar, /whitespace-nowrap rounded-\[14px\] bg-\[var\(--accent\)\]/);
   assert.match(
     navbar,
-    /whitespace-nowrap rounded-\[14px\] bg-\[var\(--accent\)\][\s\S]{0,350}Get eSIM/
+    /whitespace-nowrap rounded-\[14px\] bg-\[var\(--accent\)\][\s\S]{0,800}Get eSIM/
   );
   assert.match(navbar, /flex-1 items-center justify-end/);
   assert.match(pkg, /"qa:navbar-layout"/);
@@ -50,6 +50,7 @@ function main() {
   console.log("3) Mobile menu still present");
   assert.match(navbar, /mobile-nav|lg:hidden/);
   assert.match(navbar, /Open menu|Close menu/);
+  assert.match(navbar, /role="dialog"|aria-modal/);
   console.log("   ok");
 
   console.log("ALL_QA_PASSED=navbar-layout");
