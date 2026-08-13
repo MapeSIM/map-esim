@@ -16,7 +16,7 @@ const sections: LegalSection[] = [
     title: "Introduction",
     paragraphs: [
       `This Privacy Policy explains how ${BRAND_NAME} (“we”, “us”, “our”) handles personal information when you visit ${BRAND_SITE_HOST}, create an account, purchase an eSIM plan, or contact us.`,
-      "This page is a professional draft prepared for business and legal review. It describes practices that apply to our customer accounts, security processes, order fulfilment through a third-party eSIM provider, and transactional email channels.",
+      "It describes practices that apply to our customer accounts, security processes, order fulfilment through a third-party eSIM provider, and transactional email channels.",
     ],
   },
   {
@@ -182,7 +182,7 @@ export default function PrivacyPolicyPage() {
   return (
     <LegalDocument
       title="Privacy Policy"
-      summary={`This Privacy Policy describes how ${BRAND_NAME} handles personal information for website use, customer accounts, eSIM orders and related support. It is a draft for final business and legal review.`}
+      summary={`This Privacy Policy describes how ${BRAND_NAME} handles personal information for website use, customer accounts, eSIM orders and related support.`}
       sections={sections}
     />
   );

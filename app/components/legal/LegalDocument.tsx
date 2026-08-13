@@ -48,7 +48,7 @@ export default function LegalDocument({
             </ol>
           </nav>
           <p className="mt-4 text-xs leading-relaxed text-[var(--text-soft)]">
-            Draft for business and legal review. Related:{" "}
+            Related:{" "}
             <Link
               href="/privacy-policy"
               className="text-[var(--accent-strong)] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"

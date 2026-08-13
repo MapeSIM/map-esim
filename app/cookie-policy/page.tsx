@@ -16,7 +16,6 @@ const sections: LegalSection[] = [
     title: "Introduction",
     paragraphs: [
       `This Cookie Policy explains how ${BRAND_NAME} uses cookies and similar technologies on ${BRAND_SITE_HOST}. It should be read together with our Privacy Policy.`,
-      "This page is a professional draft prepared for business and legal review.",
     ],
   },
   {
@@ -117,7 +116,7 @@ export default function CookiePolicyPage() {
   return (
     <LegalDocument
       title="Cookie Policy"
-      summary={`This Cookie Policy explains how ${BRAND_NAME} uses essential cookies today and how non-essential cookies would be handled if introduced later. It is a draft for final business and legal review.`}
+      summary={`This Cookie Policy explains how ${BRAND_NAME} uses essential cookies today and how non-essential cookies would be handled if introduced later.`}
       sections={sections}
     />
   );
