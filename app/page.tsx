@@ -329,6 +329,13 @@ export default function Home() {
               device can add a cellular plan digitally. If that option is
               missing, a physical SIM may still be required.
             </p>
+            <Link
+              href="/device-compatibility"
+              className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+            >
+              Check device compatibility
+              <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
+            </Link>
           </div>
         </div>
       </section>

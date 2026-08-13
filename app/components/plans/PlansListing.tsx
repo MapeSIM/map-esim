@@ -413,6 +413,16 @@ export default function PlansListing({
       </section>
 
       <section className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6 sm:py-10">
+        <p className="mb-6 text-sm leading-relaxed text-[var(--text-muted)]">
+          Before buying: confirm your device supports eSIM and is
+          carrier-unlocked.{" "}
+          <Link
+            href="/device-compatibility"
+            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+          >
+            Check compatibility →
+          </Link>
+        </p>
         {loading && (
           <div className="rounded-3xl border border-[var(--border-strong)] bg-[var(--surface)] p-10 text-center text-[var(--text)]">
             Loading eSIM plans...

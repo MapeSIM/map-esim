@@ -53,6 +53,7 @@
     "qa:navbar-layout": "tsx scripts/qa-navbar-layout.ts",
     "qa:customer-mobile-nav": "tsx scripts/qa-customer-mobile-nav.ts",
     "qa:seo-canonical": "tsx scripts/qa-seo-canonical.ts",
+    "qa:device-compatibility": "tsx scripts/qa-device-compatibility.ts",
     "qa:vesim-provider-email": "tsx scripts/qa-vesim-provider-email.ts",
     "qa:iccid-persistence": "tsx scripts/qa-iccid-persistence.ts",
     "qa:admin-wallet-purchase": "tsx scripts/qa-admin-wallet-purchase.ts",

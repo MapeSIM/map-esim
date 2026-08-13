@@ -42,7 +42,7 @@ const quickHelp = [
   {
     title: "Device compatibility",
     description:
-      "Check whether your phone is likely eSIM-compatible before you buy.",
+      "Confirm eSIM support and carrier unlock with quick settings checks before you buy.",
     href: "/device-compatibility",
     icon: Smartphone,
   },
@@ -82,9 +82,9 @@ const topics = [
   {
     title: "Device compatibility",
     icon: Smartphone,
-    body: "MAP eSIM plans require an unlocked phone that supports eSIM. Use the device compatibility checker before purchase, or confirm Add eSIM in Settings / manufacturer docs.",
+    body: "MAP eSIM plans require an unlocked phone that supports eSIM. Use the device compatibility guide before purchase, or confirm Add eSIM in Settings / manufacturer docs.",
     href: "/device-compatibility",
-    linkLabel: "Open compatibility checker",
+    linkLabel: "Check device compatibility",
   },
   {
     title: "QR code and manual installation",
