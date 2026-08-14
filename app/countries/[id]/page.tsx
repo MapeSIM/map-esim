@@ -5,6 +5,7 @@ import type { VesimDestination } from "@/app/lib/vesim/destinations";
 import {
   findDestinationBySlug,
   findRelatedRegionalDestination,
+  retailMinFromProviderStartingPrice,
   slugifyDestination,
   withLowestOfferRetailMinPrice,
 } from "@/app/lib/vesim/destinations";
@@ -30,13 +31,17 @@ function staticToDestination(id: string): VesimDestination | undefined {
 
   if (!match) return undefined;
 
+  // startingPrice is a raw/provider snapshot — convert to MAP retail once.
+  const retail = retailMinFromProviderStartingPrice(match.startingPrice);
+
   return {
     code: match.code,
     name: match.name,
     flag: match.flag,
     regions: match.region ? [match.region] : [],
     offerCount: match.plans,
-    minPriceFormatted: match.startingPrice,
+    minPrice: retail.minPrice,
+    minPriceFormatted: retail.minPriceFormatted,
     isPopular: match.region === "Popular",
     isRegional: false,
     isGlobal: false,

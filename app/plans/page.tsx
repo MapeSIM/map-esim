@@ -6,6 +6,7 @@ import {
   selectPlansPriorityDestinations,
 } from "@/app/lib/plans/plansDiscovery";
 import {
+  retailMinFromProviderStartingPrice,
   slugifyDestination,
   type VesimDestination,
 } from "@/app/lib/vesim/destinations";
@@ -15,24 +16,25 @@ import { fetchPublicDestinationCatalog } from "@/app/lib/vesim/server";
 export const revalidate = 300;
 
 function staticFallbackDestinations(): VesimDestination[] {
-  return staticCountries.map((item) => ({
-    code: item.code,
-    name: item.name,
-    flag: item.flag,
-    regions: item.region ? [item.region] : [],
-    offerCount: item.plans,
-    minPriceFormatted: item.startingPrice,
-    minPrice: (() => {
-      const parsed = Number(item.startingPrice.replace(/[^0-9.]/g, ""));
-      return Number.isFinite(parsed) ? parsed : null;
-    })(),
-    isPopular: item.region === "Popular",
-    isRegional: false,
-    isGlobal: false,
-    searchAliases: [item.id, item.code, item.name],
-    slug: item.id || slugifyDestination(item.name),
-    kind: "country" as const,
-  }));
+  return staticCountries.map((item) => {
+    // startingPrice is a raw/provider snapshot — convert to MAP retail once.
+    const retail = retailMinFromProviderStartingPrice(item.startingPrice);
+    return {
+      code: item.code,
+      name: item.name,
+      flag: item.flag,
+      regions: item.region ? [item.region] : [],
+      offerCount: item.plans,
+      minPriceFormatted: retail.minPriceFormatted,
+      minPrice: retail.minPrice,
+      isPopular: item.region === "Popular",
+      isRegional: false,
+      isGlobal: false,
+      searchAliases: [item.id, item.code, item.name],
+      slug: item.id || slugifyDestination(item.name),
+      kind: "country" as const,
+    };
+  });
 }
 
 async function loadCatalog(): Promise<VesimDestination[]> {

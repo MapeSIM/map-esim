@@ -153,8 +153,8 @@ function buildDestination(
       : typeof item.minPriceUSD === "number"
         ? item.minPriceUSD
         : null;
-  // Raw VeSIM list minPrice is supplier cost (no offer allowance). Entry-tier
-  // retail is a fallback only; public catalog replaces it with lowest offer retail.
+  // Raw VeSIM list minPrice is supplier cost. Entry retail uses the same
+  // provider-cost bands; public catalog prefers lowest offer retail when loaded.
   const applyEntryRetail = options?.applyEntryRetail !== false;
   const retailMin =
     applyEntryRetail && rawMin != null
@@ -225,6 +225,33 @@ export function parsePublicDestinations(payload: unknown): VesimDestination[] {
 
 /** Marketing static list in `app/data/countries.ts` — never overwrite a full catalog with this size. */
 export const STATIC_DESTINATION_FALLBACK_MAX = 8;
+
+/**
+ * Map a static emergency starting-price snapshot to MAP entry retail.
+ *
+ * Contract: `providerStartingPrice` must be a raw/provider-ish USD snapshot
+ * (e.g. from `app/data/countries.ts` `startingPrice`), never an already-retail
+ * MAP price. Callers must apply this helper exactly once on that snapshot.
+ */
+export function retailMinFromProviderStartingPrice(
+  providerStartingPrice: string
+): {
+  minPrice: number | null;
+  minPriceFormatted: string;
+} {
+  const parsed = Number(String(providerStartingPrice).replace(/[^0-9.]/g, ""));
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return { minPrice: null, minPriceFormatted: providerStartingPrice };
+  }
+  const retail = calculateEntryRetailPriceUsd(parsed);
+  if (retail == null) {
+    return { minPrice: parsed, minPriceFormatted: providerStartingPrice };
+  }
+  return {
+    minPrice: retail,
+    minPriceFormatted: formatOfferPrice(retail, "USD"),
+  };
+}
 
 export type DestinationCatalogSource = "catalog" | "static";
 

@@ -1,3 +1,9 @@
+/**
+ * Emergency static destination snapshots used only when the live catalog is
+ * unavailable. `startingPrice` is a raw/provider-ish USD snapshot — never MAP
+ * retail. Call sites must convert via `retailMinFromProviderStartingPrice`
+ * exactly once before customer display.
+ */
 export const countries = [
     {
       id: "pakistan",

@@ -1,5 +1,5 @@
 /**
- * Offline QA for authoritative MAP eSIM retail pricing (allowance-based).
+ * Offline QA for authoritative MAP eSIM retail pricing (provider-cost bands).
  * Does not call VeSIM, mutate DB, or place orders.
  */
 import assert from "node:assert/strict";
@@ -10,15 +10,11 @@ import {
   calculateEntryRetailPriceUsd,
   calculateRetailPriceCents,
   calculateRetailPriceUsd,
-  MARKUP_100MB_TO_500MB,
-  MARKUP_1GB_TO_5GB,
-  MARKUP_500MB_TO_1GB,
-  MARKUP_5GB_TO_10GB,
-  MARKUP_ENTRY_UNKNOWN_ALLOWANCE,
-  MARKUP_OVER_10GB,
-  MARKUP_UNLIMITED,
-  MARKUP_UP_TO_100MB,
-  markupRateForAllowance,
+  RETAIL_ADD_CENTS_067_TO_100,
+  RETAIL_ADD_CENTS_101_TO_299,
+  RETAIL_CENTS_FOR_PROVIDER_66,
+  RETAIL_MULTIPLIER_1000_PLUS,
+  RETAIL_MULTIPLIER_300_TO_999,
   roundUpToNextCent,
 } from "../app/lib/pricing/retailPrice";
 import {
@@ -27,6 +23,7 @@ import {
   normalizeDestinations,
   parsePublicDestination,
   parsePublicDestinations,
+  retailMinFromProviderStartingPrice,
   withLowestOfferRetailMinPrice,
 } from "../app/lib/vesim/destinations";
 import {
@@ -36,6 +33,7 @@ import {
   toPublicVesimOffers,
 } from "../app/lib/vesim/offers";
 import { convertFromUsd, formatMoney } from "../app/lib/currency/format";
+import { FALLBACK_USD_RATES } from "../app/lib/currency/currencies";
 
 const root = join(__dirname, "..");
 
@@ -44,70 +42,59 @@ function read(rel: string): string {
 }
 
 function main() {
-  assert.equal(MARKUP_UP_TO_100MB, 0.02);
-  assert.equal(MARKUP_100MB_TO_500MB, 0.02);
-  assert.equal(MARKUP_500MB_TO_1GB, 0.03);
-  assert.equal(MARKUP_1GB_TO_5GB, 0.04);
-  assert.equal(MARKUP_5GB_TO_10GB, 0.05);
-  assert.equal(MARKUP_OVER_10GB, 0.06);
-  assert.equal(MARKUP_UNLIMITED, 0.06);
-  assert.equal(MARKUP_ENTRY_UNKNOWN_ALLOWANCE, 0.02);
+  assert.equal(RETAIL_CENTS_FOR_PROVIDER_66, 68);
+  assert.equal(RETAIL_ADD_CENTS_067_TO_100, 50);
+  assert.equal(RETAIL_ADD_CENTS_101_TO_299, 60);
+  assert.equal(RETAIL_MULTIPLIER_300_TO_999, 1.2);
+  assert.equal(RETAIL_MULTIPLIER_1000_PLUS, 1.15);
+  assert.equal(FALLBACK_USD_RATES.PKR, 293);
+  console.log("PASS retail_band_constants");
 
-  assert.equal(markupRateForAllowance({ dataMB: 100 }), 0.02);
-  assert.equal(markupRateForAllowance({ dataMB: 101 }), 0.02);
-  assert.equal(markupRateForAllowance({ dataMB: 500 }), 0.02);
-  assert.equal(markupRateForAllowance({ dataMB: 501 }), 0.03);
-  assert.equal(markupRateForAllowance({ dataGB: 1 }), 0.03);
-  assert.equal(markupRateForAllowance({ dataMB: 1024 }), 0.03);
-  assert.equal(markupRateForAllowance({ dataMB: 1025 }), 0.04);
-  assert.equal(markupRateForAllowance({ dataGB: 5 }), 0.04);
-  assert.equal(markupRateForAllowance({ dataGB: 5.1 }), 0.05);
-  assert.equal(markupRateForAllowance({ dataGB: 10 }), 0.05);
-  assert.equal(markupRateForAllowance({ dataGB: 10.1 }), 0.06);
-  assert.equal(markupRateForAllowance({ dataUnlimited: true }), 0.06);
-  console.log("PASS markup_tiers_and_boundaries");
+  // Required cost-band samples (USD).
+  assert.equal(calculateRetailPriceUsd(0.5), 1.0);
+  assert.equal(calculateRetailPriceUsd(0.65), 1.15);
+  assert.equal(calculateRetailPriceUsd(0.66), 0.68);
+  assert.equal(calculateRetailPriceUsd(0.67), 1.17);
+  assert.equal(calculateRetailPriceUsd(1.0), 1.5);
+  assert.equal(calculateRetailPriceUsd(1.01), 1.61);
+  assert.equal(calculateRetailPriceUsd(2.0), 2.6);
+  assert.equal(calculateRetailPriceUsd(2.99), 3.59);
+  assert.equal(calculateRetailPriceUsd(3.0), 3.6);
+  assert.equal(calculateRetailPriceUsd(5.0), 6.0);
+  assert.equal(calculateRetailPriceUsd(8.0), 9.6);
+  assert.equal(calculateRetailPriceUsd(9.99), 11.99); // 999×1.20 → ceil 1199¢
+  assert.equal(calculateRetailPriceUsd(10.0), 11.5);
+  assert.equal(calculateRetailPriceUsd(20.0), 23.0);
 
-  // Representative provider costs → ceil-to-cent retail (no .49/.99).
-  assert.equal(calculateRetailPriceCents(66, { dataMB: 100 }), 68); // 2%
-  assert.equal(calculateRetailPriceCents(66, { dataMB: 500 }), 68); // 2%
-  assert.equal(calculateRetailPriceCents(120, { dataGB: 1 }), 124); // 3%
-  assert.equal(calculateRetailPriceCents(250, { dataGB: 3 }), 260); // 4%
-  assert.equal(calculateRetailPriceCents(400, { dataGB: 5 }), 416); // 4%
-  assert.equal(calculateRetailPriceCents(800, { dataGB: 10 }), 840); // 5%
-  assert.equal(calculateRetailPriceCents(1200, { dataGB: 20 }), 1272); // 6%
-  assert.equal(
-    calculateRetailPriceCents(1500, { dataUnlimited: true }),
-    1590
-  ); // 6%
-  assert.equal(calculateRetailPriceUsd(0.66, { dataMB: 100 }), 0.68);
+  assert.equal(calculateRetailPriceCents(50), 100);
+  assert.equal(calculateRetailPriceCents(65), 115);
+  assert.equal(calculateRetailPriceCents(66), 68);
+  assert.equal(calculateRetailPriceCents(67), 117);
+  assert.equal(calculateRetailPriceCents(100), 150);
+  assert.equal(calculateRetailPriceCents(101), 161);
+  assert.equal(calculateRetailPriceCents(299), 359);
+  assert.equal(calculateRetailPriceCents(300), 360);
+  assert.equal(calculateRetailPriceCents(999), 1199);
+  assert.equal(calculateRetailPriceCents(1000), 1150);
+
+  // Allowance is ignored — same cost → same retail.
+  assert.equal(calculateRetailPriceCents(66, { dataMB: 100 }), 68);
+  assert.equal(calculateRetailPriceCents(66, { dataMB: 502 }), 68);
+  assert.equal(calculateRetailPriceCents(66, { dataUnlimited: true }), 68);
   assert.equal(calculateEntryRetailPriceCents(66), 68);
   assert.equal(calculateEntryRetailPriceUsd(0.66), 0.68);
-  console.log("PASS sample_retail_targets");
+  assert.equal(calculateEntryRetailPriceUsd(0.68), 1.18); // 68¢ + 50¢
+  console.log("PASS sample_retail_cost_bands");
 
-  // Rounding: next cent only; never reduces marked-up amount.
-  const cases: Array<{
-    cents: number;
-    allowance: Parameters<typeof calculateRetailPriceCents>[1];
-  }> = [
-    { cents: 1, allowance: { dataMB: 100 } },
-    { cents: 66, allowance: { dataMB: 100 } },
-    { cents: 66, allowance: { dataMB: 500 } },
-    { cents: 99, allowance: { dataGB: 1 } },
-    { cents: 250, allowance: { dataGB: 3 } },
-    { cents: 999, allowance: { dataGB: 10 } },
-    { cents: 1500, allowance: { dataUnlimited: true } },
-    { cents: 3276, allowance: { dataGB: 20 } },
-  ];
-  for (const { cents, allowance } of cases) {
-    const rate = markupRateForAllowance(allowance)!;
-    const markedUp = roundUpToNextCent(cents * (1 + rate));
-    const retail = calculateRetailPriceCents(cents, allowance)!;
-    assert.equal(retail, markedUp);
-    assert.ok(retail >= markedUp);
-    assert.ok(retail >= cents);
-  }
+  // Rounding: multipliers ceil to next cent; never below provider.
+  assert.equal(roundUpToNextCent(1198.8), 1199);
   assert.equal(roundUpToNextCent(67.01), 68);
   assert.equal(roundUpToNextCent(67), 67);
+  for (const cents of [66, 67, 100, 101, 299, 300, 999, 1000, 2000, 3276]) {
+    const retail = calculateRetailPriceCents(cents)!;
+    assert.ok(retail >= cents);
+    assert.equal(retail, Math.trunc(retail));
+  }
   console.log("PASS rounding_up_to_next_cent_never_reduces");
 
   const pricing = read("app/lib/pricing/retailPrice.ts");
@@ -125,14 +112,16 @@ function main() {
   const countriesList = read("app/countries/page.tsx");
   const countriesListing = read("app/components/countries/CountriesListing.tsx");
   const currencyFormat = read("app/lib/currency/format.ts");
+  const currencies = read("app/lib/currency/currencies.ts");
   const pkg = read("package.json");
 
   assert.match(pricing, /calculateRetailPriceCents/);
-  assert.match(pricing, /markupRateForAllowance/);
+  assert.match(pricing, /RETAIL_CENTS_FOR_PROVIDER_66/);
   assert.match(pricing, /roundUpToNextCent/);
+  assert.doesNotMatch(pricing, /markupRateForAllowance/);
+  assert.doesNotMatch(pricing, /MARKUP_UP_TO_100MB/);
   assert.doesNotMatch(pricing, /roundUpToRetailEndingCents/);
   assert.match(offers, /calculateRetailPriceUsd/);
-  assert.match(offers, /dataUnlimited:\s*data\.dataUnlimited/);
   assert.match(offers, /providerPriceUSD/);
   assert.match(offers, /toPublicVesimOffers/);
   assert.match(server, /providerPriceUSD/);
@@ -155,11 +144,17 @@ function main() {
   );
   assert.match(persist, /displayAmount:\s*options\.verifiedOffer\.priceUSD/);
   assert.match(destinations, /calculateEntryRetailPriceUsd/);
+  assert.match(destinations, /retailMinFromProviderStartingPrice/);
+  assert.doesNotMatch(destinations, /retailMinFromStaticStartingPrice/);
   assert.match(destinations, /withLowestOfferRetailMinPrice/);
-  assert.match(destinations, /lowestOfferRetailUsd/);
   assert.match(countryDetail, /withLowestOfferRetailMinPrice/);
+  assert.match(countryDetail, /retailMinFromProviderStartingPrice/);
+  assert.match(countriesList, /retailMinFromProviderStartingPrice/);
+  assert.match(read("app/plans/page.tsx"), /retailMinFromProviderStartingPrice/);
+  assert.match(read("app/data/countries.ts"), /raw\/provider-ish USD snapshot/);
   assert.match(server, /fetchPublicDestinationCatalog|enrichDestinationsWithOfferRetailMins/);
   assert.match(currencyFormat, /convertFromUsd/);
+  assert.match(currencies, /PKR:\s*293/);
   assert.match(pkg, /"qa:retail-pricing"/);
   assert.doesNotMatch(offersRoute, /providerPriceUSD/);
   const destinationsRoute = read("app/api/vesim/destinations/route.ts");
@@ -174,8 +169,6 @@ function main() {
   assert.match(actions, /void formData\.get\("price"\)/);
   console.log("PASS client_price_tampering_blocked");
 
-  // Country UI must trust public retail JSON — never second markup pass.
-  // Detail SSR sanitizes via toPublicVesimOffers; listing client uses parsePublicDestinations.
   assert.match(countryDetail, /toPublicVesimOffers|parsePublicVesimOffers/);
   assert.doesNotMatch(countryDetail, /normalizeOffers\(/);
   assert.match(offers, /parsePublicVesimOffers/);
@@ -185,7 +178,7 @@ function main() {
   );
   console.log("PASS country_public_offers_no_second_normalize");
 
-  // provider ~$0.66 → server retail $0.68; public display must stay $0.68 (not $0.70).
+  // provider $0.66 → retail $0.68; public display must stay $0.68.
   const raw100 = {
     id: "qa-100mb",
     name: "100MB QA",
@@ -206,13 +199,11 @@ function main() {
   })[0];
   assert.ok(display100);
   assert.equal(display100.priceUSD, 0.68);
-  assert.notEqual(display100.priceUSD, 0.7);
   assert.equal(display100.providerPriceUSD, undefined);
-  // Wallet/checkout authoritative path = single normalizeOffers on raw VeSIM.
   assert.equal(server100!.priceUSD, display100.priceUSD);
   console.log("PASS no_double_markup_100mb_display_matches_authoritative");
 
-  // Larger package: provider $1.20 / 1GB → 3% → $1.24 (not second-marked to $1.27).
+  // Larger package: provider $1.20 → +$0.60 → $1.80 (allowance ignored).
   const raw1gb = {
     id: "qa-1gb",
     name: "1GB QA",
@@ -222,19 +213,17 @@ function main() {
   };
   const server1gb = normalizeOffer(raw1gb);
   assert.ok(server1gb);
-  assert.equal(server1gb!.priceUSD, 1.24);
+  assert.equal(server1gb!.priceUSD, 1.8);
   assert.equal(server1gb!.providerPriceUSD, 1.2);
   const display1gb = parsePublicVesimOffers({
     offers: [toPublicVesimOffer(server1gb!)],
   })[0];
   assert.ok(display1gb);
-  assert.equal(display1gb.priceUSD, 1.24);
-  assert.notEqual(display1gb.priceUSD, 1.27);
+  assert.equal(display1gb.priceUSD, 1.8);
   assert.equal(display1gb.providerPriceUSD, undefined);
   assert.equal(server1gb!.priceUSD, display1gb.priceUSD);
   console.log("PASS no_double_markup_larger_plan_display_matches_authoritative");
 
-  // Accidental provider leak in public JSON must be stripped by parsePublic.
   const leaked = parsePublicVesimOffers({
     offers: [
       {
@@ -252,7 +241,6 @@ function main() {
   assert.equal(leaked.providerPriceUSD, undefined);
   console.log("PASS provider_price_stripped_from_public_parse");
 
-  // Destination "From" / Starting price: entry retail once on raw VeSIM, never twice on public JSON.
   assert.match(countriesList, /fetchPublicDestinationCatalog/);
   assert.match(countriesListing, /parsePublicDestinations/);
   assert.doesNotMatch(countriesListing, /normalizeDestinations\(/);
@@ -280,14 +268,13 @@ function main() {
   );
   assert.ok(displayDest);
   assert.equal(displayDest!.minPrice, 0.68);
-  assert.notEqual(displayDest!.minPrice, 0.7);
-  // Second normalize would mark 0.68 → 0.70
+  // Re-applying entry retail to an already-retail 0.68 treats it as provider 68¢ → $1.18.
   const doubleBugged = normalizeDestination({
     code: "PK",
     name: "Pakistan",
     minPrice: 0.68,
   });
-  assert.equal(doubleBugged!.minPrice, 0.7);
+  assert.equal(doubleBugged!.minPrice, 1.18);
   assert.equal(
     parsePublicDestination({
       code: "PK",
@@ -298,7 +285,6 @@ function main() {
   );
   console.log("PASS starting_price_no_double_entry_markup");
 
-  // Same destination: Starting from (catalog retail) matches cheapest public plan retail.
   const cheapestPlan = normalizeOffer({
     id: "pk-100mb",
     name: "100MB",
@@ -313,15 +299,14 @@ function main() {
   assert.equal(publicPlan.priceUSD, displayDest!.minPrice);
   console.log("PASS starting_price_matches_cheapest_public_plan_068");
 
-  // Entry-tier destination min understates when cheapest offer is 502MB (3% tier).
-  // Authoritative Starting from must use lowest offer retail, not entry estimate.
-  const rawDeMinProvider = 0.68; // 68¢ → entry 2% = 70¢; 502MB 3% = 71¢
+  // Same provider cost → entry min and offer retail match (cost bands ignore allowance).
+  const rawDeMinProvider = 0.68;
   const entryDe = normalizeDestination({
     code: "DE",
     name: "Germany",
     minPrice: rawDeMinProvider,
   });
-  assert.equal(entryDe!.minPrice, 0.7);
+  assert.equal(entryDe!.minPrice, 1.18);
   const de502 = normalizeOffer({
     id: "de-502",
     name: "Germany 500MB/Day",
@@ -330,23 +315,21 @@ function main() {
     durationDays: 1,
   });
   assert.ok(de502);
-  assert.equal(de502!.priceUSD, 0.71);
-  assert.notEqual(entryDe!.minPrice, de502!.priceUSD);
+  assert.equal(de502!.priceUSD, 1.18);
+  assert.equal(entryDe!.minPrice, de502!.priceUSD);
   const dePublicPlan = parsePublicVesimOffers({
     offers: [toPublicVesimOffer(de502!)],
   })[0];
   const deEnriched = withLowestOfferRetailMinPrice(entryDe!, [dePublicPlan]);
-  assert.equal(deEnriched.minPrice, 0.71);
-  assert.equal(deEnriched.minPrice, dePublicPlan.priceUSD);
-  assert.equal(lowestOfferRetailUsd([dePublicPlan]), 0.71);
-  console.log("PASS starting_from_uses_offer_retail_not_entry_for_502mb");
+  assert.equal(deEnriched.minPrice, 1.18);
+  assert.equal(lowestOfferRetailUsd([dePublicPlan]), 1.18);
+  console.log("PASS starting_from_uses_offer_retail_matches_cost_band");
 
-  // Additional destinations: offer-derived Starting from matches cheapest plan retail.
   const samples = [
-    { code: "FR", name: "France", provider: 1.0, dataMB: 500, retail: 1.02 },
-    { code: "US", name: "United States", provider: 2.0, dataMB: 200, retail: 2.04 },
-    { code: "AU", name: "Australia", provider: 3.0, dataMB: 100, retail: 3.06 },
-    { code: "IT", name: "Italy", provider: 0.68, dataMB: 502, retail: 0.71 },
+    { code: "FR", name: "France", provider: 1.0, dataMB: 500, retail: 1.5 },
+    { code: "US", name: "United States", provider: 2.0, dataMB: 200, retail: 2.6 },
+    { code: "AU", name: "Australia", provider: 3.0, dataMB: 100, retail: 3.6 },
+    { code: "IT", name: "Italy", provider: 0.68, dataMB: 502, retail: 1.18 },
   ] as const;
   for (const sample of samples) {
     const entryDest = normalizeDestination({
@@ -377,7 +360,6 @@ function main() {
   }
   console.log("PASS starting_price_matches_cheapest_for_extra_countries");
 
-  // Regional catalog Starting from also uses single public retail.
   const regional = parsePublicDestinations({
     destinations: normalizeDestinations({
       destinations: [
@@ -393,20 +375,52 @@ function main() {
   assert.ok(regional);
   assert.equal(regional.kind, "regional");
   assert.equal(regional.minPrice, 0.68);
-  assert.notEqual(regional.minPrice, 0.7);
   console.log("PASS regional_starting_price_no_double_markup");
 
-  // PKR conversion derives from the same final USD retail (0.68), not 0.70.
-  const pkrFrom068 = convertFromUsd(0.68, "PKR");
-  const pkrFrom070 = convertFromUsd(0.7, "PKR");
-  assert.ok(pkrFrom068 !== pkrFrom070);
+  // Static emergency fallback maps provider snapshot → MAP retail exactly once.
+  const staticPk = retailMinFromProviderStartingPrice("$0.66");
+  assert.equal(staticPk.minPrice, 0.68);
+  assert.match(staticPk.minPriceFormatted, /0\.68/);
+  const staticSa = retailMinFromProviderStartingPrice("$1.43");
+  assert.equal(staticSa.minPrice, 2.03); // 143¢ + 60¢
+  const staticLow = retailMinFromProviderStartingPrice("$0.50");
+  assert.equal(staticLow.minPrice, 1.0);
+
+  // Public fallback pages call the helper once on countries.ts snapshots only —
+  // never re-feed the helper's retail output (would double-mark 0.68 → 1.18).
+  assert.match(countriesList, /retailMinFromProviderStartingPrice\(item\.startingPrice\)/);
+  assert.match(
+    read("app/plans/page.tsx"),
+    /retailMinFromProviderStartingPrice\(item\.startingPrice\)/
+  );
+  assert.match(
+    countryDetail,
+    /retailMinFromProviderStartingPrice\(match\.startingPrice\)/
+  );
+  assert.doesNotMatch(
+    countriesList,
+    /retailMinFromProviderStartingPrice\([^\)]*minPrice/
+  );
+  assert.doesNotMatch(
+    countryDetail,
+    /retailMinFromProviderStartingPrice\([^\)]*minPriceFormatted/
+  );
+  assert.notEqual(
+    retailMinFromProviderStartingPrice(staticPk.minPriceFormatted).minPrice,
+    staticPk.minPrice
+  );
+  console.log("PASS static_provider_starting_price_maps_once_to_entry_retail");
+
+  // PKR conversion from final USD retail × 293.
+  assert.equal(formatMoney(0.68, "PKR"), "Rs 199");
+  assert.equal(convertFromUsd(0.68, "PKR"), 0.68 * 293);
   assert.equal(
     formatMoney(displayDest!.minPrice, "PKR"),
     formatMoney(0.68, "PKR")
   );
   assert.notEqual(
     formatMoney(displayDest!.minPrice, "PKR"),
-    formatMoney(0.7, "PKR")
+    formatMoney(1.18, "PKR")
   );
   console.log("PASS pkr_starting_price_uses_final_usd_retail");
 
