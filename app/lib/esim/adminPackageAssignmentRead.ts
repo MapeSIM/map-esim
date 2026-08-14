@@ -47,6 +47,7 @@ export async function getAdminAssignableCustomer(
       email: true,
       role: true,
       deletedAt: true,
+      blockedAt: true,
     },
   });
 
@@ -58,7 +59,7 @@ export async function getAdminAssignableCustomer(
     id: customer.id,
     name: customer.name,
     emailMasked: maskAdminEmail(customer.email),
-    accountActive: !customer.deletedAt,
+    accountActive: !customer.deletedAt && !customer.blockedAt,
   };
 }
 

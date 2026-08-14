@@ -35,6 +35,10 @@ import {
 } from "@/app/lib/admin/operationalControlsPolicy";
 import { OPERATIONAL_CONTROL_UNAVAILABLE_MESSAGE } from "@/app/lib/admin/operationalControlsShared";
 import { walletOnlyPurchaseFunding, calculatePurchaseFunding } from "@/app/lib/esim/purchaseFunding";
+import {
+  assertCustomerFinancialActivityAllowed,
+  CustomerAccountRestrictedError,
+} from "@/app/lib/auth/customerAccountStatus";
 
 export const WALLET_PURCHASE_STARTED = "esim.wallet_purchase_started";
 export const WALLET_FUNDS_RESERVED = "esim.wallet_funds_reserved";
@@ -189,6 +193,22 @@ async function assertActiveCustomer(
   return customer;
 }
 
+async function assertCustomerMayStartWalletPurchase(
+  customerUserId: string,
+  assisted: boolean
+) {
+  try {
+    await assertCustomerFinancialActivityAllowed(customerUserId, {
+      forAdmin: assisted,
+    });
+  } catch (error) {
+    if (error instanceof CustomerAccountRestrictedError) {
+      throw new WalletEsimPurchaseError("CUSTOMER_UNAVAILABLE", error.message);
+    }
+    throw error;
+  }
+}
+
 function throwIfOperationalControlBlocks(error: unknown): never {
   if (
     error instanceof OperationalControlBlockedError ||
@@ -275,6 +295,7 @@ export async function prepareWalletEsimPurchase(
     requireEmailVerified: isAssisted,
     assisted: isAssisted,
   });
+  await assertCustomerMayStartWalletPurchase(customerUserId, isAssisted);
 
   const existing = await prisma.walletEsimPurchase.findUnique({
     where: { idempotencyKey },
@@ -489,6 +510,7 @@ export async function setWalletPurchaseFundingChoice(
     requireEmailVerified: false,
     assisted: false,
   });
+  await assertCustomerMayStartWalletPurchase(customerUserId, false);
 
   const purchase = await prisma.walletEsimPurchase.findUnique({
     where: { id: purchaseId },
@@ -1107,6 +1129,10 @@ export async function confirmWalletEsimPurchase(
     requireEmailVerified: confirmAsAssisted,
     assisted: confirmAsAssisted,
   });
+  await assertCustomerMayStartWalletPurchase(
+    customerUserId,
+    confirmAsAssisted
+  );
 
   const purchase = await prisma.walletEsimPurchase.findUnique({
     where: { id: purchaseId },

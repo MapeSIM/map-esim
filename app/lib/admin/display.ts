@@ -23,6 +23,8 @@ const METADATA_ALLOWLIST = new Set([
   "amountCents",
   "currency",
   "reason",
+  "previousStatus",
+  "accountStatusVersion",
   "fundingSource",
   "providerCostCents",
   "failureCategory",
@@ -41,7 +43,7 @@ export type AdminOrderAssociationFilter = "ALL" | "LINKED" | "GUEST";
 
 export type AdminCustomerVerificationFilter = "ALL" | "VERIFIED" | "UNVERIFIED";
 export type AdminCustomerAuthFilter = "ALL" | "GOOGLE" | "CREDENTIALS";
-export type AdminCustomerAccountFilter = "ALL" | "ACTIVE" | "DELETED";
+export type AdminCustomerAccountFilter = "ALL" | "ACTIVE" | "BLOCKED" | "DELETED";
 
 /**
  * Safe short prefix/suffix of a provider order id for admin lists.
@@ -193,7 +195,7 @@ export function parseAdminCustomerAccountFilter(
   raw: string | null | undefined
 ): AdminCustomerAccountFilter {
   const v = (raw ?? "").trim().toUpperCase();
-  if (v === "ACTIVE" || v === "DELETED") return v;
+  if (v === "ACTIVE" || v === "BLOCKED" || v === "DELETED") return v;
   return "ALL";
 }
 

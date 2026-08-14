@@ -5,6 +5,7 @@ import { getAdminCustomerRecentOrders } from "@/app/lib/admin/orders";
 import { getAdminCustomerRecentTopups } from "@/app/lib/admin/topups";
 import { getAdminCustomerWalletSummary } from "@/app/lib/admin/wallet";
 import { ADMIN_DEBIT_MIN_CENTS } from "@/app/lib/wallet/amount";
+import { CustomerBlockPanel } from "@/app/components/admin/CustomerBlockPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +121,13 @@ export default async function AdminCustomerDetailPage({
         />
         <DetailRow label="Account status" value={detail.accountStatusLabel} />
         <DetailRow label="Deleted at" value={detail.deletedAtLabel} />
+        <DetailRow label="Blocked at" value={detail.blockedAtLabel} />
+        {detail.accountStatusLabel === "Blocked" ? (
+          <DetailRow
+            label="Block reason (admin only)"
+            value={detail.blockedReasonLabel}
+          />
+        ) : null}
         <DetailRow
           label="Authentication method"
           value={detail.authMethodLabel}
@@ -166,6 +174,21 @@ export default async function AdminCustomerDetailPage({
           value={String(detail.claimedOrderCount)}
         />
       </dl>
+
+      {detail.accountStatusLabel === "Active" ? (
+        <CustomerBlockPanel
+          customerUserId={detail.id}
+          accountStatusVersion={detail.accountStatusVersion}
+          mode="block"
+        />
+      ) : null}
+      {detail.accountStatusLabel === "Blocked" ? (
+        <CustomerBlockPanel
+          customerUserId={detail.id}
+          accountStatusVersion={detail.accountStatusVersion}
+          mode="reactivate"
+        />
+      ) : null}
 
       {detail.localOrderCount > 0 ? (
         <p>

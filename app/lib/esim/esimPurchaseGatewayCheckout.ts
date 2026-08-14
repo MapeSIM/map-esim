@@ -25,6 +25,10 @@ import {
   esimPurchasePaymentReturnPath,
 } from "@/app/lib/payments/safepayCheckoutPaths";
 import { resumeSafepayHostedCheckout } from "@/app/lib/payments/safepayAdapter";
+import {
+  assertCustomerFinancialActivityAllowed,
+  CustomerAccountRestrictedError,
+} from "@/app/lib/auth/customerAccountStatus";
 
 export class EsimPurchaseGatewayCheckoutError extends Error {
   readonly code:
@@ -160,6 +164,17 @@ export async function startEsimPurchaseHostedCheckout(
       "CUSTOMER_UNAVAILABLE",
       "Your account is unavailable for checkout."
     );
+  }
+  try {
+    await assertCustomerFinancialActivityAllowed(customerUserId);
+  } catch (error) {
+    if (error instanceof CustomerAccountRestrictedError) {
+      throw new EsimPurchaseGatewayCheckoutError(
+        "CUSTOMER_UNAVAILABLE",
+        error.message
+      );
+    }
+    throw error;
   }
 
   const purchase = await prisma.walletEsimPurchase.findUnique({

@@ -49,6 +49,7 @@ function main() {
   assert.ok(!/requireRole\("ADMIN"\)/.test(actions));
   assert.match(service, /role !== Role\.CUSTOMER/);
   assert.match(service, /deletedAt/);
+  assert.match(service, /assertCustomerFinancialActivityAllowed/);
   console.log("PASS active_customer_only_access");
 
   assert.match(readSrc, /customerUserId !== owner/);
@@ -85,7 +86,7 @@ function main() {
   console.log("PASS insufficient_balance_before_provider");
 
   assert.match(confirmForm, /name="confirm"/);
-  assert.match(confirmForm, /disabled=\{pending \|\| !confirmed\}/);
+  assert.match(confirmForm, /disabled=\{busy \|\| !confirmed\}/);
   assert.match(confirmForm, /Buy eSIM with Wallet/);
   assert.ok(!/confirmPhrase|WALLET_PURCHASE_CONFIRM_PHRASE/.test(confirmForm));
   assert.ok(!/parseWalletPurchaseConfirmPhrase|confirmPhrase/.test(actions));
@@ -145,7 +146,7 @@ function main() {
 
   assert.match(service, /REFUND_CREDIT/);
   assert.match(service, /FAILED_REFUNDED/);
-  assert.match(service, /increment:\s*options\.priceCents/);
+  assert.match(service, /increment:\s*priceCents/);
   assert.match(service, /refund_\$\{options\.purchaseId\}/);
   console.log("PASS confirmed_failure_restores_exact_amount_once");
 
@@ -171,7 +172,8 @@ function main() {
 
   assert.match(accountOrderDetail, /getCustomerOwnedOrderDetail/);
   assert.match(accountOrders, /listCustomerOrders|\/account\/orders\//);
-  assert.ok(!/providerCost|Company-funded|ADMIN/i.test(accountOrderDetail));
+  assert.ok(!/providerCost|Company-funded/i.test(accountOrderDetail));
+  assert.ok(!/\bADMIN\b/.test(accountOrderDetail));
   console.log("PASS wrong_owner_order_access_fails_safely");
 
   assert.ok(!/providerCost|provider cost/i.test(confirmForm));

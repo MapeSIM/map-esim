@@ -34,6 +34,10 @@ import {
   OperationalControlUnavailableError,
 } from "@/app/lib/admin/operationalControlsPolicy";
 import { OPERATIONAL_CONTROL_UNAVAILABLE_MESSAGE } from "@/app/lib/admin/operationalControlsShared";
+import {
+  assertCustomerFinancialActivityAllowed,
+  CustomerAccountRestrictedError,
+} from "@/app/lib/auth/customerAccountStatus";
 
 export const ADMIN_ASSIGNMENT_STARTED = "esim.admin_assignment_started";
 export const ADMIN_ASSIGNMENT_COMPLETED = "esim.admin_assignment_completed";
@@ -147,6 +151,22 @@ async function assertActiveCustomer(customerUserId: string) {
   return customer;
 }
 
+async function assertCustomerMayReceiveAssignment(customerUserId: string) {
+  try {
+    await assertCustomerFinancialActivityAllowed(customerUserId, {
+      forAdmin: true,
+    });
+  } catch (error) {
+    if (error instanceof CustomerAccountRestrictedError) {
+      throw new AdminPackageAssignmentError(
+        "CUSTOMER_UNAVAILABLE",
+        error.message
+      );
+    }
+    throw error;
+  }
+}
+
 function throwIfOperationalControlBlocksAssignment(error: unknown): never {
   if (
     error instanceof OperationalControlBlockedError ||
@@ -216,6 +236,7 @@ export async function prepareAdminPackageAssignment(
 
   await assertActiveAdmin(adminUserId);
   await assertActiveCustomer(customerUserId);
+  await assertCustomerMayReceiveAssignment(customerUserId);
 
   const existing = await prisma.adminPackageAssignment.findUnique({
     where: { idempotencyKey },
@@ -449,6 +470,7 @@ export async function confirmAdminPackageAssignment(
 
   await assertActiveAdmin(adminUserId);
   const customer = await assertActiveCustomer(customerUserId);
+  await assertCustomerMayReceiveAssignment(customerUserId);
 
   const assignment = await prisma.adminPackageAssignment.findUnique({
     where: { id: assignmentId },

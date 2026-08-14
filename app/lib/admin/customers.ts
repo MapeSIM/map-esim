@@ -15,6 +15,7 @@ import {
   type AdminCustomerVerificationFilter,
 } from "@/app/lib/admin/display";
 import { prisma } from "@/app/lib/db";
+import { resolveCustomerAccountStatus } from "@/app/lib/auth/customerAccountStatus";
 
 export type AdminCustomerAuthMethodLabel =
   | "Google"
@@ -29,7 +30,7 @@ export type AdminCustomerListRow = {
   emailMasked: string;
   authMethodLabel: AdminCustomerAuthMethodLabel;
   emailVerifiedLabel: string;
-  accountStatusLabel: "Active" | "Deleted";
+  accountStatusLabel: "Active" | "Blocked" | "Deleted";
   localOrderCount: number;
 };
 
@@ -54,8 +55,11 @@ export type AdminCustomerDetail = {
   roleLabel: string;
   emailVerifiedLabel: string;
   emailVerifiedAtLabel: string;
-  accountStatusLabel: "Active" | "Deleted";
+  accountStatusLabel: "Active" | "Blocked" | "Deleted";
   deletedAtLabel: string;
+  blockedAtLabel: string;
+  blockedReasonLabel: string;
+  accountStatusVersion: number;
   authMethodLabel: AdminCustomerAuthMethodLabel;
   googleLinkedLabel: "Yes" | "No";
   credentialsAvailableLabel: "Yes" | "No";
@@ -108,6 +112,10 @@ function buildCustomerWhere(options: {
 
   if (options.account === "ACTIVE") {
     where.deletedAt = null;
+    where.blockedAt = null;
+  } else if (options.account === "BLOCKED") {
+    where.deletedAt = null;
+    where.blockedAt = { not: null };
   } else if (options.account === "DELETED") {
     where.deletedAt = { not: null };
   }
@@ -183,6 +191,7 @@ export async function getAdminCustomersPage(
       email: true,
       emailVerifiedAt: true,
       deletedAt: true,
+      blockedAt: true,
       accounts: {
         where: { provider: "google" },
         select: { provider: true },
@@ -220,7 +229,12 @@ export async function getAdminCustomersPage(
       emailMasked: maskAdminEmail(row.email),
       authMethodLabel: authMethodLabel(hasGoogle, hasCredentials),
       emailVerifiedLabel: row.emailVerifiedAt ? "Verified" : "Unverified",
-      accountStatusLabel: row.deletedAt ? "Deleted" : "Active",
+      accountStatusLabel: (() => {
+        const s = resolveCustomerAccountStatus(row);
+        if (s === "DELETED") return "Deleted";
+        if (s === "BLOCKED") return "Blocked";
+        return "Active";
+      })(),
       localOrderCount: row._count.orders,
     };
   });
@@ -261,6 +275,9 @@ export async function getAdminCustomerDetail(
       role: true,
       emailVerifiedAt: true,
       deletedAt: true,
+      blockedAt: true,
+      blockedReason: true,
+      accountStatusVersion: true,
       termsAcceptedAt: true,
       termsVersion: true,
       privacyAcknowledgedAt: true,
@@ -308,8 +325,16 @@ export async function getAdminCustomerDetail(
     roleLabel: row.role,
     emailVerifiedLabel: row.emailVerifiedAt ? "Verified" : "Unverified",
     emailVerifiedAtLabel: formatDateTime(row.emailVerifiedAt),
-    accountStatusLabel: row.deletedAt ? "Deleted" : "Active",
+    accountStatusLabel: (() => {
+      const s = resolveCustomerAccountStatus(row);
+      if (s === "DELETED") return "Deleted";
+      if (s === "BLOCKED") return "Blocked";
+      return "Active";
+    })(),
     deletedAtLabel: formatDateTime(row.deletedAt),
+    blockedAtLabel: formatDateTime(row.blockedAt),
+    blockedReasonLabel: displayOrUnavailable(row.blockedReason),
+    accountStatusVersion: row.accountStatusVersion,
     authMethodLabel: authMethodLabel(hasGoogle, hasCredentials),
     googleLinkedLabel: hasGoogle ? "Yes" : "No",
     credentialsAvailableLabel: hasCredentials ? "Yes" : "No",

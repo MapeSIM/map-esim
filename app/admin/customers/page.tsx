@@ -145,6 +145,7 @@ export default async function AdminCustomersPage({
           >
             <option value="ALL">All accounts</option>
             <option value="ACTIVE">Active</option>
+            <option value="BLOCKED">Blocked</option>
             <option value="DELETED">Deleted</option>
           </select>
         </label>

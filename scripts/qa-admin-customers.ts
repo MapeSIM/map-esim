@@ -41,6 +41,7 @@ function main() {
   assert.equal(parseAdminCustomerAuthFilter("credentials"), "CREDENTIALS");
   assert.equal(parseAdminCustomerAuthFilter("oauth"), "ALL");
   assert.equal(parseAdminCustomerAccountFilter("deleted"), "DELETED");
+  assert.equal(parseAdminCustomerAccountFilter("blocked"), "BLOCKED");
   assert.equal(parseAdminCustomerAccountFilter("suspended"), "ALL");
   assert.equal(normalizeAdminUserIdFilter("abc_123"), "abc_123");
   assert.equal(normalizeAdminUserIdFilter("bad id!"), "");
@@ -66,6 +67,9 @@ function main() {
   assert.ok(!/vesim\/checkout|checkout\/credit/i.test(customersSrc));
   assert.ok(!/\.create\(|\.update\(|\.delete\(/.test(customersSrc));
   assert.match(customersSrc, /deletedAt/);
+  assert.match(customersSrc, /blockedAt/);
+  assert.match(customersSrc, /accountStatusVersion/);
+  assert.match(customersSrc, /Blocked/);
   console.log("PASS customers_module_server_only_safe");
 
   const listSrc = readFileSync(
@@ -91,6 +95,8 @@ function main() {
   assert.match(detailSrc, /getAdminCustomerRecentOrders/);
   assert.match(detailSrc, /No eSIM orders found for this customer/);
   assert.match(detailSrc, /View related order/);
+  assert.match(detailSrc, /CustomerBlockPanel/);
+  assert.match(detailSrc, /Block reason \(admin only\)|mode="block"|mode="reactivate"/);
   assert.ok(!/passwordHash|access_token|refresh_token|providerAccountId|session_state/i.test(detailSrc));
   assert.ok(!/JSON\.stringify/.test(detailSrc));
   assert.ok(!/vesim\/checkout|sendOtp|resetPassword/i.test(detailSrc));
@@ -108,7 +114,11 @@ function main() {
   console.log("PASS shared_prisma_singleton");
 
   // Soft-deleted representation: list maps deletedAt → Deleted label
-  assert.match(customersSrc, /accountStatusLabel: row\.deletedAt \? "Deleted" : "Active"/);
+  assert.match(
+    customersSrc,
+    /resolveCustomerAccountStatus|accountStatusLabel: \(\(\) =>/
+  );
+  assert.match(customersSrc, /"Blocked"/);
   console.log("PASS soft_deleted_status_represented");
 
   console.log("ALL_QA_PASSED=10");

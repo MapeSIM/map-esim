@@ -179,6 +179,13 @@ model User {
   credentialsChangedAt         DateTime?
   /// Soft-delete timestamp. When set, the account cannot sign in.
   deletedAt                    DateTime?
+  /// Admin block (Model 2): null = not blocked. Does not revoke sessions or deny login.
+  blockedAt                    DateTime?
+  /// Internal admin-only reason. Never expose to the customer.
+  blockedReason                String?
+  blockedByAdminId             String?
+  /// CAS version for block/reactivate admin actions.
+  accountStatusVersion         Int                      @default(0)
   /// Incremented on each ADMIN credentials sign-in; JWT must match (single active admin session).
   adminSessionVersion          Int                      @default(0)
   /// Signup (or future) consent to Terms & Conditions.
@@ -197,6 +204,8 @@ model User {
   passwordResetTokens          PasswordResetToken[]
   emailOtps                    EmailOtp[]
   auditLogs                    AuditLog[]               @relation("AuditActor")
+  blockedByAdmin               User?                    @relation("UserBlockedByAdmin", fields: [blockedByAdminId], references: [id], onDelete: SetNull)
+  customersBlocked             User[]                   @relation("UserBlockedByAdmin")
   walletAccount                WalletAccount?
   packageAssignmentsAsCustomer AdminPackageAssignment[] @relation("AssignmentCustomer")
   packageAssignmentsAsAdmin    AdminPackageAssignment[] @relation("AssignmentAdmin")
@@ -208,6 +217,7 @@ model User {
   refundRequestsDecided        RefundRequest[]          @relation("RefundRequestDecidedBy")
 
   @@index([deletedAt])
+  @@index([blockedAt])
 }
 
 model EmailOtp {

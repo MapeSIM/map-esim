@@ -33,6 +33,10 @@ import {
   TOPUP_RECONCILIATION,
   TOPUP_WEBHOOK_DUPLICATE,
 } from "@/app/lib/wallet/topupConstants";
+import {
+  assertCustomerFinancialActivityAllowed,
+  CustomerAccountRestrictedError,
+} from "@/app/lib/auth/customerAccountStatus";
 
 export {
   TOPUP_CREDIT_REFERENCE_TYPE,
@@ -145,6 +149,17 @@ async function assertActiveCustomer(customerUserId: string) {
   return customer;
 }
 
+async function assertCustomerMayStartTopup(customerUserId: string) {
+  try {
+    await assertCustomerFinancialActivityAllowed(customerUserId);
+  } catch (error) {
+    if (error instanceof CustomerAccountRestrictedError) {
+      throw new WalletTopupError("CUSTOMER_UNAVAILABLE", error.message);
+    }
+    throw error;
+  }
+}
+
 /**
  * Create a DRAFT top-up for an active CUSTOMER with an existing wallet.
  * Does not invent PKR amounts, call gateways, or credit the wallet.
@@ -211,6 +226,7 @@ export async function createWalletTopupDraft(
   }
 
   await assertActiveCustomer(customerUserId);
+  await assertCustomerMayStartTopup(customerUserId);
 
   const wallet = await prisma.walletAccount.findUnique({
     where: { userId: customerUserId },
@@ -351,6 +367,7 @@ export async function startWalletTopupCheckout(options: {
   const customerUserId = options.customerUserId.trim();
   const topupId = options.topupId.trim();
   await assertActiveCustomer(customerUserId);
+  await assertCustomerMayStartTopup(customerUserId);
 
   const topup = await prisma.walletTopup.findUnique({
     where: { id: topupId },

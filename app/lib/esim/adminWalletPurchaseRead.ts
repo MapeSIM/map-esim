@@ -55,6 +55,7 @@ export async function getAdminWalletBuyCustomer(
       email: true,
       role: true,
       deletedAt: true,
+      blockedAt: true,
       emailVerifiedAt: true,
       walletAccount: { select: { balanceCents: true } },
     },
@@ -64,14 +65,17 @@ export async function getAdminWalletBuyCustomer(
     return null;
   }
 
-  const accountActive = !customer.deletedAt;
+  const accountActive = !customer.deletedAt && !customer.blockedAt;
   const emailVerified = Boolean(customer.emailVerifiedAt);
   const hasWallet = Boolean(customer.walletAccount);
   const balanceCents = customer.walletAccount?.balanceCents ?? 0;
 
   let blockedReason: string | null = null;
-  if (!accountActive) {
+  if (customer.deletedAt) {
     blockedReason = "Packages cannot be purchased for deleted customer accounts.";
+  } else if (customer.blockedAt) {
+    blockedReason =
+      "This customer account is currently restricted and cannot receive assisted wallet purchases.";
   } else if (!emailVerified) {
     blockedReason =
       "Customer email must be verified before an assisted wallet purchase.";
