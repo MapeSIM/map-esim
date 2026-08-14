@@ -8,10 +8,12 @@ import {
 import type { HealthStatus, OpsWarning } from "@/app/lib/admin/operationsHealthShared";
 import { OperationalControlsPanel } from "@/app/components/admin/OperationalControlsPanel";
 import { RunAlertNotificationsPanel } from "@/app/components/admin/RunAlertNotificationsPanel";
+import { WhatsAppSupportPanel } from "@/app/components/admin/WhatsAppSupportPanel";
 import {
   getMonitoringAlertSummary,
   type MonitoringAlertSummary,
 } from "@/app/lib/admin/monitoringAlerts";
+import { getAdminWhatsAppSupportView } from "@/app/lib/support/whatsappSupport";
 
 export const dynamic = "force-dynamic";
 
@@ -145,9 +147,11 @@ function WarningList({ warnings }: { warnings: OpsWarning[] }) {
 function DashboardBody({
   data,
   alertSummary,
+  whatsappSupport,
 }: {
   data: OperationsHealthDashboard;
   alertSummary: MonitoringAlertSummary;
+  whatsappSupport: Awaited<ReturnType<typeof getAdminWhatsAppSupportView>>;
 }) {
   const app = data.applicationDatabase;
   const recon = data.reconciliation;
@@ -269,6 +273,8 @@ function DashboardBody({
         overallStatus={controls.overallTransactionsStatus}
         guestCheckoutStatus={controls.guestCheckoutStatus}
       />
+
+      <WhatsAppSupportPanel initial={whatsappSupport} />
 
       <RunAlertNotificationsPanel />
 
@@ -475,12 +481,27 @@ export default async function AdminOperationsPage() {
 
   let data: OperationsHealthDashboard;
   let alertSummary: MonitoringAlertSummary;
+  let whatsappSupport: Awaited<ReturnType<typeof getAdminWhatsAppSupportView>>;
   try {
-    [data, alertSummary] = await Promise.all([
+    [data, alertSummary, whatsappSupport] = await Promise.all([
       getOperationsHealthDashboard(),
       getMonitoringAlertSummary(),
+      getAdminWhatsAppSupportView(),
     ]);
   } catch {
+    // Health may fail independently — still try to load WhatsApp config for ops.
+    try {
+      whatsappSupport = await getAdminWhatsAppSupportView();
+    } catch {
+      whatsappSupport = {
+        enabled: false,
+        phoneDisplay: "",
+        message: "",
+        version: 1,
+        updatedAtLabel: null,
+        updatedByAdminIdSafe: null,
+      };
+    }
     return (
       <div className="space-y-6">
         <header>
@@ -497,9 +518,16 @@ export default async function AdminOperationsPage() {
             {UNAVAILABLE}
           </p>
         </div>
+        <WhatsAppSupportPanel initial={whatsappSupport} />
       </div>
     );
   }
 
-  return <DashboardBody data={data} alertSummary={alertSummary} />;
+  return (
+    <DashboardBody
+      data={data}
+      alertSummary={alertSummary}
+      whatsappSupport={whatsappSupport}
+    />
+  );
 }

@@ -74,6 +74,7 @@
     "qa:admin-reconciliation-final": "tsx scripts/qa-admin-reconciliation-final.ts",
     "qa:admin-operations-health": "tsx scripts/qa-admin-operations-health.ts",
     "qa:admin-operations-controls": "tsx scripts/qa-admin-operations-controls.ts",
+    "qa:whatsapp-support": "tsx scripts/qa-whatsapp-support.ts",
     "qa:admin-monitoring-alerts": "tsx scripts/qa-admin-monitoring-alerts.ts",
     "smoke:admin-monitoring-alerts": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/smoke-admin-monitoring-alerts.ts",
     "qa:admin-alert-notifications": "tsx scripts/qa-admin-alert-notifications.ts",

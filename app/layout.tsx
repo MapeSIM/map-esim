@@ -8,6 +8,7 @@ import PreferenceStorageSync from "./components/cookies/PreferenceStorageSync";
 import { CurrencyProvider } from "./components/currency/CurrencyProvider";
 import JsonLd from "./components/seo/JsonLd";
 import ThemeProvider from "./components/theme/ThemeProvider";
+import WhatsAppSupportButton from "./components/support/WhatsAppSupportButton";
 import { auth } from "@/auth";
 import { navAuthLink } from "@/app/lib/auth/redirects";
 import { BRAND_NAME, BRAND_SITE_URL, BRAND_TAGLINE } from "@/app/lib/brand";
@@ -121,6 +122,7 @@ export default async function RootLayout({
               />
               {children}
               <Footer />
+              <WhatsAppSupportButton />
             </CurrencyProvider>
           </ThemeProvider>
         </CookieConsentProvider>

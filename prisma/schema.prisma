@@ -695,6 +695,22 @@ model OperationalControl {
   @@index([updatedAt])
 }
 
+/// Singleton runtime config for the public WhatsApp support button.
+/// Admin-editable without redeploy. Never stores secrets or arbitrary JSON.
+model WhatsAppSupportConfig {
+  /// Fixed singleton id — always "default".
+  id               String   @id
+  enabled          Boolean  @default(false)
+  /// Digits-only international number for wa.me (no +). Null when unset.
+  phoneE164        String?
+  /// Plain-text default chat message. Null/empty allowed when disabled.
+  defaultMessage   String?
+  version          Int      @default(1)
+  updatedByAdminId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
 /// Lifecycle state per deterministic Part B1 alert ID (activation cycles).
 /// Display statuses like not-eligible / cooldown are derived, not stored.
 model AlertNotificationState {
