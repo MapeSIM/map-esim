@@ -56,6 +56,10 @@ export type VesimOffer = {
   apn?: string;
   isRefundable?: boolean;
   supportTopUp?: boolean;
+  /** Provider top-up mode hint when present — preserved for future gating only. */
+  supportTopUpType?: string | null;
+  /** Preserved for future gating only — do not enable cancel/recharge from this. */
+  isDataUsageAvailable?: boolean;
   isPopular?: boolean;
 };
 
@@ -504,6 +508,19 @@ export function normalizeOffer(raw: unknown): VesimOffer | null {
     apn: firstString(item.apn, item.APN, item.apnName),
     isRefundable: item.isRefundable === true,
     supportTopUp: item.supportTopUp === true,
+    supportTopUpType:
+      typeof item.supportTopUpType === "string" && item.supportTopUpType.trim()
+        ? item.supportTopUpType.trim()
+        : typeof item.support_top_up_type === "string" &&
+            item.support_top_up_type.trim()
+          ? item.support_top_up_type.trim()
+          : null,
+    isDataUsageAvailable:
+      item.isDataUsageAvailable === true
+        ? true
+        : item.isDataUsageAvailable === false
+          ? false
+          : undefined,
     isPopular: item.isPopular === true,
   };
 }

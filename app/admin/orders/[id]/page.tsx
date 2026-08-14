@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
+import AdminEsimUsagePanel from "@/app/components/orders/AdminEsimUsagePanel";
 import { getAdminOrderDetail } from "@/app/lib/admin/orders";
 
 export const dynamic = "force-dynamic";
@@ -99,6 +100,8 @@ export default async function AdminOrderDetailPage({
           revealPath={`/api/admin/orders/${encodeURIComponent(detail.id)}/iccid`}
         />
       </dl>
+
+      <AdminEsimUsagePanel orderId={detail.id} />
     </div>
   );
 }

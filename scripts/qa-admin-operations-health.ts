@@ -120,11 +120,13 @@ function main() {
   // --- VeSIM / provider ---
   assert.match(service, /isVesimEnvironmentConfigured|validateVesimEnvironmentConfig/);
   assert.match(service, /brokerHostClass|STAGING_APPROVED|LIVE_UNCONFIRMED/);
-  assert.match(service, /balanceSupport:\s*"NOT_VERIFIED"/);
+  assert.match(service, /balanceSupport:\s*"ON_DEMAND"/);
   assert.match(service, /DATABASE_DERIVED|CONFIGURATION_DERIVED/);
   assert.doesNotMatch(service, /executeCreditCheckout|\/api\/checkout\/credit/);
   assert.doesNotMatch(service, /method:\s*["']POST["']/);
   assert.doesNotMatch(page, /access_token|Authorization|VESIM_PASSWORD/);
+  assert.match(page, /ProviderWalletPanel|Refresh provider wallet/);
+  assert.match(page, /ON_DEMAND|ProviderWalletPanel/);
   console.log("PASS provider_readiness_no_live_mutation");
 
   // --- Payment NOT IMPLEMENTED ---

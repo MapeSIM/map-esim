@@ -9,6 +9,7 @@ import type { HealthStatus, OpsWarning } from "@/app/lib/admin/operationsHealthS
 import { OperationalControlsPanel } from "@/app/components/admin/OperationalControlsPanel";
 import { RunAlertNotificationsPanel } from "@/app/components/admin/RunAlertNotificationsPanel";
 import { WhatsAppSupportPanel } from "@/app/components/admin/WhatsAppSupportPanel";
+import { ProviderWalletPanel } from "@/app/components/admin/ProviderWalletPanel";
 import {
   getMonitoringAlertSummary,
   type MonitoringAlertSummary,
@@ -41,7 +42,8 @@ function statusTone(status: string): string {
       return "bg-red-500/10 text-red-700 dark:text-red-300";
     case "NOT_IMPLEMENTED":
     case "NOT_AVAILABLE":
-    case "NOT_VERIFIED":
+    case "ON_DEMAND":
+    case "NOT_CHECKED":
     case "UNKNOWN":
     case "unknown":
     case "NOT_IMPLEMENTED / DISABLED":
@@ -276,6 +278,8 @@ function DashboardBody({
 
       <WhatsAppSupportPanel initial={whatsappSupport} />
 
+      <ProviderWalletPanel />
+
       <RunAlertNotificationsPanel />
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -409,7 +413,10 @@ function DashboardBody({
             label="Refresh in progress"
             value={provider.refreshInProgressCount}
           />
-          <Metric label="Provider balance" value={provider.balanceSupport} />
+          <Metric
+            label="Provider balance"
+            value={provider.balanceSupport}
+          />
         </HealthCard>
 
         <HealthCard

@@ -12,9 +12,9 @@ import { extractInstallDetails, hasInstallDetails } from "@/app/lib/email/extrac
 import { isValidInstallQrValue } from "@/app/lib/email/qr";
 import { prisma } from "@/app/lib/db";
 import {
-  getBrokerToken,
   getVesimBaseUrl,
   readJsonSafe,
+  vesimAuthorizedFetch,
 } from "@/app/lib/vesim/server";
 
 function notFoundResponse(): NextResponse {
@@ -121,18 +121,10 @@ export async function fetchBrokerOrderPayload(
   if (!id || id.length > 120) return null;
 
   try {
-    const token = await getBrokerToken();
     const baseUrl = getVesimBaseUrl();
-    const response = await fetch(
+    const response = await vesimAuthorizedFetch(
       `${baseUrl}/api/broker/orders/${encodeURIComponent(id)}`,
-      {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          Authorization: `${token.tokenType} ${token.accessToken}`,
-        },
-        cache: "no-store",
-      }
+      { method: "GET" }
     );
     const data = await readJsonSafe(response);
     if (!response.ok) return null;

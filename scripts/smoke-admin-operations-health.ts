@@ -591,7 +591,7 @@ async function main() {
           dashboard.provider.freshness === "DATABASE_DERIVED"
       );
       assert.ok(
-        dashboard.provider.balanceSupport === "NOT_VERIFIED" ||
+        dashboard.provider.balanceSupport === "ON_DEMAND" ||
           dashboard.provider.balanceSupport === "NOT_AVAILABLE"
       );
       record(
@@ -600,7 +600,7 @@ async function main() {
         `freshness=${dashboard.provider.freshness} mode=${dashboard.provider.modeLabel} host=${dashboard.provider.brokerHostClass}`
       );
       record(
-        "provider balance reports NOT_VERIFIED / NOT_AVAILABLE",
+        "provider balance reports ON_DEMAND / NOT_AVAILABLE (explicit refresh only)",
         "PASS",
         `balanceSupport=${dashboard.provider.balanceSupport}`
       );

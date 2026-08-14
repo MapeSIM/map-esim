@@ -363,23 +363,6 @@ function buildConfigAlerts(input: {
     }
   }
 
-  pushUnique(
-    alerts,
-    makeAlert({
-      category: "PROVIDER",
-      code: "PROVIDER_BALANCE_NOT_VERIFIED",
-      severity: "INFO",
-      title: "Provider balance not verified",
-      description:
-        "Provider balance monitoring is NOT_VERIFIED / NOT_AVAILABLE. No undocumented balance endpoint is called.",
-      sourceAt: now,
-      now,
-      freshness: "CONFIGURATION_DERIVED",
-      href: "/admin/operations",
-      recommendedAction: "Use Operations for provider readiness. Do not invent balance checks.",
-    })
-  );
-
   const pay = paymentGatewayCardDefaults();
   pushUnique(
     alerts,

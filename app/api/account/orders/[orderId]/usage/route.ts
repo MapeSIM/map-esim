@@ -41,9 +41,13 @@ export async function GET(
     const result = await getCustomerOwnedOrderUsage(orderId);
     if (!result.ok) {
       const pub = customerUsagePublicError(result.code);
+      const headers: Record<string, string> = { ...NO_STORE };
+      if (result.code === "RATE_LIMITED" && result.retryAfterSec) {
+        headers["Retry-After"] = String(result.retryAfterSec);
+      }
       return NextResponse.json(
         { success: false, error: pub.message },
-        { status: pub.status, headers: NO_STORE }
+        { status: pub.status, headers }
       );
     }
 

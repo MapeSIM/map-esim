@@ -173,8 +173,15 @@ function main() {
   assert.match(usageLib, /authorizeCustomerOwnedOrderInstall/);
   assert.match(usageLib, /\/api\/esim\/usage\//);
   assert.match(usageLib, /usedDataGB = Math\.max\(initialDataGB - remainingDataGB, 0\)/);
+  assert.match(usageLib, /RATE_LIMITED/);
+  assert.match(usageLib, /consumeRateLimit/);
+  assert.match(usageLib, /30_000/);
+  assert.match(usageLib, /getBrokerToken/);
+  assert.match(usageLib, /Authorization: `\$\{token\.tokenType\} \$\{token\.accessToken\}`/);
+  assert.doesNotMatch(usageLib, /vesimAuthorizedFetch/);
   assert.doesNotMatch(usageApi, /iccid:\s/);
   assert.doesNotMatch(usageApi, /accessToken|bearer/i);
+  assert.match(usageApi, /Retry-After/);
   assert.match(usagePanel, /View usage/);
   assert.match(usagePanel, /Refresh usage/);
   assert.match(usagePanel, /Usage data may be delayed by up to 1 hour/);

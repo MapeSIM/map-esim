@@ -17,6 +17,14 @@ import {
   mergeOfferPageItems,
 } from "@/app/lib/vesim/offersPagination";
 import { unstable_cache } from "next/cache";
+import {
+  getBrokerToken,
+  vesimAuthorizedFetch,
+  type BrokerTokenResult,
+} from "@/app/lib/vesim/brokerAuth";
+
+export type TokenResult = BrokerTokenResult;
+export { getBrokerToken, vesimAuthorizedFetch };
 
 export type VerifiedCheckoutOffer = {
   offerId: string;
@@ -46,11 +54,6 @@ export function toPublicVerifiedCheckoutOffer(offer: VerifiedCheckoutOffer) {
   };
 }
 
-type TokenResult = {
-  accessToken: string;
-  tokenType: string;
-};
-
 type JsonRecord = Record<string, unknown>;
 
 const IDEMPOTENCY_TTL_MS = 10 * 60 * 1000;
@@ -62,14 +65,6 @@ const idempotencyStore = new Map<
     expiresAt: number;
   }
 >();
-
-function getRequiredEnv(name: string): string {
-  const value = process.env[name]?.trim();
-  if (!value) {
-    throw new Error("Server configuration is incomplete");
-  }
-  return value;
-}
 
 export function getVesimBaseUrl(): string {
   // Shared fail-closed boundary: mode + host must match before any provider call.
@@ -166,52 +161,21 @@ export function toVerifiedCheckoutOffer(
   };
 }
 
-export async function getBrokerToken(): Promise<TokenResult> {
-  // Validates VESIM_ENVIRONMENT + VESIM_BASE_URL before credentials or network.
-  const baseUrl = getVesimBaseUrl();
-  const email = getRequiredEnv("VESIM_EMAIL");
-  const password = getRequiredEnv("VESIM_PASSWORD");
-
-  const response = await fetch(`${baseUrl}/api/auth/broker/token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({ email, password }),
-    cache: "no-store",
-  });
-
-  const data = await readJsonSafe(response);
-  const accessToken =
-    typeof data.access_token === "string" ? data.access_token : "";
-
-  if (!response.ok || !accessToken) {
-    throw new Error("Unable to authenticate with the eSIM provider");
-  }
-
-  return {
-    accessToken,
-    tokenType:
-      typeof data.token_type === "string" && data.token_type.trim()
-        ? data.token_type.trim()
-        : "Bearer",
-  };
-}
-
 export async function fetchDestinations(
   token?: TokenResult
 ): Promise<VesimDestination[]> {
-  const auth = token || (await getBrokerToken());
   const baseUrl = getVesimBaseUrl();
-
-  const response = await fetch(`${baseUrl}/api/esim/destinations`, {
-    headers: {
-      Authorization: `${auth.tokenType} ${auth.accessToken}`,
-      Accept: "application/json",
-    },
-    cache: "no-store",
-  });
+  // When a token is supplied by the caller, use it once (no auto-retry here);
+  // otherwise use authorized fetch with one auth recovery + one retry.
+  const response = token
+    ? await fetch(`${baseUrl}/api/esim/destinations`, {
+        headers: {
+          Authorization: `${token.tokenType} ${token.accessToken}`,
+          Accept: "application/json",
+        },
+        cache: "no-store",
+      })
+    : await vesimAuthorizedFetch(`${baseUrl}/api/esim/destinations`);
 
   const data = await readJsonSafe(response);
   if (!response.ok) {
@@ -306,23 +270,22 @@ export async function fetchOffersForCountry(
   country: string,
   token?: TokenResult
 ): Promise<VesimOffer[]> {
-  const auth = token || (await getBrokerToken());
   const baseUrl = getVesimBaseUrl();
   const destination = country.trim();
   if (!destination) return [];
 
   const collected = await collectAllOfferPagePayloads(async (page) => {
     const query = buildVesimOffersQuery(destination, page);
-    const response = await fetch(
-      `${baseUrl}/api/esim/offers?${query.toString()}`,
-      {
-        headers: {
-          Authorization: `${auth.tokenType} ${auth.accessToken}`,
-          Accept: "application/json",
-        },
-        cache: "no-store",
-      }
-    );
+    const url = `${baseUrl}/api/esim/offers?${query.toString()}`;
+    const response = token
+      ? await fetch(url, {
+          headers: {
+            Authorization: `${token.tokenType} ${token.accessToken}`,
+            Accept: "application/json",
+          },
+          cache: "no-store",
+        })
+      : await vesimAuthorizedFetch(url);
     const payload = await readJsonSafe(response);
     return { httpOk: response.ok, payload };
   });

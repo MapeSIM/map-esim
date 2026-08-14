@@ -21,12 +21,14 @@ import {
   getVesimBaseUrl,
   readJsonSafe,
 } from "@/app/lib/vesim/server";
+import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
 
 export type CustomerUsageErrorCode =
   | "NOT_FOUND"
   | "NO_ICCID"
   | "USAGE_UNAVAILABLE"
-  | "TEMPORARY_ERROR";
+  | "TEMPORARY_ERROR"
+  | "RATE_LIMITED";
 
 export type CustomerUsageSnapshot = {
   status: string;
@@ -48,7 +50,11 @@ export type CustomerUsageSnapshot = {
 
 export type CustomerUsageResult =
   | { ok: true; usage: CustomerUsageSnapshot }
-  | { ok: false; code: CustomerUsageErrorCode };
+  | {
+      ok: false;
+      code: CustomerUsageErrorCode;
+      retryAfterSec?: number;
+    };
 
 type JsonRecord = Record<string, unknown>;
 
@@ -186,7 +192,10 @@ export function normalizeProviderUsagePayload(
   };
 }
 
-async function fetchProviderUsage(
+/** Shared VeSIM usage GET — used by customer and admin paths.
+ * Preserves pre–Batch 1 provider auth: getBrokerToken + Bearer fetch (no auto-retry).
+ */
+export async function fetchProviderUsage(
   iccid: string
 ): Promise<
   | { ok: true; payload: JsonRecord }
@@ -219,6 +228,8 @@ async function fetchProviderUsage(
   }
 }
 
+const USAGE_RATE_WINDOW_MS = 30_000;
+
 /**
  * Explicit customer action: load sanitized usage for an owned completed order.
  */
@@ -228,6 +239,20 @@ export async function getCustomerOwnedOrderUsage(
   const authz = await authorizeCustomerOwnedOrderInstall(localOrderIdRaw);
   if (!authz.ok) {
     return { ok: false, code: "NOT_FOUND" };
+  }
+
+  const rateKey = `customer-usage:${authz.order.localOrderId}`;
+  const rate = consumeRateLimit({
+    key: rateKey,
+    limit: 1,
+    windowMs: USAGE_RATE_WINDOW_MS,
+  });
+  if (!rate.ok) {
+    return {
+      ok: false,
+      code: "RATE_LIMITED",
+      retryAfterSec: rate.retryAfterSec,
+    };
   }
 
   const localIccid = await resolveLocalIccid(authz.order.localOrderId);
@@ -273,8 +298,15 @@ export async function getCustomerOwnedOrderUsage(
 export function customerUsagePublicError(code: CustomerUsageErrorCode): {
   status: number;
   message: string;
+  retryAfterSec?: number;
 } {
   switch (code) {
+    case "RATE_LIMITED":
+      return {
+        status: 429,
+        message:
+          "Please wait a moment before refreshing usage again (about 30 seconds).",
+      };
     case "NO_ICCID":
       return {
         status: 404,

@@ -117,7 +117,7 @@ export type ProviderReadinessHealth = HealthCardMeta & {
   latestFailureOrUncertaintyLabel: string;
   providerUncertainCount: number;
   refreshInProgressCount: number;
-  balanceSupport: "NOT_AVAILABLE" | "NOT_VERIFIED";
+  balanceSupport: "NOT_AVAILABLE" | "ON_DEMAND";
 };
 
 export type PaymentReadinessHealth = HealthCardMeta & {
@@ -977,7 +977,7 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
     ),
     providerUncertainCount: reconciliation.providerUncertainCount,
     refreshInProgressCount: reconciliation.refreshOrRecoveryInProgressCount,
-    balanceSupport: "NOT_VERIFIED",
+    balanceSupport: "ON_DEMAND",
   };
 
   const guestEnabled = isGuestVesimCheckoutEnabled();
