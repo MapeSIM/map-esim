@@ -60,10 +60,13 @@ export const CURRENCY_OPTIONS: CurrencyOption[] = CURRENCY_CODES.map(
   })
 );
 
-/** Fallback USD→currency rates used when live FX is unavailable. */
+/**
+ * Fallback USD→currency rates used when live FX is unavailable.
+ * PKR is also the fixed MAP retail display rate (1 USD = 293 PKR).
+ */
 export const FALLBACK_USD_RATES: Record<CurrencyCode, number> = {
   USD: 1,
-  PKR: 278.5,
+  PKR: 293,
   EUR: 0.92,
   CAD: 1.37,
   BRL: 5.45,

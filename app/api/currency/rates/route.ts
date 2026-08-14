@@ -32,9 +32,12 @@ export async function GET() {
     const rates = Object.fromEntries(
       CURRENCY_CODES.map((code) => [
         code,
-        typeof data.rates?.[code] === "number" && data.rates[code] > 0
-          ? data.rates[code]
-          : FALLBACK_USD_RATES[code],
+        // PKR uses MAP's fixed retail display rate from FALLBACK_USD_RATES.
+        code === "PKR"
+          ? FALLBACK_USD_RATES.PKR
+          : typeof data.rates?.[code] === "number" && data.rates[code] > 0
+            ? data.rates[code]
+            : FALLBACK_USD_RATES[code],
       ])
     ) as Record<CurrencyCode, number>;
 
