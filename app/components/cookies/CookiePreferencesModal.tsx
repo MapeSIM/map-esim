@@ -137,7 +137,7 @@ export default function CookiePreferencesModal({
     <dialog
       ref={dialogRef}
       aria-labelledby={titleId}
-      className="fixed left-1/2 top-1/2 z-50 m-0 w-[min(100%-1.5rem,32rem)] max-h-[min(90vh,720px)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] p-0 text-[var(--heading)] shadow-[var(--shadow-strong)] open:flex open:flex-col backdrop:bg-black/45"
+      className="fixed left-1/2 top-1/2 z-50 m-0 w-[min(100%-1.5rem,32rem)] max-h-[min(88vh,720px)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] p-0 text-[var(--heading)] shadow-[var(--shadow-strong)] open:flex open:flex-col backdrop:bg-black/45"
       onClose={handleCancel}
       onCancel={(event) => {
         event.preventDefault();
