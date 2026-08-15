@@ -14,7 +14,7 @@ const partnerLinks: PartnerNavLink[] = [
   { href: "/partner", label: "Home", exact: true },
   { href: "/partner/wallet", label: "Wallet" },
   { href: "/partner/catalog", label: "Catalog" },
-  { href: "#", label: "Orders", disabled: true },
+  { href: "/partner/orders", label: "Orders" },
 ];
 
 export default async function PartnerLayout({

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { Role } from "@prisma/client";
+import { PartnerEsimPurchaseStatus, Role } from "@prisma/client";
 import { writeAuditLog } from "@/app/lib/auth/audit";
 import { prisma } from "@/app/lib/db";
 import {
@@ -8,9 +8,11 @@ import {
   isIccidEncryptionConfigured,
   validateIccid,
 } from "@/app/lib/orders/iccidCrypto";
+import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
 
 export const ICCID_REVEAL_ADMIN_ACTION = "order.iccid_revealed_admin";
 export const ICCID_REVEAL_CUSTOMER_ACTION = "order.iccid_revealed_customer";
+export const ICCID_REVEAL_PARTNER_ACTION = "order.iccid_revealed_partner";
 
 export type IccidRevealErrorCode =
   | "NOT_FOUND"
@@ -138,6 +140,60 @@ export async function revealIccidForCustomer(
     targetId: order.id,
     metadata: {
       orderId: order.id,
+    },
+  });
+
+  return result;
+}
+
+/**
+ * Owning PARTNER reveal. Ownership is PartnerEsimPurchase.partnerId only.
+ * Other Partner / missing / non-completed → NOT_FOUND (no existence leak).
+ * Never logs or audits the ICCID value.
+ */
+export async function revealIccidForPartner(
+  partnerUserId: string,
+  orderIdRaw: string
+): Promise<IccidRevealResult> {
+  const orderId = normalizeOrderId(orderIdRaw);
+  if (!orderId) {
+    return { ok: false, code: "NOT_FOUND" };
+  }
+
+  const actor = await requireActivePartnerActor(partnerUserId);
+  if (!actor) {
+    return { ok: false, code: "NOT_FOUND" };
+  }
+
+  const purchase = await prisma.partnerEsimPurchase.findFirst({
+    where: {
+      partnerId: actor.partnerId,
+      orderId,
+      status: PartnerEsimPurchaseStatus.COMPLETED,
+    },
+    select: {
+      id: true,
+      order: {
+        select: { id: true, iccidEncrypted: true },
+      },
+    },
+  });
+  if (!purchase?.order) {
+    return { ok: false, code: "NOT_FOUND" };
+  }
+
+  const result = await decryptStoredIccid(purchase.order.iccidEncrypted);
+  if (!result.ok) return result;
+
+  await writeAuditLog({
+    actorUserId: actor.userId,
+    action: ICCID_REVEAL_PARTNER_ACTION,
+    targetType: "Order",
+    targetId: purchase.order.id,
+    metadata: {
+      // IDs only — never ICCID, last4, ciphertext, or install secrets.
+      orderId: purchase.order.id,
+      purchaseId: purchase.id,
     },
   });
 

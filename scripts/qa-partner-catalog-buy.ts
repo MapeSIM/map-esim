@@ -556,8 +556,9 @@ async function main() {
       "utf8"
     );
     assert.ok(layoutSrc.includes('href: "/partner/catalog"'));
-    assert.ok(layoutSrc.includes('label: "Orders", disabled: true'));
-    console.log("PASS nav_catalog_enabled_orders_soon");
+    assert.ok(layoutSrc.includes('href: "/partner/orders"'));
+    assert.equal(layoutSrc.includes('label: "Orders", disabled: true'), false);
+    console.log("PASS nav_catalog_and_orders_enabled");
 
     console.log("ALL PASS qa-partner-catalog-buy");
   } finally {
