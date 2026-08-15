@@ -110,7 +110,15 @@ async function main() {
   assert.match(service, /emailVerifiedAt:\s*now/);
   assert.match(service, /OtpPurpose\.PASSWORD_RESET/);
   assert.match(service, /sendOtpEmail/);
+  assert.match(service, /kind:\s*["']admin_invite["']/);
   assert.match(service, /inviteMethod:\s*["']password_reset_otp["']/);
+  assert.doesNotMatch(
+    service.slice(
+      service.indexOf("sendOtpEmail"),
+      service.indexOf("sendOtpEmail") + 280
+    ),
+    /kind:\s*["']password_reset["']/
+  );
   assert.match(service, /disableActiveAdminUnderLock/);
   assert.match(service, /acquireAdminStatusXactLock/);
   assert.match(service, /invitation email could not be sent|Forgot Password/);
@@ -137,11 +145,83 @@ async function main() {
   const forgot = read("app/lib/auth/actions.ts");
   assert.match(forgot, /forgotPasswordAction/);
   assert.match(forgot, /OtpPurpose\.PASSWORD_RESET|PASSWORD_RESET/);
+  assert.match(forgot, /kind:\s*["']password_reset["']/);
+  assert.doesNotMatch(forgot, /kind:\s*["']admin_invite["']/);
   assert.doesNotMatch(
     forgot.slice(forgot.indexOf("forgotPasswordAction"), forgot.indexOf("forgotPasswordAction") + 1200),
     /passwordHash/
   );
   console.log("PASS invited_passwordHash_null_can_use_forgot_password");
+
+  const otpTemplate = read("app/lib/email/otpTemplate.ts");
+  assert.match(otpTemplate, /admin_invite/);
+  assert.match(otpTemplate, /Set up your \$\{BRAND_NAME\} Admin account|Set up your .* Admin account/);
+  assert.match(otpTemplate, /Admin account setup code/);
+  assert.match(
+    otpTemplate,
+    /You have been invited to become a \$\{BRAND_NAME\} administrator/
+  );
+  assert.match(
+    otpTemplate,
+    /set your password and activate your administrator account/
+  );
+  assert.match(
+    otpTemplate,
+    /If you were not expecting this administrator invitation/
+  );
+  assert.match(otpTemplate, /Password reset code/);
+  assert.match(otpTemplate, /Your \$\{BRAND_NAME\} password reset code/);
+  assert.doesNotMatch(
+    otpTemplate.slice(
+      otpTemplate.indexOf('kind === "admin_invite"'),
+      otpTemplate.indexOf('kind === "password_reset"')
+    ),
+    /requested a password reset|Password reset code/
+  );
+  console.log("PASS admin_invite_email_wording_distinct_from_password_reset");
+
+  // Runtime template render checks (no SMTP).
+  const {
+    otpEmailSubject,
+    renderOtpEmailHtml,
+    renderOtpEmailText,
+  } = await import("../app/lib/email/otpTemplate");
+  const inviteHtml = renderOtpEmailHtml({
+    kind: "admin_invite",
+    code: "123456",
+    recipientEmail: "invitee@example.com",
+  });
+  const inviteText = renderOtpEmailText({
+    kind: "admin_invite",
+    code: "123456",
+    recipientEmail: "invitee@example.com",
+  });
+  const inviteSubject = otpEmailSubject("admin_invite");
+  assert.match(inviteSubject, /Set up your MAP eSIM Admin account/);
+  assert.match(inviteHtml, /Admin account setup code/);
+  assert.match(inviteHtml, /You have been invited to become a MAP eSIM administrator/);
+  assert.match(inviteHtml, /This code expires in 10 minutes/);
+  assert.match(
+    inviteHtml,
+    /If you were not expecting this administrator invitation/
+  );
+  assert.doesNotMatch(inviteHtml, /Password reset code/);
+  assert.doesNotMatch(inviteHtml, /requested a password reset/i);
+  assert.doesNotMatch(inviteText, /Password reset code/);
+  assert.match(inviteText, /Admin account setup code/);
+
+  const resetHtml = renderOtpEmailHtml({
+    kind: "password_reset",
+    code: "654321",
+    recipientEmail: "user@example.com",
+  });
+  const resetSubject = otpEmailSubject("password_reset");
+  assert.match(resetSubject, /password reset code/i);
+  assert.match(resetHtml, /Password reset code/);
+  assert.match(resetHtml, /reset your MAP eSIM password/);
+  assert.doesNotMatch(resetHtml, /Admin account setup code/);
+  assert.doesNotMatch(resetHtml, /invited to become a MAP eSIM administrator/);
+  console.log("PASS otp_template_admin_invite_vs_password_reset_render");
 
   // Success audits are created inside the same $transaction as the mutation.
   assert.match(service, /\$transaction\(async \(tx\) => \{/);

@@ -332,7 +332,8 @@ export async function inviteAdminUser(options: {
 
   if (issued.ok) {
     const sent = await sendOtpEmail({
-      kind: "password_reset",
+      // Same PASSWORD_RESET OTP mechanism; distinct invite email wording only.
+      kind: "admin_invite",
       to: email,
       code: issued.code,
     });

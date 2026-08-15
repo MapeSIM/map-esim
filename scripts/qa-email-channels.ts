@@ -130,6 +130,11 @@ function main() {
     code: "654321",
     recipientEmail: "qa@mapesim.com",
   });
+  const inviteHtml = renderOtpEmailHtml({
+    kind: "admin_invite",
+    code: "111222",
+    recipientEmail: "admin.invite@mapesim.com",
+  });
   assert.equal(otpHtml.includes("MAP eSIM"), true);
   assert.equal(otpHtml.includes("MAP-eSIM"), false);
   assert.equal(otpHtml.includes("Global eSIM Connectivity"), true);
@@ -140,7 +145,12 @@ function main() {
   assert.equal(otpHtml.includes("security@mapesim.com"), true);
   assert.equal(otpHtml.includes("billing@mapesim.com"), false);
   assert.equal(otpText.includes("https://mapesim.com"), true);
+  assert.equal(otpText.includes("Password reset code"), true);
   assert.equal(otpHtml.includes("SMTP_"), false);
+  assert.equal(inviteHtml.includes("Admin account setup code"), true);
+  assert.equal(inviteHtml.includes("Password reset code"), false);
+  assert.equal(inviteHtml.includes("MAP eSIM Security"), true);
+  assert.equal(inviteHtml.includes("security@mapesim.com"), true);
 
   const orderHtml = renderOrderEmailHtml(getSampleOrderEmailPayload());
   assert.equal(orderHtml.includes("MAP eSIM Orders"), true);
