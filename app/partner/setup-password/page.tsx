@@ -5,7 +5,6 @@ import { AuthFooterLinks, AuthForm } from "@/app/components/auth/AuthForm";
 import { completePartnerPasswordSetupAction } from "@/app/lib/partner/partnerInviteActions";
 import {
   PARTNER_INVITE_INVALID_MESSAGE,
-  exchangePartnerInviteToken,
   getPartnerInviteSetupUser,
 } from "@/app/lib/partner/partnerInvite";
 
@@ -29,31 +28,13 @@ export default async function PartnerSetupPasswordPage({
   searchParams: Promise<{ token?: string }>;
 }) {
   const params = await searchParams;
-  const rawToken = typeof params.token === "string" ? params.token : "";
+  const rawToken = typeof params.token === "string" ? params.token.trim() : "";
 
+  // Backward compat: never write cookies here — hand off to Route Handler.
   if (rawToken) {
-    const exchanged = await exchangePartnerInviteToken(rawToken);
-    if (!exchanged.ok) {
-      return (
-        <AuthCard
-          title="Partner password setup"
-          subtitle="Create a password to activate your MAP eSIM Partner account."
-        >
-          <div className="space-y-4">
-            <p
-              className="rounded-xl border border-[var(--warning-border)] bg-[var(--warning-bg)] px-3 py-2 text-sm text-[var(--warning-text)]"
-              role="alert"
-            >
-              {PARTNER_INVITE_INVALID_MESSAGE}
-            </p>
-            <AuthFooterLinks
-              links={[{ href: "/signin", label: "Back to sign in" }]}
-            />
-          </div>
-        </AuthCard>
-      );
-    }
-    redirect("/partner/setup-password");
+    redirect(
+      `/partner/setup-password/exchange?token=${encodeURIComponent(rawToken)}`
+    );
   }
 
   const setupUser = await getPartnerInviteSetupUser();

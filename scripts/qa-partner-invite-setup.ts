@@ -99,13 +99,34 @@ async function main() {
   assert.doesNotMatch(send, /console\.log\([^\)]*setupUrl/);
   console.log("PASS partner_invite_email_channel");
 
+  assert.match(
+    invite,
+    /new URL\(["']\/partner\/setup-password\/exchange["']/
+  );
+  console.log("PASS invite_url_targets_exchange_route");
+
+  const exchangeRoute = read(
+    "app/partner/setup-password/exchange/route.ts"
+  );
+  assert.match(exchangeRoute, /export async function GET/);
+  assert.match(exchangeRoute, /exchangePartnerInviteToken/);
+  assert.match(exchangeRoute, /["']\/partner\/setup-password["']/);
+  assert.match(exchangeRoute, /NextResponse\.redirect\(cleanSetup\)/);
+  assert.doesNotMatch(exchangeRoute, /console\.(?:log|info|warn|error)/);
+  console.log("PASS exchange_route_handler_cookie_capable");
+
   const setupPage = read("app/partner/setup-password/page.tsx");
-  assert.match(setupPage, /exchangePartnerInviteToken/);
-  assert.match(setupPage, /redirect\(["']\/partner\/setup-password["']\)/);
+  assert.doesNotMatch(setupPage, /exchangePartnerInviteToken/);
+  assert.doesNotMatch(setupPage, /cookies\(\)\.(?:set|delete)/);
+  assert.match(
+    setupPage,
+    /redirect\([\s\S]*\/partner\/setup-password\/exchange/
+  );
+  assert.match(setupPage, /getPartnerInviteSetupUser/);
   assert.match(setupPage, /robots:\s*\{[\s\S]*index:\s*false/);
   assert.match(setupPage, /no-referrer|referrer:\s*["']no-referrer["']/);
   assert.match(setupPage, /Create password|completePartnerPasswordSetupAction/);
-  console.log("PASS setup_page_exchange_and_noindex");
+  console.log("PASS setup_page_read_only_no_cookie_write");
 
   const actions = read("app/lib/partner/partnerInviteActions.ts");
   assert.match(actions, /^["']use server["']/m);
@@ -122,10 +143,15 @@ async function main() {
 
   const authConfig = read("auth.config.ts");
   assert.match(authConfig, /\/partner\/setup-password/);
+  assert.match(
+    authConfig,
+    /pathname\.startsWith\(["']\/partner\/setup-password\/["']\)/
+  );
   console.log("PASS auth_allows_public_setup_route");
 
   const robots = read("app/robots.ts");
   assert.match(robots, /\/partner\/setup-password/);
+  assert.match(robots, /\/partner\/setup-password\/exchange/);
   console.log("PASS robots_disallow_setup");
 
   // M: Forgot password unchanged

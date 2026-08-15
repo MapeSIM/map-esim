@@ -78,7 +78,10 @@ export const authConfig = {
         return true;
       }
 
-      if (pathname === "/partner/setup-password") {
+      if (
+        pathname === "/partner/setup-password" ||
+        pathname.startsWith("/partner/setup-password/")
+      ) {
         // Public one-time Partner invitation password setup (opaque token / setup cookie).
         return true;
       }

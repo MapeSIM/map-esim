@@ -38,7 +38,8 @@ export function buildPartnerInviteSetupUrl(rawToken: string): string {
     process.env.AUTH_URL?.trim() ||
     "http://localhost:3000";
   const origin = base.replace(/\/$/, "");
-  const url = new URL("/partner/setup-password", origin);
+  // Route Handler — cookie writes are illegal in Server Components.
+  const url = new URL("/partner/setup-password/exchange", origin);
   url.searchParams.set("token", rawToken);
   return url.toString();
 }
