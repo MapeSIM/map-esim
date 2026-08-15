@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 const partnerLinks: PartnerNavLink[] = [
   { href: "/partner", label: "Home", exact: true },
   { href: "/partner/wallet", label: "Wallet" },
-  { href: "#", label: "Catalog", disabled: true },
+  { href: "/partner/catalog", label: "Catalog" },
   { href: "#", label: "Orders", disabled: true },
 ];
 

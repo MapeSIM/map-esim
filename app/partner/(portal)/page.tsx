@@ -44,8 +44,8 @@ export default async function PartnerDashboardPage() {
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Partner dashboard</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Your prepaid balance and reseller discount. Catalog and order
-          purchases arrive in Phase 2.
+          Your prepaid balance and reseller discount. Browse the catalog to
+          purchase eSIMs with Partner balance.
         </p>
       </header>
 
@@ -102,7 +102,14 @@ export default async function PartnerDashboardPage() {
             </span>
           </dd>
           <p className="mt-2 text-xs text-[var(--text-soft)]">
-            Purchases not available yet in Phase 1.
+            Purchase from{" "}
+            <Link
+              href="/partner/catalog"
+              className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+            >
+              Catalog
+            </Link>
+            .
           </p>
         </div>
       </dl>
