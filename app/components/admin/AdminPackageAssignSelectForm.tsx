@@ -172,7 +172,8 @@ export default function AdminPackageAssignSelectForm({
                       {offer.dataLabel} · {offer.validityLabel}
                     </p>
                     <p className="mt-1 text-[var(--text-muted)]">
-                      {offer.destinationLabel} · Provider cost {offer.costLabel}
+                      {offer.destinationLabel} · Provider cost{" "}
+                      {offer.providerCostLabel}
                     </p>
                     <p className="mt-1 text-xs text-[var(--text-soft)] break-all">
                       Offer ID {offer.offerId}

@@ -226,7 +226,57 @@ function main() {
   assert.match(actions, /^"use server"/m);
   console.log("PASS automated_qa_no_real_provider_checkout");
 
-  console.log("ALL_QA_PASSED=30");
+  // Buy page UX polish — destination discovery + retail display
+  const assignmentRead = read("app/lib/esim/adminPackageAssignmentRead.ts");
+  assert.match(buyPage, /Where are you traveling\?/);
+  assert.match(buyPage, /max-w-5xl/);
+  assert.match(buyPage, /CUSTOMER_ACCOUNT_RESTRICTED_MESSAGE/);
+  assert.match(buyPage, /accountRestricted/);
+  assert.doesNotMatch(buyPage, /blockedReason/);
+  assert.match(selectForm, /filterPlansDiscoveryDestinations/);
+  assert.match(selectForm, /Popular Destinations/);
+  assert.match(selectForm, /All Destinations/);
+  assert.match(selectForm, /Search destinations/);
+  assert.match(selectForm, /aria-pressed=\{selected\}/);
+  assert.match(selectForm, /grid-cols-2/);
+  assert.match(selectForm, /lg:grid-cols-4/);
+  assert.match(selectForm, /Available plans/);
+  assert.match(selectForm, /No destinations found/);
+  assert.match(selectForm, /No plans are currently available for this destination/);
+  assert.match(selectForm, /loadCustomerWalletPurchaseOffersAction/);
+  assert.match(selectForm, /prepareWalletEsimPurchaseAction/);
+  assert.doesNotMatch(selectForm, /CountriesListing|\/api\/vesim\/destinations/);
+  assert.doesNotMatch(selectForm, /Plans from|minPrice/);
+  assert.match(selectForm, /accountRestricted/);
+  assert.match(
+    selectForm,
+    /Checkout is unavailable while your account is restricted/
+  );
+  // Continue control is omitted when restricted (not merely disabled).
+  assert.match(
+    selectForm,
+    /accountRestricted \? \([\s\S]*?Checkout is unavailable[\s\S]*?\) : \([\s\S]*?Continue to checkout/
+  );
+  // Retail display: selector costLabel from verified.priceUSD (not providerPriceUSD)
+  assert.match(
+    assignmentRead,
+    /costLabel:\s*`\$\{formatUsdCents\(Math\.round\(verified\.priceUSD \* 100\)\)\} USD`/
+  );
+  assert.match(assignmentRead, /providerCostLabel:/);
+  assert.match(
+    assignmentRead,
+    /providerCostLabel:\s*`\$\{formatUsdCents\(Math\.round\(verified\.providerPriceUSD \* 100\)\)\} USD`/
+  );
+  // Prepare/review uses the same verified retail field
+  assert.match(service, /priceCents = usdPriceToCents\(offer\.priceUSD\)/);
+  assert.doesNotMatch(selectForm, /providerCostLabel|providerPriceUSD/);
+  const adminAssignForm = read(
+    "app/components/admin/AdminPackageAssignSelectForm.tsx"
+  );
+  assert.match(adminAssignForm, /providerCostLabel/);
+  console.log("PASS buy_esim_ux_destination_search_retail_price");
+
+  console.log("ALL_QA_PASSED=31");
 }
 
 main();

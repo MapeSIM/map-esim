@@ -4,6 +4,10 @@ import { redirect } from "next/navigation";
 import WalletPurchaseSelectForm from "@/app/components/account/WalletPurchaseSelectForm";
 import { buildWalletBuyReturnPath } from "@/app/lib/auth/redirects";
 import { requireRole } from "@/app/lib/auth/session";
+import {
+  CUSTOMER_ACCOUNT_RESTRICTED_MESSAGE,
+  resolveCustomerAccountStatus,
+} from "@/app/lib/auth/customerAccountStatus";
 import { listAdminAssignmentDestinations } from "@/app/lib/esim/adminPackageAssignmentRead";
 import {
   prepareWalletEsimPurchase,
@@ -51,20 +55,31 @@ export default async function AccountWalletBuyPage({
   let hasWallet = false;
   let loadError = false;
   let directOfferError: string | null = null;
+  let accountRestricted = false;
 
   try {
-    const wallet = await prisma.walletAccount.findUnique({
-      where: { userId: user.id },
-      select: { balanceCents: true },
+    const account = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: {
+        deletedAt: true,
+        blockedAt: true,
+        walletAccount: { select: { balanceCents: true } },
+      },
     });
-    hasWallet = Boolean(wallet);
-    balanceLabel = formatUsdCents(wallet?.balanceCents ?? 0);
+    accountRestricted =
+      resolveCustomerAccountStatus({
+        deletedAt: account?.deletedAt ?? null,
+        blockedAt: account?.blockedAt ?? null,
+      }) === "BLOCKED";
+    hasWallet = Boolean(account?.walletAccount);
+    balanceLabel = formatUsdCents(account?.walletAccount?.balanceCents ?? 0);
     destinations = await listAdminAssignmentDestinations();
   } catch {
     loadError = true;
   }
 
   // Valid public Buy Now hint → prepare + skip package selector.
+  // Server-side financial guard remains authoritative (including BLOCKED).
   let directPurchaseId: string | null = null;
   if (!loadError && hasWallet && offerIdHint) {
     try {
@@ -134,7 +149,7 @@ export default async function AccountWalletBuyPage({
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-8">
+    <div className="mx-auto max-w-5xl space-y-8">
       <div>
         <Link
           href="/account/wallet"
@@ -142,11 +157,22 @@ export default async function AccountWalletBuyPage({
         >
           ← Back to wallet
         </Link>
-        <h1 className="mt-4 text-2xl font-bold tracking-tight">Buy eSIM</h1>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Choose a destination and package, then continue to checkout.
+        <h1 className="mt-4 text-2xl font-bold tracking-tight text-[var(--heading)] sm:text-3xl">
+          Buy eSIM
+        </h1>
+        <p className="mt-2 text-sm text-[var(--text-muted)] sm:text-[15px]">
+          Where are you traveling?
         </p>
       </div>
+
+      {accountRestricted ? (
+        <div
+          className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 py-3 text-sm font-medium text-[var(--heading)]"
+          role="status"
+        >
+          {CUSTOMER_ACCOUNT_RESTRICTED_MESSAGE}
+        </div>
+      ) : null}
 
       {directOfferError ? (
         <div
@@ -160,6 +186,7 @@ export default async function AccountWalletBuyPage({
       <WalletPurchaseSelectForm
         destinations={destinations}
         balanceLabel={balanceLabel}
+        accountRestricted={accountRestricted}
       />
     </div>
   );

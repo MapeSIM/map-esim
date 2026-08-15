@@ -14,6 +14,7 @@ import {
   sanitizeCountryHint,
   toVerifiedCheckoutOffer,
 } from "@/app/lib/vesim/server";
+import { destinationDisplayName } from "@/app/lib/vesim/destinationPresentation";
 import { formatUsdCents } from "@/app/lib/wallet/display";
 
 function formatDateTime(date: Date): string {
@@ -67,6 +68,10 @@ export type AdminDestinationOption = {
   code: string;
   name: string;
   kind: string;
+  flag?: string;
+  isPopular?: boolean;
+  slug?: string;
+  searchAliases?: string[];
 };
 
 export type AdminOfferOption = {
@@ -74,7 +79,10 @@ export type AdminOfferOption = {
   name: string;
   dataLabel: string;
   validityLabel: string;
+  /** Customer-facing MAP retail (matches prepare/review). Never provider cost. */
   costLabel: string;
+  /** Admin assignment display only — supplier/provider cost. */
+  providerCostLabel: string;
   destinationLabel: string;
 };
 
@@ -88,8 +96,12 @@ export async function listAdminAssignmentDestinations(): Promise<
       .slice(0, 400)
       .map((d) => ({
         code: d.code,
-        name: d.name,
+        name: destinationDisplayName(d),
         kind: d.kind,
+        flag: d.flag,
+        isPopular: d.isPopular === true,
+        slug: d.slug,
+        searchAliases: d.searchAliases,
       }));
   } catch {
     return [];
@@ -116,7 +128,9 @@ export async function listAdminAssignmentOffers(
           verified.durationDays != null
             ? `${verified.durationDays} Days`
             : "Not available",
-        costLabel: `${formatUsdCents(Math.round(verified.providerPriceUSD * 100))} USD`,
+        // Retail from verified.priceUSD — same source as prepare/review snapshot.
+        costLabel: `${formatUsdCents(Math.round(verified.priceUSD * 100))} USD`,
+        providerCostLabel: `${formatUsdCents(Math.round(verified.providerPriceUSD * 100))} USD`,
         destinationLabel:
           verified.countryName || verified.countryCode || code,
       });
