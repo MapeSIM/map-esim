@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PartnerDiscountPanel } from "@/app/components/admin/PartnerDiscountPanel";
+import { PartnerInviteResendPanel } from "@/app/components/admin/PartnerInviteResendPanel";
 import { PartnerStatusPanel } from "@/app/components/admin/PartnerStatusPanel";
 import { PartnerWalletPanel } from "@/app/components/admin/PartnerWalletPanel";
 import { getPartnerDetail } from "@/app/lib/partner/partners";
@@ -104,6 +105,10 @@ export default async function AdminPartnerDetailPage({
         discountVersion={detail.discountVersion}
         disabled={discountDisabled}
       />
+
+      {detail.statusLabel === "Invited" ? (
+        <PartnerInviteResendPanel partnerId={detail.id} />
+      ) : null}
 
       {detail.statusLabel === "Active" || detail.statusLabel === "Invited" ? (
         <PartnerStatusPanel

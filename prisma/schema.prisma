@@ -212,6 +212,8 @@ model User {
   sessions                     Session[]
   orders                       Order[]
   passwordResetTokens          PasswordResetToken[]
+  partnerInviteTokens          PartnerInviteToken[]
+  partnerInviteSetupTokens     PartnerInviteSetupToken[]
   emailOtps                    EmailOtp[]
   auditLogs                    AuditLog[]               @relation("AuditActor")
   blockedByAdmin               User?                    @relation("UserBlockedByAdmin", fields: [blockedByAdminId], references: [id], onDelete: SetNull)
@@ -352,6 +354,38 @@ model PasswordResetToken {
 
   @@index([userId])
   @@index([tokenHash])
+}
+
+/// Opaque Partner invitation token (email link). Store hash only; never log raw token.
+model PartnerInviteToken {
+  id         String                    @id @default(cuid())
+  userId     String
+  tokenHash  String                    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime                  @default(now())
+  user       User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  setupTokens PartnerInviteSetupToken[]
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Short-lived setup-session cookie after invite URL exchange (keeps raw invite token out of the URL).
+model PartnerInviteSetupToken {
+  id         String             @id @default(cuid())
+  userId     String
+  inviteId   String
+  tokenHash  String             @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime           @default(now())
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invite     PartnerInviteToken @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([inviteId])
+  @@index([expiresAt])
 }
 
 model Order {

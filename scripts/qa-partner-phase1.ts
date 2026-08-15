@@ -103,8 +103,10 @@ async function main() {
   assert.match(partners, /partner\.reactivated/);
   assert.match(partners, /partner\.management_action_blocked/);
   assert.match(partners, /Role\.PARTNER/);
-  assert.match(partners, /kind:\s*["']partner_invite["']/);
-  assert.match(partners, /OtpPurpose\.PASSWORD_RESET/);
+  assert.match(partners, /mintPartnerInviteToken|sendPartnerInviteEmail/);
+  assert.match(partners, /opaque_setup_link/);
+  assert.doesNotMatch(partners, /kind:\s*["']partner_invite["']/);
+  assert.doesNotMatch(partners, /OtpPurpose\.PASSWORD_RESET/);
   assert.match(partners, /session\.deleteMany/);
   assert.match(partners, /credentialsChangedAt/);
   assert.match(partners, /discountVersion:\s*\{\s*increment:\s*1\s*\}/);
@@ -326,18 +328,21 @@ async function main() {
   assert.match(adminDetail, /PartnerDiscountPanel/);
   assert.match(adminDetail, /PartnerWalletPanel/);
   assert.match(adminDetail, /PartnerStatusPanel/);
+  assert.match(adminDetail, /PartnerInviteResendPanel/);
   console.log("PASS admin_partners_ui");
 
-  const partnerLayout = read("app/partner/layout.tsx");
-  const partnerHome = read("app/partner/page.tsx");
+  const partnerLayout = read("app/partner/(portal)/layout.tsx");
+  const partnerHome = read("app/partner/(portal)/page.tsx");
   assert.match(partnerLayout, /requireRole\(["']PARTNER["']\)/);
   assert.match(partnerHome, /Available Balance|balance|Total Added|discount/i);
   assert.doesNotMatch(partnerHome, /confirmWalletEsimPurchase|prepareWalletEsimPurchase/);
   console.log("PASS partner_portal_shell");
 
+  const inviteEmail = read("app/lib/email/partnerInviteTemplate.ts");
+  assert.match(inviteEmail, /Set up my password/);
+  assert.match(inviteEmail, /expires in 30 minutes/);
   const otp = read("app/lib/email/otpTemplate.ts");
-  assert.match(otp, /partner_invite/);
-  assert.match(otp, /Partner account setup code/);
+  assert.match(otp, /admin_invite/);
   assert.match(otp, /Password reset code/);
   console.log("PASS partner_invite_email_kind");
 

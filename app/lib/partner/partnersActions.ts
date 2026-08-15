@@ -8,6 +8,7 @@ import {
   createPartner,
   disablePartner,
   reactivatePartner,
+  resendPartnerInvitation,
 } from "@/app/lib/partner/partners";
 import type {
   PartnerWalletActionState,
@@ -102,6 +103,22 @@ export async function reactivatePartnerAction(
     partnerId,
     expectedVersion: formData.get("expectedVersion"),
     reason: formData.get("reason"),
+  });
+  if (result.ok && partnerId) {
+    revalidatePartnerPaths(partnerId);
+  }
+  return result;
+}
+
+export async function resendPartnerInvitationAction(
+  _prev: PartnersFormState,
+  formData: FormData
+): Promise<PartnersFormState> {
+  const admin = await requireRole("ADMIN");
+  const partnerId = String(formData.get("partnerId") ?? "").trim();
+  const result = await resendPartnerInvitation({
+    adminUserId: admin.id,
+    partnerId,
   });
   if (result.ok && partnerId) {
     revalidatePartnerPaths(partnerId);

@@ -4,7 +4,6 @@
 import "server-only";
 
 import {
-  OtpPurpose,
   PartnerWalletTransactionType,
   Prisma,
   Role,
@@ -14,21 +13,27 @@ import { prisma } from "@/app/lib/db";
 import { writeAuditLog } from "@/app/lib/auth/audit";
 import { findActiveAdminActor } from "@/app/lib/auth/adminAccess";
 import { isValidEmailFormat, normalizeEmail } from "@/app/lib/auth/email";
-import { issueEmailOtp } from "@/app/lib/auth/otp";
-import { sendOtpEmail } from "@/app/lib/email/sendOtpEmail";
+import { sendPartnerInviteEmail } from "@/app/lib/email/sendPartnerInviteEmail";
 import { assertSameOriginAdminRequest } from "@/app/lib/admin/reconciliationCaseManagement";
 import { maskAdminEmail } from "@/app/lib/admin/display";
 import {
   formatDiscountBpsAsPercent,
   parseDiscountPercentToBps,
 } from "@/app/lib/partner/discount";
+import {
+  buildPartnerInviteSetupUrl,
+  mintPartnerInviteToken,
+} from "@/app/lib/partner/partnerInvite";
 import { formatUsdCents, formatWalletDateTime } from "@/app/lib/wallet/display";
 
 export const PARTNER_CREATED_AUDIT = "partner.created";
 export const PARTNER_DISCOUNT_CHANGED_AUDIT = "partner.discount_changed";
 export const PARTNER_DISABLED_AUDIT = "partner.disabled";
 export const PARTNER_REACTIVATED_AUDIT = "partner.reactivated";
+export const PARTNER_INVITATION_RESENT_AUDIT = "partner.invitation_resent";
 export const PARTNER_MANAGEMENT_BLOCKED_AUDIT = "partner.management_action_blocked";
+export const PARTNER_PASSWORD_SETUP_COMPLETED_AUDIT =
+  "partner.password_setup_completed";
 
 const PARTNERS_PAGE_SIZE = 20;
 const NAME_MIN = 1;
@@ -565,7 +570,7 @@ export async function createPartner(options: {
           metadata: {
             partnerUserId: user.id,
             discountBps: discountParsed.discountBps,
-            inviteMethod: "password_reset_otp",
+            inviteMethod: "opaque_setup_link",
           },
         },
       });
@@ -590,29 +595,27 @@ export async function createPartner(options: {
   let inviteEmailDelivered = false;
   const user = await prisma.user.findFirst({
     where: { partnerProfile: { id: createdPartnerId } },
-    select: { id: true },
+    select: { id: true, email: true },
   });
 
   if (user) {
-    const issued = await issueEmailOtp({
-      userId: user.id,
-      purpose: OtpPurpose.PASSWORD_RESET,
-      force: true,
-    });
-
-    if (issued.ok) {
-      const sent = await sendOtpEmail({
-        kind: "partner_invite",
-        to: email,
-        code: issued.code,
+    try {
+      const minted = await mintPartnerInviteToken(user.id);
+      const setupUrl = buildPartnerInviteSetupUrl(minted.rawToken);
+      const sent = await sendPartnerInviteEmail({
+        to: user.email,
+        setupUrl,
       });
       if (sent.ok) {
         inviteEmailDelivered = true;
       } else {
-        console.error("Partner invite OTP email failed:", sent.reason);
+        console.error("Partner invite email failed:", sent.reason);
       }
-    } else {
-      console.error("Partner invite OTP issue failed:", issued.reason);
+    } catch (err) {
+      console.error(
+        "Partner invite mint/send failed:",
+        err instanceof Error ? err.name : "unknown"
+      );
     }
   }
 
@@ -620,8 +623,118 @@ export async function createPartner(options: {
     ok: true,
     partnerId: createdPartnerId,
     message: inviteEmailDelivered
-      ? "Partner invited. They will receive a password setup code by email."
-      : "Partner account created, but the invitation email could not be sent. Ask them to use Forgot Password with this email to set their own password.",
+      ? "Partner invited. They will receive a password setup link by email."
+      : "Partner account created, but the invitation email could not be sent. Use Resend setup link on the Partner detail page, or ask them to use Forgot Password after a link is delivered.",
+  };
+}
+
+/**
+ * Resend Partner setup link when passwordHash is still null (Invited).
+ * Supersedes prior unused invite tokens. Never returns/logs the raw token.
+ */
+export async function resendPartnerInvitation(options: {
+  adminUserId: string;
+  partnerId: string;
+}): Promise<PartnersMutationResult> {
+  const sameOrigin = await assertSameOriginAdminRequest();
+  if (!sameOrigin) {
+    await auditBlocked({
+      actorUserId: options.adminUserId,
+      targetId: options.partnerId,
+      failureCode: "same_origin",
+    });
+    return { ok: false, error: "Request could not be verified. Please try again." };
+  }
+
+  const actor = await findActiveAdminActor(options.adminUserId);
+  if (!actor) {
+    return { ok: false, error: "Not authorized." };
+  }
+
+  const partnerId = (options.partnerId ?? "").trim();
+  if (!partnerId || partnerId.length > 64) {
+    return { ok: false, error: "Partner is unavailable." };
+  }
+
+  const partner = await prisma.partnerProfile.findUnique({
+    where: { id: partnerId },
+    select: {
+      id: true,
+      disabledAt: true,
+      user: {
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          passwordHash: true,
+          deletedAt: true,
+        },
+      },
+    },
+  });
+
+  if (!partner || partner.user.role !== Role.PARTNER) {
+    return { ok: false, error: "Partner is unavailable." };
+  }
+  if (partner.user.deletedAt) {
+    return { ok: false, error: "Deleted partners cannot receive invitations." };
+  }
+  if (partner.disabledAt) {
+    return {
+      ok: false,
+      error: "Reactivate the Partner before resending a setup link.",
+    };
+  }
+  if (partner.user.passwordHash) {
+    return {
+      ok: false,
+      error:
+        "This Partner already has a password. Use Forgot Password for recovery.",
+    };
+  }
+
+  let inviteEmailDelivered = false;
+  try {
+    const minted = await mintPartnerInviteToken(partner.user.id);
+    const setupUrl = buildPartnerInviteSetupUrl(minted.rawToken);
+    const sent = await sendPartnerInviteEmail({
+      to: partner.user.email,
+      setupUrl,
+    });
+    inviteEmailDelivered = sent.ok;
+    if (!sent.ok) {
+      console.error("Partner invite resend email failed:", sent.reason);
+    }
+  } catch (err) {
+    console.error(
+      "Partner invite resend failed:",
+      err instanceof Error ? err.name : "unknown"
+    );
+  }
+
+  await writeAuditLog({
+    actorUserId: actor.id,
+    action: PARTNER_INVITATION_RESENT_AUDIT,
+    targetType: "PartnerProfile",
+    targetId: partner.id,
+    metadata: {
+      partnerUserId: partner.user.id,
+      emailDelivered: inviteEmailDelivered,
+    },
+  });
+
+  if (!inviteEmailDelivered) {
+    return {
+      ok: false,
+      error:
+        "Could not send the setup link email. The previous unused links were superseded; try again shortly.",
+    };
+  }
+
+  return {
+    ok: true,
+    partnerId: partner.id,
+    message: "Setup link resent. It expires in 30 minutes.",
   };
 }
 

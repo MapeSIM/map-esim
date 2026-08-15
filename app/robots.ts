@@ -22,6 +22,8 @@ export default function robots(): MetadataRoute.Robots {
         "/oauth-consent",
         "/dashboard",
         "/esim",
+        "/partner",
+        "/partner/setup-password",
       ],
     },
     sitemap: `${BRAND_SITE_URL}/sitemap.xml`,

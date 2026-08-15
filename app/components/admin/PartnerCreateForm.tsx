@@ -43,8 +43,8 @@ export function PartnerCreateForm() {
           Create Partner
         </h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Creates a dedicated PARTNER account and emails a password setup code.
-          Existing emails in any role cannot be reused.
+          Creates a dedicated PARTNER account and emails a secure password setup
+          link. Existing emails in any role cannot be reused.
         </p>
       </div>
 
