@@ -272,6 +272,7 @@ model PartnerProfile {
   user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   walletAccount   PartnerWalletAccount?
   esimPurchases   PartnerEsimPurchase[]
+  esimShareTokens PartnerEsimShareToken[]
 
   @@index([disabledAt])
   @@index([createdAt])
@@ -455,6 +456,7 @@ model Order {
   adminPackageAssignment           AdminPackageAssignment?
   walletEsimPurchase               WalletEsimPurchase?
   partnerEsimPurchase              PartnerEsimPurchase?
+  partnerEsimShareTokens           PartnerEsimShareToken[]
   refundRequests                   RefundRequest[]
 
   @@index([customerEmail])
@@ -726,6 +728,23 @@ model PartnerEsimPurchase {
   @@index([providerRefreshClaimedAt])
   @@index([providerRefreshResult])
   @@index([reconRequiredEmailNotificationStatus])
+}
+
+/// Opaque Partner eSIM share token. Store SHA-256 hash only; never persist or log the raw token.
+model PartnerEsimShareToken {
+  id         String         @id @default(cuid())
+  partnerId  String
+  orderId    String
+  tokenHash  String         @unique
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  revokedAt  DateTime?
+  partner    PartnerProfile @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  order      Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+  @@index([orderId])
+  @@index([revokedAt])
 }
 
 /// Gateway remainder payment attempt for a WalletEsimPurchase (not WalletTopup).
