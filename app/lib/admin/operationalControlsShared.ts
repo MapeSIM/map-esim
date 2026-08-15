@@ -99,7 +99,7 @@ export const CONTROL_DISPLAY = {
   PARTNER_WALLET_PURCHASES: {
     name: "Partner wallet purchases",
     scope:
-      "Pauses new Partner prepaid-wallet eSIM purchases. Enforcement is wired in Partner Phase 2 purchase slices.",
+      "Pauses new Partner prepaid-wallet eSIM purchases (prepare/reserve).",
   },
   ALERT_NOTIFICATIONS: {
     name: "Alert notification emails",
@@ -115,7 +115,8 @@ export type TransactionFlow =
   | "customer_wallet_purchase"
   | "admin_wallet_purchase"
   | "company_assignment"
-  | "provider_order";
+  | "provider_order"
+  | "partner_wallet_purchase";
 
 export function isOperationalControlKey(
   raw: string | null | undefined
@@ -192,6 +193,8 @@ export function requiredControlsForFlow(
     keys.push("COMPANY_ASSIGNMENTS");
   } else if (flow === "provider_order") {
     keys.push("PROVIDER_ORDER_CREATION");
+  } else if (flow === "partner_wallet_purchase") {
+    keys.push("PARTNER_WALLET_PURCHASES");
   }
   if (
     options?.includeProviderOrder &&
