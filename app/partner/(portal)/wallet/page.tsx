@@ -43,8 +43,8 @@ export default async function PartnerWalletPage() {
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Wallet</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Read-only ledger of admin credits and debits. Purchases will appear
-          here in Phase 2.
+          Read-only ledger of Partner wallet activity, including admin
+          adjustments and eSIM purchase debits and refunds.
         </p>
       </header>
 
