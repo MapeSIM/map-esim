@@ -9,6 +9,7 @@ export const OPERATIONAL_CONTROL_KEYS = [
   "ADMIN_WALLET_PURCHASES",
   "COMPANY_ASSIGNMENTS",
   "PROVIDER_ORDER_CREATION",
+  "PARTNER_WALLET_PURCHASES",
   "ALERT_NOTIFICATIONS",
 ] as const;
 
@@ -22,6 +23,7 @@ export const TRANSACTION_OPERATIONAL_CONTROL_KEYS = [
   "ADMIN_WALLET_PURCHASES",
   "COMPANY_ASSIGNMENTS",
   "PROVIDER_ORDER_CREATION",
+  "PARTNER_WALLET_PURCHASES",
 ] as const satisfies readonly OperationalControlKeyName[];
 
 export const OPERATIONAL_CONTROL_REASON_MIN = 5;
@@ -58,6 +60,10 @@ export const CONTROL_CONFIRM_PHRASES = {
     pause: "PAUSE PROVIDER ORDERS",
     resume: "RESUME PROVIDER ORDERS",
   },
+  PARTNER_WALLET_PURCHASES: {
+    pause: "PAUSE PARTNER PURCHASES",
+    resume: "RESUME PARTNER PURCHASES",
+  },
   ALERT_NOTIFICATIONS: {
     pause: "PAUSE ALERT NOTIFICATIONS",
     resume: "RESUME ALERT NOTIFICATIONS",
@@ -89,6 +95,11 @@ export const CONTROL_DISPLAY = {
     name: "Provider order creation",
     scope:
       "Pauses initiating new VeSIM/provider-backed orders on supported purchase paths. Never enables order creation when environment or other gates block it.",
+  },
+  PARTNER_WALLET_PURCHASES: {
+    name: "Partner wallet purchases",
+    scope:
+      "Pauses new Partner prepaid-wallet eSIM purchases. Enforcement is wired in Partner Phase 2 purchase slices.",
   },
   ALERT_NOTIFICATIONS: {
     name: "Alert notification emails",

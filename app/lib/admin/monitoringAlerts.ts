@@ -77,6 +77,7 @@ type MonitoringAlertCodeFromControl =
   | "CONTROL_ADMIN_PURCHASES_PAUSED"
   | "CONTROL_COMPANY_ASSIGNMENTS_PAUSED"
   | "CONTROL_PROVIDER_ORDERS_PAUSED"
+  | "CONTROL_PARTNER_PURCHASES_PAUSED"
   | "CONTROL_ALERT_NOTIFICATIONS_PAUSED";
 
 export type MonitoringAlertsDashboard = {
@@ -454,6 +455,10 @@ function buildConfigAlerts(input: {
         PROVIDER_ORDER_CREATION: {
           code: "CONTROL_PROVIDER_ORDERS_PAUSED",
           title: "Provider order creation paused",
+        },
+        PARTNER_WALLET_PURCHASES: {
+          code: "CONTROL_PARTNER_PURCHASES_PAUSED",
+          title: "Partner purchases paused",
         },
         // Dashboard-visible WARNING only — never email-eligible.
         ALERT_NOTIFICATIONS: {

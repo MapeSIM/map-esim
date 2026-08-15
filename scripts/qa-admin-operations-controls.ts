@@ -67,6 +67,7 @@ function main() {
     "ADMIN_WALLET_PURCHASES",
     "COMPANY_ASSIGNMENTS",
     "PROVIDER_ORDER_CREATION",
+    "PARTNER_WALLET_PURCHASES",
     "ALERT_NOTIFICATIONS",
   ]);
   assert.equal(

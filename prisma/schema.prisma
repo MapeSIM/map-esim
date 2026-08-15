@@ -16,6 +16,10 @@ enum Role {
 enum PartnerWalletTransactionType {
   ADMIN_CREDIT
   ADMIN_DEBIT
+  /// Automated Partner eSIM purchase debit (never reuse ADMIN_DEBIT).
+  ESIM_PURCHASE_DEBIT
+  /// Automated confirmed-failure / restore refund of a Partner eSIM purchase debit.
+  ESIM_PURCHASE_REFUND
 }
 
 enum OrderClaimStatus {
@@ -35,6 +39,8 @@ enum OrderFundingSource {
   /// Customer package funded by wallet contribution + gateway remainder.
   CUSTOMER_SPLIT
   DIRECT_PAYMENT
+  /// Partner prepaid wallet (PartnerWalletAccount) — never Customer WalletAccount.
+  PARTNER_BALANCE
 }
 
 enum AdminPackageAssignmentStatus {
@@ -54,6 +60,18 @@ enum WalletEsimPurchaseStatus {
   FUNDS_RESERVED
   /// Funding fully secured (wallet reserved + gateway confirmed when required).
   FUNDED
+  PROVIDER_PENDING
+  COMPLETED
+  FAILED_REFUNDED
+  RECONCILIATION_REQUIRED
+}
+
+/// Durable Partner wallet-funded eSIM purchase attempt (provider write outside Prisma tx).
+/// Mirrors WalletEsimPurchase terminology for equivalent states; no gateway split path.
+enum PartnerEsimPurchaseStatus {
+  DRAFT
+  READY
+  FUNDS_RESERVED
   PROVIDER_PENDING
   COMPLETED
   FAILED_REFUNDED
@@ -154,6 +172,8 @@ enum OperationalControlKey {
   ADMIN_WALLET_PURCHASES
   COMPANY_ASSIGNMENTS
   PROVIDER_ORDER_CREATION
+  /// Pauses new Partner wallet-funded eSIM purchases (enforcement in later Phase 2 slices).
+  PARTNER_WALLET_PURCHASES
   /// Pauses alert-notification email delivery only. Aggregation/dashboard stay live.
   ALERT_NOTIFICATIONS
 }
@@ -251,6 +271,7 @@ model PartnerProfile {
   updatedAt       DateTime             @updatedAt
   user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   walletAccount   PartnerWalletAccount?
+  esimPurchases   PartnerEsimPurchase[]
 
   @@index([disabledAt])
   @@index([createdAt])
@@ -287,6 +308,8 @@ model PartnerWalletTransaction {
   createdAt              DateTime                      @default(now())
   wallet                 PartnerWalletAccount          @relation(fields: [partnerWalletAccountId], references: [id], onDelete: Cascade)
   createdByAdmin         User?                         @relation("PartnerWalletTxCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: SetNull)
+  purchaseAsDebit        PartnerEsimPurchase?          @relation("PartnerPurchaseDebitTx")
+  purchaseAsRefund       PartnerEsimPurchase?          @relation("PartnerPurchaseRefundTx")
 
   @@index([partnerWalletAccountId, createdAt])
   @@index([createdByAdminId])
@@ -431,6 +454,7 @@ model Order {
   user                             User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
   adminPackageAssignment           AdminPackageAssignment?
   walletEsimPurchase               WalletEsimPurchase?
+  partnerEsimPurchase              PartnerEsimPurchase?
   refundRequests                   RefundRequest[]
 
   @@index([customerEmail])
@@ -604,6 +628,95 @@ model WalletEsimPurchase {
   @@index([status])
   @@index([createdAt])
   @@index([customerUserId, createdAt])
+  @@index([providerOrderId])
+  @@index([providerResultKind])
+  @@index([status, updatedAt])
+  @@index([reconciliationResolvedAt])
+  @@index([reconciliationLockedAt])
+  @@index([reconciliationEscalatedAt])
+  @@index([providerRefreshClaimedAt])
+  @@index([providerRefreshResult])
+  @@index([reconRequiredEmailNotificationStatus])
+}
+
+/// Durable PARTNER wallet-funded eSIM purchase attempt (provider write outside Prisma tx).
+/// Completely separate from WalletEsimPurchase / Customer WalletAccount.
+model PartnerEsimPurchase {
+  id                               String                    @id @default(cuid())
+  partnerId                        String
+  offerId                          String
+  destinationCode                  String?
+  destinationName                  String?
+  planName                         String?
+  dataAllowance                    String?
+  validity                         String?
+  /// MAP retail catalog price snapshot (integer USD cents) — what Partner sees.
+  retailPriceCents                 Int
+  /// Partner discount snapshot in basis points at reserve/confirm time.
+  discountBps                      Int
+  /// PartnerProfile.discountVersion snapshot at reserve/confirm time.
+  discountVersion                  Int
+  /// Actual Partner wallet debit snapshot (integer USD cents). Refunds must reuse this.
+  partnerChargeCents               Int
+  /// Provider cost snapshot (integer USD cents) for floor checks / admin visibility.
+  providerCostCents                Int
+  currency                         String                    @default("USD")
+  fundingSource                    OrderFundingSource        @default(PARTNER_BALANCE)
+  status                           PartnerEsimPurchaseStatus @default(DRAFT)
+  idempotencyKey                   String                    @unique
+  debitTransactionId               String?                   @unique
+  refundTransactionId              String?                   @unique
+  orderId                          String?                   @unique
+  /// Stored only when required for reconciliation; never shown as a public secret.
+  providerOrderId                  String?
+  /// Safe provider outcome snapshot: success | declined | uncertain | none
+  providerResultKind               String?
+  providerObservedAt               DateTime?
+  /// Non-secret provider status token (e.g. http_500). Never raw payload.
+  safeProviderStatusCode           String?
+  reconciliationResolvedAt         DateTime?
+  reconciliationResolvedByAdminId  String?
+  reconciliationResolutionReason   String?
+  reconciliationResolutionCode     String?
+  reconciliationLockedAt           DateTime?
+  reconciliationLockedByAdminId    String?
+  reconciliationLockReason         String?
+  reconciliationEscalatedAt        DateTime?
+  reconciliationEscalatedByAdminId String?
+  reconciliationEscalationReason   String?
+  reconciliationEscalationPriority String?
+  /// Durable provider-status refresh claim (single-flight). Null when idle.
+  providerRefreshClaimedAt         DateTime?
+  providerRefreshCompletedAt       DateTime?
+  providerRefreshByAdminId         String?
+  /// Sanitized lookup result: FOUND | NOT_FOUND | UNKNOWN | TIMEOUT | …
+  providerRefreshResult            String?
+  providerRefreshSafeCode          String?
+  /// yes | no | unknown
+  providerRefreshOrderExists       String?
+  providerRefreshOfferMatch        String?
+  providerRefreshInstallData       String?
+  /// Short non-secret provider state token only.
+  providerRefreshSafeState         String?
+  failureCategory                  String?
+  failureCode                      String?
+  reconciliationState              String?
+  emailDeliveryStatus              String?
+  /// Durable once-only Partner "order under review" email (RECONCILIATION_REQUIRED).
+  reconRequiredEmailNotificationStatus String?
+  reconRequiredEmailNotifiedAt     DateTime?
+  createdAt                        DateTime                  @default(now())
+  updatedAt                        DateTime                  @updatedAt
+  completedAt                      DateTime?
+  partner                          PartnerProfile            @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  order                            Order?                    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  debitTransaction                 PartnerWalletTransaction? @relation("PartnerPurchaseDebitTx", fields: [debitTransactionId], references: [id], onDelete: SetNull)
+  refundTransaction                PartnerWalletTransaction? @relation("PartnerPurchaseRefundTx", fields: [refundTransactionId], references: [id], onDelete: SetNull)
+
+  @@index([partnerId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([partnerId, createdAt])
   @@index([providerOrderId])
   @@index([providerResultKind])
   @@index([status, updatedAt])

@@ -83,7 +83,20 @@ async function main() {
   assert.match(schema, /enum PartnerWalletTransactionType/);
   assert.match(schema, /ADMIN_CREDIT/);
   assert.match(schema, /ADMIN_DEBIT/);
-  assert.doesNotMatch(schema, /model PartnerEsimPurchase/);
+  assert.match(schema, /ESIM_PURCHASE_DEBIT/);
+  assert.match(schema, /ESIM_PURCHASE_REFUND/);
+  assert.match(schema, /PARTNER_BALANCE/);
+  assert.match(schema, /enum PartnerEsimPurchaseStatus/);
+  assert.match(schema, /model PartnerEsimPurchase/);
+  assert.match(schema, /retailPriceCents/);
+  assert.match(schema, /partnerChargeCents/);
+  assert.match(schema, /PARTNER_WALLET_PURCHASES/);
+  const pepIdx = schema.indexOf("model PartnerEsimPurchase");
+  assert.ok(pepIdx >= 0);
+  const pepBody = schema.slice(pepIdx, pepIdx + 4000);
+  assert.doesNotMatch(pepBody, /customerUserId/);
+  assert.doesNotMatch(pepBody, /\bWalletAccount\b/);
+  assert.doesNotMatch(pepBody, /WalletEsimPurchase/);
   console.log("PASS schema_partner_phase1");
 
   const migration = read(
