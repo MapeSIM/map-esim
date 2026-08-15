@@ -64,9 +64,9 @@ export async function revealIccidForAdmin(
 
   const admin = await prisma.user.findUnique({
     where: { id: adminId },
-    select: { id: true, role: true, deletedAt: true },
+    select: { id: true, role: true, deletedAt: true, adminDisabledAt: true },
   });
-  if (!admin || admin.deletedAt || admin.role !== Role.ADMIN) {
+  if (!admin || admin.deletedAt || admin.role !== Role.ADMIN || admin.adminDisabledAt) {
     return { ok: false, code: "FORBIDDEN" };
   }
 
@@ -111,7 +111,7 @@ export async function revealIccidForCustomer(
 
   const customer = await prisma.user.findUnique({
     where: { id: customerId },
-    select: { id: true, role: true, deletedAt: true },
+    select: { id: true, role: true, deletedAt: true, adminDisabledAt: true },
   });
   if (!customer || customer.deletedAt || customer.role !== Role.CUSTOMER) {
     return { ok: false, code: "NOT_FOUND" };

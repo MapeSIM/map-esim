@@ -7,6 +7,7 @@ import "server-only";
 import { Role } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
 import { writeAuditLog } from "@/app/lib/auth/audit";
+import { findActiveAdminActor } from "@/app/lib/auth/adminAccess";
 import { resolveCustomerAccountStatus } from "@/app/lib/auth/customerAccountStatus";
 import { assertSameOriginAdminRequest } from "@/app/lib/admin/reconciliationCaseManagement";
 
@@ -76,14 +77,7 @@ function parseExpectedVersion(
 }
 
 async function requireActiveAdminActor(adminUserId: string) {
-  const admin = await prisma.user.findUnique({
-    where: { id: adminUserId },
-    select: { id: true, role: true, deletedAt: true },
-  });
-  if (!admin || admin.deletedAt || admin.role !== Role.ADMIN) {
-    return null;
-  }
-  return admin;
+  return findActiveAdminActor(adminUserId);
 }
 
 /**

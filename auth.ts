@@ -73,6 +73,8 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         if (!user?.passwordHash) return null;
         if (user.deletedAt) return null;
         if (!user.emailVerifiedAt) return null;
+        // Disabled admins must not sign in.
+        if (user.role === "ADMIN" && user.adminDisabledAt) return null;
 
         const passwordHash = user.passwordHash;
         const valid = await verifyPassword(parsed.data.password, passwordHash);
@@ -262,6 +264,11 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       }
 
       if (!dbUser?.emailVerifiedAt || dbUser.deletedAt) {
+        return invalidate();
+      }
+
+      // Disabled ADMIN: deny immediately (do not rely on middleware JWT alone).
+      if (dbUser.role === "ADMIN" && dbUser.adminDisabledAt) {
         return invalidate();
       }
 

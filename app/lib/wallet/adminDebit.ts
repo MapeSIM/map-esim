@@ -206,15 +206,15 @@ export async function debitCustomerWalletByAdmin(
 
       const admin = await tx.user.findUnique({
         where: { id: adminUserId },
-        select: { id: true, role: true, deletedAt: true },
+        select: { id: true, role: true, deletedAt: true, adminDisabledAt: true },
       });
-      if (!admin || admin.deletedAt || admin.role !== Role.ADMIN) {
+      if (!admin || admin.deletedAt || admin.role !== Role.ADMIN || admin.adminDisabledAt) {
         throw new AdminWalletDebitError("FORBIDDEN", "Not authorized.");
       }
 
       const customer = await tx.user.findUnique({
         where: { id: customerUserId },
-        select: { id: true, role: true, deletedAt: true },
+        select: { id: true, role: true, deletedAt: true, adminDisabledAt: true },
       });
       if (
         !customer ||

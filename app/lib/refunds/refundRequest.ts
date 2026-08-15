@@ -117,7 +117,7 @@ export async function createCustomerRefundRequest(
   try {
     customer = await prisma.user.findUnique({
       where: { id: customerUserId },
-      select: { id: true, role: true, deletedAt: true },
+      select: { id: true, role: true, deletedAt: true, adminDisabledAt: true },
     });
   } catch {
     throw new RefundRequestError(
@@ -383,9 +383,9 @@ export async function applyAdminRefundRequestDecision(options: {
 
   const admin = await prisma.user.findUnique({
     where: { id: adminUserId },
-    select: { id: true, role: true, deletedAt: true },
+    select: { id: true, role: true, deletedAt: true, adminDisabledAt: true },
   });
-  if (!admin || admin.deletedAt || admin.role !== Role.ADMIN) {
+  if (!admin || admin.deletedAt || admin.role !== Role.ADMIN || admin.adminDisabledAt) {
     throw new RefundRequestError("UNAVAILABLE", "Admin session is unavailable.");
   }
 

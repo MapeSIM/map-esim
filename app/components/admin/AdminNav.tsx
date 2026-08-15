@@ -15,6 +15,7 @@ const links = [
   { href: "/admin/operations", label: "Operations", exact: false },
   { href: "/admin/alerts", label: "Alerts", exact: false },
   { href: "/admin/audit-logs", label: "Audit logs", exact: false },
+  { href: "/admin/admin-users", label: "Admin Users", exact: false },
   { href: "/admin/settings", label: "Settings", exact: false },
 ] as const;
 

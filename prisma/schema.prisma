@@ -188,6 +188,10 @@ model User {
   accountStatusVersion         Int                      @default(0)
   /// Incremented on each ADMIN credentials sign-in; JWT must match (single active admin session).
   adminSessionVersion          Int                      @default(0)
+  /// Admin disable (Admin Users): null = not disabled. Denies admin login/access when set.
+  adminDisabledAt              DateTime?
+  /// CAS version for admin deactivate/reactivate.
+  adminStatusVersion           Int                      @default(0)
   /// Signup (or future) consent to Terms & Conditions.
   termsAcceptedAt              DateTime?
   termsVersion                 String?
@@ -218,6 +222,7 @@ model User {
 
   @@index([deletedAt])
   @@index([blockedAt])
+  @@index([adminDisabledAt])
 }
 
 model EmailOtp {

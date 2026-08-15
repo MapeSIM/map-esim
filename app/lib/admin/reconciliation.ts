@@ -200,9 +200,16 @@ export async function requireActiveAdminForReconciliation() {
   const sessionUser = await requireRole("ADMIN");
   const admin = await prisma.user.findUnique({
     where: { id: sessionUser.id },
-    select: { id: true, role: true, deletedAt: true, name: true, email: true },
+    select: {
+      id: true,
+      role: true,
+      deletedAt: true,
+      adminDisabledAt: true,
+      name: true,
+      email: true,
+    },
   });
-  if (!admin || admin.deletedAt || admin.role !== Role.ADMIN) {
+  if (!admin || admin.deletedAt || admin.role !== Role.ADMIN || admin.adminDisabledAt) {
     // Generic denial — do not leak inactive-admin details.
     redirect("/signin");
   }

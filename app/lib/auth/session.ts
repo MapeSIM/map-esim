@@ -77,6 +77,20 @@ export async function requireRole(
     }
     redirect("/signin");
   }
+
+  // Defense in depth: disabled ADMIN must not retain admin access via stale JWT.
+  if (role === "ADMIN") {
+    const dbUser = await loadConsentGateUser(user.id);
+    if (
+      !dbUser ||
+      dbUser.role !== "ADMIN" ||
+      dbUser.deletedAt ||
+      dbUser.adminDisabledAt
+    ) {
+      redirect("/signin");
+    }
+  }
+
   return user;
 }
 

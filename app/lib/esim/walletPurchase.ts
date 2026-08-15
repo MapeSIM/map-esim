@@ -152,9 +152,9 @@ function purchaseAuditMethod(assisted: boolean): string {
 async function assertActiveAdmin(adminUserId: string) {
   const admin = await prisma.user.findUnique({
     where: { id: adminUserId },
-    select: { id: true, role: true, deletedAt: true },
+    select: { id: true, role: true, deletedAt: true, adminDisabledAt: true },
   });
-  if (!admin || admin.deletedAt || admin.role !== Role.ADMIN) {
+  if (!admin || admin.deletedAt || admin.role !== Role.ADMIN || admin.adminDisabledAt) {
     throw new WalletEsimPurchaseError("FORBIDDEN", "Not authorized.");
   }
   return admin;

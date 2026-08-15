@@ -147,9 +147,9 @@ export async function getAdminWalletPurchaseReview(
 
   const admin = await prisma.user.findUnique({
     where: { id: adminId },
-    select: { id: true, role: true, deletedAt: true },
+    select: { id: true, role: true, deletedAt: true, adminDisabledAt: true },
   });
-  if (!admin || admin.deletedAt || admin.role !== Role.ADMIN) return null;
+  if (!admin || admin.deletedAt || admin.role !== Role.ADMIN || admin.adminDisabledAt) return null;
 
   const row = await prisma.walletEsimPurchase.findUnique({
     where: { id },

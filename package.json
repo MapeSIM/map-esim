@@ -21,6 +21,8 @@
     "qa:admin-orders": "tsx scripts/qa-admin-orders.ts",
     "qa:admin-customers": "tsx scripts/qa-admin-customers.ts",
     "qa:admin-single-session": "tsx scripts/qa-admin-single-session.ts",
+    "qa:admin-users": "tsx scripts/qa-admin-users.ts",
+    "qa:admin-users-concurrency": "tsx scripts/qa-admin-users-concurrency.ts",
     "qa:wallet-foundation": "tsx scripts/qa-wallet-foundation.ts",
     "qa:admin-wallet-credit": "tsx scripts/qa-admin-wallet-credit.ts",
     "qa:admin-wallet-debit": "tsx scripts/qa-admin-wallet-debit.ts",

@@ -216,9 +216,9 @@ export async function requireActiveAdminForOperations() {
   const sessionUser = await requireRole("ADMIN");
   const admin = await prisma.user.findUnique({
     where: { id: sessionUser.id },
-    select: { id: true, role: true, deletedAt: true, name: true },
+    select: { id: true, role: true, deletedAt: true, adminDisabledAt: true, name: true },
   });
-  if (!admin || admin.deletedAt || admin.role !== Role.ADMIN) {
+  if (!admin || admin.deletedAt || admin.role !== Role.ADMIN || admin.adminDisabledAt) {
     redirect("/signin");
   }
   return { sessionUser, admin };

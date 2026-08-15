@@ -22,6 +22,7 @@ export const loadConsentGateUser = cache(
         deletedAt: Date | null;
         credentialsChangedAt: Date | null;
         adminSessionVersion: number;
+        adminDisabledAt: Date | null;
       })
     | null
   > => {
@@ -33,6 +34,7 @@ export const loadConsentGateUser = cache(
         credentialsChangedAt: true,
         deletedAt: true,
         adminSessionVersion: true,
+        adminDisabledAt: true,
         termsAcceptedAt: true,
         privacyAcknowledgedAt: true,
         termsVersion: true,
@@ -52,6 +54,7 @@ export const loadConsentGateUser = cache(
       credentialsChangedAt: user.credentialsChangedAt,
       deletedAt: user.deletedAt,
       adminSessionVersion: user.adminSessionVersion,
+      adminDisabledAt: user.adminDisabledAt,
       termsAcceptedAt: user.termsAcceptedAt,
       privacyAcknowledgedAt: user.privacyAcknowledgedAt,
       termsVersion: user.termsVersion,

@@ -3,9 +3,9 @@
  */
 import "server-only";
 
-import { Role } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
 import { writeAuditLog } from "@/app/lib/auth/audit";
+import { findActiveAdminActor } from "@/app/lib/auth/adminAccess";
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
 import { assertSameOriginAdminRequest } from "@/app/lib/admin/reconciliationCaseManagement";
 import {
@@ -35,14 +35,7 @@ export type WhatsAppSupportMutationResult =
     };
 
 async function requireActiveAdminActor(adminUserId: string) {
-  const admin = await prisma.user.findUnique({
-    where: { id: adminUserId },
-    select: { id: true, role: true, deletedAt: true },
-  });
-  if (!admin || admin.deletedAt || admin.role !== Role.ADMIN) {
-    return null;
-  }
-  return admin;
+  return findActiveAdminActor(adminUserId);
 }
 
 function parseEnabled(
