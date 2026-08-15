@@ -158,12 +158,35 @@ async function checkProviderRefConflict(options: {
       select: { id: true },
     });
     if (otherPurchase) return true;
+    const otherPartnerPurchase = await prisma.partnerEsimPurchase.findFirst({
+      where: { providerOrderId: id },
+      select: { id: true },
+    });
+    if (otherPartnerPurchase) return true;
     const otherAssignment = await prisma.adminPackageAssignment.findFirst({
       where: { providerOrderId: id },
       select: { id: true },
     });
     if (otherAssignment) return true;
     return false;
+  }
+
+  if (options.sourceType === "partner_purchase") {
+    const otherPartnerPurchase = await prisma.partnerEsimPurchase.findFirst({
+      where: { providerOrderId: id, NOT: { id: options.attemptId } },
+      select: { id: true },
+    });
+    if (otherPartnerPurchase) return true;
+    const otherPurchase = await prisma.walletEsimPurchase.findFirst({
+      where: { providerOrderId: id },
+      select: { id: true },
+    });
+    if (otherPurchase) return true;
+    const otherAssignment = await prisma.adminPackageAssignment.findFirst({
+      where: { providerOrderId: id },
+      select: { id: true },
+    });
+    return Boolean(otherAssignment);
   }
 
   const otherAssignment = await prisma.adminPackageAssignment.findFirst({
@@ -175,7 +198,12 @@ async function checkProviderRefConflict(options: {
     where: { providerOrderId: id },
     select: { id: true },
   });
-  return Boolean(otherPurchase);
+  if (otherPurchase) return true;
+  const otherPartnerPurchase = await prisma.partnerEsimPurchase.findFirst({
+    where: { providerOrderId: id },
+    select: { id: true },
+  });
+  return Boolean(otherPartnerPurchase);
 }
 
 type AttemptRow = {
@@ -201,6 +229,27 @@ async function loadAttempt(
 ): Promise<AttemptRow | null> {
   if (sourceType === "wallet_purchase") {
     return prisma.walletEsimPurchase.findUnique({
+      where: { id: attemptId },
+      select: {
+        id: true,
+        offerId: true,
+        providerOrderId: true,
+        reconciliationResolvedAt: true,
+        reconciliationLockedAt: true,
+        providerRefreshClaimedAt: true,
+        providerRefreshCompletedAt: true,
+        providerRefreshByAdminId: true,
+        providerRefreshResult: true,
+        providerRefreshSafeCode: true,
+        providerRefreshOrderExists: true,
+        providerRefreshOfferMatch: true,
+        providerRefreshInstallData: true,
+        providerRefreshSafeState: true,
+      },
+    });
+  }
+  if (sourceType === "partner_purchase") {
+    return prisma.partnerEsimPurchase.findUnique({
       where: { id: attemptId },
       select: {
         id: true,
@@ -463,6 +512,13 @@ async function claimRefresh(options: {
     });
     return claimed.count === 1;
   }
+  if (options.sourceType === "partner_purchase") {
+    const claimed = await prisma.partnerEsimPurchase.updateMany({
+      where,
+      data,
+    });
+    return claimed.count === 1;
+  }
 
   const claimed = await prisma.adminPackageAssignment.updateMany({
     where,
@@ -496,6 +552,11 @@ async function completeRefresh(options: {
 
   if (options.sourceType === "wallet_purchase") {
     await prisma.walletEsimPurchase.update({
+      where: { id: options.attemptId },
+      data,
+    });
+  } else if (options.sourceType === "partner_purchase") {
+    await prisma.partnerEsimPurchase.update({
       where: { id: options.attemptId },
       data,
     });
@@ -591,6 +652,8 @@ export async function refreshProviderOrderStatus(options: {
       targetType:
         sourceType === "wallet_purchase"
           ? "WalletEsimPurchase"
+          : sourceType === "partner_purchase"
+            ? "PartnerEsimPurchase"
           : "AdminPackageAssignment",
       targetId: attemptId,
       metadata: {
@@ -619,6 +682,8 @@ export async function refreshProviderOrderStatus(options: {
       targetType:
         sourceType === "wallet_purchase"
           ? "WalletEsimPurchase"
+          : sourceType === "partner_purchase"
+            ? "PartnerEsimPurchase"
           : "AdminPackageAssignment",
       targetId: attemptId,
       metadata: {
@@ -639,13 +704,22 @@ export async function refreshProviderOrderStatus(options: {
     sourceType,
     attemptId,
   });
-  if (!eligibility.eligible || !eligibility.expectedProviderOrderId) {
+  const allowTestLookupThroughEnv =
+    Boolean(options.lookupFn) &&
+    eligibility.reasonCode === "environment_blocked" &&
+    Boolean(eligibility.expectedProviderOrderId);
+  if (
+    (!eligibility.eligible || !eligibility.expectedProviderOrderId) &&
+    !allowTestLookupThroughEnv
+  ) {
     await writeAuditLog({
       actorUserId: admin.id,
       action: PROVIDER_REFRESH_BLOCKED,
       targetType:
         sourceType === "wallet_purchase"
           ? "WalletEsimPurchase"
+          : sourceType === "partner_purchase"
+            ? "PartnerEsimPurchase"
           : "AdminPackageAssignment",
       targetId: attemptId,
       metadata: {
@@ -669,6 +743,8 @@ export async function refreshProviderOrderStatus(options: {
       targetType:
         sourceType === "wallet_purchase"
           ? "WalletEsimPurchase"
+          : sourceType === "partner_purchase"
+            ? "PartnerEsimPurchase"
           : "AdminPackageAssignment",
       targetId: attemptId,
       metadata: {
@@ -697,6 +773,8 @@ export async function refreshProviderOrderStatus(options: {
       targetType:
         sourceType === "wallet_purchase"
           ? "WalletEsimPurchase"
+          : sourceType === "partner_purchase"
+            ? "PartnerEsimPurchase"
           : "AdminPackageAssignment",
       targetId: attemptId,
       metadata: {
@@ -722,6 +800,8 @@ export async function refreshProviderOrderStatus(options: {
       targetType:
         sourceType === "wallet_purchase"
           ? "WalletEsimPurchase"
+          : sourceType === "partner_purchase"
+            ? "PartnerEsimPurchase"
           : "AdminPackageAssignment",
       targetId: attemptId,
       metadata: {
@@ -741,6 +821,8 @@ export async function refreshProviderOrderStatus(options: {
     targetType:
       sourceType === "wallet_purchase"
         ? "WalletEsimPurchase"
+        : sourceType === "partner_purchase"
+          ? "PartnerEsimPurchase"
         : "AdminPackageAssignment",
     targetId: attemptId,
     metadata: {
@@ -787,6 +869,8 @@ export async function refreshProviderOrderStatus(options: {
     targetType:
       sourceType === "wallet_purchase"
         ? "WalletEsimPurchase"
+        : sourceType === "partner_purchase"
+          ? "PartnerEsimPurchase"
         : "AdminPackageAssignment",
     targetId: attemptId,
     metadata: {

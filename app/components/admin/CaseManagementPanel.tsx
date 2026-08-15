@@ -7,6 +7,7 @@ import {
   lockReconciliationCaseAction,
   backfillReconciliationIccidAction,
   finalizeReconciliationLocalRecordAction,
+  refundReconciliationPartnerPurchaseAction,
   refundReconciliationWalletPurchaseAction,
   resendReconciliationEmailAction,
   resolveReconciliationCaseAction,
@@ -20,6 +21,7 @@ import {
   ESCALATION_PRIORITIES,
   FINALIZE_LOCAL_RECORD_PHRASE,
   LOCK_CASE_PHRASE,
+  REFUND_PARTNER_FUNDS_PHRASE,
   REFUND_WALLET_FUNDS_PHRASE,
   RESEND_EMAIL_PHRASE,
   RESOLUTION_CODES,
@@ -102,6 +104,9 @@ export default function CaseManagementPanel(props: {
   walletRefundSupported: boolean;
   walletRefundAllowed: boolean;
   walletRefundMessage: string;
+  partnerRefundSupported: boolean;
+  partnerRefundAllowed: boolean;
+  partnerRefundMessage: string;
 }) {
   const [lockState, lockAction, lockPending] = useActionState(
     lockReconciliationCaseAction,
@@ -139,6 +144,8 @@ export default function CaseManagementPanel(props: {
     refundReconciliationWalletPurchaseAction,
     initial
   );
+  const [partnerRefundState, partnerRefundAction, partnerRefundPending] =
+    useActionState(refundReconciliationPartnerPurchaseAction, initial);
 
   const readOnly = props.resolved;
   const busy =
@@ -150,7 +157,8 @@ export default function CaseManagementPanel(props: {
     resendPending ||
     iccidPending ||
     finalizePending ||
-    refundPending;
+    refundPending ||
+    partnerRefundPending;
 
   return (
     <section className="space-y-5 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
@@ -158,9 +166,10 @@ export default function CaseManagementPanel(props: {
         <h2 className="text-lg font-semibold tracking-tight">Case management</h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           Lock, escalate, or mark resolved when local evidence shows no active
-          risk. Wallet balances, refunds, and provider order placement are never
-          changed here. ICCID backfill writes only a missing ICCID when provider
-          evidence confirms it.
+          risk. Dedicated recovery actions below can restore the original
+          customer or Partner balance only after provider verification. They
+          never place provider orders. ICCID backfill writes only a missing
+          ICCID when provider evidence confirms it.
         </p>
       </div>
 
@@ -692,6 +701,68 @@ export default function CaseManagementPanel(props: {
                 className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {refundPending ? "Refunding…" : "Refund wallet funds"}
+              </button>
+            </form>
+          ) : null}
+
+          {props.partnerRefundSupported ? (
+            <form action={partnerRefundAction} className="space-y-3">
+              <h3 className="text-sm font-semibold text-[var(--heading)]">
+                Refund Partner funds
+              </h3>
+              <p className="text-sm text-[var(--text-muted)]">
+                {props.partnerRefundMessage}
+              </p>
+              <p className="text-sm font-medium text-[var(--danger-text)]">
+                Warning: this action changes financial state by restoring the
+                immutable Partner charge exactly once.
+              </p>
+              <input type="hidden" name="sourceType" value={props.sourceType} />
+              <input type="hidden" name="attemptId" value={props.attemptId} />
+              <div>
+                <label
+                  htmlFor="partner-refund-reason"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Reason
+                </label>
+                <textarea
+                  id="partner-refund-reason"
+                  name="reason"
+                  required
+                  maxLength={CASE_REASON_MAX}
+                  rows={2}
+                  disabled={busy || !props.partnerRefundAllowed}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                />
+                <FieldError state={partnerRefundState} field="reason" />
+              </div>
+              <div>
+                <label
+                  htmlFor="partner-refund-confirm"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Type {REFUND_PARTNER_FUNDS_PHRASE}
+                </label>
+                <input
+                  id="partner-refund-confirm"
+                  name="confirmPhrase"
+                  required
+                  disabled={busy || !props.partnerRefundAllowed}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                />
+                <FieldError
+                  state={partnerRefundState}
+                  field="confirmPhrase"
+                />
+              </div>
+              <ActionMessage state={partnerRefundState} />
+              <button
+                type="submit"
+                disabled={busy || !props.partnerRefundAllowed}
+                className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {partnerRefundPending ? "Refunding…" : "Refund Partner funds"}
               </button>
             </form>
           ) : null}

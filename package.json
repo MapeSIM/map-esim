@@ -30,6 +30,7 @@
     "qa:partner-purchase-provider": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-purchase-provider.ts",
     "qa:partner-catalog-buy": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-catalog-buy.ts",
     "qa:partner-orders": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-orders.ts",
+    "qa:partner-reconciliation": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-reconciliation.ts",
     "qa:partner-invite-setup": "tsx scripts/qa-partner-invite-setup.ts",
     "qa:wallet-foundation": "tsx scripts/qa-wallet-foundation.ts",
     "qa:admin-wallet-credit": "tsx scripts/qa-admin-wallet-credit.ts",

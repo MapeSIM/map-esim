@@ -228,8 +228,7 @@ function main() {
   // --- Authorization / mutation surface ---
   assert.match(actions, /requireRole\("ADMIN"\)/);
   assert.match(mut, /assertSameOriginAdminRequest/);
-  assert.match(mut, /role !== Role\.ADMIN/);
-  assert.match(mut, /deletedAt/);
+  assert.match(mut, /findActiveAdminActor/);
   assert.match(mut, /consumeRateLimit/);
   assert.match(mut, /ops-control:admin:/);
   assert.match(mut, /ops-control:key:/);

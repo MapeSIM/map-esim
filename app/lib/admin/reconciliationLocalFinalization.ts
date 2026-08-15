@@ -10,6 +10,7 @@ import {
   AdminPackageAssignmentStatus,
   OrderFundingSource,
   OrderStatus,
+  PartnerEsimPurchaseStatus,
   Prisma,
   Role,
   WalletEsimPurchaseStatus,
@@ -85,6 +86,7 @@ type AttemptContext = {
   dataAllowance: string | null;
   validity: string | null;
   priceCents: number | null;
+  retailPriceCents: number | null;
   providerCostCents: number | null;
   currency: string;
   fundingSource: OrderFundingSource;
@@ -107,7 +109,9 @@ function resolveIds(
     targetType:
       sourceType === "assignment"
         ? "AdminPackageAssignment"
-        : "WalletEsimPurchase",
+        : sourceType === "partner_purchase"
+          ? "PartnerEsimPurchase"
+          : "WalletEsimPurchase",
   };
 }
 
@@ -143,10 +147,10 @@ function buildOffer(ctx: AttemptContext): VerifiedCheckoutOffer | null {
   let retailUsd = 0;
   let providerUsd = 0;
   if (
-    Number.isInteger(ctx.priceCents) &&
-    (ctx.priceCents ?? 0) > 0
+    Number.isInteger(ctx.retailPriceCents ?? ctx.priceCents) &&
+    (ctx.retailPriceCents ?? ctx.priceCents ?? 0) > 0
   ) {
-    retailUsd = (ctx.priceCents as number) / 100;
+    retailUsd = (ctx.retailPriceCents ?? ctx.priceCents as number) / 100;
   }
   if (
     typeof ctx.providerCostCents === "number" &&
@@ -231,11 +235,83 @@ async function loadAttemptContext(
       dataAllowance: row.dataAllowance,
       validity: row.validity,
       priceCents: row.priceCents,
+      retailPriceCents: null,
       providerCostCents: row.providerCostCents,
       currency: row.currency,
       fundingSource: row.fundingSource,
       debitTransactionId: row.debitTransactionId,
       debitStatus: row.debitTransaction?.status ?? null,
+      refundTransactionId: row.refundTransactionId,
+    };
+  }
+
+  if (ids.sourceType === "partner_purchase") {
+    const row = await client.partnerEsimPurchase.findUnique({
+      where: { id: ids.recordId },
+      select: {
+        status: true,
+        orderId: true,
+        providerOrderId: true,
+        providerResultKind: true,
+        failureCategory: true,
+        failureCode: true,
+        offerId: true,
+        planName: true,
+        destinationCode: true,
+        destinationName: true,
+        dataAllowance: true,
+        validity: true,
+        partnerChargeCents: true,
+        retailPriceCents: true,
+        providerCostCents: true,
+        currency: true,
+        fundingSource: true,
+        debitTransactionId: true,
+        refundTransactionId: true,
+        reconciliationResolvedAt: true,
+        reconciliationLockedAt: true,
+        reconciliationLockedByAdminId: true,
+        providerRefreshClaimedAt: true,
+        providerRefreshCompletedAt: true,
+        providerRefreshResult: true,
+        partner: {
+          select: {
+            userId: true,
+            user: { select: { email: true, deletedAt: true } },
+          },
+        },
+        debitTransaction: { select: { id: true } },
+      },
+    });
+    if (!row) return null;
+    return {
+      caseResolved: Boolean(row.reconciliationResolvedAt),
+      caseLocked: Boolean(row.reconciliationLockedAt),
+      lockedByAdminId: row.reconciliationLockedByAdminId,
+      providerRefreshInProgress: isRefreshInProgress(row),
+      status: row.status,
+      orderId: row.orderId,
+      providerOrderId: (row.providerOrderId ?? "").trim(),
+      providerResultKind: row.providerResultKind,
+      failureCategory: row.failureCategory,
+      failureCode: row.failureCode,
+      offerId: row.offerId,
+      customerUserId: row.partner.userId,
+      customerEmail: row.partner.user.deletedAt
+        ? null
+        : row.partner.user.email,
+      planName: row.planName,
+      destinationCode: row.destinationCode,
+      destinationName: row.destinationName,
+      dataAllowance: row.dataAllowance,
+      validity: row.validity,
+      priceCents: row.partnerChargeCents,
+      retailPriceCents: row.retailPriceCents,
+      providerCostCents: row.providerCostCents,
+      currency: row.currency,
+      fundingSource: row.fundingSource,
+      debitTransactionId: row.debitTransactionId,
+      debitStatus: row.debitTransaction ? "COMPLETED" : null,
       refundTransactionId: row.refundTransactionId,
     };
   }
@@ -289,6 +365,7 @@ async function loadAttemptContext(
     dataAllowance: row.dataAllowance,
     validity: row.validity,
     priceCents: null,
+    retailPriceCents: null,
     providerCostCents: row.providerCostCents,
     currency: row.providerCurrency,
     fundingSource: row.fundingSource,
@@ -319,6 +396,7 @@ function localEligibilityFromContext(
     customerUserId: ctx.customerUserId,
     customerEmail: ctx.customerEmail,
     priceCents: ctx.priceCents,
+    fundingSource: ctx.fundingSource,
     debitStatus: ctx.debitStatus,
     debitTransactionId: ctx.debitTransactionId,
     refundTransactionId: ctx.refundTransactionId,
@@ -437,6 +515,7 @@ async function assertOrderCompatible(
       offerId: true,
       fundingSource: true,
       walletEsimPurchase: { select: { id: true } },
+      partnerEsimPurchase: { select: { id: true } },
       adminPackageAssignment: { select: { id: true } },
     },
   });
@@ -469,12 +548,29 @@ async function assertOrderCompatible(
     if (existing.adminPackageAssignment?.id) {
       return { ok: false, blocker: "conflicting_attempt_link" };
     }
+    if (existing.partnerEsimPurchase?.id) {
+      return { ok: false, blocker: "conflicting_attempt_link" };
+    }
+  } else if (options.sourceType === "partner_purchase") {
+    const linked = existing.partnerEsimPurchase?.id;
+    if (linked && linked !== options.attemptId) {
+      return { ok: false, blocker: "conflicting_attempt_link" };
+    }
+    if (
+      existing.walletEsimPurchase?.id ||
+      existing.adminPackageAssignment?.id
+    ) {
+      return { ok: false, blocker: "conflicting_attempt_link" };
+    }
   } else {
     const linked = existing.adminPackageAssignment?.id;
     if (linked && linked !== options.attemptId) {
       return { ok: false, blocker: "conflicting_attempt_link" };
     }
     if (existing.walletEsimPurchase?.id) {
+      return { ok: false, blocker: "conflicting_attempt_link" };
+    }
+    if (existing.partnerEsimPurchase?.id) {
       return { ok: false, blocker: "conflicting_attempt_link" };
     }
   }
@@ -488,6 +584,8 @@ export async function finalizeReconciliationLocalRecord(options: {
   attemptId: string;
   reason: string;
   confirmPhrase: string;
+  /** Test seam only — defaults to GET-only provider confirmation. */
+  confirmProviderSuccessFn?: typeof confirmProviderSuccess;
 }): Promise<CaseActionResult> {
   if (!(await assertSameOriginAdminRequest())) {
     return { ok: false, error: PUBLIC_ERROR };
@@ -659,7 +757,9 @@ export async function finalizeReconciliationLocalRecord(options: {
     };
   }
 
-  const providerOk = await confirmProviderSuccess({
+  const confirmFn =
+    options.confirmProviderSuccessFn ?? confirmProviderSuccess;
+  const providerOk = await confirmFn({
     providerOrderId: ctx.providerOrderId,
     expectedOfferId: verifiedOffer.offerId,
   });
@@ -719,7 +819,10 @@ export async function finalizeReconciliationLocalRecord(options: {
         providerOrderId: fresh.providerOrderId,
         customerUserId: fresh.customerUserId,
         offerId: fresh.offerId,
-        fundingSource: fresh.fundingSource,
+        fundingSource:
+          ids.sourceType === "partner_purchase"
+            ? OrderFundingSource.PARTNER_BALANCE
+            : fresh.fundingSource,
         attemptId: ids.recordId,
         sourceType: ids.sourceType,
       });
@@ -740,7 +843,10 @@ export async function finalizeReconciliationLocalRecord(options: {
         customerUserId: fresh.customerUserId,
         customerEmail: fresh.customerEmail as string,
         verifiedOffer: offer,
-        fundingSource: fresh.fundingSource,
+        fundingSource:
+          ids.sourceType === "partner_purchase"
+            ? OrderFundingSource.PARTNER_BALANCE
+            : fresh.fundingSource,
         status: OrderStatus.COMPLETED,
       });
 
@@ -778,6 +884,32 @@ export async function finalizeReconciliationLocalRecord(options: {
           },
           data: {
             status: WalletEsimPurchaseStatus.COMPLETED,
+            orderId: order.id,
+            providerOrderId: order.providerOrderId,
+            providerResultKind: "success",
+            providerObservedAt: new Date(),
+            completedAt: new Date(),
+            failureCategory: null,
+            failureCode: null,
+            reconciliationState: null,
+          },
+        });
+        if (purchaseCas.count === 0) {
+          return { status: "blocked" as const, failureCode: "cas_conflict" };
+        }
+      } else if (ids.sourceType === "partner_purchase") {
+        const purchaseCas = await tx.partnerEsimPurchase.updateMany({
+          where: {
+            id: ids.recordId,
+            status: PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED,
+            orderId: null,
+            providerOrderId: fresh.providerOrderId,
+            reconciliationResolvedAt: null,
+            reconciliationLockedByAdminId: admin.id,
+            NOT: { reconciliationLockedAt: null },
+          },
+          data: {
+            status: PartnerEsimPurchaseStatus.COMPLETED,
             orderId: order.id,
             providerOrderId: order.providerOrderId,
             providerResultKind: "success",

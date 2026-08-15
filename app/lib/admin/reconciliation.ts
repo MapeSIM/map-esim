@@ -998,6 +998,7 @@ export async function getReconciliationDetail(
         validity: true,
         retailPriceCents: true,
         partnerChargeCents: true,
+        providerCostCents: true,
         discountBps: true,
         discountVersion: true,
         currency: true,
@@ -1112,7 +1113,7 @@ export async function getReconciliationDetail(
       customerLabel: customerLabelFrom(partnerUser),
       customerHref: partnerUser ? `/admin/customers/${partnerUser.id}` : null,
       destinationPackage: destinationPackageLabel(row),
-      amountLabel: `Partner debit ${formatUsdCents(row.partnerChargeCents)} (retail ${formatUsdCents(row.retailPriceCents)}, discount ${row.discountBps} bps v${row.discountVersion}) ${row.currency || "USD"}`,
+      amountLabel: `Partner debit ${formatUsdCents(row.partnerChargeCents)} (retail ${formatUsdCents(row.retailPriceCents)}, provider cost ${formatUsdCents(row.providerCostCents)}, discount ${row.discountBps} bps v${row.discountVersion}) ${row.currency || "USD"}`,
       walletDebitRefundLabel: walletDebitRefundLabel({
         hasDebit: Boolean(row.debitTransactionId),
         hasRefund: Boolean(row.refundTransactionId),

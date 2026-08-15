@@ -28,6 +28,7 @@ import {
   PartnerPurchaseWalletError,
   refundPartnerPurchaseFundsInTx,
 } from "@/app/lib/partner/partnerPurchaseWallet";
+import { schedulePartnerReconciliationRequiredNotification } from "@/app/lib/partner/partnerReconciliationRequiredNotification";
 import {
   executeCreditCheckout,
   type CreditCheckoutResult,
@@ -40,9 +41,6 @@ export const PARTNER_ESIM_PURCHASE_FAILED_REFUNDED_AUDIT =
   "partner.esim_purchase_failed_refunded";
 export const PARTNER_ESIM_PURCHASE_RECONCILIATION_AUDIT =
   "partner.esim_purchase_reconciliation_required";
-
-/** Deferred — no Partner-specific recon email template in this slice. */
-export const PARTNER_RECON_EMAIL_DEFERRED = "deferred_partner_template";
 
 export type PartnerProviderCheckoutExecutor = (options: {
   offerId: string;
@@ -268,7 +266,6 @@ async function markPartnerReconciliationRequired(options: {
         failureCode: options.code,
         reconciliationState: "awaiting_manual_review",
         providerRefreshClaimedAt: null,
-        reconRequiredEmailNotificationStatus: PARTNER_RECON_EMAIL_DEFERRED,
       },
     });
     await tx.auditLog.create({
@@ -282,11 +279,13 @@ async function markPartnerReconciliationRequired(options: {
           fundingSource: OrderFundingSource.PARTNER_BALANCE,
           failureCategory: options.category,
           failureCode: options.code,
-          reconEmail: PARTNER_RECON_EMAIL_DEFERRED,
+          reconEmail: "scheduled",
         } satisfies Prisma.InputJsonValue,
       },
     });
   });
+
+  schedulePartnerReconciliationRequiredNotification(options.purchaseId);
 
   throw new PartnerEsimPurchaseError(
     "RECONCILIATION_REQUIRED",

@@ -102,6 +102,7 @@ export default async function AdminReconciliationDetailPage({
   ]);
   const showRefreshSection =
     detail.sourceType === "wallet_purchase" ||
+    detail.sourceType === "partner_purchase" ||
     detail.sourceType === "assignment";
   const refreshDisabled = !refreshUi.eligibility.eligible;
   const refreshReasonCode = refreshUi.eligibility.reasonCode;
@@ -201,6 +202,9 @@ export default async function AdminReconciliationDetailPage({
           walletRefundSupported={caseUi.walletRefundSupported}
           walletRefundAllowed={caseUi.walletRefundAllowed}
           walletRefundMessage={caseUi.walletRefundMessage}
+          partnerRefundSupported={caseUi.partnerRefundSupported}
+          partnerRefundAllowed={caseUi.partnerRefundAllowed}
+          partnerRefundMessage={caseUi.partnerRefundMessage}
         />
       ) : null}
 

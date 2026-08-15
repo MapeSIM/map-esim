@@ -13,6 +13,7 @@ export const RESEND_EMAIL_PHRASE = "RESEND EMAIL";
 export const BACKFILL_ICCID_PHRASE = "BACKFILL ICCID";
 export const FINALIZE_LOCAL_RECORD_PHRASE = "FINALIZE LOCAL RECORD";
 export const REFUND_WALLET_FUNDS_PHRASE = "REFUND WALLET FUNDS";
+export const REFUND_PARTNER_FUNDS_PHRASE = "REFUND PARTNER FUNDS";
 
 /** Wallet-purchase-only refund recovery sources. */
 export const WALLET_REFUND_SOURCE_TYPES = ["wallet_purchase"] as const;
@@ -26,9 +27,23 @@ export function isWalletRefundSourceType(
   return (WALLET_REFUND_SOURCE_TYPES as readonly string[]).includes(v);
 }
 
+/** Partner-purchase-only refund recovery sources. */
+export const PARTNER_REFUND_SOURCE_TYPES = ["partner_purchase"] as const;
+
+export type PartnerRefundSourceType =
+  (typeof PARTNER_REFUND_SOURCE_TYPES)[number];
+
+export function isPartnerRefundSourceType(
+  raw: string | null | undefined
+): raw is PartnerRefundSourceType {
+  const v = (raw ?? "").trim();
+  return (PARTNER_REFUND_SOURCE_TYPES as readonly string[]).includes(v);
+}
+
 /** Sources that can recover incomplete local finalization after provider success. */
 export const LOCAL_FINALIZATION_SOURCE_TYPES = [
   "wallet_purchase",
+  "partner_purchase",
   "assignment",
 ] as const;
 
@@ -79,6 +94,7 @@ export type ResolutionCode = (typeof RESOLUTION_CODES)[number];
 
 export const CASE_MANAGEMENT_SOURCE_TYPES = [
   "wallet_purchase",
+  "partner_purchase",
   "assignment",
   "topup",
   "order_email",
@@ -598,8 +614,9 @@ export type LocalFinalizationLocalInput = {
   offerId?: string | null;
   customerUserId?: string | null;
   customerEmail?: string | null;
-  /** Wallet purchase selling price (cents). Required for wallet_purchase. */
+  /** Debit-backed selling/charge snapshot (cents). */
   priceCents?: number | null;
+  fundingSource?: string | null;
   debitStatus?: string | null;
   debitTransactionId?: string | null;
   refundTransactionId?: string | null;
@@ -675,11 +692,26 @@ export function evaluateLocalFinalizationEligibility(
     blockers.push("not_finalization_recovery_state");
   }
   if (hasOrder) blockers.push("conflicting_local_order_link");
-  if (!isLocalFinalizeFailureSignal(input)) {
+  // Partner uncertain→success recovery: allow once providerResultKind is success.
+  // Wallet/assignment remain limited to local_finalize_failed signals.
+  if (
+    input.sourceType !== "partner_purchase" &&
+    !isLocalFinalizeFailureSignal(input)
+  ) {
+    blockers.push("not_local_finalize_failure");
+  }
+  if (
+    input.sourceType === "partner_purchase" &&
+    !isLocalFinalizeFailureSignal(input) &&
+    resultKind !== "success"
+  ) {
     blockers.push("not_local_finalize_failure");
   }
 
-  if (input.sourceType === "wallet_purchase") {
+  if (
+    input.sourceType === "wallet_purchase" ||
+    input.sourceType === "partner_purchase"
+  ) {
     if (
       !Number.isInteger(input.priceCents) ||
       (input.priceCents ?? 0) <= 0
@@ -693,10 +725,20 @@ export function evaluateLocalFinalizationEligibility(
       blockers.push("refund_present");
     }
     const debitStatus = (input.debitStatus ?? "").trim().toUpperCase();
-    if (debitStatus && debitStatus !== "PENDING" && debitStatus !== "COMPLETED") {
+    if (
+      debitStatus &&
+      debitStatus !== "PENDING" &&
+      debitStatus !== "COMPLETED"
+    ) {
       blockers.push("debit_state_unusable");
     }
     if (!debitStatus) blockers.push("missing_debit_reservation");
+    if (
+      input.sourceType === "partner_purchase" &&
+      (input.fundingSource ?? "").trim().toUpperCase() !== "PARTNER_BALANCE"
+    ) {
+      blockers.push("funding_source_mismatch");
+    }
   }
 
   return {
@@ -999,6 +1041,114 @@ export function evaluateWalletRefundLocalEligibility(
   };
 }
 
+/** Pure local gates for confirmed-failure Partner balance refund recovery. */
+export type PartnerRefundLocalInput = Omit<
+  WalletRefundLocalInput,
+  "priceCents" | "customerUserId"
+> & {
+  partnerId?: string | null;
+  partnerChargeCents?: number | null;
+};
+
+export type PartnerRefundEligibility = WalletRefundEligibility;
+
+export function evaluatePartnerRefundLocalEligibility(
+  input: PartnerRefundLocalInput
+): PartnerRefundEligibility {
+  const blockers: string[] = [];
+  const status = (input.status ?? "").trim().toUpperCase();
+  const hasRefund = Boolean((input.refundTransactionId ?? "").trim());
+  const alreadyRefunded = status === "FAILED_REFUNDED" && hasRefund;
+
+  if (!isPartnerRefundSourceType(input.sourceType)) {
+    return {
+      allowed: false,
+      blockers: ["unsupported_source"],
+      supported: false,
+      alreadyRefunded: false,
+    };
+  }
+
+  if (input.alreadyResolved) blockers.push("already_resolved");
+  if (!input.locked) blockers.push("case_unlocked");
+  if (input.locked) {
+    const owner = (input.lockedByAdminId ?? "").trim();
+    const actor = (input.currentAdminId ?? "").trim();
+    if (!owner || !actor || owner !== actor) {
+      blockers.push("lock_not_owned");
+    }
+  }
+  if (input.providerRefreshInProgress) {
+    blockers.push("provider_refresh_in_progress");
+  }
+
+  if ((input.fundingSource ?? "").trim().toUpperCase() !== "PARTNER_BALANCE") {
+    blockers.push("not_partner_balance_funded");
+  }
+  if (!(input.providerOrderId ?? "").trim()) {
+    blockers.push("missing_provider_reference");
+  }
+  if (!(input.offerId ?? "").trim()) blockers.push("missing_package_evidence");
+  if (!(input.partnerId ?? "").trim()) blockers.push("missing_partner_evidence");
+  if (
+    !Number.isInteger(input.partnerChargeCents) ||
+    (input.partnerChargeCents ?? 0) <= 0
+  ) {
+    blockers.push("missing_pricing_evidence");
+  }
+  if (!(input.debitTransactionId ?? "").trim()) {
+    blockers.push("missing_debit_reservation");
+  }
+  if (
+    Number.isInteger(input.debitAmountCents) &&
+    Number.isInteger(input.partnerChargeCents) &&
+    input.debitAmountCents !== input.partnerChargeCents
+  ) {
+    blockers.push("debit_amount_mismatch");
+  }
+
+  if (input.fulfilmentIccidPresent) {
+    blockers.push("fulfilment_iccid_present");
+  }
+  if (input.providerInstallDataPresent) {
+    blockers.push("fulfilment_install_evidence");
+  }
+
+  const orderId = (input.orderId ?? "").trim();
+  const orderStatus = (input.orderStatus ?? "").trim().toUpperCase();
+  if (orderId && orderStatus !== "FAILED") {
+    blockers.push("usable_local_order_exists");
+  }
+
+  if (alreadyRefunded) {
+    return {
+      allowed: blockers.length === 0,
+      blockers,
+      supported: true,
+      alreadyRefunded: true,
+    };
+  }
+
+  if (hasRefund) blockers.push("incomplete_or_conflicting_refund");
+  if (!isRefundRecoveryStatus(status)) {
+    blockers.push("not_refund_recovery_state");
+  }
+  if (status === "COMPLETED") blockers.push("purchase_already_completed");
+
+  const debitStatus = (input.debitStatus ?? "").trim().toUpperCase();
+  if (debitStatus && debitStatus !== "COMPLETED") {
+    blockers.push("debit_state_unusable");
+  }
+  if (!debitStatus) blockers.push("missing_debit_reservation");
+
+  return {
+    allowed: blockers.length === 0,
+    blockers,
+    supported: true,
+    alreadyRefunded: false,
+  };
+}
+
 /**
  * Pure provider-evidence gate for confirmed-failure wallet refund.
  * Fail closed: only FOUND orders with an explicit non-fulfilment failure state.
@@ -1151,6 +1301,34 @@ export function walletRefundBlockerLabel(code: string): string {
       return "Wallet refund could not be completed. Please try again.";
     default:
       return "Wallet refund recovery is unavailable for this case.";
+  }
+}
+
+export function partnerRefundBlockerLabel(code: string): string {
+  switch (code) {
+    case "unsupported_source":
+      return "This case type does not support Partner balance refund recovery.";
+    case "already_resolved":
+      return "Resolved cases cannot run Partner balance refund recovery.";
+    case "case_unlocked":
+      return "Lock this case before refunding Partner funds.";
+    case "lock_not_owned":
+      return "Only the admin who locked this case can refund Partner funds.";
+    case "not_partner_balance_funded":
+      return "Only Partner-balance purchases can be refunded here.";
+    case "missing_partner_evidence":
+      return "Partner ownership evidence is missing on the purchase.";
+    case "transaction_failed":
+      return "Partner balance refund could not be completed. Please try again.";
+    case "missing_local_attempt":
+      return "Local Partner purchase attempt was not found.";
+    default:
+      return walletRefundBlockerLabel(code)
+        .replace("wallet refund", "Partner balance refund")
+        .replace("Wallet refund", "Partner balance refund")
+        .replace("wallet funds", "Partner funds")
+        .replace("Wallet funds", "Partner funds")
+        .replace("Wallet debit", "Partner wallet debit");
   }
 }
 

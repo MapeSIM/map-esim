@@ -18,12 +18,15 @@ import {
   evaluateEmailResendEligibility,
   evaluateIccidBackfillLocalEligibility,
   evaluateLocalFinalizationEligibility,
+  evaluatePartnerRefundLocalEligibility,
   evaluateResolutionEligibility,
   evaluateWalletRefundLocalEligibility,
   iccidBackfillBlockerLabel,
   isIccidBackfillSourceType,
   isLocalFinalizationSourceType,
   localFinalizationBlockerLabel,
+  partnerRefundBlockerLabel,
+  isPartnerRefundSourceType,
   walletRefundBlockerLabel,
   isWalletRefundSourceType,
   LOCK_CASE_PHRASE,
@@ -133,6 +136,9 @@ export type CaseManagementUiState = {
   walletRefundSupported: boolean;
   walletRefundAllowed: boolean;
   walletRefundMessage: string;
+  partnerRefundSupported: boolean;
+  partnerRefundAllowed: boolean;
+  partnerRefundMessage: string;
 };
 
 const PUBLIC_ERROR = "Unable to update this case right now.";
@@ -165,6 +171,8 @@ function targetTypeFor(sourceType: CaseManagementSourceType): string {
     case "wallet_purchase":
     case "order_email":
       return "WalletEsimPurchase";
+    case "partner_purchase":
+      return "PartnerEsimPurchase";
     case "assignment":
       return "AdminPackageAssignment";
     case "topup":
@@ -287,7 +295,10 @@ function isRefreshInProgress(row: {
   orderProviderOrderId?: string | null;
   offerId?: string | null;
   customerUserId?: string | null;
+  partnerId?: string | null;
   priceCents?: number | null;
+  retailPriceCents?: number | null;
+  providerCostCents?: number | null;
   debitTransactionId?: string | null;
   debitAmountCents?: number | null;
   fundingSource?: string | null;
@@ -301,6 +312,7 @@ function isRefreshInProgress(row: {
   providerRefreshResult?: string | null;
   providerRefreshClaimedAt?: Date | null;
   providerRefreshCompletedAt?: Date | null;
+  providerInstallDataPresent?: boolean;
   lockedByName?: string | null;
   escalatedByName?: string | null;
   resolvedByName?: string | null;
@@ -354,6 +366,72 @@ async function loadCaseRow(
       iccidHash: row.order?.iccidHash ?? null,
       iccidCapturedAt: row.order?.iccidCapturedAt ?? null,
       orderProviderOrderId: row.order?.providerOrderId ?? null,
+    };
+  }
+
+  if (sourceType === "partner_purchase") {
+    const row = await prisma.partnerEsimPurchase.findUnique({
+      where: { id: recordId },
+      select: {
+        ...CASE_FIELD_SELECT,
+        status: true,
+        providerResultKind: true,
+        providerOrderId: true,
+        providerObservedAt: true,
+        safeProviderStatusCode: true,
+        failureCategory: true,
+        failureCode: true,
+        debitTransactionId: true,
+        refundTransactionId: true,
+        orderId: true,
+        offerId: true,
+        partnerId: true,
+        partnerChargeCents: true,
+        retailPriceCents: true,
+        providerCostCents: true,
+        fundingSource: true,
+        providerRefreshClaimedAt: true,
+        providerRefreshCompletedAt: true,
+        providerRefreshByAdminId: true,
+        providerRefreshResult: true,
+        providerRefreshSafeCode: true,
+        providerRefreshOrderExists: true,
+        providerRefreshOfferMatch: true,
+        providerRefreshInstallData: true,
+        providerRefreshSafeState: true,
+        debitTransaction: { select: { id: true, amountCents: true } },
+        partner: {
+          select: {
+            user: { select: { id: true, email: true, deletedAt: true } },
+          },
+        },
+        order: {
+          select: {
+            status: true,
+            providerOrderId: true,
+            iccidHash: true,
+            iccidCapturedAt: true,
+          },
+        },
+      },
+    });
+    if (!row) return null;
+    return {
+      ...row,
+      customerUserId: row.partner.user.id,
+      partnerId: row.partnerId,
+      customerEmail: row.partner.user.deletedAt
+        ? null
+        : row.partner.user.email,
+      priceCents: row.partnerChargeCents,
+      debitStatus: row.debitTransaction ? "COMPLETED" : null,
+      debitAmountCents: row.debitTransaction?.amountCents ?? null,
+      orderStatus: row.order?.status ?? null,
+      iccidHash: row.order?.iccidHash ?? null,
+      iccidCapturedAt: row.order?.iccidCapturedAt ?? null,
+      orderProviderOrderId: row.order?.providerOrderId ?? null,
+      providerInstallDataPresent:
+        (row.providerRefreshInstallData ?? "").trim().toLowerCase() === "yes",
     };
   }
 
@@ -613,6 +691,7 @@ export async function getCaseManagementEligibility(options: {
         customerUserId: row.customerUserId,
         customerEmail: row.customerEmail,
         priceCents: row.priceCents,
+        fundingSource: row.fundingSource,
         debitStatus: row.debitStatus,
         debitTransactionId: row.debitTransactionId,
         refundTransactionId: row.refundTransactionId,
@@ -677,6 +756,48 @@ export async function getCaseManagementEligibility(options: {
     }
   }
 
+  const partnerRefundSupported = isPartnerRefundSourceType(ids.sourceType);
+  const partnerRefundEligibility = partnerRefundSupported
+    ? evaluatePartnerRefundLocalEligibility({
+        sourceType: ids.sourceType,
+        alreadyResolved: resolved,
+        locked,
+        lockedByAdminId: row.reconciliationLockedByAdminId,
+        currentAdminId: (options.adminUserId ?? "").trim(),
+        status: row.status,
+        fundingSource: row.fundingSource,
+        orderId: row.orderId,
+        orderStatus: row.orderStatus,
+        providerOrderId: row.providerOrderId,
+        offerId: row.offerId,
+        partnerId: row.partnerId,
+        partnerChargeCents: row.priceCents,
+        debitAmountCents: row.debitAmountCents,
+        debitStatus: row.debitStatus,
+        debitTransactionId: row.debitTransactionId,
+        refundTransactionId: row.refundTransactionId,
+        fulfilmentIccidPresent: Boolean(row.iccidHash || row.iccidCapturedAt),
+        providerInstallDataPresent: row.providerInstallDataPresent,
+        providerRefreshInProgress: refreshInProgress,
+      })
+    : null;
+
+  let partnerRefundMessage =
+    "Partner balance refund recovery is not available for this case type.";
+  if (partnerRefundEligibility) {
+    if (!partnerRefundEligibility.allowed) {
+      partnerRefundMessage = partnerRefundEligibility.blockers
+        .map(partnerRefundBlockerLabel)
+        .join(" ");
+    } else if (partnerRefundEligibility.alreadyRefunded) {
+      partnerRefundMessage =
+        "Partner funds already refunded. Submit only confirms idempotent success.";
+    } else {
+      partnerRefundMessage =
+        "This action restores the immutable Partner charge exactly once after confirmed provider failure. It changes financial state. Provider evidence will be re-verified on submit.";
+    }
+  }
+
   return {
     stateLabel: caseManagementStateLabel({
       resolvedAt: row.reconciliationResolvedAt,
@@ -725,6 +846,9 @@ export async function getCaseManagementEligibility(options: {
     walletRefundSupported,
     walletRefundAllowed: Boolean(walletRefundEligibility?.allowed),
     walletRefundMessage,
+    partnerRefundSupported,
+    partnerRefundAllowed: Boolean(partnerRefundEligibility?.allowed),
+    partnerRefundMessage,
   };
 }
 
@@ -797,6 +921,9 @@ function delegateFor(
 ): PrismaDelegate {
   if (sourceType === "wallet_purchase" || (sourceType === "order_email" && !orderEmailOnAssignment)) {
     return prisma.walletEsimPurchase as unknown as PrismaDelegate;
+  }
+  if (sourceType === "partner_purchase") {
+    return prisma.partnerEsimPurchase as unknown as PrismaDelegate;
   }
   if (sourceType === "assignment" || (sourceType === "order_email" && orderEmailOnAssignment)) {
     return prisma.adminPackageAssignment as unknown as PrismaDelegate;
@@ -1536,7 +1663,32 @@ export async function resolveReconciliationCase(options: {
   return prisma.$transaction(async (tx) => {
     // Reload inside transaction for eligibility re-check.
     let row: LoadedCase | null = null;
-    if (
+    if (ids.sourceType === "partner_purchase") {
+      const r = await tx.partnerEsimPurchase.findUnique({
+        where: { id: ids.recordId },
+        select: {
+          ...CASE_FIELD_SELECT,
+          status: true,
+          providerResultKind: true,
+          providerOrderId: true,
+          failureCategory: true,
+          failureCode: true,
+          debitTransactionId: true,
+          refundTransactionId: true,
+          orderId: true,
+          providerRefreshResult: true,
+          providerRefreshClaimedAt: true,
+          providerRefreshCompletedAt: true,
+          debitTransaction: { select: { id: true } },
+        },
+      });
+      if (r) {
+        row = {
+          ...r,
+          debitStatus: r.debitTransaction ? "COMPLETED" : null,
+        };
+      }
+    } else if (
       ids.sourceType === "wallet_purchase" ||
       (ids.sourceType === "order_email" && !ids.orderEmailOnAssignment)
     ) {
@@ -1684,7 +1836,17 @@ export async function resolveReconciliationCase(options: {
     };
 
     let count = 0;
-    if (
+    if (ids.sourceType === "partner_purchase") {
+      const r = await tx.partnerEsimPurchase.updateMany({
+        where: {
+          id: ids.recordId,
+          reconciliationResolvedAt: null,
+          reconciliationLockedAt: null,
+        },
+        data,
+      });
+      count = r.count;
+    } else if (
       ids.sourceType === "wallet_purchase" ||
       (ids.sourceType === "order_email" && !ids.orderEmailOnAssignment)
     ) {

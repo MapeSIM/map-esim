@@ -27,9 +27,16 @@ export function parseProviderRefreshReason(
 
 export function isProviderRefreshSourceType(
   raw: string | null | undefined
-): raw is "wallet_purchase" | "assignment" {
+): raw is "wallet_purchase" | "partner_purchase" | "assignment" {
   const v = (raw ?? "").trim();
-  return v === "wallet_purchase" || v === "assignment";
+  return (
+    v === "wallet_purchase" ||
+    v === "partner_purchase" ||
+    v === "assignment"
+  );
 }
 
-export type ProviderRefreshSourceType = "wallet_purchase" | "assignment";
+export type ProviderRefreshSourceType =
+  | "wallet_purchase"
+  | "partner_purchase"
+  | "assignment";
