@@ -14,7 +14,6 @@ import {
   WalletEsimPurchaseError,
 } from "@/app/lib/esim/walletPurchase";
 import { prisma } from "@/app/lib/db";
-import { formatUsdCents } from "@/app/lib/wallet/display";
 import {
   normalizeOfferId,
   sanitizeCountryHint,
@@ -51,7 +50,6 @@ export default async function AccountWalletBuyPage({
   let destinations: Awaited<
     ReturnType<typeof listAdminAssignmentDestinations>
   > = [];
-  let balanceLabel = "$0.00";
   let hasWallet = false;
   let loadError = false;
   let directOfferError: string | null = null;
@@ -63,7 +61,7 @@ export default async function AccountWalletBuyPage({
       select: {
         deletedAt: true,
         blockedAt: true,
-        walletAccount: { select: { balanceCents: true } },
+        walletAccount: { select: { id: true } },
       },
     });
     accountRestricted =
@@ -72,16 +70,36 @@ export default async function AccountWalletBuyPage({
         blockedAt: account?.blockedAt ?? null,
       }) === "BLOCKED";
     hasWallet = Boolean(account?.walletAccount);
-    balanceLabel = formatUsdCents(account?.walletAccount?.balanceCents ?? 0);
     destinations = await listAdminAssignmentDestinations();
   } catch {
     loadError = true;
   }
 
-  // Valid public Buy Now hint → prepare + skip package selector.
-  // Server-side financial guard remains authoritative (including BLOCKED).
+  // Country-page Buy Now → /account/esim/buy?offerId=&country=
+  // Prepare + redirect to review. Server-side financial guard remains authoritative.
   let directPurchaseId: string | null = null;
-  if (!loadError && hasWallet && offerIdHint) {
+  if (!loadError && offerIdHint) {
+    if (!hasWallet) {
+      return (
+        <div className="space-y-6">
+          <Link
+            href="/account/wallet"
+            className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+          >
+            ← Back to wallet
+          </Link>
+          <h1 className="text-2xl font-bold tracking-tight">Buy eSIM</h1>
+          <div
+            className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
+            role="status"
+          >
+            <p className="text-sm font-medium text-[var(--heading)]">
+              A wallet is required before purchasing an eSIM.
+            </p>
+          </div>
+        </div>
+      );
+    }
     try {
       const prepared = await prepareWalletEsimPurchase({
         customerUserId: user.id,
@@ -126,28 +144,6 @@ export default async function AccountWalletBuyPage({
     );
   }
 
-  if (!hasWallet) {
-    return (
-      <div className="space-y-6">
-        <Link
-          href="/account/wallet"
-          className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-        >
-          ← Back to wallet
-        </Link>
-        <h1 className="text-2xl font-bold tracking-tight">Buy eSIM</h1>
-        <div
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-          role="status"
-        >
-          <p className="text-sm font-medium text-[var(--heading)]">
-            A wallet is required before purchasing an eSIM.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="mx-auto max-w-5xl space-y-8">
       <div>
@@ -183,11 +179,7 @@ export default async function AccountWalletBuyPage({
         </div>
       ) : null}
 
-      <WalletPurchaseSelectForm
-        destinations={destinations}
-        balanceLabel={balanceLabel}
-        accountRestricted={accountRestricted}
-      />
+      <WalletPurchaseSelectForm destinations={destinations} />
     </div>
   );
 }

@@ -117,8 +117,7 @@ async function main() {
   assert.match(buyPage, /CUSTOMER_ACCOUNT_RESTRICTED_MESSAGE/);
   assert.doesNotMatch(buyPage, /blockedReason/);
   assert.doesNotMatch(buySelect, /blockedReason/);
-  assert.match(buySelect, /accountRestricted/);
-  assert.match(buySelect, /Checkout is unavailable while your account is restricted/);
+  assert.match(buyPage, /accountRestricted/);
   assert.match(walletPurchase, /assertCustomerMayStartWalletPurchase/);
   console.log("PASS no_blockedReason_in_customer_apis");
 
