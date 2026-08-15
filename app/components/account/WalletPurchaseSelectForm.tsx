@@ -184,21 +184,11 @@ export default function WalletPurchaseSelectForm({
   const [idempotencyKey] = useState(newIdempotencyKey);
   const [search, setSearch] = useState("");
   const [destinationCode, setDestinationCode] = useState("");
-  /** When false with a selection, discovery grid is collapsed so plans stay visible. */
-  const [destinationPickerOpen, setDestinationPickerOpen] = useState(true);
   const [offers, setOffers] = useState<AdminOfferOption[]>([]);
   const [selectedOfferId, setSelectedOfferId] = useState("");
   const [offersError, setOffersError] = useState<string | null>(null);
   const [loadingOffers, startOffersTransition] = useTransition();
   const errorState = state as WalletPurchaseActionState;
-
-  const selectedDestination = useMemo(
-    () => destinations.find((d) => d.code === destinationCode) ?? null,
-    [destinations, destinationCode]
-  );
-
-  const showDestinationPicker =
-    destinationPickerOpen || !selectedDestination;
 
   const searchDestinations = useMemo(
     () => destinations.map(toSearchDestination),
@@ -242,7 +232,6 @@ export default function WalletPurchaseSelectForm({
 
   function onDestinationSelect(code: string) {
     setDestinationCode(code);
-    setDestinationPickerOpen(false);
     setSelectedOfferId("");
     setOffers([]);
     setOffersError(null);
@@ -262,10 +251,6 @@ export default function WalletPurchaseSelectForm({
         setOffersError("Unable to load packages right now. Please try again.");
       }
     });
-  }
-
-  function onChangeDestination() {
-    setDestinationPickerOpen(true);
   }
 
   const canContinue =
@@ -301,80 +286,54 @@ export default function WalletPurchaseSelectForm({
         </div>
       ) : null}
 
-      {showDestinationPicker ? (
-        <div className="space-y-4">
-          <div className="relative">
-            <label htmlFor={searchFieldId} className="sr-only">
-              Search destinations
-            </label>
-            <Search
-              className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-soft)]"
-              aria-hidden="true"
-            />
-            <input
-              id={searchFieldId}
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search destinations"
-              autoComplete="off"
-              className="
-                w-full rounded-[14px] border border-[var(--border-strong)]
-                bg-[var(--surface)] py-3 pl-10 pr-3 text-sm text-[var(--heading)]
-                placeholder:text-[var(--text-soft)]
-                focus:border-[var(--accent-strong)]/50 focus:outline-none
-                focus:ring-2 focus:ring-[var(--accent-strong)]/25
-              "
-            />
-          </div>
+      <div className="space-y-4">
+        <div className="relative">
+          <label htmlFor={searchFieldId} className="sr-only">
+            Search destinations
+          </label>
+          <Search
+            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-soft)]"
+            aria-hidden="true"
+          />
+          <input
+            id={searchFieldId}
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search destinations"
+            autoComplete="off"
+            className="
+              w-full rounded-[14px] border border-[var(--border-strong)]
+              bg-[var(--surface)] py-3 pl-10 pr-3 text-sm text-[var(--heading)]
+              placeholder:text-[var(--text-soft)]
+              focus:border-[var(--accent-strong)]/50 focus:outline-none
+              focus:ring-2 focus:ring-[var(--accent-strong)]/25
+            "
+          />
+        </div>
 
-          {visibleDestinations.length === 0 ? (
-            <p className="text-sm text-[var(--text-muted)]" role="status">
-              No destinations found.
-            </p>
-          ) : (
-            <div className="space-y-6">
-              {popularDestinations.length > 0 ? (
-                <section aria-labelledby={`${destinationsLabelId}-popular`}>
-                  <h2
-                    id={`${destinationsLabelId}-popular`}
-                    className="text-sm font-semibold text-[var(--heading)]"
-                  >
-                    Popular Destinations
-                  </h2>
-                  <div
-                    role="group"
-                    aria-label="Popular destinations"
-                    className="mt-3 grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3 lg:grid-cols-4"
-                  >
-                    {popularDestinations.map((destination) => (
-                      <DestinationCardButton
-                        key={`popular-${destination.code}`}
-                        destination={destination}
-                        selected={destinationCode === destination.code}
-                        disabled={pending || loadingOffers}
-                        onSelect={onDestinationSelect}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ) : null}
-
-              <section aria-labelledby={`${destinationsLabelId}-all`}>
+        {visibleDestinations.length === 0 ? (
+          <p className="text-sm text-[var(--text-muted)]" role="status">
+            No destinations found.
+          </p>
+        ) : (
+          <div className="space-y-6">
+            {popularDestinations.length > 0 ? (
+              <section aria-labelledby={`${destinationsLabelId}-popular`}>
                 <h2
-                  id={`${destinationsLabelId}-all`}
+                  id={`${destinationsLabelId}-popular`}
                   className="text-sm font-semibold text-[var(--heading)]"
                 >
-                  All Destinations
+                  Popular Destinations
                 </h2>
                 <div
                   role="group"
-                  aria-label="All destinations"
+                  aria-label="Popular destinations"
                   className="mt-3 grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3 lg:grid-cols-4"
                 >
-                  {allDestinations.map((destination) => (
+                  {popularDestinations.map((destination) => (
                     <DestinationCardButton
-                      key={`all-${destination.code}`}
+                      key={`popular-${destination.code}`}
                       destination={destination}
                       selected={destinationCode === destination.code}
                       disabled={pending || loadingOffers}
@@ -383,58 +342,34 @@ export default function WalletPurchaseSelectForm({
                   ))}
                 </div>
               </section>
-            </div>
-          )}
-        </div>
-      ) : selectedDestination ? (
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-[var(--heading)]">
-            Selected destination
-          </h2>
-          <div
-            className="
-              flex min-w-0 flex-col gap-3 rounded-2xl border border-[var(--accent-strong)]
-              bg-[var(--surface)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between
-            "
-          >
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-2)]">
-                <DestinationFlagMark
-                  destination={{
-                    code: selectedDestination.code,
-                    name: selectedDestination.name,
-                    flag: selectedDestination.flag,
-                    kind:
-                      selectedDestination.kind === "regional" ||
-                      selectedDestination.kind === "global" ||
-                      selectedDestination.kind === "country"
-                        ? selectedDestination.kind
-                        : "country",
-                  }}
-                />
-              </span>
-              <p className="min-w-0 truncate text-sm font-semibold text-[var(--heading)]">
-                {selectedDestination.name}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onChangeDestination}
-              className="
-                inline-flex h-10 w-full shrink-0 items-center justify-center rounded-[12px]
-                border border-[var(--border-strong)] bg-[var(--surface-2)] px-4
-                text-sm font-semibold text-[var(--heading)] transition
-                hover:bg-[var(--surface)]
-                focus-visible:outline-none focus-visible:ring-2
-                focus-visible:ring-[var(--accent-strong)]
-                sm:w-auto
-              "
-            >
-              Change destination
-            </button>
+            ) : null}
+
+            <section aria-labelledby={`${destinationsLabelId}-all`}>
+              <h2
+                id={`${destinationsLabelId}-all`}
+                className="text-sm font-semibold text-[var(--heading)]"
+              >
+                All Destinations
+              </h2>
+              <div
+                role="group"
+                aria-label="All destinations"
+                className="mt-3 grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3 lg:grid-cols-4"
+              >
+                {allDestinations.map((destination) => (
+                  <DestinationCardButton
+                    key={`all-${destination.code}`}
+                    destination={destination}
+                    selected={destinationCode === destination.code}
+                    disabled={pending || loadingOffers}
+                    onSelect={onDestinationSelect}
+                  />
+                ))}
+              </div>
+            </section>
           </div>
-        </div>
-      ) : null}
+        )}
+      </div>
 
       <div className="space-y-3">
         <h2 className="text-sm font-semibold text-[var(--heading)]">

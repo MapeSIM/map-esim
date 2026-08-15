@@ -257,13 +257,6 @@ function main() {
     selectForm,
     /accountRestricted \? \([\s\S]*?Checkout is unavailable[\s\S]*?\) : \([\s\S]*?Continue to checkout/
   );
-  // Selected destination collapses discovery; Change destination reopens it.
-  assert.match(selectForm, /destinationPickerOpen/);
-  assert.match(selectForm, /setDestinationPickerOpen\(false\)/);
-  assert.match(selectForm, /Selected destination/);
-  assert.match(selectForm, /Change destination/);
-  assert.match(selectForm, /onChangeDestination|setDestinationPickerOpen\(true\)/);
-  assert.match(selectForm, /showDestinationPicker/);
   // Retail display: selector costLabel from verified.priceUSD (not providerPriceUSD)
   assert.match(
     assignmentRead,
