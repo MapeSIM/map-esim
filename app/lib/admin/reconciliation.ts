@@ -6,6 +6,7 @@ import "server-only";
 import {
   AdminPackageAssignmentStatus,
   OrderStatus,
+  PartnerEsimPurchaseStatus,
   Role,
   WalletEsimPurchaseStatus,
   WalletTopupStatus,
@@ -231,6 +232,7 @@ export async function getReconciliationListPage(options: {
   try {
     const [
       purchases,
+      partnerPurchases,
       assignments,
       topups,
       emailPurchases,
@@ -284,6 +286,54 @@ export async function getReconciliationListPage(options: {
           customer: { select: { id: true, name: true, email: true } },
           debitTransaction: { select: { status: true } },
           refundTransaction: { select: { status: true } },
+        },
+      }),
+      prisma.partnerEsimPurchase.findMany({
+        where: {
+          OR: [
+            { status: PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED },
+            {
+              status: PartnerEsimPurchaseStatus.PROVIDER_PENDING,
+              updatedAt: { lte: stuckBefore },
+            },
+          ],
+        },
+        orderBy: { updatedAt: "desc" },
+        take: RECONCILIATION_LIST_LIMIT,
+        select: {
+          id: true,
+          status: true,
+          providerOrderId: true,
+          providerResultKind: true,
+          failureCategory: true,
+          failureCode: true,
+          debitTransactionId: true,
+          refundTransactionId: true,
+          orderId: true,
+          emailDeliveryStatus: true,
+          reconciliationResolvedAt: true,
+          reconciliationLockedAt: true,
+          reconciliationEscalatedAt: true,
+          reconciliationEscalationPriority: true,
+          reconciliationResolutionReason: true,
+          destinationName: true,
+          destinationCode: true,
+          planName: true,
+          dataAllowance: true,
+          validity: true,
+          retailPriceCents: true,
+          partnerChargeCents: true,
+          currency: true,
+          createdAt: true,
+          updatedAt: true,
+          partner: {
+            select: {
+              id: true,
+              user: { select: { id: true, name: true, email: true } },
+            },
+          },
+          debitTransaction: { select: { id: true } },
+          refundTransaction: { select: { id: true } },
         },
       }),
       prisma.adminPackageAssignment.findMany({
@@ -506,6 +556,70 @@ export async function getReconciliationListPage(options: {
           hasRefund: Boolean(row.refundTransactionId),
           debitStatus: row.debitTransaction?.status,
           refundStatus: row.refundTransaction?.status,
+        }),
+        providerResultKindLabel: providerResultLabel(row.providerResultKind),
+        providerRefMasked: maskProviderOrderRef(row.providerOrderId),
+        hasProviderRef: Boolean((row.providerOrderId ?? "").trim()),
+        localOrderLabel: row.orderId || "—",
+        localOrderHref: row.orderId ? `/admin/orders/${row.orderId}` : null,
+        failureLabel: failureLabel(row.failureCategory, row.failureCode),
+        category,
+        categoryLabel: categoryLabel(category),
+        createdAtLabel: formatTs(row.createdAt),
+        updatedAtLabel: formatTs(row.updatedAt),
+        resolutionLabel: resolutionLabel({
+          resolvedAt: row.reconciliationResolvedAt,
+          lockedAt: row.reconciliationLockedAt,
+          escalatedAt: row.reconciliationEscalatedAt,
+          escalationPriority: row.reconciliationEscalationPriority,
+          reason: row.reconciliationResolutionReason,
+        }),
+        locked: Boolean(row.reconciliationLockedAt),
+        escalated: Boolean(row.reconciliationEscalatedAt),
+      });
+    }
+
+    for (const row of partnerPurchases) {
+      const category = classifyReconciliationCase({
+        sourceType: "partner_purchase",
+        status: row.status,
+        providerOrderId: row.providerOrderId,
+        providerResultKind: row.providerResultKind,
+        failureCategory: row.failureCategory,
+        failureCode: row.failureCode,
+        debitTransactionId: row.debitTransactionId,
+        refundTransactionId: row.refundTransactionId,
+        orderId: row.orderId,
+        emailDeliveryStatus: row.emailDeliveryStatus,
+        reconciliationResolvedAt: row.reconciliationResolvedAt,
+        updatedAt: row.updatedAt,
+        now,
+      });
+      if (
+        !categoryMatchesFilter(category, filter, {
+          locked: Boolean(row.reconciliationLockedAt),
+          escalated: Boolean(row.reconciliationEscalatedAt),
+        })
+      ) {
+        continue;
+      }
+      const partnerUser = row.partner?.user ?? null;
+      rows.push({
+        sourceType: "partner_purchase",
+        attemptId: row.id,
+        href: `/admin/reconciliation/partner_purchase/${row.id}`,
+        customerLabel: customerLabelFrom(partnerUser),
+        customerHref: partnerUser
+          ? `/admin/customers/${partnerUser.id}`
+          : null,
+        purchaseType: "Partner balance",
+        destinationPackage: destinationPackageLabel(row),
+        amountLabel: `Partner debit ${formatUsdCents(row.partnerChargeCents)} (retail ${formatUsdCents(row.retailPriceCents)}) ${row.currency || "USD"}`,
+        walletDebitRefundLabel: walletDebitRefundLabel({
+          hasDebit: Boolean(row.debitTransactionId),
+          hasRefund: Boolean(row.refundTransactionId),
+          debitStatus: row.debitTransaction ? "COMPLETED" : undefined,
+          refundStatus: row.refundTransaction ? "COMPLETED" : undefined,
         }),
         providerResultKindLabel: providerResultLabel(row.providerResultKind),
         providerRefMasked: maskProviderOrderRef(row.providerOrderId),
@@ -854,6 +968,186 @@ export async function getReconciliationDetail(
   const sourceType = sourceTypeRaw;
   const attemptId = (attemptIdRaw ?? "").trim();
   if (!attemptId || attemptId.length > 96) return null;
+
+  if (sourceType === "partner_purchase") {
+    const row = await prisma.partnerEsimPurchase.findUnique({
+      where: { id: attemptId },
+      select: {
+        id: true,
+        status: true,
+        providerOrderId: true,
+        providerResultKind: true,
+        providerObservedAt: true,
+        safeProviderStatusCode: true,
+        failureCategory: true,
+        failureCode: true,
+        debitTransactionId: true,
+        refundTransactionId: true,
+        orderId: true,
+        emailDeliveryStatus: true,
+        reconciliationState: true,
+        reconciliationResolvedAt: true,
+        reconciliationLockedAt: true,
+        reconciliationEscalatedAt: true,
+        reconciliationEscalationPriority: true,
+        reconciliationResolutionReason: true,
+        destinationName: true,
+        destinationCode: true,
+        planName: true,
+        dataAllowance: true,
+        validity: true,
+        retailPriceCents: true,
+        partnerChargeCents: true,
+        discountBps: true,
+        discountVersion: true,
+        currency: true,
+        createdAt: true,
+        updatedAt: true,
+        completedAt: true,
+        partner: {
+          select: {
+            id: true,
+            user: { select: { id: true, name: true, email: true } },
+          },
+        },
+        debitTransaction: { select: { id: true } },
+        refundTransaction: { select: { id: true } },
+        order: {
+          select: {
+            id: true,
+            iccidHash: true,
+            iccidCapturedAt: true,
+            fundingSource: true,
+          },
+        },
+      },
+    });
+    if (!row) return null;
+
+    const isStuck =
+      row.status === PartnerEsimPurchaseStatus.PROVIDER_PENDING &&
+      isStuckAttemptAge(row.updatedAt);
+    const isRecon =
+      row.status === PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED;
+    if (!isRecon && !isStuck && !row.reconciliationResolvedAt) {
+      return null;
+    }
+
+    const category = classifyReconciliationCase({
+      sourceType: "partner_purchase",
+      status: row.status,
+      providerOrderId: row.providerOrderId,
+      providerResultKind: row.providerResultKind,
+      failureCategory: row.failureCategory,
+      failureCode: row.failureCode,
+      debitTransactionId: row.debitTransactionId,
+      refundTransactionId: row.refundTransactionId,
+      orderId: row.orderId,
+      emailDeliveryStatus: row.emailDeliveryStatus,
+      reconciliationResolvedAt: row.reconciliationResolvedAt,
+      updatedAt: row.updatedAt,
+    });
+
+    const partnerUser = row.partner?.user ?? null;
+    const hasProvider = Boolean((row.providerOrderId ?? "").trim());
+    const timeline: ReconciliationTimelineEvent[] = [
+      timelineEvent("Attempt prepared", "done", formatTs(row.createdAt)),
+      timelineEvent(
+        "Partner funds reserved",
+        row.debitTransactionId ? "done" : "pending",
+        row.debitTransactionId
+          ? `Debit linked (${formatUsdCents(row.partnerChargeCents)})`
+          : "No debit yet"
+      ),
+      timelineEvent(
+        "Provider call initiated",
+        row.status === PartnerEsimPurchaseStatus.READY ? "pending" : "done",
+        row.status
+      ),
+      timelineEvent(
+        "Provider result observed",
+        row.providerObservedAt || row.providerResultKind ? "done" : "unknown",
+        providerResultLabel(row.providerResultKind)
+      ),
+      timelineEvent(
+        hasProvider ? "Provider reference stored" : "Provider reference missing",
+        hasProvider ? "done" : "failed",
+        hasProvider
+          ? maskProviderOrderRef(row.providerOrderId)
+          : "Not stored"
+      ),
+      timelineEvent(
+        row.status === PartnerEsimPurchaseStatus.COMPLETED
+          ? "Local finalization completed"
+          : row.failureCategory === "local_finalize_failed"
+            ? "Local finalization failed"
+            : "Local finalization pending",
+        row.status === PartnerEsimPurchaseStatus.COMPLETED
+          ? "done"
+          : row.failureCategory === "local_finalize_failed"
+            ? "failed"
+            : "pending",
+        row.orderId ? `Order ${row.orderId}` : "No local order"
+      ),
+      timelineEvent(
+        row.refundTransactionId ? "Partner refund completed" : "Partner refund missing",
+        row.refundTransactionId
+          ? "done"
+          : row.debitTransactionId &&
+              row.status !== PartnerEsimPurchaseStatus.COMPLETED
+            ? "pending"
+            : "unknown",
+        row.refundTransactionId
+          ? `Refund ${row.refundTransactionId}`
+          : "—"
+      ),
+    ];
+
+    return {
+      sourceType: "partner_purchase",
+      attemptId: row.id,
+      purchaseType: "Partner balance",
+      category,
+      categoryLabel: categoryLabel(category),
+      customerLabel: customerLabelFrom(partnerUser),
+      customerHref: partnerUser ? `/admin/customers/${partnerUser.id}` : null,
+      destinationPackage: destinationPackageLabel(row),
+      amountLabel: `Partner debit ${formatUsdCents(row.partnerChargeCents)} (retail ${formatUsdCents(row.retailPriceCents)}, discount ${row.discountBps} bps v${row.discountVersion}) ${row.currency || "USD"}`,
+      walletDebitRefundLabel: walletDebitRefundLabel({
+        hasDebit: Boolean(row.debitTransactionId),
+        hasRefund: Boolean(row.refundTransactionId),
+        debitStatus: row.debitTransaction ? "COMPLETED" : undefined,
+        refundStatus: row.refundTransaction ? "COMPLETED" : undefined,
+      }),
+      providerResultKindLabel: providerResultLabel(row.providerResultKind),
+      providerRefMasked: maskProviderOrderRef(row.providerOrderId),
+      hasProviderRef: hasProvider,
+      localOrderLabel: row.orderId || "—",
+      localOrderHref: row.orderId ? `/admin/orders/${row.orderId}` : null,
+      failureLabel: failureLabel(row.failureCategory, row.failureCode),
+      createdAtLabel: formatTs(row.createdAt),
+      updatedAtLabel: formatTs(row.updatedAt),
+      resolutionLabel: resolutionLabel({
+        resolvedAt: row.reconciliationResolvedAt,
+        lockedAt: row.reconciliationLockedAt,
+        escalatedAt: row.reconciliationEscalatedAt,
+        escalationPriority: row.reconciliationEscalationPriority,
+        reason: row.reconciliationResolutionReason,
+      }),
+      locked: Boolean(row.reconciliationLockedAt),
+      escalated: Boolean(row.reconciliationEscalatedAt),
+      timeline,
+      relatedLinks: [
+        ...(partnerUser
+          ? [{ label: "Partner user", href: `/admin/customers/${partnerUser.id}` }]
+          : []),
+        ...(row.orderId
+          ? [{ label: "Order", href: `/admin/orders/${row.orderId}` }]
+          : []),
+        { label: "Audit logs", href: "/admin/audit-logs" },
+      ],
+    };
+  }
 
   if (sourceType === "wallet_purchase" || sourceType === "order_email") {
     const id =

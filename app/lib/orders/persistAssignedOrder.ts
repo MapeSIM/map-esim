@@ -12,7 +12,8 @@ import type { VerifiedCheckoutOffer } from "@/app/lib/vesim/server";
 
 /**
  * Persist a customer-linked order after confirmed provider success.
- * Supports COMPANY_FUNDED and CUSTOMER_WALLET. Upserts on providerOrderId.
+ * Supports COMPANY_FUNDED, CUSTOMER_WALLET, CUSTOMER_SPLIT, DIRECT_PAYMENT,
+ * and PARTNER_BALANCE. Upserts on providerOrderId.
  * Never stores QR/LPA/access tokens. ICCID stored encrypted when present.
  */
 export async function persistAssignedOrder(
@@ -42,7 +43,8 @@ export async function persistAssignedOrder(
     options.fundingSource !== OrderFundingSource.COMPANY_FUNDED &&
     options.fundingSource !== OrderFundingSource.CUSTOMER_WALLET &&
     options.fundingSource !== OrderFundingSource.CUSTOMER_SPLIT &&
-    options.fundingSource !== OrderFundingSource.DIRECT_PAYMENT
+    options.fundingSource !== OrderFundingSource.DIRECT_PAYMENT &&
+    options.fundingSource !== OrderFundingSource.PARTNER_BALANCE
   ) {
     throw new Error("Unsupported order funding source for this flow.");
   }

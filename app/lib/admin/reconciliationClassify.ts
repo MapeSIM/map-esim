@@ -37,6 +37,7 @@ export type ReconciliationCategory =
 
 export type ReconciliationSourceType =
   | "wallet_purchase"
+  | "partner_purchase"
   | "assignment"
   | "topup"
   | "order_email"
@@ -46,6 +47,7 @@ export type ReconciliationSourceType =
 export type ReconciliationPurchaseType =
   | "Self-service wallet"
   | "Admin-assisted wallet"
+  | "Partner balance"
   | "Company-funded"
   | "Top-up"
   | "Email issue"
@@ -323,6 +325,7 @@ export function isValidReconciliationSourceType(
   const v = (raw ?? "").trim();
   return (
     v === "wallet_purchase" ||
+    v === "partner_purchase" ||
     v === "assignment" ||
     v === "topup" ||
     v === "order_email" ||

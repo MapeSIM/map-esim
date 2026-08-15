@@ -181,3 +181,80 @@ export async function persistAssignmentProviderObservation(
     providerOrderId: providerOrderId || current.providerOrderId,
   };
 }
+
+/**
+ * Persist observed providerOrderId + safe result metadata on a Partner purchase.
+ * Idempotent same-id updates. Refuses to overwrite a different stored id.
+ */
+export async function persistPartnerPurchaseProviderObservation(
+  purchaseId: string,
+  input: PersistProviderObservationInput,
+  tx?: Prisma.TransactionClient
+): Promise<PersistProviderObservationResult> {
+  const client = tx ?? prisma;
+  const id = (purchaseId ?? "").trim();
+  if (!id) return { ok: false, reason: "invalid_id" };
+
+  const providerOrderId = normalizeProviderOrderId(input.providerOrderId);
+  const safeCode = normalizeStatusCode(input.safeProviderStatusCode);
+  const now = new Date();
+
+  const current = await client.partnerEsimPurchase.findUnique({
+    where: { id },
+    select: { id: true, providerOrderId: true },
+  });
+  if (!current) return { ok: false, reason: "invalid_id" };
+
+  if (
+    providerOrderId &&
+    current.providerOrderId &&
+    current.providerOrderId !== providerOrderId
+  ) {
+    return { ok: false, reason: "conflict_existing_different" };
+  }
+
+  if (providerOrderId) {
+    const otherPartner = await client.partnerEsimPurchase.findFirst({
+      where: {
+        providerOrderId,
+        NOT: { id },
+      },
+      select: { id: true },
+    });
+    if (otherPartner) {
+      return { ok: false, reason: "conflict_other_attempt" };
+    }
+    const otherPurchase = await client.walletEsimPurchase.findFirst({
+      where: { providerOrderId },
+      select: { id: true },
+    });
+    if (otherPurchase) {
+      return { ok: false, reason: "conflict_other_attempt" };
+    }
+    const otherAssignment = await client.adminPackageAssignment.findFirst({
+      where: { providerOrderId },
+      select: { id: true },
+    });
+    if (otherAssignment) {
+      return { ok: false, reason: "conflict_other_attempt" };
+    }
+  }
+
+  await client.partnerEsimPurchase.update({
+    where: { id },
+    data: {
+      ...(providerOrderId && !current.providerOrderId
+        ? { providerOrderId }
+        : {}),
+      providerResultKind: input.providerResultKind,
+      providerObservedAt: now,
+      ...(safeCode ? { safeProviderStatusCode: safeCode } : {}),
+    },
+  });
+
+  return {
+    ok: true,
+    stored: Boolean(providerOrderId),
+    providerOrderId: providerOrderId || current.providerOrderId,
+  };
+}

@@ -78,6 +78,9 @@ export class PartnerEsimPurchaseError extends Error {
     | "INVALID_STATE"
     | "INSUFFICIENT_FUNDS"
     | "WALLET_UNAVAILABLE"
+    | "PROVIDER_FAILED"
+    | "RECONCILIATION_REQUIRED"
+    | "PROVIDER_IN_FLIGHT"
     | "UNAVAILABLE";
 
   constructor(code: PartnerEsimPurchaseError["code"], message: string) {
