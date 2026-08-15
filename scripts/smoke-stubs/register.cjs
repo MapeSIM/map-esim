@@ -4,10 +4,21 @@
  *
  * Optional ops-auth overrides (set before importing app modules):
  *   SMOKE_SESSION_USER_ID
- *   SMOKE_SESSION_ROLE=ADMIN|CUSTOMER
+ *   SMOKE_SESSION_ROLE=ADMIN|CUSTOMER|PARTNER
  */
 const Module = require("module");
 const path = require("path");
+
+/**
+ * Explicit application role allowlist (mirrors app/lib/auth/appRole.ts).
+ * Unknown/invalid roles fail closed — never collapse to CUSTOMER.
+ */
+function coerceSmokeAppRole(role) {
+  if (role === "CUSTOMER" || role === "ADMIN" || role === "PARTNER") {
+    return role;
+  }
+  return null;
+}
 
 function isAuthSessionRequest(request) {
   const r = String(request).replace(/\\/g, "/");
@@ -24,6 +35,26 @@ function smokeRedirect(url) {
   const err = new Error(`SMOKE_REDIRECT:${url}`);
   err.name = "SmokeRedirect";
   throw err;
+}
+
+function resolveSmokeSessionRole() {
+  const raw = (process.env.SMOKE_SESSION_ROLE || "ADMIN").trim();
+  const role = coerceSmokeAppRole(raw);
+  if (!role) {
+    smokeRedirect("/signin");
+  }
+  return role;
+}
+
+function smokeSessionUser() {
+  return {
+    id: process.env.SMOKE_SESSION_USER_ID,
+    name: "Smoke Session",
+    email: "smoke-session@example.invalid",
+    role: resolveSmokeSessionRole(),
+    needsLegalConsent: false,
+    authMethod: "credentials",
+  };
 }
 
 const originalLoad = Module._load;
@@ -67,40 +98,14 @@ Module._load = function smokeStubLoad(request, parent, isMain) {
   }
   if (process.env.SMOKE_SESSION_USER_ID && isAuthSessionRequest(request)) {
     return {
-      getSessionUser: async () => {
-        const sessionRole = (process.env.SMOKE_SESSION_ROLE || "ADMIN").trim();
-        return {
-          id: process.env.SMOKE_SESSION_USER_ID,
-          name: "Smoke Session",
-          email: "smoke-session@example.invalid",
-          role: sessionRole === "ADMIN" ? "ADMIN" : "CUSTOMER",
-          needsLegalConsent: false,
-          authMethod: "credentials",
-        };
-      },
-      requireSession: async () => {
-        const sessionRole = (process.env.SMOKE_SESSION_ROLE || "ADMIN").trim();
-        return {
-          id: process.env.SMOKE_SESSION_USER_ID,
-          name: "Smoke Session",
-          email: "smoke-session@example.invalid",
-          role: sessionRole === "ADMIN" ? "ADMIN" : "CUSTOMER",
-          needsLegalConsent: false,
-          authMethod: "credentials",
-        };
-      },
+      getSessionUser: async () => smokeSessionUser(),
+      requireSession: async () => smokeSessionUser(),
       requireRole: async (role) => {
-        const sessionRole = (process.env.SMOKE_SESSION_ROLE || "ADMIN").trim();
-        const sessionUser = {
-          id: process.env.SMOKE_SESSION_USER_ID,
-          name: "Smoke Session",
-          email: "smoke-session@example.invalid",
-          role: sessionRole === "ADMIN" ? "ADMIN" : "CUSTOMER",
-          needsLegalConsent: false,
-          authMethod: "credentials",
-        };
+        const sessionUser = smokeSessionUser();
         if (sessionUser.role !== role) {
-          smokeRedirect(role === "ADMIN" ? "/account" : "/signin");
+          if (sessionUser.role === "ADMIN") smokeRedirect("/admin");
+          if (sessionUser.role === "PARTNER") smokeRedirect("/partner");
+          smokeRedirect("/signin");
         }
         return sessionUser;
       },
@@ -112,6 +117,8 @@ Module._load = function smokeStubLoad(request, parent, isMain) {
   }
   return originalLoad.apply(this, arguments);
 };
+
+exports.coerceSmokeAppRole = coerceSmokeAppRole;
 
 // Silence unused path import if bundlers complain — keep for future path joins.
 void path;

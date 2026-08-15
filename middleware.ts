@@ -9,6 +9,8 @@ export const config = {
     "/account/:path*",
     "/admin",
     "/admin/:path*",
+    "/partner",
+    "/partner/:path*",
     "/oauth-consent",
     "/checkout",
     "/checkout/:path*",

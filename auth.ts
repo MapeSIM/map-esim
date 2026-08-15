@@ -1,3 +1,4 @@
+import { coerceAppRole } from "@/app/lib/auth/appRole";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
@@ -75,6 +76,14 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         if (!user.emailVerifiedAt) return null;
         // Disabled admins must not sign in.
         if (user.role === "ADMIN" && user.adminDisabledAt) return null;
+        // Disabled partners must not sign in.
+        if (user.role === "PARTNER") {
+          const partner = await prisma.partnerProfile.findUnique({
+            where: { userId: user.id },
+            select: { disabledAt: true },
+          });
+          if (!partner || partner.disabledAt) return null;
+        }
 
         const passwordHash = user.passwordHash;
         const valid = await verifyPassword(parsed.data.password, passwordHash);
@@ -95,11 +104,14 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           });
         }
 
+        const role = coerceAppRole(user.role);
+        if (!role) return null;
+
         return {
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role === "ADMIN" ? "ADMIN" : "CUSTOMER",
+          role,
           remember: parsed.data.remember === "1",
         };
       },
@@ -204,6 +216,10 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         return false; // GOOGLE_ADMIN_DENIED
       }
 
+      if (category === "PARTNER") {
+        return false; // GOOGLE_PARTNER_DENIED
+      }
+
       if (category === "UNLINKED_CUSTOMER") {
         // Continue — Auth.js emits OAuthAccountNotLinked (no auto-link).
         return true;
@@ -272,6 +288,17 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         return invalidate();
       }
 
+      // Disabled PARTNER: deny immediately.
+      if (dbUser.role === "PARTNER") {
+        const partner = await prisma.partnerProfile.findUnique({
+          where: { userId: userId },
+          select: { disabledAt: true },
+        });
+        if (!partner || partner.disabledAt) {
+          return invalidate();
+        }
+      }
+
       // Snapshot prior claims before overwrite.
       const priorCredentialsChangedAt =
         typeof token.credentialsChangedAt === "number"
@@ -297,8 +324,13 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         hasGoogleAccount: dbUser.hasGoogleAccount,
       });
 
+      const appRole = coerceAppRole(dbUser.role);
+      if (!appRole) {
+        return invalidate();
+      }
+
       token.sub = userId;
-      token.role = dbUser.role === "ADMIN" ? "ADMIN" : "CUSTOMER";
+      token.role = appRole;
       token.authMethod = authMethod;
       token.credentialsChangedAt =
         dbUser.credentialsChangedAt?.getTime() ?? 0;
@@ -379,7 +411,13 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       }
       if (session.user) {
         session.user.id = token.sub;
-        session.user.role = token.role === "ADMIN" ? "ADMIN" : "CUSTOMER";
+        const role = coerceAppRole(token.role);
+        if (!role) {
+          session.user.id = "";
+          session.user.role = "CUSTOMER";
+        } else {
+          session.user.role = role;
+        }
         session.user.needsLegalConsent = Boolean(token.needsLegalConsent);
         session.user.authMethod =
           token.authMethod === GOOGLE_AUTH_METHOD

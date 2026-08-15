@@ -21,6 +21,7 @@ import {
   verifyEmailOtp,
 } from "@/app/lib/auth/otp";
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
+import { coerceAppRole } from "@/app/lib/auth/appRole";
 import { resolvePostSignInPath } from "@/app/lib/auth/redirects";
 import { getRequestIpKey } from "@/app/lib/auth/requestMeta";
 import { readRequestOrigin } from "@/app/lib/auth/requestOrigin";
@@ -286,7 +287,7 @@ export async function signinAction(
     redirect(`/verify-email?email=${encodeURIComponent(email)}`);
   }
 
-  const role = user.role === "ADMIN" ? "ADMIN" : "CUSTOMER";
+  const role = coerceAppRole(user.role) ?? "CUSTOMER";
   const requestOrigin = await readRequestOrigin();
   const redirectTo = resolvePostSignInPath(role, rawCallbackUrl, {
     requestOrigin,

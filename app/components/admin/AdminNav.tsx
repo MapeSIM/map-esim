@@ -8,6 +8,7 @@ const links = [
   { href: "/admin", label: "Overview", exact: true },
   { href: "/admin/orders", label: "Orders", exact: false },
   { href: "/admin/customers", label: "Customers", exact: false },
+  { href: "/admin/partners", label: "Partners", exact: false },
   { href: "/admin/wallet-topups", label: "Wallet top-ups", exact: false },
   { href: "/admin/payments/pending", label: "Pending payments", exact: false },
   { href: "/admin/refund-requests", label: "Refund requests", exact: false },

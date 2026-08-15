@@ -96,10 +96,12 @@ export function safeCallbackPath(
   return path;
 }
 
-export function postSignInPath(role: "CUSTOMER" | "ADMIN"): string {
+export function postSignInPath(role: "CUSTOMER" | "ADMIN" | "PARTNER"): string {
   // Normal customer sign-in lands on public home. Protected flows still
   // honor a safe internal callbackUrl via resolvePostSignInPath.
-  return role === "ADMIN" ? "/admin" : "/";
+  if (role === "ADMIN") return "/admin";
+  if (role === "PARTNER") return "/partner";
+  return "/";
 }
 
 /**
@@ -107,7 +109,7 @@ export function postSignInPath(role: "CUSTOMER" | "ADMIN"): string {
  * Honors a safe internal callbackUrl only if the role may access it.
  */
 export function resolvePostSignInPath(
-  role: "CUSTOMER" | "ADMIN",
+  role: "CUSTOMER" | "ADMIN" | "PARTNER",
   callbackUrl?: string | null,
   options?: SafeCallbackOptions
 ): string {
@@ -116,7 +118,15 @@ export function resolvePostSignInPath(
   if (!safe) return fallback;
 
   if (safe === "/admin" || safe.startsWith("/admin/")) {
-    return role === "ADMIN" ? safe : "/account";
+    return role === "ADMIN" ? safe : fallback;
+  }
+  if (safe === "/partner" || safe.startsWith("/partner/")) {
+    return role === "PARTNER" ? safe : fallback;
+  }
+  if (safe === "/account" || safe.startsWith("/account/")) {
+    if (role === "CUSTOMER") return safe;
+    if (role === "ADMIN") return safe;
+    return fallback;
   }
 
   return safe;
@@ -124,13 +134,16 @@ export function resolvePostSignInPath(
 
 export function navAuthLink(options: {
   userId?: string | null;
-  role?: "CUSTOMER" | "ADMIN" | null;
+  role?: "CUSTOMER" | "ADMIN" | "PARTNER" | null;
 }): { href: string; label: string } {
   if (!options.userId) {
     return { href: "/signin", label: "Sign in" };
   }
   if (options.role === "ADMIN") {
     return { href: "/admin", label: "Admin" };
+  }
+  if (options.role === "PARTNER") {
+    return { href: "/partner", label: "Partner" };
   }
   return { href: "/account", label: "Account" };
 }

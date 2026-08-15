@@ -16,7 +16,8 @@ export type OtpEmailKind =
   | "signup"
   | "password_reset"
   | "account_deletion"
-  | "admin_invite";
+  | "admin_invite"
+  | "partner_invite";
 
 function copyForKind(kind: OtpEmailKind): {
   subject: string;
@@ -25,6 +26,19 @@ function copyForKind(kind: OtpEmailKind): {
   ignore: string;
   preheader: string;
 } {
+  if (kind === "partner_invite") {
+    return {
+      subject: `Set up your ${BRAND_NAME} Partner account`,
+      headline: "Partner account setup code",
+      introLines: [
+        `You have been invited to become a ${BRAND_NAME} partner.`,
+        "Use this one-time code to set your password and activate your partner account.",
+      ],
+      ignore:
+        "If you were not expecting this partner invitation, you can ignore this email.",
+      preheader: `Your ${BRAND_NAME} partner account setup code expires in 10 minutes.`,
+    };
+  }
   if (kind === "admin_invite") {
     return {
       subject: `Set up your ${BRAND_NAME} Admin account`,

@@ -10,6 +10,12 @@ datasource db {
 enum Role {
   CUSTOMER
   ADMIN
+  PARTNER
+}
+
+enum PartnerWalletTransactionType {
+  ADMIN_CREDIT
+  ADMIN_DEBIT
 }
 
 enum OrderClaimStatus {
@@ -219,10 +225,70 @@ model User {
   refundRequests               RefundRequest[]          @relation("RefundRequestCustomer")
   refundRequestsReviewed       RefundRequest[]          @relation("RefundRequestReviewedBy")
   refundRequestsDecided        RefundRequest[]          @relation("RefundRequestDecidedBy")
+  partnerProfile               PartnerProfile?
+  partnerWalletTxCreated       PartnerWalletTransaction[] @relation("PartnerWalletTxCreatedByAdmin")
 
   @@index([deletedAt])
   @@index([blockedAt])
   @@index([adminDisabledAt])
+}
+
+/// 1:1 Partner/reseller profile for Role.PARTNER users.
+model PartnerProfile {
+  id              String               @id @default(cuid())
+  userId          String               @unique
+  /// Discount in basis points (500 = 5.00%). Applied at future purchase debit time.
+  discountBps     Int                  @default(0)
+  /// CAS version for discount changes (purchase confirm will use in Phase 2).
+  discountVersion Int                  @default(0)
+  /// Null = active. When set, Partner portal + financial actions are denied.
+  disabledAt      DateTime?
+  /// CAS version for disable/reactivate.
+  statusVersion   Int                  @default(0)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletAccount   PartnerWalletAccount?
+
+  @@index([disabledAt])
+  @@index([createdAt])
+}
+
+/// Separate Partner prepaid balance (integer USD cents). Not customer WalletAccount.
+model PartnerWalletAccount {
+  id           String                     @id @default(cuid())
+  partnerId    String                     @unique
+  currency     WalletCurrency             @default(USD)
+  balanceCents Int                        @default(0)
+  version      Int                        @default(0)
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+  partner      PartnerProfile             @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  transactions PartnerWalletTransaction[]
+
+  @@index([createdAt])
+}
+
+/// Append-only Partner wallet ledger (Phase 1: admin credit/debit only).
+model PartnerWalletTransaction {
+  id                     String                        @id @default(cuid())
+  partnerWalletAccountId String
+  type                   PartnerWalletTransactionType
+  amountCents            Int
+  balanceBeforeCents     Int
+  balanceAfterCents      Int
+  reason                 String
+  referenceType          String?
+  referenceId            String?
+  createdByAdminId       String?
+  idempotencyKey         String?                       @unique
+  createdAt              DateTime                      @default(now())
+  wallet                 PartnerWalletAccount          @relation(fields: [partnerWalletAccountId], references: [id], onDelete: Cascade)
+  createdByAdmin         User?                         @relation("PartnerWalletTxCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: SetNull)
+
+  @@index([partnerWalletAccountId, createdAt])
+  @@index([createdByAdminId])
+  @@index([createdAt])
 }
 
 model EmailOtp {

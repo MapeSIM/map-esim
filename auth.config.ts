@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
+import { coerceAppRole } from "@/app/lib/auth/appRole";
 import { isAllowedDuringLegalConsent } from "@/app/lib/auth/legalConsentPolicy";
 import { safeCallbackPath } from "@/app/lib/auth/redirects";
 
@@ -22,9 +23,10 @@ export const authConfig = {
     jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
-        // Role is set authoritatively in auth.ts (DB lookup). Pass through if present.
-        if (user.role === "ADMIN" || user.role === "CUSTOMER") {
-          token.role = user.role;
+        // Role is set authoritatively in auth.ts (DB lookup). Pass through allowlist only.
+        const role = coerceAppRole(user.role);
+        if (role) {
+          token.role = role;
         }
       }
       // Preserve authMethod / needsLegalConsent already encoded on the JWT.
@@ -33,7 +35,12 @@ export const authConfig = {
     session({ session, token }) {
       if (session.user) {
         session.user.id = token.sub || "";
-        session.user.role = token.role === "ADMIN" ? "ADMIN" : "CUSTOMER";
+        const role = coerceAppRole(token.role);
+        // Fail closed to empty id path if role missing — never invent CUSTOMER.
+        session.user.role = role ?? "CUSTOMER";
+        if (!role) {
+          session.user.id = "";
+        }
         session.user.needsLegalConsent = Boolean(token.needsLegalConsent);
         session.user.authMethod =
           token.authMethod === "google" || token.authMethod === "credentials"
@@ -45,7 +52,7 @@ export const authConfig = {
     authorized({ auth, request }) {
       const { pathname } = request.nextUrl;
       const isLoggedIn = Boolean(auth?.user?.id);
-      const role = auth?.user?.role;
+      const role = coerceAppRole(auth?.user?.role);
       const needsLegalConsent = Boolean(auth?.user?.needsLegalConsent);
 
       // Google CUSTOMER with incomplete consent: allow only consent + legal + Auth.js.
@@ -64,13 +71,36 @@ export const authConfig = {
       if (pathname === "/admin" || pathname.startsWith("/admin/")) {
         if (!isLoggedIn) return false;
         if (role !== "ADMIN") {
-          return Response.redirect(new URL("/account", request.nextUrl));
+          const dest =
+            role === "PARTNER" ? "/partner" : role === "CUSTOMER" ? "/account" : "/signin";
+          return Response.redirect(new URL(dest, request.nextUrl));
+        }
+        return true;
+      }
+
+      if (pathname === "/partner" || pathname.startsWith("/partner/")) {
+        if (!isLoggedIn) return false;
+        if (role !== "PARTNER") {
+          const dest =
+            role === "ADMIN" ? "/admin" : role === "CUSTOMER" ? "/account" : "/signin";
+          return Response.redirect(new URL(dest, request.nextUrl));
         }
         return true;
       }
 
       if (pathname === "/account" || pathname.startsWith("/account/")) {
-        return isLoggedIn;
+        if (!isLoggedIn) return false;
+        if (role === "PARTNER") {
+          return Response.redirect(new URL("/partner", request.nextUrl));
+        }
+        if (role === "ADMIN") {
+          // Admins may open /account only when explicitly navigating; keep reachable.
+          return true;
+        }
+        if (role !== "CUSTOMER") {
+          return Response.redirect(new URL("/signin", request.nextUrl));
+        }
+        return true;
       }
 
       if (pathname === "/oauth-consent") {

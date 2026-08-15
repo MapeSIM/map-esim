@@ -8,6 +8,7 @@ export type GoogleDbCategory =
   | "LINKED_CUSTOMER"
   | "UNLINKED_CUSTOMER"
   | "ADMIN"
+  | "PARTNER"
   | "DELETED";
 
 export type JwtSubjectResolution = {
@@ -65,6 +66,7 @@ export function classifyGoogleSignInUser(options: {
   if (!options.userExists) return "NEW_USER";
   if (options.deleted) return "DELETED";
   if (options.role === "ADMIN") return "ADMIN";
+  if (options.role === "PARTNER") return "PARTNER";
   if (options.hasGoogleLinked) return "LINKED_CUSTOMER";
   return "UNLINKED_CUSTOMER";
 }
