@@ -1,7 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import CustomerEsimUsagePanel from "@/app/components/orders/CustomerEsimUsagePanel";
 import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
+import PartnerEsimInstallPanel from "@/app/components/partner/PartnerEsimInstallPanel";
 import PartnerEsimShareControls from "@/app/components/partner/PartnerEsimShareControls";
 import { requireRole } from "@/app/lib/auth/session";
 import { hasActivePartnerEsimShareToken } from "@/app/lib/partner/partnerEsimShareToken";
@@ -149,21 +151,23 @@ export default async function PartnerOrderDetailPage({
       </section>
 
       {detail.statusBadge === "Completed" ? (
-        <PartnerEsimShareControls
-          orderId={detail.orderId}
-          hasActiveToken={hasActiveToken}
-          companyName={companyName}
-        />
+        <>
+          <PartnerEsimInstallPanel
+            orderId={detail.orderId}
+            installEligible
+          />
+          <CustomerEsimUsagePanel
+            orderId={detail.orderId}
+            usageEligible
+            usagePath={`/api/partner/orders/${encodeURIComponent(detail.orderId)}/usage`}
+          />
+          <PartnerEsimShareControls
+            orderId={detail.orderId}
+            hasActiveToken={hasActiveToken}
+            companyName={companyName}
+          />
+        </>
       ) : null}
-
-      <section className="min-w-0 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-4 py-5 text-sm text-[var(--text-muted)]">
-        <p className="font-medium text-[var(--heading)]">Installation</p>
-        <p className="mt-2">
-          Use the full ICCID above with your device&apos;s eSIM install flow when
-          ready. Secure QR and one-tap install for Partners will follow in a later
-          phase.
-        </p>
-      </section>
     </div>
   );
 }

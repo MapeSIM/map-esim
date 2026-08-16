@@ -19,6 +19,9 @@ function main() {
   const partnerLayout = read("app/partner/(portal)/layout.tsx");
   const partnerWallet = read("app/partner/(portal)/wallet/page.tsx");
   const partnerOrders = read("app/partner/(portal)/orders/page.tsx");
+  const partnerOrderDetail = read(
+    "app/partner/(portal)/orders/[orderId]/page.tsx"
+  );
   const navbar = read("app/components/Navbar.tsx");
   const rootLayout = read("app/layout.tsx");
   const accountPage = read("app/account/page.tsx");
@@ -41,6 +44,11 @@ function main() {
   assert.doesNotMatch(partnerWallet, /href=["']\/account\/wallet\/top-up["']/);
   assert.match(partnerWallet, /Available Partner Balance/);
   assert.match(partnerOrders, /My eSIMs/);
+  assert.match(partnerOrderDetail, /PartnerEsimInstallPanel/);
+  assert.doesNotMatch(
+    partnerOrderDetail,
+    /Use the full ICCID above|Secure QR and one-tap install for Partners will follow/
+  );
   assert.match(partnerWallet, /Partner/);
   assert.match(access, /Purchase debit/);
   assert.match(access, /Purchase refund/);

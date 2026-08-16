@@ -30,6 +30,7 @@
     "qa:partner-purchase-provider": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-purchase-provider.ts",
     "qa:partner-catalog-buy": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-catalog-buy.ts",
     "qa:partner-orders": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-orders.ts",
+    "qa:partner-install-recovery": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-install-recovery.ts",
     "qa:partner-reconciliation": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-reconciliation.ts",
     "qa:partner-share-token": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-share-token.ts",
     "qa:partner-share-page": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-share-page.ts",

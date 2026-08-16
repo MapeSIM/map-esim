@@ -25,6 +25,8 @@ type Props = {
   orderId: string;
   usageEligible: boolean;
   autoOpen?: boolean;
+  /** Override usage API path. Defaults to the customer account route. */
+  usagePath?: string;
 };
 
 function formatGb(value: number | null): string {
@@ -62,6 +64,7 @@ export default function CustomerEsimUsagePanel({
   orderId,
   usageEligible,
   autoOpen = false,
+  usagePath,
 }: Props) {
   const headingId = useId();
   const [open, setOpen] = useState(false);
@@ -74,7 +77,8 @@ export default function CustomerEsimUsagePanel({
     setError(null);
     try {
       const res = await fetch(
-        `/api/account/orders/${encodeURIComponent(orderId)}/usage`,
+        usagePath ||
+          `/api/account/orders/${encodeURIComponent(orderId)}/usage`,
         {
           method: "GET",
           cache: "no-store",
@@ -141,7 +145,7 @@ export default function CustomerEsimUsagePanel({
     } finally {
       setLoading(false);
     }
-  }, [orderId]);
+  }, [orderId, usagePath]);
 
   const openAndLoad = useCallback(async () => {
     setOpen(true);

@@ -3,6 +3,11 @@
  * Never returns ICCID/QR/LPA/activation secrets — presence flags only.
  */
 
+import {
+  extractInstallDetails,
+  hasInstallDetails,
+} from "@/app/lib/email/extract";
+
 export type ProviderOrderLookupKind =
   | "FOUND"
   | "NOT_FOUND"
@@ -114,30 +119,7 @@ function extractReturnedOfferId(payload: JsonRecord): string | null {
 }
 
 function installDataPresent(payload: JsonRecord): boolean {
-  const containers = collectContainers(payload);
-  const iccid = extractFromContainers(containers, [
-    "iccid",
-    "ICCID",
-    "iccId",
-    "icc_id",
-  ]);
-  const qr = extractFromContainers(containers, [
-    "qrValue",
-    "qr_value",
-    "lpa",
-    "LPA",
-    "matchingId",
-  ]);
-  const smdp = extractFromContainers(containers, [
-    "smdpAddress",
-    "smDpAddress",
-    "smdp",
-  ]);
-  const activation = extractFromContainers(containers, [
-    "activationCode",
-    "activation_code",
-  ]);
-  return Boolean(iccid || qr || smdp || activation);
+  return hasInstallDetails(extractInstallDetails(payload));
 }
 
 function sanitizeStateToken(raw: unknown): string | null {

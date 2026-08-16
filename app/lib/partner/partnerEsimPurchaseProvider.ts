@@ -23,6 +23,7 @@ import {
   type ProviderResultKind,
 } from "@/app/lib/esim/providerResultPersist";
 import { persistAssignedOrder } from "@/app/lib/orders/persistAssignedOrder";
+import { classifyOrderPersistError } from "@/app/lib/orders/orderPersistError";
 import { PartnerEsimPurchaseError } from "@/app/lib/partner/partnerEsimPurchase";
 import {
   PartnerPurchaseWalletError,
@@ -242,6 +243,12 @@ async function markPartnerReconciliationRequired(options: {
   partnerUserId: string;
   category: string;
   code: string;
+  persistDiagnostic?: {
+    persistErrorCode: string;
+    family: string;
+    targetEntity: "Order";
+    providerOrderId?: string | null;
+  };
   providerObservation?: {
     providerOrderId?: string | null;
     providerResultKind: ProviderResultKind;
@@ -280,6 +287,19 @@ async function markPartnerReconciliationRequired(options: {
           failureCategory: options.category,
           failureCode: options.code,
           reconEmail: "scheduled",
+          ...(options.persistDiagnostic
+            ? {
+                persistErrorCode: options.persistDiagnostic.persistErrorCode,
+                persistErrorFamily: options.persistDiagnostic.family,
+                persistTargetEntity: options.persistDiagnostic.targetEntity,
+                ...(options.persistDiagnostic.providerOrderId
+                  ? {
+                      providerOrderId:
+                        options.persistDiagnostic.providerOrderId,
+                    }
+                  : {}),
+              }
+            : {}),
         } satisfies Prisma.InputJsonValue,
       },
     });
@@ -682,11 +702,22 @@ export async function executePartnerEsimProviderPurchase(
     orderId = finalized.id;
   } catch (error) {
     if (error instanceof PartnerEsimPurchaseError) throw error;
+    const persistDiagnostic = classifyOrderPersistError(error);
+    console.error(
+      "Partner local finalize persist failed",
+      persistDiagnostic.persistErrorCode
+    );
     await markPartnerReconciliationRequired({
       purchaseId: purchase.id,
       partnerUserId: partner.partnerUserId,
       category: "local_finalize_failed",
       code: "order_persist_error",
+      persistDiagnostic: {
+        persistErrorCode: persistDiagnostic.persistErrorCode,
+        family: persistDiagnostic.family,
+        targetEntity: persistDiagnostic.targetEntity,
+        providerOrderId: successCheckout.providerOrderId,
+      },
       providerObservation: {
         providerOrderId: successCheckout.providerOrderId,
         providerResultKind: "success",
