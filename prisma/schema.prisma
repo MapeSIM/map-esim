@@ -234,6 +234,7 @@ model User {
   passwordResetTokens          PasswordResetToken[]
   partnerInviteTokens          PartnerInviteToken[]
   partnerInviteSetupTokens     PartnerInviteSetupToken[]
+  adminInviteSetupTokens       AdminInviteSetupToken[]
   emailOtps                    EmailOtp[]
   auditLogs                    AuditLog[]               @relation("AuditActor")
   blockedByAdmin               User?                    @relation("UserBlockedByAdmin", fields: [blockedByAdminId], references: [id], onDelete: SetNull)
@@ -416,6 +417,20 @@ model PartnerInviteSetupToken {
 
   @@index([userId])
   @@index([inviteId])
+  @@index([expiresAt])
+}
+
+/// Opaque Admin invitation password-setup token (email link). Store hash only; never log raw token.
+model AdminInviteSetupToken {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
   @@index([expiresAt])
 }
 

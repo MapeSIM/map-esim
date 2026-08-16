@@ -108,10 +108,14 @@ async function main() {
   assert.match(service, /stale_version/);
   assert.match(service, /passwordHash:\s*null/);
   assert.match(service, /emailVerifiedAt:\s*now/);
-  assert.match(service, /OtpPurpose\.PASSWORD_RESET/);
-  assert.match(service, /sendOtpEmail/);
-  assert.match(service, /kind:\s*["']admin_invite["']/);
-  assert.match(service, /inviteMethod:\s*["']password_reset_otp["']/);
+  assert.match(service, /mintAdminInviteSetupToken/);
+  assert.match(service, /sendAdminInviteEmail/);
+  assert.match(service, /inviteMethod:\s*["']opaque_setup_link["']/);
+  assert.doesNotMatch(service, /OtpPurpose\.PASSWORD_RESET/);
+  assert.doesNotMatch(service, /issueEmailOtp/);
+  assert.doesNotMatch(service, /sendOtpEmail/);
+  assert.doesNotMatch(service, /kind:\s*["']admin_invite["']/);
+  assert.doesNotMatch(service, /inviteMethod:\s*["']password_reset_otp["']/);
   assert.doesNotMatch(
     service.slice(
       service.indexOf("sendOtpEmail"),
@@ -121,14 +125,17 @@ async function main() {
   );
   assert.match(service, /disableActiveAdminUnderLock/);
   assert.match(service, /acquireAdminStatusXactLock/);
-  assert.match(service, /invitation email could not be sent|Forgot Password/);
+  assert.match(service, /invitation email could not be sent|Resend setup link/);
   assert.match(service, /adminStatusVersion: expectedVersion/);
   assert.match(service, /session\.deleteMany/);
   assert.match(service, /credentialsChangedAt/);
   assert.match(service, /adminSessionVersion/);
   assert.match(service, /tx\.auditLog\.create/);
   assert.doesNotMatch(service, /temporaryPassword|plainTextPassword|INITIAL_ADMIN_PASSWORD/);
-  assert.doesNotMatch(service, /console\.(log|info|debug)\([^\)]*issued\.code/);
+  assert.doesNotMatch(service, /console\.(log|info|debug)\([^\)]*(?:rawToken|setupUrl|issued\.code)/);
+  assert.match(service, /resendAdminInviteSetup/);
+  assert.match(service, /ADMIN_INVITATION_RESENT_AUDIT|admin\.invitation_resent/);
+  assert.match(service, /Use Resend setup link/);
   console.log("PASS invite_deactivate_reactivate_rules");
 
   const lockSrc = read("app/lib/admin/adminUsersLock.ts");
@@ -154,62 +161,58 @@ async function main() {
   console.log("PASS invited_passwordHash_null_can_use_forgot_password");
 
   const otpTemplate = read("app/lib/email/otpTemplate.ts");
-  assert.match(otpTemplate, /admin_invite/);
-  assert.match(otpTemplate, /Set up your \$\{BRAND_NAME\} Admin account|Set up your .* Admin account/);
-  assert.match(otpTemplate, /Admin account setup code/);
-  assert.match(
-    otpTemplate,
-    /You have been invited to become a \$\{BRAND_NAME\} administrator/
-  );
-  assert.match(
-    otpTemplate,
-    /set your password and activate your administrator account/
-  );
-  assert.match(
-    otpTemplate,
-    /If you were not expecting this administrator invitation/
-  );
   assert.match(otpTemplate, /Password reset code/);
   assert.match(otpTemplate, /Your \$\{BRAND_NAME\} password reset code/);
   assert.doesNotMatch(
     otpTemplate.slice(
-      otpTemplate.indexOf('kind === "admin_invite"'),
-      otpTemplate.indexOf('kind === "password_reset"')
+      otpTemplate.indexOf('kind === "password_reset"'),
+      otpTemplate.indexOf('kind === "account_deletion"')
     ),
-    /requested a password reset|Password reset code/
+    /Admin account setup code|invited as a .* administrator/
   );
+  console.log("PASS password_reset_email_wording_distinct_from_admin_invite");
+
+  const inviteTpl = read("app/lib/email/adminInviteTemplate.ts");
+  assert.match(inviteTpl, /You have been invited as a \$\{escapeHtml\(BRAND_NAME\)\} administrator/);
+  assert.match(inviteTpl, /Use the secure link below to create your password/);
+  assert.match(inviteTpl, /This link expires in 30 minutes/);
+  assert.match(
+    inviteTpl,
+    /If the link expires, contact the administrator to resend the setup link/
+  );
+  assert.doesNotMatch(inviteTpl, /setup code|temporary password|OTP/i);
   console.log("PASS admin_invite_email_wording_distinct_from_password_reset");
 
   // Runtime template render checks (no SMTP).
   const {
-    otpEmailSubject,
-    renderOtpEmailHtml,
-    renderOtpEmailText,
-  } = await import("../app/lib/email/otpTemplate");
-  const inviteHtml = renderOtpEmailHtml({
-    kind: "admin_invite",
-    code: "123456",
+    renderAdminInviteEmailHtml,
+    renderAdminInviteEmailText,
+    ADMIN_INVITE_EMAIL_SUBJECT,
+  } = await import("../app/lib/email/adminInviteTemplate");
+  const inviteHtml = renderAdminInviteEmailHtml({
     recipientEmail: "invitee@example.com",
+    setupUrl: "https://mapesim.com/admin-setup-password?token=qa-token",
   });
-  const inviteText = renderOtpEmailText({
-    kind: "admin_invite",
-    code: "123456",
+  const inviteText = renderAdminInviteEmailText({
     recipientEmail: "invitee@example.com",
+    setupUrl: "https://mapesim.com/admin-setup-password?token=qa-token",
   });
-  const inviteSubject = otpEmailSubject("admin_invite");
-  assert.match(inviteSubject, /Set up your MAP eSIM Admin account/);
-  assert.match(inviteHtml, /Admin account setup code/);
-  assert.match(inviteHtml, /You have been invited to become a MAP eSIM administrator/);
-  assert.match(inviteHtml, /This code expires in 10 minutes/);
+  assert.match(ADMIN_INVITE_EMAIL_SUBJECT, /Set up your MAP eSIM Admin account/);
+  assert.match(inviteHtml, /You have been invited as a MAP eSIM administrator/);
+  assert.match(inviteHtml, /Use the secure link below to create your password/);
+  assert.match(inviteHtml, /This link expires in 30 minutes/);
   assert.match(
     inviteHtml,
-    /If you were not expecting this administrator invitation/
+    /If the link expires, contact the administrator to resend the setup link/
   );
-  assert.doesNotMatch(inviteHtml, /Password reset code/);
-  assert.doesNotMatch(inviteHtml, /requested a password reset/i);
-  assert.doesNotMatch(inviteText, /Password reset code/);
-  assert.match(inviteText, /Admin account setup code/);
+  assert.doesNotMatch(inviteHtml, /Password reset code|setup code|temporary password/i);
+  assert.doesNotMatch(inviteText, /Password reset code|setup code/i);
+  assert.match(inviteText, /admin-setup-password\?token=qa-token/);
 
+  const {
+    otpEmailSubject,
+    renderOtpEmailHtml,
+  } = await import("../app/lib/email/otpTemplate");
   const resetHtml = renderOtpEmailHtml({
     kind: "password_reset",
     code: "654321",
@@ -219,8 +222,7 @@ async function main() {
   assert.match(resetSubject, /password reset code/i);
   assert.match(resetHtml, /Password reset code/);
   assert.match(resetHtml, /reset your MAP eSIM password/);
-  assert.doesNotMatch(resetHtml, /Admin account setup code/);
-  assert.doesNotMatch(resetHtml, /invited to become a MAP eSIM administrator/);
+  assert.doesNotMatch(resetHtml, /invited as a MAP eSIM administrator/);
   console.log("PASS otp_template_admin_invite_vs_password_reset_render");
 
   // Success audits are created inside the same $transaction as the mutation.
@@ -274,15 +276,17 @@ async function main() {
   assert.match(panel, /ACTIVE|INVITED|DISABLED/);
   assert.match(panel, /Deactivate/);
   assert.match(panel, /Reactivate/);
+  assert.match(panel, /Resend setup link/);
   assert.match(panel, /Invitation pending/);
   assert.match(panel, /isSelf/);
-  assert.doesNotMatch(panel, /passwordHash|resetToken|adminSessionVersion/);
-  assert.doesNotMatch(page, /passwordHash|resetToken|adminSessionVersion/);
+  assert.doesNotMatch(panel, /passwordHash|resetToken|adminSessionVersion|rawToken/);
+  assert.doesNotMatch(page, /passwordHash|resetToken|adminSessionVersion|rawToken/);
   assert.match(page, /never\s+shown/i);
   console.log("PASS admin_users_ui");
 
   const actions = read("app/lib/admin/adminUsersActions.ts");
   assert.match(actions, /inviteAdminAction/);
+  assert.match(actions, /resendAdminInviteAction/);
   assert.match(actions, /deactivateAdminAction/);
   assert.match(actions, /reactivateAdminAction/);
   assert.match(actions, /requireRole\(["']ADMIN["']\)/);

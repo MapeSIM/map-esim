@@ -4,7 +4,7 @@
  */
 import "server-only";
 
-import { OtpPurpose, Prisma, Role } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
 import { writeAuditLog } from "@/app/lib/auth/audit";
 import {
@@ -14,8 +14,11 @@ import {
   type AdminAccountStatusLabel,
 } from "@/app/lib/auth/adminAccess";
 import { isValidEmailFormat, normalizeEmail } from "@/app/lib/auth/email";
-import { issueEmailOtp } from "@/app/lib/auth/otp";
-import { sendOtpEmail } from "@/app/lib/email/sendOtpEmail";
+import {
+  buildAdminInviteSetupUrl,
+  mintAdminInviteSetupToken,
+} from "@/app/lib/admin/adminInviteSetup";
+import { sendAdminInviteEmail } from "@/app/lib/email/sendAdminInviteEmail";
 import { assertSameOriginAdminRequest } from "@/app/lib/admin/reconciliationCaseManagement";
 import type { AdminUserListRow } from "@/app/lib/admin/adminUsersShared";
 import {
@@ -26,6 +29,7 @@ import {
 export type { AdminUserListRow } from "@/app/lib/admin/adminUsersShared";
 
 export const ADMIN_INVITED_AUDIT = "admin.invited";
+export const ADMIN_INVITATION_RESENT_AUDIT = "admin.invitation_resent";
 export const ADMIN_DEACTIVATED_AUDIT = "admin.deactivated";
 export const ADMIN_REACTIVATED_AUDIT = "admin.reactivated";
 export const ADMIN_MANAGEMENT_BLOCKED_AUDIT = "admin.management_action_blocked";
@@ -145,8 +149,9 @@ export async function listAdminUsers(actorUserId: string): Promise<AdminUserList
 }
 
 /**
- * Invite a new ADMIN by email. Uses password-reset OTP so invitee sets their own password.
+ * Invite a new ADMIN by email. Sends a one-time password setup link (30 minutes).
  * Sets emailVerifiedAt so credentials login works after password is established (ACTIVE).
+ * No temporary password. No numeric setup code.
  */
 export async function inviteAdminUser(options: {
   adminUserId: string;
@@ -257,7 +262,7 @@ export async function inviteAdminUser(options: {
         return {
           ok: false,
           error:
-            "An invitation is already pending for this email. Ask them to use the password reset code email, or wait and try again later.",
+            "An invitation is already pending for this email. Use Resend setup link instead of inviting again.",
         };
       }
       await auditBlocked({
@@ -281,7 +286,7 @@ export async function inviteAdminUser(options: {
           role: Role.ADMIN,
           passwordHash: null,
           // Credentials login + ACTIVE status require verification.
-          // Invitee establishes password via existing password-reset OTP (no temp password).
+          // Invitee establishes password via the one-time setup link (no temp password).
           emailVerifiedAt: now,
           adminDisabledAt: null,
           adminStatusVersion: 0,
@@ -298,7 +303,7 @@ export async function inviteAdminUser(options: {
           targetType: "user",
           targetId: created.id,
           metadata: {
-            inviteMethod: "password_reset_otp",
+            inviteMethod: "opaque_setup_link",
             previousStatus: null,
             adminStatusVersion: 0,
           },
@@ -322,37 +327,169 @@ export async function inviteAdminUser(options: {
     throw err;
   }
 
-  // OTP issue/send outside the create transaction (email I/O). Never log the code.
+  // Mint/send outside the create transaction (email I/O). Never log the raw token.
   let inviteEmailDelivered = false;
-  const issued = await issueEmailOtp({
-    userId: createdId,
-    purpose: OtpPurpose.PASSWORD_RESET,
-    force: true,
-  });
-
-  if (issued.ok) {
-    const sent = await sendOtpEmail({
-      // Same PASSWORD_RESET OTP mechanism; distinct invite email wording only.
-      kind: "admin_invite",
+  try {
+    const minted = await mintAdminInviteSetupToken(createdId);
+    const setupUrl = buildAdminInviteSetupUrl(minted.rawToken);
+    const sent = await sendAdminInviteEmail({
       to: email,
-      code: issued.code,
+      setupUrl,
     });
     if (sent.ok) {
       inviteEmailDelivered = true;
     } else {
-      console.error("Admin invite OTP email failed:", sent.reason);
+      console.error("Admin invite email failed:", sent.reason);
     }
-  } else {
-    console.error("Admin invite OTP issue failed:", issued.reason);
+  } catch (err) {
+    console.error(
+      "Admin invite mint/send failed:",
+      err instanceof Error ? err.name : "unknown"
+    );
   }
 
   return {
     ok: true,
     message: inviteEmailDelivered
-      ? "Admin invited. They will receive a password setup code by email (same secure channel as password reset)."
-      : "Admin account created (INVITED), but the invitation email could not be sent. Ask them to use Forgot Password with this email to set their own password.",
+      ? "Admin invited. They will receive a password setup link by email (expires in 30 minutes)."
+      : "Admin account created (INVITED), but the invitation email could not be sent. Use Resend setup link.",
     status: "INVITED",
     adminStatusVersion: 0,
+  };
+}
+
+/**
+ * Resend Admin setup link when the account is still INVITED.
+ * Supersedes prior unused setup tokens. Never returns/logs the raw token.
+ * Does not create another Admin account or reset an active Admin.
+ */
+export async function resendAdminInviteSetup(options: {
+  adminUserId: string;
+  targetUserId: string;
+}): Promise<AdminUsersMutationResult> {
+  const sameOrigin = await assertSameOriginAdminRequest();
+  if (!sameOrigin) {
+    await auditBlocked({
+      actorUserId: options.adminUserId,
+      targetId: options.targetUserId,
+      failureCode: "same_origin",
+    });
+    return { ok: false, error: "Request could not be verified. Please try again." };
+  }
+
+  const actor = await findActiveAdminActor(options.adminUserId);
+  if (!actor) {
+    return { ok: false, error: "Not authorized." };
+  }
+
+  const targetId = (options.targetUserId ?? "").trim();
+  if (!targetId || targetId.length > 64) {
+    return { ok: false, error: "Admin not found." };
+  }
+
+  const target = await prisma.user.findUnique({
+    where: { id: targetId },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      deletedAt: true,
+      adminDisabledAt: true,
+      passwordHash: true,
+      emailVerifiedAt: true,
+    },
+  });
+
+  if (!target || target.role !== Role.ADMIN) {
+    await auditBlocked({
+      actorUserId: actor.id,
+      targetId,
+      failureCode: "not_admin",
+    });
+    return { ok: false, error: "Admin not found." };
+  }
+
+  const previousStatus = resolveAdminAccountStatus(target);
+  if (previousStatus === "DELETED") {
+    await auditBlocked({
+      actorUserId: actor.id,
+      targetId,
+      failureCode: "deleted",
+      metadata: { previousStatus },
+    });
+    return { ok: false, error: "Deleted accounts cannot receive invitations." };
+  }
+  if (previousStatus === "DISABLED") {
+    await auditBlocked({
+      actorUserId: actor.id,
+      targetId,
+      failureCode: "disabled_use_reactivate",
+      metadata: { previousStatus },
+    });
+    return {
+      ok: false,
+      error: "Reactivate the admin before resending a setup link.",
+    };
+  }
+  if (previousStatus === "ACTIVE") {
+    await auditBlocked({
+      actorUserId: actor.id,
+      targetId,
+      failureCode: "already_active_admin",
+      metadata: { previousStatus },
+    });
+    return {
+      ok: false,
+      error:
+        "This admin already has a password. Use Forgot Password for recovery.",
+    };
+  }
+  if (previousStatus !== "INVITED") {
+    await auditBlocked({
+      actorUserId: actor.id,
+      targetId,
+      failureCode: "not_invited",
+      metadata: { previousStatus },
+    });
+    return { ok: false, error: "A setup link can only be resent for invited admins." };
+  }
+
+  let inviteEmailDelivered = false;
+  try {
+    const minted = await mintAdminInviteSetupToken(target.id);
+    const setupUrl = buildAdminInviteSetupUrl(minted.rawToken);
+    const sent = await sendAdminInviteEmail({
+      to: target.email,
+      setupUrl,
+    });
+    inviteEmailDelivered = sent.ok;
+    if (!sent.ok) {
+      console.error("Admin invite resend email failed:", sent.reason);
+    }
+  } catch (err) {
+    console.error(
+      "Admin invite resend failed:",
+      err instanceof Error ? err.name : "unknown"
+    );
+  }
+
+  await writeAuditLog({
+    actorUserId: actor.id,
+    action: ADMIN_INVITATION_RESENT_AUDIT,
+    targetType: "user",
+    targetId: target.id,
+    metadata: {
+      previousStatus,
+      emailDelivered: inviteEmailDelivered,
+    },
+  });
+
+  return {
+    ok: true,
+    message: inviteEmailDelivered
+      ? "Setup link resent. The previous unused link is no longer valid."
+      : "A new setup link was generated, but the email could not be sent. Try again shortly.",
+    status: "INVITED",
   };
 }
 

@@ -162,11 +162,13 @@ async function main() {
   assert.match(forgot, /OtpPurpose\.PASSWORD_RESET|PASSWORD_RESET/);
   console.log("PASS forgot_password_unchanged");
 
-  // N: Admin invite still OTP-based
+  // N: Admin invite uses dedicated opaque setup link (not Partner tokens, not OTP).
   const adminUsers = read("app/lib/admin/adminUsers.ts");
-  assert.match(adminUsers, /admin_invite/);
-  assert.match(adminUsers, /issueEmailOtp|PASSWORD_RESET/);
-  console.log("PASS admin_invite_unchanged");
+  assert.match(adminUsers, /mintAdminInviteSetupToken|sendAdminInviteEmail/);
+  assert.doesNotMatch(adminUsers, /issueEmailOtp/);
+  assert.doesNotMatch(adminUsers, /kind:\s*["']admin_invite["']/);
+  assert.doesNotMatch(adminUsers, /OtpPurpose\.PASSWORD_RESET/);
+  console.log("PASS admin_invite_uses_setup_link_not_otp");
 
   const otpTpl = read("app/lib/email/otpTemplate.ts");
   assert.match(otpTpl, /admin_invite/);

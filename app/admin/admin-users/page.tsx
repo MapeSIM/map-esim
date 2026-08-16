@@ -40,7 +40,7 @@ export default async function AdminUsersPage() {
         <h1 className="text-2xl font-bold tracking-tight">Admin Users</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
           Invite and manage dedicated admin accounts. Each admin uses their own
-          password. Password hashes, OTP codes, and session details are never
+          password. Password hashes, setup links, and session details are never
           shown here.
         </p>
       </header>

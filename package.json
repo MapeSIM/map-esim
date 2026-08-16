@@ -22,6 +22,7 @@
     "qa:admin-customers": "tsx scripts/qa-admin-customers.ts",
     "qa:admin-single-session": "tsx scripts/qa-admin-single-session.ts",
     "qa:admin-users": "tsx scripts/qa-admin-users.ts",
+    "qa:admin-invite-setup": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-admin-invite-setup.ts",
     "qa:admin-users-concurrency": "tsx scripts/qa-admin-users-concurrency.ts",
     "qa:partner-phase1": "tsx scripts/qa-partner-phase1.ts",
     "qa:partner-pricing": "tsx scripts/qa-partner-pricing.ts",

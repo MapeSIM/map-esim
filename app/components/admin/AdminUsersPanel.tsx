@@ -5,6 +5,7 @@ import {
   deactivateAdminAction,
   inviteAdminAction,
   reactivateAdminAction,
+  resendAdminInviteAction,
   type AdminUsersFormState,
 } from "@/app/lib/admin/adminUsersActions";
 import type { AdminUserListRow } from "@/app/lib/admin/adminUsersShared";
@@ -61,9 +62,9 @@ export function InviteAdminForm() {
           Invite Admin
         </h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Creates a dedicated admin account and emails a password setup code.
-          No temporary password is generated. Customer emails cannot be
-          promoted.
+          Creates a dedicated admin account and emails a one-time password
+          setup link that expires in 30 minutes. No temporary password is
+          generated. Customer emails cannot be promoted.
         </p>
       </div>
 
@@ -115,6 +116,30 @@ export function InviteAdminForm() {
         </div>
       </form>
     </section>
+  );
+}
+
+function ResendSetupLinkButton({
+  row,
+}: {
+  row: AdminUserListRow;
+}) {
+  const [state, formAction, pending] = useActionState(
+    resendAdminInviteAction,
+    null
+  );
+  return (
+    <form action={formAction} className="inline-flex flex-col items-start gap-1">
+      <input type="hidden" name="targetUserId" value={row.id} />
+      <button
+        type="submit"
+        disabled={pending}
+        className="text-sm font-semibold text-[var(--accent-strong)] outline-none hover:underline focus-visible:underline disabled:opacity-60"
+      >
+        {pending ? "Sending…" : "Resend setup link"}
+      </button>
+      <FormMessage state={state} />
+    </form>
   );
 }
 
@@ -220,7 +245,8 @@ export function AdminUsersTable({ rows }: { rows: AdminUserListRow[] }) {
                 </span>
                 {row.status === "INVITED" ? (
                   <p className="mt-1 text-xs text-[var(--text-muted)]">
-                    Invitation pending — password not set yet.
+                    Invitation pending — password not set yet. Resend setup
+                    link if the previous email expired.
                   </p>
                 ) : null}
               </td>
@@ -232,7 +258,12 @@ export function AdminUsersTable({ rows }: { rows: AdminUserListRow[] }) {
                   <span className="text-xs text-[var(--text-muted)]">
                     —
                   </span>
-                ) : row.status === "ACTIVE" || row.status === "INVITED" ? (
+                ) : row.status === "INVITED" ? (
+                  <div className="flex flex-col items-start gap-2">
+                    <ResendSetupLinkButton row={row} />
+                    <DeactivateButton row={row} />
+                  </div>
+                ) : row.status === "ACTIVE" ? (
                   <DeactivateButton row={row} />
                 ) : row.status === "DISABLED" ? (
                   <ReactivateButton row={row} />
