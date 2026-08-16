@@ -49,6 +49,8 @@ export type PartnerOrderListRow = {
   destination: string;
   flagUrl: string | null;
   planName: string;
+  dataAllowance: string;
+  validity: string;
   retailPriceLabel: string;
   partnerDebitLabel: string;
   statusBadge: PartnerOrderStatusBadge;
@@ -125,6 +127,8 @@ export async function listPartnerOrdersPage(
       destinationCode: true,
       destinationName: true,
       planName: true,
+      dataAllowance: true,
+      validity: true,
       retailPriceCents: true,
       partnerChargeCents: true,
       createdAt: true,
@@ -135,6 +139,8 @@ export async function listPartnerOrdersPage(
           id: true,
           destination: true,
           planName: true,
+          dataAllowance: true,
+          validity: true,
           status: true,
           createdAt: true,
           iccidLast4: true,
@@ -152,6 +158,10 @@ export async function listPartnerOrdersPage(
       row.order?.destination || row.destinationName || row.destinationCode
     );
     const planName = displayOrUnavailable(row.order?.planName || row.planName);
+    const dataAllowance = displayOrUnavailable(
+      row.order?.dataAllowance || row.dataAllowance
+    );
+    const validity = displayOrUnavailable(row.order?.validity || row.validity);
     const retailPriceLabel = `${formatUsdCents(row.retailPriceCents)} USD`;
     const partnerDebitLabel = `${formatUsdCents(row.partnerChargeCents)} USD`;
     const statusBadge = partnerOrderStatusFromPurchase(row.status);
@@ -170,6 +180,8 @@ export async function listPartnerOrdersPage(
         destination,
         flagUrl: customerFlagImageUrl(row.destinationCode),
         planName,
+        dataAllowance,
+        validity,
         retailPriceLabel,
         partnerDebitLabel,
         statusBadge,

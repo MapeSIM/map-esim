@@ -11,7 +11,9 @@ import ThemeProvider from "./components/theme/ThemeProvider";
 import WhatsAppSupportButton from "./components/support/WhatsAppSupportButton";
 import HideOnShare from "./components/share/HideOnShare";
 import { auth } from "@/auth";
+import { coerceAppRole } from "@/app/lib/auth/appRole";
 import { navAuthLink } from "@/app/lib/auth/redirects";
+import { getPartnerPortalSummary } from "@/app/lib/partner/partnerAccess";
 import { BRAND_NAME, BRAND_SITE_URL, BRAND_TAGLINE } from "@/app/lib/brand";
 import { getCustomerWalletSummary } from "@/app/lib/wallet/read";
 import type { NavbarCustomerSummary } from "./components/Navbar";
@@ -67,18 +69,16 @@ export default async function RootLayout({
   );
   const htmlThemeClass = themePreferenceToHtmlClass(initialTheme);
 
-  const sessionRole =
-    session?.user?.role === "ADMIN"
-      ? "ADMIN"
-      : session?.user?.id
-        ? "CUSTOMER"
-        : null;
+  const sessionRole = session?.user?.id
+    ? coerceAppRole(session.user.role)
+    : null;
   const { href: authHref, label: authLabel } = navAuthLink({
     userId: session?.user?.id,
     role: sessionRole,
   });
 
   let customerNav: NavbarCustomerSummary | null = null;
+  let partnerNav: NavbarCustomerSummary | null = null;
   if (sessionRole === "CUSTOMER" && session?.user?.id) {
     const name = (session.user.name ?? "").trim() || "Customer";
     const email = (session.user.email ?? "").trim();
@@ -92,6 +92,27 @@ export default async function RootLayout({
       };
     } catch {
       customerNav = {
+        name,
+        email,
+        walletBalanceLabel: null,
+        walletCurrency: "USD",
+      };
+    }
+  }
+
+  if (sessionRole === "PARTNER" && session?.user?.id) {
+    const name = (session.user.name ?? "").trim() || "Partner";
+    const email = (session.user.email ?? "").trim();
+    try {
+      const summary = await getPartnerPortalSummary(session.user.id);
+      partnerNav = {
+        name,
+        email,
+        walletBalanceLabel: summary?.balanceLabel ?? "$0.00",
+        walletCurrency: "USD",
+      };
+    } catch {
+      partnerNav = {
         name,
         email,
         walletBalanceLabel: null,
@@ -121,6 +142,7 @@ export default async function RootLayout({
                   authHref={authHref}
                   authLabel={authLabel}
                   customer={customerNav}
+                  partner={partnerNav}
                 />
               </HideOnShare>
               {children}

@@ -99,6 +99,14 @@ export const authConfig = {
       if (pathname === "/account" || pathname.startsWith("/account/")) {
         if (!isLoggedIn) return false;
         if (role === "PARTNER") {
+          if (
+            pathname === "/account/esim/buy" ||
+            pathname.startsWith("/account/esim/buy/")
+          ) {
+            const dest = new URL("/partner/buy", request.nextUrl);
+            dest.search = request.nextUrl.search;
+            return Response.redirect(dest);
+          }
           return Response.redirect(new URL("/partner", request.nextUrl));
         }
         if (role === "ADMIN") {

@@ -64,6 +64,20 @@ export function buildCheckoutHref(
   return `/account/esim/buy?${params.toString()}`;
 }
 
+/** Partner wallet buy from the public storefront. Same offer/country hints only. */
+export function buildPartnerCheckoutHref(
+  offer: VesimOffer,
+  destinationCode: string
+): string {
+  const params = new URLSearchParams({
+    offerId: offer.id,
+  });
+  if (destinationCode.trim()) {
+    params.set("country", destinationCode.trim());
+  }
+  return `/partner/buy?${params.toString()}`;
+}
+
 export function summarizePlanTypes(offers: VesimOffer[]) {
   const dataOnly = offers.filter((offer) => !offerHasVoiceSms(offer)).length;
   const withVoice = offers.filter(offerHasVoiceSms).length;

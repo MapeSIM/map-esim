@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import PartnerMenu, {
-  type PartnerNavLink,
-} from "@/app/components/partner/PartnerMenu";
+import AccountMenu, {
+  type AccountNavLink,
+} from "@/app/components/account/AccountMenu";
 import { requireRole } from "@/app/lib/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -10,11 +10,14 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false, nocache: true },
 };
 
-const partnerLinks: PartnerNavLink[] = [
-  { href: "/partner", label: "Home", exact: true },
+const partnerLinks: AccountNavLink[] = [
+  { href: "/partner", label: "Overview", exact: true },
+  { href: "/partner/orders", label: "My eSIMs" },
   { href: "/partner/wallet", label: "Wallet" },
+  { href: "/countries", label: "Buy eSIM" },
   { href: "/partner/catalog", label: "Catalog" },
-  { href: "/partner/orders", label: "Orders" },
+  { href: "/partner/profile", label: "Profile" },
+  { href: "/partner/security", label: "Security" },
 ];
 
 export default async function PartnerLayout({
@@ -28,7 +31,7 @@ export default async function PartnerLayout({
     <main className="min-h-screen w-full max-w-full bg-[var(--page-bg)] px-3 py-8 text-[var(--heading)] sm:px-6 sm:py-10">
       <div className="mx-auto w-full min-w-0 max-w-5xl space-y-4">
         <header className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 sm:px-5">
-          <PartnerMenu
+          <AccountMenu
             userName={user.name}
             userEmail={user.email}
             links={partnerLinks}

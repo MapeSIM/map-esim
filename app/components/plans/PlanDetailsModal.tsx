@@ -27,6 +27,7 @@ type PlanDetailsModalProps = {
   onClose: () => void;
   /** Prefer coverage-first copy for regional/global destinations. */
   coverageFocused?: boolean;
+  checkoutHref?: (offer: VesimOffer, destinationCode: string) => string;
 };
 
 function DetailRow({
@@ -53,6 +54,7 @@ export default function PlanDetailsModal({
   countryNames = {},
   onClose,
   coverageFocused = false,
+  checkoutHref = buildCheckoutHref,
 }: PlanDetailsModalProps) {
   const { formatPrice } = useCurrency();
 
@@ -310,7 +312,7 @@ export default function PlanDetailsModal({
 
         <div className="border-t border-[var(--border)] px-5 py-4 sm:px-6">
           <Link
-            href={buildCheckoutHref(offer, destination.code)}
+            href={checkoutHref(offer, destination.code)}
             className="
               flex w-full items-center justify-center rounded-2xl
               bg-[var(--accent-strong)] px-5 py-3.5 text-sm font-bold text-[var(--accent-ink)]

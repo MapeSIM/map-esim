@@ -143,7 +143,7 @@ export function navAuthLink(options: {
     return { href: "/admin", label: "Admin" };
   }
   if (options.role === "PARTNER") {
-    return { href: "/partner", label: "Partner" };
+    return { href: "/partner", label: "Account" };
   }
   return { href: "/account", label: "Account" };
 }

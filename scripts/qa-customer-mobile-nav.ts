@@ -50,12 +50,16 @@ function main() {
   assert.match(navbar, /signOutAction|Sign out/);
   assert.match(navbar, /walletBalanceLabel|balanceLabel/);
   // Wallet is only via the balance card — no redundant Account-nav Wallet row.
+  const customerDrawer = navbar.slice(
+    navbar.indexOf("isCustomer && customer"),
+    navbar.indexOf("isPartner && partner")
+  );
   assert.match(
-    navbar,
+    customerDrawer,
     /aria-label="Account">[\s\S]*?My eSIMs[\s\S]*?My Account[\s\S]*?<\/nav>/
   );
   assert.doesNotMatch(
-    navbar,
+    customerDrawer,
     /aria-label="Account">[\s\S]*?Wallet[\s\S]*?<\/nav>/
   );
   assert.doesNotMatch(navbar, /reward|Reward points|Add data to this eSIM/i);

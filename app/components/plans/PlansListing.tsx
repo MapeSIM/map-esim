@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -23,6 +23,7 @@ import SortSelect from "@/app/components/plans/SortSelect";
 import { useCurrency } from "@/app/components/currency/CurrencyProvider";
 import {
   buildCheckoutHref,
+  buildPartnerCheckoutHref,
   filterOffers,
   formatValidityPhrase,
   formatValidityPill,
@@ -48,6 +49,7 @@ type PlansListingProps = {
   error?: string;
   countryNames?: Record<string, string>;
   relatedRegional?: VesimDestination | null;
+  checkoutHref?: (offer: VesimOffer, destinationCode: string) => string;
 };
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
@@ -206,6 +208,7 @@ export default function PlansListing({
   error = "",
   countryNames = {},
   relatedRegional = null,
+  checkoutHref,
 }: PlansListingProps) {
   const isRegionalOrGlobal =
     destination.kind === "regional" || destination.kind === "global";
@@ -218,7 +221,27 @@ export default function PlansListing({
   const [sort, setSort] = useState<SortOption>("price-asc");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState<VesimOffer | null>(null);
+  const [partnerCheckout, setPartnerCheckout] = useState(false);
   const { formatPrice } = useCurrency();
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/session", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((session: { user?: { role?: string } } | null) => {
+        if (!cancelled && session?.user?.role === "PARTNER") {
+          setPartnerCheckout(true);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const resolveCheckoutHref =
+    checkoutHref ??
+    (partnerCheckout ? buildPartnerCheckoutHref : buildCheckoutHref);
 
   const planTypeSummary = useMemo(() => summarizePlanTypes(offers), [offers]);
   const categorySummary = useMemo(() => summarizeCategories(offers), [offers]);
@@ -705,7 +728,7 @@ export default function PlansListing({
                                   : "Plan details"}
                               </button>
                               <Link
-                                href={buildCheckoutHref(
+                                href={resolveCheckoutHref(
                                   offer,
                                   destination.code
                                 )}
@@ -736,6 +759,7 @@ export default function PlansListing({
         countryNames={countryNames}
         onClose={() => setSelectedOffer(null)}
         coverageFocused={isRegionalOrGlobal}
+        checkoutHref={resolveCheckoutHref}
       />
     </main>
   );

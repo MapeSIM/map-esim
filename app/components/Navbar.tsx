@@ -94,12 +94,15 @@ type NavbarProps = {
   authLabel?: string;
   /** Logged-in CUSTOMER summary for the mobile drawer only. */
   customer?: NavbarCustomerSummary | null;
+  /** Logged-in PARTNER summary for the mobile drawer only. */
+  partner?: NavbarCustomerSummary | null;
 };
 
 export default function Navbar({
   authHref = "/signin",
   authLabel = "Sign in",
   customer = null,
+  partner = null,
 }: NavbarProps) {
   const [open, setOpen] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
@@ -107,6 +110,7 @@ export default function Navbar({
   const drawerTitleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const isCustomer = Boolean(customer);
+  const isPartner = Boolean(partner);
   const isLoggedOut = authHref === "/signin";
 
   useEffect(() => {
@@ -429,6 +433,60 @@ export default function Navbar({
                           href="/account"
                           onClick={closeMenu}
                           className={`rounded-[14px] px-4 py-3 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 ${mobileNavClass(pathname === "/account")}`}
+                        >
+                          My Account
+                        </Link>
+                      </nav>
+
+                      <form action={signOutAction}>
+                        <button
+                          type="submit"
+                          className="inline-flex h-12 w-full items-center justify-center rounded-[14px] border border-[var(--danger-border)] bg-[var(--danger-bg)] px-4 text-sm font-bold text-[var(--danger-text)] transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger-border)]"
+                        >
+                          Sign out
+                        </button>
+                      </form>
+                    </div>
+                  ) : isPartner && partner ? (
+                    <div className="mt-5 space-y-3">
+                      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
+                        <p className="truncate text-base font-bold text-[var(--heading)]">
+                          {partner.name}
+                        </p>
+                        <p className="mt-0.5 truncate text-sm text-[var(--text-muted)]">
+                          {partner.email}
+                        </p>
+                        <Link
+                          href="/partner/wallet"
+                          onClick={closeMenu}
+                          className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 transition hover:border-[var(--accent-strong)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+                        >
+                          <span className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--heading)]">
+                            <Wallet className="h-4 w-4 text-[var(--accent-strong)]" />
+                            Wallet
+                          </span>
+                          <span className="text-sm font-bold tabular-nums text-[var(--heading)]">
+                            {partner.walletBalanceLabel ?? "—"}{" "}
+                            <span className="text-xs font-semibold text-[var(--text-soft)]">
+                              {partner.walletCurrency}
+                            </span>
+                          </span>
+                        </Link>
+                      </div>
+
+                      <nav className="flex flex-col gap-1" aria-label="Partner account">
+                        <Link
+                          href="/partner/orders"
+                          onClick={closeMenu}
+                          className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-3.5 text-base font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 ${mobileNavClass(isActive("/partner/orders"), true)}`}
+                        >
+                          <Smartphone className="h-4 w-4 text-[var(--accent-strong)]" />
+                          My eSIMs
+                        </Link>
+                        <Link
+                          href="/partner"
+                          onClick={closeMenu}
+                          className={`rounded-[14px] px-4 py-3 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 ${mobileNavClass(pathname === "/partner")}`}
                         >
                           My Account
                         </Link>

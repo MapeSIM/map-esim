@@ -1,4 +1,13 @@
-import Link from "next/link";
+import {
+  CreditCard,
+  Palette,
+  Shield,
+  Smartphone,
+  UserRound,
+  Wallet,
+} from "lucide-react";
+import AccountActionRow from "@/app/components/account/AccountActionRow";
+import PartnerSignOutRow from "@/app/components/partner/PartnerSignOutRow";
 import { getPartnerPortalSummary } from "@/app/lib/partner/partnerAccess";
 import { requireRole } from "@/app/lib/auth/session";
 
@@ -42,120 +51,119 @@ export default async function PartnerDashboardPage() {
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Partner dashboard</h1>
-        <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Your prepaid balance and reseller discount. Browse the catalog to
-          purchase eSIMs with Partner balance.
+        <h1 className="text-2xl font-bold tracking-tight">My Account</h1>
+        <p className="mt-2 text-sm text-[var(--text-muted)]">
+          Manage Partner balance, purchases, and account settings.
         </p>
       </header>
 
-      <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
-          <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Available balance
-          </dt>
-          <dd className="mt-2 text-2xl font-bold tabular-nums text-[var(--heading)]">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
+            Partner Balance
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
             {summary.balanceLabel}
-            <span className="ml-1 text-sm font-semibold text-[var(--text-muted)]">
-              USD
-            </span>
-          </dd>
+          </p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">USD</p>
         </div>
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
-          <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Your discount
-          </dt>
-          <dd className="mt-2 text-2xl font-bold tabular-nums text-[var(--heading)]">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
+            Current Partner Discount
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
             {summary.discountPercentLabel}
-          </dd>
-        </div>
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
-          <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Total added
-          </dt>
-          <dd className="mt-2 text-2xl font-bold tabular-nums text-[var(--heading)]">
-            {summary.totalAddedLabel}
-            <span className="ml-1 text-sm font-semibold text-[var(--text-muted)]">
-              USD
-            </span>
-          </dd>
-        </div>
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
-          <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Total deducted
-          </dt>
-          <dd className="mt-2 text-2xl font-bold tabular-nums text-[var(--heading)]">
-            {summary.totalDeductedLabel}
-            <span className="ml-1 text-sm font-semibold text-[var(--text-muted)]">
-              USD
-            </span>
-          </dd>
-        </div>
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
-          <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Total spent
-          </dt>
-          <dd className="mt-2 text-2xl font-bold tabular-nums text-[var(--heading)]">
-            {summary.totalSpentLabel}
-            <span className="ml-1 text-sm font-semibold text-[var(--text-muted)]">
-              USD
-            </span>
-          </dd>
-          <p className="mt-2 text-xs text-[var(--text-soft)]">
-            Purchase from{" "}
-            <Link
-              href="/partner/catalog"
-              className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-            >
-              Catalog
-            </Link>
-            .
+          </p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Applied automatically at purchase
           </p>
         </div>
-      </dl>
+      </div>
 
       <section className="space-y-3">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <h2 className="text-lg font-semibold tracking-tight">
-            Recent wallet activity
-          </h2>
-          <Link
+        <h2 className="text-lg font-semibold tracking-tight">Quick Actions</h2>
+        <div className="grid gap-3">
+          <AccountActionRow
+            href="/countries"
+            title="Buy eSIM"
+            subtitle="Browse the same destinations and plans as customers"
+            icon={<CreditCard className="h-5 w-5" aria-hidden="true" />}
+            emphasize
+          />
+          <AccountActionRow
             href="/partner/wallet"
-            className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-          >
-            View full ledger
-          </Link>
+            title="My Wallet"
+            subtitle="Partner balance and transaction history"
+            icon={<Wallet className="h-5 w-5" aria-hidden="true" />}
+            trailing={
+              <span className="mt-1 block text-sm font-bold text-[var(--heading)]">
+                {summary.balanceLabel}
+                <span className="ml-1 text-xs font-semibold text-[var(--text-soft)]">
+                  USD
+                </span>
+              </span>
+            }
+          />
+          <AccountActionRow
+            href="/partner/orders"
+            title="My eSIMs"
+            subtitle="Install, usage, and ICCID for Partner purchases"
+            icon={<Smartphone className="h-5 w-5" aria-hidden="true" />}
+          />
+          <AccountActionRow
+            href="/partner/profile"
+            title="Account / Share Branding"
+            subtitle="Profile details and future share branding"
+            icon={<Palette className="h-5 w-5" aria-hidden="true" />}
+          />
+          <PartnerSignOutRow />
         </div>
+      </section>
 
-        {summary.recentTransactions.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-4 py-6 text-sm text-[var(--text-muted)]">
-            No wallet activity yet. Admin credits will appear here.
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold tracking-tight">
+          Profile Information
+        </h2>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 text-sm">
+          <p>
+            <span className="text-[var(--text-soft)]">Name:</span>{" "}
+            <b>{user.name}</b>
           </p>
-        ) : (
-          <ul className="space-y-3">
-            {summary.recentTransactions.slice(0, 5).map((tx) => (
-              <li
-                key={tx.id}
-                className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="font-semibold text-[var(--heading)]">
-                      {tx.typeLabel}
-                    </p>
-                    <p className="mt-1 text-[var(--text-muted)]">{tx.reason}</p>
-                  </div>
-                  <p className="font-semibold tabular-nums text-[var(--heading)]">
-                    {tx.amountLabel}
-                  </p>
-                </div>
-                <p className="mt-2 text-xs text-[var(--text-soft)]">
-                  {tx.createdAtLabel} · Balance after {tx.balanceAfterLabel}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
+          <p className="mt-2">
+            <span className="text-[var(--text-soft)]">Email:</span>{" "}
+            <b>{user.email}</b>
+          </p>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold tracking-tight">Account Info</h2>
+        <div className="grid gap-3">
+          <AccountActionRow
+            href="/partner/profile"
+            title="Profile"
+            subtitle="Partner account information"
+            icon={<UserRound className="h-5 w-5" aria-hidden="true" />}
+          />
+          <AccountActionRow
+            href="/partner/security"
+            title="Password & Security"
+            subtitle="Password and security controls"
+            icon={<Shield className="h-5 w-5" aria-hidden="true" />}
+          />
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold tracking-tight">Share Branding</h2>
+        <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-5 text-sm text-[var(--text-muted)]">
+          <p className="font-medium text-[var(--heading)]">Coming later</p>
+          <p className="mt-2">
+            Company name, support email, website, logo, and button colors will
+            appear here when share branding is enabled. Secure share links
+            already use MAP eSIM branding.
+          </p>
+        </div>
       </section>
     </div>
   );

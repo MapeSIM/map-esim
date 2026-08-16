@@ -54,7 +54,7 @@ export default async function PartnerOrderDetailPage({
           href="/partner/orders"
           className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
         >
-          ← Back to Orders
+          ← Back to My eSIMs
         </Link>
         <div
           className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
@@ -79,7 +79,7 @@ export default async function PartnerOrderDetailPage({
           href="/partner/orders"
           className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
         >
-          ← Back to Orders
+          ← Back to My eSIMs
         </Link>
         <div className="mt-4 flex min-w-0 flex-wrap items-center gap-3">
           {detail.flagUrl ? (

@@ -61,6 +61,8 @@ function OrderCard({ row }: { row: PartnerOrderListRow }) {
             </div>
             <p className="truncate text-sm text-[var(--text-muted)]">
               {row.planName}
+              {row.dataAllowance ? ` · ${row.dataAllowance}` : ""}
+              {row.validity ? ` · ${row.validity}` : ""}
             </p>
             <dl className="grid gap-1 text-xs text-[var(--text-muted)] sm:grid-cols-2">
               <div className="min-w-0">
@@ -178,10 +180,10 @@ export default async function PartnerOrdersPage() {
   return (
     <div className="min-w-0 space-y-8">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
+        <h1 className="text-2xl font-bold tracking-tight">My eSIMs</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Your Partner eSIM purchases. Open a completed order for install
-          details and secure ICCID reveal.
+          Your purchased Partner eSIMs. Open an order for installation, usage,
+          and secure ICCID reveal.
         </p>
       </header>
 
@@ -210,8 +212,14 @@ export default async function PartnerOrdersPage() {
         </h2>
         {data.orders.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-4 py-6 text-sm text-[var(--text-muted)]">
-            No completed Partner orders yet. Buy a plan from Catalog to get
-            started.
+            You have not purchased an eSIM yet.{" "}
+            <Link
+              href="/countries"
+              className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+            >
+              Browse destinations
+            </Link>{" "}
+            to find a plan.
           </p>
         ) : (
           <ul className="space-y-3">

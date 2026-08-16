@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   getPartnerPortalSummary,
@@ -63,8 +64,15 @@ export default async function PartnerCatalogPage() {
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Catalog</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Browse MAP eSIM plans at retail catalog prices and purchase with your
-          Partner balance.
+          Same MAP eSIM retail plans as the public storefront. Prefer{" "}
+          <Link
+            href="/countries"
+            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+          >
+            Destinations
+          </Link>{" "}
+          for the full plan-card experience. This page remains available as a
+          direct Partner-balance purchase path.
         </p>
       </header>
 

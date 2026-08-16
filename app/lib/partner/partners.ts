@@ -201,6 +201,10 @@ function partnerTxTypeLabel(type: PartnerWalletTransactionType): string {
       return "Admin credit";
     case PartnerWalletTransactionType.ADMIN_DEBIT:
       return "Admin debit";
+    case PartnerWalletTransactionType.ESIM_PURCHASE_DEBIT:
+      return "Purchase debit";
+    case PartnerWalletTransactionType.ESIM_PURCHASE_REFUND:
+      return "Purchase refund";
     default:
       return "Transaction";
   }
@@ -210,7 +214,10 @@ function formatPartnerTxAmount(
   amountCents: number,
   type: PartnerWalletTransactionType
 ): string {
-  if (type === PartnerWalletTransactionType.ADMIN_DEBIT) {
+  if (
+    type === PartnerWalletTransactionType.ADMIN_DEBIT ||
+    type === PartnerWalletTransactionType.ESIM_PURCHASE_DEBIT
+  ) {
     return formatUsdCents(-Math.abs(amountCents));
   }
   const body = formatUsdCents(Math.abs(amountCents));
