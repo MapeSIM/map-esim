@@ -12,6 +12,8 @@ type Props = {
   revealable: boolean;
   /** Absolute path to POST reveal endpoint. */
   revealPath: string;
+  /** Single-row ICCID + Copy for compact Partner install cards. */
+  compact?: boolean;
 };
 
 export default function IccidRevealPanel({
@@ -19,6 +21,7 @@ export default function IccidRevealPanel({
   maskedLabel,
   revealable,
   revealPath,
+  compact = false,
 }: Props) {
   const [revealed, setRevealed] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -102,12 +105,8 @@ export default function IccidRevealPanel({
     }
   }
 
-  return (
-    <div className="grid gap-2 border-b border-[var(--border)] py-3 sm:grid-cols-[200px_1fr] sm:gap-4">
-      <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-        ICCID
-      </dt>
-      <dd className="space-y-2 text-sm font-medium text-[var(--heading)]">
+  const body = (
+      <dd className="min-w-0 space-y-2 text-sm font-medium text-[var(--heading)]">
         <p className="break-all font-mono" aria-label={`ICCID for order ${orderId}`}>
           {revealed ?? maskedLabel}
         </p>
@@ -156,6 +155,63 @@ export default function IccidRevealPanel({
           </p>
         ) : null}
       </dd>
+  );
+
+  if (compact) {
+    return (
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+          ICCID
+        </p>
+        <div className="min-w-0 space-y-2 text-sm font-medium text-[var(--heading)]">
+          <p className="break-all font-mono" aria-label={`ICCID for order ${orderId}`}>
+            {revealed ?? maskedLabel}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {!revealed ? (
+              <button
+                type="button"
+                onClick={() => void reveal()}
+                disabled={!revealable || pending}
+                className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--border-strong)] px-3 text-xs font-semibold text-[var(--heading)] transition hover:bg-[var(--surface)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {pending ? "Revealing…" : "Show"}
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void copy()}
+                  className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--border-strong)] px-3 text-xs font-semibold text-[var(--heading)] transition hover:bg-[var(--surface)]"
+                >
+                  {copied ? "Copied" : "Copy"}
+                </button>
+                <button
+                  type="button"
+                  onClick={hide}
+                  className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--border-strong)] px-3 text-xs font-semibold text-[var(--heading)] transition hover:bg-[var(--surface)]"
+                >
+                  Hide
+                </button>
+              </>
+            )}
+          </div>
+          {error ? (
+            <p className="text-xs font-normal text-amber-700 dark:text-amber-200" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-2 border-b border-[var(--border)] py-3 sm:grid-cols-[200px_1fr] sm:gap-4">
+      <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+        ICCID
+      </dt>
+      {body}
     </div>
   );
 }

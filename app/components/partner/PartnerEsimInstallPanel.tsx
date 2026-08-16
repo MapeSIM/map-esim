@@ -1,9 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { QrCode, Smartphone } from "lucide-react";
-import EsimInstallExperience from "@/app/components/install/EsimInstallExperience";
-import { useAppleOneTapInstallState } from "@/app/components/install/AppleOneTapInstallButton";
+import { useCallback, useState } from "react";
+import { QrCode } from "lucide-react";
+import Link from "next/link";
+import AppleOneTapInstallButton, {
+  AppleOneTapSafariGuidance,
+  useAppleOneTapInstallState,
+} from "@/app/components/install/AppleOneTapInstallButton";
+import InstallEsimSheet from "@/app/components/install/InstallEsimSheet";
+import ManualInstallSheet from "@/app/components/install/ManualInstallSheet";
+import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
+import PartnerEsimShareControls from "@/app/components/partner/PartnerEsimShareControls";
 import { PARTNER_INSTALL_UNAVAILABLE_MESSAGE } from "@/app/lib/partner/partnerOrderInstallClient";
 
 type InstallPayload = {
@@ -25,12 +32,21 @@ type InstallPayload = {
 type Props = {
   orderId: string;
   installEligible: boolean;
+  iccidMasked: string;
+  iccidRevealable: boolean;
+  hasActiveShareToken: boolean;
+  companyName: string | null;
 };
 
 export default function PartnerEsimInstallPanel({
   orderId,
   installEligible,
+  iccidMasked,
+  iccidRevealable,
+  hasActiveShareToken,
+  companyName,
 }: Props) {
+  const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<InstallPayload | null>(null);
@@ -83,107 +99,138 @@ export default function PartnerEsimInstallPanel({
     }
   }, [orderId]);
 
-  const autoOpenStarted = useRef(false);
-  useEffect(() => {
-    if (autoOpenStarted.current) return;
-    if (!installEligible || data || loading) return;
-    autoOpenStarted.current = true;
-    void loadInstall();
-  }, [installEligible, data, loading, loadInstall]);
+  async function expand() {
+    setExpanded(true);
+    if (!data && !loading) {
+      await loadInstall();
+    }
+  }
 
   if (!installEligible) {
     return (
-      <section
-        className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-5"
-        role="status"
-      >
-        <h2 className="text-base font-bold text-[var(--heading)]">
-          Install your eSIM
-        </h2>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
-          {PARTNER_INSTALL_UNAVAILABLE_MESSAGE}
-        </p>
-      </section>
+      <p className="text-sm text-[var(--text-muted)]" role="status">
+        {PARTNER_INSTALL_UNAVAILABLE_MESSAGE}
+      </p>
     );
   }
 
-  return (
-    <section className="min-w-0 space-y-4">
-      <div className="rounded-2xl border border-[var(--border-hover)] bg-[var(--surface-2)] p-5">
-        <div className="flex items-start gap-3">
-          <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-strong)]" />
-          <div className="min-w-0">
-            <h2 className="text-base font-bold text-[var(--heading)]">
-              Install your eSIM
-            </h2>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Use the QR code or manual details below. An ICCID is not enough to
-              install this eSIM.
-            </p>
-          </div>
-        </div>
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => void expand()}
+        className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--accent-ink)] outline-none transition hover:bg-[var(--accent-strong)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+      >
+        <QrCode className="h-4 w-4" aria-hidden="true" />
+        View QR Code & Install
+      </button>
+    );
+  }
 
-        {!data ? (
-          <div className="mt-5 space-y-3">
-            {loading ? (
-              <p className="text-sm text-[var(--text-muted)]" role="status">
-                Loading installation details…
-              </p>
-            ) : (
-              <button
-                type="button"
-                onClick={() => void loadInstall()}
-                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-              >
-                <QrCode className="h-4 w-4" />
-                View QR Code & Details
-              </button>
-            )}
-            {error ? (
-              <p className="text-sm text-[var(--danger-text)]" role="alert">
-                {error}
-              </p>
-            ) : null}
+  const showQr = Boolean(data?.hasVerifiedLpa && data.qrViewHref);
+  const eligibleIphone = Boolean(appleOneTap.href);
+
+  return (
+    <div className="min-w-0 space-y-3">
+      <h2 className="sr-only">Install your eSIM</h2>
+      {loading && !data ? (
+        <p className="text-sm text-[var(--text-muted)]" role="status">
+          Loading installation details…
+        </p>
+      ) : null}
+      {error && !data ? (
+        <p className="text-sm text-[var(--danger-text)]" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      {data && !data.hasInstallDetails ? (
+        <p className="text-sm text-[var(--text-muted)]" role="status">
+          {PARTNER_INSTALL_UNAVAILABLE_MESSAGE}
+        </p>
+      ) : null}
+
+      <div
+        className={
+          showQr
+            ? "min-w-0 space-y-3 sm:grid sm:grid-cols-[minmax(0,240px)_minmax(0,1fr)] sm:items-start sm:gap-4 sm:space-y-0"
+            : "min-w-0 space-y-3"
+        }
+      >
+        {showQr ? (
+          <div className="rounded-2xl border border-[var(--border)] bg-white p-4">
+            {/* authorized partner QR route */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={data!.qrViewHref!}
+              alt="eSIM installation QR code"
+              width={240}
+              height={240}
+              className="mx-auto h-auto w-full max-w-[220px] sm:max-w-[240px]"
+            />
           </div>
-        ) : (
-          <div className="mt-5 min-w-0">
-            <EsimInstallExperience
+        ) : null}
+
+        <div className="min-w-0 space-y-3">
+          {eligibleIphone ? (
+            <AppleOneTapInstallButton
+              href={appleOneTap.href!}
+              label="One-Tap Install eSIM"
+            />
+          ) : null}
+
+          {appleOneTap.showSafariGuidance && !eligibleIphone ? (
+            <AppleOneTapSafariGuidance />
+          ) : null}
+
+          {data ? (
+            <InstallEsimSheet
               appleOneTapHref={appleOneTap.href}
               showSafariOneTapGuidance={appleOneTap.showSafariGuidance}
-              hasOfficialIphoneActivationUrl={
-                data.hasOfficialIphoneActivationUrl
-              }
-              iphoneInstallHref={data.iphoneInstallHref}
-              iphoneGuideHref={data.iphoneGuideHref}
-              androidGuideHref={data.androidGuideHref}
-              androidActivationUrl={data.androidActivationUrl}
-              hasVerifiedLpa={data.hasVerifiedLpa}
               qrViewHref={data.qrViewHref}
-              qrDownloadHref={data.qrDownloadHref}
               smdpAddress={data.smdpAddress}
               activationCode={data.activationCode}
               lpa={data.lpa}
-              manualInstallText={
-                [data.smdpAddress, data.activationCode, data.lpa]
-                  .filter(Boolean)
-                  .length > 0
-                  ? [
-                      data.smdpAddress
-                        ? `SM-DP+: ${data.smdpAddress}`
-                        : null,
-                      data.activationCode
-                        ? `Activation code: ${data.activationCode}`
-                        : null,
-                      data.lpa ? `LPA: ${data.lpa}` : null,
-                    ]
-                      .filter(Boolean)
-                      .join("\n")
-                  : null
-              }
+              iphoneGuideHref={data.iphoneGuideHref}
+              androidGuideHref={data.androidGuideHref}
             />
+          ) : null}
+
+          <PartnerEsimShareControls
+            orderId={orderId}
+            hasActiveToken={hasActiveShareToken}
+            companyName={companyName}
+            compact
+          />
+
+          <IccidRevealPanel
+            orderId={orderId}
+            maskedLabel={iccidMasked}
+            revealable={iccidRevealable}
+            revealPath={`/api/partner/orders/${encodeURIComponent(orderId)}/iccid`}
+            compact
+          />
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            <ManualInstallSheet
+              label="Manual installation details"
+              smdpAddress={data?.smdpAddress}
+              activationCode={data?.activationCode}
+              lpa={data?.lpa}
+            />
+            <Link
+              href={
+                eligibleIphone
+                  ? data?.iphoneGuideHref || "/install/iphone"
+                  : data?.androidGuideHref || "/install/android"
+              }
+              className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--page-bg-soft)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            >
+              Installation Guide
+            </Link>
           </div>
-        )}
+        </div>
       </div>
-    </section>
+    </div>
   );
 }

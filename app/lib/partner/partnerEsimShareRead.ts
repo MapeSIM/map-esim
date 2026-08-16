@@ -38,7 +38,7 @@ import { loadPublicShareBrandingForPartner } from "@/app/lib/partner/partnerShar
 import type { PartnerShareBrandingFields } from "@/app/lib/partner/partnerShareBrandingValidate";
 import { SHARE_PAGE_UNAVAILABLE_MESSAGE } from "@/app/lib/share/shareSurface";
 
-export const SHARE_STATUS_READY = "Ready";
+export const SHARE_STATUS_READY = "Ready to install";
 
 export type PartnerEsimSharePublicBranding = PartnerShareBrandingFields;
 

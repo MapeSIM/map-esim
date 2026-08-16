@@ -7,6 +7,9 @@ import { PartnerEsimPurchaseStatus } from "@prisma/client";
 
 export const PARTNER_ORDERS_PAGE_LIMIT = 100;
 
+/** Completed Partner eSIM with install credentials, no activation evidence. */
+export const PARTNER_ESIM_READY_LABEL = "Ready to install";
+
 export type PartnerOrderStatusBadge =
   | "Completed"
   | "Processing"

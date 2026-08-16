@@ -228,6 +228,8 @@ async function main() {
     assert.equal(rowA!.statusBadge, "Completed");
     assert.equal(rowA!.retailPriceLabel, "$10.00 USD");
     assert.equal(rowA!.partnerDebitLabel, "$9.00 USD"); // 10% off
+    assert.equal(rowA!.iccidRevealable, true);
+    assert.equal(typeof rowA!.hasActiveShareToken, "boolean");
     assert.equal(rowA!.iccidMasked.includes(SAMPLE_ICCID), false);
     assert.match(rowA!.iccidMasked, /•|Pending|Not provided/);
     console.log("PASS A_partner_sees_own_completed_order");

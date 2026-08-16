@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import EsimActionSheet from "@/app/components/install/EsimActionSheet";
 import {
   createOrRegeneratePartnerShareLinkAction,
   revokePartnerShareLinkAction,
@@ -16,12 +17,14 @@ type Props = {
   orderId: string;
   hasActiveToken: boolean;
   companyName: string | null;
+  compact?: boolean;
 };
 
 export default function PartnerEsimShareControls({
   orderId,
   hasActiveToken,
   companyName,
+  compact = false,
 }: Props) {
   const [active, setActive] = useState(hasActiveToken);
   const [sharePath, setSharePath] = useState<string | null>(null);
@@ -29,6 +32,7 @@ export default function PartnerEsimShareControls({
   const [copied, setCopied] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   function currentShareUrl(): string | null {
     if (!sharePath) return null;
@@ -131,16 +135,8 @@ export default function PartnerEsimShareControls({
     ? buildPartnerWhatsAppShareHref({ shareUrl, companyName })
     : null;
 
-  return (
-    <section className="min-w-0 space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-5 sm:px-5">
-      <div>
-        <h2 className="text-lg font-semibold tracking-tight">Share eSIM</h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Create a secure link for this completed order. The raw link is shown
-          only once. Regenerating stops the old link.
-        </p>
-      </div>
-
+  const body = (
+    <div className="min-w-0 space-y-4">
       {shareUrl ? (
         <p className="break-all rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 font-mono text-xs text-[var(--heading)]">
           {shareUrl}
@@ -219,6 +215,44 @@ export default function PartnerEsimShareControls({
           {error}
         </p>
       ) : null}
+    </div>
+  );
+
+  if (compact) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setSheetOpen(true)}
+          className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--page-bg-soft)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+        >
+          Share eSIM
+        </button>
+        <EsimActionSheet
+          open={sheetOpen}
+          title="Share eSIM"
+          onClose={() => setSheetOpen(false)}
+        >
+          <p className="mb-4 text-sm text-[var(--text-muted)]">
+            Create a secure link for this completed order. The raw link is shown
+            only once. Regenerating stops the old link.
+          </p>
+          {body}
+        </EsimActionSheet>
+      </>
+    );
+  }
+
+  return (
+    <section className="min-w-0 space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-5 sm:px-5">
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight">Share eSIM</h2>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">
+          Create a secure link for this completed order. The raw link is shown
+          only once. Regenerating stops the old link.
+        </p>
+      </div>
+      {body}
     </section>
   );
 }

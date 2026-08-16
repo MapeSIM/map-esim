@@ -213,9 +213,13 @@ async function main() {
   assert.match(viewSrc, /clipboard\.writeText/);
   assert.match(viewSrc, /\/api\/share\/\$\{encodeURIComponent\(token\)\}\/usage/);
   assert.match(viewSrc, /method:\s*["']POST["']/);
-  assert.doesNotMatch(viewSrc, /navigator\.share|Copy link|wa\.me/i);
+  assert.match(viewSrc, /Check Usage/);
+  assert.match(viewSrc, /ManualInstallSheet/);
+  assert.match(viewSrc, /Installation Guide/);
+  assert.doesNotMatch(viewSrc, /wa\.me/i);
   assert.doesNotMatch(viewSrc, /partnerCharge|discountBps|providerCost|wallet/);
   assert.doesNotMatch(viewSrc, /Confirmation PIN|confirmationPin/);
+  assert.doesNotMatch(viewSrc, /eSIM activated and ready to use/);
   assert.match(viewSrc, /data:image|qrDataUrl/);
   assert.match(usageRoute, /getPartnerEsimShareUsage\(token\)/);
   assert.match(usageRoute, /PRIVATE_API_RESPONSE_HEADERS/);

@@ -1,12 +1,12 @@
-import Image from "next/image";
 import Link from "next/link";
+import PartnerEsimOrderCard from "@/app/components/partner/PartnerEsimOrderCard";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   listPartnerOrdersPage,
   type PartnerAttentionRow,
-  type PartnerOrderListRow,
 } from "@/app/lib/partner/partnerOrders";
 import type { PartnerOrderStatusBadge } from "@/app/lib/partner/partnerOrdersDisplay";
+import { getPartnerShareBranding } from "@/app/lib/partner/partnerShareBranding";
 
 export const dynamic = "force-dynamic";
 
@@ -26,80 +26,6 @@ function statusBadgeClass(status: PartnerOrderStatusBadge): string {
     default:
       return "bg-[var(--surface)] text-[var(--text-muted)] border-[var(--border)]";
   }
-}
-
-function OrderCard({ row }: { row: PartnerOrderListRow }) {
-  return (
-    <li className="min-w-0">
-      <Link
-        href={`/partner/orders/${encodeURIComponent(row.orderId)}`}
-        className="block min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 transition hover:border-[var(--border-strong)] hover:bg-[var(--surface)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-      >
-        <div className="flex min-w-0 items-start gap-3">
-          {row.flagUrl ? (
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]">
-              <Image
-                src={row.flagUrl}
-                alt=""
-                width={40}
-                height={30}
-                className="h-6 w-auto object-cover"
-                unoptimized
-              />
-            </div>
-          ) : null}
-          <div className="min-w-0 flex-1 space-y-2">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <p className="truncate text-sm font-semibold text-[var(--heading)]">
-                {row.destination}
-              </p>
-              <span
-                className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${statusBadgeClass(row.statusBadge)}`}
-              >
-                {row.statusBadge}
-              </span>
-            </div>
-            <p className="truncate text-sm text-[var(--text-muted)]">
-              {row.planName}
-              {row.dataAllowance ? ` · ${row.dataAllowance}` : ""}
-              {row.validity ? ` · ${row.validity}` : ""}
-            </p>
-            <dl className="grid gap-1 text-xs text-[var(--text-muted)] sm:grid-cols-2">
-              <div className="min-w-0">
-                <dt className="inline text-[var(--text-soft)]">Ref </dt>
-                <dd className="inline font-mono text-[var(--heading)]">
-                  {row.shortReference}
-                </dd>
-              </div>
-              <div className="min-w-0">
-                <dt className="inline text-[var(--text-soft)]">Retail </dt>
-                <dd className="inline tabular-nums text-[var(--heading)]">
-                  {row.retailPriceLabel}
-                </dd>
-              </div>
-              <div className="min-w-0">
-                <dt className="inline text-[var(--text-soft)]">Debit </dt>
-                <dd className="inline tabular-nums text-[var(--heading)]">
-                  {row.partnerDebitLabel}
-                </dd>
-              </div>
-              <div className="min-w-0">
-                <dt className="inline text-[var(--text-soft)]">Purchased </dt>
-                <dd className="inline text-[var(--heading)]">
-                  {row.purchasedAtLabel}
-                </dd>
-              </div>
-            </dl>
-            {row.statusBadge === "Completed" ? (
-              <p className="text-xs font-semibold text-[var(--accent-strong)]">
-                Share eSIM
-              </p>
-            ) : null}
-          </div>
-        </div>
-      </Link>
-    </li>
-  );
 }
 
 function AttentionCard({ row }: { row: PartnerAttentionRow }) {
@@ -130,13 +56,7 @@ function AttentionCard({ row }: { row: PartnerAttentionRow }) {
           </dd>
         </div>
         <div className="min-w-0">
-          <dt className="inline text-[var(--text-soft)]">Retail </dt>
-          <dd className="inline tabular-nums text-[var(--heading)]">
-            {row.retailPriceLabel}
-          </dd>
-        </div>
-        <div className="min-w-0">
-          <dt className="inline text-[var(--text-soft)]">Debit </dt>
+          <dt className="inline text-[var(--text-soft)]">Amount Paid </dt>
           <dd className="inline tabular-nums text-[var(--heading)]">
             {row.partnerDebitLabel}
           </dd>
@@ -182,13 +102,16 @@ export default async function PartnerOrdersPage() {
     );
   }
 
+  const branding = await getPartnerShareBranding(user.id);
+  const companyName = branding.ok ? branding.branding.companyName : null;
+
   return (
     <div className="min-w-0 space-y-8">
       <header>
         <h1 className="text-2xl font-bold tracking-tight">My eSIMs</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Your purchased Partner eSIMs. Open an order for installation, usage,
-          and secure ICCID reveal.
+          Your purchased Partner eSIMs. Open QR and usage only when you need
+          them.
         </p>
       </header>
 
@@ -229,7 +152,9 @@ export default async function PartnerOrdersPage() {
         ) : (
           <ul className="space-y-3">
             {data.orders.map((row) => (
-              <OrderCard key={row.orderId} row={row} />
+              <li key={row.orderId} className="min-w-0">
+                <PartnerEsimOrderCard row={row} companyName={companyName} />
+              </li>
             ))}
           </ul>
         )}

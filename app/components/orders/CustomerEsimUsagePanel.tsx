@@ -27,6 +27,8 @@ type Props = {
   autoOpen?: boolean;
   /** Override usage API path. Defaults to the customer account route. */
   usagePath?: string;
+  /** Compact Partner/share result card. Default remains the customer panel. */
+  compact?: boolean;
 };
 
 function formatGb(value: number | null): string {
@@ -65,9 +67,10 @@ export default function CustomerEsimUsagePanel({
   usageEligible,
   autoOpen = false,
   usagePath,
+  compact = false,
 }: Props) {
   const headingId = useId();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(Boolean(autoOpen && usageEligible));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usage, setUsage] = useState<UsagePayload | null>(null);
@@ -153,13 +156,13 @@ export default function CustomerEsimUsagePanel({
   }, [loadUsage]);
 
   useEffect(() => {
-    if (!autoOpen || !usageEligible || open || usage || loading) return;
-    // Deep-link from My eSIMs "View usage" (?usage=1): one explicit navigation load.
-    // Not background polling — runs once after the customer chose View usage.
+    if (!autoOpen || !usageEligible || usage || loading) return;
+    // Deep-link from My eSIMs "View usage" (?usage=1) or Partner "Show eSIM Status".
+    // Not background polling — runs once after the user chose to view usage.
     queueMicrotask(() => {
-      void openAndLoad();
+      void loadUsage();
     });
-  }, [autoOpen, usageEligible, open, usage, loading, openAndLoad]);
+  }, [autoOpen, usageEligible, usage, loading, loadUsage]);
 
   if (!usageEligible) {
     return null;
@@ -176,9 +179,24 @@ export default function CustomerEsimUsagePanel({
     <section
       id="usage"
       aria-labelledby={headingId}
-      className="rounded-2xl border border-[var(--border-hover)] bg-[var(--surface-2)] p-4 sm:p-5"
+      className={
+        compact
+          ? "min-w-0"
+          : "rounded-2xl border border-[var(--border-hover)] bg-[var(--surface-2)] p-4 sm:p-5"
+      }
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div
+        className={
+          compact
+            ? "flex flex-col gap-2"
+            : "flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+        }
+      >
+        {compact ? (
+          <h2 id={headingId} className="sr-only">
+            eSIM Status &amp; Usage
+          </h2>
+        ) : (
         <div className="min-w-0">
           <h2
             id={headingId}
@@ -191,6 +209,7 @@ export default function CustomerEsimUsagePanel({
             refresh.
           </p>
         </div>
+        )}
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           {!open ? (
             <button
@@ -200,7 +219,7 @@ export default function CustomerEsimUsagePanel({
               className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 disabled:opacity-60 sm:w-auto"
             >
               <Signal className="h-4 w-4" aria-hidden="true" />
-              {loading ? "Loading…" : "View usage"}
+              {loading ? "Loading…" : compact ? "Check Usage" : "View usage"}
             </button>
           ) : (
             <button
@@ -231,6 +250,54 @@ export default function CustomerEsimUsagePanel({
           ) : null}
 
           {usage ? (
+            compact ? (
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass(usage)}`}
+                  >
+                    {usage.statusLabel}
+                  </span>
+                </div>
+                {usage.isUnlimited ? (
+                  <p className="mt-3 text-sm font-semibold text-[var(--heading)]">
+                    Unlimited data
+                  </p>
+                ) : (
+                  <dl className="mt-3 grid grid-cols-3 gap-2 text-center text-sm">
+                    <div>
+                      <dt className="text-xs text-[var(--text-soft)]">Used</dt>
+                      <dd className="mt-0.5 font-semibold tabular-nums text-[var(--heading)]">
+                        {formatGb(usage.usedDataGB)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-[var(--text-soft)]">
+                        Remaining
+                      </dt>
+                      <dd className="mt-0.5 font-semibold tabular-nums text-[var(--heading)]">
+                        {formatGb(usage.remainingDataGB)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-[var(--text-soft)]">Total</dt>
+                      <dd className="mt-0.5 font-semibold tabular-nums text-[var(--heading)]">
+                        {formatGb(usage.initialDataGB)}
+                      </dd>
+                    </div>
+                  </dl>
+                )}
+                {usage.expiresAt ? (
+                  <p className="mt-3 text-xs text-[var(--text-muted)]">
+                    Expires {formatWhen(usage.expiresAt)}
+                  </p>
+                ) : usage.activatedAt ? (
+                  <p className="mt-3 text-xs text-[var(--text-muted)]">
+                    Activated {formatWhen(usage.activatedAt)}
+                  </p>
+                ) : null}
+              </div>
+            ) : (
             <>
               <div className="flex flex-wrap items-center gap-2">
                 <span
@@ -327,15 +394,18 @@ export default function CustomerEsimUsagePanel({
                 )}
               </div>
             </>
+            )
           ) : null}
 
           {!usage && !error && loading ? (
             <p className="text-sm text-[var(--text-muted)]">Loading usage…</p>
           ) : null}
 
+          {compact ? null : (
           <p className="text-xs leading-relaxed text-[var(--text-soft)]">
             Usage data may be delayed by up to 1 hour.
           </p>
+          )}
         </div>
       ) : null}
     </section>

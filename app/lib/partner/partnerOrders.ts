@@ -57,6 +57,10 @@ export type PartnerOrderListRow = {
   purchasedAtLabel: string;
   /** Masked last-4 or pending — never plaintext. */
   iccidMasked: string;
+  /** True only when encrypted ICCID is stored. */
+  iccidRevealable: boolean;
+  /** Boolean-only; never a raw share token. */
+  hasActiveShareToken: boolean;
 };
 
 export type PartnerAttentionRow = {
@@ -191,6 +195,8 @@ export async function listPartnerOrdersPage(
           Boolean(row.order.iccidEncrypted?.trim()),
           row.order.status
         ),
+        iccidRevealable: Boolean(row.order.iccidEncrypted?.trim()),
+        hasActiveShareToken: false,
       });
       continue;
     }
@@ -211,6 +217,21 @@ export async function listPartnerOrdersPage(
       message: partnerAttentionMessage(kind),
       purchasedAtLabel,
     });
+  }
+
+  if (orders.length > 0) {
+    const activeShares = await prisma.partnerEsimShareToken.findMany({
+      where: {
+        partnerId: actor.partnerId,
+        revokedAt: null,
+        orderId: { in: orders.map((order) => order.orderId) },
+      },
+      select: { orderId: true },
+    });
+    const active = new Set(activeShares.map((token) => token.orderId));
+    for (const order of orders) {
+      order.hasActiveShareToken = active.has(order.orderId);
+    }
   }
 
   return { orders, attention };

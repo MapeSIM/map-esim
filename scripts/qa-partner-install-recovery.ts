@@ -182,16 +182,18 @@ async function main() {
   assert.doesNotMatch(partnerInstall, /method:\s*["']POST["']/);
   assert.match(refreshCore, /extractInstallDetails/);
   assert.match(refreshCore, /hasInstallDetails/);
-  assert.match(partnerPage, /PartnerEsimInstallPanel/);
-  assert.match(partnerPage, /CustomerEsimUsagePanel/);
+  assert.match(partnerPage, /PartnerEsimOrderCard/);
+  assert.match(partnerPage, /CustomerEsimUsagePanel|PartnerEsimOrderCard/);
   assert.doesNotMatch(
     partnerPage,
     /Use the full ICCID above|Secure QR and one-tap install for Partners will follow/
   );
-  assert.match(partnerPanel, /EsimInstallExperience/);
   assert.match(partnerPanel, /useAppleOneTapInstallState/);
   assert.match(partnerPanel, /Install your eSIM/);
+  assert.match(partnerPanel, /View QR Code & Install/);
   assert.match(partnerPanel, /PARTNER_INSTALL_UNAVAILABLE_MESSAGE/);
+  assert.match(partnerPanel, /ManualInstallSheet/);
+  assert.doesNotMatch(partnerPanel, /EsimInstallExperience/);
   assert.doesNotMatch(partnerPanel, /Confirmation PIN|confirmationPin/);
   assert.match(customerPanel, /\/api\/account\/orders\/\$\{encodeURIComponent\(orderId\)\}\/install/);
   assert.match(customerInstall, /\/api\/account\/orders\//);

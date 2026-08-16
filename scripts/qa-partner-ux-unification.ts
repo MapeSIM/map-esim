@@ -44,11 +44,22 @@ function main() {
   assert.doesNotMatch(partnerWallet, /href=["']\/account\/wallet\/top-up["']/);
   assert.match(partnerWallet, /Available Partner Balance/);
   assert.match(partnerOrders, /My eSIMs/);
-  assert.match(partnerOrderDetail, /PartnerEsimInstallPanel/);
+  assert.match(partnerOrders, /PartnerEsimOrderCard/);
+  assert.match(partnerOrders, /Amount Paid/);
+  assert.doesNotMatch(partnerOrders, /Reward Points|rewardPoints/i);
+  assert.match(partnerOrderDetail, /PartnerEsimOrderCard/);
   assert.doesNotMatch(
     partnerOrderDetail,
-    /Use the full ICCID above|Secure QR and one-tap install for Partners will follow/
+    /Use the full ICCID above|Secure QR and one-tap install for Partners will follow|eSIM activated and ready to use/
   );
+  const partnerCard = read("app/components/partner/PartnerEsimOrderCard.tsx");
+  assert.match(partnerCard, /Show eSIM Status & Usage/);
+  assert.match(partnerCard, /PARTNER_ESIM_READY_LABEL/);
+  assert.doesNotMatch(partnerCard, /Recharge|Add Data|Reward Points/i);
+  const partnerInstall = read("app/components/partner/PartnerEsimInstallPanel.tsx");
+  assert.match(partnerInstall, /View QR Code & Install/);
+  assert.match(partnerInstall, /ManualInstallSheet/);
+  assert.doesNotMatch(partnerInstall, /eSIM activated and ready to use/);
   assert.match(partnerWallet, /Partner/);
   assert.match(access, /Purchase debit/);
   assert.match(access, /Purchase refund/);

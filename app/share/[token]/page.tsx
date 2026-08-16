@@ -38,8 +38,12 @@ export default async function PartnerEsimSharePage({
           {companyName || BRAND_NAME}
         </p>
         <h1 className="text-2xl font-bold tracking-tight text-[var(--heading)]">
-          Your eSIM is ready
+          {data.planName}
         </h1>
+        <p className="text-sm text-[var(--text-muted)]">{data.destinationName}</p>
+        <span className="inline-flex rounded-full border border-[var(--accent-strong)]/40 bg-[var(--accent-strong)]/10 px-3 py-1 text-xs font-semibold text-[var(--heading)]">
+          {data.statusLabel}
+        </span>
       </header>
       <PartnerEsimShareView token={token} data={data} />
       <p className="text-center text-xs text-[var(--text-soft)]">
