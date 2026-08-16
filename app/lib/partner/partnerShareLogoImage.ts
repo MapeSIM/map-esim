@@ -10,6 +10,10 @@ import {
   PARTNER_LOGO_MAX_INPUT_DIMENSION,
   PARTNER_LOGO_MAX_OUTPUT_DIMENSION,
 } from "@/app/lib/partner/partnerShareLogoBlob";
+import {
+  PARTNER_LOGO_STAGE,
+  type PartnerLogoStage,
+} from "@/app/lib/partner/partnerShareLogoStages";
 
 export const PARTNER_LOGO_UNAVAILABLE = "Logo upload is temporarily unavailable.";
 export const PARTNER_LOGO_INVALID =
@@ -69,24 +73,44 @@ export async function preparePartnerLogoWebp(input: {
   filename?: string | null;
 }): Promise<
   | { ok: true; logo: PreparedPartnerLogo }
-  | { ok: false; error: string }
+  | { ok: false; error: string; stage: PartnerLogoStage }
 > {
   const bytes = input.bytes;
   if (!Buffer.isBuffer(bytes) || bytes.length === 0) {
-    return { ok: false, error: PARTNER_LOGO_INVALID };
+    return {
+      ok: false,
+      error: PARTNER_LOGO_INVALID,
+      stage: PARTNER_LOGO_STAGE.INVALID_IMAGE,
+    };
   }
   if (bytes.length > PARTNER_LOGO_MAX_BYTES) {
-    return { ok: false, error: PARTNER_LOGO_INVALID };
+    return {
+      ok: false,
+      error: PARTNER_LOGO_INVALID,
+      stage: PARTNER_LOGO_STAGE.INVALID_IMAGE,
+    };
   }
   if (!extensionOk(input.filename)) {
-    return { ok: false, error: PARTNER_LOGO_INVALID };
+    return {
+      ok: false,
+      error: PARTNER_LOGO_INVALID,
+      stage: PARTNER_LOGO_STAGE.INVALID_IMAGE,
+    };
   }
   if (looksLikeSvgOrHtml(bytes)) {
-    return { ok: false, error: PARTNER_LOGO_INVALID };
+    return {
+      ok: false,
+      error: PARTNER_LOGO_INVALID,
+      stage: PARTNER_LOGO_STAGE.INVALID_IMAGE,
+    };
   }
   const kind = detectSafeRasterKind(bytes);
   if (!kind) {
-    return { ok: false, error: PARTNER_LOGO_INVALID };
+    return {
+      ok: false,
+      error: PARTNER_LOGO_INVALID,
+      stage: PARTNER_LOGO_STAGE.INVALID_IMAGE,
+    };
   }
 
   try {
@@ -98,21 +122,37 @@ export async function preparePartnerLogoWebp(input: {
     const meta = await image.metadata();
     const format = (meta.format ?? "").toLowerCase();
     if (format !== kind) {
-      return { ok: false, error: PARTNER_LOGO_INVALID };
+      return {
+        ok: false,
+        error: PARTNER_LOGO_INVALID,
+        stage: PARTNER_LOGO_STAGE.INVALID_IMAGE,
+      };
     }
     if (format !== "png" && format !== "jpeg" && format !== "webp") {
-      return { ok: false, error: PARTNER_LOGO_INVALID };
+      return {
+        ok: false,
+        error: PARTNER_LOGO_INVALID,
+        stage: PARTNER_LOGO_STAGE.INVALID_IMAGE,
+      };
     }
     const width = meta.width ?? 0;
     const height = meta.height ?? 0;
     if (!width || !height) {
-      return { ok: false, error: PARTNER_LOGO_INVALID };
+      return {
+        ok: false,
+        error: PARTNER_LOGO_INVALID,
+        stage: PARTNER_LOGO_STAGE.INVALID_IMAGE,
+      };
     }
     if (
       width > PARTNER_LOGO_MAX_INPUT_DIMENSION ||
       height > PARTNER_LOGO_MAX_INPUT_DIMENSION
     ) {
-      return { ok: false, error: PARTNER_LOGO_TOO_LARGE_DIMENSIONS };
+      return {
+        ok: false,
+        error: PARTNER_LOGO_TOO_LARGE_DIMENSIONS,
+        stage: PARTNER_LOGO_STAGE.INVALID_IMAGE,
+      };
     }
 
     const body = await image
@@ -125,7 +165,11 @@ export async function preparePartnerLogoWebp(input: {
       .toBuffer();
 
     if (!body.length || body.length > PARTNER_LOGO_MAX_BYTES) {
-      return { ok: false, error: PARTNER_LOGO_INVALID };
+      return {
+        ok: false,
+        error: PARTNER_LOGO_INVALID,
+        stage: PARTNER_LOGO_STAGE.INVALID_IMAGE,
+      };
     }
 
     return {
@@ -133,6 +177,10 @@ export async function preparePartnerLogoWebp(input: {
       logo: { body, contentType: "image/webp" },
     };
   } catch {
-    return { ok: false, error: PARTNER_LOGO_INVALID };
+    return {
+      ok: false,
+      error: PARTNER_LOGO_UNAVAILABLE,
+      stage: PARTNER_LOGO_STAGE.IMAGE_PROCESS_FAILED,
+    };
   }
 }

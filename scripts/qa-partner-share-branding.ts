@@ -32,16 +32,28 @@ import {
   publicShareLogoSrc,
   sharePoweredByLabel,
 } from "../app/lib/partner/partnerShareBrandingValidate";
+import { prisma as appPrisma } from "../app/lib/db";
 import {
   isOwnedPartnerLogoBlobUrl,
+  isVercelBlobPublicHost,
+  parsePartnerLogoBlobUrl,
   PARTNER_LOGO_MAX_BYTES,
 } from "../app/lib/partner/partnerShareLogoBlob";
-import { preparePartnerLogoWebp } from "../app/lib/partner/partnerShareLogoImage";
 import {
+  PARTNER_LOGO_INVALID,
+  PARTNER_LOGO_UNAVAILABLE,
+  preparePartnerLogoWebp,
+} from "../app/lib/partner/partnerShareLogoImage";
+import {
+  isPartnerLogoBlobWriteConfigured,
   removePartnerShareLogo,
   uploadPartnerShareLogo,
   type PartnerLogoBlobStore,
 } from "../app/lib/partner/partnerShareLogo";
+import {
+  PARTNER_LOGO_STAGE,
+  safePartnerLogoStageMeta,
+} from "../app/lib/partner/partnerShareLogoStages";
 import sharp from "sharp";
 import {
   assertSafeSharePayload,
@@ -236,13 +248,24 @@ async function main() {
   assert.match(actionsSrc, /user\.id/);
   assert.match(logoSrc, /buildPartnerLogoBlobPathname\(actor\.partnerId/);
   assert.doesNotMatch(logoSrc, /formData\.get\(["']pathname["']\)/);
+  assert.match(logoSrc, /access:\s*["']public["']/);
+  assert.match(logoSrc, /new Blob\(/);
+  assert.match(logoSrc, /\.\.\.auth/);
+  assert.match(logoSrc, /blobWriteOptions/);
+  assert.match(logoSrc, /PARTNER_LOGO_STAGE\.BLOB_PUT_FAILED/);
   assert.match(logoBlobSrc, /PARTNER_LOGO_BLOB_PREFIX/);
+  assert.match(logoBlobSrc, /vercel-storage/);
   assert.match(logoImageSrc, /sharp/);
   assert.match(logoImageSrc, /image\/webp/);
+  assert.match(logoImageSrc, /PARTNER_LOGO_STAGE\.IMAGE_PROCESS_FAILED/);
   assert.doesNotMatch(logoSrc, /console\.(?:log|info|warn)\(/);
+  assert.doesNotMatch(logoSrc, /err\.message|error\.message|exception\.message/);
   assert.doesNotMatch(actionsSrc, /BLOB_READ_WRITE_TOKEN/);
+  assert.doesNotMatch(actionsSrc, /result\.stage/);
   assert.match(logoBlobSrc, /BLOB_READ_WRITE_TOKEN/);
   assert.match(logoSrc, /PARTNER_LOGO_BLOB_TOKEN_ENV/);
+  assert.match(formSrc, /Logo upload is temporarily unavailable/);
+  assert.doesNotMatch(formSrc, /PARTNER_LOGO_BLOB_PUT_FAILED/);
   assert.match(validateSrc, /SHARE_HEX_RE/);
   assert.match(validateSrc, /https:/);
   assert.match(copySrc, /wa\.me\/\?text=/);
@@ -313,6 +336,79 @@ async function main() {
     )
   );
   console.log("PASS T_U_share_headers_and_noreferrer_actions");
+
+  const partnerAId = "partnerAid012345678901234567";
+  const partnerBId = "partnerBid012345678901234567";
+  const officialUrl = `https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/partner-logos/${partnerAId}/abcd1234efgh5678.webp`;
+  const suffixedUrl = `https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/partner-logos/${partnerAId}/abcd1234efgh5678-NoOVGDVcqSPc7VY.webp`;
+  const namedStoreUrl = `https://map-esim-partner-logos.public.blob.vercel-storage.com/partner-logos/${partnerAId}/abcd1234efgh5678.webp`;
+  assert.equal(isVercelBlobPublicHost("ce0rcu23vrrdzqap.public.blob.vercel-storage.com"), true);
+  assert.equal(parsePartnerLogoBlobUrl(officialUrl)?.partnerId, partnerAId);
+  assert.equal(parsePartnerLogoBlobUrl(`${officialUrl}?download=1`)?.partnerId, partnerAId);
+  assert.equal(parsePartnerLogoBlobUrl(suffixedUrl)?.partnerId, partnerAId);
+  assert.equal(parsePartnerLogoBlobUrl(namedStoreUrl)?.partnerId, partnerAId);
+  assert.equal(isOwnedPartnerLogoBlobUrl(officialUrl, partnerAId), true);
+  assert.equal(isOwnedPartnerLogoBlobUrl(suffixedUrl, partnerAId), true);
+  assert.equal(isOwnedPartnerLogoBlobUrl(officialUrl, partnerBId), false);
+  assert.equal(
+    isOwnedPartnerLogoBlobUrl(
+      `https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/partner-logos/${partnerBId}/abcd1234efgh5678.webp`,
+      partnerAId
+    ),
+    false
+  );
+  assert.equal(
+    parsePartnerLogoBlobUrl(
+      "https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com.evil.example/partner-logos/partnerAid012345678901234567/abcd1234efgh5678.webp"
+    ),
+    null
+  );
+  assert.equal(
+    parsePartnerLogoBlobUrl(
+      `https://map-esim.vercel.app/partner-logos/${partnerAId}/abcd1234efgh5678.webp`
+    ),
+    null
+  );
+  assert.equal(
+    parsePartnerLogoBlobUrl(
+      `https://ce0rcu23vrrdzqap.private.blob.vercel-storage.com/partner-logos/${partnerAId}/abcd1234efgh5678.webp`
+    ),
+    null
+  );
+  assert.equal(
+    parsePartnerLogoBlobUrl(`https://cdn.example.com/partner-logos/${partnerAId}/abcd1234efgh5678.webp`),
+    null
+  );
+  const safeMeta = safePartnerLogoStageMeta({
+    stage: PARTNER_LOGO_STAGE.BLOB_PUT_FAILED,
+    partnerId: partnerAId,
+    contentType: "image/webp",
+    inputBytes: 16558,
+    processedBytes: 4000,
+    pathnamePrefix: "partner-logos",
+  });
+  const safeJson = JSON.stringify(safeMeta);
+  assert.equal(safeMeta.stage, PARTNER_LOGO_STAGE.BLOB_PUT_FAILED);
+  assert.doesNotMatch(safeJson, /BLOB_READ_WRITE_TOKEN|vercel_blob_rw|exception|ECONN|secret/i);
+  console.log("PASS D_E_F_G_blob_url_ownership_and_safe_stage_meta");
+
+  const mapLogoBytes = readFileSync(
+    path.join(__dirname, "..", "public", "brand", "map-esim-logo.png")
+  );
+  assert.ok(mapLogoBytes.length > 0 && mapLogoBytes.length <= PARTNER_LOGO_MAX_BYTES);
+  const mapPrepared = await preparePartnerLogoWebp({
+    bytes: mapLogoBytes,
+    filename: "map-esim-logo.png",
+  });
+  assert.equal(mapPrepared.ok, true);
+  if (mapPrepared.ok) {
+    assert.equal(mapPrepared.logo.contentType, "image/webp");
+    const mapMeta = await sharp(mapPrepared.logo.body).metadata();
+    assert.equal(mapMeta.format, "webp");
+    assert.ok((mapMeta.width ?? 0) > 0 && (mapMeta.width ?? 0) <= 1024);
+    assert.ok((mapMeta.height ?? 0) > 0 && (mapMeta.height ?? 0) <= 1024);
+  }
+  console.log("PASS MAP_logo_fixture_sharp_rotate_resize_webp");
 
   expectInvalid({ supportEmail: "not-an-email" }, "INVALID_EMAIL");
   expectInvalid({ websiteUrl: "http://example.com" }, "INVALID_WEBSITE");
@@ -800,11 +896,133 @@ async function main() {
       store: failStore,
     });
     assert.equal(failed.ok, false);
+    if (!failed.ok) {
+      assert.equal(failed.stage, PARTNER_LOGO_STAGE.BLOB_PUT_FAILED);
+      assert.equal(failed.error, PARTNER_LOGO_UNAVAILABLE);
+      assert.equal(failed.error.includes("blob_down"), false);
+    }
     const afterFail = await getPartnerShareBranding(partnerA.id);
     assert.equal(afterFail.ok, true);
     if (!afterFail.ok) throw new Error("after fail");
     assert.equal(afterFail.branding.logoUrl, beforeFail.branding.logoUrl);
     console.log("PASS O_failed_replace_keeps_old_logo");
+
+    const brokenPng = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.from("not-a-png"),
+    ]);
+    const sharpFail = await uploadPartnerShareLogo({
+      partnerUserId: partnerA.id,
+      bytes: brokenPng,
+      filename: "broken.png",
+      store: aStore.store,
+    });
+    assert.equal(sharpFail.ok, false);
+    if (!sharpFail.ok) {
+      assert.ok(
+        sharpFail.stage === PARTNER_LOGO_STAGE.INVALID_IMAGE ||
+          sharpFail.stage === PARTNER_LOGO_STAGE.IMAGE_PROCESS_FAILED
+      );
+      assert.ok(
+        sharpFail.error === PARTNER_LOGO_INVALID ||
+          sharpFail.error === PARTNER_LOGO_UNAVAILABLE
+      );
+      assert.equal(sharpFail.error.includes("not-a-png"), false);
+    }
+    console.log("PASS A_sharp_failure_safe_ui");
+
+    const savedToken = process.env.BLOB_READ_WRITE_TOKEN;
+    const savedStoreId = process.env.BLOB_STORE_ID;
+    const savedOidc = process.env.VERCEL_OIDC_TOKEN;
+    try {
+      delete process.env.BLOB_READ_WRITE_TOKEN;
+      delete process.env.BLOB_STORE_ID;
+      delete process.env.VERCEL_OIDC_TOKEN;
+      assert.equal(isPartnerLogoBlobWriteConfigured(), false);
+      const missingCred = await uploadPartnerShareLogo({
+        partnerUserId: partnerA.id,
+        bytes: png,
+        filename: "noconfig.png",
+      });
+      assert.equal(missingCred.ok, false);
+      if (!missingCred.ok) {
+        assert.equal(missingCred.stage, PARTNER_LOGO_STAGE.BLOB_CONFIG_MISSING);
+        assert.equal(missingCred.error, PARTNER_LOGO_UNAVAILABLE);
+      }
+    } finally {
+      if (savedToken) process.env.BLOB_READ_WRITE_TOKEN = savedToken;
+      else delete process.env.BLOB_READ_WRITE_TOKEN;
+      if (savedStoreId) process.env.BLOB_STORE_ID = savedStoreId;
+      else delete process.env.BLOB_STORE_ID;
+      if (savedOidc) process.env.VERCEL_OIDC_TOKEN = savedOidc;
+      else delete process.env.VERCEL_OIDC_TOKEN;
+    }
+    console.log("PASS B_missing_blob_credential");
+
+    const rejectStore: PartnerLogoBlobStore = {
+      async put() {
+        return {
+          url: "https://cdn.example.com/partner-logos/not-ours/logo.webp",
+        };
+      },
+      async del() {
+        throw new Error("must_not_delete_foreign_url");
+      },
+    };
+    const rejectedUrl = await uploadPartnerShareLogo({
+      partnerUserId: partnerA.id,
+      bytes: png,
+      filename: "reject.png",
+      store: rejectStore,
+    });
+    assert.equal(rejectedUrl.ok, false);
+    if (!rejectedUrl.ok) {
+      assert.equal(rejectedUrl.stage, PARTNER_LOGO_STAGE.BLOB_URL_REJECTED);
+      assert.equal(rejectedUrl.error, PARTNER_LOGO_UNAVAILABLE);
+    }
+    console.log("PASS D_malformed_blob_url_rejected");
+
+    const orphanStore = mockBlobStore();
+    const origUpdate = appPrisma.partnerProfile.update.bind(appPrisma.partnerProfile);
+    let forceDbFail = true;
+    try {
+      (
+        appPrisma.partnerProfile as { update: typeof appPrisma.partnerProfile.update }
+      ).update = (async (args: Parameters<typeof origUpdate>[0]) => {
+        const data =
+          args && typeof args === "object"
+            ? (args as { data?: { shareLogoUrl?: unknown } }).data
+            : undefined;
+        if (forceDbFail && data && "shareLogoUrl" in data && data.shareLogoUrl) {
+          forceDbFail = false;
+          throw new Error("qa_forced_db_fail_SECRET");
+        }
+        return origUpdate(args as never);
+      }) as unknown as typeof origUpdate;
+      const dbFail = await uploadPartnerShareLogo({
+        partnerUserId: partnerA.id,
+        bytes: png,
+        filename: "dbfail.png",
+        store: orphanStore.store,
+      });
+      assert.equal(dbFail.ok, false);
+      if (!dbFail.ok) {
+        assert.equal(dbFail.stage, PARTNER_LOGO_STAGE.PROFILE_UPDATE_FAILED);
+        assert.equal(dbFail.error, PARTNER_LOGO_UNAVAILABLE);
+        assert.equal(dbFail.error.includes("qa_forced_db_fail_SECRET"), false);
+      }
+    } finally {
+      (
+        appPrisma.partnerProfile as { update: typeof appPrisma.partnerProfile.update }
+      ).update = origUpdate;
+    }
+    assert.equal(orphanStore.events.includes("put"), true);
+    assert.equal(orphanStore.events.includes("del"), true);
+    const afterDbFail = await getPartnerShareBranding(partnerA.id);
+    assert.equal(afterDbFail.ok, true);
+    if (!afterDbFail.ok) throw new Error("after db fail");
+    assert.notEqual(afterDbFail.branding.logoUrl, orphanStore.puts.at(-1)?.url);
+    console.log("PASS H_db_update_failure_orphan_cleanup");
 
     const historic = "https://cdn.example.com/partner-logo.png";
     await prisma.partnerProfile.update({
@@ -852,6 +1070,13 @@ async function main() {
     const auditJson = JSON.stringify(audits);
     assert.match(auditJson, /partner\.share_branding_updated/);
     assert.match(auditJson, /partner\.share_logo_updated/);
+    assert.match(auditJson, /partner\.share_logo_upload_failed/);
+    assert.match(auditJson, /PARTNER_LOGO_BLOB_PUT_FAILED/);
+    assert.match(auditJson, /PARTNER_LOGO_BLOB_CONFIG_MISSING/);
+    assert.match(auditJson, /PARTNER_LOGO_PROFILE_UPDATE_FAILED/);
+    assert.equal(auditJson.includes("qa_forced_db_fail_SECRET"), false);
+    assert.equal(auditJson.includes("blob_down"), false);
+    assert.equal(auditJson.includes("must_not_delete_foreign_url"), false);
     assert.equal(auditJson.includes(createdA.rawToken), false);
     assert.equal(auditJson.includes(createdAgain.rawToken), false);
     assert.equal(auditJson.includes(rotated.rawToken), false);
