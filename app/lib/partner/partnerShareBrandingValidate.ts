@@ -6,7 +6,9 @@
 import { BRAND_NAME } from "@/app/lib/brand";
 import { isPublicPartnerLogoBlobUrl } from "@/app/lib/partner/partnerShareLogoBlob";
 
-export const SHARE_COMPANY_NAME_MAX = 80;
+export const SHARE_COMPANY_NAME_MAX = 30;
+export const SHARE_COMPANY_NAME_TOO_LONG =
+  "Company name must be 30 characters or fewer.";
 export const SHARE_EMAIL_MAX = 254;
 export const SHARE_URL_MAX = 2048;
 export const SHARE_HEX_RE = /^#[0-9a-f]{6}$/;
@@ -192,14 +194,22 @@ export function normalizeShareSupportEmail(
   return email;
 }
 
-export function normalizeShareCompanyName(
+/** Display sanitizer — does not drop legacy names that exceed the new limit. */
+export function displayShareCompanyName(
   value: string | null | undefined
 ): string | null {
   const raw = blankToNull(value);
   if (!raw) return null;
   const cleaned = stripUnsafeText(raw);
+  if (!cleaned || /https?:\/\//i.test(cleaned)) return null;
+  return cleaned;
+}
+
+export function normalizeShareCompanyName(
+  value: string | null | undefined
+): string | null {
+  const cleaned = displayShareCompanyName(value);
   if (!cleaned || cleaned.length > SHARE_COMPANY_NAME_MAX) return null;
-  if (/https?:\/\//i.test(cleaned)) return null;
   return cleaned;
 }
 
@@ -207,20 +217,28 @@ export function normalizeShareCompanyName(
 export function sharePoweredByLabel(
   companyName: string | null | undefined
 ): string {
-  const name = normalizeShareCompanyName(companyName);
+  const name = displayShareCompanyName(companyName);
   return name ? `Powered by ${name}` : `Powered by ${BRAND_NAME}`;
 }
 
 export function parsePartnerShareBrandingInput(
   input: PartnerShareBrandingInput
 ): PartnerShareBrandingFields {
-  const companyName = normalizeShareCompanyName(input.companyName);
-  if (blankToNull(input.companyName) && !companyName) {
+  const rawName = blankToNull(input.companyName);
+  const displayedName = displayShareCompanyName(input.companyName);
+  if (rawName && !displayedName) {
     throw new PartnerShareBrandingError(
       "INVALID_NAME",
       "Enter a valid company name, or leave it blank."
     );
   }
+  if (displayedName && displayedName.length > SHARE_COMPANY_NAME_MAX) {
+    throw new PartnerShareBrandingError(
+      "INVALID_NAME",
+      SHARE_COMPANY_NAME_TOO_LONG
+    );
+  }
+  const companyName = displayedName;
 
   const supportEmail = normalizeShareSupportEmail(input.supportEmail);
   if (blankToNull(input.supportEmail) && !supportEmail) {

@@ -3,7 +3,10 @@ import { BRAND_NAME } from "@/app/lib/brand";
 import PartnerEsimShareView from "@/app/components/partner/PartnerEsimShareView";
 import PartnerSharePageLogo from "@/app/components/partner/PartnerSharePageLogo";
 import { getPartnerEsimSharePageData } from "@/app/lib/partner/partnerEsimShareRead";
-import { sharePoweredByLabel } from "@/app/lib/partner/partnerShareBrandingValidate";
+import {
+  displayShareCompanyName,
+  sharePoweredByLabel,
+} from "@/app/lib/partner/partnerShareBrandingValidate";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -22,17 +25,18 @@ export default async function PartnerEsimSharePage({
   }
 
   const companyName = data.branding.companyName;
+  const companyLabel = displayShareCompanyName(companyName) || BRAND_NAME;
 
   return (
-    <div className="space-y-5 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-8">
+    <div className="min-w-0 space-y-5 overflow-x-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-8">
       <header className="space-y-3">
-        <div className="flex flex-col items-center text-center">
+        <div className="flex min-w-0 flex-col items-center text-center">
           <PartnerSharePageLogo
             src={data.branding.logoUrl}
-            alt={companyName || BRAND_NAME}
+            alt={companyLabel}
           />
-          <p className="mt-2 text-sm font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            {companyName || BRAND_NAME}
+          <p className="mt-3 line-clamp-2 max-w-full min-w-0 break-words text-center text-lg font-bold leading-snug text-[var(--heading)] [overflow-wrap:anywhere] sm:text-xl">
+            {companyLabel}
           </p>
         </div>
         <h1 className="text-center text-2xl font-bold tracking-tight text-[var(--heading)]">
@@ -48,7 +52,7 @@ export default async function PartnerEsimSharePage({
         </div>
       </header>
       <PartnerEsimShareView token={token} data={data} />
-      <p className="text-center text-xs text-[var(--text-soft)]">
+      <p className="mx-auto max-w-full break-words text-center text-xs leading-snug text-[var(--text-soft)] [overflow-wrap:anywhere]">
         {sharePoweredByLabel(companyName)}
       </p>
     </div>

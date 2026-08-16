@@ -30,6 +30,8 @@ import {
   PartnerShareBrandingError,
   publicShareBrandingDto,
   publicShareLogoSrc,
+  SHARE_COMPANY_NAME_MAX,
+  SHARE_COMPANY_NAME_TOO_LONG,
   sharePoweredByLabel,
 } from "../app/lib/partner/partnerShareBrandingValidate";
 import { prisma as appPrisma } from "../app/lib/db";
@@ -290,6 +292,10 @@ async function main() {
   assert.doesNotMatch(controlsSrc, /expires in \d+|expires in X /i);
   assert.match(controlsSrc, /navigator\.share/);
   assert.match(controlsSrc, /window\.location\.origin/);
+  assert.match(formSrc, /SHARE_COMPANY_NAME_MAX/);
+  assert.match(formSrc, /maxLength=\{SHARE_COMPANY_NAME_MAX\}/);
+  assert.match(validateSrc, /SHARE_COMPANY_NAME_MAX = 30/);
+  assert.match(validateSrc, /Company name must be 30 characters or fewer/);
   assert.match(formSrc, /Save Branding/);
   assert.match(formSrc, /Upload Logo/);
   assert.match(formSrc, /Replace Logo/);
@@ -311,9 +317,13 @@ async function main() {
   const shareLogoCmp = read("app/components/partner/PartnerSharePageLogo.tsx");
   assert.match(shareLogoCmp, /object-contain/);
   assert.match(shareLogoCmp, /justify-center/);
+  assert.match(shareLogoCmp, /w-fit/);
+  assert.match(shareLogoCmp, /max-w-\[170px\]/);
+  assert.match(shareLogoCmp, /max-h-\[70px\]/);
   assert.match(shareLogoCmp, /onError/);
   assert.match(shareLogoCmp, /BRAND_LOGO_LIGHT_PUBLIC_PATH/);
   assert.doesNotMatch(shareLogoCmp, /object-cover|aspect-square/);
+  assert.doesNotMatch(shareLogoCmp, /sm:max-w-\[180px\]|w-full min-w-0 max-w-\[160px\]/);
   assert.doesNotMatch(shareLogoCmp, /from ["']@\/app\/lib\/db["']/);
   assert.doesNotMatch(shareLogoCmp, /uploadPartnerShareLogo|prisma\./);
   assert.match(validateSrc, /export function sharePoweredByLabel/);
@@ -442,6 +452,21 @@ async function main() {
   expectInvalid({ logoUrl: "javascript:alert(1)" }, "INVALID_LOGO");
   expectInvalid({ logoUrl: "http://evil.example/logo.png" }, "INVALID_LOGO");
   expectInvalid({ logoUrl: "https://evil.example/not-an-image" }, "INVALID_LOGO");
+  const name30 = "A".repeat(SHARE_COMPANY_NAME_MAX);
+  const name31 = "A".repeat(SHARE_COMPANY_NAME_MAX + 1);
+  assert.equal(parsePartnerShareBrandingInput({ companyName: name30 }).companyName, name30);
+  try {
+    parsePartnerShareBrandingInput({ companyName: name31 });
+    throw new Error("expected INVALID_NAME");
+  } catch (err) {
+    assert.ok(err instanceof PartnerShareBrandingError);
+    assert.equal(err.code, "INVALID_NAME");
+    assert.equal(err.message, SHARE_COMPANY_NAME_TOO_LONG);
+  }
+  assert.equal(
+    sharePoweredByLabel(name31),
+    `Powered by ${name31}`
+  );
   console.log("PASS D_E_F_G_invalid_inputs_rejected");
 
   const remoteLogo = parsePartnerShareBrandingInput({

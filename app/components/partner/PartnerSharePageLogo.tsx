@@ -33,14 +33,14 @@ export default function PartnerSharePageLogo({
   }
 
   return (
-    <div className="mx-auto flex h-16 w-full min-w-0 max-w-[160px] items-center justify-center rounded-xl bg-white px-3 py-1.5 sm:h-[4.5rem] sm:max-w-[180px]">
+    <div className="mx-auto inline-flex w-fit max-h-[70px] max-w-[170px] items-center justify-center rounded-xl bg-white p-2">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={currentSrc}
         alt={alt || BRAND_NAME}
-        width={180}
-        height={72}
-        className="h-auto max-h-14 w-auto max-w-full object-contain sm:max-h-16"
+        width={170}
+        height={70}
+        className="h-auto w-auto max-h-[54px] max-w-[154px] object-contain"
         referrerPolicy="no-referrer"
         onError={() => {
           if (currentSrc !== fallback) {

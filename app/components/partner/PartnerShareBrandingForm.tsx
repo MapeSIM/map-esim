@@ -8,6 +8,7 @@ import {
 } from "@/app/lib/partner/partnerShareBrandingActions";
 import {
   publicShareLogoSrc,
+  SHARE_COMPANY_NAME_MAX,
   type PartnerShareBrandingFields,
 } from "@/app/lib/partner/partnerShareBrandingValidate";
 
@@ -168,10 +169,13 @@ export default function PartnerShareBrandingForm({
               name="companyName"
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
-              maxLength={80}
+              maxLength={SHARE_COMPANY_NAME_MAX}
               autoComplete="organization"
               className={inputClass}
             />
+            <span className="mt-1 block text-xs text-[var(--text-muted)]">
+              {companyName.length} / {SHARE_COMPANY_NAME_MAX}
+            </span>
           </label>
           <label className="min-w-0 text-sm font-medium text-[var(--heading)]">
             Support Email
