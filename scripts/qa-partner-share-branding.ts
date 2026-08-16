@@ -305,7 +305,17 @@ async function main() {
   assert.doesNotMatch(viewSrc, /wa\.me/i);
   assert.match(pageSrc, /companyName/);
   assert.match(pageSrc, /sharePoweredByLabel\(companyName\)/);
+  assert.match(pageSrc, /PartnerSharePageLogo/);
+  assert.match(pageSrc, /items-center text-center/);
   assert.doesNotMatch(pageSrc, /Powered by \{BRAND_NAME\}/);
+  const shareLogoCmp = read("app/components/partner/PartnerSharePageLogo.tsx");
+  assert.match(shareLogoCmp, /object-contain/);
+  assert.match(shareLogoCmp, /justify-center/);
+  assert.match(shareLogoCmp, /onError/);
+  assert.match(shareLogoCmp, /BRAND_LOGO_LIGHT_PUBLIC_PATH/);
+  assert.doesNotMatch(shareLogoCmp, /object-cover|aspect-square/);
+  assert.doesNotMatch(shareLogoCmp, /from ["']@\/app\/lib\/db["']/);
+  assert.doesNotMatch(shareLogoCmp, /uploadPartnerShareLogo|prisma\./);
   assert.match(validateSrc, /export function sharePoweredByLabel/);
   assert.match(layoutSrc, /index:\s*false/);
   assert.match(layoutSrc, /referrer:\s*["']no-referrer["']/);
