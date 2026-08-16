@@ -19,10 +19,10 @@ import {
   isOpenPartnerRefundStatus,
   parsePartnerRefundRequestReason,
   partnerRefundReasonLabel,
+  partnerRefundStatusLabel,
   sanitizePartnerRefundNote,
 } from "@/app/lib/partner/partnerRefundRequestConstants";
 import { formatPartnerOrderDate } from "@/app/lib/partner/partnerOrdersDisplay";
-import { refundStatusLabel } from "@/app/lib/refunds/refundRequestConstants";
 import { formatUsdCents } from "@/app/lib/wallet/display";
 
 export class PartnerRefundRequestError extends Error {
@@ -72,6 +72,7 @@ export type PartnerRefundRequestSummary = {
   reasonLabel: string;
   createdAtLabel: string;
   partnerDebitLabel: string;
+  adminDecisionNote: string | null;
 };
 
 async function loadOwnedOpenRequest(
@@ -325,6 +326,7 @@ export async function listPartnerRefundRequestSummaries(options: {
       status: true,
       reason: true,
       partnerChargeCents: true,
+      adminDecisionNote: true,
       createdAt: true,
     },
   });
@@ -333,15 +335,41 @@ export async function listPartnerRefundRequestSummaries(options: {
     requestId: row.id,
     purchaseId: row.partnerEsimPurchaseId,
     status: row.status,
-    statusLabel: refundStatusLabel(row.status),
+    statusLabel: partnerRefundStatusLabel(row.status),
     reasonLabel: partnerRefundReasonLabel(row.reason),
     createdAtLabel: formatPartnerOrderDate(row.createdAt),
     partnerDebitLabel: `${formatUsdCents(row.partnerChargeCents)} USD`,
+    adminDecisionNote:
+      row.status === RefundRequestStatus.REJECTED
+        ? row.adminDecisionNote
+        : null,
   }));
+}
+
+export function latestPartnerRefundSummary(
+  rows: PartnerRefundRequestSummary[]
+): PartnerRefundRequestSummary | null {
+  return rows[0] ?? null;
 }
 
 export function latestOpenPartnerRefundSummary(
   rows: PartnerRefundRequestSummary[]
 ): PartnerRefundRequestSummary | null {
   return rows.find((row) => isOpenPartnerRefundStatus(row.status)) ?? null;
+}
+
+export function toPartnerRefundCardState(row: PartnerRefundRequestSummary): {
+  statusLabel: string;
+  reasonLabel: string;
+  createdAtLabel: string;
+  isOpen: boolean;
+  decisionNote: string | null;
+} {
+  return {
+    statusLabel: row.statusLabel,
+    reasonLabel: row.reasonLabel,
+    createdAtLabel: row.createdAtLabel,
+    isOpen: isOpenPartnerRefundStatus(row.status),
+    decisionNote: row.adminDecisionNote,
+  };
 }

@@ -24,7 +24,30 @@ export const PARTNER_REFUND_REQUEST_OPEN_STATUSES = [
 
 export const PARTNER_REFUND_AUDIT = {
   CREATED: "partner_refund.request_created",
+  REVIEW_STARTED: "partner_refund.review_started",
+  APPROVED_PENDING: "partner_refund.approved_pending_execution",
+  REJECTED: "partner_refund.rejected",
 } as const;
+
+/** Partner-facing status copy (Admin queue may use the shared refund labels). */
+export function partnerRefundStatusLabel(status: string): string {
+  switch (status) {
+    case "REQUESTED":
+      return "Refund requested";
+    case "UNDER_REVIEW":
+      return "Under review";
+    case "APPROVED_PENDING_EXECUTION":
+      return "Approved — refund pending";
+    case "REJECTED":
+      return "Refund request rejected";
+    case "COMPLETED":
+      return "Refunded";
+    case "CANCELLED":
+      return "Cancelled";
+    default:
+      return "Unavailable";
+  }
+}
 
 export function partnerRefundReasonLabel(reason: string): string {
   switch (reason) {

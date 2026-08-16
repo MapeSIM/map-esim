@@ -45,6 +45,7 @@ export type AdminRefundRequestListRow = {
   reasonLabel: string;
   statusLabel: string;
   status: RefundRequestStatus;
+  createdAt: Date;
   createdAtLabel: string;
 };
 
@@ -83,6 +84,7 @@ export async function listAdminRefundRequests(
     reasonLabel: refundReasonLabel(row.reason),
     statusLabel: refundStatusLabel(row.status),
     status: row.status,
+    createdAt: row.createdAt,
     createdAtLabel: formatDate(row.createdAt),
   }));
 }

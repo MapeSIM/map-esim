@@ -1,6 +1,8 @@
 import Link from "next/link";
 import PartnerEsimOrderCard from "@/app/components/partner/PartnerEsimOrderCard";
-import PartnerRefundRequestControls from "@/app/components/partner/PartnerRefundRequestControls";
+import PartnerRefundRequestControls, {
+  type PartnerRefundRequestCardState,
+} from "@/app/components/partner/PartnerRefundRequestControls";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   listPartnerOrdersPage,
@@ -8,8 +10,9 @@ import {
 } from "@/app/lib/partner/partnerOrders";
 import type { PartnerOrderStatusBadge } from "@/app/lib/partner/partnerOrdersDisplay";
 import {
-  latestOpenPartnerRefundSummary,
+  latestPartnerRefundSummary,
   listPartnerRefundRequestSummaries,
+  toPartnerRefundCardState,
 } from "@/app/lib/partner/partnerRefundRequest";
 
 export const dynamic = "force-dynamic";
@@ -37,11 +40,7 @@ function AttentionCard({
   refundRequest,
 }: {
   row: PartnerAttentionRow;
-  refundRequest: {
-    statusLabel: string;
-    reasonLabel: string;
-    createdAtLabel: string;
-  } | null;
+  refundRequest: PartnerRefundRequestCardState;
 }) {
   return (
     <li className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
@@ -111,10 +110,7 @@ export default async function PartnerOrdersPage() {
     );
   }
 
-  let refundByPurchase = new Map<
-    string,
-    { statusLabel: string; reasonLabel: string; createdAtLabel: string }
-  >();
+  let refundByPurchase = new Map<string, NonNullable<PartnerRefundRequestCardState>>();
   if (data) {
     const purchaseIds = [
       ...data.orders.map((row) => row.purchaseId),
@@ -126,15 +122,11 @@ export default async function PartnerOrdersPage() {
         purchaseIds,
       });
       for (const purchaseId of purchaseIds) {
-        const open = latestOpenPartnerRefundSummary(
+        const latest = latestPartnerRefundSummary(
           summaries.filter((row) => row.purchaseId === purchaseId)
         );
-        if (open) {
-          refundByPurchase.set(purchaseId, {
-            statusLabel: open.statusLabel,
-            reasonLabel: open.reasonLabel,
-            createdAtLabel: open.createdAtLabel,
-          });
+        if (latest) {
+          refundByPurchase.set(purchaseId, toPartnerRefundCardState(latest));
         }
       }
     } catch {

@@ -18,6 +18,8 @@ export type PartnerRefundRequestCardState = {
   statusLabel: string;
   reasonLabel: string;
   createdAtLabel: string;
+  isOpen: boolean;
+  decisionNote: string | null;
 } | null;
 
 type Props = {
@@ -52,40 +54,49 @@ export default function PartnerRefundRequestControls({
     );
   }
 
-  if (existingRequest) {
-    return (
-      <section
-        className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
-        aria-label="Refund request status"
-      >
-        <p className="text-sm font-semibold text-[var(--heading)]">
-          Refund requested
-        </p>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          {existingRequest.statusLabel} · {existingRequest.reasonLabel}
-        </p>
-        <p className="mt-1 text-xs text-[var(--text-soft)]">
-          Submitted {existingRequest.createdAtLabel}
-        </p>
-      </section>
-    );
-  }
+  const showButton = !existingRequest?.isOpen;
 
   return (
-    <div className="min-w-0">
-      {state?.ok ? (
-        <p className="text-sm font-semibold text-[var(--heading)]" role="status">
-          {state.message}
-        </p>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--page-bg-soft)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
+    <div className="min-w-0 space-y-3">
+      {existingRequest ? (
+        <section
+          className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
+          aria-label="Refund request status"
         >
-          Request Refund
-        </button>
-      )}
+          <p className="text-sm font-semibold text-[var(--heading)]">
+            {existingRequest.statusLabel}
+          </p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            {existingRequest.reasonLabel}
+          </p>
+          {existingRequest.decisionNote ? (
+            <p className="mt-1 break-words text-sm text-[var(--text-muted)]">
+              {existingRequest.decisionNote}
+            </p>
+          ) : null}
+          <p className="mt-1 text-xs text-[var(--text-soft)]">
+            Submitted {existingRequest.createdAtLabel}
+          </p>
+        </section>
+      ) : null}
+
+      {showButton ? (
+        <>
+          {state?.ok ? (
+            <p className="text-sm font-semibold text-[var(--heading)]" role="status">
+              {state.message}
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--page-bg-soft)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
+            >
+              Request Refund
+            </button>
+          )}
+        </>
+      ) : null}
 
       <EsimActionSheet
         open={open}

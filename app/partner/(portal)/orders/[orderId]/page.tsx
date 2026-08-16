@@ -5,8 +5,9 @@ import { requireRole } from "@/app/lib/auth/session";
 import { hasActivePartnerEsimShareToken } from "@/app/lib/partner/partnerEsimShareToken";
 import { getPartnerOwnedOrderDetail } from "@/app/lib/partner/partnerOrders";
 import {
-  latestOpenPartnerRefundSummary,
+  latestPartnerRefundSummary,
   listPartnerRefundRequestSummaries,
+  toPartnerRefundCardState,
 } from "@/app/lib/partner/partnerRefundRequest";
 
 export const dynamic = "force-dynamic";
@@ -52,23 +53,15 @@ export default async function PartnerOrderDetailPage({
     orderId: detail.orderId,
   });
 
-  let refundRequest: {
-    statusLabel: string;
-    reasonLabel: string;
-    createdAtLabel: string;
-  } | null = null;
+  let refundRequest: ReturnType<typeof toPartnerRefundCardState> | null = null;
   try {
     const summaries = await listPartnerRefundRequestSummaries({
       partnerUserId: user.id,
       purchaseIds: [detail.purchaseId],
     });
-    const open = latestOpenPartnerRefundSummary(summaries);
-    if (open) {
-      refundRequest = {
-        statusLabel: open.statusLabel,
-        reasonLabel: open.reasonLabel,
-        createdAtLabel: open.createdAtLabel,
-      };
+    const latest = latestPartnerRefundSummary(summaries);
+    if (latest) {
+      refundRequest = toPartnerRefundCardState(latest);
     }
   } catch {
     refundRequest = null;
