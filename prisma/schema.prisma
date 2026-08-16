@@ -753,6 +753,7 @@ model PartnerEsimPurchase {
 }
 
 /// Opaque Partner eSIM share token. Store SHA-256 hash only; never persist or log the raw token.
+/// No time-based expiry: an active token (revokedAt null) stays valid until revoke or regenerate.
 model PartnerEsimShareToken {
   id         String         @id @default(cuid())
   partnerId  String

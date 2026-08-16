@@ -162,6 +162,30 @@ async function main() {
   }
   assert.match(src, /\/share\/\$\{rawToken\}|\/share\/\$\{/);
   assert.doesNotMatch(src, /searchParams\.set\(["']token["']/);
+  assert.match(src, /no time-based expiry/);
+  assert.doesNotMatch(src, /expiresAt\s*[:=]/);
+  assert.doesNotMatch(src, /\.expiresAt\b/);
+  assert.doesNotMatch(
+    src,
+    /createdAt[\s\S]{0,80}(getTime\(\)|Date\.now|TTL)/
+  );
+
+  const schema = read("prisma/schema.prisma");
+  const shareModel = schema.match(
+    /model PartnerEsimShareToken \{[\s\S]*?\n\}/
+  )?.[0];
+  assert.ok(shareModel);
+  assert.doesNotMatch(shareModel, /\bexpiresAt\b/);
+  assert.match(shareModel, /revokedAt/);
+
+  const controlsSrc = read("app/components/partner/PartnerEsimShareControls.tsx");
+  assert.match(
+    controlsSrc,
+    /This share link stays\s+active until you revoke or regenerate it/
+  );
+  assert.match(controlsSrc, /Revoke Share Link/);
+  assert.match(controlsSrc, /Regenerate Share Link/);
+  assert.doesNotMatch(controlsSrc, /expires in \d+|expires in X /i);
 
   const robots = read("app/robots.ts");
   assert.match(robots, /["']\/share\/["']/);
@@ -400,6 +424,16 @@ async function main() {
     });
     assert.equal(activeCount, 1);
     console.log("PASS K_rotate_one_active");
+
+    // No automatic time expiry: an old createdAt still resolves.
+    const aged = await prisma.partnerEsimShareToken.updateMany({
+      where: { orderId: orderAId, revokedAt: null },
+      data: { createdAt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) },
+    });
+    assert.equal(aged.count, 1);
+    const stillValidAfterAge = await resolvePartnerEsimShareToken(second.rawToken);
+    assert.equal(stillValidAfterAge.ok, true);
+    console.log("PASS L_no_time_expiry_aged_token_still_valid");
 
     // L. repeated revoke idempotent
     const revoke1 = await revokePartnerEsimShareToken({

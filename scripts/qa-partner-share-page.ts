@@ -205,6 +205,8 @@ async function main() {
   assert.doesNotMatch(readSrc, /method:\s*["']POST["']/);
   assert.doesNotMatch(readSrc, /creditCheckout|buyPartnerEsim/);
   assert.match(pageSrc, /notFound\(\)/);
+  assert.match(pageSrc, /sharePoweredByLabel\(companyName\)/);
+  assert.doesNotMatch(pageSrc, /Powered by \{BRAND_NAME\}/);
   assert.doesNotMatch(pageSrc, /auth\(|requireRole/);
   assert.match(layoutSrc, /index:\s*false/);
   assert.match(layoutSrc, /noarchive:\s*true/);

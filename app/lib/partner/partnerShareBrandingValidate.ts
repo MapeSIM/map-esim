@@ -3,6 +3,8 @@
  * Empty input normalizes to null (MAP eSIM fallback).
  */
 
+import { BRAND_NAME } from "@/app/lib/brand";
+
 export const SHARE_COMPANY_NAME_MAX = 80;
 export const SHARE_EMAIL_MAX = 254;
 export const SHARE_URL_MAX = 2048;
@@ -185,6 +187,14 @@ export function normalizeShareCompanyName(
   if (!cleaned || cleaned.length > SHARE_COMPANY_NAME_MAX) return null;
   if (/https?:\/\//i.test(cleaned)) return null;
   return cleaned;
+}
+
+/** Public share footer. Sanitized company name only — never Partner IDs. */
+export function sharePoweredByLabel(
+  companyName: string | null | undefined
+): string {
+  const name = normalizeShareCompanyName(companyName);
+  return name ? `Powered by ${name}` : `Powered by ${BRAND_NAME}`;
 }
 
 export function parsePartnerShareBrandingInput(

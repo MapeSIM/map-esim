@@ -6,6 +6,10 @@
  * Canonical public path (Slice 2): /share/<opaque-token> — never query params.
  * Platform/web-server access logs may still record the path; this module never
  * writes the raw token or /share/<token> into AuditLog or application logs.
+ *
+ * Active share links have no time-based expiry. They stay valid until the
+ * Partner revokes them or regenerates (which immediately invalidates the old
+ * token). Do not add expiresAt for share links.
  */
 import "server-only";
 
@@ -330,6 +334,7 @@ export type ResolvePartnerEsimShareTokenResult =
  * Public resolver foundation. Invalid / unknown / revoked / malformed all
  * return the same { ok: false } — no existence leak. No ICCID, wallet,
  * provider cost, discount, payment, or admin fields.
+ * Does not apply time-based expiry. Age of createdAt is ignored.
  */
 export async function resolvePartnerEsimShareToken(
   rawToken: string

@@ -29,6 +29,7 @@ import {
   parsePartnerShareBrandingInput,
   PartnerShareBrandingError,
   publicShareBrandingDto,
+  sharePoweredByLabel,
 } from "../app/lib/partner/partnerShareBrandingValidate";
 import {
   assertSafeSharePayload,
@@ -185,26 +186,37 @@ async function main() {
   assert.match(controlsSrc, /Create Share Link/);
   assert.match(controlsSrc, /Revoke Share Link/);
   assert.match(controlsSrc, /Copy Link/);
+  assert.match(
+    controlsSrc,
+    /This share link stays\s+active until you revoke or regenerate it/
+  );
+  assert.doesNotMatch(controlsSrc, /expires in \d+|expires in X /i);
   assert.match(controlsSrc, /navigator\.share/);
   assert.match(controlsSrc, /window\.location\.origin/);
   assert.match(formSrc, /Save Branding/);
+  assert.doesNotMatch(formSrc, /type=["']file["']/);
   assert.match(profileSrc, /PartnerShareBrandingForm/);
   assert.doesNotMatch(profileSrc, /Coming later/);
-  assert.match(viewSrc, /Mail Support|Visit Partner Website/);
+  assert.match(viewSrc, /Support|Visit website/);
   assert.match(viewSrc, /noopener noreferrer/);
   assert.match(viewSrc, /referrerPolicy=["']no-referrer["']/);
-  assert.doesNotMatch(viewSrc, /navigator\.share|wa\.me/i);
+  assert.doesNotMatch(viewSrc, /wa\.me/i);
   assert.match(pageSrc, /companyName/);
+  assert.match(pageSrc, /sharePoweredByLabel\(companyName\)/);
+  assert.doesNotMatch(pageSrc, /Powered by \{BRAND_NAME\}/);
+  assert.match(validateSrc, /export function sharePoweredByLabel/);
   assert.match(layoutSrc, /index:\s*false/);
   assert.match(layoutSrc, /referrer:\s*["']no-referrer["']/);
   assert.match(headersSrc, /SHARE_SURFACE_HEADERS/);
   assert.match(tokenSrc, /hasActivePartnerEsimShareToken/);
   assert.match(tokenSrc, /createHash\(["']sha256["']\)/);
+  assert.match(tokenSrc, /no time-based expiry/);
   assert.doesNotMatch(tokenSrc, /rawToken.*prisma|prisma.*rawToken/);
   assert.doesNotMatch(customerUsage, /partnerShareBranding|shareCompanyName/);
   assert.doesNotMatch(customerInstall, /partnerShareBranding|shareCompanyName/);
   assert.doesNotMatch(accountPage, /shareCompanyName|PartnerShareBrandingForm/);
   assert.match(pkg, /"qa:partner-share-branding"/);
+  assert.doesNotMatch(pkg, /@vercel\/blob|@aws-sdk\/client-s3|cloudinary|uploadthing/);
   assert.match(linkSrc, /createPartnerEsimShareToken/);
   assert.match(linkSrc, /revokePartnerEsimShareToken/);
 
@@ -282,6 +294,17 @@ async function main() {
   assertSafeSharePayload(web.title);
   assert.doesNotMatch(web.text, /iccid|LPA:|smdp|wallet|discount|activation code/i);
   console.log("PASS P_Q_R_copy_whatsapp_webshare_payloads");
+
+  assert.equal(sharePoweredByLabel("Rana Travel"), "Powered by Rana Travel");
+  assert.equal(sharePoweredByLabel("ABC Tours"), "Powered by ABC Tours");
+  assert.equal(sharePoweredByLabel(null), "Powered by MAP eSIM");
+  assert.equal(sharePoweredByLabel(""), "Powered by MAP eSIM");
+  assert.equal(sharePoweredByLabel("   "), "Powered by MAP eSIM");
+  assert.equal(
+    sharePoweredByLabel("<Rana Travel>"),
+    "Powered by Rana Travel"
+  );
+  console.log("PASS R_S_powered_by_company_name_and_map_fallback");
 
   const prisma = new PrismaClient();
   const stamp = Date.now();
@@ -440,6 +463,7 @@ async function main() {
     assert.equal(pageA.branding.logoUrl, "/brand/map-esim-logo-dark.svg");
     assert.equal(pageA.branding.buttonBackground, "#84ff00");
     assert.equal(pageA.branding.buttonTextColor, "#102018");
+    assert.equal(sharePoweredByLabel(pageA.branding.companyName), "Powered by Atlas Travel");
     assertNoPublicSecrets(pageA, createdA.rawToken);
     assert.deepEqual(Object.keys(pageA.branding).sort(), [
       "buttonBackground",
@@ -458,6 +482,7 @@ async function main() {
     assert.equal(pageB.branding.companyName, null);
     assert.equal(pageB.branding.logoUrl, null);
     assert.equal(pageB.branding.buttonBackground, null);
+    assert.equal(sharePoweredByLabel(pageB.branding.companyName), "Powered by MAP eSIM");
     console.log("PASS I_unbranded_falls_back_to_map");
 
     assert.doesNotMatch(customerUsage, /shareCompanyName/);

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { BRAND_LOGO_DARK_PUBLIC_PATH, BRAND_NAME } from "@/app/lib/brand";
 import PartnerEsimShareView from "@/app/components/partner/PartnerEsimShareView";
 import { getPartnerEsimSharePageData } from "@/app/lib/partner/partnerEsimShareRead";
+import { sharePoweredByLabel } from "@/app/lib/partner/partnerShareBrandingValidate";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -47,7 +48,7 @@ export default async function PartnerEsimSharePage({
       </header>
       <PartnerEsimShareView token={token} data={data} />
       <p className="text-center text-xs text-[var(--text-soft)]">
-        Powered by {BRAND_NAME}
+        {sharePoweredByLabel(companyName)}
       </p>
     </div>
   );

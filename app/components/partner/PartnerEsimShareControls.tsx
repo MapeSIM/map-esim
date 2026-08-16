@@ -234,8 +234,9 @@ export default function PartnerEsimShareControls({
           onClose={() => setSheetOpen(false)}
         >
           <p className="mb-4 text-sm text-[var(--text-muted)]">
-            Create a secure link for this completed order. The raw link is shown
-            only once. Regenerating stops the old link.
+            Create a secure link for this completed order. This share link stays
+            active until you revoke or regenerate it. The raw link is shown only
+            once. Regenerating immediately invalidates the old link.
           </p>
           {body}
         </EsimActionSheet>
@@ -248,8 +249,9 @@ export default function PartnerEsimShareControls({
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Share eSIM</h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Create a secure link for this completed order. The raw link is shown
-          only once. Regenerating stops the old link.
+          Create a secure link for this completed order. This share link stays
+          active until you revoke or regenerate it. The raw link is shown only
+          once. Regenerating immediately invalidates the old link.
         </p>
       </div>
       {body}
