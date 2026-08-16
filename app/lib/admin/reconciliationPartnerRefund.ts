@@ -36,6 +36,7 @@ import {
   PartnerPurchaseWalletError,
   refundPartnerPurchaseFundsInTx,
 } from "@/app/lib/partner/partnerPurchaseWallet";
+import { syncPartnerRefundRequestsForPurchase } from "@/app/lib/partner/partnerRefundRequestSync";
 import { VesimEnvironmentError } from "@/app/lib/vesim/environment";
 import {
   classifyProviderOrderResponse,
@@ -235,7 +236,7 @@ function localEligibilityFromContext(
   });
 }
 
-async function confirmProviderFailure(options: {
+export async function confirmProviderFailure(options: {
   providerOrderId: string;
   expectedOfferId: string;
 }): Promise<{ ok: true } | { ok: false; blocker: string }> {
@@ -456,6 +457,17 @@ export async function refundReconciliationPartnerPurchase(options: {
         reason: reasonParsed.reason.slice(0, 80),
       },
     });
+    if (ctx.refundTransactionId) {
+      try {
+        await syncPartnerRefundRequestsForPurchase(prisma, {
+          purchaseId: ids.recordId,
+          refundTransactionId: ctx.refundTransactionId,
+          actorUserId: admin.id,
+        });
+      } catch {
+        // Money already settled; request sync can complete on the next execute.
+      }
+    }
     return {
       ok: true,
       idempotent: true,
@@ -621,6 +633,17 @@ export async function refundReconciliationPartnerPurchase(options: {
           reason: reasonParsed.reason.slice(0, 80),
         },
       });
+      if (result.refundTransactionId) {
+        try {
+          await syncPartnerRefundRequestsForPurchase(prisma, {
+            purchaseId: ids.recordId,
+            refundTransactionId: result.refundTransactionId,
+            actorUserId: admin.id,
+          });
+        } catch {
+          // Money already settled; request sync can complete on the next execute.
+        }
+      }
       return {
         ok: true,
         idempotent: true,
@@ -648,6 +671,17 @@ export async function refundReconciliationPartnerPurchase(options: {
         reason: reasonParsed.reason.slice(0, 80),
       },
     });
+    if (result.refundTransactionId) {
+      try {
+        await syncPartnerRefundRequestsForPurchase(prisma, {
+          purchaseId: ids.recordId,
+          refundTransactionId: result.refundTransactionId,
+          actorUserId: admin.id,
+        });
+      } catch {
+        // Money already settled; request sync can complete on the next execute.
+      }
+    }
     return {
       ok: true,
       idempotent,

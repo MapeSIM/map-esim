@@ -19,6 +19,10 @@ import {
   sanitizePartnerRefundNote,
 } from "@/app/lib/partner/partnerRefundRequestConstants";
 import {
+  evaluatePartnerRefundRequestExecutionEligibility,
+  partnerRefundExecutionBlockerLabel,
+} from "@/app/lib/partner/partnerRefundRequestExecutionShared";
+import {
   shortPartnerOrderReference,
   shortPartnerPurchaseReference,
 } from "@/app/lib/partner/partnerOrdersDisplay";
@@ -170,9 +174,12 @@ export type AdminPartnerRefundRequestDetail = {
   appearsProvisioned: boolean;
   hasReconciliationCase: boolean;
   reconciliationHref: string | null;
-  canMarkUnderReview: boolean;
+    canMarkUnderReview: boolean;
   canApprove: boolean;
   canReject: boolean;
+  canExecute: boolean;
+  localExecutionBlocker: string | null;
+  localExecutionBlockerLabel: string | null;
 };
 
 function hasReconciliationCase(purchase: {
@@ -211,6 +218,7 @@ export async function getAdminPartnerRefundRequestDetail(
       currency: true,
       createdAt: true,
       reviewedAt: true,
+      partnerId: true,
       partner: {
         select: {
           user: { select: { name: true, email: true } },
@@ -219,15 +227,22 @@ export async function getAdminPartnerRefundRequestDetail(
       purchase: {
         select: {
           id: true,
+          partnerId: true,
           status: true,
+          fundingSource: true,
+          partnerChargeCents: true,
+          debitTransactionId: true,
+          refundTransactionId: true,
           destinationName: true,
           planName: true,
           updatedAt: true,
           reconciliationResolvedAt: true,
           providerRefreshInstallData: true,
+          debitTransaction: { select: { amountCents: true } },
           order: {
             select: {
               id: true,
+              status: true,
               destination: true,
               planName: true,
               iccidLast4: true,
@@ -261,6 +276,34 @@ export async function getAdminPartnerRefundRequestDetail(
   const recon = hasReconciliationCase(row.purchase);
   const currency = row.currency;
   const debitLabel = moneyLabel(row.partnerChargeCents, currency);
+  const localExec = evaluatePartnerRefundRequestExecutionEligibility({
+    requestStatus: row.status,
+    requestReason: row.reason,
+    requestPartnerId: row.partnerId,
+    requestPartnerChargeCents: row.partnerChargeCents,
+    purchasePartnerId: row.purchase.partnerId,
+    purchaseStatus: row.purchase.status,
+    fundingSource: row.purchase.fundingSource,
+    purchasePartnerChargeCents: row.purchase.partnerChargeCents,
+    debitTransactionId: row.purchase.debitTransactionId,
+    debitAmountCents: row.purchase.debitTransaction?.amountCents ?? null,
+    refundTransactionId: row.purchase.refundTransactionId,
+    orderId: order?.id ?? null,
+    orderStatus: order?.status ?? null,
+    iccidPresent: Boolean(
+      last4.length === 4 ||
+        (order?.iccidHash ?? "").trim() ||
+        order?.iccidCapturedAt
+    ),
+    installEvidencePresent:
+      (row.purchase.providerRefreshInstallData ?? "").trim().toLowerCase() ===
+      "yes",
+  });
+  const localExecutionBlocker =
+    row.status === RefundRequestStatus.APPROVED_PENDING_EXECUTION &&
+    !localExec.ok
+      ? localExec.blocker
+      : null;
 
   return {
     id: row.id,
@@ -293,7 +336,14 @@ export async function getAdminPartnerRefundRequestDetail(
       : null,
     canMarkUnderReview: row.status === RefundRequestStatus.REQUESTED,
     canApprove: row.status === RefundRequestStatus.UNDER_REVIEW,
-    canReject: row.status === RefundRequestStatus.UNDER_REVIEW,
+    canReject:
+      row.status === RefundRequestStatus.UNDER_REVIEW ||
+      row.status === RefundRequestStatus.APPROVED_PENDING_EXECUTION,
+    canExecute: row.status === RefundRequestStatus.APPROVED_PENDING_EXECUTION,
+    localExecutionBlocker,
+    localExecutionBlockerLabel: localExecutionBlocker
+      ? partnerRefundExecutionBlockerLabel(localExecutionBlocker)
+      : null,
   };
 }
 
@@ -532,7 +582,10 @@ export async function applyAdminPartnerRefundRequestDecision(
       idempotent: true,
     };
   }
-  if (current.status !== RefundRequestStatus.UNDER_REVIEW) {
+  if (
+    current.status !== RefundRequestStatus.UNDER_REVIEW &&
+    current.status !== RefundRequestStatus.APPROVED_PENDING_EXECUTION
+  ) {
     throw new PartnerRefundRequestAdminError(
       "INVALID_TRANSITION",
       "Only Partner refunds under review can be rejected."
@@ -548,7 +601,12 @@ export async function applyAdminPartnerRefundRequestDecision(
   const updated = await prisma.partnerRefundRequest.updateMany({
     where: {
       id: current.id,
-      status: RefundRequestStatus.UNDER_REVIEW,
+      status: {
+        in: [
+          RefundRequestStatus.UNDER_REVIEW,
+          RefundRequestStatus.APPROVED_PENDING_EXECUTION,
+        ],
+      },
     },
     data: {
       status: RefundRequestStatus.REJECTED,
@@ -587,7 +645,7 @@ export async function applyAdminPartnerRefundRequestDecision(
         orderId: current.orderId,
         partnerChargeCents: current.partnerChargeCents,
         currency: current.currency,
-        fromStatus: RefundRequestStatus.UNDER_REVIEW,
+        fromStatus: current.status,
         toStatus: RefundRequestStatus.REJECTED,
       },
     },

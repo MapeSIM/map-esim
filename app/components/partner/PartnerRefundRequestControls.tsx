@@ -19,7 +19,9 @@ export type PartnerRefundRequestCardState = {
   reasonLabel: string;
   createdAtLabel: string;
   isOpen: boolean;
+  isCompleted: boolean;
   decisionNote: string | null;
+  refundedAmountLabel: string | null;
 } | null;
 
 type Props = {
@@ -45,6 +47,25 @@ export default function PartnerRefundRequestControls({
   useEffect(() => {
     if (state?.ok) setOpen(false);
   }, [state]);
+
+  if (existingRequest?.isCompleted) {
+    return (
+      <section
+        className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
+        aria-label="Refund completed"
+      >
+        <p className="text-sm font-semibold text-[var(--heading)]">
+          {existingRequest.statusLabel}
+        </p>
+        {existingRequest.refundedAmountLabel ? (
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            {existingRequest.refundedAmountLabel} returned to your Partner
+            balance
+          </p>
+        ) : null}
+      </section>
+    );
+  }
 
   if (alreadyRefunded) {
     return (

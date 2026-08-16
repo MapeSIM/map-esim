@@ -27,6 +27,10 @@ export const PARTNER_REFUND_AUDIT = {
   REVIEW_STARTED: "partner_refund.review_started",
   APPROVED_PENDING: "partner_refund.approved_pending_execution",
   REJECTED: "partner_refund.rejected",
+  EXECUTION_STARTED: "partner_refund.execution_started",
+  EXECUTION_BLOCKED: "partner_refund.execution_blocked",
+  WALLET_REFUNDED: "partner_refund.wallet_refunded",
+  REQUEST_COMPLETED: "partner_refund.request_completed",
 } as const;
 
 /** Partner-facing status copy (Admin queue may use the shared refund labels). */
@@ -41,7 +45,7 @@ export function partnerRefundStatusLabel(status: string): string {
     case "REJECTED":
       return "Refund request rejected";
     case "COMPLETED":
-      return "Refunded";
+      return "Refund completed";
     case "CANCELLED":
       return "Cancelled";
     default:

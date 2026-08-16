@@ -363,13 +363,18 @@ export function toPartnerRefundCardState(row: PartnerRefundRequestSummary): {
   reasonLabel: string;
   createdAtLabel: string;
   isOpen: boolean;
+  isCompleted: boolean;
   decisionNote: string | null;
+  refundedAmountLabel: string | null;
 } {
+  const isCompleted = row.status === RefundRequestStatus.COMPLETED;
   return {
     statusLabel: row.statusLabel,
     reasonLabel: row.reasonLabel,
     createdAtLabel: row.createdAtLabel,
     isOpen: isOpenPartnerRefundStatus(row.status),
+    isCompleted,
     decisionNote: row.adminDecisionNote,
+    refundedAmountLabel: isCompleted ? row.partnerDebitLabel : null,
   };
 }

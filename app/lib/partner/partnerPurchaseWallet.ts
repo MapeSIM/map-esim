@@ -431,7 +431,6 @@ async function refundCreditAttempt(
 
   if (
     !profile ||
-    profile.disabledAt ||
     !profile.user ||
     profile.user.deletedAt ||
     profile.user.role !== Role.PARTNER
@@ -441,6 +440,8 @@ async function refundCreditAttempt(
       "Partner is unavailable."
     );
   }
+  // Disabled Partners may still receive ESIM_PURCHASE_REFUND for a debit
+  // already taken. New purchases remain blocked on the reserve path.
 
   const wallet = profile.walletAccount;
   if (!wallet) {

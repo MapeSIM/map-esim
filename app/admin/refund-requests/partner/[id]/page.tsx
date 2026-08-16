@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import AdminPartnerRefundRequestActions from "@/app/components/admin/AdminPartnerRefundRequestActions";
+import AdminPartnerRefundRequestExecute from "@/app/components/admin/AdminPartnerRefundRequestExecute";
 import { requireRole } from "@/app/lib/auth/session";
 import { getAdminPartnerRefundRequestDetail } from "@/app/lib/partner/partnerRefundRequestAdmin";
 
@@ -163,6 +164,15 @@ export default async function AdminPartnerRefundRequestDetailPage({
         canApprove={detail.canApprove}
         canReject={detail.canReject}
       />
+
+      {detail.canExecute ? (
+        <AdminPartnerRefundRequestExecute
+          requestId={detail.id}
+          debitLabel={detail.debitLabel}
+          refundBasisLabel={detail.refundBasisLabel}
+          localBlockerLabel={detail.localExecutionBlockerLabel}
+        />
+      ) : null}
     </div>
   );
 }

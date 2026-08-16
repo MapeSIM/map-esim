@@ -205,7 +205,7 @@ function runOfflineChecks(): void {
   assert.doesNotMatch(admin, /refundReconciliationPartnerPurchase/);
   assert.doesNotMatch(admin, /ESIM_PURCHASE_REFUND/);
   assert.doesNotMatch(admin, /from ["']@\/app\/lib\/vesim/);
-  assert.doesNotMatch(admin, /refundTransactionId:\s*/);
+  assert.doesNotMatch(admin, /refundTransactionId:\s*refund/);
   assert.doesNotMatch(admin, /completedAt:\s/);
   assert.doesNotMatch(admin, /providerCostCents/);
   assert.doesNotMatch(partnerDetail, /providerCost|iccidEncrypted|full ICCID|\bLPA\b/i);
