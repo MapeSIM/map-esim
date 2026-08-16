@@ -24,6 +24,7 @@ import {
 import CookieConsentBanner from "@/app/components/cookies/CookieConsentBanner";
 import CookiePreferencesModal from "@/app/components/cookies/CookiePreferencesModal";
 import ConsentScriptGate from "@/app/components/cookies/ConsentScriptGate";
+import HideOnShare from "@/app/components/share/HideOnShare";
 
 type CookieConsentContextValue = {
   consent: CookieConsentRecord | null;
@@ -159,9 +160,11 @@ export default function CookieConsentProvider({
   return (
     <CookieConsentContext.Provider value={value}>
       {children}
-      <ConsentScriptGate />
-      <CookieConsentBanner pending={pending} />
-      <CookiePreferencesModal pending={pending} />
+      <HideOnShare>
+        <ConsentScriptGate />
+        <CookieConsentBanner pending={pending} />
+        <CookiePreferencesModal pending={pending} />
+      </HideOnShare>
     </CookieConsentContext.Provider>
   );
 }

@@ -105,6 +105,7 @@ const WHATSAPP_BLOCKED_PREFIXES = [
   "/verify-reset-code",
   "/oauth-consent",
   "/dashboard",
+  "/share",
 ] as const;
 
 const WHATSAPP_ALLOWED_EXACT = new Set([

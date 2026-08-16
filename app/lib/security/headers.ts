@@ -22,6 +22,14 @@ export const PRIVATE_NOINDEX_HEADERS: SecurityHeader[] = [
   { key: "X-Robots-Tag", value: "noindex, nofollow" },
 ];
 
+/** Tokenized public share surface — noindex/noarchive + no-referrer + no-store. */
+export const SHARE_SURFACE_HEADERS: SecurityHeader[] = [
+  { key: "Cache-Control", value: PRIVATE_NO_STORE_VALUE },
+  { key: "Pragma", value: "no-cache" },
+  { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+  { key: "Referrer-Policy", value: "no-referrer" },
+];
+
 /**
  * HSTS only for real production HTTPS deployments.
  * Never enable for localhost or plain-http AUTH_URL.
@@ -150,7 +158,10 @@ export function buildNextConfigHeaderSources(
     "/api/admin/:path*",
     "/api/vesim/:path*",
     "/api/auth/:path*",
+    "/api/share/:path*",
   ];
+
+  const shareHtmlSources = ["/share", "/share/:path*"];
 
   return [
     { source: "/:path*", headers: global },
@@ -161,6 +172,10 @@ export function buildNextConfigHeaderSources(
     ...privateApiSources.map((source) => ({
       source,
       headers: privateApi,
+    })),
+    ...shareHtmlSources.map((source) => ({
+      source,
+      headers: SHARE_SURFACE_HEADERS,
     })),
   ];
 }

@@ -18,6 +18,7 @@ const BLOCKED_PREFIXES = [
   "/verify-reset-code",
   "/oauth-consent",
   "/dashboard",
+  "/share",
 ] as const;
 
 const ALLOWED_EXACT = new Set([

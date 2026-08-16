@@ -83,7 +83,7 @@ export default function TawkChat({
   const widgetVisible = consentReady && routeAllowed;
 
   useEffect(() => {
-    if (!consentReady) {
+    if (!consentReady || !routeAllowed) {
       unloadTawkWidget();
       return;
     }
@@ -113,7 +113,7 @@ export default function TawkChat({
     } else {
       hideTawkWidget();
     }
-  }, [consentReady, widgetVisible]);
+  }, [consentReady, routeAllowed, widgetVisible]);
 
   useEffect(() => {
     return () => {
@@ -121,7 +121,7 @@ export default function TawkChat({
     };
   }, []);
 
-  if (!consentReady || !embedSrc) {
+  if (!consentReady || !embedSrc || !routeAllowed) {
     return null;
   }
 

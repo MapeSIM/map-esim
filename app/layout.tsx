@@ -9,6 +9,7 @@ import { CurrencyProvider } from "./components/currency/CurrencyProvider";
 import JsonLd from "./components/seo/JsonLd";
 import ThemeProvider from "./components/theme/ThemeProvider";
 import WhatsAppSupportButton from "./components/support/WhatsAppSupportButton";
+import HideOnShare from "./components/share/HideOnShare";
 import { auth } from "@/auth";
 import { navAuthLink } from "@/app/lib/auth/redirects";
 import { BRAND_NAME, BRAND_SITE_URL, BRAND_TAGLINE } from "@/app/lib/brand";
@@ -107,7 +108,6 @@ export default async function RootLayout({
   return (
     <html lang="en" className={htmlThemeClass} suppressHydrationWarning>
       <body>
-        <JsonLd data={siteGraph} />
         <CookieConsentProvider
           initialConsent={initialCookieConsent}
           initialPreferencesAllowed={initialPreferencesAllowed}
@@ -115,14 +115,19 @@ export default async function RootLayout({
           <ThemeProvider initialTheme={initialTheme}>
             <PreferenceStorageSync />
             <CurrencyProvider initialCurrency={initialCurrency}>
-              <Navbar
-                authHref={authHref}
-                authLabel={authLabel}
-                customer={customerNav}
-              />
+              <HideOnShare>
+                <JsonLd data={siteGraph} />
+                <Navbar
+                  authHref={authHref}
+                  authLabel={authLabel}
+                  customer={customerNav}
+                />
+              </HideOnShare>
               {children}
-              <Footer />
-              <WhatsAppSupportButton />
+              <HideOnShare>
+                <Footer />
+                <WhatsAppSupportButton />
+              </HideOnShare>
             </CurrencyProvider>
           </ThemeProvider>
         </CookieConsentProvider>
