@@ -113,7 +113,7 @@ export default async function PartnerDashboardPage() {
           <AccountActionRow
             href="/partner/profile"
             title="Account / Share Branding"
-            subtitle="Profile details and future share branding"
+            subtitle="Profile details and share-page branding"
             icon={<Palette className="h-5 w-5" aria-hidden="true" />}
           />
           <PartnerSignOutRow />
@@ -156,14 +156,12 @@ export default async function PartnerDashboardPage() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold tracking-tight">Share Branding</h2>
-        <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-5 text-sm text-[var(--text-muted)]">
-          <p className="font-medium text-[var(--heading)]">Coming later</p>
-          <p className="mt-2">
-            Company name, support email, website, logo, and button colors will
-            appear here when share branding is enabled. Secure share links
-            already use MAP eSIM branding.
-          </p>
-        </div>
+        <AccountActionRow
+          href="/partner/profile"
+          title="Share Branding"
+          subtitle="Company name, support email, website, logo, and button colors"
+          icon={<Palette className="h-5 w-5" aria-hidden="true" />}
+        />
       </section>
     </div>
   );

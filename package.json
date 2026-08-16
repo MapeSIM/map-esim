@@ -33,6 +33,7 @@
     "qa:partner-reconciliation": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-reconciliation.ts",
     "qa:partner-share-token": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-share-token.ts",
     "qa:partner-share-page": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-share-page.ts",
+    "qa:partner-share-branding": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-share-branding.ts",
     "qa:partner-ux-unification": "tsx scripts/qa-partner-ux-unification.ts",
     "qa:partner-invite-setup": "tsx scripts/qa-partner-invite-setup.ts",
     "qa:wallet-foundation": "tsx scripts/qa-wallet-foundation.ts",

@@ -339,10 +339,21 @@ async function main() {
     assert.equal(page.qrDataUrl?.includes(rawToken), false);
     assert.equal(page.qrDataUrl?.includes("/share/"), false);
     assertNoPublicSecrets(page, rawToken);
+    assert.deepEqual(Object.keys(page.branding).sort(), [
+      "buttonBackground",
+      "buttonTextColor",
+      "companyName",
+      "logoUrl",
+      "supportEmail",
+      "websiteUrl",
+    ]);
+    assert.equal(page.branding.companyName, null);
+    assert.equal(page.branding.logoUrl, null);
     assert.deepEqual(
       Object.keys(page).sort(),
       [
         "activationCode",
+        "branding",
         "dataAllowance",
         "destinationName",
         "fullIccid",

@@ -2,9 +2,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
+import PartnerEsimShareControls from "@/app/components/partner/PartnerEsimShareControls";
 import { requireRole } from "@/app/lib/auth/session";
+import { hasActivePartnerEsimShareToken } from "@/app/lib/partner/partnerEsimShareToken";
 import { getPartnerOwnedOrderDetail } from "@/app/lib/partner/partnerOrders";
 import type { PartnerOrderStatusBadge } from "@/app/lib/partner/partnerOrdersDisplay";
+import { getPartnerShareBranding } from "@/app/lib/partner/partnerShareBranding";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +75,17 @@ export default async function PartnerOrderDetailPage({
     notFound();
   }
 
+  const [hasActiveToken, brandingResult] = await Promise.all([
+    hasActivePartnerEsimShareToken({
+      partnerUserId: user.id,
+      orderId: detail.orderId,
+    }),
+    getPartnerShareBranding(user.id),
+  ]);
+  const companyName = brandingResult.ok
+    ? brandingResult.branding.companyName
+    : null;
+
   return (
     <div className="min-w-0 space-y-8">
       <div>
@@ -133,6 +147,14 @@ export default async function PartnerOrderDetailPage({
           />
         </dl>
       </section>
+
+      {detail.statusBadge === "Completed" ? (
+        <PartnerEsimShareControls
+          orderId={detail.orderId}
+          hasActiveToken={hasActiveToken}
+          companyName={companyName}
+        />
+      ) : null}
 
       <section className="min-w-0 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-4 py-5 text-sm text-[var(--text-muted)]">
         <p className="font-medium text-[var(--heading)]">Installation</p>

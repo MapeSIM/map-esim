@@ -1,5 +1,7 @@
+import PartnerShareBrandingForm from "@/app/components/partner/PartnerShareBrandingForm";
 import { requireRole } from "@/app/lib/auth/session";
 import { getPartnerPortalSummary } from "@/app/lib/partner/partnerAccess";
+import { getPartnerShareBranding } from "@/app/lib/partner/partnerShareBranding";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +14,18 @@ export default async function PartnerProfilePage() {
   } catch {
     discountLabel = "—";
   }
+
+  const brandingResult = await getPartnerShareBranding(user.id);
+  const branding = brandingResult.ok
+    ? brandingResult.branding
+    : {
+        companyName: null,
+        supportEmail: null,
+        websiteUrl: null,
+        logoUrl: null,
+        buttonBackground: null,
+        buttonTextColor: null,
+      };
 
   return (
     <div className="space-y-8">
@@ -43,13 +57,12 @@ export default async function PartnerProfilePage() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold tracking-tight">Share Branding</h2>
-        <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-5 text-sm text-[var(--text-muted)]">
-          <p className="font-medium text-[var(--heading)]">Coming later</p>
-          <p className="mt-2">
-            Company name, support email, website, logo, and button colors are
-            not stored yet. This section is reserved for a later share-branding
-            slice.
-          </p>
+        <p className="text-sm text-[var(--text-muted)]">
+          Shown only on secure share pages for your eSIM orders. Public MAP
+          storefront branding is unchanged.
+        </p>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5">
+          <PartnerShareBrandingForm initial={branding} />
         </div>
       </section>
     </div>

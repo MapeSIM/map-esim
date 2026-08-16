@@ -227,6 +227,36 @@ export async function createPartnerEsimShareToken(options: {
   }
 }
 
+/**
+ * Boolean-only probe. Never returns a raw token or hash.
+ * Used so the Partner UI can show Create vs Regenerate without faking recovery.
+ */
+export async function hasActivePartnerEsimShareToken(options: {
+  partnerUserId: string;
+  orderId: string;
+}): Promise<boolean> {
+  const actor = await requireActivePartnerActor(options.partnerUserId);
+  if (!actor) return false;
+
+  const orderId = normalizeOrderId(options.orderId);
+  if (!orderId) return false;
+
+  const owned = await loadOwnedCompletedPartnerOrder({
+    partnerId: actor.partnerId,
+    orderId,
+  });
+  if (!owned) return false;
+
+  const active = await prisma.partnerEsimShareToken.count({
+    where: {
+      orderId,
+      partnerId: actor.partnerId,
+      revokedAt: null,
+    },
+  });
+  return active > 0;
+}
+
 export type RevokePartnerEsimShareTokenResult =
   | { ok: true; alreadyRevoked: boolean }
   | { ok: false; error: string };

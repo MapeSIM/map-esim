@@ -267,6 +267,13 @@ model PartnerProfile {
   disabledAt      DateTime?
   /// CAS version for disable/reactivate.
   statusVersion   Int                  @default(0)
+  /// Optional Partner share-page branding (Phase 3 Slice 3). Null = MAP eSIM fallback.
+  shareCompanyName        String?
+  shareSupportEmail       String?
+  shareWebsiteUrl         String?
+  shareLogoUrl            String?
+  shareButtonBackground   String?
+  shareButtonTextColor    String?
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
   user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)

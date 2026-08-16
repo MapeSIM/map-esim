@@ -23,17 +23,31 @@ type UsagePayload = {
   expiresAt: string | null;
 };
 
+type BrandButtonStyle = {
+  backgroundColor?: string;
+  color?: string;
+} | undefined;
+
 type Props = {
   token: string;
   data: PartnerEsimSharePageData;
 };
 
+function brandButtonStyle(data: PartnerEsimSharePageData): BrandButtonStyle {
+  const bg = data.branding.buttonBackground;
+  const fg = data.branding.buttonTextColor;
+  if (!bg || !fg) return undefined;
+  return { backgroundColor: bg, color: fg };
+}
+
 function CopyRow({
   label,
   value,
+  buttonStyle,
 }: {
   label: string;
   value: string;
+  buttonStyle?: BrandButtonStyle;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -60,6 +74,7 @@ function CopyRow({
           type="button"
           onClick={() => void copy()}
           className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg border border-[var(--border-strong)] px-2.5 text-xs font-semibold text-[var(--heading)] outline-none hover:bg-[var(--surface)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+          style={buttonStyle}
         >
           <Copy className="h-3.5 w-3.5" aria-hidden="true" />
           {copied ? "Copied" : "Copy"}
@@ -79,6 +94,7 @@ export default function PartnerEsimShareView({ token, data }: Props) {
   const [usage, setUsage] = useState<UsagePayload | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
   const [usageLoading, setUsageLoading] = useState(false);
+  const ctaStyle = brandButtonStyle(data);
 
   const loadUsage = useCallback(async () => {
     setUsageLoading(true);
@@ -197,13 +213,25 @@ export default function PartnerEsimShareView({ token, data }: Props) {
             </h2>
           </div>
           {data.smdpAddress ? (
-            <CopyRow label="SM-DP+ address" value={data.smdpAddress} />
+            <CopyRow
+              label="SM-DP+ address"
+              value={data.smdpAddress}
+              buttonStyle={ctaStyle}
+            />
           ) : null}
           {data.activationCode ? (
-            <CopyRow label="Activation code" value={data.activationCode} />
+            <CopyRow
+              label="Activation code"
+              value={data.activationCode}
+              buttonStyle={ctaStyle}
+            />
           ) : null}
           {data.lpa ? (
-            <CopyRow label="LPA / full activation value" value={data.lpa} />
+            <CopyRow
+              label="LPA / full activation value"
+              value={data.lpa}
+              buttonStyle={ctaStyle}
+            />
           ) : null}
         </section>
       ) : null}
@@ -211,7 +239,11 @@ export default function PartnerEsimShareView({ token, data }: Props) {
       {data.fullIccid ? (
         <section className="space-y-3">
           <h2 className="text-base font-bold text-[var(--heading)]">ICCID</h2>
-          <CopyRow label="Full ICCID" value={data.fullIccid} />
+          <CopyRow
+            label="Full ICCID"
+            value={data.fullIccid}
+            buttonStyle={ctaStyle}
+          />
         </section>
       ) : null}
 
@@ -227,6 +259,7 @@ export default function PartnerEsimShareView({ token, data }: Props) {
           onClick={() => void loadUsage()}
           disabled={usageLoading}
           className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] outline-none hover:bg-[var(--accent)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60 sm:w-auto"
+          style={ctaStyle}
         >
           <RefreshCw
             className={`h-4 w-4 ${usageLoading ? "animate-spin" : ""}`}
@@ -294,6 +327,49 @@ export default function PartnerEsimShareView({ token, data }: Props) {
           </a>
         </div>
       </section>
+
+      {data.branding.supportEmail || data.branding.websiteUrl ? (
+        <section className="space-y-3">
+          <h2 className="text-base font-bold text-[var(--heading)]">
+            Partner support
+          </h2>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            {data.branding.supportEmail ? (
+              <a
+                href={`mailto:${data.branding.supportEmail}`}
+                rel="noopener noreferrer"
+                referrerPolicy="no-referrer"
+                className="inline-flex h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                style={
+                  ctaStyle ?? {
+                    backgroundColor: "var(--accent-strong)",
+                    color: "var(--accent-ink)",
+                  }
+                }
+              >
+                Mail Support
+              </a>
+            ) : null}
+            {data.branding.websiteUrl ? (
+              <a
+                href={data.branding.websiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                referrerPolicy="no-referrer"
+                className="inline-flex h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                style={
+                  ctaStyle ?? {
+                    backgroundColor: "var(--accent-strong)",
+                    color: "var(--accent-ink)",
+                  }
+                }
+              >
+                Visit Partner Website
+              </a>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

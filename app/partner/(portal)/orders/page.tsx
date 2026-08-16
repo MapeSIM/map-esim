@@ -90,6 +90,11 @@ function OrderCard({ row }: { row: PartnerOrderListRow }) {
                 </dd>
               </div>
             </dl>
+            {row.statusBadge === "Completed" ? (
+              <p className="text-xs font-semibold text-[var(--accent-strong)]">
+                Share eSIM
+              </p>
+            ) : null}
           </div>
         </div>
       </Link>

@@ -34,9 +34,13 @@ import {
 } from "@/app/lib/orders/customerEsimUsage";
 import { displayOrUnavailable } from "@/app/lib/partner/partnerOrdersDisplay";
 import { resolvePartnerEsimShareToken } from "@/app/lib/partner/partnerEsimShareToken";
+import { loadPublicShareBrandingForPartner } from "@/app/lib/partner/partnerShareBranding";
+import type { PartnerShareBrandingFields } from "@/app/lib/partner/partnerShareBrandingValidate";
 import { SHARE_PAGE_UNAVAILABLE_MESSAGE } from "@/app/lib/share/shareSurface";
 
 export const SHARE_STATUS_READY = "Ready";
+
+export type PartnerEsimSharePublicBranding = PartnerShareBrandingFields;
 
 export type PartnerEsimSharePageData = {
   destinationName: string;
@@ -51,6 +55,7 @@ export type PartnerEsimSharePageData = {
   fullIccid: string | null;
   hasInstallDetails: boolean;
   installDetailsAvailable: boolean;
+  branding: PartnerEsimSharePublicBranding;
 };
 
 export type ShareBrokerLookup = (
@@ -198,6 +203,8 @@ export async function getPartnerEsimSharePageData(
     hasInstallDetails(install) || fullIccid || lpa
   );
 
+  const branding = await loadPublicShareBrandingForPartner(resolved.partnerId);
+
   return {
     destinationName: displayOrUnavailable(
       row.destination || row.purchaseDestination
@@ -215,6 +222,7 @@ export async function getPartnerEsimSharePageData(
     fullIccid,
     hasInstallDetails: installAvailable,
     installDetailsAvailable: Boolean(lpa || install.smdpAddress || install.activationCode),
+    branding,
   };
 }
 
