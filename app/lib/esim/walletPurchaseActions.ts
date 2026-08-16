@@ -186,6 +186,10 @@ export async function confirmWalletEsimPurchaseAction(
   void formData.get("cancel_url");
   void formData.get("chargeAmount");
   void formData.get("currency");
+  void formData.get("promoCode");
+  void formData.get("discountCents");
+  void formData.get("finalPriceCents");
+  void formData.get("percent");
 
   if (!purchaseId || purchaseId.length > 64) {
     return { ok: false, error: "This purchase is unavailable." };
@@ -303,6 +307,9 @@ export async function confirmWalletEsimPurchaseAction(
       }
       if (error.code === "RECONCILIATION_REQUIRED") {
         redirect(reconciliationPath(purchaseId));
+      }
+      if (error.code === "PROMO_INVALID") {
+        return { ok: false, error: error.message };
       }
       return { ok: false, error: error.message };
     }

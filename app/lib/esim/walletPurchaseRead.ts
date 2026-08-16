@@ -6,7 +6,8 @@ import {
   WalletEsimPurchaseStatus,
 } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
-import { calculatePurchaseFunding } from "@/app/lib/esim/purchaseFunding";
+import { calculatePayablePurchaseFunding } from "@/app/lib/esim/purchaseFunding";
+import { payablePackageCents } from "@/app/lib/promo/promoDiscount";
 import { formatWalletPurchasePriceLabel } from "@/app/lib/esim/walletPurchase";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
 import { formatUsdCents } from "@/app/lib/wallet/display";
@@ -29,6 +30,13 @@ export type WalletPurchaseReview = {
   deliveryLabel: string;
   priceLabel: string;
   priceCents: number;
+  payableCents: number;
+  promoApplied: boolean;
+  promoCode: string | null;
+  promoDiscountCents: number;
+  promoOriginalLabel: string;
+  promoDiscountLabel: string;
+  promoTotalLabel: string;
   balanceLabel: string;
   balanceCents: number;
   balanceAfterLabel: string;
@@ -69,6 +77,8 @@ export async function getWalletPurchaseReview(
       dataAllowance: true,
       validity: true,
       priceCents: true,
+      promoCodeNormalized: true,
+      promoDiscountCents: true,
       useWallet: true,
       walletAppliedCents: true,
       gatewayAmountCents: true,
@@ -94,9 +104,15 @@ export async function getWalletPurchaseReview(
   });
   const balanceCents = wallet?.balanceCents ?? 0;
 
+  const payableCents = payablePackageCents(
+    row.priceCents,
+    row.promoDiscountCents
+  );
+  const promoApplied =
+    Boolean(row.promoCodeNormalized) && row.promoDiscountCents > 0;
   // Live preview from current balance + stored choice (server-side for initial render).
-  const liveFunding = calculatePurchaseFunding({
-    priceCents: row.priceCents,
+  const liveFunding = calculatePayablePurchaseFunding({
+    priceCents: payableCents,
     walletBalanceCents: balanceCents,
     useWallet: row.useWallet,
   });
@@ -126,8 +142,15 @@ export async function getWalletPurchaseReview(
     dataAllowance: displayOrUnavailable(row.dataAllowance),
     validity: displayOrUnavailable(row.validity),
     deliveryLabel: "Instant eSIM delivery",
-    priceLabel: formatWalletPurchasePriceLabel(row.priceCents),
+    priceLabel: formatWalletPurchasePriceLabel(payableCents),
     priceCents: row.priceCents,
+    payableCents,
+    promoApplied,
+    promoCode: row.promoCodeNormalized,
+    promoDiscountCents: row.promoDiscountCents,
+    promoOriginalLabel: formatWalletPurchasePriceLabel(row.priceCents),
+    promoDiscountLabel: formatWalletPurchasePriceLabel(row.promoDiscountCents),
+    promoTotalLabel: formatWalletPurchasePriceLabel(payableCents),
     balanceLabel: formatUsdCents(balanceCents),
     balanceCents,
     balanceAfterLabel: formatUsdCents(after),
@@ -198,6 +221,8 @@ export async function getCompletedWalletPurchase(
       dataAllowance: true,
       validity: true,
       priceCents: true,
+      promoDiscountCents: true,
+      promoCodeNormalized: true,
       walletAppliedCents: true,
       gatewayAmountCents: true,
       status: true,
@@ -228,6 +253,10 @@ export async function getCompletedWalletPurchase(
 
   const walletApplied = Math.max(0, row.walletAppliedCents ?? 0);
   const gatewayPaid = Math.max(0, row.gatewayAmountCents ?? 0);
+  const payableCents = payablePackageCents(
+    row.priceCents,
+    row.promoDiscountCents
+  );
   const showWallet =
     row.fundingSource === OrderFundingSource.CUSTOMER_WALLET ||
     row.fundingSource === OrderFundingSource.CUSTOMER_SPLIT;
@@ -241,12 +270,12 @@ export async function getCompletedWalletPurchase(
     planName: displayOrUnavailable(row.planName),
     dataAllowance: displayOrUnavailable(row.dataAllowance),
     validity: displayOrUnavailable(row.validity),
-    amountChargedLabel: formatWalletPurchasePriceLabel(row.priceCents),
+    amountChargedLabel: formatWalletPurchasePriceLabel(payableCents),
     walletAppliedLabel:
       showWallet && walletApplied > 0
         ? formatWalletPurchasePriceLabel(walletApplied)
         : row.fundingSource === OrderFundingSource.CUSTOMER_WALLET
-          ? formatWalletPurchasePriceLabel(row.priceCents)
+          ? formatWalletPurchasePriceLabel(payableCents)
           : null,
     gatewayPaidLabel:
       gatewayPaid > 0 ? formatWalletPurchasePriceLabel(gatewayPaid) : null,

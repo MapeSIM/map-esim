@@ -251,6 +251,10 @@ export type CustomerOrderDetail = {
   statusBadge: CustomerEsimStatusBadge;
   statusLabel: string;
   amountLabel: string;
+  promoCode: string | null;
+  originalAmountLabel: string | null;
+  discountAmountLabel: string | null;
+  finalAmountLabel: string | null;
   currencyLabel: string;
   fundingLabel: string;
   createdAtLabel: string;
@@ -321,6 +325,8 @@ export async function getCustomerOwnedOrderDetail(
           destinationCode: true,
           emailDeliveryStatus: true,
           priceCents: true,
+          promoCodeNormalized: true,
+          promoDiscountCents: true,
           updatedAt: true,
           completedAt: true,
           refundTransaction: {
@@ -411,6 +417,28 @@ export async function getCustomerOwnedOrderDetail(
     statusBadge,
     statusLabel: statusBadge,
     amountLabel: formatCustomerOrderAmount(amount, currency),
+    promoCode: order.walletEsimPurchase?.promoCodeNormalized || null,
+    originalAmountLabel:
+      order.walletEsimPurchase &&
+      order.walletEsimPurchase.promoDiscountCents > 0
+        ? formatUsdCentsAmount(order.walletEsimPurchase.priceCents)
+        : null,
+    discountAmountLabel:
+      order.walletEsimPurchase &&
+      order.walletEsimPurchase.promoDiscountCents > 0
+        ? formatUsdCentsAmount(order.walletEsimPurchase.promoDiscountCents)
+        : null,
+    finalAmountLabel:
+      order.walletEsimPurchase &&
+      order.walletEsimPurchase.promoDiscountCents > 0
+        ? formatUsdCentsAmount(
+            Math.max(
+              0,
+              order.walletEsimPurchase.priceCents -
+                order.walletEsimPurchase.promoDiscountCents
+            )
+          )
+        : null,
     currencyLabel: currency,
     fundingLabel: customerFundingLabel(order.fundingSource),
     createdAtLabel: formatOrderDate(order.createdAt),

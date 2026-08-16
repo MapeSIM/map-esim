@@ -87,3 +87,23 @@ export function walletOnlyPurchaseFunding(
     gatewayAmountCents: 0,
   };
 }
+
+/**
+ * Funding against a payable amount after a server-validated promo.
+ * Payable 0 (100% / full fixed discount) is wallet 0 + gateway 0.
+ */
+export function calculatePayablePurchaseFunding(
+  input: PurchaseFundingInput
+): PurchaseFundingBreakdown {
+  if (input.priceCents === 0) {
+    if (!Number.isInteger(input.walletBalanceCents) || input.walletBalanceCents < 0) {
+      throw new PurchaseFundingError("INVALID_BALANCE", "Invalid funding amount.");
+    }
+    return {
+      useWallet: Boolean(input.useWallet),
+      walletAppliedCents: 0,
+      gatewayAmountCents: 0,
+    };
+  }
+  return calculatePurchaseFunding(input);
+}

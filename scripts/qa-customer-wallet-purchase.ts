@@ -196,7 +196,8 @@ function main() {
   assert.ok(!/sendOrderEmail\(/.test(qaSelf));
   console.log("PASS no_email_sent_during_qa");
 
-  assert.ok(!/stripe|paypal|promo|reward|webhook|impersonat/i.test(service));
+  assert.ok(!/stripe|paypal|reward|webhook|impersonat/i.test(service));
+  assert.match(service, /claimPurchasePromoInTx|promoDiscountCents/);
   assert.ok(!/admin.*wallet.*purchase|wallet.*admin.*assign/i.test(buyPage));
   console.log("PASS no_payment_gateway_promo_rewards_admin_wallet_purchase");
 

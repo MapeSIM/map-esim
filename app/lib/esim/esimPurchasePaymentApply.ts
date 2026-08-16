@@ -28,6 +28,11 @@ import {
   verifyOfferAuthoritative,
 } from "@/app/lib/vesim/server";
 import { schedulePaymentFailureNotification } from "@/app/lib/esim/paymentFailureNotification";
+import { claimPurchasePromoInTx } from "@/app/lib/promo/promoCustomer";
+import {
+  completePromoRedemptionInTx,
+  releasePromoRedemptionInTx,
+} from "@/app/lib/promo/promoRedemption";
 import { scheduleWalletTransactionNotification } from "@/app/lib/wallet/transactionNotification";
 
 export const ESIM_PAYMENT_WEBHOOK_DUPLICATE = "esim.payment_webhook_duplicate";
@@ -893,6 +898,12 @@ export async function fulfillFundedEsimPurchase(
         },
       });
 
+      await completePromoRedemptionInTx(tx, {
+        purchaseId: purchase.id,
+        orderId: order.id,
+        actorUserId: null,
+      });
+
       await tx.auditLog.create({
         data: {
           actorUserId: null,
@@ -1080,6 +1091,10 @@ export async function reserveSplitWalletBeforeGatewayCheckout(options: {
         status: true,
         debitTransactionId: true,
         walletAppliedCents: true,
+        promoCodeId: true,
+        offerId: true,
+        destinationCode: true,
+        priceCents: true,
       },
     });
     if (!current || current.customerUserId !== options.customerUserId) {
@@ -1108,6 +1123,10 @@ export async function reserveSplitWalletBeforeGatewayCheckout(options: {
       tx,
       options.purchaseId
     );
+    const promoDiscountCents = Math.max(
+      0,
+      current.priceCents - walletAppliedCents - options.gatewayAmountCents
+    );
     if (debitKeyPlan.kind === "reuse_pending") {
       await tx.walletEsimPurchase.update({
         where: { id: options.purchaseId },
@@ -1117,6 +1136,7 @@ export async function reserveSplitWalletBeforeGatewayCheckout(options: {
           useWallet: options.useWallet,
           walletAppliedCents,
           gatewayAmountCents: options.gatewayAmountCents,
+          promoDiscountCents,
           fundingSource: OrderFundingSource.CUSTOMER_SPLIT,
         },
       });
@@ -1143,6 +1163,7 @@ export async function reserveSplitWalletBeforeGatewayCheckout(options: {
         useWallet: options.useWallet,
         walletAppliedCents,
         gatewayAmountCents: options.gatewayAmountCents,
+        promoDiscountCents,
         fundingSource: OrderFundingSource.CUSTOMER_SPLIT,
       },
     });
@@ -1159,6 +1180,18 @@ export async function reserveSplitWalletBeforeGatewayCheckout(options: {
         };
       }
       throw new Error("RESERVE_CLAIM_FAILED");
+    }
+
+    if (current.promoCodeId) {
+      await claimPurchasePromoInTx(tx, {
+        customerUserId: options.customerUserId,
+        purchaseId: options.purchaseId,
+        offerId: current.offerId,
+        destinationCode: current.destinationCode,
+        priceCents: current.priceCents,
+        promoCodeId: current.promoCodeId,
+        actorUserId: options.customerUserId,
+      });
     }
 
     const reserved = await reserveWalletPurchaseFundsInTx(tx, {
@@ -1188,7 +1221,12 @@ export async function releaseSplitReservationAfterSessionFailure(options: {
   customerUserId: string;
   walletAppliedCents: number;
 }): Promise<void> {
-  if (options.walletAppliedCents <= 0) return;
+  if (options.walletAppliedCents <= 0) {
+    await prisma.$transaction(async (tx) => {
+      await releasePromoRedemptionInTx(tx, options.purchaseId);
+    });
+    return;
+  }
   let releasedRefundId: string | null = null;
   await prisma.$transaction(async (tx) => {
     const release = await refundReservedFundsInTx(tx, {

@@ -9,7 +9,14 @@ import {
   WalletEsimPurchaseStatus,
 } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
-import { calculatePurchaseFunding } from "@/app/lib/esim/purchaseFunding";
+import { calculatePurchaseFunding, calculatePayablePurchaseFunding } from "@/app/lib/esim/purchaseFunding";
+import { payablePackageCents } from "@/app/lib/promo/promoDiscount";
+import {
+  claimPurchasePromoInTx,
+  revalidatePurchasePromo,
+} from "@/app/lib/promo/promoCustomer";
+import { releasePromoRedemptionInTx } from "@/app/lib/promo/promoRedemption";
+import { PromoEvaluateError } from "@/app/lib/promo/promoEvaluate";
 import {
   releaseSplitReservationAfterSessionFailure,
   reserveSplitWalletBeforeGatewayCheckout,
@@ -184,6 +191,10 @@ export async function startEsimPurchaseHostedCheckout(
       customerUserId: true,
       adminUserId: true,
       priceCents: true,
+      promoCodeId: true,
+      promoDiscountCents: true,
+      offerId: true,
+      destinationCode: true,
       currency: true,
       useWallet: true,
       status: true,
@@ -235,11 +246,44 @@ export async function startEsimPurchaseHostedCheckout(
     );
   }
 
-  const funding = calculatePurchaseFunding({
-    priceCents: purchase.priceCents,
-    walletBalanceCents: wallet.balanceCents,
-    useWallet: Boolean(input.useWallet),
-  });
+  let payableCents = payablePackageCents(
+    purchase.priceCents,
+    purchase.promoDiscountCents
+  );
+  if (purchase.promoCodeId) {
+    try {
+      const evaluated = await revalidatePurchasePromo({
+        customerUserId,
+        purchaseId: purchase.id,
+        offerId: purchase.offerId,
+        destinationCode: purchase.destinationCode,
+        priceCents: purchase.priceCents,
+        promoCodeId: purchase.promoCodeId,
+      });
+      payableCents = evaluated?.finalPriceCents ?? purchase.priceCents;
+    } catch (error) {
+      if (error instanceof PromoEvaluateError) {
+        throw new EsimPurchaseGatewayCheckoutError(
+          "INVALID_STATE",
+          error.message
+        );
+      }
+      throw error;
+    }
+  }
+
+  const funding =
+    payableCents === 0
+      ? calculatePayablePurchaseFunding({
+          priceCents: payableCents,
+          walletBalanceCents: wallet.balanceCents,
+          useWallet: Boolean(input.useWallet),
+        })
+      : calculatePurchaseFunding({
+          priceCents: payableCents,
+          walletBalanceCents: wallet.balanceCents,
+          useWallet: Boolean(input.useWallet),
+        });
 
   if (funding.gatewayAmountCents <= 0) {
     throw new EsimPurchaseGatewayCheckoutError(
@@ -272,6 +316,12 @@ export async function startEsimPurchaseHostedCheckout(
         useWallet: funding.useWallet,
       });
     } catch (error) {
+      if (error instanceof PromoEvaluateError) {
+        throw new EsimPurchaseGatewayCheckoutError(
+          "INVALID_STATE",
+          error.message
+        );
+      }
       if (
         error instanceof WalletEsimPurchaseError &&
         error.code === "INSUFFICIENT_FUNDS"
@@ -287,24 +337,48 @@ export async function startEsimPurchaseHostedCheckout(
       );
     }
   } else {
-    await prisma.walletEsimPurchase.updateMany({
-      where: {
-        id: purchase.id,
-        customerUserId,
-        status: {
-          in: [
-            WalletEsimPurchaseStatus.READY,
-            WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
-          ],
-        },
-      },
-      data: {
-        useWallet: funding.useWallet,
-        walletAppliedCents: funding.walletAppliedCents,
-        gatewayAmountCents: funding.gatewayAmountCents,
-        fundingSource,
-      },
-    });
+    try {
+      await prisma.$transaction(async (tx) => {
+        if (purchase.promoCodeId) {
+          await claimPurchasePromoInTx(tx, {
+            customerUserId,
+            purchaseId: purchase.id,
+            offerId: purchase.offerId,
+            destinationCode: purchase.destinationCode,
+            priceCents: purchase.priceCents,
+            promoCodeId: purchase.promoCodeId,
+            actorUserId: customerUserId,
+          });
+        }
+        await tx.walletEsimPurchase.updateMany({
+          where: {
+            id: purchase.id,
+            customerUserId,
+            status: {
+              in: [
+                WalletEsimPurchaseStatus.READY,
+                WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+              ],
+            },
+          },
+          data: {
+            useWallet: funding.useWallet,
+            walletAppliedCents: funding.walletAppliedCents,
+            gatewayAmountCents: funding.gatewayAmountCents,
+            fundingSource,
+            promoDiscountCents: purchase.priceCents - payableCents,
+          },
+        });
+      });
+    } catch (error) {
+      if (error instanceof PromoEvaluateError) {
+        throw new EsimPurchaseGatewayCheckoutError(
+          "INVALID_STATE",
+          error.message
+        );
+      }
+      throw error;
+    }
   }
 
   const checkoutKey = gatewayCheckoutIdempotencyKey(purchase.idempotencyKey);
@@ -474,13 +548,11 @@ export async function startEsimPurchaseHostedCheckout(
       cancelPath,
     });
   } catch {
-    if (funding.walletAppliedCents > 0) {
-      await releaseSplitReservationAfterSessionFailure({
-        purchaseId: purchase.id,
-        customerUserId,
-        walletAppliedCents: funding.walletAppliedCents,
-      }).catch(() => undefined);
-    }
+    await releaseSplitReservationAfterSessionFailure({
+      purchaseId: purchase.id,
+      customerUserId,
+      walletAppliedCents: funding.walletAppliedCents,
+    }).catch(() => undefined);
     throw new EsimPurchaseGatewayCheckoutError(
       "UNAVAILABLE",
       CARD_PAYMENT_UNAVAILABLE_MESSAGE
@@ -488,13 +560,11 @@ export async function startEsimPurchaseHostedCheckout(
   }
 
   if (!session.ok) {
-    if (funding.walletAppliedCents > 0) {
-      await releaseSplitReservationAfterSessionFailure({
-        purchaseId: purchase.id,
-        customerUserId,
-        walletAppliedCents: funding.walletAppliedCents,
-      }).catch(() => undefined);
-    }
+    await releaseSplitReservationAfterSessionFailure({
+      purchaseId: purchase.id,
+      customerUserId,
+      walletAppliedCents: funding.walletAppliedCents,
+    }).catch(() => undefined);
     throw new EsimPurchaseGatewayCheckoutError(
       session.code === "MISCONFIGURED" || session.code === "GATEWAY_UNAVAILABLE"
         ? "GATEWAY_UNAVAILABLE"
@@ -505,13 +575,11 @@ export async function startEsimPurchaseHostedCheckout(
 
   const providerRef = (session.providerPaymentRef ?? "").trim();
   if (!providerRef) {
-    if (funding.walletAppliedCents > 0) {
-      await releaseSplitReservationAfterSessionFailure({
-        purchaseId: purchase.id,
-        customerUserId,
-        walletAppliedCents: funding.walletAppliedCents,
-      }).catch(() => undefined);
-    }
+    await releaseSplitReservationAfterSessionFailure({
+      purchaseId: purchase.id,
+      customerUserId,
+      walletAppliedCents: funding.walletAppliedCents,
+    }).catch(() => undefined);
     throw new EsimPurchaseGatewayCheckoutError(
       "UNAVAILABLE",
       CARD_PAYMENT_UNAVAILABLE_MESSAGE

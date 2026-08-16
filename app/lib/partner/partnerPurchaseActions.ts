@@ -59,6 +59,9 @@ export async function buyPartnerEsimAction(
   void formData.get("partnerChargeCents");
   void formData.get("providerCostCents");
   void formData.get("planName");
+  void formData.get("promoCode");
+  void formData.get("discountCents");
+  void formData.get("finalPriceCents");
 
   if (!offerId) {
     return {

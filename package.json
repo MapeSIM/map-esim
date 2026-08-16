@@ -48,6 +48,7 @@
     "qa:customer-wallet-purchase": "tsx scripts/qa-customer-wallet-purchase.ts",
     "qa:esim-purchase-split-funding": "tsx scripts/qa-esim-purchase-split-funding.ts",
     "qa:esim-purchase-funding-choice": "tsx scripts/qa-esim-purchase-funding-choice.ts",
+    "qa:promo-codes": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-promo-codes.ts",
     "qa:login-return-to-checkout": "tsx scripts/qa-login-return-to-checkout.ts",
     "qa:safepay-foundation": "tsx scripts/qa-safepay-foundation.ts",
     "qa:esim-purchase-hosted-checkout": "tsx scripts/qa-esim-purchase-hosted-checkout.ts",

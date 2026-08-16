@@ -84,6 +84,17 @@ enum OtpPurpose {
   ACCOUNT_DELETION
 }
 
+enum PromoDiscountType {
+  PERCENT
+  FIXED_USD
+}
+
+enum PromoRedemptionStatus {
+  HELD
+  COMPLETED
+  RELEASED
+}
+
 enum WalletCurrency {
   USD
 }
@@ -258,6 +269,8 @@ model User {
   refundRequestsDecided        RefundRequest[]          @relation("RefundRequestDecidedBy")
   partnerProfile               PartnerProfile?
   partnerWalletTxCreated       PartnerWalletTransaction[] @relation("PartnerWalletTxCreatedByAdmin")
+  promoCodesCreated            PromoCode[]                @relation("PromoCodeCreatedByAdmin")
+  promoCodeRedemptions         PromoCodeRedemption[]
 
   @@index([deletedAt])
   @@index([blockedAt])
@@ -490,6 +503,7 @@ model Order {
   partnerEsimShareTokens           PartnerEsimShareToken[]
   refundRequests                   RefundRequest[]
   partnerRefundRequests            PartnerRefundRequest[]
+  promoRedemptions                 PromoCodeRedemption[]
 
   @@index([customerEmail])
   @@index([userId])
@@ -594,6 +608,10 @@ model WalletEsimPurchase {
   validity                         String?
   /// Authoritative customer selling price in integer USD cents.
   priceCents                       Int
+  /// Optional customer promo applied at checkout. priceCents stays the catalog price.
+  promoCodeId                      String?
+  promoCodeNormalized              String?
+  promoDiscountCents               Int                      @default(0)
   /// Customer chose to apply wallet funds (server-persisted; never trust browser money).
   useWallet                        Boolean                  @default(true)
   /// Server-calculated wallet contribution in USD cents.
@@ -656,8 +674,11 @@ model WalletEsimPurchase {
   debitTransaction                 WalletTransaction?       @relation("PurchaseDebitTx", fields: [debitTransactionId], references: [id], onDelete: SetNull)
   refundTransaction                WalletTransaction?       @relation("PurchaseRefundTx", fields: [refundTransactionId], references: [id], onDelete: SetNull)
   paymentAttempts                  EsimPurchasePaymentAttempt[]
+  promoCode                        PromoCode?               @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  promoRedemption                  PromoCodeRedemption?
 
   @@index([customerUserId])
+  @@index([promoCodeId])
   @@index([adminUserId])
   @@index([status])
   @@index([createdAt])
@@ -1141,4 +1162,85 @@ model RefundRequest {
   @@index([createdAt])
   @@index([customerUserId, createdAt])
   @@index([status, createdAt])
+}
+
+/// Admin-managed customer checkout promo. Code is stored normalized (uppercase).
+model PromoCode {
+  id                     String              @id @default(cuid())
+  /// Unique normalized code, e.g. SUMMER20
+  code                   String              @unique
+  description            String?
+  discountType           PromoDiscountType
+  /// PERCENT: 1–100. FIXED_USD: integer USD cents > 0.
+  discountValue          Int
+  isActive               Boolean             @default(true)
+  startsAt               DateTime?
+  endsAt                 DateTime?
+  totalUsageLimit        Int?
+  perCustomerUsageLimit  Int?
+  minimumOrderCents      Int?
+  firstOrderOnly         Boolean             @default(false)
+  usageCount             Int                 @default(0)
+  createdByAdminId       String?
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  createdByAdmin         User?               @relation("PromoCodeCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: SetNull)
+  destinations           PromoCodeDestination[]
+  offers                 PromoCodeOffer[]
+  redemptions            PromoCodeRedemption[]
+  purchases              WalletEsimPurchase[]
+
+  @@index([isActive])
+  @@index([startsAt])
+  @@index([endsAt])
+  @@index([createdAt])
+}
+
+model PromoCodeDestination {
+  id               String    @id @default(cuid())
+  promoCodeId      String
+  /// Authoritative destination code (ISO-2, region-*, or global).
+  destinationCode  String
+  promoCode        PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+
+  @@unique([promoCodeId, destinationCode])
+  @@index([destinationCode])
+}
+
+model PromoCodeOffer {
+  id          String    @id @default(cuid())
+  promoCodeId String
+  offerId     String
+  promoCode   PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+
+  @@unique([promoCodeId, offerId])
+  @@index([offerId])
+}
+
+/// Durable promo usage. Created only at funded/reserved stage — never on apply-preview.
+model PromoCodeRedemption {
+  id                   String                 @id @default(cuid())
+  promoCodeId          String
+  customerUserId       String
+  walletEsimPurchaseId String                 @unique
+  orderId              String?
+  status               PromoRedemptionStatus  @default(HELD)
+  promoCodeNormalized  String
+  discountType         PromoDiscountType
+  discountValue        Int
+  originalPriceCents   Int
+  discountCents        Int
+  finalPriceCents      Int
+  createdAt            DateTime               @default(now())
+  completedAt          DateTime?
+  promoCode            PromoCode              @relation(fields: [promoCodeId], references: [id], onDelete: Restrict)
+  customer             User                   @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+  purchase             WalletEsimPurchase     @relation(fields: [walletEsimPurchaseId], references: [id], onDelete: Cascade)
+  order                Order?                 @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([promoCodeId])
+  @@index([customerUserId])
+  @@index([status])
+  @@index([promoCodeId, customerUserId, status])
+  @@index([createdAt])
 }

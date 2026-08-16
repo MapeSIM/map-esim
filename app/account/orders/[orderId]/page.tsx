@@ -192,6 +192,18 @@ export default async function AccountOrderDetailPage({
         <DetailRow label="Validity" value={detail.validity} />
         <DetailRow label="Status" value={detail.statusLabel} />
         <DetailRow label="Amount" value={detail.amountLabel} />
+        {detail.promoCode ? (
+          <DetailRow label="Promo code" value={detail.promoCode} />
+        ) : null}
+        {detail.originalAmountLabel ? (
+          <DetailRow label="Original" value={detail.originalAmountLabel} />
+        ) : null}
+        {detail.discountAmountLabel ? (
+          <DetailRow label="Discount" value={`−${detail.discountAmountLabel}`} />
+        ) : null}
+        {detail.finalAmountLabel ? (
+          <DetailRow label="Package total" value={detail.finalAmountLabel} />
+        ) : null}
         <DetailRow label="Currency" value={detail.currencyLabel} />
         <DetailRow label="Purchased" value={detail.createdAtLabel} />
         <DetailRow label="Order reference" value={detail.shortReference} />

@@ -24,6 +24,7 @@ import {
 } from "@/app/lib/esim/walletPurchaseFormState";
 import type { WalletPurchaseReview } from "@/app/lib/esim/walletPurchaseRead";
 import { formatUsdCents } from "@/app/lib/wallet/display";
+import CheckoutPromoCodeSection from "@/app/components/account/CheckoutPromoCodeSection";
 
 type Props = {
   review: WalletPurchaseReview;
@@ -37,9 +38,17 @@ function previewPurchaseFunding(
   review: WalletPurchaseReview,
   useWallet: boolean
 ): PurchaseFundingBreakdown {
+  const payableCents = Math.trunc(Number(review.payableCents ?? review.priceCents));
   try {
+    if (payableCents === 0) {
+      return {
+        useWallet,
+        walletAppliedCents: 0,
+        gatewayAmountCents: 0,
+      };
+    }
     return calculatePurchaseFunding({
-      priceCents: review.priceCents,
+      priceCents: payableCents,
       walletBalanceCents: review.balanceCents,
       useWallet,
     });
@@ -54,7 +63,7 @@ function previewPurchaseFunding(
     }
     // Toggle ahead of a persisted refresh: coerce display cents only.
     // Submit always re-validates with server balance/price.
-    const priceCents = Math.trunc(Number(review.priceCents));
+    const priceCents = payableCents;
     const balanceCents = Math.max(0, Math.trunc(Number(review.balanceCents)));
     if (
       !Number.isFinite(priceCents) ||
@@ -208,6 +217,16 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         </p>
       </section>
 
+      <CheckoutPromoCodeSection
+        purchaseId={review.purchaseId}
+        applied={review.promoApplied}
+        code={review.promoCode}
+        originalCents={review.priceCents}
+        discountCents={review.promoDiscountCents}
+        totalCents={review.payableCents}
+        disabled={busy}
+      />
+
       <section
         className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 sm:px-5"
         aria-labelledby={walletHeadingId}
@@ -256,7 +275,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               Package total
             </dt>
             <dd className="font-semibold text-[var(--heading)]">
-              {formatUsdCents(review.priceCents)}
+              {formatUsdCents(review.payableCents)}
             </dd>
           </div>
           <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[180px_1fr]">

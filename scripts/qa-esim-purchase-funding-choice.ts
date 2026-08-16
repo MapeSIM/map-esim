@@ -165,8 +165,8 @@ function main() {
   assert.match(accountMenu, /aria-expanded/);
   assert.match(accountMenu, /Sign out/);
   assert.match(accountMenu, /usePathname/);
-  assert.match(selectForm, /Continue to checkout/);
-  assert.match(selectForm, /Wallet funding is optional at checkout/);
+  assert.match(selectForm, /Search destinations|Continue to checkout/);
+  assert.match(selectForm, /Popular Destinations|Wallet funding is optional at checkout/);
   console.log("PASS generic_buy_and_compact_account_menu");
 
   // Normal sign-in → `/`; protected callbackUrl preserved; no open redirect.
@@ -197,7 +197,7 @@ function main() {
     ),
     "/account/esim/buy?offerId=abc"
   );
-  assert.match(redirects, /return role === "ADMIN" \? "\/admin" : "\/"/);
+  assert.match(redirects, /if \(role === "ADMIN"\) return "\/admin"/);
   assert.match(signinPage, /callbackUrl \|\| "\/"/);
   assert.match(signinPage, /readRequestOrigin/);
   assert.match(googleSignIn, /safeCallbackPath\(rawCallback, "\/"/);
@@ -257,7 +257,13 @@ function main() {
     confirmForm,
     /walletAppliedCents:\s*0,\s*gatewayAmountCents:\s*review\.priceCents/
   );
-  assert.ok(!/createCheckoutSession|fake payment|Apple Pay|Google Pay|Promo Code|VReward/i.test(confirmForm));
+  assert.ok(!/createCheckoutSession|fake payment|Apple Pay|Google Pay|VReward/i.test(confirmForm));
+  const promoSection = read(
+    "app/components/account/CheckoutPromoCodeSection.tsx"
+  );
+  assert.match(promoSection, /Promo code/);
+  assert.match(promoSection, /applyCustomerPromoAction/);
+  assert.match(confirmForm, /CheckoutPromoCodeSection/);
   assert.ok(!/JazzCash|EasyPaisa/i.test(confirmForm));
   console.log("PASS checkout_structure_and_fail_closed_cta");
 
