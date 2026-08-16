@@ -310,13 +310,24 @@ async function main() {
       path.join(root, "app/lib/partner/partnerOrders.ts"),
       "utf8"
     );
+    const cardSrc = readFileSync(
+      path.join(root, "app/components/partner/PartnerEsimOrderCard.tsx"),
+      "utf8"
+    );
+    const installSrc = readFileSync(
+      path.join(root, "app/components/partner/PartnerEsimInstallPanel.tsx"),
+      "utf8"
+    );
     assert.doesNotMatch(listPageSrc, /IccidRevealPanel|Show full ICCID/);
-    assert.match(listPageSrc, /\/partner\/orders\/\$\{encodeURIComponent/);
-    assert.doesNotMatch(ordersLibSrc, /decryptIccid/);
-    assert.match(detailPageSrc, /IccidRevealPanel/);
     assert.match(
-      detailPageSrc,
-      /\/api\/partner\/orders\/\$\{encodeURIComponent\(detail\.orderId\)\}\/iccid/
+      cardSrc,
+      /\/api\/partner\/orders\/\$\{encodeURIComponent\(row\.orderId\)\}\/usage/
+    );
+    assert.doesNotMatch(ordersLibSrc, /decryptIccid/);
+    assert.match(detailPageSrc, /PartnerEsimOrderCard/);
+    assert.match(
+      installSrc,
+      /\/api\/partner\/orders\/\$\{encodeURIComponent\(orderId\)\}\/iccid/
     );
     for (const blob of [
       JSON.stringify(listA2),

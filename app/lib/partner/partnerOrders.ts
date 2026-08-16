@@ -44,6 +44,7 @@ function partnerIccidMasked(
 }
 
 export type PartnerOrderListRow = {
+  purchaseId: string;
   orderId: string;
   shortReference: string;
   destination: string;
@@ -179,6 +180,7 @@ export async function listPartnerOrdersPage(
       row.order
     ) {
       orders.push({
+        purchaseId: row.id,
         orderId: row.order.id,
         shortReference: shortPartnerOrderReference(row.order.id),
         destination,

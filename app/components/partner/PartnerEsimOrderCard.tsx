@@ -5,6 +5,9 @@ import Image from "next/image";
 import { Signal } from "lucide-react";
 import CustomerEsimUsagePanel from "@/app/components/orders/CustomerEsimUsagePanel";
 import PartnerEsimInstallPanel from "@/app/components/partner/PartnerEsimInstallPanel";
+import PartnerRefundRequestControls, {
+  type PartnerRefundRequestCardState,
+} from "@/app/components/partner/PartnerRefundRequestControls";
 import type { PartnerOrderListRow } from "@/app/lib/partner/partnerOrders";
 import {
   PARTNER_ESIM_READY_LABEL,
@@ -28,9 +31,10 @@ function statusBadgeClass(status: PartnerOrderStatusBadge): string {
 
 type Props = {
   row: PartnerOrderListRow;
+  refundRequest: PartnerRefundRequestCardState;
 };
 
-export default function PartnerEsimOrderCard({ row }: Props) {
+export default function PartnerEsimOrderCard({ row, refundRequest }: Props) {
   const [showUsage, setShowUsage] = useState(false);
   const completed = row.statusBadge === "Completed";
 
@@ -125,6 +129,12 @@ export default function PartnerEsimOrderCard({ row }: Props) {
             planName={row.planName}
             dataAllowance={row.dataAllowance}
             validity={row.validity}
+          />
+          <PartnerRefundRequestControls
+            purchaseId={row.purchaseId}
+            partnerDebitLabel={row.partnerDebitLabel}
+            alreadyRefunded={false}
+            existingRequest={refundRequest}
           />
         </div>
       ) : null}

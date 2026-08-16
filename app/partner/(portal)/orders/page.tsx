@@ -1,11 +1,16 @@
 import Link from "next/link";
 import PartnerEsimOrderCard from "@/app/components/partner/PartnerEsimOrderCard";
+import PartnerRefundRequestControls from "@/app/components/partner/PartnerRefundRequestControls";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   listPartnerOrdersPage,
   type PartnerAttentionRow,
 } from "@/app/lib/partner/partnerOrders";
 import type { PartnerOrderStatusBadge } from "@/app/lib/partner/partnerOrdersDisplay";
+import {
+  latestOpenPartnerRefundSummary,
+  listPartnerRefundRequestSummaries,
+} from "@/app/lib/partner/partnerRefundRequest";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +32,17 @@ function statusBadgeClass(status: PartnerOrderStatusBadge): string {
   }
 }
 
-function AttentionCard({ row }: { row: PartnerAttentionRow }) {
+function AttentionCard({
+  row,
+  refundRequest,
+}: {
+  row: PartnerAttentionRow;
+  refundRequest: {
+    statusLabel: string;
+    reasonLabel: string;
+    createdAtLabel: string;
+  } | null;
+}) {
   return (
     <li className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -65,6 +80,14 @@ function AttentionCard({ row }: { row: PartnerAttentionRow }) {
           <dd className="inline text-[var(--heading)]">{row.purchasedAtLabel}</dd>
         </div>
       </dl>
+      <div className="mt-3">
+        <PartnerRefundRequestControls
+          purchaseId={row.purchaseId}
+          partnerDebitLabel={row.partnerDebitLabel}
+          alreadyRefunded={row.statusBadge === "Failed — balance returned"}
+          existingRequest={refundRequest}
+        />
+      </div>
     </li>
   );
 }
@@ -86,6 +109,37 @@ export default async function PartnerOrdersPage() {
         </p>
       </div>
     );
+  }
+
+  let refundByPurchase = new Map<
+    string,
+    { statusLabel: string; reasonLabel: string; createdAtLabel: string }
+  >();
+  if (data) {
+    const purchaseIds = [
+      ...data.orders.map((row) => row.purchaseId),
+      ...data.attention.map((row) => row.purchaseId),
+    ];
+    try {
+      const summaries = await listPartnerRefundRequestSummaries({
+        partnerUserId: user.id,
+        purchaseIds,
+      });
+      for (const purchaseId of purchaseIds) {
+        const open = latestOpenPartnerRefundSummary(
+          summaries.filter((row) => row.purchaseId === purchaseId)
+        );
+        if (open) {
+          refundByPurchase.set(purchaseId, {
+            statusLabel: open.statusLabel,
+            reasonLabel: open.reasonLabel,
+            createdAtLabel: open.createdAtLabel,
+          });
+        }
+      }
+    } catch {
+      refundByPurchase = new Map();
+    }
   }
 
   if (!data) {
@@ -121,7 +175,11 @@ export default async function PartnerOrdersPage() {
           </h2>
           <ul className="space-y-3">
             {data.attention.map((row) => (
-              <AttentionCard key={row.purchaseId} row={row} />
+              <AttentionCard
+                key={row.purchaseId}
+                row={row}
+                refundRequest={refundByPurchase.get(row.purchaseId) ?? null}
+              />
             ))}
           </ul>
         </section>
@@ -149,7 +207,10 @@ export default async function PartnerOrdersPage() {
           <ul className="space-y-3">
             {data.orders.map((row) => (
               <li key={row.orderId} className="min-w-0">
-                <PartnerEsimOrderCard row={row} />
+                <PartnerEsimOrderCard
+                  row={row}
+                  refundRequest={refundByPurchase.get(row.purchaseId) ?? null}
+                />
               </li>
             ))}
           </ul>

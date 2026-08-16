@@ -164,6 +164,14 @@ enum RefundRequestReason {
   OTHER
 }
 
+/// Partner-initiated refund request reasons (separate from customer RefundRequestReason).
+enum PartnerRefundRequestReason {
+  ESIM_NOT_RECEIVED
+  INSTALL_DETAILS_UNAVAILABLE
+  PROVIDER_OR_ORDER_ISSUE
+  OTHER
+}
+
 /// Allowlisted runtime pause switches only (Admin Operations Part A2).
 /// Never stores secrets, arbitrary JSON, or customer data.
 enum OperationalControlKey {
@@ -281,6 +289,7 @@ model PartnerProfile {
   walletAccount   PartnerWalletAccount?
   esimPurchases   PartnerEsimPurchase[]
   esimShareTokens PartnerEsimShareToken[]
+  refundRequests  PartnerRefundRequest[]
 
   @@index([disabledAt])
   @@index([createdAt])
@@ -480,6 +489,7 @@ model Order {
   partnerEsimPurchase              PartnerEsimPurchase?
   partnerEsimShareTokens           PartnerEsimShareToken[]
   refundRequests                   RefundRequest[]
+  partnerRefundRequests            PartnerRefundRequest[]
 
   @@index([customerEmail])
   @@index([userId])
@@ -736,6 +746,7 @@ model PartnerEsimPurchase {
   order                            Order?                    @relation(fields: [orderId], references: [id], onDelete: SetNull)
   debitTransaction                 PartnerWalletTransaction? @relation("PartnerPurchaseDebitTx", fields: [debitTransactionId], references: [id], onDelete: SetNull)
   refundTransaction                PartnerWalletTransaction? @relation("PartnerPurchaseRefundTx", fields: [refundTransactionId], references: [id], onDelete: SetNull)
+  refundRequests                   PartnerRefundRequest[]
 
   @@index([partnerId])
   @@index([status])
@@ -768,6 +779,43 @@ model PartnerEsimShareToken {
   @@index([partnerId])
   @@index([orderId])
   @@index([revokedAt])
+}
+
+/// Partner-initiated refund REQUEST only. Slice 1 never credits a wallet or calls the provider.
+model PartnerRefundRequest {
+  id                          String                      @id @default(cuid())
+  partnerId                   String
+  partnerEsimPurchaseId       String
+  orderId                     String?
+  reason                      PartnerRefundRequestReason
+  /// Optional short Partner explanation (never a refund amount).
+  partnerNote                 String?
+  status                      RefundRequestStatus         @default(REQUESTED)
+  /// Immutable Partner debit snapshot — the only refund basis.
+  partnerChargeCents          Int
+  /// Display snapshot only — never used as the refund amount.
+  retailPriceCents            Int
+  currency                    String                      @default("USD")
+  /// Equals partnerEsimPurchaseId while open; null when terminal — at most one open request per purchase.
+  openPurchaseKey             String?                     @unique
+  adminDecisionNote           String?
+  /// Future execution link only. Slice 1 never sets this.
+  executedRefundTransactionId String?
+  reviewedAt                  DateTime?
+  completedAt                 DateTime?
+  createdAt                   DateTime                    @default(now())
+  updatedAt                   DateTime                    @updatedAt
+  partner                     PartnerProfile              @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  purchase                    PartnerEsimPurchase         @relation(fields: [partnerEsimPurchaseId], references: [id], onDelete: Cascade)
+  order                       Order?                      @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([partnerId])
+  @@index([partnerEsimPurchaseId])
+  @@index([orderId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([partnerId, createdAt])
+  @@index([status, createdAt])
 }
 
 /// Gateway remainder payment attempt for a WalletEsimPurchase (not WalletTopup).
