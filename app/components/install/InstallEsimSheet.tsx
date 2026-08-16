@@ -106,21 +106,20 @@ export default function InstallEsimSheet({
               activationCode={activationCode}
               lpa={lpa}
             />
-            {eligibleIphone ? (
+            <div className="grid gap-2 sm:grid-cols-2">
               <Link
                 href={iphoneGuideHref}
                 className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--page-bg-soft)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
               >
-                Installation Guide
+                iPhone Guide
               </Link>
-            ) : (
               <Link
                 href={androidGuideHref}
                 className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--page-bg-soft)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
               >
                 Android Guide
               </Link>
-            )}
+            </div>
           </div>
         </div>
       </EsimActionSheet>

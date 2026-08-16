@@ -7,6 +7,7 @@ import AppleOneTapInstallButton, {
   AppleOneTapSafariGuidance,
   useAppleOneTapInstallState,
 } from "@/app/components/install/AppleOneTapInstallButton";
+import EsimActionSheet from "@/app/components/install/EsimActionSheet";
 import InstallEsimSheet from "@/app/components/install/InstallEsimSheet";
 import ManualInstallSheet from "@/app/components/install/ManualInstallSheet";
 import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
@@ -47,6 +48,7 @@ export default function PartnerEsimInstallPanel({
   companyName,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<InstallPayload | null>(null);
@@ -218,17 +220,34 @@ export default function PartnerEsimInstallPanel({
               activationCode={data?.activationCode}
               lpa={data?.lpa}
             />
-            <Link
-              href={
-                eligibleIphone
-                  ? data?.iphoneGuideHref || "/install/iphone"
-                  : data?.androidGuideHref || "/install/android"
-              }
+            <button
+              type="button"
+              onClick={() => setGuideOpen(true)}
               className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--page-bg-soft)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
             >
               Installation Guide
-            </Link>
+            </button>
           </div>
+          <EsimActionSheet
+            open={guideOpen}
+            title="Installation Guide"
+            onClose={() => setGuideOpen(false)}
+          >
+            <div className="flex flex-col gap-2">
+              <Link
+                href={data?.iphoneGuideHref || "/install/iphone"}
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--surface-2)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+              >
+                iPhone Guide
+              </Link>
+              <Link
+                href={data?.androidGuideHref || "/install/android"}
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--page-bg-soft)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+              >
+                Android Guide
+              </Link>
+            </div>
+          </EsimActionSheet>
         </div>
       </div>
     </div>
