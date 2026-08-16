@@ -36,7 +36,10 @@ type Props = {
   iccidMasked: string;
   iccidRevealable: boolean;
   hasActiveShareToken: boolean;
-  companyName: string | null;
+  destination: string | null;
+  planName: string | null;
+  dataAllowance: string | null;
+  validity: string | null;
 };
 
 export default function PartnerEsimInstallPanel({
@@ -45,7 +48,10 @@ export default function PartnerEsimInstallPanel({
   iccidMasked,
   iccidRevealable,
   hasActiveShareToken,
-  companyName,
+  destination,
+  planName,
+  dataAllowance,
+  validity,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -201,7 +207,10 @@ export default function PartnerEsimInstallPanel({
           <PartnerEsimShareControls
             orderId={orderId}
             hasActiveToken={hasActiveShareToken}
-            companyName={companyName}
+            destination={destination}
+            planName={planName}
+            dataAllowance={dataAllowance}
+            validity={validity}
             compact
           />
 

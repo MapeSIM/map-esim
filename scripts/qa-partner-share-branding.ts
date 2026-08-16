@@ -61,6 +61,7 @@ import {
   buildPartnerShareWhatsAppText,
   buildPartnerWebSharePayload,
   buildPartnerWhatsAppShareHref,
+  countShareUrlOccurrences,
 } from "../app/lib/partner/partnerShareCopy";
 import {
   buildNextConfigHeaderSources,
@@ -269,6 +270,15 @@ async function main() {
   assert.match(validateSrc, /SHARE_HEX_RE/);
   assert.match(validateSrc, /https:/);
   assert.match(copySrc, /wa\.me\/\?text=/);
+  assert.match(copySrc, /Here are the eSIM QR details for/);
+  assert.match(copySrc, /countShareUrlOccurrences/);
+  assert.doesNotMatch(copySrc, /has shared your eSIM details securely/);
+  assert.doesNotMatch(copySrc, /Here are your eSIM details for/);
+  assert.doesNotMatch(copySrc, / — /);
+  assert.match(controlsSrc, /destination/);
+  assert.match(controlsSrc, /planName/);
+  assert.match(controlsSrc, /dataAllowance/);
+  assert.match(controlsSrc, /validity/);
   assert.match(controlsSrc, /Regenerate Share Link/);
   assert.match(controlsSrc, /Create Share Link/);
   assert.match(controlsSrc, /Revoke Share Link/);
@@ -451,27 +461,72 @@ async function main() {
 
   const shareUrl = buildAbsoluteShareUrl(
     "/share/abcdefghijklmnopqrstuvwxyz0123456789ABCDE",
-    "http://127.0.0.1:3005"
+    "https://mapesim.com"
   );
   assert.equal(
     shareUrl,
-    "http://127.0.0.1:3005/share/abcdefghijklmnopqrstuvwxyz0123456789ABCDE"
+    "https://mapesim.com/share/abcdefghijklmnopqrstuvwxyz0123456789ABCDE"
   );
   assertSafeSharePayload(shareUrl);
-  const waText = buildPartnerShareWhatsAppText({
+  const pakistanFields = {
     shareUrl,
-    companyName: "Travel Co",
-  });
-  assert.match(waText, /Travel Co has shared your eSIM details securely via MAP eSIM/);
-  assert.equal(waText.includes(shareUrl), true);
-  assert.doesNotMatch(waText, /iccid|LPA:|smdp|wallet|discount/i);
-  const waHref = buildPartnerWhatsAppShareHref({ shareUrl, companyName: "Travel Co" });
+    destination: "Pakistan",
+    planName: "100MB 7Days",
+    dataAllowance: "102 MB",
+    validity: "7 Days",
+  };
+  const waText = buildPartnerShareWhatsAppText(pakistanFields);
+  assert.equal(
+    waText,
+    `Here are the eSIM QR details for Pakistan 100MB 7Days (102 MB, 7 Days):\n${shareUrl}`
+  );
+  assert.equal(countShareUrlOccurrences(waText, shareUrl), 1);
+  assert.doesNotMatch(waText, /—/);
+  assert.doesNotMatch(waText, /iccid|LPA:|smdp|wallet|discount|activation code|provider|undefined|null/i);
+  const waHref = buildPartnerWhatsAppShareHref(pakistanFields);
   assert.match(waHref, /^https:\/\/wa\.me\/\?text=/);
-  const web = buildPartnerWebSharePayload({ shareUrl, companyName: "Travel Co" });
+  const decodedWa = decodeURIComponent(new URL(waHref).searchParams.get("text") || "");
+  assert.equal(decodedWa, waText);
+  assert.equal(countShareUrlOccurrences(decodedWa, shareUrl), 1);
+  const web = buildPartnerWebSharePayload(pakistanFields);
   assert.equal(web.url, shareUrl);
+  assert.equal(
+    web.text,
+    "Here are the eSIM QR details for Pakistan 100MB 7Days (102 MB, 7 Days):"
+  );
+  assert.equal(web.text.includes(shareUrl), false);
+  assert.equal(countShareUrlOccurrences(`${web.text}\n${web.url}`, shareUrl), 1);
   assertSafeSharePayload(web.text);
   assertSafeSharePayload(web.title);
+  assertSafeSharePayload(web.url);
   assert.doesNotMatch(web.text, /iccid|LPA:|smdp|wallet|discount|activation code/i);
+
+  const omitted = buildPartnerShareWhatsAppText({
+    shareUrl,
+    destination: "Pakistan",
+    planName: "Not available",
+    dataAllowance: null,
+    validity: "undefined",
+  });
+  assert.equal(omitted, `Here are the eSIM QR details for Pakistan:\n${shareUrl}`);
+  assert.doesNotMatch(omitted, /Not available|undefined|null/);
+  assert.equal(countShareUrlOccurrences(omitted, shareUrl), 1);
+
+  const fallback = buildPartnerShareWhatsAppText({ shareUrl });
+  assert.equal(fallback, `Here are the eSIM QR details:\n${shareUrl}`);
+
+  const strippedSecrets = buildPartnerShareWhatsAppText({
+    shareUrl,
+    destination: "Pakistan",
+    planName: SAMPLE_ICCID,
+    dataAllowance: QA_LPA,
+    validity: "7 Days",
+  });
+  assert.equal(
+    strippedSecrets,
+    `Here are the eSIM QR details for Pakistan (7 Days):\n${shareUrl}`
+  );
+  assert.doesNotMatch(strippedSecrets, /8900000000000000777|LPA:|iccid/i);
   console.log("PASS P_Q_R_copy_whatsapp_webshare_payloads");
 
   assert.equal(sharePoweredByLabel("Rana Travel"), "Powered by Rana Travel");

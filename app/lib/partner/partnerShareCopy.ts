@@ -1,7 +1,59 @@
 /**
- * Safe Partner share-control copy. Never includes ICCID, QR, LPA, wallet,
- * discount, or payment data.
+ * Safe Partner share-control copy. Never includes ICCID, LPA, SM-DP+,
+ * activation codes, wallet, discount, or payment data.
  */
+
+export type PartnerSharePackageFields = {
+  destination?: string | null;
+  planName?: string | null;
+  dataAllowance?: string | null;
+  validity?: string | null;
+};
+
+export type PartnerShareCopyInput = PartnerSharePackageFields & {
+  shareUrl: string;
+};
+
+const OMITTED_FIELD =
+  /^(not available|n\/a|null|undefined|none|—|-|\.)$/i;
+
+function sanitizeShareField(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim().replace(/\s+/g, " ");
+  if (!trimmed || OMITTED_FIELD.test(trimmed)) return null;
+  if (trimmed.length > 80) return null;
+  if (/https?:\/\//i.test(trimmed) || /\/share\//i.test(trimmed)) return null;
+  const compact = trimmed.replace(/\s+/g, "");
+  if (/^\d{15,22}$/.test(compact)) return null;
+  const lower = trimmed.toLowerCase();
+  if (
+    lower.includes("iccid") ||
+    lower.includes("lpa:") ||
+    lower.includes("smdp") ||
+    lower.includes("activation code") ||
+    lower.includes("wallet") ||
+    lower.includes("discount") ||
+    lower.includes("provider")
+  ) {
+    return null;
+  }
+  return trimmed;
+}
+
+export function buildPartnerSharePackageLabel(
+  input: PartnerSharePackageFields
+): string | null {
+  const destination = sanitizeShareField(input.destination);
+  const planName = sanitizeShareField(input.planName);
+  const dataAllowance = sanitizeShareField(input.dataAllowance);
+  const validity = sanitizeShareField(input.validity);
+  const title = [destination, planName].filter(Boolean).join(" ");
+  const spec = [dataAllowance, validity].filter(Boolean).join(", ");
+  if (title && spec) return `${title} (${spec})`;
+  if (title) return title;
+  if (spec) return `(${spec})`;
+  return null;
+}
 
 export function buildAbsoluteShareUrl(sharePath: string, origin: string): string {
   const path = (sharePath ?? "").trim();
@@ -18,37 +70,74 @@ export function buildAbsoluteShareUrl(sharePath: string, origin: string): string
   return `${cleanOrigin}${path}`;
 }
 
-export function buildPartnerShareWhatsAppText(input: {
-  shareUrl: string;
-  companyName?: string | null;
-}): string {
-  const shareUrl = (input.shareUrl ?? "").trim();
-  const company = (input.companyName ?? "").trim();
-  if (company) {
-    return `${company} has shared your eSIM details securely via MAP eSIM.\n${shareUrl}`;
+export function countShareUrlOccurrences(haystack: string, shareUrl: string): number {
+  const url = (shareUrl ?? "").trim();
+  if (!url) return 0;
+  let count = 0;
+  let from = 0;
+  while (from <= haystack.length) {
+    const at = haystack.indexOf(url, from);
+    if (at === -1) break;
+    count += 1;
+    from = at + url.length;
   }
-  return `Your MAP eSIM is ready.\nOpen your secure eSIM details:\n${shareUrl}`;
+  return count;
 }
 
-export function buildPartnerWhatsAppShareHref(input: {
-  shareUrl: string;
-  companyName?: string | null;
-}): string {
+function shareIntroLine(input: PartnerSharePackageFields): string {
+  const destination = sanitizeShareField(input.destination);
+  const planName = sanitizeShareField(input.planName);
+  const dataAllowance = sanitizeShareField(input.dataAllowance);
+  const validity = sanitizeShareField(input.validity);
+  const title = [destination, planName].filter(Boolean).join(" ");
+  const spec = [dataAllowance, validity].filter(Boolean).join(", ");
+  if (title && spec) {
+    return `Here are the eSIM QR details for ${title} (${spec}):`;
+  }
+  if (title) return `Here are the eSIM QR details for ${title}:`;
+  if (spec) return `Here are the eSIM QR details (${spec}):`;
+  return "Here are the eSIM QR details:";
+}
+
+export function buildPartnerShareWhatsAppText(
+  input: PartnerShareCopyInput
+): string {
+  const shareUrl = (input.shareUrl ?? "").trim();
+  const text = `${shareIntroLine(input)}\n${shareUrl}`;
+  if (countShareUrlOccurrences(text, shareUrl) !== 1) {
+    throw new Error("share_payload_url_count");
+  }
+  assertSafeSharePayload(text);
+  return text;
+}
+
+export function buildPartnerWhatsAppShareHref(
+  input: PartnerShareCopyInput
+): string {
   return `https://wa.me/?text=${encodeURIComponent(
     buildPartnerShareWhatsAppText(input)
   )}`;
 }
 
-export function buildPartnerWebSharePayload(input: {
-  shareUrl: string;
-  companyName?: string | null;
-}): { title: string; text: string; url: string } {
-  const company = (input.companyName ?? "").trim();
-  return {
-    title: company ? `${company} eSIM details` : "Your MAP eSIM is ready",
-    text: buildPartnerShareWhatsAppText(input),
-    url: input.shareUrl,
+export function buildPartnerWebSharePayload(input: PartnerShareCopyInput): {
+  title: string;
+  text: string;
+  url: string;
+} {
+  const shareUrl = (input.shareUrl ?? "").trim();
+  const text = shareIntroLine(input);
+  const payload = {
+    title: "Your eSIM details",
+    text,
+    url: shareUrl,
   };
+  if (countShareUrlOccurrences(`${payload.text}\n${payload.url}`, shareUrl) !== 1) {
+    throw new Error("share_payload_url_count");
+  }
+  assertSafeSharePayload(payload.title);
+  assertSafeSharePayload(payload.text);
+  assertSafeSharePayload(payload.url);
+  return payload;
 }
 
 export function assertSafeSharePayload(value: string): void {
@@ -63,5 +152,8 @@ export function assertSafeSharePayload(value: string): void {
     lower.includes("provider")
   ) {
     throw new Error("share_payload_contains_sensitive_data");
+  }
+  if (/\bundefined\b|\bnull\b/i.test(value)) {
+    throw new Error("share_payload_contains_placeholder");
   }
 }

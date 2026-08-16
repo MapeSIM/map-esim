@@ -4,7 +4,6 @@ import PartnerEsimOrderCard from "@/app/components/partner/PartnerEsimOrderCard"
 import { requireRole } from "@/app/lib/auth/session";
 import { hasActivePartnerEsimShareToken } from "@/app/lib/partner/partnerEsimShareToken";
 import { getPartnerOwnedOrderDetail } from "@/app/lib/partner/partnerOrders";
-import { getPartnerShareBranding } from "@/app/lib/partner/partnerShareBranding";
 
 export const dynamic = "force-dynamic";
 
@@ -44,16 +43,10 @@ export default async function PartnerOrderDetailPage({
     notFound();
   }
 
-  const [hasActiveToken, brandingResult] = await Promise.all([
-    hasActivePartnerEsimShareToken({
-      partnerUserId: user.id,
-      orderId: detail.orderId,
-    }),
-    getPartnerShareBranding(user.id),
-  ]);
-  const companyName = brandingResult.ok
-    ? brandingResult.branding.companyName
-    : null;
+  const hasActiveToken = await hasActivePartnerEsimShareToken({
+    partnerUserId: user.id,
+    orderId: detail.orderId,
+  });
 
   return (
     <div className="min-w-0 space-y-6">
@@ -80,7 +73,6 @@ export default async function PartnerOrderDetailPage({
           iccidRevealable: detail.iccidRevealable,
           hasActiveShareToken: hasActiveToken,
         }}
-        companyName={companyName}
       />
     </div>
   );

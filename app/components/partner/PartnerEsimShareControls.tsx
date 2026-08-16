@@ -16,14 +16,20 @@ import {
 type Props = {
   orderId: string;
   hasActiveToken: boolean;
-  companyName: string | null;
+  destination: string | null;
+  planName: string | null;
+  dataAllowance: string | null;
+  validity: string | null;
   compact?: boolean;
 };
 
 export default function PartnerEsimShareControls({
   orderId,
   hasActiveToken,
-  companyName,
+  destination,
+  planName,
+  dataAllowance,
+  validity,
   compact = false,
 }: Props) {
   const [active, setActive] = useState(hasActiveToken);
@@ -106,7 +112,10 @@ export default function PartnerEsimShareControls({
     if (!url) return;
     const payload = buildPartnerWebSharePayload({
       shareUrl: url,
-      companyName,
+      destination,
+      planName,
+      dataAllowance,
+      validity,
     });
     try {
       assertSafeSharePayload(payload.text);
@@ -131,8 +140,14 @@ export default function PartnerEsimShareControls({
   }
 
   const shareUrl = currentShareUrl();
+  const packageFields = {
+    destination,
+    planName,
+    dataAllowance,
+    validity,
+  };
   const whatsappHref = shareUrl
-    ? buildPartnerWhatsAppShareHref({ shareUrl, companyName })
+    ? buildPartnerWhatsAppShareHref({ shareUrl, ...packageFields })
     : null;
 
   const body = (

@@ -28,10 +28,9 @@ function statusBadgeClass(status: PartnerOrderStatusBadge): string {
 
 type Props = {
   row: PartnerOrderListRow;
-  companyName: string | null;
 };
 
-export default function PartnerEsimOrderCard({ row, companyName }: Props) {
+export default function PartnerEsimOrderCard({ row }: Props) {
   const [showUsage, setShowUsage] = useState(false);
   const completed = row.statusBadge === "Completed";
 
@@ -122,7 +121,10 @@ export default function PartnerEsimOrderCard({ row, companyName }: Props) {
             iccidMasked={row.iccidMasked}
             iccidRevealable={row.iccidRevealable}
             hasActiveShareToken={row.hasActiveShareToken}
-            companyName={companyName}
+            destination={row.destination}
+            planName={row.planName}
+            dataAllowance={row.dataAllowance}
+            validity={row.validity}
           />
         </div>
       ) : null}

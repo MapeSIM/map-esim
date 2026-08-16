@@ -6,7 +6,6 @@ import {
   type PartnerAttentionRow,
 } from "@/app/lib/partner/partnerOrders";
 import type { PartnerOrderStatusBadge } from "@/app/lib/partner/partnerOrdersDisplay";
-import { getPartnerShareBranding } from "@/app/lib/partner/partnerShareBranding";
 
 export const dynamic = "force-dynamic";
 
@@ -102,9 +101,6 @@ export default async function PartnerOrdersPage() {
     );
   }
 
-  const branding = await getPartnerShareBranding(user.id);
-  const companyName = branding.ok ? branding.branding.companyName : null;
-
   return (
     <div className="min-w-0 space-y-8">
       <header>
@@ -153,7 +149,7 @@ export default async function PartnerOrdersPage() {
           <ul className="space-y-3">
             {data.orders.map((row) => (
               <li key={row.orderId} className="min-w-0">
-                <PartnerEsimOrderCard row={row} companyName={companyName} />
+                <PartnerEsimOrderCard row={row} />
               </li>
             ))}
           </ul>
