@@ -106,6 +106,7 @@
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
     "@prisma/client": "^6.19.3",
+    "@vercel/blob": "^2.8.0",
     "bcryptjs": "^3.0.3",
     "lucide-react": "^1.28.0",
     "next": "16.2.10",

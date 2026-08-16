@@ -29,8 +29,20 @@ import {
   parsePartnerShareBrandingInput,
   PartnerShareBrandingError,
   publicShareBrandingDto,
+  publicShareLogoSrc,
   sharePoweredByLabel,
 } from "../app/lib/partner/partnerShareBrandingValidate";
+import {
+  isOwnedPartnerLogoBlobUrl,
+  PARTNER_LOGO_MAX_BYTES,
+} from "../app/lib/partner/partnerShareLogoBlob";
+import { preparePartnerLogoWebp } from "../app/lib/partner/partnerShareLogoImage";
+import {
+  removePartnerShareLogo,
+  uploadPartnerShareLogo,
+  type PartnerLogoBlobStore,
+} from "../app/lib/partner/partnerShareLogo";
+import sharp from "sharp";
 import {
   assertSafeSharePayload,
   buildAbsoluteShareUrl,
@@ -62,6 +74,44 @@ function assertLocalPhase3Db(url: string): void {
 
 function idem(tag: string): string {
   return `pep_sbrand_${tag}_${randomBytes(8).toString("hex")}`.slice(0, 128);
+}
+
+async function rasterBytes(
+  format: "png" | "jpeg" | "webp",
+  size = 16
+): Promise<Buffer> {
+  const image = sharp({
+    create: {
+      width: size,
+      height: size,
+      channels: 4,
+      background: { r: 16, g: 180, b: 40, alpha: 1 },
+    },
+  });
+  if (format === "png") return image.png().toBuffer();
+  if (format === "jpeg") return image.jpeg({ quality: 80 }).toBuffer();
+  return image.webp({ quality: 80 }).toBuffer();
+}
+
+function mockBlobStore(host = "map-esim-partner-logos.public.blob.vercel-storage.com") {
+  const events: string[] = [];
+  const puts: { pathname: string; url: string }[] = [];
+  const dels: string[] = [];
+  const store: PartnerLogoBlobStore = {
+    async put(input) {
+      events.push("put");
+      assert.equal(input.contentType, "image/webp");
+      assert.match(input.pathname, /^partner-logos\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.webp$/);
+      const url = `https://${host}/${input.pathname}`;
+      puts.push({ pathname: input.pathname, url });
+      return { url };
+    },
+    async del(url) {
+      events.push("del");
+      dels.push(url);
+    },
+  };
+  return { store, events, puts, dels };
 }
 
 function read(rel: string): string {
@@ -168,6 +218,9 @@ async function main() {
   const headersSrc = read("app/lib/security/headers.ts");
   const profileSrc = read("app/partner/(portal)/profile/page.tsx");
   const tokenSrc = read("app/lib/partner/partnerEsimShareToken.ts");
+  const logoSrc = read("app/lib/partner/partnerShareLogo.ts");
+  const logoBlobSrc = read("app/lib/partner/partnerShareLogoBlob.ts");
+  const logoImageSrc = read("app/lib/partner/partnerShareLogoImage.ts");
   const customerUsage = read("app/lib/orders/customerEsimUsage.ts");
   const customerInstall = read("app/lib/orders/customerOrderInstall.ts");
   const accountPage = read("app/account/page.tsx");
@@ -177,8 +230,19 @@ async function main() {
   assert.match(brandingSrc, /partner\.share_branding_updated/);
   assert.match(brandingSrc, /changedFields/);
   assert.doesNotMatch(brandingSrc, /logoContents|rawToken|iccid|providerCost|discountBps/);
+  assert.match(actionsSrc, /uploadPartnerShareLogoAction/);
+  assert.match(actionsSrc, /void formData\.get\(["']pathname["']\)/);
   assert.match(actionsSrc, /void formData\.get\(["']partnerId["']\)/);
   assert.match(actionsSrc, /user\.id/);
+  assert.match(logoSrc, /buildPartnerLogoBlobPathname\(actor\.partnerId/);
+  assert.doesNotMatch(logoSrc, /formData\.get\(["']pathname["']\)/);
+  assert.match(logoBlobSrc, /PARTNER_LOGO_BLOB_PREFIX/);
+  assert.match(logoImageSrc, /sharp/);
+  assert.match(logoImageSrc, /image\/webp/);
+  assert.doesNotMatch(logoSrc, /console\.(?:log|info|warn)\(/);
+  assert.doesNotMatch(actionsSrc, /BLOB_READ_WRITE_TOKEN/);
+  assert.match(logoBlobSrc, /BLOB_READ_WRITE_TOKEN/);
+  assert.match(logoSrc, /PARTNER_LOGO_BLOB_TOKEN_ENV/);
   assert.match(validateSrc, /SHARE_HEX_RE/);
   assert.match(validateSrc, /https:/);
   assert.match(copySrc, /wa\.me\/\?text=/);
@@ -194,7 +258,12 @@ async function main() {
   assert.match(controlsSrc, /navigator\.share/);
   assert.match(controlsSrc, /window\.location\.origin/);
   assert.match(formSrc, /Save Branding/);
-  assert.doesNotMatch(formSrc, /type=["']file["']/);
+  assert.match(formSrc, /Upload Logo/);
+  assert.match(formSrc, /Replace Logo/);
+  assert.match(formSrc, /Remove Logo/);
+  assert.match(formSrc, /PNG, JPG or WEBP\. Max 1 MB\./);
+  assert.match(formSrc, /type=["']file["']/);
+  assert.doesNotMatch(formSrc, /mapesim\.com\/brand\/your-logo/);
   assert.match(profileSrc, /PartnerShareBrandingForm/);
   assert.doesNotMatch(profileSrc, /Coming later/);
   assert.match(viewSrc, /Support|Visit website/);
@@ -216,7 +285,9 @@ async function main() {
   assert.doesNotMatch(customerInstall, /partnerShareBranding|shareCompanyName/);
   assert.doesNotMatch(accountPage, /shareCompanyName|PartnerShareBrandingForm/);
   assert.match(pkg, /"qa:partner-share-branding"/);
-  assert.doesNotMatch(pkg, /@vercel\/blob|@aws-sdk\/client-s3|cloudinary|uploadthing/);
+  assert.match(pkg, /"@vercel\/blob"/);
+  assert.doesNotMatch(pkg, /@aws-sdk\/client-s3|cloudinary|uploadthing/);
+  assert.match(headersSrc, /public\.blob\.vercel-storage\.com/);
   assert.match(linkSrc, /createPartnerEsimShareToken/);
   assert.match(linkSrc, /revokePartnerEsimShareToken/);
 
@@ -268,6 +339,18 @@ async function main() {
   assert.equal(
     publicShareBrandingDto(mapLogo).logoUrl,
     "/brand/map-esim-logo-dark.svg"
+  );
+  const blobLogoUrl =
+    "https://map-esim-partner-logos.public.blob.vercel-storage.com/partner-logos/partnerAid012345678901234567/abcd1234efgh5678.webp";
+  assert.equal(publicShareLogoSrc(blobLogoUrl), blobLogoUrl);
+  assert.equal(publicShareLogoSrc("https://cdn.example.com/logo.png"), null);
+  assert.equal(
+    isOwnedPartnerLogoBlobUrl(blobLogoUrl, "partnerAid012345678901234567"),
+    true
+  );
+  assert.equal(
+    isOwnedPartnerLogoBlobUrl(blobLogoUrl, "partnerBid012345678901234567"),
+    false
   );
 
   const shareUrl = buildAbsoluteShareUrl(
@@ -558,17 +641,224 @@ async function main() {
     assert.ok(newOk);
     console.log("PASS N_regenerate_invalidates_old");
 
+    const png = await rasterBytes("png");
+    const jpeg = await rasterBytes("jpeg");
+    const webp = await rasterBytes("webp");
+    const aStore = mockBlobStore();
+    const pngUp = await uploadPartnerShareLogo({
+      partnerUserId: partnerA.id,
+      bytes: png,
+      filename: "logo.png",
+      store: aStore.store,
+    });
+    assert.equal(pngUp.ok, true);
+    if (!pngUp.ok) throw new Error("png upload");
+    assert.match(pngUp.branding.logoUrl ?? "", /partner-logos\//);
+    assert.match(pngUp.branding.logoUrl ?? "", /\.webp/);
+    const prepared = await preparePartnerLogoWebp({ bytes: png, filename: "logo.png" });
+    assert.equal(prepared.ok, true);
+    if (prepared.ok) {
+      assert.equal(prepared.logo.contentType, "image/webp");
+      const outMeta = await sharp(prepared.logo.body).metadata();
+      assert.equal(outMeta.format, "webp");
+    }
+    console.log("PASS A_K_L_valid_png_reencoded_webp_saved");
+
+    const jpegUp = await uploadPartnerShareLogo({
+      partnerUserId: partnerA.id,
+      bytes: jpeg,
+      filename: "logo.jpg",
+      store: aStore.store,
+    });
+    assert.equal(jpegUp.ok, true);
+    const webpUp = await uploadPartnerShareLogo({
+      partnerUserId: partnerA.id,
+      bytes: webp,
+      filename: "logo.webp",
+      store: aStore.store,
+    });
+    assert.equal(webpUp.ok, true);
+    if (!webpUp.ok) throw new Error("webp upload");
+    console.log("PASS B_C_jpeg_webp_accepted");
+
+    const malformed = await uploadPartnerShareLogo({
+      partnerUserId: partnerA.id,
+      bytes: Buffer.from("not-an-image"),
+      filename: "logo.png",
+      store: aStore.store,
+    });
+    assert.equal(malformed.ok, false);
+    const svg = await uploadPartnerShareLogo({
+      partnerUserId: partnerA.id,
+      bytes: Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>'
+      ),
+      filename: "logo.svg",
+      store: aStore.store,
+    });
+    assert.equal(svg.ok, false);
+    const oversized = await uploadPartnerShareLogo({
+      partnerUserId: partnerA.id,
+      bytes: Buffer.alloc(PARTNER_LOGO_MAX_BYTES + 1, 1),
+      filename: "logo.png",
+      store: aStore.store,
+    });
+    assert.equal(oversized.ok, false);
+    const huge = await sharp({
+      create: {
+        width: 4100,
+        height: 32,
+        channels: 3,
+        background: { r: 0, g: 0, b: 0 },
+      },
+    })
+      .png()
+      .toBuffer();
+    const hugeUp = await uploadPartnerShareLogo({
+      partnerUserId: partnerA.id,
+      bytes: huge,
+      filename: "huge.png",
+      store: aStore.store,
+    });
+    assert.equal(hugeUp.ok, false);
+    console.log("PASS D_E_F_G_invalid_logo_bytes_rejected");
+
+    const beforeB = await getPartnerShareBranding(partnerB.id);
+    assert.equal(beforeB.ok, true);
+    const cross = await uploadPartnerShareLogo({
+      partnerUserId: partnerB.id,
+      bytes: png,
+      filename: "logo.png",
+      store: aStore.store,
+    });
+    assert.equal(cross.ok, true);
+    if (!cross.ok) throw new Error("b upload");
+    assert.equal(
+      (cross.branding.logoUrl ?? "").includes(partnerA.partnerProfile!.id),
+      false
+    );
+    assert.equal(
+      (cross.branding.logoUrl ?? "").includes(partnerB.partnerProfile!.id),
+      true
+    );
+    const disabledLogo = await uploadPartnerShareLogo({
+      partnerUserId: disabled.id,
+      bytes: png,
+      filename: "logo.png",
+      store: aStore.store,
+    });
+    assert.equal(disabledLogo.ok, false);
+    console.log("PASS H_I_J_cross_partner_path_and_disabled");
+
+    const pageLogo = await getPartnerEsimSharePageData(rotated.rawToken, {
+      fetchBrokerPayload: fetchBroker,
+    });
+    assert.ok(pageLogo);
+    assert.equal(pageLogo.branding.logoUrl, webpUp.branding.logoUrl);
+    assert.equal(sharePoweredByLabel(pageLogo.branding.companyName).startsWith("Powered by"), true);
+    console.log("PASS M_V_share_page_renders_uploaded_logo");
+
+    const replaceStore = mockBlobStore();
+    const firstReplace = await uploadPartnerShareLogo({
+      partnerUserId: partnerA.id,
+      bytes: png,
+      filename: "one.png",
+      store: replaceStore.store,
+    });
+    assert.equal(firstReplace.ok, true);
+    if (!firstReplace.ok) throw new Error("first replace");
+    const oldLogo = firstReplace.branding.logoUrl;
+    const secondReplace = await uploadPartnerShareLogo({
+      partnerUserId: partnerA.id,
+      bytes: jpeg,
+      filename: "two.jpg",
+      store: replaceStore.store,
+    });
+    assert.equal(secondReplace.ok, true);
+    if (!secondReplace.ok) throw new Error("second replace");
+    assert.notEqual(secondReplace.branding.logoUrl, oldLogo);
+    assert.equal(replaceStore.events[0], "put");
+    assert.equal(replaceStore.events.includes("del"), true);
+    assert.equal(replaceStore.dels.includes(oldLogo ?? ""), true);
+    console.log("PASS N_replace_deletes_old_after_success");
+
+    const failStore: PartnerLogoBlobStore = {
+      async put() {
+        throw new Error("blob_down");
+      },
+      async del() {
+        throw new Error("should_not_delete");
+      },
+    };
+    const beforeFail = await getPartnerShareBranding(partnerA.id);
+    assert.equal(beforeFail.ok, true);
+    if (!beforeFail.ok) throw new Error("before fail");
+    const failed = await uploadPartnerShareLogo({
+      partnerUserId: partnerA.id,
+      bytes: png,
+      filename: "fail.png",
+      store: failStore,
+    });
+    assert.equal(failed.ok, false);
+    const afterFail = await getPartnerShareBranding(partnerA.id);
+    assert.equal(afterFail.ok, true);
+    if (!afterFail.ok) throw new Error("after fail");
+    assert.equal(afterFail.branding.logoUrl, beforeFail.branding.logoUrl);
+    console.log("PASS O_failed_replace_keeps_old_logo");
+
+    const historic = "https://cdn.example.com/partner-logo.png";
+    await prisma.partnerProfile.update({
+      where: { id: partnerA.partnerProfile!.id },
+      data: { shareLogoUrl: historic },
+    });
+    const historicStore = mockBlobStore();
+    const removedHistoric = await removePartnerShareLogo({
+      partnerUserId: partnerA.id,
+      store: historicStore.store,
+    });
+    assert.equal(removedHistoric.ok, true);
+    if (!removedHistoric.ok) throw new Error("remove historic");
+    assert.equal(removedHistoric.branding.logoUrl, null);
+    assert.equal(historicStore.dels.length, 0);
+    const pageFallback = await getPartnerEsimSharePageData(rotated.rawToken, {
+      fetchBrokerPayload: fetchBroker,
+    });
+    assert.ok(pageFallback);
+    assert.equal(pageFallback.branding.logoUrl, null);
+    console.log("PASS P_Q_R_remove_clears_and_skips_arbitrary_url_delete");
+
+    const bUrl = cross.branding.logoUrl;
+    assert.ok(bUrl);
+    const stealStore = mockBlobStore();
+    await prisma.partnerProfile.update({
+      where: { id: partnerA.partnerProfile!.id },
+      data: { shareLogoUrl: bUrl },
+    });
+    const steal = await removePartnerShareLogo({
+      partnerUserId: partnerA.id,
+      store: stealStore.store,
+    });
+    assert.equal(steal.ok, true);
+    assert.equal(stealStore.dels.includes(bUrl), false);
+    const bStill = await getPartnerShareBranding(partnerB.id);
+    assert.equal(bStill.ok, true);
+    if (!bStill.ok) throw new Error("b still");
+    assert.equal(bStill.branding.logoUrl, bUrl);
+    console.log("PASS S_cannot_delete_other_partner_blob");
+
     const audits = await prisma.auditLog.findMany({
       where: { actorUserId: partnerA.id },
     });
     const auditJson = JSON.stringify(audits);
     assert.match(auditJson, /partner\.share_branding_updated/);
+    assert.match(auditJson, /partner\.share_logo_updated/);
     assert.equal(auditJson.includes(createdA.rawToken), false);
     assert.equal(auditJson.includes(createdAgain.rawToken), false);
     assert.equal(auditJson.includes(rotated.rawToken), false);
     assert.equal(auditJson.includes(SAMPLE_ICCID), false);
+    assert.doesNotMatch(auditJson, /BLOB_READ_WRITE_TOKEN|vercel_blob_rw/i);
     assert.doesNotMatch(auditJson, /<svg|data:image/);
-    console.log("PASS S_no_raw_token_or_logo_contents_in_audit");
+    console.log("PASS S_T_U_W_no_raw_token_or_blob_secret_in_audit");
 
     console.log("ALL_QA_PASSED=partner-share-branding");
   } finally {

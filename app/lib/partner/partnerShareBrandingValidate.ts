@@ -4,6 +4,7 @@
  */
 
 import { BRAND_NAME } from "@/app/lib/brand";
+import { isPublicPartnerLogoBlobUrl } from "@/app/lib/partner/partnerShareLogoBlob";
 
 export const SHARE_COMPANY_NAME_MAX = 80;
 export const SHARE_EMAIL_MAX = 254;
@@ -167,6 +168,19 @@ export function publicSameOriginLogoPath(logoUrl: string | null): string | null 
   }
 }
 
+/**
+ * Public share/img src: MAP same-origin path or an owned Vercel Blob Partner logo.
+ * Arbitrary remote URLs stay off the public share page.
+ */
+export function publicShareLogoSrc(
+  logoUrl: string | null | undefined
+): string | null {
+  const sameOrigin = publicSameOriginLogoPath(logoUrl ?? null);
+  if (sameOrigin) return sameOrigin;
+  if (isPublicPartnerLogoBlobUrl(logoUrl)) return (logoUrl ?? "").trim();
+  return null;
+}
+
 export function normalizeShareSupportEmail(
   value: string | null | undefined
 ): string | null {
@@ -279,7 +293,7 @@ export function publicShareBrandingDto(
     companyName: fields.companyName,
     supportEmail: fields.supportEmail,
     websiteUrl: fields.websiteUrl,
-    logoUrl: publicSameOriginLogoPath(fields.logoUrl),
+    logoUrl: publicShareLogoSrc(fields.logoUrl),
     buttonBackground:
       fields.buttonBackground &&
       fields.buttonTextColor &&

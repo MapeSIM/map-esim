@@ -71,7 +71,7 @@ export function buildCspReportOnlyValue(
     // Next.js App Router currently needs inline script compatibility until nonce CSP.
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://embed.tawk.to https://cdn.jsdelivr.net",
     "style-src 'self' 'unsafe-inline' https://*.tawk.to",
-    "img-src 'self' data: blob: https://flagcdn.com https://*.tawk.to https://cdn.jsdelivr.net",
+    "img-src 'self' data: blob: https://flagcdn.com https://*.tawk.to https://cdn.jsdelivr.net https://*.public.blob.vercel-storage.com https://*.blob.vercel-storage.com",
     "font-src 'self' data: https://*.tawk.to",
     "connect-src 'self' https://*.tawk.to wss://*.tawk.to",
     "frame-src https://*.tawk.to",

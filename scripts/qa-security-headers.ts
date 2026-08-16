@@ -132,7 +132,7 @@ function main() {
   );
   assert.match(
     csp,
-    /img-src 'self' data: blob: https:\/\/flagcdn\.com https:\/\/\*\.tawk\.to https:\/\/cdn\.jsdelivr\.net/
+    /img-src 'self' data: blob: https:\/\/flagcdn\.com https:\/\/\*\.tawk\.to https:\/\/cdn\.jsdelivr\.net https:\/\/\*\.public\.blob\.vercel-storage\.com https:\/\/\*\.blob\.vercel-storage\.com/
   );
   assert.ok(!/script-src[^;]*https:\/\/\*\.tawk\.to/.test(csp));
   assert.ok(!/style-src[^;]*cdn\.jsdelivr\.net/.test(csp));

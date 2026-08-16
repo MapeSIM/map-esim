@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 import { buildNextConfigHeaderSources } from "./app/lib/security/headers";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "2mb",
+    },
+  },
   images: {
     remotePatterns: [
       {

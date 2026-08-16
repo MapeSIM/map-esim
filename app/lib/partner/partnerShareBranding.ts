@@ -106,16 +106,6 @@ export async function updatePartnerShareBranding(
     return { ok: false, error: PARTNER_SHARE_BRANDING_UNAVAILABLE };
   }
 
-  let next: PartnerShareBrandingFields;
-  try {
-    next = parsePartnerShareBrandingInput(input);
-  } catch (err) {
-    if (err instanceof PartnerShareBrandingError) {
-      return { ok: false, error: err.message, code: err.code };
-    }
-    return { ok: false, error: "Share branding could not be saved." };
-  }
-
   const current = await prisma.partnerProfile.findUnique({
     where: { id: actor.partnerId },
     select: {
@@ -129,6 +119,20 @@ export async function updatePartnerShareBranding(
   });
   if (!current) {
     return { ok: false, error: PARTNER_SHARE_BRANDING_UNAVAILABLE };
+  }
+
+  let next: PartnerShareBrandingFields;
+  try {
+    next = parsePartnerShareBrandingInput({
+      ...input,
+      logoUrl:
+        input.logoUrl === undefined ? current.shareLogoUrl : input.logoUrl,
+    });
+  } catch (err) {
+    if (err instanceof PartnerShareBrandingError) {
+      return { ok: false, error: err.message, code: err.code };
+    }
+    return { ok: false, error: "Share branding could not be saved." };
   }
 
   const before = rowToFields(current);
