@@ -2,6 +2,8 @@ export const REWARDS_AUDIT = {
   purchaseEarned: "rewards.purchase_earned",
   redemptionCompleted: "rewards.redemption_completed",
   redemptionRestored: "rewards.redemption_restored",
+  redemptionRestoredForRefund: "rewards.redemption_restored_for_refund",
+  purchaseEarnReversedForRefund: "rewards.purchase_earn_reversed_for_refund",
 } as const;
 
 export const REWARD_POINTS_PER_USD = 1;
@@ -31,9 +33,23 @@ export function purchaseRedemptionRestoreIdempotencyKey(
   return `customer_reward_redemption_restore_${purchaseId}`;
 }
 
+export function purchaseRefundRedemptionRestoreIdempotencyKey(
+  purchaseId: string
+): string {
+  return `customer_reward_refund_redemption_restore_${purchaseId}`;
+}
+
+export function purchaseEarnReversalIdempotencyKey(purchaseId: string): string {
+  return `customer_reward_purchase_earn_reversal_${purchaseId}`;
+}
+
+export function isRefundRedemptionRestoreIdempotencyKey(key: string): boolean {
+  return key.startsWith("customer_reward_refund_redemption_restore_");
+}
+
 export function pointsNeededToUnlockRewards(pointsBalance: number): number {
   if (!Number.isInteger(pointsBalance) || pointsBalance >= REWARD_MIN_REDEMPTION_POINTS) {
     return 0;
   }
-  return REWARD_MIN_REDEMPTION_POINTS - Math.max(0, pointsBalance);
+  return REWARD_MIN_REDEMPTION_POINTS - pointsBalance;
 }

@@ -50,7 +50,7 @@ export function calculateRewardPointsToApply(options: {
   if (!Number.isInteger(afterPromoCents) || afterPromoCents < 0) {
     throw new Error("INVALID_REWARD_SPEND");
   }
-  if (!Number.isInteger(pointsBalance) || pointsBalance < 0) {
+  if (!Number.isInteger(pointsBalance)) {
     throw new Error("INVALID_REWARD_BALANCE");
   }
   const eligible = isRewardRedemptionEligible(pointsBalance);

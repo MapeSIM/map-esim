@@ -8,6 +8,7 @@ import { prisma } from "@/app/lib/db";
 import {
   REWARD_MIN_REDEMPTION_POINTS,
   REWARDS_COPY,
+  isRefundRedemptionRestoreIdempotencyKey,
 } from "@/app/lib/rewards/rewardConstants";
 
 export type CustomerRewardHistoryItem = {
@@ -62,7 +63,9 @@ export async function getCustomerRewardSummary(
       type: {
         in: [
           CustomerRewardTransactionType.PURCHASE_EARN,
+          CustomerRewardTransactionType.PURCHASE_EARN_REVERSAL,
           CustomerRewardTransactionType.REDEMPTION,
+          CustomerRewardTransactionType.REDEMPTION_RESTORE,
         ],
       },
     },
@@ -73,6 +76,7 @@ export async function getCustomerRewardSummary(
       type: true,
       pointsDelta: true,
       createdAt: true,
+      idempotencyKey: true,
     },
   });
 
@@ -86,13 +90,23 @@ export async function getCustomerRewardSummary(
         ? REWARDS_COPY.earnMore
         : REWARDS_COPY.useAtCheckout,
     history: rows
-      .filter((row) => row.pointsDelta !== 0)
+      .filter((row) => {
+        if (row.pointsDelta === 0) return false;
+        if (row.type !== CustomerRewardTransactionType.REDEMPTION_RESTORE) {
+          return true;
+        }
+        return isRefundRedemptionRestoreIdempotencyKey(row.idempotencyKey);
+      })
       .map((row) => ({
         id: row.id,
         label:
           row.type === CustomerRewardTransactionType.REDEMPTION
             ? "Rewards used"
-            : "eSIM purchase",
+            : row.type === CustomerRewardTransactionType.REDEMPTION_RESTORE
+              ? "Refund reward restore"
+              : row.type === CustomerRewardTransactionType.PURCHASE_EARN_REVERSAL
+                ? "Refund earn reversal"
+                : "eSIM purchase",
         pointsLabel:
           row.pointsDelta < 0
             ? `−${Math.abs(row.pointsDelta)} points`

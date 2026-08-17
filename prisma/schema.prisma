@@ -1274,7 +1274,9 @@ model CustomerRewardAccount {
   id                     String                      @id @default(cuid())
   customerUserId         String                      @unique
   pointsBalance          Int                         @default(0)
+  /// Gross points ever earned from completed purchases. Not reduced on earn reversal.
   lifetimeEarnedPoints   Int                         @default(0)
+  /// Gross points ever completed-redeemed. Not reduced on refund restore. Hold-release does not increment this.
   lifetimeRedeemedPoints Int                         @default(0)
   /// CAS version for concurrent earn retries.
   version                Int                         @default(0)
@@ -1311,7 +1313,10 @@ model CustomerRewardRedemption {
   @@index([createdAt])
 }
 
-/// Append-only customer rewards ledger. Slice 1 writes PURCHASE_EARN; Slice 2 writes REDEMPTION / REDEMPTION_RESTORE.
+/// Append-only customer rewards ledger.
+/// PURCHASE_EARN / PURCHASE_EARN_REVERSAL / REDEMPTION are one-per-purchase via partial unique indexes.
+/// REDEMPTION_RESTORE may exist twice (pre-funding hold release vs post-refund restore), distinguished by idempotencyKey.
+/// lifetimeRedeemedPoints / lifetimeEarnedPoints are gross completed totals and are not reduced on refund restore/reversal.
 model CustomerRewardTransaction {
   id                 String                         @id @default(cuid())
   rewardAccountId    String
@@ -1331,7 +1336,6 @@ model CustomerRewardTransaction {
   purchase           WalletEsimPurchase?            @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
   order              Order?                         @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
-  @@unique([purchaseId, type])
   @@index([customerUserId, createdAt])
   @@index([rewardAccountId, createdAt])
   @@index([type])
