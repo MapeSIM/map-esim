@@ -190,6 +190,30 @@ function offlineChecks(): void {
   }
   console.log("PASS AD_checkout_wired_gateways_untouched");
 
+  const promoSection = read(
+    "app/components/account/CheckoutPromoCodeSection.tsx"
+  );
+  assert.doesNotMatch(promoSection, /<form[\s>]/);
+  assert.equal((confirmForm.match(/<form[\s>]/g) || []).length, 1);
+  assert.match(promoSection, /formAction=\{applyAction\}/);
+  assert.match(promoSection, /formAction=\{removeAction\}/);
+  assert.match(promoSection, /applyCustomerPromoAction/);
+  assert.match(promoSection, /removeCustomerPromoAction/);
+  assert.match(promoSection, /requestSubmit/);
+  assert.doesNotMatch(promoSection, /confirmWalletEsimPurchaseAction/);
+  assert.match(confirmForm, /confirmWalletEsimPurchaseAction/);
+  assert.match(confirmForm, /<form action=\{formAction\}/);
+  assert.doesNotMatch(confirmForm, /formAction=\{/);
+  assert.match(confirmForm, /Buy eSIM with Wallet/);
+  assert.doesNotMatch(actions, /confirmWalletEsimPurchaseAction/);
+  assert.doesNotMatch(
+    actions,
+    /reserveWallet|PURCHASE_DEBIT|executeCreditCheckout|createCheckoutSession/
+  );
+  assert.doesNotMatch(partnerStore, /formAction=\{applyAction\}/);
+  assert.doesNotMatch(partnerCatalog, /formAction=\{applyAction\}/);
+  console.log("PASS AE_promo_formAction_not_nested_not_confirm");
+
   void PROMO_CUSTOMER_MESSAGES;
 }
 

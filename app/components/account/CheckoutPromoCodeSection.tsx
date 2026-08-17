@@ -1,6 +1,12 @@
 "use client";
 
-import { useActionState, useEffect, useId, useRef } from "react";
+import {
+  useActionState,
+  useEffect,
+  useId,
+  useRef,
+  type KeyboardEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   applyCustomerPromoAction,
@@ -34,6 +40,7 @@ export default function CheckoutPromoCodeSection({
   const router = useRouter();
   const headingId = useId();
   const inputId = useId();
+  const applyButtonRef = useRef<HTMLButtonElement>(null);
   const [applyState, applyAction, applyPending] = useActionState(
     applyCustomerPromoAction,
     initialPromoCheckoutState
@@ -66,6 +73,15 @@ export default function CheckoutPromoCodeSection({
     applyResult.ok === false ? applyResult.error : null;
   const removeError =
     removeResult.ok === false ? removeResult.error : null;
+
+  function onPromoInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    const submitter = applyButtonRef.current;
+    const form = event.currentTarget.form;
+    if (!form || !submitter || submitter.disabled) return;
+    form.requestSubmit(submitter);
+  }
 
   return (
     <section
@@ -104,16 +120,15 @@ export default function CheckoutPromoCodeSection({
               </dd>
             </div>
           </dl>
-          <form action={removeAction}>
-            <input type="hidden" name="purchaseId" value={purchaseId} />
-            <button
-              type="submit"
-              disabled={busy}
-              className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline disabled:opacity-60"
-            >
-              {removePending ? "Removing…" : "Remove promo"}
-            </button>
-          </form>
+          <input type="hidden" name="purchaseId" value={purchaseId} />
+          <button
+            type="submit"
+            formAction={removeAction}
+            disabled={busy}
+            className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline disabled:opacity-60"
+          >
+            {removePending ? "Removing…" : "Remove promo"}
+          </button>
           {removeError ? (
             <p className="text-sm text-[var(--heading)]" role="alert">
               {removeError}
@@ -121,7 +136,7 @@ export default function CheckoutPromoCodeSection({
           ) : null}
         </div>
       ) : (
-        <form action={applyAction} className="mt-3 space-y-2">
+        <div className="mt-3 space-y-2">
           <input type="hidden" name="purchaseId" value={purchaseId} />
           <div className="flex flex-col gap-2 sm:flex-row">
             <label htmlFor={inputId} className="sr-only">
@@ -136,10 +151,13 @@ export default function CheckoutPromoCodeSection({
               maxLength={30}
               disabled={busy}
               placeholder="Enter code"
+              onKeyDown={onPromoInputKeyDown}
               className="min-w-0 flex-1 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm uppercase text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
             />
             <button
+              ref={applyButtonRef}
               type="submit"
+              formAction={applyAction}
               disabled={busy}
               className="inline-flex h-10 shrink-0 items-center justify-center rounded-[12px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-ink)] disabled:opacity-60"
             >
@@ -151,7 +169,7 @@ export default function CheckoutPromoCodeSection({
               {applyError}
             </p>
           ) : null}
-        </form>
+        </div>
       )}
     </section>
   );
