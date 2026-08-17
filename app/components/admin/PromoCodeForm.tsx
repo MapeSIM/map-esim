@@ -4,10 +4,12 @@ import { useActionState, useId } from "react";
 import { PromoDiscountType } from "@prisma/client";
 import {
   createPromoCodeAction,
-  initialPromoAdminState,
   updatePromoCodeAction,
-  type PromoAdminActionState,
 } from "@/app/lib/promo/promoAdminActions";
+import {
+  initialPromoAdminState,
+  type PromoAdminActionState,
+} from "@/app/lib/promo/promoAdminState";
 import type { PromoAdminDetail } from "@/app/lib/promo/promoAdmin";
 
 type Props = {

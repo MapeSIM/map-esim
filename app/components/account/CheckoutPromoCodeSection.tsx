@@ -4,10 +4,12 @@ import { useActionState, useEffect, useId, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   applyCustomerPromoAction,
-  initialPromoCheckoutState,
   removeCustomerPromoAction,
-  type PromoCheckoutActionState,
 } from "@/app/lib/promo/promoCustomerActions";
+import {
+  initialPromoCheckoutState,
+  type PromoCheckoutActionState,
+} from "@/app/lib/promo/promoCustomerState";
 import { formatUsdCents } from "@/app/lib/wallet/display";
 
 type Props = {

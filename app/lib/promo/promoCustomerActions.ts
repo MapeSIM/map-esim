@@ -9,12 +9,7 @@ import {
 } from "@/app/lib/promo/promoCustomer";
 import { PROMO_CUSTOMER_MESSAGES } from "@/app/lib/promo/promoMessages";
 import { PromoEvaluateError } from "@/app/lib/promo/promoEvaluate";
-
-export type PromoCheckoutActionState =
-  | { ok: true }
-  | { ok: false; error: string };
-
-export const initialPromoCheckoutState: PromoCheckoutActionState = { ok: true };
+import type { PromoCheckoutActionState } from "@/app/lib/promo/promoCustomerState";
 
 export async function applyCustomerPromoAction(
   _prev: PromoCheckoutActionState,

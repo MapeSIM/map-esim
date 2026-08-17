@@ -8,16 +8,7 @@ import {
   updateAdminPromoCode,
 } from "@/app/lib/promo/promoAdmin";
 import { PromoValidationError } from "@/app/lib/promo/promoCode";
-
-export type PromoAdminActionState =
-  | { ok: true; message?: string }
-  | {
-      ok: false;
-      error: string;
-      fieldErrors?: Record<string, string>;
-    };
-
-export const initialPromoAdminState: PromoAdminActionState = { ok: true };
+import type { PromoAdminActionState } from "@/app/lib/promo/promoAdminState";
 
 export async function createPromoCodeAction(
   _prev: PromoAdminActionState,
