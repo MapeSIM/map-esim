@@ -624,6 +624,7 @@ async function releaseOnGatewayFailure(options: {
       // already_refunded after a failed CAS claim inside restoreReady means
       // success funded first — do not treat as wallet returned.
     } else {
+      await releasePromoRedemptionInTx(tx, options.purchaseId);
       await tx.walletEsimPurchase.updateMany({
         where: {
           id: options.purchaseId,
@@ -943,6 +944,8 @@ export async function fulfillFundedEsimPurchase(
  * Idempotent release of a still-pending split reservation when cancel is authenticated.
  * Never marks gateway payment failed if a success webhook may still arrive —
  * only releases wallet when attempt is not payment-confirmed.
+ * Card-only / promo-only checkouts reuse this same path to release a HELD
+ * redemption and restore READY — they never touch wallet funds.
  */
 export async function maybeReleasePendingGatewayReservation(options: {
   customerUserId: string;
@@ -998,28 +1001,44 @@ export async function maybeReleasePendingGatewayReservation(options: {
       return;
     }
 
-    if (
-      attempt.purchase.walletAppliedCents <= 0 ||
-      !attempt.purchase.debitTransactionId ||
-      (attempt.purchase.status !==
-        WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT &&
-        attempt.purchase.status !== WalletEsimPurchaseStatus.FUNDS_RESERVED)
-    ) {
+    const canReleaseSplitWallet =
+      attempt.purchase.walletAppliedCents > 0 &&
+      Boolean(attempt.purchase.debitTransactionId) &&
+      (attempt.purchase.status ===
+        WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT ||
+        attempt.purchase.status === WalletEsimPurchaseStatus.FUNDS_RESERVED);
+
+    if (canReleaseSplitWallet) {
+      const release = await refundReservedFundsInTx(tx, {
+        purchaseId,
+        customerUserId,
+        actorUserId: customerUserId,
+        assisted: false,
+        priceCents: attempt.purchase.walletAppliedCents,
+        restoreReady: true,
+      });
+      if (release.outcome === "created") {
+        releasedRefundId = release.refundTransactionId;
+        released = true;
+      } else if (release.outcome === "linked_existing") {
+        released = true;
+      }
       return;
     }
 
-    const release = await refundReservedFundsInTx(tx, {
-      purchaseId,
-      customerUserId,
-      actorUserId: customerUserId,
-      assisted: false,
-      priceCents: attempt.purchase.walletAppliedCents,
-      restoreReady: true,
-    });
-    if (release.outcome === "created") {
-      releasedRefundId = release.refundTransactionId;
-      released = true;
-    } else if (release.outcome === "linked_existing") {
+    if (attempt.purchase.walletAppliedCents <= 0) {
+      await releasePromoRedemptionInTx(tx, purchaseId);
+      await tx.walletEsimPurchase.updateMany({
+        where: {
+          id: purchaseId,
+          status: WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+        },
+        data: {
+          status: WalletEsimPurchaseStatus.READY,
+          failureCategory: null,
+          failureCode: null,
+        },
+      });
       released = true;
     }
   });

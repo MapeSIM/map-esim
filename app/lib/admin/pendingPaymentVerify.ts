@@ -228,10 +228,14 @@ export async function verifyPendingGatewayPayment(options: {
   });
 
   let reservationReleased = false;
-  const releaseCandidate = shouldReleaseSplitReservationOnDecision(
-    decided.decision,
-    attempt.purchase.walletAppliedCents
-  );
+  const releaseCandidate =
+    shouldReleaseSplitReservationOnDecision(
+      decided.decision,
+      attempt.purchase.walletAppliedCents
+    ) ||
+    ((decided.decision === "VERIFIED_FAILED" ||
+      decided.decision === "VERIFIED_CANCELLED_OR_EXPIRED") &&
+      attempt.purchase.walletAppliedCents <= 0);
 
   if (releaseCandidate) {
     const releaseFn =
