@@ -204,6 +204,12 @@ export default async function AccountOrderDetailPage({
         {detail.finalAmountLabel ? (
           <DetailRow label="Package total" value={detail.finalAmountLabel} />
         ) : null}
+        {detail.rewardsEarnedPoints != null && detail.rewardsEarnedPoints > 0 ? (
+          <DetailRow
+            label="Rewards earned"
+            value={`+${detail.rewardsEarnedPoints} points`}
+          />
+        ) : null}
         <DetailRow label="Currency" value={detail.currencyLabel} />
         <DetailRow label="Purchased" value={detail.createdAtLabel} />
         <DetailRow label="Order reference" value={detail.shortReference} />

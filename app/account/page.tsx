@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   Check,
+  Gift,
   Shield,
   Smartphone,
   UserRound,
@@ -10,6 +11,7 @@ import AccountActionRow from "@/app/components/account/AccountActionRow";
 import { requireSession } from "@/app/lib/auth/session";
 import { prisma } from "@/app/lib/db";
 import { getCustomerWalletSummary } from "@/app/lib/wallet/read";
+import { getCustomerRewardSummary } from "@/app/lib/rewards/rewardRead";
 
 export default async function AccountOverviewPage() {
   const user = await requireSession();
@@ -20,12 +22,19 @@ export default async function AccountOverviewPage() {
   const emailVerified = Boolean(dbUser?.emailVerifiedAt);
 
   let walletBalanceLabel: string | null = null;
+  let rewardsPointsLabel: string | null = null;
   if (user.role === "CUSTOMER") {
     try {
       const summary = await getCustomerWalletSummary(user.id);
       walletBalanceLabel = summary?.balanceLabel ?? "$0.00";
     } catch {
       walletBalanceLabel = null;
+    }
+    try {
+      const rewards = await getCustomerRewardSummary(user.id);
+      rewardsPointsLabel = rewards ? `${rewards.pointsBalanceLabel} points` : "0 points";
+    } catch {
+      rewardsPointsLabel = null;
     }
   }
 
@@ -84,6 +93,19 @@ export default async function AccountOverviewPage() {
                     USD
                   </span>
                 ) : null}
+              </span>
+            }
+          />
+        ) : null}
+        {user.role === "CUSTOMER" ? (
+          <AccountActionRow
+            href="/account/rewards"
+            title="Rewards"
+            subtitle="100 points = $1 reward"
+            icon={<Gift className="h-5 w-5" aria-hidden="true" />}
+            trailing={
+              <span className="mt-1 block text-sm font-bold text-[var(--heading)]">
+                {rewardsPointsLabel ?? "Temporarily unavailable"}
               </span>
             }
           />

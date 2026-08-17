@@ -38,6 +38,7 @@ import {
 } from "@/app/lib/admin/reconciliationCaseShared";
 import { PROVIDER_REFRESH_STALE_CLAIM_MS } from "@/app/lib/admin/providerRefreshShared";
 import { persistAssignedOrder } from "@/app/lib/orders/persistAssignedOrder";
+import { awardCustomerPurchaseEarnInTx } from "@/app/lib/rewards/rewardEarn";
 import { VesimEnvironmentError } from "@/app/lib/vesim/environment";
 import {
   classifyProviderOrderResponse,
@@ -897,6 +898,13 @@ export async function finalizeReconciliationLocalRecord(options: {
         if (purchaseCas.count === 0) {
           return { status: "blocked" as const, failureCode: "cas_conflict" };
         }
+
+        await awardCustomerPurchaseEarnInTx(tx, {
+          customerUserId: fresh.customerUserId,
+          purchaseId: ids.recordId,
+          orderId: order.id,
+          actorUserId: admin.id,
+        });
       } else if (ids.sourceType === "partner_purchase") {
         const purchaseCas = await tx.partnerEsimPurchase.updateMany({
           where: {

@@ -95,6 +95,14 @@ enum PromoRedemptionStatus {
   RELEASED
 }
 
+enum CustomerRewardTransactionType {
+  PURCHASE_EARN
+  PURCHASE_EARN_REVERSAL
+  REDEMPTION
+  REDEMPTION_RESTORE
+  ADMIN_ADJUSTMENT
+}
+
 enum WalletCurrency {
   USD
 }
@@ -271,6 +279,8 @@ model User {
   partnerWalletTxCreated       PartnerWalletTransaction[] @relation("PartnerWalletTxCreatedByAdmin")
   promoCodesCreated            PromoCode[]                @relation("PromoCodeCreatedByAdmin")
   promoCodeRedemptions         PromoCodeRedemption[]
+  customerRewardAccount        CustomerRewardAccount?     @relation("CustomerRewardAccount")
+  customerRewardTransactions   CustomerRewardTransaction[] @relation("CustomerRewardTransaction")
 
   @@index([deletedAt])
   @@index([blockedAt])
@@ -504,6 +514,7 @@ model Order {
   refundRequests                   RefundRequest[]
   partnerRefundRequests            PartnerRefundRequest[]
   promoRedemptions                 PromoCodeRedemption[]
+  customerRewardTransactions       CustomerRewardTransaction[]
 
   @@index([customerEmail])
   @@index([userId])
@@ -676,6 +687,7 @@ model WalletEsimPurchase {
   paymentAttempts                  EsimPurchasePaymentAttempt[]
   promoCode                        PromoCode?               @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
   promoRedemption                  PromoCodeRedemption?
+  rewardTransactions               CustomerRewardTransaction[]
 
   @@index([customerUserId])
   @@index([promoCodeId])
@@ -1242,5 +1254,49 @@ model PromoCodeRedemption {
   @@index([customerUserId])
   @@index([status])
   @@index([promoCodeId, customerUserId, status])
+  @@index([createdAt])
+}
+
+/// Customer-only rewards ledger. Partner users never receive an account.
+model CustomerRewardAccount {
+  id                     String                      @id @default(cuid())
+  customerUserId         String                      @unique
+  pointsBalance          Int                         @default(0)
+  lifetimeEarnedPoints   Int                         @default(0)
+  lifetimeRedeemedPoints Int                         @default(0)
+  /// CAS version for concurrent earn retries.
+  version                Int                         @default(0)
+  createdAt              DateTime                    @default(now())
+  updatedAt              DateTime                    @updatedAt
+  customer               User                        @relation("CustomerRewardAccount", fields: [customerUserId], references: [id], onDelete: Cascade)
+  transactions           CustomerRewardTransaction[]
+
+  @@index([createdAt])
+}
+
+/// Append-only customer rewards ledger. Slice 1 runtime writes PURCHASE_EARN only.
+model CustomerRewardTransaction {
+  id                 String                         @id @default(cuid())
+  rewardAccountId    String
+  customerUserId     String
+  type               CustomerRewardTransactionType
+  pointsDelta        Int
+  balanceAfter       Int
+  /// Snapshotted eligible customer package cents (after promo). Reconstructs history.
+  eligibleSpendCents Int?
+  purchaseId         String?
+  orderId            String?
+  refundRequestId    String?
+  idempotencyKey     String                         @unique
+  createdAt          DateTime                       @default(now())
+  account            CustomerRewardAccount          @relation(fields: [rewardAccountId], references: [id], onDelete: Cascade)
+  customer           User                           @relation("CustomerRewardTransaction", fields: [customerUserId], references: [id], onDelete: Cascade)
+  purchase           WalletEsimPurchase?            @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  order              Order?                         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@unique([purchaseId, type])
+  @@index([customerUserId, createdAt])
+  @@index([rewardAccountId, createdAt])
+  @@index([type])
   @@index([createdAt])
 }

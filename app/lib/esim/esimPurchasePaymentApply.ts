@@ -33,6 +33,7 @@ import {
   completePromoRedemptionInTx,
   releasePromoRedemptionInTx,
 } from "@/app/lib/promo/promoRedemption";
+import { awardCustomerPurchaseEarnInTx } from "@/app/lib/rewards/rewardEarn";
 import { scheduleWalletTransactionNotification } from "@/app/lib/wallet/transactionNotification";
 
 export const ESIM_PAYMENT_WEBHOOK_DUPLICATE = "esim.payment_webhook_duplicate";
@@ -725,6 +726,7 @@ export async function fulfillFundedEsimPurchase(
       offerId: true,
       destinationCode: true,
       priceCents: true,
+      promoDiscountCents: true,
       currency: true,
       fundingSource: true,
       debitTransactionId: true,
@@ -900,6 +902,13 @@ export async function fulfillFundedEsimPurchase(
       });
 
       await completePromoRedemptionInTx(tx, {
+        purchaseId: purchase.id,
+        orderId: order.id,
+        actorUserId: null,
+      });
+
+      await awardCustomerPurchaseEarnInTx(tx, {
+        customerUserId: purchase.customerUserId,
         purchaseId: purchase.id,
         orderId: order.id,
         actorUserId: null,

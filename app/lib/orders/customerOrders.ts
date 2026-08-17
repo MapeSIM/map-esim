@@ -1,6 +1,6 @@
 import "server-only";
 
-import { OrderStatus, Prisma, Role } from "@prisma/client";
+import { CustomerRewardTransactionType, OrderStatus, Prisma, Role } from "@prisma/client";
 import { formatStoredIccidLast4 } from "@/app/lib/admin/display";
 import { prisma } from "@/app/lib/db";
 import {
@@ -268,6 +268,7 @@ export type CustomerOrderDetail = {
   refundStatusLabel: string | null;
   refundedAtLabel: string | null;
   refundAmountLabel: string | null;
+  rewardsEarnedPoints: number | null;
 };
 
 /**
@@ -383,6 +384,22 @@ export async function getCustomerOwnedOrderDetail(
   const installEligible =
     order.status === OrderStatus.COMPLETED && statusBadge === "Completed";
 
+  let rewardsEarnedPoints: number | null = null;
+  if (installEligible && order.walletEsimPurchase) {
+    const earn = await prisma.customerRewardTransaction.findFirst({
+      where: {
+        customerUserId: owner.id,
+        orderId: order.id,
+        type: CustomerRewardTransactionType.PURCHASE_EARN,
+        pointsDelta: { gt: 0 },
+      },
+      select: { pointsDelta: true },
+    });
+    if (earn && earn.pointsDelta > 0) {
+      rewardsEarnedPoints = earn.pointsDelta;
+    }
+  }
+
   let refundStatusLabel: string | null = null;
   let refundedAtLabel: string | null = null;
   let refundAmountLabel: string | null = null;
@@ -450,5 +467,6 @@ export async function getCustomerOwnedOrderDetail(
     refundStatusLabel,
     refundedAtLabel,
     refundAmountLabel,
+    rewardsEarnedPoints,
   };
 }

@@ -4,6 +4,7 @@ import AccountMenu, {
 } from "@/app/components/account/AccountMenu";
 import { requireSession } from "@/app/lib/auth/session";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
+import { Role } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -11,28 +12,28 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false, nocache: true },
 };
 
-const baseLinks: AccountNavLink[] = [
-  { href: "/account", label: "Overview", exact: true },
-  { href: "/account/orders", label: "My eSIMs" },
-  { href: "/account/wallet", label: "Wallet" },
-  { href: "/account/esim/buy", label: "Buy eSIM" },
-  { href: "/account/profile", label: "Profile" },
-  { href: "/account/security", label: "Security" },
-];
-
 export default async function AccountLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const user = await requireSession();
-  const links = isPaymentGatewayConfigured()
-    ? [
-        ...baseLinks.slice(0, 3),
-        { href: "/account/wallet/top-up", label: "Add funds" },
-        ...baseLinks.slice(3),
-      ]
-    : baseLinks;
+  const links: AccountNavLink[] = [
+    { href: "/account", label: "Overview", exact: true },
+    { href: "/account/orders", label: "My eSIMs" },
+    { href: "/account/wallet", label: "Wallet" },
+  ];
+  if (user.role === Role.CUSTOMER) {
+    links.push({ href: "/account/rewards", label: "Rewards" });
+  }
+  if (isPaymentGatewayConfigured()) {
+    links.push({ href: "/account/wallet/top-up", label: "Add funds" });
+  }
+  links.push(
+    { href: "/account/esim/buy", label: "Buy eSIM" },
+    { href: "/account/profile", label: "Profile" },
+    { href: "/account/security", label: "Security" }
+  );
 
   return (
     <main className="min-h-screen w-full max-w-full bg-[var(--page-bg)] px-3 py-8 text-[var(--heading)] sm:px-6 sm:py-10">

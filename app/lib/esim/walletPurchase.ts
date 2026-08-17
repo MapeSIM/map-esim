@@ -44,6 +44,7 @@ import {
   completePromoRedemptionInTx,
   releasePromoRedemptionInTx,
 } from "@/app/lib/promo/promoRedemption";
+import { awardCustomerPurchaseEarnInTx } from "@/app/lib/rewards/rewardEarn";
 import { PromoEvaluateError } from "@/app/lib/promo/promoEvaluate";
 import {
   assertCustomerFinancialActivityAllowed,
@@ -1570,6 +1571,13 @@ export async function confirmWalletEsimPurchase(
       });
 
       await completePromoRedemptionInTx(tx, {
+        purchaseId: purchase.id,
+        orderId: order.id,
+        actorUserId,
+      });
+
+      await awardCustomerPurchaseEarnInTx(tx, {
+        customerUserId,
         purchaseId: purchase.id,
         orderId: order.id,
         actorUserId,
