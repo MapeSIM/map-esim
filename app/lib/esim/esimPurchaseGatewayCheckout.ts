@@ -9,14 +9,19 @@ import {
   WalletEsimPurchaseStatus,
 } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
-import { calculatePurchaseFunding, calculatePayablePurchaseFunding } from "@/app/lib/esim/purchaseFunding";
+import { calculatePurchaseFunding, calculatePayablePurchaseFunding, calculateCustomerCheckoutFunding } from "@/app/lib/esim/purchaseFunding";
 import { payablePackageCents } from "@/app/lib/promo/promoDiscount";
 import {
   claimPurchasePromoInTx,
   revalidatePurchasePromo,
 } from "@/app/lib/promo/promoCustomer";
-import { releasePromoRedemptionInTx } from "@/app/lib/promo/promoRedemption";
 import { PromoEvaluateError } from "@/app/lib/promo/promoEvaluate";
+import {
+  claimRewardRedemptionInTx,
+  loadCustomerRewardPointsBalance,
+  RewardRedemptionError,
+} from "@/app/lib/rewards/rewardRedeem";
+import { REWARDS_REFRESH_CHECKOUT_MESSAGE } from "@/app/lib/rewards/rewardConstants";
 import {
   releaseSplitReservationAfterSessionFailure,
   reserveSplitWalletBeforeGatewayCheckout,
@@ -60,6 +65,8 @@ export type StartEsimPurchaseHostedCheckoutInput = {
   purchaseId: string;
   /** Server-parsed useWallet choice from the checkout form (never money fields). */
   useWallet: boolean;
+  /** Server-parsed useRewards choice from the checkout form (never points/money fields). */
+  useRewards: boolean;
 };
 
 export type StartEsimPurchaseHostedCheckoutResult = {
@@ -197,6 +204,7 @@ export async function startEsimPurchaseHostedCheckout(
       destinationCode: true,
       currency: true,
       useWallet: true,
+      useRewards: true,
       status: true,
       fundingSource: true,
       idempotencyKey: true,
@@ -272,18 +280,28 @@ export async function startEsimPurchaseHostedCheckout(
     }
   }
 
-  const funding =
-    payableCents === 0
-      ? calculatePayablePurchaseFunding({
-          priceCents: payableCents,
-          walletBalanceCents: wallet.balanceCents,
-          useWallet: Boolean(input.useWallet),
-        })
-      : calculatePurchaseFunding({
-          priceCents: payableCents,
-          walletBalanceCents: wallet.balanceCents,
-          useWallet: Boolean(input.useWallet),
-        });
+  const pointsBalance = await loadCustomerRewardPointsBalance(
+    prisma,
+    customerUserId
+  );
+  const useRewards = Boolean(input.useRewards);
+  const funding = calculateCustomerCheckoutFunding({
+    priceCents: purchase.priceCents,
+    promoDiscountCents: purchase.priceCents - payableCents,
+    walletBalanceCents: wallet.balanceCents,
+    useWallet: Boolean(input.useWallet),
+    pointsBalance,
+    useRewards,
+  });
+  void calculatePayablePurchaseFunding;
+  void calculatePurchaseFunding;
+
+  if (useRewards && !funding.useRewards) {
+    throw new EsimPurchaseGatewayCheckoutError(
+      "INVALID_STATE",
+      REWARDS_REFRESH_CHECKOUT_MESSAGE
+    );
+  }
 
   if (funding.gatewayAmountCents <= 0) {
     throw new EsimPurchaseGatewayCheckoutError(
@@ -314,9 +332,18 @@ export async function startEsimPurchaseHostedCheckout(
         walletAppliedCents: funding.walletAppliedCents,
         gatewayAmountCents: funding.gatewayAmountCents,
         useWallet: funding.useWallet,
+        promoDiscountCents: purchase.priceCents - payableCents,
+        rewardPointsRedeemed: funding.rewardPointsRedeemed,
+        afterPromoCents: funding.afterPromoCents,
       });
     } catch (error) {
       if (error instanceof PromoEvaluateError) {
+        throw new EsimPurchaseGatewayCheckoutError(
+          "INVALID_STATE",
+          error.message
+        );
+      }
+      if (error instanceof RewardRedemptionError) {
         throw new EsimPurchaseGatewayCheckoutError(
           "INVALID_STATE",
           error.message
@@ -350,6 +377,12 @@ export async function startEsimPurchaseHostedCheckout(
             actorUserId: customerUserId,
           });
         }
+        await claimRewardRedemptionInTx(tx, {
+          customerUserId,
+          purchaseId: purchase.id,
+          pointsToHold: funding.rewardPointsRedeemed,
+          afterPromoCents: funding.afterPromoCents,
+        });
         await tx.walletEsimPurchase.updateMany({
           where: {
             id: purchase.id,
@@ -363,6 +396,8 @@ export async function startEsimPurchaseHostedCheckout(
           },
           data: {
             useWallet: funding.useWallet,
+            useRewards: funding.useRewards,
+            rewardPointsRedeemed: funding.rewardPointsRedeemed,
             walletAppliedCents: funding.walletAppliedCents,
             gatewayAmountCents: funding.gatewayAmountCents,
             fundingSource,
@@ -372,6 +407,12 @@ export async function startEsimPurchaseHostedCheckout(
       });
     } catch (error) {
       if (error instanceof PromoEvaluateError) {
+        throw new EsimPurchaseGatewayCheckoutError(
+          "INVALID_STATE",
+          error.message
+        );
+      }
+      if (error instanceof RewardRedemptionError) {
         throw new EsimPurchaseGatewayCheckoutError(
           "INVALID_STATE",
           error.message

@@ -95,6 +95,12 @@ enum PromoRedemptionStatus {
   RELEASED
 }
 
+enum CustomerRewardRedemptionStatus {
+  HELD
+  COMPLETED
+  RELEASED
+}
+
 enum CustomerRewardTransactionType {
   PURCHASE_EARN
   PURCHASE_EARN_REVERSAL
@@ -281,6 +287,7 @@ model User {
   promoCodeRedemptions         PromoCodeRedemption[]
   customerRewardAccount        CustomerRewardAccount?     @relation("CustomerRewardAccount")
   customerRewardTransactions   CustomerRewardTransaction[] @relation("CustomerRewardTransaction")
+  customerRewardRedemptions    CustomerRewardRedemption[] @relation("CustomerRewardRedemption")
 
   @@index([deletedAt])
   @@index([blockedAt])
@@ -625,6 +632,10 @@ model WalletEsimPurchase {
   promoDiscountCents               Int                      @default(0)
   /// Customer chose to apply wallet funds (server-persisted; never trust browser money).
   useWallet                        Boolean                  @default(true)
+  /// Customer chose to apply rewards at checkout. Server recomputes points; never trust browser money.
+  useRewards                       Boolean                  @default(false)
+  /// Snapshotted reward points applied (1 point = 1 USD cent). Preview until held/completed.
+  rewardPointsRedeemed             Int                      @default(0)
   /// Server-calculated wallet contribution in USD cents.
   walletAppliedCents               Int
   /// Server-calculated gateway remainder in USD cents.
@@ -687,6 +698,7 @@ model WalletEsimPurchase {
   paymentAttempts                  EsimPurchasePaymentAttempt[]
   promoCode                        PromoCode?               @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
   promoRedemption                  PromoCodeRedemption?
+  rewardRedemption                 CustomerRewardRedemption?
   rewardTransactions               CustomerRewardTransaction[]
 
   @@index([customerUserId])
@@ -1270,11 +1282,36 @@ model CustomerRewardAccount {
   updatedAt              DateTime                    @updatedAt
   customer               User                        @relation("CustomerRewardAccount", fields: [customerUserId], references: [id], onDelete: Cascade)
   transactions           CustomerRewardTransaction[]
+  redemptions            CustomerRewardRedemption[]
 
   @@index([createdAt])
 }
 
-/// Append-only customer rewards ledger. Slice 1 runtime writes PURCHASE_EARN only.
+/// Durable customer reward reservation (promo-like HELD → COMPLETED / RELEASED).
+model CustomerRewardRedemption {
+  id                   String                          @id @default(cuid())
+  customerUserId       String
+  rewardAccountId      String
+  walletEsimPurchaseId String                          @unique
+  status               CustomerRewardRedemptionStatus  @default(HELD)
+  /// Points reserved from pointsBalance. 1 point = 1 USD cent.
+  pointsHeld           Int
+  /// Package cents after promo at hold time (earning basis is this amount, not cash payable).
+  afterPromoCents      Int
+  completedAt          DateTime?
+  orderId              String?
+  createdAt            DateTime                        @default(now())
+  updatedAt            DateTime                        @updatedAt
+  customer             User                            @relation("CustomerRewardRedemption", fields: [customerUserId], references: [id], onDelete: Cascade)
+  account              CustomerRewardAccount           @relation(fields: [rewardAccountId], references: [id], onDelete: Cascade)
+  purchase             WalletEsimPurchase              @relation(fields: [walletEsimPurchaseId], references: [id], onDelete: Cascade)
+
+  @@index([customerUserId, createdAt])
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// Append-only customer rewards ledger. Slice 1 writes PURCHASE_EARN; Slice 2 writes REDEMPTION / REDEMPTION_RESTORE.
 model CustomerRewardTransaction {
   id                 String                         @id @default(cuid())
   rewardAccountId    String

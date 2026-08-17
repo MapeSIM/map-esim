@@ -37,3 +37,8 @@ export function parseUseWalletChoice(raw: unknown): boolean {
   if (raw === true || raw === "true" || raw === "on" || raw === "1") return true;
   return false;
 }
+
+/** Same parser as wallet — never accepts points or money amounts. */
+export function parseUseRewardsChoice(raw: unknown): boolean {
+  return parseUseWalletChoice(raw);
+}

@@ -36,33 +36,44 @@ type Props = {
  */
 function previewPurchaseFunding(
   review: WalletPurchaseReview,
-  useWallet: boolean
-): PurchaseFundingBreakdown {
-  const payableCents = Math.trunc(Number(review.payableCents ?? review.priceCents));
+  useWallet: boolean,
+  useRewards: boolean
+): PurchaseFundingBreakdown & { rewardPointsRedeemed: number } {
+  const afterPromoCents = Math.trunc(Number(review.payableCents ?? review.priceCents));
+  const pointsBalance = Math.max(0, Math.trunc(Number(review.rewardPointsBalance)));
+  const eligible = review.rewardEligible === true;
+  const rewardPointsRedeemed =
+    useRewards && eligible
+      ? Math.min(pointsBalance, Math.max(0, afterPromoCents))
+      : 0;
+  const payableCents = Math.max(0, afterPromoCents - rewardPointsRedeemed);
   try {
     if (payableCents === 0) {
       return {
         useWallet,
         walletAppliedCents: 0,
         gatewayAmountCents: 0,
+        rewardPointsRedeemed,
       };
     }
-    return calculatePurchaseFunding({
-      priceCents: payableCents,
-      walletBalanceCents: review.balanceCents,
-      useWallet,
-    });
+    return {
+      ...calculatePurchaseFunding({
+        priceCents: payableCents,
+        walletBalanceCents: review.balanceCents,
+        useWallet,
+      }),
+      rewardPointsRedeemed,
+    };
   } catch {
     // Same choice as the server review DTO — trust its live breakdown.
-    if (useWallet === review.useWallet) {
+    if (useWallet === review.useWallet && useRewards === review.useRewards) {
       return {
         useWallet: review.useWallet,
         walletAppliedCents: review.walletAppliedCents,
         gatewayAmountCents: review.gatewayAmountCents,
+        rewardPointsRedeemed: review.rewardPointsRedeemed,
       };
     }
-    // Toggle ahead of a persisted refresh: coerce display cents only.
-    // Submit always re-validates with server balance/price.
     const priceCents = payableCents;
     const balanceCents = Math.max(0, Math.trunc(Number(review.balanceCents)));
     if (
@@ -74,6 +85,7 @@ function previewPurchaseFunding(
         useWallet: review.useWallet,
         walletAppliedCents: review.walletAppliedCents,
         gatewayAmountCents: review.gatewayAmountCents,
+        rewardPointsRedeemed: review.rewardPointsRedeemed,
       };
     }
     const walletAppliedCents = useWallet
@@ -83,6 +95,7 @@ function previewPurchaseFunding(
       useWallet,
       walletAppliedCents,
       gatewayAmountCents: priceCents - walletAppliedCents,
+      rewardPointsRedeemed,
     };
   }
 }
@@ -95,13 +108,16 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
   );
   const [confirmed, setConfirmed] = useState(false);
   const [useWallet, setUseWallet] = useState(review.useWallet);
+  const [useRewards, setUseRewards] = useState(review.useRewards);
   const [fundingPending, startFundingTransition] = useTransition();
   const fundingChoiceGen = useRef(0);
   const confirmId = useId();
   const useWalletId = useId();
+  const useRewardsId = useId();
   const planHeadingId = useId();
   const customerHeadingId = useId();
   const walletHeadingId = useId();
+  const rewardsHeadingId = useId();
   const orderHeadingId = useId();
   const paymentHeadingId = useId();
   const errorState = state as WalletPurchaseActionState;
@@ -109,12 +125,15 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
   // Reset local choice only when navigating to a different purchase.
   useEffect(() => {
     setUseWallet(review.useWallet);
-  }, [review.purchaseId, review.useWallet]);
+    setUseRewards(review.useRewards);
+  }, [review.purchaseId, review.useWallet, review.useRewards]);
 
-  const preview = previewPurchaseFunding(review, useWallet);
+  const preview = previewPurchaseFunding(review, useWallet, useRewards);
   const gatewayRequired = preview.gatewayAmountCents > 0;
   const walletFundsApplied = preview.walletAppliedCents > 0;
   const fullWallet = !gatewayRequired && walletFundsApplied;
+  const zeroCashConfirm = !gatewayRequired;
+  const rewardsDisabled = !review.rewardEligible;
   const walletDisabled = review.balanceCents <= 0;
   const paymentGatewayConfigured = review.paymentGatewayConfigured === true;
   const gatewayReady = gatewayRequired && paymentGatewayConfigured;
@@ -131,13 +150,13 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         : errorState.error
       : null;
 
-  function onUseWalletChange(checked: boolean) {
-    setUseWallet(checked);
+  function persistFundingChoice(nextWallet: boolean, nextRewards: boolean) {
     const gen = ++fundingChoiceGen.current;
     startFundingTransition(async () => {
       const fd = new FormData();
       fd.set("purchaseId", review.purchaseId);
-      if (checked) fd.set("useWallet", "on");
+      if (nextWallet) fd.set("useWallet", "on");
+      if (nextRewards) fd.set("useRewards", "on");
       const result = await setWalletPurchaseFundingChoiceAction(
         initialWalletPurchaseState,
         fd
@@ -146,6 +165,16 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         router.refresh();
       }
     });
+  }
+
+  function onUseWalletChange(checked: boolean) {
+    setUseWallet(checked);
+    persistFundingChoice(checked, useRewards && !rewardsDisabled);
+  }
+
+  function onUseRewardsChange(checked: boolean) {
+    setUseRewards(checked);
+    persistFundingChoice(useWallet && !walletDisabled, checked);
   }
 
   return (
@@ -229,6 +258,66 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
 
       <section
         className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 sm:px-5"
+        aria-labelledby={rewardsHeadingId}
+      >
+        <h2
+          id={rewardsHeadingId}
+          className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+        >
+          Rewards
+        </h2>
+        {review.rewardEligible ? (
+          <>
+            <p className="mt-2 text-sm text-[var(--text-muted)]">
+              {review.rewardPointsBalanceLabel} points available (
+              {review.rewardValueLabel})
+            </p>
+            <label
+              htmlFor={useRewardsId}
+              className="mt-4 flex items-start gap-3 text-sm text-[var(--heading)]"
+            >
+              <input
+                id={useRewardsId}
+                name="useRewards"
+                type="checkbox"
+                value="on"
+                checked={useRewards}
+                onChange={(event) => onUseRewardsChange(event.target.checked)}
+                disabled={busy}
+                className="mt-1"
+              />
+              <span>Use rewards</span>
+            </label>
+          </>
+        ) : (
+          <>
+            <p className="mt-2 text-sm text-[var(--heading)]">
+              {review.rewardPointsBalanceLabel} points available
+            </p>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Earn {review.rewardPointsToUnlock} more points to unlock rewards.
+            </p>
+            <label
+              htmlFor={useRewardsId}
+              className="mt-4 flex items-start gap-3 text-sm text-[var(--text-muted)]"
+            >
+              <input
+                id={useRewardsId}
+                name="useRewards"
+                type="checkbox"
+                value="on"
+                checked={false}
+                disabled
+                className="mt-1"
+              />
+              <span>Use rewards</span>
+            </label>
+          </>
+        )}
+      </section>
+
+      <section
+        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 sm:px-5"
         aria-labelledby={walletHeadingId}
       >
         <h2
@@ -275,22 +364,42 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               Package total
             </dt>
             <dd className="font-semibold text-[var(--heading)]">
-              {formatUsdCents(review.payableCents)}
+              {formatUsdCents(review.priceCents)}
             </dd>
           </div>
-          <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[180px_1fr]">
-            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              Wallet applied
-            </dt>
-            <dd className="font-semibold text-[var(--heading)]">
-              {preview.walletAppliedCents > 0
-                ? `−${formatUsdCents(preview.walletAppliedCents)}`
-                : formatUsdCents(0)}
-            </dd>
-          </div>
+          {review.promoDiscountCents > 0 ? (
+            <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[180px_1fr]">
+              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                Promo discount
+              </dt>
+              <dd className="font-semibold text-[var(--heading)]">
+                −{formatUsdCents(review.promoDiscountCents)}
+              </dd>
+            </div>
+          ) : null}
+          {preview.rewardPointsRedeemed > 0 ? (
+            <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[180px_1fr]">
+              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                Rewards applied
+              </dt>
+              <dd className="font-semibold text-[var(--heading)]">
+                −{formatUsdCents(preview.rewardPointsRedeemed)}
+              </dd>
+            </div>
+          ) : null}
+          {preview.walletAppliedCents > 0 ? (
+            <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[180px_1fr]">
+              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                Wallet applied
+              </dt>
+              <dd className="font-semibold text-[var(--heading)]">
+                −{formatUsdCents(preview.walletAppliedCents)}
+              </dd>
+            </div>
+          ) : null}
           <div
             className={`grid gap-1 py-3 sm:grid-cols-[180px_1fr]${
-              fullWallet ? " border-b border-[var(--border)]" : ""
+              fullWallet || zeroCashConfirm ? " border-b border-[var(--border)]" : ""
             }`}
           >
             <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
@@ -349,14 +458,14 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         </section>
       ) : null}
 
-      {fullWallet ? (
+      {zeroCashConfirm ? (
         <div
           className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-4 text-sm text-[var(--text-muted)]"
           role="note"
         >
-          Confirm below to complete this purchase with your wallet. If the
-          provider confirms failure, the amount will be restored automatically.
-          An uncertain provider result may require support review.
+          {fullWallet
+            ? "Confirm below to complete this purchase with your wallet. If the provider confirms failure, the amount will be restored automatically. An uncertain provider result may require support review."
+            : "Confirm below to complete this purchase. No card payment is required. If the provider confirms failure, reserved rewards are restored automatically."}
         </div>
       ) : null}
 
@@ -369,7 +478,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         </div>
       ) : null}
 
-      {fullWallet ? (
+      {zeroCashConfirm ? (
         <>
           <div className="space-y-2">
             <label
@@ -386,8 +495,9 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 className="mt-1"
               />
               <span>
-                I confirm this wallet purchase and understand funds are reserved
-                before provider checkout.
+                {fullWallet
+                  ? "I confirm this wallet purchase and understand funds are reserved before provider checkout."
+                  : "I confirm this purchase. No card payment is required."}
               </span>
             </label>
             {errorState.ok === false && errorState.fieldErrors?.confirm ? (
@@ -402,7 +512,13 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
             disabled={busy || !confirmed}
             className="inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] disabled:opacity-60"
           >
-            {pending ? "Buying with wallet…" : "Buy eSIM with Wallet"}
+            {pending
+              ? fullWallet
+                ? "Buying with wallet…"
+                : "Completing purchase…"
+              : fullWallet
+                ? "Buy eSIM with Wallet"
+                : "Complete purchase"}
           </button>
         </>
       ) : gatewayReady ? (

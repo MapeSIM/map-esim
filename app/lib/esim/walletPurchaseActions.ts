@@ -17,6 +17,7 @@ import {
   type WalletPurchaseActionState,
 } from "@/app/lib/esim/walletPurchaseFormState";
 import {
+  parseUseRewardsChoice,
   parseUseWalletChoice,
   parseWalletPurchaseIdempotencyKey,
 } from "@/app/lib/esim/walletPurchaseValidation";
@@ -133,12 +134,16 @@ export async function setWalletPurchaseFundingChoiceAction(
   const customer = await requireRole("CUSTOMER");
   const purchaseId = String(formData.get("purchaseId") ?? "").trim();
   const useWallet = parseUseWalletChoice(formData.get("useWallet"));
+  const useRewards = parseUseRewardsChoice(formData.get("useRewards"));
 
   void formData.get("walletAppliedCents");
   void formData.get("gatewayAmountCents");
   void formData.get("price");
   void formData.get("priceCents");
   void formData.get("walletBalance");
+  void formData.get("rewardPoints");
+  void formData.get("rewardPointsRedeemed");
+  void formData.get("pointsBalance");
 
   if (!purchaseId || purchaseId.length > 64) {
     return { ok: false, error: "This purchase is unavailable." };
@@ -149,6 +154,7 @@ export async function setWalletPurchaseFundingChoiceAction(
       customerUserId: customer.id,
       purchaseId,
       useWallet,
+      useRewards,
     });
   } catch (error) {
     if (error instanceof WalletEsimPurchaseError) {
@@ -175,6 +181,7 @@ export async function confirmWalletEsimPurchaseAction(
   );
   const confirmed = formData.get("confirm") === "on";
   const useWallet = parseUseWalletChoice(formData.get("useWallet"));
+  const useRewards = parseUseRewardsChoice(formData.get("useRewards"));
 
   // Never trust browser money fields.
   void formData.get("price");
@@ -190,6 +197,9 @@ export async function confirmWalletEsimPurchaseAction(
   void formData.get("discountCents");
   void formData.get("finalPriceCents");
   void formData.get("percent");
+  void formData.get("rewardPoints");
+  void formData.get("rewardPointsRedeemed");
+  void formData.get("pointsBalance");
 
   if (!purchaseId || purchaseId.length > 64) {
     return { ok: false, error: "This purchase is unavailable." };
@@ -205,6 +215,7 @@ export async function confirmWalletEsimPurchaseAction(
       customerUserId: customer.id,
       purchaseId,
       useWallet,
+      useRewards,
     });
   } catch (error) {
     if (
@@ -237,6 +248,7 @@ export async function confirmWalletEsimPurchaseAction(
           customerUserId: customer.id,
           purchaseId,
           useWallet,
+          useRewards,
         });
       } catch (error) {
         if (error instanceof EsimPurchaseGatewayCheckoutError) {
@@ -264,6 +276,7 @@ export async function confirmWalletEsimPurchaseAction(
         customerUserId: customer.id,
         purchaseId,
         useWallet,
+        useRewards,
       });
     } catch (error) {
       if (error instanceof EsimPurchaseGatewayCheckoutError) {
@@ -308,7 +321,7 @@ export async function confirmWalletEsimPurchaseAction(
       if (error.code === "RECONCILIATION_REQUIRED") {
         redirect(reconciliationPath(purchaseId));
       }
-      if (error.code === "PROMO_INVALID") {
+      if (error.code === "PROMO_INVALID" || error.code === "REWARDS_INVALID") {
         return { ok: false, error: error.message };
       }
       return { ok: false, error: error.message };

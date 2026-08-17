@@ -3,6 +3,9 @@
  * Never accepts browser-authoritative balances or money fields.
  */
 
+import { payablePackageCents } from "@/app/lib/promo/promoDiscount";
+import { calculateRewardPointsToApply } from "@/app/lib/rewards/rewardPoints";
+
 export type PurchaseFundingInput = {
   priceCents: number;
   /** Server-loaded wallet balance only. */
@@ -106,4 +109,64 @@ export function calculatePayablePurchaseFunding(
     };
   }
   return calculatePurchaseFunding(input);
+}
+
+export type CustomerCheckoutFundingInput = {
+  /** Authoritative catalog price. */
+  priceCents: number;
+  promoDiscountCents: number;
+  walletBalanceCents: number;
+  useWallet: boolean;
+  /** Live pre-redemption points balance. */
+  pointsBalance: number;
+  useRewards: boolean;
+};
+
+export type CustomerCheckoutFundingBreakdown = PurchaseFundingBreakdown & {
+  afterPromoCents: number;
+  cashPayableCents: number;
+  rewardEligible: boolean;
+  rewardPointsRedeemed: number;
+  useRewards: boolean;
+};
+
+/**
+ * Locked money order: catalog → promo → rewards → wallet → gateway.
+ * Rewards never discount wallet balance. Browser never authoritative.
+ */
+export function calculateCustomerCheckoutFunding(
+  input: CustomerCheckoutFundingInput
+): CustomerCheckoutFundingBreakdown {
+  const afterPromoCents = payablePackageCents(
+    input.priceCents,
+    input.promoDiscountCents
+  );
+  const applied = calculateRewardPointsToApply({
+    afterPromoCents,
+    pointsBalance: input.pointsBalance,
+    useRewards: input.useRewards,
+  });
+  const rewardPointsRedeemed = applied.pointsApplied;
+  const cashPayableCents = afterPromoCents - rewardPointsRedeemed;
+  if (cashPayableCents < 0) {
+    throw new PurchaseFundingError(
+      "INVALID_BREAKDOWN",
+      "Invalid funding breakdown."
+    );
+  }
+  const walletGateway = calculatePayablePurchaseFunding({
+    priceCents: cashPayableCents,
+    walletBalanceCents: input.walletBalanceCents,
+    useWallet: input.useWallet,
+  });
+  return {
+    afterPromoCents,
+    cashPayableCents,
+    rewardEligible: applied.eligible,
+    rewardPointsRedeemed,
+    useRewards: Boolean(input.useRewards) && applied.eligible,
+    useWallet: walletGateway.useWallet,
+    walletAppliedCents: walletGateway.walletAppliedCents,
+    gatewayAmountCents: walletGateway.gatewayAmountCents,
+  };
 }

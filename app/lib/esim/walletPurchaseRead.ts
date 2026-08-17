@@ -6,11 +6,13 @@ import {
   WalletEsimPurchaseStatus,
 } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
-import { calculatePayablePurchaseFunding } from "@/app/lib/esim/purchaseFunding";
+import { calculateCustomerCheckoutFunding } from "@/app/lib/esim/purchaseFunding";
 import { payablePackageCents } from "@/app/lib/promo/promoDiscount";
 import { formatWalletPurchasePriceLabel } from "@/app/lib/esim/walletPurchase";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
 import { formatUsdCents } from "@/app/lib/wallet/display";
+import { pointsNeededToUnlockRewards } from "@/app/lib/rewards/rewardConstants";
+import { isRewardRedemptionEligible } from "@/app/lib/rewards/rewardPoints";
 
 function displayOrUnavailable(value: string | null | undefined): string {
   const trimmed = (value ?? "").trim();
@@ -37,6 +39,14 @@ export type WalletPurchaseReview = {
   promoOriginalLabel: string;
   promoDiscountLabel: string;
   promoTotalLabel: string;
+  rewardPointsBalance: number;
+  rewardPointsBalanceLabel: string;
+  rewardValueLabel: string;
+  rewardEligible: boolean;
+  rewardPointsToUnlock: number;
+  useRewards: boolean;
+  rewardPointsRedeemed: number;
+  rewardAppliedLabel: string;
   balanceLabel: string;
   balanceCents: number;
   balanceAfterLabel: string;
@@ -80,6 +90,8 @@ export async function getWalletPurchaseReview(
       promoCodeNormalized: true,
       promoDiscountCents: true,
       useWallet: true,
+      useRewards: true,
+      rewardPointsRedeemed: true,
       walletAppliedCents: true,
       gatewayAmountCents: true,
       fundingSource: true,
@@ -103,6 +115,11 @@ export async function getWalletPurchaseReview(
     select: { balanceCents: true },
   });
   const balanceCents = wallet?.balanceCents ?? 0;
+  const rewardAccount = await prisma.customerRewardAccount.findUnique({
+    where: { customerUserId: owner.id },
+    select: { pointsBalance: true },
+  });
+  const rewardPointsBalance = rewardAccount?.pointsBalance ?? 0;
 
   const payableCents = payablePackageCents(
     row.priceCents,
@@ -110,22 +127,39 @@ export async function getWalletPurchaseReview(
   );
   const promoApplied =
     Boolean(row.promoCodeNormalized) && row.promoDiscountCents > 0;
-  // Live preview from current balance + stored choice (server-side for initial render).
-  const liveFunding = calculatePayablePurchaseFunding({
-    priceCents: payableCents,
+  const liveFunding = calculateCustomerCheckoutFunding({
+    priceCents: row.priceCents,
+    promoDiscountCents: row.promoDiscountCents,
     walletBalanceCents: balanceCents,
     useWallet: row.useWallet,
+    pointsBalance: rewardPointsBalance,
+    useRewards: row.useRewards,
   });
+  const snapshotLocked =
+    row.status !== WalletEsimPurchaseStatus.READY;
+  const displayFunding = snapshotLocked
+    ? {
+        ...liveFunding,
+        useWallet: row.useWallet,
+        useRewards: row.useRewards,
+        rewardPointsRedeemed: row.rewardPointsRedeemed,
+        walletAppliedCents: row.walletAppliedCents,
+        gatewayAmountCents: row.gatewayAmountCents,
+      }
+    : liveFunding;
+  const rewardEligible = snapshotLocked
+    ? row.useRewards || isRewardRedemptionEligible(rewardPointsBalance)
+    : isRewardRedemptionEligible(rewardPointsBalance);
 
   const after =
     row.status === WalletEsimPurchaseStatus.READY
-      ? Math.max(0, balanceCents - liveFunding.walletAppliedCents)
+      ? Math.max(0, balanceCents - displayFunding.walletAppliedCents)
       : balanceCents;
 
   let fundingLabel: WalletPurchaseReview["fundingLabel"] = "Wallet";
-  if (liveFunding.gatewayAmountCents > 0 && liveFunding.walletAppliedCents > 0) {
+  if (displayFunding.gatewayAmountCents > 0 && displayFunding.walletAppliedCents > 0) {
     fundingLabel = "Wallet + card";
-  } else if (liveFunding.gatewayAmountCents > 0) {
+  } else if (displayFunding.gatewayAmountCents > 0) {
     fundingLabel = "Card";
   }
 
@@ -151,14 +185,22 @@ export async function getWalletPurchaseReview(
     promoOriginalLabel: formatWalletPurchasePriceLabel(row.priceCents),
     promoDiscountLabel: formatWalletPurchasePriceLabel(row.promoDiscountCents),
     promoTotalLabel: formatWalletPurchasePriceLabel(payableCents),
+    rewardPointsBalance,
+    rewardPointsBalanceLabel: String(rewardPointsBalance),
+    rewardValueLabel: formatUsdCents(rewardPointsBalance),
+    rewardEligible,
+    rewardPointsToUnlock: pointsNeededToUnlockRewards(rewardPointsBalance),
+    useRewards: displayFunding.useRewards,
+    rewardPointsRedeemed: displayFunding.rewardPointsRedeemed,
+    rewardAppliedLabel: formatUsdCents(displayFunding.rewardPointsRedeemed),
     balanceLabel: formatUsdCents(balanceCents),
     balanceCents,
     balanceAfterLabel: formatUsdCents(after),
-    useWallet: liveFunding.useWallet,
-    walletAppliedCents: liveFunding.walletAppliedCents,
-    walletAppliedLabel: formatUsdCents(liveFunding.walletAppliedCents),
-    gatewayAmountCents: liveFunding.gatewayAmountCents,
-    gatewayAmountLabel: formatUsdCents(liveFunding.gatewayAmountCents),
+    useWallet: displayFunding.useWallet,
+    walletAppliedCents: displayFunding.walletAppliedCents,
+    walletAppliedLabel: formatUsdCents(displayFunding.walletAppliedCents),
+    gatewayAmountCents: displayFunding.gatewayAmountCents,
+    gatewayAmountLabel: formatUsdCents(displayFunding.gatewayAmountCents),
     fundingLabel,
     paymentGatewayConfigured: isPaymentGatewayConfigured(),
     idempotencyKey: row.idempotencyKey,

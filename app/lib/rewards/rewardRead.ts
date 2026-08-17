@@ -59,13 +59,18 @@ export async function getCustomerRewardSummary(
   const rows = await prisma.customerRewardTransaction.findMany({
     where: {
       customerUserId: owner.id,
-      type: CustomerRewardTransactionType.PURCHASE_EARN,
-      pointsDelta: { gt: 0 },
+      type: {
+        in: [
+          CustomerRewardTransactionType.PURCHASE_EARN,
+          CustomerRewardTransactionType.REDEMPTION,
+        ],
+      },
     },
     orderBy: { createdAt: "desc" },
     take: 20,
     select: {
       id: true,
+      type: true,
       pointsDelta: true,
       createdAt: true,
     },
@@ -79,13 +84,21 @@ export async function getCustomerRewardSummary(
     statusCopy:
       pointsBalance < REWARD_MIN_REDEMPTION_POINTS
         ? REWARDS_COPY.earnMore
-        : REWARDS_COPY.redemptionComing,
-    history: rows.map((row) => ({
-      id: row.id,
-      label: "eSIM purchase",
-      pointsLabel: `+${row.pointsDelta} points`,
-      dateLabel: formatDate(row.createdAt),
-    })),
+        : REWARDS_COPY.useAtCheckout,
+    history: rows
+      .filter((row) => row.pointsDelta !== 0)
+      .map((row) => ({
+        id: row.id,
+        label:
+          row.type === CustomerRewardTransactionType.REDEMPTION
+            ? "Rewards used"
+            : "eSIM purchase",
+        pointsLabel:
+          row.pointsDelta < 0
+            ? `−${Math.abs(row.pointsDelta)} points`
+            : `+${row.pointsDelta} points`,
+        dateLabel: formatDate(row.createdAt),
+      })),
   };
 }
 

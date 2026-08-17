@@ -269,6 +269,7 @@ export type CustomerOrderDetail = {
   refundedAtLabel: string | null;
   refundAmountLabel: string | null;
   rewardsEarnedPoints: number | null;
+  rewardsAppliedPoints: number | null;
 };
 
 /**
@@ -328,6 +329,7 @@ export async function getCustomerOwnedOrderDetail(
           priceCents: true,
           promoCodeNormalized: true,
           promoDiscountCents: true,
+          rewardPointsRedeemed: true,
           updatedAt: true,
           completedAt: true,
           refundTransaction: {
@@ -384,7 +386,14 @@ export async function getCustomerOwnedOrderDetail(
   const installEligible =
     order.status === OrderStatus.COMPLETED && statusBadge === "Completed";
 
+  let rewardsAppliedPoints: number | null = null;
   let rewardsEarnedPoints: number | null = null;
+  if (
+    order.walletEsimPurchase &&
+    order.walletEsimPurchase.rewardPointsRedeemed > 0
+  ) {
+    rewardsAppliedPoints = order.walletEsimPurchase.rewardPointsRedeemed;
+  }
   if (installEligible && order.walletEsimPurchase) {
     const earn = await prisma.customerRewardTransaction.findFirst({
       where: {
@@ -468,5 +477,6 @@ export async function getCustomerOwnedOrderDetail(
     refundedAtLabel,
     refundAmountLabel,
     rewardsEarnedPoints,
+    rewardsAppliedPoints,
   };
 }

@@ -34,7 +34,7 @@ import {
   OperationalControlUnavailableError,
 } from "@/app/lib/admin/operationalControlsPolicy";
 import { OPERATIONAL_CONTROL_UNAVAILABLE_MESSAGE } from "@/app/lib/admin/operationalControlsShared";
-import { walletOnlyPurchaseFunding, calculatePurchaseFunding, calculatePayablePurchaseFunding } from "@/app/lib/esim/purchaseFunding";
+import { walletOnlyPurchaseFunding, calculatePurchaseFunding, calculateCustomerCheckoutFunding } from "@/app/lib/esim/purchaseFunding";
 import { payablePackageCents } from "@/app/lib/promo/promoDiscount";
 import {
   claimPurchasePromoInTx,
@@ -45,6 +45,14 @@ import {
   releasePromoRedemptionInTx,
 } from "@/app/lib/promo/promoRedemption";
 import { awardCustomerPurchaseEarnInTx } from "@/app/lib/rewards/rewardEarn";
+import {
+  claimRewardRedemptionInTx,
+  completeRewardRedemptionInTx,
+  loadCustomerRewardPointsBalance,
+  releaseRewardRedemptionInTx,
+  RewardRedemptionError,
+} from "@/app/lib/rewards/rewardRedeem";
+import { REWARDS_REFRESH_CHECKOUT_MESSAGE } from "@/app/lib/rewards/rewardConstants";
 import { PromoEvaluateError } from "@/app/lib/promo/promoEvaluate";
 import {
   assertCustomerFinancialActivityAllowed,
@@ -109,7 +117,8 @@ export class WalletEsimPurchaseError extends Error {
     | "PROVIDER_FAILED"
     | "RECONCILIATION_REQUIRED"
     | "UNAVAILABLE"
-    | "PROMO_INVALID";
+    | "PROMO_INVALID"
+    | "REWARDS_INVALID";
 
   constructor(code: WalletEsimPurchaseError["code"], message: string) {
     super(message);
@@ -482,6 +491,7 @@ export type SetWalletPurchaseFundingChoiceInput = {
   customerUserId: string;
   purchaseId: string;
   useWallet: boolean;
+  useRewards: boolean;
 };
 
 export type SetWalletPurchaseFundingChoiceResult = {
@@ -495,7 +505,7 @@ export type SetWalletPurchaseFundingChoiceResult = {
 
 /**
  * Persist customer wallet-funding choice on a READY purchase.
- * Accepts only useWallet — price and balance are re-read server-side.
+ * Accepts only useWallet / useRewards — price and balances are re-read server-side.
  * Does not reserve wallet funds, create gateway sessions, or change status.
  */
 export async function setWalletPurchaseFundingChoice(
@@ -504,6 +514,7 @@ export async function setWalletPurchaseFundingChoice(
   const customerUserId = input.customerUserId.trim();
   const purchaseId = input.purchaseId.trim();
   const useWallet = Boolean(input.useWallet);
+  const useRewards = Boolean(input.useRewards);
 
   if (!customerUserId || customerUserId.length > 64) {
     throw new WalletEsimPurchaseError(
@@ -577,14 +588,17 @@ export async function setWalletPurchaseFundingChoice(
     );
   }
 
-  const payableCents = payablePackageCents(
-    purchase.priceCents,
-    purchase.promoDiscountCents
+  const pointsBalance = await loadCustomerRewardPointsBalance(
+    prisma,
+    customerUserId
   );
-  const funding = calculatePayablePurchaseFunding({
-    priceCents: payableCents,
+  const funding = calculateCustomerCheckoutFunding({
+    priceCents: purchase.priceCents,
+    promoDiscountCents: purchase.promoDiscountCents,
     walletBalanceCents: wallet.balanceCents,
     useWallet,
+    pointsBalance,
+    useRewards,
   });
 
   // Keep fundingSource aligned with the authoritative breakdown:
@@ -604,6 +618,8 @@ export async function setWalletPurchaseFundingChoice(
     },
     data: {
       useWallet: funding.useWallet,
+      useRewards: funding.useRewards,
+      rewardPointsRedeemed: funding.rewardPointsRedeemed,
       walletAppliedCents: funding.walletAppliedCents,
       gatewayAmountCents: funding.gatewayAmountCents,
       fundingSource,
@@ -999,6 +1015,7 @@ export async function refundReservedFundsInTx(
   }
 
   await releasePromoRedemptionInTx(tx, purchase.id);
+  await releaseRewardRedemptionInTx(tx, purchase.id);
 
   await tx.auditLog.create({
     data: {
@@ -1165,6 +1182,9 @@ export async function confirmWalletEsimPurchase(
       priceCents: true,
       promoCodeId: true,
       promoDiscountCents: true,
+      useWallet: true,
+      useRewards: true,
+      rewardPointsRedeemed: true,
       status: true,
       idempotencyKey: true,
       orderId: true,
@@ -1288,7 +1308,7 @@ export async function confirmWalletEsimPurchase(
 
   const debitKey = `debit_${purchase.id}`.slice(0, 128);
   let reservedDebitTransactionId = "";
-  let payableCents = snapshot.priceCents;
+  let afterPromoCents = snapshot.priceCents;
   if (!isAssisted && purchase.promoCodeId) {
     try {
       const evaluated = await revalidatePurchasePromo({
@@ -1299,7 +1319,7 @@ export async function confirmWalletEsimPurchase(
         priceCents: snapshot.priceCents,
         promoCodeId: purchase.promoCodeId,
       });
-      payableCents = evaluated?.finalPriceCents ?? snapshot.priceCents;
+      afterPromoCents = evaluated?.finalPriceCents ?? snapshot.priceCents;
     } catch (error) {
       if (error instanceof PromoEvaluateError) {
         throw new WalletEsimPurchaseError("PROMO_INVALID", error.message);
@@ -1307,20 +1327,61 @@ export async function confirmWalletEsimPurchase(
       throw error;
     }
   } else if (!isAssisted) {
-    payableCents = payablePackageCents(
+    afterPromoCents = payablePackageCents(
       snapshot.priceCents,
       purchase.promoDiscountCents
     );
   }
-  // Assisted: full catalog price. Self-service: payable after server promo.
-  const walletOnlyFunding =
-    payableCents > 0
-      ? walletOnlyPurchaseFunding(payableCents)
-      : {
-          useWallet: true,
-          walletAppliedCents: 0,
-          gatewayAmountCents: 0,
-        };
+
+  const wallet = await prisma.walletAccount.findUnique({
+    where: { userId: customerUserId },
+    select: { balanceCents: true },
+  });
+  if (!wallet) {
+    throw new WalletEsimPurchaseError(
+      "WALLET_UNAVAILABLE",
+      isAssisted
+        ? "A customer wallet is required before an assisted purchase."
+        : "A wallet is required before purchasing with wallet funds."
+    );
+  }
+
+  const pointsBalance = isAssisted
+    ? 0
+    : await loadCustomerRewardPointsBalance(prisma, customerUserId);
+  const promoDiscountCents = snapshot.priceCents - afterPromoCents;
+  const checkoutFunding = isAssisted
+    ? {
+        ...walletOnlyPurchaseFunding(snapshot.priceCents),
+        afterPromoCents: snapshot.priceCents,
+        cashPayableCents: snapshot.priceCents,
+        rewardEligible: false,
+        rewardPointsRedeemed: 0,
+        useRewards: false,
+      }
+    : calculateCustomerCheckoutFunding({
+        priceCents: snapshot.priceCents,
+        promoDiscountCents,
+        walletBalanceCents: wallet.balanceCents,
+        useWallet: purchase.useWallet,
+        pointsBalance,
+        useRewards: purchase.useRewards,
+      });
+
+  if (!isAssisted && purchase.useRewards && !checkoutFunding.useRewards) {
+    throw new WalletEsimPurchaseError(
+      "REWARDS_INVALID",
+      REWARDS_REFRESH_CHECKOUT_MESSAGE
+    );
+  }
+  if (!isAssisted && checkoutFunding.gatewayAmountCents > 0) {
+    throw new WalletEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is not ready for confirmation."
+    );
+  }
+
+  const walletDebitCents = checkoutFunding.walletAppliedCents;
 
   // Atomic claim + wallet reservation (provider call stays outside).
   try {
@@ -1340,10 +1401,12 @@ export async function confirmWalletEsimPurchase(
           dataAllowance: snapshot.dataAllowance,
           validity: snapshot.validity,
           priceCents: snapshot.priceCents,
-          promoDiscountCents: snapshot.priceCents - payableCents,
-          useWallet: walletOnlyFunding.useWallet,
-          walletAppliedCents: walletOnlyFunding.walletAppliedCents,
-          gatewayAmountCents: walletOnlyFunding.gatewayAmountCents,
+          promoDiscountCents,
+          useWallet: checkoutFunding.useWallet,
+          useRewards: checkoutFunding.useRewards,
+          rewardPointsRedeemed: checkoutFunding.rewardPointsRedeemed,
+          walletAppliedCents: checkoutFunding.walletAppliedCents,
+          gatewayAmountCents: checkoutFunding.gatewayAmountCents,
           providerCostCents: snapshot.providerCostCents,
           currency: snapshot.currency,
         },
@@ -1375,13 +1438,21 @@ export async function confirmWalletEsimPurchase(
         }
       }
 
-      if (payableCents <= 0) {
+      if (!isAssisted) {
+        await claimRewardRedemptionInTx(tx, {
+          customerUserId,
+          purchaseId: purchase.id,
+          pointsToHold: checkoutFunding.rewardPointsRedeemed,
+          afterPromoCents: checkoutFunding.afterPromoCents,
+        });
+      }
+
+      if (walletDebitCents <= 0) {
         await tx.walletEsimPurchase.update({
           where: { id: purchase.id },
           data: {
             status: WalletEsimPurchaseStatus.PROVIDER_PENDING,
             debitTransactionId: null,
-            promoDiscountCents: snapshot.priceCents,
           },
         });
         return "";
@@ -1390,7 +1461,7 @@ export async function confirmWalletEsimPurchase(
       const reserved = await reserveWalletPurchaseFundsInTx(tx, {
         purchaseId: purchase.id,
         customerUserId,
-        amountCents: isAssisted ? snapshot.priceCents : payableCents,
+        amountCents: walletDebitCents,
         debitIdempotencyKey: debitKey,
       });
 
@@ -1414,8 +1485,8 @@ export async function confirmWalletEsimPurchase(
             purchaseId: purchase.id,
             offerId: snapshot.offerId,
             amountCents: snapshot.priceCents,
-            walletAppliedCents: walletOnlyFunding.walletAppliedCents,
-            gatewayAmountCents: walletOnlyFunding.gatewayAmountCents,
+            walletAppliedCents: checkoutFunding.walletAppliedCents,
+            gatewayAmountCents: checkoutFunding.gatewayAmountCents,
             currency: snapshot.currency,
             walletTransactionId: reserved.debitTransactionId,
             ...(isAssisted
@@ -1433,6 +1504,9 @@ export async function confirmWalletEsimPurchase(
     });
   } catch (error) {
     if (error instanceof WalletEsimPurchaseError) throw error;
+    if (error instanceof RewardRedemptionError) {
+      throw new WalletEsimPurchaseError("REWARDS_INVALID", error.message);
+    }
     if (error instanceof PromoEvaluateError) {
       throw new WalletEsimPurchaseError("PROMO_INVALID", error.message);
     }
@@ -1457,18 +1531,19 @@ export async function confirmWalletEsimPurchase(
   });
 
   if (checkout.kind === "declined") {
-    if (payableCents > 0) {
+    if (walletDebitCents > 0) {
       await refundReservedFunds({
         purchaseId: purchase.id,
         customerUserId,
         actorUserId,
         assisted: isAssisted,
-        priceCents: isAssisted ? snapshot.priceCents : payableCents,
+        priceCents: walletDebitCents,
         debitTransactionId: reservedDebitTransactionId,
       });
     } else {
       await prisma.$transaction(async (tx) => {
         await releasePromoRedemptionInTx(tx, purchase.id);
+        await releaseRewardRedemptionInTx(tx, purchase.id);
         await tx.walletEsimPurchase.updateMany({
           where: {
             id: purchase.id,
@@ -1571,6 +1646,12 @@ export async function confirmWalletEsimPurchase(
       });
 
       await completePromoRedemptionInTx(tx, {
+        purchaseId: purchase.id,
+        orderId: order.id,
+        actorUserId,
+      });
+
+      await completeRewardRedemptionInTx(tx, {
         purchaseId: purchase.id,
         orderId: order.id,
         actorUserId,

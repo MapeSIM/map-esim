@@ -34,6 +34,11 @@ import {
   releasePromoRedemptionInTx,
 } from "@/app/lib/promo/promoRedemption";
 import { awardCustomerPurchaseEarnInTx } from "@/app/lib/rewards/rewardEarn";
+import {
+  claimRewardRedemptionInTx,
+  completeRewardRedemptionInTx,
+  releaseRewardRedemptionInTx,
+} from "@/app/lib/rewards/rewardRedeem";
 import { scheduleWalletTransactionNotification } from "@/app/lib/wallet/transactionNotification";
 
 export const ESIM_PAYMENT_WEBHOOK_DUPLICATE = "esim.payment_webhook_duplicate";
@@ -626,6 +631,7 @@ async function releaseOnGatewayFailure(options: {
       // success funded first — do not treat as wallet returned.
     } else {
       await releasePromoRedemptionInTx(tx, options.purchaseId);
+      await releaseRewardRedemptionInTx(tx, options.purchaseId);
       await tx.walletEsimPurchase.updateMany({
         where: {
           id: options.purchaseId,
@@ -907,6 +913,12 @@ export async function fulfillFundedEsimPurchase(
         actorUserId: null,
       });
 
+      await completeRewardRedemptionInTx(tx, {
+        purchaseId: purchase.id,
+        orderId: order.id,
+        actorUserId: null,
+      });
+
       await awardCustomerPurchaseEarnInTx(tx, {
         customerUserId: purchase.customerUserId,
         purchaseId: purchase.id,
@@ -1037,6 +1049,7 @@ export async function maybeReleasePendingGatewayReservation(options: {
 
     if (attempt.purchase.walletAppliedCents <= 0) {
       await releasePromoRedemptionInTx(tx, purchaseId);
+      await releaseRewardRedemptionInTx(tx, purchaseId);
       await tx.walletEsimPurchase.updateMany({
         where: {
           id: purchaseId,
@@ -1101,6 +1114,9 @@ export async function reserveSplitWalletBeforeGatewayCheckout(options: {
   walletAppliedCents: number;
   gatewayAmountCents: number;
   useWallet: boolean;
+  promoDiscountCents: number;
+  rewardPointsRedeemed: number;
+  afterPromoCents: number;
 }): Promise<{ debitTransactionId: string | null; alreadyReserved: boolean }> {
   const walletAppliedCents = options.walletAppliedCents;
   if (!Number.isInteger(walletAppliedCents) || walletAppliedCents < 0) {
@@ -1151,10 +1167,8 @@ export async function reserveSplitWalletBeforeGatewayCheckout(options: {
       tx,
       options.purchaseId
     );
-    const promoDiscountCents = Math.max(
-      0,
-      current.priceCents - walletAppliedCents - options.gatewayAmountCents
-    );
+    const promoDiscountCents = Math.max(0, options.promoDiscountCents);
+    const rewardPointsRedeemed = Math.max(0, options.rewardPointsRedeemed);
     if (debitKeyPlan.kind === "reuse_pending") {
       await tx.walletEsimPurchase.update({
         where: { id: options.purchaseId },
@@ -1162,6 +1176,8 @@ export async function reserveSplitWalletBeforeGatewayCheckout(options: {
           status: WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
           debitTransactionId: debitKeyPlan.debitTransactionId,
           useWallet: options.useWallet,
+          useRewards: rewardPointsRedeemed > 0,
+          rewardPointsRedeemed,
           walletAppliedCents,
           gatewayAmountCents: options.gatewayAmountCents,
           promoDiscountCents,
@@ -1189,6 +1205,8 @@ export async function reserveSplitWalletBeforeGatewayCheckout(options: {
       data: {
         status: WalletEsimPurchaseStatus.FUNDS_RESERVED,
         useWallet: options.useWallet,
+        useRewards: rewardPointsRedeemed > 0,
+        rewardPointsRedeemed,
         walletAppliedCents,
         gatewayAmountCents: options.gatewayAmountCents,
         promoDiscountCents,
@@ -1222,6 +1240,13 @@ export async function reserveSplitWalletBeforeGatewayCheckout(options: {
       });
     }
 
+    await claimRewardRedemptionInTx(tx, {
+      customerUserId: options.customerUserId,
+      purchaseId: options.purchaseId,
+      pointsToHold: rewardPointsRedeemed,
+      afterPromoCents: options.afterPromoCents,
+    });
+
     const reserved = await reserveWalletPurchaseFundsInTx(tx, {
       purchaseId: options.purchaseId,
       customerUserId: options.customerUserId,
@@ -1252,6 +1277,7 @@ export async function releaseSplitReservationAfterSessionFailure(options: {
   if (options.walletAppliedCents <= 0) {
     await prisma.$transaction(async (tx) => {
       await releasePromoRedemptionInTx(tx, options.purchaseId);
+      await releaseRewardRedemptionInTx(tx, options.purchaseId);
     });
     return;
   }

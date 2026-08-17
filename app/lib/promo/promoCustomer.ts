@@ -8,7 +8,7 @@ import {
 import { prisma } from "@/app/lib/db";
 import { writeAuditLog } from "@/app/lib/auth/audit";
 import {
-  calculatePurchaseFunding,
+  calculateCustomerCheckoutFunding,
   type PurchaseFundingBreakdown,
 } from "@/app/lib/esim/purchaseFunding";
 import {
@@ -20,7 +20,7 @@ import {
 } from "@/app/lib/promo/promoEvaluate";
 import { claimPromoRedemptionInTx } from "@/app/lib/promo/promoRedemption";
 import { PROMO_AUDIT, PROMO_CUSTOMER_MESSAGES } from "@/app/lib/promo/promoMessages";
-import { payablePackageCents } from "@/app/lib/promo/promoDiscount";
+import { loadCustomerRewardPointsBalance } from "@/app/lib/rewards/rewardRedeem";
 
 export type AppliedPromoSnapshot = {
   code: string;
@@ -28,25 +28,6 @@ export type AppliedPromoSnapshot = {
   discountCents: number;
   finalPriceCents: number;
 };
-
-function fundingForPayable(
-  payableCents: number,
-  walletBalanceCents: number,
-  useWallet: boolean
-): PurchaseFundingBreakdown {
-  if (payableCents === 0) {
-    return {
-      useWallet,
-      walletAppliedCents: 0,
-      gatewayAmountCents: 0,
-    };
-  }
-  return calculatePurchaseFunding({
-    priceCents: payableCents,
-    walletBalanceCents,
-    useWallet,
-  });
-}
 
 function fundingSourceOf(funding: PurchaseFundingBreakdown): OrderFundingSource {
   if (funding.gatewayAmountCents <= 0) return OrderFundingSource.CUSTOMER_WALLET;
@@ -76,6 +57,7 @@ async function loadReadyCustomerPurchase(
       destinationCode: true,
       priceCents: true,
       useWallet: true,
+      useRewards: true,
       status: true,
       fundingSource: true,
       promoCodeId: true,
@@ -119,20 +101,24 @@ async function persistPromoOnReadyPurchase(options: {
 
   const purchase = await prisma.walletEsimPurchase.findUnique({
     where: { id: options.purchaseId },
-    select: { priceCents: true },
+    select: { priceCents: true, useRewards: true },
   });
   if (!purchase) {
     throw new PromoEvaluateError("UNAVAILABLE");
   }
 
-  const payable = options.evaluated
-    ? options.evaluated.finalPriceCents
-    : purchase.priceCents;
-  const funding = fundingForPayable(
-    payable,
-    wallet.balanceCents,
-    options.useWallet
+  const pointsBalance = await loadCustomerRewardPointsBalance(
+    prisma,
+    options.customerUserId
   );
+  const funding = calculateCustomerCheckoutFunding({
+    priceCents: purchase.priceCents,
+    promoDiscountCents: options.evaluated?.discountCents ?? 0,
+    walletBalanceCents: wallet.balanceCents,
+    useWallet: options.useWallet,
+    pointsBalance,
+    useRewards: purchase.useRewards,
+  });
 
   const updated = await prisma.walletEsimPurchase.updateMany({
     where: {
@@ -145,6 +131,8 @@ async function persistPromoOnReadyPurchase(options: {
       promoCodeNormalized: options.evaluated?.code ?? null,
       promoDiscountCents: options.evaluated?.discountCents ?? 0,
       useWallet: funding.useWallet,
+      useRewards: funding.useRewards,
+      rewardPointsRedeemed: funding.rewardPointsRedeemed,
       walletAppliedCents: funding.walletAppliedCents,
       gatewayAmountCents: funding.gatewayAmountCents,
       fundingSource: fundingSourceOf(funding),
@@ -337,5 +325,3 @@ export function customerPromoErrorMessage(error: unknown): string {
   if (error instanceof PromoEvaluateError) return error.message;
   return PROMO_CUSTOMER_MESSAGES.UNAVAILABLE;
 }
-
-export { fundingForPayable, payablePackageCents };
