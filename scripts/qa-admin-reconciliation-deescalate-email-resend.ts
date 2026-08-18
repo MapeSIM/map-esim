@@ -80,6 +80,19 @@ function main() {
   assert.equal(resolvedBlocked.allowed, false);
   assert.ok(resolvedBlocked.blockers.includes("already_resolved"));
 
+  const sendingBlocked = evaluateEmailResendEligibility({
+    sourceType: "order_email",
+    alreadyResolved: false,
+    status: "COMPLETED",
+    orderId: "ord_1",
+    orderStatus: "COMPLETED",
+    providerOrderId: "PO-ABC",
+    emailDeliveryStatus: "sending",
+    customerEmail: "a@example.com",
+  });
+  assert.equal(sendingBlocked.allowed, false);
+  assert.ok(sendingBlocked.blockers.includes("email_send_in_progress"));
+
   const invalidEmail = evaluateEmailResendEligibility({
     sourceType: "order_email",
     alreadyResolved: false,

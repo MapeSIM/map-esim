@@ -21,11 +21,13 @@ import {
 } from "@/app/lib/esim/walletPurchase";
 import { persistWalletPurchaseProviderObservation } from "@/app/lib/esim/providerResultPersist";
 import { persistAssignedOrder } from "@/app/lib/orders/persistAssignedOrder";
+import { deliverCompletedWalletPurchaseInstallEmail } from "@/app/lib/esim/esimPurchaseInstallEmail";
 import type { NormalizedPaymentEvent } from "@/app/lib/payments/types";
 import { executeCreditCheckout } from "@/app/lib/vesim/creditCheckout";
 import {
   sanitizeCountryHint,
   verifyOfferAuthoritative,
+  type VerifiedCheckoutOffer,
 } from "@/app/lib/vesim/server";
 import { schedulePaymentFailureNotification } from "@/app/lib/esim/paymentFailureNotification";
 import { claimPurchasePromoInTx } from "@/app/lib/promo/promoCustomer";
@@ -711,6 +713,23 @@ async function releaseOnGatewayFailure(options: {
   };
 }
 
+async function deliverFundedPurchaseInstallEmail(
+  purchaseId: string,
+  extras?: {
+    checkoutPayload?: Record<string, unknown>;
+    verifiedOffer?: VerifiedCheckoutOffer;
+    assisted?: boolean;
+  }
+): Promise<void> {
+  await deliverCompletedWalletPurchaseInstallEmail({
+    purchaseId,
+    checkoutPayload: extras?.checkoutPayload,
+    verifiedOffer: extras?.verifiedOffer,
+    actorUserId: null,
+    assistedWalletPurchaseNotice: extras?.assisted,
+  });
+}
+
 /**
  * Exact-once VeSIM order after purchase is FUNDED.
  * Duplicate webhooks/retries are safe; never creates provider order before FUNDED.
@@ -738,6 +757,7 @@ export async function fulfillFundedEsimPurchase(
       debitTransactionId: true,
       walletAppliedCents: true,
       gatewayAmountCents: true,
+      adminUserId: true,
       customer: {
         select: { id: true, email: true, role: true, deletedAt: true },
       },
@@ -757,6 +777,9 @@ export async function fulfillFundedEsimPurchase(
     purchase.status === WalletEsimPurchaseStatus.COMPLETED &&
     purchase.orderId
   ) {
+    await deliverFundedPurchaseInstallEmail(purchase.id, {
+      assisted: Boolean(purchase.adminUserId),
+    });
     return { ok: true, duplicate: true, orderId: purchase.orderId };
   }
 
@@ -789,6 +812,9 @@ export async function fulfillFundedEsimPurchase(
       again?.status === WalletEsimPurchaseStatus.COMPLETED &&
       again.orderId
     ) {
+      await deliverFundedPurchaseInstallEmail(purchase.id, {
+        assisted: Boolean(purchase.adminUserId),
+      });
       return { ok: true, duplicate: true, orderId: again.orderId };
     }
     return { ok: false };
@@ -941,6 +967,12 @@ export async function fulfillFundedEsimPurchase(
       });
 
       return order.id;
+    });
+
+    await deliverFundedPurchaseInstallEmail(purchase.id, {
+      checkoutPayload: checkout.payload,
+      verifiedOffer,
+      assisted: Boolean(purchase.adminUserId),
     });
 
     return { ok: true, orderId };

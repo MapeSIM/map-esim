@@ -13,8 +13,7 @@ import {
 import { prisma } from "@/app/lib/db";
 import { usdPriceToCents } from "@/app/lib/esim/assignmentValidation";
 import { persistAssignedOrder } from "@/app/lib/orders/persistAssignedOrder";
-import { deliverOrderEmailAfterCheckout } from "@/app/lib/email/deliverAfterCheckout";
-import { createOrderAccessToken } from "@/app/lib/vesim/orderAccess";
+import { deliverCompletedWalletPurchaseInstallEmail } from "@/app/lib/esim/esimPurchaseInstallEmail";
 import { executeCreditCheckout } from "@/app/lib/vesim/creditCheckout";
 import { scheduleReconciliationRequiredNotification } from "@/app/lib/esim/reconciliationRequiredNotification";
 import {
@@ -66,7 +65,7 @@ export const WALLET_PURCHASE_FAILED_REFUNDED =
   "esim.wallet_purchase_failed_refunded";
 export const WALLET_PURCHASE_RECONCILIATION =
   "esim.wallet_purchase_reconciliation_required";
-export const WALLET_DELIVERY_EMAIL_FAILED = "esim.wallet_delivery_email_failed";
+export { WALLET_DELIVERY_EMAIL_FAILED } from "@/app/lib/esim/esimPurchaseInstallEmail";
 
 export const WALLET_PURCHASE_DEBIT_REF = "WALLET_ESIM_PURCHASE";
 export const WALLET_PURCHASE_REFUND_REF = "WALLET_ESIM_PURCHASE_REFUND";
@@ -1239,6 +1238,11 @@ export async function confirmWalletEsimPurchase(
   }
 
   if (purchase.status === WalletEsimPurchaseStatus.COMPLETED) {
+    await deliverCompletedWalletPurchaseInstallEmail({
+      purchaseId: purchase.id,
+      actorUserId,
+      assistedWalletPurchaseNotice: isAssisted,
+    });
     return {
       purchaseId: purchase.id,
       customerUserId,
@@ -1713,67 +1717,15 @@ export async function confirmWalletEsimPurchase(
     });
   }
 
-  // Best-effort email — never reverses purchase or retries provider.
-  try {
-    const accessToken = createOrderAccessToken(successCheckout.providerOrderId);
-    const emailResult = await deliverOrderEmailAfterCheckout({
-      orderId: successCheckout.providerOrderId,
-      customerEmail: customer.email,
-      verifiedOffer,
+  // Best-effort install email after Order persist — never reverses purchase or retries provider.
+  if (orderId) {
+    await deliverCompletedWalletPurchaseInstallEmail({
+      purchaseId: purchase.id,
       checkoutPayload: successCheckout.payload,
-      accessToken: accessToken || undefined,
+      verifiedOffer,
+      actorUserId,
       assistedWalletPurchaseNotice: isAssisted,
     });
-    await prisma.walletEsimPurchase.update({
-      where: { id: purchase.id },
-      data: { emailDeliveryStatus: emailResult.emailDelivery },
-    });
-    if (
-      emailResult.emailDelivery === "failed" ||
-      emailResult.emailDelivery === "invalid_email"
-    ) {
-      await prisma.auditLog.create({
-        data: {
-          actorUserId,
-          action: WALLET_DELIVERY_EMAIL_FAILED,
-          targetType: "WalletEsimPurchase",
-          targetId: purchase.id,
-          metadata: {
-            method: purchaseAuditMethod(isAssisted),
-            fundingSource: OrderFundingSource.CUSTOMER_WALLET,
-            purchaseId: purchase.id,
-            failureCategory: "email_delivery",
-            failureCode: emailResult.emailDelivery,
-            ...(isAssisted ? { targetUserId: customerUserId } : {}),
-          } satisfies Prisma.InputJsonValue,
-        },
-      });
-    }
-  } catch {
-    try {
-      await prisma.walletEsimPurchase.update({
-        where: { id: purchase.id },
-        data: { emailDeliveryStatus: "failed" },
-      });
-      await prisma.auditLog.create({
-        data: {
-          actorUserId,
-          action: WALLET_DELIVERY_EMAIL_FAILED,
-          targetType: "WalletEsimPurchase",
-          targetId: purchase.id,
-          metadata: {
-            method: purchaseAuditMethod(isAssisted),
-            fundingSource: OrderFundingSource.CUSTOMER_WALLET,
-            purchaseId: purchase.id,
-            failureCategory: "email_delivery",
-            failureCode: "exception",
-            ...(isAssisted ? { targetUserId: customerUserId } : {}),
-          } satisfies Prisma.InputJsonValue,
-        },
-      });
-    } catch {
-      // ignore secondary audit failures
-    }
   }
 
   return {

@@ -17,6 +17,7 @@ function main() {
   const credit = read("app/lib/vesim/creditCheckout.ts");
   const wallet = read("app/lib/esim/walletPurchase.ts");
   const apply = read("app/lib/esim/esimPurchasePaymentApply.ts");
+  const installEmail = read("app/lib/esim/esimPurchaseInstallEmail.ts");
   const adminAssign = read("app/lib/esim/adminPackageAssignment.ts");
   const guestCheckout = read("app/api/vesim/checkout/route.ts");
   const quote = read("app/api/vesim/quote/route.ts");
@@ -42,18 +43,19 @@ function main() {
   assert.doesNotMatch(bodySlice, /options\.customerEmail|customerEmail,\s*$/m);
   console.log("PASS vesim_credit_checkout_uses_orders_inbox");
 
-  // Wallet + gateway apply: one provider call; MAP email uses customer.email
+  // Wallet + gateway apply: one provider call; MAP install email uses frozen Order.customerEmail
   assert.match(wallet, /executeCreditCheckout\(/);
   assert.equal((wallet.match(/executeCreditCheckout\(/g) || []).length, 1);
-  assert.match(
-    wallet,
-    /deliverOrderEmailAfterCheckout\(\{[\s\S]*?customerEmail:\s*customer\.email/
-  );
+  assert.match(wallet, /deliverCompletedWalletPurchaseInstallEmail/);
   assert.match(apply, /executeCreditCheckout\(/);
+  assert.match(apply, /deliverCompletedWalletPurchaseInstallEmail/);
   assert.match(
     apply,
     /persistAssignedOrder\(tx, \{[\s\S]*?customerEmail:\s*purchase\.customer\.email/
   );
+  assert.match(installEmail, /order\.customerEmail/);
+  assert.match(installEmail, /customerEmail:\s*frozenEmail/);
+  assert.doesNotMatch(installEmail, /executeCreditCheckout\(/);
   console.log("PASS wallet_and_gateway_paths_consistent");
 
   // Admin assignment direct fetch also uses relay; MAP email keeps customer.email

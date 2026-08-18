@@ -125,6 +125,7 @@ function main() {
   assert.match(apply, /PAYMENT_CONFIRMED/);
   assert.match(apply, /WalletEsimPurchaseStatus\.FUNDED/);
   assert.match(apply, /fulfillFundedEsimPurchase/);
+  assert.match(apply, /deliverCompletedWalletPurchaseInstallEmail/);
   assert.match(apply, /reserveSplitWalletBeforeGatewayCheckout/);
   assert.match(apply, /splitReservationDebitIdempotencyKey/);
   assert.match(apply, /debit_\$\{purchaseId\}:\$\{priorCount \+ 1\}/);

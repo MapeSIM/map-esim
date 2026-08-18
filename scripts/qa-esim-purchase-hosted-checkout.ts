@@ -70,6 +70,10 @@ function main() {
     read("app/lib/esim/esimPurchasePaymentApply.ts"),
     /splitReservationDebitIdempotencyKey/
   );
+  assert.match(
+    read("app/lib/esim/esimPurchasePaymentApply.ts"),
+    /deliverCompletedWalletPurchaseInstallEmail/
+  );
   assert.doesNotMatch(gateway, /PARTIAL_WALLET_UNSUPPORTED/);
   assert.doesNotMatch(gateway, /confirmWalletEsimPurchase/);
   assert.doesNotMatch(gateway, /executeCreditCheckout/);

@@ -1,6 +1,7 @@
 /**
  * Offline QA for Phase 8G-B3B2 — controlled local finalization recovery.
- * Never places VeSIM orders, creates new wallet charges, refunds, or emails.
+ * Never places VeSIM orders, creates new wallet charges, or refunds.
+ * Wallet purchases may call the shared post-success install-email helper.
  */
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
@@ -256,6 +257,16 @@ function main() {
   assert.doesNotMatch(service, /refundReservedFunds|debitWallet|creditWallet/);
   assert.doesNotMatch(service, /balanceCents:\s*\{/);
   assert.doesNotMatch(service, /walletTransaction\.create/);
+  assert.doesNotMatch(service, /executeCreditCheckout/);
+  assert.match(service, /deliverCompletedWalletPurchaseInstallEmail/);
+  assert.ok(
+    service.lastIndexOf("persistAssignedOrder") <
+      service.lastIndexOf("deliverCompletedWalletPurchaseInstallEmail")
+  );
+  assert.match(
+    service,
+    /if \(ids\.sourceType === "wallet_purchase"\) \{\s*try \{\s*await deliverCompletedWalletPurchaseInstallEmail/
+  );
   assert.doesNotMatch(
     service,
     /sendOrderEmail|deliverOrderEmailAfterCheckout|scheduleWalletTransactionNotification|resendFailedWallet/

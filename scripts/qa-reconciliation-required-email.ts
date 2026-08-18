@@ -214,7 +214,7 @@ function main() {
 
   console.log("6) Existing purchase/refund/wallet paths unchanged structurally");
   assert.match(purchase, /scheduleWalletTransactionNotification/);
-  assert.match(purchase, /deliverOrderEmailAfterCheckout/);
+  assert.match(purchase, /deliverCompletedWalletPurchaseInstallEmail/);
   assert.match(purchase, /refundReservedFunds/);
   const paymentFailure = read("app/lib/esim/paymentFailureNotification.ts");
   assert.match(paymentFailure, /schedulePaymentFailureNotification/);

@@ -188,6 +188,7 @@ function main() {
   assert.match(displaySrc, /eSIM purchase/);
   console.log("PASS company_funded_and_prior_wallet_history_unchanged");
 
+  assert.match(service, /deliverCompletedWalletPurchaseInstallEmail/);
   assert.ok(!/deliverOrderEmailAfterCheckout/.test(actions));
   assert.ok(!/sendOrderEmail/.test(selectForm));
   assert.ok(!/sendOrderEmail/.test(confirmForm));

@@ -2,7 +2,9 @@
  * Controlled local finalization recovery for reconciliation cases.
  * Reuses persistAssignedOrder after GET-only provider confirmation.
  * Never places/retries VeSIM orders, creates new wallet debits/credits/refunds,
- * sends email, auto-resolves/unlocks, or overwrites conflicting records.
+ * auto-resolves/unlocks, or overwrites conflicting records.
+ * Wallet purchases may receive a best-effort MAP install email after persist;
+ * email failure never retries provider or wallet mutations.
  */
 import "server-only";
 
@@ -38,6 +40,7 @@ import {
 } from "@/app/lib/admin/reconciliationCaseShared";
 import { PROVIDER_REFRESH_STALE_CLAIM_MS } from "@/app/lib/admin/providerRefreshShared";
 import { persistAssignedOrder } from "@/app/lib/orders/persistAssignedOrder";
+import { deliverCompletedWalletPurchaseInstallEmail } from "@/app/lib/esim/esimPurchaseInstallEmail";
 import { awardCustomerPurchaseEarnInTx } from "@/app/lib/rewards/rewardEarn";
 import { completeRewardRedemptionInTx } from "@/app/lib/rewards/rewardRedeem";
 import { VesimEnvironmentError } from "@/app/lib/vesim/environment";
@@ -1012,6 +1015,17 @@ export async function finalizeReconciliationLocalRecord(options: {
         reason: reasonParsed.reason.slice(0, 80),
       },
     });
+
+    if (ids.sourceType === "wallet_purchase") {
+      try {
+        await deliverCompletedWalletPurchaseInstallEmail({
+          purchaseId: ids.recordId,
+          actorUserId: admin.id,
+        });
+      } catch {
+        // Email must never fail local finalization, provider, or wallet state.
+      }
+    }
 
     return {
       ok: true,

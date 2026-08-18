@@ -267,7 +267,9 @@ export function evaluateEmailResendEligibility(
 
   if (source === "order_email") {
     const emailStatus = (input.emailDeliveryStatus ?? "").trim().toLowerCase();
-    if (emailStatus !== "failed" && emailStatus !== "not_configured") {
+    if (emailStatus === "sending") {
+      blockers.push("email_send_in_progress");
+    } else if (emailStatus !== "failed" && emailStatus !== "not_configured") {
       // invalid_email is not safely resendable without correcting the address.
       if (emailStatus === "invalid_email") blockers.push("invalid_email");
       else if (emailStatus === "sent" || emailStatus === "already_sent") {

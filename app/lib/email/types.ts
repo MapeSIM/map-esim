@@ -1,5 +1,6 @@
 export type EmailDeliveryStatus =
   | "sent"
+  | "sending"
   | "not_configured"
   | "skipped_no_install_details"
   | "invalid_email"
