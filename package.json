@@ -85,6 +85,7 @@
     "qa:device-compatibility": "tsx scripts/qa-device-compatibility.ts",
     "qa:vesim-provider-email": "tsx scripts/qa-vesim-provider-email.ts",
     "qa:esim-install-email-delivery": "tsx scripts/qa-esim-install-email-delivery.ts",
+    "qa:esim-alternate-delivery-email-schema": "tsx scripts/qa-esim-alternate-delivery-email-schema.ts",
     "qa:iccid-persistence": "tsx scripts/qa-iccid-persistence.ts",
     "qa:admin-wallet-purchase": "tsx scripts/qa-admin-wallet-purchase.ts",
     "qa:iccid-reveal": "tsx scripts/qa-iccid-reveal.ts",
