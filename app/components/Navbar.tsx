@@ -29,7 +29,7 @@ type NavLink = {
   flagSrc?: string;
 };
 
-/** Desktop/mobile primary order (Plans stays at /plans but is not linked here). */
+/** Desktop/mobile primary order (legacy /plans permanently redirects to /countries). */
 const navLinks: NavLink[] = [
   { href: "/", label: "Home" },
   {

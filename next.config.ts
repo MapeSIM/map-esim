@@ -19,6 +19,15 @@ const nextConfig: NextConfig = {
   async headers() {
     return buildNextConfigHeaderSources(process.env);
   },
+  async redirects() {
+    return [
+      {
+        source: "/plans",
+        destination: "/countries",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
