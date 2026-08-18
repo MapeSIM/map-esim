@@ -193,6 +193,10 @@ function offlineChecks(): void {
   const promoSection = read(
     "app/components/account/CheckoutPromoCodeSection.tsx"
   );
+  assert.match(promoSection, /CheckoutMoney cents=\{originalCents\}/);
+  assert.match(promoSection, /CheckoutMoney cents=\{discountCents\} signed/);
+  assert.match(promoSection, /CheckoutMoney cents=\{totalCents\}/);
+  assert.doesNotMatch(promoSection, /formatUsdCents/);
   assert.doesNotMatch(promoSection, /<form[\s>]/);
   assert.equal((confirmForm.match(/<form[\s>]/g) || []).length, 1);
   assert.match(promoSection, /formAction=\{applyAction\}/);

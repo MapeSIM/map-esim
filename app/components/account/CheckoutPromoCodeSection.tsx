@@ -16,7 +16,7 @@ import {
   initialPromoCheckoutState,
   type PromoCheckoutActionState,
 } from "@/app/lib/promo/promoCustomerState";
-import { formatUsdCents } from "@/app/lib/wallet/display";
+import { CheckoutMoney } from "@/app/components/account/CheckoutMoney";
 
 type Props = {
   purchaseId: string;
@@ -104,19 +104,19 @@ export default function CheckoutPromoCodeSection({
             <div className="grid gap-1 py-1 sm:grid-cols-[140px_1fr]">
               <dt className="text-[var(--text-muted)]">Original</dt>
               <dd className="font-medium text-[var(--heading)]">
-                {formatUsdCents(originalCents)}
+                <CheckoutMoney cents={originalCents} />
               </dd>
             </div>
             <div className="grid gap-1 py-1 sm:grid-cols-[140px_1fr]">
               <dt className="text-[var(--text-muted)]">Discount</dt>
               <dd className="font-medium text-[var(--heading)]">
-                −{formatUsdCents(discountCents)}
+                <CheckoutMoney cents={discountCents} signed />
               </dd>
             </div>
             <div className="grid gap-1 py-1 sm:grid-cols-[140px_1fr]">
               <dt className="text-[var(--text-muted)]">Package total</dt>
               <dd className="font-semibold text-[var(--heading)]">
-                {formatUsdCents(totalCents)}
+                <CheckoutMoney cents={totalCents} />
               </dd>
             </div>
           </dl>

@@ -23,8 +23,11 @@ import {
   type WalletPurchaseActionState,
 } from "@/app/lib/esim/walletPurchaseFormState";
 import type { WalletPurchaseReview } from "@/app/lib/esim/walletPurchaseRead";
-import { formatUsdCents } from "@/app/lib/wallet/display";
 import CheckoutPromoCodeSection from "@/app/components/account/CheckoutPromoCodeSection";
+import {
+  CheckoutDisplayCurrencyNote,
+  CheckoutMoney,
+} from "@/app/components/account/CheckoutMoney";
 
 type Props = {
   review: WalletPurchaseReview;
@@ -270,7 +273,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
           <>
             <p className="mt-2 text-sm text-[var(--text-muted)]">
               {review.rewardPointsBalanceLabel} points available (
-              {review.rewardValueLabel})
+              <CheckoutMoney cents={review.rewardPointsBalance} />)
             </p>
             <label
               htmlFor={useRewardsId}
@@ -327,7 +330,11 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
           Wallet
         </h2>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Current balance: {review.balanceLabel} USD
+          Current balance:{" "}
+          <CheckoutMoney
+            cents={review.balanceCents}
+            variant="wallet-balance"
+          />
           {walletDisabled ? " (no funds available)" : null}
         </p>
         <label
@@ -364,7 +371,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               Package total
             </dt>
             <dd className="font-semibold text-[var(--heading)]">
-              {formatUsdCents(review.priceCents)}
+              <CheckoutMoney cents={review.priceCents} />
             </dd>
           </div>
           {review.promoDiscountCents > 0 ? (
@@ -373,7 +380,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 Promo discount
               </dt>
               <dd className="font-semibold text-[var(--heading)]">
-                −{formatUsdCents(review.promoDiscountCents)}
+                <CheckoutMoney cents={review.promoDiscountCents} signed />
               </dd>
             </div>
           ) : null}
@@ -383,7 +390,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 Rewards applied
               </dt>
               <dd className="font-semibold text-[var(--heading)]">
-                −{formatUsdCents(preview.rewardPointsRedeemed)}
+                <CheckoutMoney cents={preview.rewardPointsRedeemed} signed />
               </dd>
             </div>
           ) : null}
@@ -393,7 +400,11 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 Wallet applied
               </dt>
               <dd className="font-semibold text-[var(--heading)]">
-                −{formatUsdCents(preview.walletAppliedCents)}
+                <CheckoutMoney
+                  cents={preview.walletAppliedCents}
+                  signed
+                  variant="wallet-deduction"
+                />
               </dd>
             </div>
           ) : null}
@@ -406,7 +417,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               Pay now
             </dt>
             <dd className="font-semibold text-[var(--heading)]">
-              {formatUsdCents(preview.gatewayAmountCents)}
+              <CheckoutMoney cents={preview.gatewayAmountCents} />
             </dd>
           </div>
           {fullWallet ? (
@@ -415,12 +426,17 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 Balance after purchase
               </dt>
               <dd className="font-semibold text-[var(--heading)]">
-                {formatUsdCents(balanceAfterPreview)} USD
+                <CheckoutMoney
+                  cents={balanceAfterPreview}
+                  variant="wallet-balance"
+                />
               </dd>
             </div>
           ) : null}
         </dl>
       </section>
+
+      <CheckoutDisplayCurrencyNote />
 
       {gatewayRequired ? (
         <section
@@ -439,10 +455,18 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
           {gatewayReady ? (
             <p className="mt-1 text-sm text-[var(--text-muted)]">
               Continue to our secure payment page to pay{" "}
-              {formatUsdCents(preview.gatewayAmountCents)}
-              {preview.walletAppliedCents > 0
-                ? ` after applying ${formatUsdCents(preview.walletAppliedCents)} from your wallet`
-                : ""}
+              <CheckoutMoney cents={preview.gatewayAmountCents} />
+              {preview.walletAppliedCents > 0 ? (
+                <>
+                  {" "}
+                  after applying{" "}
+                  <CheckoutMoney
+                    cents={preview.walletAppliedCents}
+                    variant="wallet-deduction"
+                  />{" "}
+                  from your wallet
+                </>
+              ) : null}
               . Your eSIM is created only after payment is verified.
             </p>
           ) : showGatewayUnavailable ? (
@@ -451,7 +475,8 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 {CARD_PAYMENT_UNAVAILABLE_MESSAGE}
               </p>
               <p className="mt-3 text-sm text-[var(--text-muted)]">
-                Remaining due: {formatUsdCents(preview.gatewayAmountCents)}.
+                Remaining due:{" "}
+                <CheckoutMoney cents={preview.gatewayAmountCents} />.
               </p>
             </>
           ) : null}

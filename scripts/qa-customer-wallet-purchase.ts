@@ -218,6 +218,14 @@ function main() {
   assert.ok(!/iccidEncrypted:\s*null/.test(persist));
   console.log("PASS no_raw_provider_secrets_persisted_or_rendered");
 
+  assert.match(confirmForm, /CheckoutMoney/);
+  assert.doesNotMatch(confirmForm, /formatUsdCents/);
+  assert.match(
+    service,
+    /return `\$\{formatUsdCents\(cents\)\} USD`;/
+  );
+  console.log("PASS checkout_display_uses_shared_money_usd_cents_unchanged");
+
   assert.ok(!/executeCreditCheckout\(/.test(read("scripts/qa-customer-wallet-purchase.ts")));
   assert.ok(!/getBrokerToken\(/.test(read("scripts/qa-customer-wallet-purchase.ts")));
   assert.match(walletPage, /Buy eSIM/);
@@ -266,7 +274,7 @@ function main() {
   assert.match(service, /assertCustomerFinancialActivityAllowed/);
   console.log("PASS buy_esim_destination_launcher");
 
-  console.log("ALL_QA_PASSED=31");
+  console.log("ALL_QA_PASSED=32");
 }
 
 main();

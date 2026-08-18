@@ -176,6 +176,8 @@ export async function getWalletPurchaseReview(
     dataAllowance: displayOrUnavailable(row.dataAllowance),
     validity: displayOrUnavailable(row.validity),
     deliveryLabel: "Instant eSIM delivery",
+    // USD labels remain authoritative for emails/success views.
+    // Checkout review presents these integer cents via CheckoutMoney.
     priceLabel: formatWalletPurchasePriceLabel(payableCents),
     priceCents: row.priceCents,
     payableCents,

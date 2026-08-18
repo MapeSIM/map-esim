@@ -237,6 +237,9 @@ function main() {
   assert.match(confirmForm, /Order summary/);
   assert.match(confirmForm, /Wallet applied/);
   assert.match(confirmForm, /Pay now/);
+  assert.match(confirmForm, /CheckoutMoney/);
+  assert.match(confirmForm, /CheckoutDisplayCurrencyNote/);
+  assert.doesNotMatch(confirmForm, /formatUsdCents/);
   assert.match(confirmForm, /calculatePurchaseFunding/);
   assert.match(confirmForm, /previewPurchaseFunding/);
   assert.match(confirmForm, /setWalletPurchaseFundingChoiceAction/);
@@ -263,6 +266,10 @@ function main() {
   );
   assert.match(promoSection, /Promo code/);
   assert.match(promoSection, /applyCustomerPromoAction/);
+  assert.match(promoSection, /CheckoutMoney cents=\{originalCents\}/);
+  assert.match(promoSection, /CheckoutMoney cents=\{discountCents\} signed/);
+  assert.match(promoSection, /CheckoutMoney cents=\{totalCents\}/);
+  assert.doesNotMatch(promoSection, /formatUsdCents/);
   assert.match(confirmForm, /CheckoutPromoCodeSection/);
   assert.ok(!/JazzCash|EasyPaisa/i.test(confirmForm));
   console.log("PASS checkout_structure_and_fail_closed_cta");

@@ -103,6 +103,7 @@ function offlineChecks(): void {
   const fundingChoice = wallet.split("setWalletPurchaseFundingChoice")[1]?.slice(0, 3500) ?? "";
   assert.doesNotMatch(fundingChoice, /claimRewardRedemptionInTx/);
   assert.match(confirmForm, /Use rewards/);
+  assert.match(confirmForm, /CheckoutMoney cents=\{preview\.rewardPointsRedeemed\} signed/);
   assert.match(confirmForm, /Earn \{review\.rewardPointsToUnlock\} more points to unlock rewards/);
   assert.match(confirmForm, /zeroCashConfirm/);
   assert.doesNotMatch(partnerStore, /Use rewards|reward points/i);

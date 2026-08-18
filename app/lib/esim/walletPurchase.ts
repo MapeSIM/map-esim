@@ -1785,6 +1785,10 @@ export async function confirmWalletEsimPurchase(
   };
 }
 
+/**
+ * Authoritative USD label for purchase snapshots, emails, and non-checkout views.
+ * Customer checkout display conversion is client-only via CheckoutMoney.
+ */
 export function formatWalletPurchasePriceLabel(cents: number): string {
   return `${formatUsdCents(cents)} USD`;
 }
