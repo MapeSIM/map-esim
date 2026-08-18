@@ -77,6 +77,7 @@
     "qa:destination-seo-metadata": "tsx scripts/qa-destination-seo-metadata.ts",
     "qa:plans-discovery": "tsx scripts/qa-plans-discovery.ts",
     "qa:affiliates-partnerships": "tsx scripts/qa-affiliates-partnerships.ts",
+    "qa:about": "tsx scripts/qa-about.ts",
     "qa:navbar-layout": "tsx scripts/qa-navbar-layout.ts",
     "qa:customer-mobile-nav": "tsx scripts/qa-customer-mobile-nav.ts",
     "qa:seo-canonical": "tsx scripts/qa-seo-canonical.ts",

@@ -33,6 +33,7 @@ const ALLOWED_EXACT = new Set([
   "/terms-and-conditions",
   "/cookie-policy",
   "/how-it-works",
+  "/about",
   "/contact",
   "/affiliates-and-partnerships",
 ]);

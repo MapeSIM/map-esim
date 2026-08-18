@@ -242,6 +242,7 @@ const PUBLIC_ROUTES = [
   "/device-compatibility",
   "/support",
   "/contact",
+  "/about",
   "/affiliates-and-partnerships",
   "/how-it-works",
   "/install/iphone",

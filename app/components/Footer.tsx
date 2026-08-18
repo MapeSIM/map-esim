@@ -17,6 +17,7 @@ const columns = [
     title: "Company",
     links: [
       { label: "Home", href: "/" },
+      { label: "About MAP eSIM", href: "/about" },
       { label: "How It Works", href: "/how-it-works" },
       {
         label: "Affiliates & Partnerships",
