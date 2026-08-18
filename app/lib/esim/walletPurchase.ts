@@ -13,6 +13,10 @@ import {
 import { prisma } from "@/app/lib/db";
 import { usdPriceToCents } from "@/app/lib/esim/assignmentValidation";
 import { persistAssignedOrder } from "@/app/lib/orders/persistAssignedOrder";
+import {
+  alternateDeliveryEmailLockClaim,
+  snapshotOrderAlternateDeliveryEmail,
+} from "@/app/lib/esim/esimDeliveryEmail";
 import { deliverCompletedWalletPurchaseInstallEmail } from "@/app/lib/esim/esimPurchaseInstallEmail";
 import { executeCreditCheckout } from "@/app/lib/vesim/creditCheckout";
 import { scheduleReconciliationRequiredNotification } from "@/app/lib/esim/reconciliationRequiredNotification";
@@ -1398,6 +1402,7 @@ export async function confirmWalletEsimPurchase(
         },
         data: {
           status: WalletEsimPurchaseStatus.FUNDS_RESERVED,
+          ...alternateDeliveryEmailLockClaim(),
           offerId: snapshot.offerId,
           destinationCode: snapshot.destinationCode,
           destinationName: snapshot.destinationName,
@@ -1601,6 +1606,8 @@ export async function confirmWalletEsimPurchase(
           status: true,
           debitTransactionId: true,
           orderId: true,
+          alternateDeliveryEmail: true,
+          alternateDeliveryEmailConfirmedAt: true,
         },
       });
       if (
@@ -1620,6 +1627,7 @@ export async function confirmWalletEsimPurchase(
         providerOrderId: successCheckout.providerOrderId,
         customerUserId: customer.id,
         customerEmail: customer.email,
+        alternateDeliveryEmail: snapshotOrderAlternateDeliveryEmail(current),
         verifiedOffer,
         fundingSource: OrderFundingSource.CUSTOMER_WALLET,
         status: OrderStatus.COMPLETED,

@@ -41,6 +41,7 @@ import {
 import { PROVIDER_REFRESH_STALE_CLAIM_MS } from "@/app/lib/admin/providerRefreshShared";
 import { persistAssignedOrder } from "@/app/lib/orders/persistAssignedOrder";
 import { deliverCompletedWalletPurchaseInstallEmail } from "@/app/lib/esim/esimPurchaseInstallEmail";
+import { snapshotOrderAlternateDeliveryEmail } from "@/app/lib/esim/esimDeliveryEmail";
 import { awardCustomerPurchaseEarnInTx } from "@/app/lib/rewards/rewardEarn";
 import { completeRewardRedemptionInTx } from "@/app/lib/rewards/rewardRedeem";
 import { VesimEnvironmentError } from "@/app/lib/vesim/environment";
@@ -98,6 +99,8 @@ type AttemptContext = {
   debitTransactionId: string | null;
   debitStatus: string | null;
   refundTransactionId: string | null;
+  alternateDeliveryEmail: string | null;
+  alternateDeliveryEmailConfirmedAt: Date | string | null;
 };
 
 function resolveIds(
@@ -215,6 +218,8 @@ async function loadAttemptContext(
         providerRefreshClaimedAt: true,
         providerRefreshCompletedAt: true,
         providerRefreshResult: true,
+        alternateDeliveryEmail: true,
+        alternateDeliveryEmailConfirmedAt: true,
         customer: { select: { email: true, deletedAt: true } },
         debitTransaction: { select: { status: true } },
       },
@@ -247,6 +252,8 @@ async function loadAttemptContext(
       debitTransactionId: row.debitTransactionId,
       debitStatus: row.debitTransaction?.status ?? null,
       refundTransactionId: row.refundTransactionId,
+      alternateDeliveryEmail: row.alternateDeliveryEmail,
+      alternateDeliveryEmailConfirmedAt: row.alternateDeliveryEmailConfirmedAt,
     };
   }
 
@@ -318,6 +325,8 @@ async function loadAttemptContext(
       debitTransactionId: row.debitTransactionId,
       debitStatus: row.debitTransaction ? "COMPLETED" : null,
       refundTransactionId: row.refundTransactionId,
+      alternateDeliveryEmail: null,
+      alternateDeliveryEmailConfirmedAt: null,
     };
   }
 
@@ -377,6 +386,8 @@ async function loadAttemptContext(
     debitTransactionId: null,
     debitStatus: null,
     refundTransactionId: null,
+    alternateDeliveryEmail: null,
+    alternateDeliveryEmailConfirmedAt: null,
   };
 }
 
@@ -847,6 +858,10 @@ export async function finalizeReconciliationLocalRecord(options: {
         providerOrderId: fresh.providerOrderId,
         customerUserId: fresh.customerUserId,
         customerEmail: fresh.customerEmail as string,
+        alternateDeliveryEmail:
+          ids.sourceType === "wallet_purchase"
+            ? snapshotOrderAlternateDeliveryEmail(fresh)
+            : undefined,
         verifiedOffer: offer,
         fundingSource:
           ids.sourceType === "partner_purchase"

@@ -36,6 +36,7 @@ import {
   type EmailResendEligibility,
 } from "@/app/lib/admin/reconciliationCaseShared";
 import { createOrderAccessToken, getOrderAccessSuccessUrl } from "@/app/lib/vesim/orderAccess";
+import { resolveFrozenInstallDeliveryEmail } from "@/app/lib/esim/esimDeliveryEmail";
 import {
   allowanceFromDataLabel,
   calculateRetailPriceUsd,
@@ -587,8 +588,14 @@ async function resendPurchaseOrderEmail(
       currency: true,
       providerOrderId: true,
       adminUserId: true,
-      customer: { select: { email: true } },
-      order: { select: { id: true, status: true } },
+      order: {
+        select: {
+          id: true,
+          status: true,
+          customerEmail: true,
+          alternateDeliveryEmail: true,
+        },
+      },
     },
   });
   if (
@@ -603,7 +610,7 @@ async function resendPurchaseOrderEmail(
     return { ok: false, failureCode: "underlying_incomplete" };
   }
 
-  const customerEmail = (row.customer.email ?? "").trim();
+  const customerEmail = resolveFrozenInstallDeliveryEmail(row.order);
   const broker = await fetchBrokerOrderForEmailOnly(row.providerOrderId);
   if (!broker || !hasInstallDetails(extractInstallDetails(broker))) {
     await prisma.walletEsimPurchase.updateMany({
@@ -681,8 +688,14 @@ async function resendAssignmentOrderEmail(
       providerCostCents: true,
       providerCurrency: true,
       providerOrderId: true,
-      customer: { select: { email: true } },
-      order: { select: { id: true, status: true } },
+      order: {
+        select: {
+          id: true,
+          status: true,
+          customerEmail: true,
+          alternateDeliveryEmail: true,
+        },
+      },
     },
   });
   if (!row?.providerOrderId || !row.order || row.order.status !== OrderStatus.COMPLETED) {
@@ -693,7 +706,7 @@ async function resendAssignmentOrderEmail(
     return { ok: false, failureCode: "underlying_incomplete" };
   }
 
-  const customerEmail = (row.customer.email ?? "").trim();
+  const customerEmail = resolveFrozenInstallDeliveryEmail(row.order);
   const broker = await fetchBrokerOrderForEmailOnly(row.providerOrderId);
   if (!broker || !hasInstallDetails(extractInstallDetails(broker))) {
     await prisma.adminPackageAssignment.updateMany({

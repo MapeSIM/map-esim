@@ -2,7 +2,6 @@
 
 import {
   useActionState,
-  useEffect,
   useId,
   useRef,
   useState,
@@ -24,6 +23,7 @@ import {
 } from "@/app/lib/esim/walletPurchaseFormState";
 import type { WalletPurchaseReview } from "@/app/lib/esim/walletPurchaseRead";
 import CheckoutPromoCodeSection from "@/app/components/account/CheckoutPromoCodeSection";
+import CheckoutDeliveryEmailSection from "@/app/components/account/CheckoutDeliveryEmailSection";
 import {
   CheckoutDisplayCurrencyNote,
   CheckoutMoney,
@@ -112,6 +112,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
   const [confirmed, setConfirmed] = useState(false);
   const [useWallet, setUseWallet] = useState(review.useWallet);
   const [useRewards, setUseRewards] = useState(review.useRewards);
+  const [deliveryBlocksPurchase, setDeliveryBlocksPurchase] = useState(false);
   const [fundingPending, startFundingTransition] = useTransition();
   const fundingChoiceGen = useRef(0);
   const confirmId = useId();
@@ -124,12 +125,6 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
   const orderHeadingId = useId();
   const paymentHeadingId = useId();
   const errorState = state as WalletPurchaseActionState;
-
-  // Reset local choice only when navigating to a different purchase.
-  useEffect(() => {
-    setUseWallet(review.useWallet);
-    setUseRewards(review.useRewards);
-  }, [review.purchaseId, review.useWallet, review.useRewards]);
 
   const preview = previewPurchaseFunding(review, useWallet, useRewards);
   const gatewayRequired = preview.gatewayAmountCents > 0;
@@ -146,6 +141,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
     review.balanceCents - preview.walletAppliedCents
   );
   const busy = pending || fundingPending;
+  const purchaseBlocked = busy || deliveryBlocksPurchase;
   const alertError =
     errorState.ok === false && errorState.error
       ? errorState.error === CARD_PAYMENT_UNAVAILABLE_MESSAGE
@@ -247,6 +243,15 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           Signed-in account email
         </p>
+        <CheckoutDeliveryEmailSection
+          key={`${review.purchaseId}:${review.alternateDeliveryEmail ?? ""}:${review.deliveryEmailEditable ? "1" : "0"}`}
+          purchaseId={review.purchaseId}
+          accountEmail={review.customerEmail}
+          savedAlternateEmail={review.alternateDeliveryEmail}
+          editable={review.deliveryEmailEditable}
+          disabled={busy}
+          onBlockingChange={setDeliveryBlocksPurchase}
+        />
       </section>
 
       <CheckoutPromoCodeSection
@@ -503,6 +508,12 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         </div>
       ) : null}
 
+      {deliveryBlocksPurchase ? (
+        <p className="text-sm text-[var(--text-muted)]" role="status">
+          Save or cancel the delivery email before continuing this purchase.
+        </p>
+      ) : null}
+
       {zeroCashConfirm ? (
         <>
           <div className="space-y-2">
@@ -516,7 +527,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 type="checkbox"
                 checked={confirmed}
                 onChange={(event) => setConfirmed(event.target.checked)}
-                disabled={busy}
+                disabled={purchaseBlocked}
                 className="mt-1"
               />
               <span>
@@ -534,7 +545,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
 
           <button
             type="submit"
-            disabled={busy || !confirmed}
+            disabled={purchaseBlocked || !confirmed}
             className="inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] disabled:opacity-60"
           >
             {pending
@@ -549,7 +560,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
       ) : gatewayReady ? (
         <button
           type="submit"
-          disabled={busy}
+          disabled={purchaseBlocked}
           className="inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] disabled:opacity-60"
         >
           {pending ? "Starting secure payment…" : "Continue to Secure Payment"}

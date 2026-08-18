@@ -92,7 +92,7 @@ export default async function AccountWalletBuyReviewPage({
         </p>
       </div>
 
-      <WalletPurchaseConfirmForm review={review} />
+      <WalletPurchaseConfirmForm key={review.purchaseId} review={review} />
     </div>
   );
 }

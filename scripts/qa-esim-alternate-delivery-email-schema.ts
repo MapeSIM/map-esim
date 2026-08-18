@@ -43,12 +43,6 @@ function main() {
   const order = extractModel(schema, "Order");
   const purchase = extractModel(schema, "WalletEsimPurchase");
   const credit = read("app/lib/vesim/creditCheckout.ts");
-  const install = read("app/lib/esim/esimPurchaseInstallEmail.ts");
-  const wallet = read("app/lib/esim/walletPurchase.ts");
-  const apply = read("app/lib/esim/esimPurchasePaymentApply.ts");
-  const localFinalize = read(
-    "app/lib/admin/reconciliationLocalFinalization.ts"
-  );
 
   console.log("1) Prisma models — confirmed alternate, no challenge");
   assert.match(order, /customerEmail\s+String/);
@@ -141,7 +135,7 @@ function main() {
   );
   console.log("   ok");
 
-  console.log("5) Helper is pure and not wired into runtime");
+  console.log("5) Helper is pure");
   assert.match(helper, /classifyPurchaseDeliveryRecipient/);
   assert.match(helper, /classifyPurchaseDeliveryLock/);
   assert.match(helper, /confirmed_alternate/);
@@ -149,19 +143,6 @@ function main() {
   assert.doesNotMatch(helper, /from ["']@prisma\/client["']/);
   assert.doesNotMatch(helper, /\bfetch\s*\(/);
   assert.doesNotMatch(helper, /prisma\./);
-  for (const [label, src] of [
-    ["install", install],
-    ["wallet", wallet],
-    ["apply", apply],
-    ["localFinalize", localFinalize],
-    ["credit", credit],
-  ] as const) {
-    assert.doesNotMatch(
-      src,
-      /esimDeliveryEmailState/,
-      `${label} imported P1B helper`
-    );
-  }
   assert.match(pkg, /"qa:esim-alternate-delivery-email-schema"/);
   console.log("   ok");
 

@@ -12,6 +12,7 @@ import { deliverOrderEmailAfterCheckout } from "@/app/lib/email/deliverAfterChec
 import { createOrderAccessToken } from "@/app/lib/vesim/orderAccess";
 import type { VerifiedCheckoutOffer } from "@/app/lib/vesim/server";
 import { classifyAutomaticInstallEmailStatus } from "@/app/lib/esim/esimPurchaseInstallEmailStatus";
+import { resolveFrozenInstallDeliveryEmail } from "@/app/lib/esim/esimDeliveryEmail";
 
 export const WALLET_DELIVERY_EMAIL_FAILED = "esim.wallet_delivery_email_failed";
 export const WALLET_DELIVERY_EMAIL_UNCERTAIN =
@@ -107,7 +108,7 @@ async function persistDeliveryStatus(
 
 /**
  * Best-effort MAP branded QR/install email for a completed wallet purchase.
- * Recipient is frozen Order.customerEmail (account email in this phase).
+ * Recipient is frozen Order.alternateDeliveryEmail ?? Order.customerEmail.
  * Never throws. Never retries provider checkout or mutates wallet/payment.
  */
 export async function deliverCompletedWalletPurchaseInstallEmail(options: {
@@ -146,6 +147,7 @@ export async function deliverCompletedWalletPurchaseInstallEmail(options: {
             id: true,
             status: true,
             customerEmail: true,
+            alternateDeliveryEmail: true,
             providerOrderId: true,
           },
         },
@@ -254,7 +256,7 @@ export async function deliverCompletedWalletPurchaseInstallEmail(options: {
       };
     }
 
-    const frozenEmail = (purchase.order.customerEmail ?? "").trim();
+    const frozenEmail = resolveFrozenInstallDeliveryEmail(purchase.order);
     const providerOrderId =
       purchase.providerOrderId.trim() ||
       (purchase.order.providerOrderId ?? "").trim();

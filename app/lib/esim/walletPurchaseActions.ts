@@ -17,6 +17,15 @@ import {
   type WalletPurchaseActionState,
 } from "@/app/lib/esim/walletPurchaseFormState";
 import {
+  EsimDeliveryEmailError,
+  ALTERNATE_DELIVERY_EMAIL_MESSAGES,
+} from "@/app/lib/esim/esimDeliveryEmail";
+import {
+  clearWalletPurchaseAlternateDeliveryEmail,
+  saveWalletPurchaseAlternateDeliveryEmail,
+} from "@/app/lib/esim/esimDeliveryEmailMutations";
+import type { DeliveryEmailActionState } from "@/app/lib/esim/esimDeliveryEmailFormState";
+import {
   parseUseRewardsChoice,
   parseUseWalletChoice,
   parseWalletPurchaseIdempotencyKey,
@@ -183,7 +192,7 @@ export async function confirmWalletEsimPurchaseAction(
   const useWallet = parseUseWalletChoice(formData.get("useWallet"));
   const useRewards = parseUseRewardsChoice(formData.get("useRewards"));
 
-  // Never trust browser money fields.
+  // Never trust browser money fields or delivery-email fields.
   void formData.get("price");
   void formData.get("priceUSD");
   void formData.get("walletBalance");
@@ -200,6 +209,10 @@ export async function confirmWalletEsimPurchaseAction(
   void formData.get("rewardPoints");
   void formData.get("rewardPointsRedeemed");
   void formData.get("pointsBalance");
+  void formData.get("deliveryEmail");
+  void formData.get("deliveryEmailConfirm");
+  void formData.get("deliveryEmailAttestation");
+  void formData.get("useAlternateDeliveryEmail");
 
   if (!purchaseId || purchaseId.length > 64) {
     return { ok: false, error: "This purchase is unavailable." };
@@ -337,4 +350,64 @@ export async function confirmWalletEsimPurchaseAction(
   }
 
   redirect(successPath(result.purchaseId));
+}
+
+function mapDeliveryEmailError(error: unknown): DeliveryEmailActionState {
+  if (error instanceof EsimDeliveryEmailError) {
+    return { ok: false, error: error.message };
+  }
+  return { ok: false, error: ALTERNATE_DELIVERY_EMAIL_MESSAGES.unavailable };
+}
+
+export async function saveWalletPurchaseAlternateDeliveryEmailAction(
+  _prev: DeliveryEmailActionState,
+  formData: FormData
+): Promise<DeliveryEmailActionState> {
+  const customer = await requireRole("CUSTOMER");
+  const purchaseId = String(formData.get("purchaseId") ?? "").trim();
+  void formData.get("price");
+  void formData.get("customerEmail");
+  void formData.get("accountEmail");
+
+  if (!purchaseId || purchaseId.length > 64) {
+    return { ok: false, error: ALTERNATE_DELIVERY_EMAIL_MESSAGES.unavailable };
+  }
+
+  try {
+    const result = await saveWalletPurchaseAlternateDeliveryEmail({
+      customerUserId: customer.id,
+      purchaseId,
+      deliveryEmail: formData.get("deliveryEmail"),
+      confirmDeliveryEmail: formData.get("deliveryEmailConfirm"),
+      attested: formData.get("deliveryEmailAttestation") === "on",
+    });
+    return { ok: true, mode: result.mode };
+  } catch (error) {
+    return mapDeliveryEmailError(error);
+  }
+}
+
+export async function clearWalletPurchaseAlternateDeliveryEmailAction(
+  _prev: DeliveryEmailActionState,
+  formData: FormData
+): Promise<DeliveryEmailActionState> {
+  const customer = await requireRole("CUSTOMER");
+  const purchaseId = String(formData.get("purchaseId") ?? "").trim();
+  void formData.get("deliveryEmail");
+  void formData.get("deliveryEmailConfirm");
+  void formData.get("customerEmail");
+
+  if (!purchaseId || purchaseId.length > 64) {
+    return { ok: false, error: ALTERNATE_DELIVERY_EMAIL_MESSAGES.unavailable };
+  }
+
+  try {
+    const result = await clearWalletPurchaseAlternateDeliveryEmail({
+      customerUserId: customer.id,
+      purchaseId,
+    });
+    return { ok: true, mode: result.mode };
+  } catch (error) {
+    return mapDeliveryEmailError(error);
+  }
 }

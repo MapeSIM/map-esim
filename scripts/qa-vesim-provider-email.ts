@@ -53,7 +53,8 @@ function main() {
     apply,
     /persistAssignedOrder\(tx, \{[\s\S]*?customerEmail:\s*purchase\.customer\.email/
   );
-  assert.match(installEmail, /order\.customerEmail/);
+  assert.match(installEmail, /resolveFrozenInstallDeliveryEmail/);
+  assert.match(installEmail, /alternateDeliveryEmail/);
   assert.match(installEmail, /customerEmail:\s*frozenEmail/);
   assert.doesNotMatch(installEmail, /executeCreditCheckout\(/);
   console.log("PASS wallet_and_gateway_paths_consistent");

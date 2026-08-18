@@ -86,7 +86,7 @@ function main() {
   console.log("PASS insufficient_balance_before_provider");
 
   assert.match(confirmForm, /name="confirm"/);
-  assert.match(confirmForm, /disabled=\{busy \|\| !confirmed\}/);
+  assert.match(confirmForm, /disabled=\{purchaseBlocked \|\| !confirmed\}/);
   assert.match(confirmForm, /Buy eSIM with Wallet/);
   assert.ok(!/confirmPhrase|WALLET_PURCHASE_CONFIRM_PHRASE/.test(confirmForm));
   assert.ok(!/parseWalletPurchaseConfirmPhrase|confirmPhrase/.test(actions));

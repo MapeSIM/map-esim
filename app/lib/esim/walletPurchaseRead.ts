@@ -9,6 +9,11 @@ import { prisma } from "@/app/lib/db";
 import { calculateCustomerCheckoutFunding } from "@/app/lib/esim/purchaseFunding";
 import { payablePackageCents } from "@/app/lib/promo/promoDiscount";
 import { formatWalletPurchasePriceLabel } from "@/app/lib/esim/walletPurchase";
+import {
+  canEditPurchaseDeliveryEmail,
+  snapshotOrderAlternateDeliveryEmail,
+} from "@/app/lib/esim/esimDeliveryEmail";
+import { isPurchaseDeliveryEmailLocked } from "@/app/lib/esim/esimDeliveryEmailState";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
 import { formatUsdCents } from "@/app/lib/wallet/display";
 import { pointsNeededToUnlockRewards } from "@/app/lib/rewards/rewardConstants";
@@ -60,6 +65,9 @@ export type WalletPurchaseReview = {
   idempotencyKey: string;
   status: WalletEsimPurchaseStatus;
   canConfirm: boolean;
+  alternateDeliveryEmail: string | null;
+  deliveryEmailLocked: boolean;
+  deliveryEmailEditable: boolean;
 };
 
 export async function getWalletPurchaseReview(
@@ -97,6 +105,10 @@ export async function getWalletPurchaseReview(
       fundingSource: true,
       status: true,
       idempotencyKey: true,
+      adminUserId: true,
+      alternateDeliveryEmail: true,
+      alternateDeliveryEmailConfirmedAt: true,
+      alternateDeliveryEmailLockedAt: true,
     },
   });
 
@@ -210,6 +222,15 @@ export async function getWalletPurchaseReview(
     canConfirm:
       row.status === WalletEsimPurchaseStatus.READY ||
       row.status === WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+    alternateDeliveryEmail: snapshotOrderAlternateDeliveryEmail(row),
+    deliveryEmailLocked: isPurchaseDeliveryEmailLocked(
+      row.alternateDeliveryEmailLockedAt
+    ),
+    deliveryEmailEditable: canEditPurchaseDeliveryEmail({
+      status: row.status,
+      alternateDeliveryEmailLockedAt: row.alternateDeliveryEmailLockedAt,
+      adminUserId: row.adminUserId,
+    }),
   };
 }
 

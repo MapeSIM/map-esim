@@ -69,7 +69,9 @@ function main() {
     helper,
     /OR:\s*\[[\s\S]*emailDeliveryStatus:\s*null[\s\S]*skipped_no_install_details/
   );
-  assert.match(helper, /order\.customerEmail/);
+  assert.match(helper, /customerEmail:\s*true/);
+  assert.match(helper, /alternateDeliveryEmail/);
+  assert.match(helper, /resolveFrozenInstallDeliveryEmail/);
   assert.match(helper, /customerEmail:\s*frozenEmail/);
   assert.match(helper, /deliverOrderEmailAfterCheckout/);
   assert.doesNotMatch(helper, /executeCreditCheckout\(/);
@@ -152,8 +154,13 @@ function main() {
     resend,
     /emailDeliveryStatus:\s*\{\s*in:\s*\["failed",\s*"not_configured"\]/
   );
-  assert.match(resend, /customer:\s*\{\s*select:\s*\{\s*email:\s*true/);
-  assert.doesNotMatch(resend, /alternateEmail|otp|deliveryEmail/);
+  assert.match(resend, /resolveFrozenInstallDeliveryEmail/);
+  assert.match(resend, /alternateDeliveryEmail/);
+  assert.doesNotMatch(resend, /otp|codeHash|verifiedAt/i);
+  assert.doesNotMatch(
+    resend.slice(resend.indexOf("async function resendPurchaseOrderEmail")),
+    /row\.customer\.email/
+  );
   assert.match(
     eligibility,
     /emailStatus === "sending"[\s\S]{0,80}email_send_in_progress/

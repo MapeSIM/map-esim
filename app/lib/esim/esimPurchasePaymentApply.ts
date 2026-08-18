@@ -21,6 +21,10 @@ import {
 } from "@/app/lib/esim/walletPurchase";
 import { persistWalletPurchaseProviderObservation } from "@/app/lib/esim/providerResultPersist";
 import { persistAssignedOrder } from "@/app/lib/orders/persistAssignedOrder";
+import {
+  alternateDeliveryEmailLockClaim,
+  snapshotOrderAlternateDeliveryEmail,
+} from "@/app/lib/esim/esimDeliveryEmail";
 import { deliverCompletedWalletPurchaseInstallEmail } from "@/app/lib/esim/esimPurchaseInstallEmail";
 import type { NormalizedPaymentEvent } from "@/app/lib/payments/types";
 import { executeCreditCheckout } from "@/app/lib/vesim/creditCheckout";
@@ -482,6 +486,7 @@ export async function applyVerifiedEsimPurchasePaymentEvent(
               },
         data: {
           status: WalletEsimPurchaseStatus.FUNDED,
+          ...alternateDeliveryEmailLockClaim(),
           failureCategory: null,
           failureCode: null,
         },
@@ -801,7 +806,10 @@ export async function fulfillFundedEsimPurchase(
       id: purchase.id,
       status: WalletEsimPurchaseStatus.FUNDED,
     },
-    data: { status: WalletEsimPurchaseStatus.PROVIDER_PENDING },
+    data: {
+      status: WalletEsimPurchaseStatus.PROVIDER_PENDING,
+      ...alternateDeliveryEmailLockClaim(),
+    },
   });
   if (claimed.count !== 1) {
     const again = await prisma.walletEsimPurchase.findUnique({
@@ -893,7 +901,12 @@ export async function fulfillFundedEsimPurchase(
     const orderId = await prisma.$transaction(async (tx) => {
       const current = await tx.walletEsimPurchase.findUnique({
         where: { id: purchase.id },
-        select: { status: true, orderId: true },
+        select: {
+          status: true,
+          orderId: true,
+          alternateDeliveryEmail: true,
+          alternateDeliveryEmailConfirmedAt: true,
+        },
       });
       if (
         current?.status === WalletEsimPurchaseStatus.COMPLETED &&
@@ -909,6 +922,7 @@ export async function fulfillFundedEsimPurchase(
         providerOrderId: checkout.providerOrderId,
         customerUserId: purchase.customerUserId,
         customerEmail: purchase.customer.email,
+        alternateDeliveryEmail: snapshotOrderAlternateDeliveryEmail(current),
         verifiedOffer,
         fundingSource: purchase.fundingSource,
         status: OrderStatus.COMPLETED,

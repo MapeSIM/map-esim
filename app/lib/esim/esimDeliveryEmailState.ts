@@ -1,8 +1,6 @@
 /**
  * Pure derived-state helpers for MAP eSIM alternate delivery email.
- * Side-effect free. Not imported into purchase/email runtime in P1B.
- *
- * "Confirmed" is customer attestation only — not email-ownership proof.
+ * Side-effect free. "Confirmed" is customer attestation only — not ownership proof.
  */
 
 export type PurchaseDeliveryRecipientState =

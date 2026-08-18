@@ -25,6 +25,12 @@ export async function persistAssignedOrder(
     verifiedOffer: VerifiedCheckoutOffer;
     fundingSource: OrderFundingSource;
     status?: OrderStatus;
+    /**
+     * Frozen confirmed alternate install-email recipient from the purchase.
+     * Null/omitted keeps Order.customerEmail as the install recipient.
+     * Does not change User.email.
+     */
+    alternateDeliveryEmail?: string | null;
     /** Raw ICCID when already extracted (preferred). */
     iccid?: string | null;
     /** Checkout/broker payload used to extract ICCID when needed. */
@@ -34,6 +40,12 @@ export async function persistAssignedOrder(
   const providerOrderId = options.providerOrderId.trim();
   const customerEmail = normalizeEmail(options.customerEmail);
   const customerUserId = options.customerUserId.trim();
+  const alternateDeliveryEmail =
+    options.alternateDeliveryEmail === undefined
+      ? undefined
+      : options.alternateDeliveryEmail
+        ? normalizeEmail(options.alternateDeliveryEmail)
+        : null;
 
   if (!providerOrderId || !customerEmail || !customerUserId) {
     throw new Error("Assigned order persistence requires complete identifiers.");
@@ -78,6 +90,9 @@ export async function persistAssignedOrder(
       status: options.status || OrderStatus.COMPLETED,
       claimStatus: OrderClaimStatus.CLAIMED,
       claimedAt: now,
+      ...(alternateDeliveryEmail !== undefined
+        ? { alternateDeliveryEmail }
+        : {}),
     },
     update: {
       userId: customerUserId,
@@ -98,6 +113,9 @@ export async function persistAssignedOrder(
       status: options.status || OrderStatus.COMPLETED,
       claimStatus: OrderClaimStatus.CLAIMED,
       claimedAt: now,
+      ...(alternateDeliveryEmail !== undefined
+        ? { alternateDeliveryEmail }
+        : {}),
     },
     select: {
       id: true,

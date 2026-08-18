@@ -113,6 +113,7 @@ function main() {
     true
   );
   assert.match(confirmForm, /ASSISTED_WALLET_CONFIRM_PHRASE/);
+  assert.doesNotMatch(confirmForm, /Send eSIM details to a different email/);
   assert.match(selectForm, /name="reason"/);
   console.log("PASS mandatory_reason_and_purchase_phrase");
 
