@@ -14,6 +14,8 @@ import {
 const root = join(__dirname, "..");
 const MIGRATION =
   "prisma/migrations/20260819120000_add_esim_alternate_delivery_email/migration.sql";
+const VALIDATE_MIGRATION =
+  "prisma/migrations/20260819140000_validate_esim_alternate_delivery_email_constraint/migration.sql";
 
 function read(rel: string): string {
   return readFileSync(join(root, rel), "utf8");
@@ -33,6 +35,7 @@ function extractModel(schema: string, name: string): string {
 function main() {
   const schema = read("prisma/schema.prisma");
   const migration = read(MIGRATION);
+  const validateMigration = read(VALIDATE_MIGRATION);
   const helper = read("app/lib/esim/esimDeliveryEmailState.ts");
   const pkg = read("package.json");
   const emailOtp = extractModel(schema, "EmailOtp");
@@ -181,6 +184,33 @@ function main() {
     isPurchaseDeliveryEmailLocked(new Date("2026-08-19T01:00:00Z")),
     true
   );
+  console.log("   ok");
+
+  console.log("7) Validation migration validates the exact NOT VALID CHECK");
+  assert.match(migration, /\) NOT VALID;/);
+  assert.doesNotMatch(validateMigration, /NOT VALID/);
+  assert.match(
+    validateMigration,
+    /ALTER TABLE "WalletEsimPurchase"\s+VALIDATE CONSTRAINT "WalletEsimPurchase_alternate_delivery_email_confirmed_ck";/
+  );
+  const validateSql = validateMigration
+    .split(/\r?\n/)
+    .filter((line) => !line.trim().startsWith("--"))
+    .join("\n");
+  assert.doesNotMatch(validateSql, /\bINSERT\b/i);
+  assert.doesNotMatch(validateSql, /\bUPDATE\b/i);
+  assert.doesNotMatch(validateSql, /\bDELETE\b/i);
+  assert.doesNotMatch(validateSql, /\bDROP\b/i);
+  assert.doesNotMatch(validateSql, /\bTRUNCATE\b/i);
+  assert.doesNotMatch(validateSql, /ADD\s+COLUMN|DROP\s+COLUMN|ALTER\s+COLUMN/i);
+  assert.doesNotMatch(validateSql, /CREATE\s+(UNIQUE\s+)?INDEX/i);
+  assert.doesNotMatch(validateSql, /CREATE\s+TABLE/i);
+  assert.doesNotMatch(validateSql, /CREATE\s+TYPE|CREATE\s+ENUM/i);
+  assert.equal(
+    (validateSql.match(/ALTER TABLE/g) || []).length,
+    1
+  );
+  assert.doesNotMatch(schema, /convalidated|VALIDATE CONSTRAINT/);
   console.log("   ok");
 
   console.log("PASS qa-esim-alternate-delivery-email-schema");
