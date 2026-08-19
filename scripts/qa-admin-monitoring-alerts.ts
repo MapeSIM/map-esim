@@ -241,6 +241,10 @@ function main() {
   assert.doesNotMatch(service, /operationalControl\.(update|create|delete)/);
   assert.doesNotMatch(service, /executeCreditCheckout|sendMail|refundReservedFunds/);
   assert.doesNotMatch(service, /method:\s*["']POST["']/);
+  assert.match(service, /orderEmailInboxStatusOr|isOrderEmailInboxMatch/);
+  assert.match(service, /Uncertain order email delivery/);
+  assert.match(service, /Clear stuck send/);
+  assert.match(service, /assignment:\$\{row\.id\}/);
   console.log("PASS codes_and_readonly_service");
 
   // Sanitization static

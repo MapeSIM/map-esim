@@ -25,8 +25,12 @@ import {
   filterLabel,
   isFailedEmailDelivery,
   isFailedWalletNotification,
+  isInboxStaleSendingEmailDelivery,
+  isOrderEmailInboxMatch,
+  isStaleSendingEmailDelivery,
   isStuckAttemptAge,
   isValidReconciliationSourceType,
+  orderEmailInboxStatusOr,
   parseReconciliationFilter,
   type ReconciliationCategory,
   type ReconciliationFilter,
@@ -167,6 +171,27 @@ function failureLabel(
   if (c) return c;
   if (codeV) return codeV;
   return "—";
+}
+
+function emailDeliveryFailureLabel(
+  status: string | null | undefined
+): string {
+  const v = (status ?? "").trim().toLowerCase();
+  if (v === "sending") return "email / sending (uncertain)";
+  if (!v) return "email / unknown";
+  return `email / ${v}`.slice(0, 80);
+}
+
+function orderEmailTimelineState(
+  status: string | null | undefined,
+  updatedAt: Date,
+  now: Date
+): ReconciliationTimelineEvent["state"] {
+  if (isFailedEmailDelivery(status)) return "failed";
+  if (isStaleSendingEmailDelivery(status, updatedAt, now)) return "unknown";
+  if ((status ?? "").trim().toLowerCase() === "sending") return "pending";
+  if (status) return "done";
+  return "unknown";
 }
 
 function resolutionLabel(options: {
@@ -398,7 +423,7 @@ export async function getReconciliationListPage(options: {
       prisma.walletEsimPurchase.findMany({
         where: {
           status: WalletEsimPurchaseStatus.COMPLETED,
-          emailDeliveryStatus: { in: ["failed", "invalid_email"] },
+          OR: orderEmailInboxStatusOr(now),
         },
         orderBy: { updatedAt: "desc" },
         take: RECONCILIATION_LIST_LIMIT,
@@ -432,7 +457,7 @@ export async function getReconciliationListPage(options: {
       prisma.adminPackageAssignment.findMany({
         where: {
           status: AdminPackageAssignmentStatus.COMPLETED,
-          emailDeliveryStatus: { in: ["failed", "invalid_email"] },
+          OR: orderEmailInboxStatusOr(now),
         },
         orderBy: { updatedAt: "desc" },
         take: RECONCILIATION_LIST_LIMIT,
@@ -742,7 +767,15 @@ export async function getReconciliationListPage(options: {
     }
 
     for (const row of emailPurchases) {
-      if (!isFailedEmailDelivery(row.emailDeliveryStatus)) continue;
+      if (
+        !isOrderEmailInboxMatch(row.emailDeliveryStatus, row.updatedAt, {
+          status: row.status,
+          reconciliationResolvedAt: row.reconciliationResolvedAt,
+          now,
+        })
+      ) {
+        continue;
+      }
       const category = classifyReconciliationCase({
         sourceType: "order_email",
         status: row.status,
@@ -770,7 +803,7 @@ export async function getReconciliationListPage(options: {
         hasProviderRef: Boolean((row.providerOrderId ?? "").trim()),
         localOrderLabel: row.orderId || "—",
         localOrderHref: row.orderId ? `/admin/orders/${row.orderId}` : null,
-        failureLabel: `email / ${row.emailDeliveryStatus}`,
+        failureLabel: emailDeliveryFailureLabel(row.emailDeliveryStatus),
         category,
         categoryLabel: categoryLabel(category),
         createdAtLabel: formatTs(row.createdAt),
@@ -788,7 +821,15 @@ export async function getReconciliationListPage(options: {
     }
 
     for (const row of emailAssignments) {
-      if (!isFailedEmailDelivery(row.emailDeliveryStatus)) continue;
+      if (
+        !isOrderEmailInboxMatch(row.emailDeliveryStatus, row.updatedAt, {
+          status: row.status,
+          reconciliationResolvedAt: row.reconciliationResolvedAt,
+          now,
+        })
+      ) {
+        continue;
+      }
       const category = classifyReconciliationCase({
         sourceType: "order_email",
         status: row.status,
@@ -819,7 +860,7 @@ export async function getReconciliationListPage(options: {
         hasProviderRef: Boolean((row.providerOrderId ?? "").trim()),
         localOrderLabel: row.orderId || "—",
         localOrderHref: row.orderId ? `/admin/orders/${row.orderId}` : null,
-        failureLabel: `email / ${row.emailDeliveryStatus}`,
+        failureLabel: emailDeliveryFailureLabel(row.emailDeliveryStatus),
         category,
         categoryLabel: categoryLabel(category),
         createdAtLabel: formatTs(row.createdAt),
@@ -1206,10 +1247,6 @@ export async function getReconciliationDetail(
       });
       if (!row) return null;
 
-      const isEmailCase =
-        sourceType === "order_email" &&
-        row.status === WalletEsimPurchaseStatus.COMPLETED &&
-        isFailedEmailDelivery(row.emailDeliveryStatus);
       const isStuck =
         (row.status === WalletEsimPurchaseStatus.FUNDS_RESERVED ||
           row.status === WalletEsimPurchaseStatus.PROVIDER_PENDING) &&
@@ -1217,7 +1254,29 @@ export async function getReconciliationDetail(
       const isRecon =
         row.status === WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED;
 
-      if (sourceType === "order_email" && !isEmailCase && !row.reconciliationResolvedAt) return null;
+      if (sourceType === "order_email") {
+        const isStaleSendingCase = isInboxStaleSendingEmailDelivery(
+          row.emailDeliveryStatus,
+          row.updatedAt,
+          {
+            status: row.status,
+            reconciliationResolvedAt: row.reconciliationResolvedAt,
+          }
+        );
+        const sending =
+          (row.emailDeliveryStatus ?? "").trim().toLowerCase() === "sending";
+        if (sending && !isStaleSendingCase) return null;
+        const isFailedEmailCase =
+          row.status === WalletEsimPurchaseStatus.COMPLETED &&
+          isFailedEmailDelivery(row.emailDeliveryStatus);
+        if (
+          !isFailedEmailCase &&
+          !isStaleSendingCase &&
+          !row.reconciliationResolvedAt
+        ) {
+          return null;
+        }
+      }
       if (sourceType === "wallet_purchase" && !isRecon && !isStuck && !row.reconciliationResolvedAt) {
         return null;
       }
@@ -1300,12 +1359,8 @@ export async function getReconciliationDetail(
         ),
         timelineEvent(
           "Order email state",
-          isFailedEmailDelivery(row.emailDeliveryStatus)
-            ? "failed"
-            : row.emailDeliveryStatus
-              ? "done"
-              : "unknown",
-          (row.emailDeliveryStatus ?? "—").slice(0, 40)
+          orderEmailTimelineState(row.emailDeliveryStatus, row.updatedAt, new Date()),
+          emailDeliveryFailureLabel(row.emailDeliveryStatus).replace(/^email \/ /, "")
         ),
         timelineEvent(
           "Wallet notification state",
@@ -1408,7 +1463,10 @@ export async function getReconciliationDetail(
         hasProviderRef: hasProvider,
         localOrderLabel: row.orderId || "—",
         localOrderHref: row.orderId ? `/admin/orders/${row.orderId}` : null,
-        failureLabel: failureLabel(row.failureCategory, row.failureCode),
+        failureLabel:
+          sourceType === "order_email"
+            ? emailDeliveryFailureLabel(row.emailDeliveryStatus)
+            : failureLabel(row.failureCategory, row.failureCode),
         createdAtLabel: formatTs(row.createdAt),
         updatedAtLabel: formatTs(row.updatedAt),
         resolutionLabel: resolutionLabel({
@@ -1767,9 +1825,23 @@ async function getAssignmentDetail(
   if (!row) return null;
 
   if (sourceType === "order_email") {
+    const isStaleSendingCase = isInboxStaleSendingEmailDelivery(
+      row.emailDeliveryStatus,
+      row.updatedAt,
+      {
+        status: row.status,
+        reconciliationResolvedAt: row.reconciliationResolvedAt,
+      }
+    );
+    const sending =
+      (row.emailDeliveryStatus ?? "").trim().toLowerCase() === "sending";
+    if (sending && !isStaleSendingCase) return null;
+    const isFailedEmailCase =
+      row.status === AdminPackageAssignmentStatus.COMPLETED &&
+      isFailedEmailDelivery(row.emailDeliveryStatus);
     if (
-      (row.status !== AdminPackageAssignmentStatus.COMPLETED ||
-        !isFailedEmailDelivery(row.emailDeliveryStatus)) &&
+      !isFailedEmailCase &&
+      !isStaleSendingCase &&
       !row.reconciliationResolvedAt
     ) {
       return null;
@@ -1835,12 +1907,8 @@ async function getAssignmentDetail(
     timelineEvent("Refund completed or missing", "unknown", "N/A (company-funded)"),
     timelineEvent(
       "Order email state",
-      isFailedEmailDelivery(row.emailDeliveryStatus)
-        ? "failed"
-        : row.emailDeliveryStatus
-          ? "done"
-          : "unknown",
-      (row.emailDeliveryStatus ?? "—").slice(0, 40)
+      orderEmailTimelineState(row.emailDeliveryStatus, row.updatedAt, new Date()),
+      emailDeliveryFailureLabel(row.emailDeliveryStatus).replace(/^email \/ /, "")
     ),
     timelineEvent("Wallet notification state", "unknown", "N/A"),
     timelineEvent(
@@ -1879,7 +1947,7 @@ async function getAssignmentDetail(
 
   return {
     sourceType,
-    attemptId: row.id,
+    attemptId: sourceType === "order_email" ? `assignment:${row.id}` : row.id,
     purchaseType:
       sourceType === "order_email" ? "Email issue" : "Company-funded",
     category,
@@ -1899,7 +1967,10 @@ async function getAssignmentDetail(
     hasProviderRef: hasProvider,
     localOrderLabel: row.orderId || "—",
     localOrderHref: row.orderId ? `/admin/orders/${row.orderId}` : null,
-    failureLabel: failureLabel(row.failureCategory, row.failureCode),
+    failureLabel:
+      sourceType === "order_email"
+        ? emailDeliveryFailureLabel(row.emailDeliveryStatus)
+        : failureLabel(row.failureCategory, row.failureCode),
     createdAtLabel: formatTs(row.createdAt),
     updatedAtLabel: formatTs(row.updatedAt),
     resolutionLabel: resolutionLabel({

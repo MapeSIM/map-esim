@@ -2,6 +2,11 @@
  * Shared reconciliation case-management constants (client + QA safe).
  */
 
+import {
+  isStaleSendingEmailDelivery,
+  RECONCILIATION_STUCK_AGE_MS,
+} from "@/app/lib/admin/reconciliationClassify";
+
 export const CASE_REASON_MIN = 5;
 export const CASE_REASON_MAX = 200;
 
@@ -10,6 +15,7 @@ export const UNLOCK_CASE_PHRASE = "UNLOCK CASE";
 export const RESOLVE_CASE_PHRASE = "RESOLVE CASE";
 export const DEESCALATE_CASE_PHRASE = "DE-ESCALATE CASE";
 export const RESEND_EMAIL_PHRASE = "RESEND EMAIL";
+export const CLEAR_STUCK_SEND_PHRASE = "CLEAR STUCK SEND";
 export const BACKFILL_ICCID_PHRASE = "BACKFILL ICCID";
 export const FINALIZE_LOCAL_RECORD_PHRASE = "FINALIZE LOCAL RECORD";
 export const REFUND_WALLET_FUNDS_PHRASE = "REFUND WALLET FUNDS";
@@ -359,6 +365,83 @@ export function emailResendBlockerLabel(code: string): string {
       return "Wallet balance snapshot is incomplete.";
     default:
       return "Email cannot be resent for this case.";
+  }
+}
+
+/** Pure Admin-only clear-stuck-send eligibility. No SMTP. */
+export type ClearStuckSendBlockInput = {
+  sourceType: CaseManagementSourceType;
+  alreadyResolved: boolean;
+  status?: string | null;
+  emailDeliveryStatus?: string | null;
+  updatedAt?: Date | string | null;
+  now?: Date;
+};
+
+export type ClearStuckSendEligibility = {
+  allowed: boolean;
+  blockers: string[];
+  supported: boolean;
+};
+
+export function evaluateClearStuckSendEligibility(
+  input: ClearStuckSendBlockInput
+): ClearStuckSendEligibility {
+  if (input.sourceType !== "order_email") {
+    return {
+      allowed: false,
+      blockers: ["unsupported_source"],
+      supported: false,
+    };
+  }
+
+  const blockers: string[] = [];
+  if (input.alreadyResolved) blockers.push("already_resolved");
+
+  const status = (input.status ?? "").trim().toUpperCase();
+  if (status !== "COMPLETED") blockers.push("order_not_completed");
+
+  const emailStatus = (input.emailDeliveryStatus ?? "").trim().toLowerCase();
+  if (emailStatus !== "sending") {
+    if (emailStatus === "sent" || emailStatus === "already_sent") {
+      blockers.push("email_already_sent");
+    } else {
+      blockers.push("email_not_sending");
+    }
+  } else if (
+    !isStaleSendingEmailDelivery(
+      emailStatus,
+      input.updatedAt,
+      input.now ?? new Date(),
+      RECONCILIATION_STUCK_AGE_MS
+    )
+  ) {
+    blockers.push("email_send_in_progress");
+  }
+
+  return {
+    allowed: blockers.length === 0,
+    blockers,
+    supported: true,
+  };
+}
+
+export function clearStuckSendBlockerLabel(code: string): string {
+  switch (code) {
+    case "unsupported_source":
+      return "This case type does not support clearing a stuck send.";
+    case "already_resolved":
+      return "Resolved cases cannot clear a stuck send.";
+    case "order_not_completed":
+      return "Underlying purchase/assignment is not completed.";
+    case "email_already_sent":
+      return "Email was already sent successfully.";
+    case "email_not_sending":
+      return "Email is not in a stuck sending state.";
+    case "email_send_in_progress":
+      return "An email send is already in progress.";
+    default:
+      return "Stuck send cannot be cleared for this case.";
   }
 }
 

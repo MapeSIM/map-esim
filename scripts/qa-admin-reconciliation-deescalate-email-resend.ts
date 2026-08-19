@@ -11,10 +11,12 @@ import {
   DEESCALATE_CASE_PHRASE,
   emailResendBlockerLabel,
   evaluateEmailResendEligibility,
+  evaluateClearStuckSendEligibility,
   lowerEscalationPriorities,
   parseConfirmPhrase,
   parseEscalationPriority,
   RESEND_EMAIL_PHRASE,
+  CLEAR_STUCK_SEND_PHRASE,
 } from "../app/lib/admin/reconciliationCaseShared";
 
 const root = join(__dirname, "..");
@@ -27,6 +29,7 @@ function main() {
   const shared = read("app/lib/admin/reconciliationCaseShared.ts");
   const management = read("app/lib/admin/reconciliationCaseManagement.ts");
   const emailResend = read("app/lib/admin/reconciliationEmailResend.ts");
+  const clearStuck = read("app/lib/admin/reconciliationClearStuckSend.ts");
   const actions = read("app/lib/admin/reconciliationCaseActions.ts");
   const panel = read("app/components/admin/CaseManagementPanel.tsx");
   const walletNotify = read("app/lib/wallet/transactionNotification.ts");
@@ -35,10 +38,13 @@ function main() {
 
   assert.equal(DEESCALATE_CASE_PHRASE, "DE-ESCALATE CASE");
   assert.equal(RESEND_EMAIL_PHRASE, "RESEND EMAIL");
+  assert.equal(CLEAR_STUCK_SEND_PHRASE, "CLEAR STUCK SEND");
   assert.equal(parseConfirmPhrase("DE-ESCALATE CASE", DEESCALATE_CASE_PHRASE).ok, true);
   assert.equal(parseConfirmPhrase("DEESCALATE CASE", DEESCALATE_CASE_PHRASE).ok, false);
   assert.equal(parseConfirmPhrase("RESEND EMAIL", RESEND_EMAIL_PHRASE).ok, true);
   assert.equal(parseConfirmPhrase("resend email", RESEND_EMAIL_PHRASE).ok, false);
+  assert.equal(parseConfirmPhrase("CLEAR STUCK SEND", CLEAR_STUCK_SEND_PHRASE).ok, true);
+  assert.equal(parseConfirmPhrase("clear stuck send", CLEAR_STUCK_SEND_PHRASE).ok, false);
   console.log("PASS confirmation_phrases");
 
   assert.equal(canLowerEscalation("CRITICAL", "HIGH"), true);
@@ -92,6 +98,53 @@ function main() {
   });
   assert.equal(sendingBlocked.allowed, false);
   assert.ok(sendingBlocked.blockers.includes("email_send_in_progress"));
+
+  const now = new Date("2026-08-19T12:00:00.000Z");
+  const staleAt = new Date(now.getTime() - 15 * 60 * 1000);
+  const freshAt = new Date(now.getTime() - 14 * 60 * 1000);
+  const staleClear = evaluateClearStuckSendEligibility({
+    sourceType: "order_email",
+    alreadyResolved: false,
+    status: "COMPLETED",
+    emailDeliveryStatus: "sending",
+    updatedAt: staleAt,
+    now,
+  });
+  assert.equal(staleClear.allowed, true);
+  assert.equal(staleClear.supported, true);
+
+  const freshClear = evaluateClearStuckSendEligibility({
+    sourceType: "order_email",
+    alreadyResolved: false,
+    status: "COMPLETED",
+    emailDeliveryStatus: "sending",
+    updatedAt: freshAt,
+    now,
+  });
+  assert.equal(freshClear.allowed, false);
+  assert.ok(freshClear.blockers.includes("email_send_in_progress"));
+
+  const failedClear = evaluateClearStuckSendEligibility({
+    sourceType: "order_email",
+    alreadyResolved: false,
+    status: "COMPLETED",
+    emailDeliveryStatus: "failed",
+    updatedAt: staleAt,
+    now,
+  });
+  assert.equal(failedClear.allowed, false);
+  assert.ok(failedClear.blockers.includes("email_not_sending"));
+
+  const walletClear = evaluateClearStuckSendEligibility({
+    sourceType: "wallet_email",
+    alreadyResolved: false,
+    status: "COMPLETED",
+    emailDeliveryStatus: "sending",
+    updatedAt: staleAt,
+    now,
+  });
+  assert.equal(walletClear.supported, false);
+  assert.equal(walletClear.allowed, false);
 
   const invalidEmail = evaluateEmailResendEligibility({
     sourceType: "order_email",
@@ -149,6 +202,7 @@ function main() {
   assert.match(actions, /requireRole\("ADMIN"\)/);
   assert.match(actions, /deescalateReconciliationCaseAction/);
   assert.match(actions, /resendReconciliationEmailAction/);
+  assert.match(actions, /clearStuckReconciliationSendAction/);
   console.log("PASS auth_same_origin_cas_deescalate");
 
   assert.match(emailResend, /assertSameOriginAdminRequest/);
@@ -173,14 +227,23 @@ function main() {
 
   assert.match(panel, /DEESCALATE_CASE_PHRASE|De-escalate/);
   assert.match(panel, /RESEND_EMAIL_PHRASE|Resend email/);
+  assert.match(panel, /CLEAR_STUCK_SEND_PHRASE|Clear stuck send/);
   assert.match(panel, /deescalatePriorityOptions/);
   assert.match(panel, /emailResendAllowed/);
+  assert.match(panel, /clearStuckSendAllowed/);
+  assert.match(panel, /props\.clearStuckSendAllowed\s*\?/);
+  assert.doesNotMatch(panel, /clear-stuck-reason/);
+  assert.match(panel, /duplicate installation details/);
+  assert.match(emailResend, /parseCaseReason/);
+  assert.match(management, /parseCaseReason/);
+  assert.doesNotMatch(clearStuck, /parseCaseReason/);
+  assert.doesNotMatch(clearStuck, /reason:\s/);
   assert.doesNotMatch(panel, /iccidEncrypted|LPA:|activationCode/i);
   assert.match(pkg, /qa:admin-reconciliation-deescalate-email-resend/);
   assert.ok(existsSync(join(root, "scripts/qa-admin-reconciliation-deescalate-email-resend.ts")));
   console.log("PASS ui_and_package_script");
 
-  assert.doesNotMatch(shared + management + emailResend + actions, /LPA:1\$/);
+  assert.doesNotMatch(shared + management + emailResend + actions + clearStuck, /LPA:1\$/);
   assert.doesNotMatch(
     emailResend,
     /providerOrderId:\s*row\.providerOrderId,\s*\n\s*reason/

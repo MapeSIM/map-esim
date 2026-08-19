@@ -48,6 +48,7 @@ type ActionKey =
   | "deescalate"
   | "mark_resolved"
   | "email_resend"
+  | "clear_stuck_send"
   | "iccid_backfill"
   | "local_finalization"
   | "wallet_refund";
@@ -60,6 +61,7 @@ const ALL_ACTIONS: ActionKey[] = [
   "deescalate",
   "mark_resolved",
   "email_resend",
+  "clear_stuck_send",
   "iccid_backfill",
   "local_finalization",
   "wallet_refund",
@@ -67,6 +69,10 @@ const ALL_ACTIONS: ActionKey[] = [
 
 function emailResendSupported(source: string): boolean {
   return source === "order_email" || source === "wallet_email";
+}
+
+function clearStuckSendSupported(source: string): boolean {
+  return source === "order_email";
 }
 
 function caseMgmtSupported(source: string): boolean {
@@ -85,6 +91,8 @@ function expectedSupport(source: string, action: ActionKey): boolean {
       return caseMgmtSupported(source);
     case "email_resend":
       return emailResendSupported(source);
+    case "clear_stuck_send":
+      return clearStuckSendSupported(source);
     case "iccid_backfill":
       return isIccidBackfillSourceType(source);
     case "local_finalization":
@@ -99,6 +107,7 @@ const RECON_QA_SCRIPTS = [
   "qa:admin-reconciliation-provider-refresh",
   "qa:admin-reconciliation-case-management",
   "qa:admin-reconciliation-deescalate-email-resend",
+  "qa:admin-reconciliation-clear-stuck-send",
   "qa:admin-reconciliation-iccid-backfill",
   "qa:admin-reconciliation-local-finalization",
   "qa:admin-reconciliation-wallet-refund",
@@ -131,6 +140,7 @@ function main() {
   );
   const iccidBackfill = read("app/lib/admin/reconciliationIccidBackfill.ts");
   const emailResend = read("app/lib/admin/reconciliationEmailResend.ts");
+  const clearStuck = read("app/lib/admin/reconciliationClearStuckSend.ts");
   const caseMgmt = read("app/lib/admin/reconciliationCaseManagement.ts");
   const actions = read("app/lib/admin/reconciliationCaseActions.ts");
   const refreshActions = read("app/lib/admin/providerRefreshActions.ts");
@@ -162,6 +172,7 @@ function main() {
     deescalate: true,
     mark_resolved: true,
     email_resend: false,
+    clear_stuck_send: false,
     iccid_backfill: true,
     local_finalization: true,
     wallet_refund: true,
@@ -174,6 +185,7 @@ function main() {
     deescalate: true,
     mark_resolved: true,
     email_resend: false,
+    clear_stuck_send: false,
     iccid_backfill: true,
     local_finalization: true,
     wallet_refund: false,
@@ -186,6 +198,7 @@ function main() {
     deescalate: true,
     mark_resolved: true,
     email_resend: false,
+    clear_stuck_send: false,
     iccid_backfill: false,
     local_finalization: false,
     wallet_refund: false,
@@ -198,6 +211,7 @@ function main() {
     deescalate: true,
     mark_resolved: true,
     email_resend: true,
+    clear_stuck_send: true,
     iccid_backfill: false,
     local_finalization: false,
     wallet_refund: false,
@@ -210,6 +224,7 @@ function main() {
     deescalate: true,
     mark_resolved: true,
     email_resend: true,
+    clear_stuck_send: false,
     iccid_backfill: false,
     local_finalization: false,
     wallet_refund: false,
@@ -222,6 +237,7 @@ function main() {
     deescalate: true,
     mark_resolved: true,
     email_resend: false,
+    clear_stuck_send: false,
     iccid_backfill: true,
     local_finalization: false,
     wallet_refund: false,
@@ -230,6 +246,7 @@ function main() {
   assert.deepEqual([...WALLET_REFUND_SOURCE_TYPES], ["wallet_purchase"]);
   assert.deepEqual([...LOCAL_FINALIZATION_SOURCE_TYPES], [
     "wallet_purchase",
+    "partner_purchase",
     "assignment",
   ]);
   assert.deepEqual([...ICCID_BACKFILL_SOURCE_TYPES], [
@@ -244,6 +261,7 @@ function main() {
   assert.match(panel, /props\.localFinalizationSupported\s*\?/);
   assert.match(panel, /props\.iccidBackfillSupported\s*\?/);
   assert.match(panel, /props\.emailResendSupported\s*\?/);
+  assert.match(panel, /props\.clearStuckSendAllowed\s*\?/);
   assert.match(panel, /Refund wallet funds/);
   assert.match(detailPage, /sourceType === "wallet_purchase"/);
   assert.match(detailPage, /sourceType === "assignment"/);
@@ -256,6 +274,7 @@ function main() {
     ["local_finalization", localFinalize],
     ["iccid_backfill", iccidBackfill],
     ["email_resend", emailResend],
+    ["clear_stuck_send", clearStuck],
     ["provider_refresh", providerRefresh],
   ] as const) {
     assert.doesNotMatch(
@@ -293,6 +312,7 @@ function main() {
     ["local_finalization", localFinalize],
     ["iccid_backfill", iccidBackfill],
     ["email_resend", emailResend],
+    ["clear_stuck_send", clearStuck],
   ] as const) {
     assert.doesNotMatch(src, /\/api\/checkout\/credit/);
     assert.doesNotMatch(src, /executeCreditCheckout/);
@@ -416,6 +436,7 @@ function main() {
     ["provider_refresh", providerRefresh],
     ["case_mgmt", caseMgmt],
     ["email_resend", emailResend],
+    ["clear_stuck_send", clearStuck],
     ["iccid_backfill", iccidBackfill],
     ["local_finalization", localFinalize],
     ["wallet_refund", walletRefund],
@@ -431,6 +452,7 @@ function main() {
   assert.match(shared, /RESOLVE CASE/);
   assert.match(shared, /DE-ESCALATE CASE/);
   assert.match(shared, /RESEND EMAIL/);
+  assert.match(shared, /CLEAR STUCK SEND/);
   assert.match(shared, /BACKFILL ICCID/);
   assert.match(shared, /FINALIZE LOCAL RECORD/);
   assert.match(shared, /REFUND WALLET FUNDS/);
@@ -442,6 +464,7 @@ function main() {
     ["local_finalization", localFinalize],
     ["iccid_backfill", iccidBackfill],
     ["email_resend", emailResend],
+    ["clear_stuck_send", clearStuck],
     ["provider_refresh", providerRefresh],
     ["case_mgmt", caseMgmt],
   ] as const) {

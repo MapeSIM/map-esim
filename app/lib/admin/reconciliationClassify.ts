@@ -101,6 +101,86 @@ export function isFailedEmailDelivery(
   return v === "failed" || v === "invalid_email";
 }
 
+/** True when emailDeliveryStatus is sending and updatedAt is at least 15 minutes old. */
+export function isStaleSendingEmailDelivery(
+  status: string | null | undefined,
+  updatedAt: Date | string | null | undefined,
+  now: Date = new Date(),
+  stuckAgeMs: number = RECONCILIATION_STUCK_AGE_MS
+): boolean {
+  const v = (status ?? "").trim().toLowerCase();
+  if (v !== "sending" || updatedAt == null) return false;
+  return isStuckAttemptAge(updatedAt, now, stuckAgeMs);
+}
+
+/** Inbox/detail/health/alerts: failed, invalid_email, or stale sending. Fresh sending stays hidden. */
+export function isVisibleOrderEmailDelivery(
+  status: string | null | undefined,
+  updatedAt: Date | string | null | undefined,
+  now: Date = new Date(),
+  stuckAgeMs: number = RECONCILIATION_STUCK_AGE_MS
+): boolean {
+  return (
+    isFailedEmailDelivery(status) ||
+    isStaleSendingEmailDelivery(status, updatedAt, now, stuckAgeMs)
+  );
+}
+
+/**
+ * Stale sending that may appear in Admin inbox/detail/health/alerts.
+ * Requires COMPLETED, unresolved, and age >= 15 minutes.
+ */
+export function isInboxStaleSendingEmailDelivery(
+  emailDeliveryStatus: string | null | undefined,
+  updatedAt: Date | string | null | undefined,
+  options: {
+    status?: string | null;
+    reconciliationResolvedAt?: Date | string | null;
+    now?: Date;
+  } = {}
+): boolean {
+  if ((options.status ?? "").trim().toUpperCase() !== "COMPLETED") return false;
+  if (options.reconciliationResolvedAt) return false;
+  return isStaleSendingEmailDelivery(
+    emailDeliveryStatus,
+    updatedAt,
+    options.now
+  );
+}
+
+export function isOrderEmailInboxMatch(
+  emailDeliveryStatus: string | null | undefined,
+  updatedAt: Date | string | null | undefined,
+  options: {
+    status?: string | null;
+    reconciliationResolvedAt?: Date | string | null;
+    now?: Date;
+  } = {}
+): boolean {
+  return (
+    isFailedEmailDelivery(emailDeliveryStatus) ||
+    isInboxStaleSendingEmailDelivery(emailDeliveryStatus, updatedAt, options)
+  );
+}
+
+/** Prisma OR clause for order-email inbox rows. Does not include null or not_configured. */
+export function orderEmailInboxStatusOr(now: Date = new Date()): Array<{
+  emailDeliveryStatus: string | { in: string[] };
+  updatedAt?: { lte: Date };
+  status?: "COMPLETED";
+  reconciliationResolvedAt?: null;
+}> {
+  return [
+    { emailDeliveryStatus: { in: ["failed", "invalid_email"] } },
+    {
+      emailDeliveryStatus: "sending",
+      updatedAt: { lte: new Date(now.getTime() - RECONCILIATION_STUCK_AGE_MS) },
+      status: "COMPLETED",
+      reconciliationResolvedAt: null,
+    },
+  ];
+}
+
 export function isFailedWalletNotification(
   status: string | null | undefined
 ): boolean {
@@ -201,7 +281,15 @@ export function classifyReconciliationCase(
     return "PROVIDER_UNKNOWN";
   }
 
-  if (isFailedEmailDelivery(input.emailDeliveryStatus)) {
+  if (
+    isFailedEmailDelivery(input.emailDeliveryStatus) ||
+    isStaleSendingEmailDelivery(
+      input.emailDeliveryStatus,
+      input.updatedAt,
+      now,
+      stuckAge
+    )
+  ) {
     return "ORDER_EMAIL_FAILED";
   }
   if (isFailedWalletNotification(input.emailNotificationStatus)) {

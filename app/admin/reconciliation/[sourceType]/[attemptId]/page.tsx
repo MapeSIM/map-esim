@@ -193,6 +193,9 @@ export default async function AdminReconciliationDetailPage({
           emailResendSupported={caseUi.emailResendSupported}
           emailResendAllowed={caseUi.emailResendAllowed}
           emailResendMessage={caseUi.emailResendMessage}
+          clearStuckSendSupported={caseUi.clearStuckSendSupported}
+          clearStuckSendAllowed={caseUi.clearStuckSendAllowed}
+          clearStuckSendMessage={caseUi.clearStuckSendMessage}
           iccidBackfillSupported={caseUi.iccidBackfillSupported}
           iccidBackfillAllowed={caseUi.iccidBackfillAllowed}
           iccidBackfillMessage={caseUi.iccidBackfillMessage}

@@ -38,8 +38,10 @@ import {
 } from "@/app/lib/admin/operationsHealthShared";
 import {
   classifyReconciliationCase,
-  isFailedEmailDelivery,
   isFailedWalletNotification,
+  isStaleSendingEmailDelivery,
+  isOrderEmailInboxMatch,
+  orderEmailInboxStatusOr,
   type ReconciliationCategory,
   type ReconciliationSourceType,
 } from "@/app/lib/admin/reconciliationClassify";
@@ -865,8 +867,8 @@ async function collectRecordAlerts(now: Date): Promise<{
     }),
     prisma.walletEsimPurchase.findMany({
       where: {
-        emailDeliveryStatus: { in: ["failed", "invalid_email"] },
         reconciliationResolvedAt: null,
+        OR: orderEmailInboxStatusOr(now),
       },
       orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
       take: TAKE,
@@ -875,14 +877,15 @@ async function collectRecordAlerts(now: Date): Promise<{
         status: true,
         emailDeliveryStatus: true,
         updatedAt: true,
+        reconciliationResolvedAt: true,
         reconciliationLockedAt: true,
         reconciliationEscalationPriority: true,
       },
     }),
     prisma.adminPackageAssignment.findMany({
       where: {
-        emailDeliveryStatus: { in: ["failed", "invalid_email"] },
         reconciliationResolvedAt: null,
+        OR: orderEmailInboxStatusOr(now),
       },
       orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
       take: TAKE,
@@ -891,6 +894,7 @@ async function collectRecordAlerts(now: Date): Promise<{
         status: true,
         emailDeliveryStatus: true,
         updatedAt: true,
+        reconciliationResolvedAt: true,
         reconciliationLockedAt: true,
         reconciliationEscalationPriority: true,
       },
@@ -1306,48 +1310,86 @@ async function collectRecordAlerts(now: Date): Promise<{
   }
 
   for (const row of emailPurchases) {
-    if (!isFailedEmailDelivery(row.emailDeliveryStatus)) continue;
+    if (
+      !isOrderEmailInboxMatch(row.emailDeliveryStatus, row.updatedAt, {
+        status: row.status,
+        reconciliationResolvedAt: row.reconciliationResolvedAt,
+        now,
+      })
+    ) {
+      continue;
+    }
     if (!oldestEmailFailure || row.updatedAt < oldestEmailFailure) {
       oldestEmailFailure = row.updatedAt;
     }
+    const staleSending = isStaleSendingEmailDelivery(
+      row.emailDeliveryStatus,
+      row.updatedAt,
+      now
+    );
     pushUnique(
       alerts,
       makeAlert({
         category: "EMAIL",
         code: "EMAIL_ORDER_FAILED",
         severity: "WARNING",
-        title: "Failed order email",
-        description: "An order delivery email failure is unresolved.",
+        title: staleSending
+          ? "Uncertain order email delivery"
+          : "Failed order email",
+        description: staleSending
+          ? "An install email has been stuck in sending longer than 15 minutes. Delivery is not verified."
+          : "An order delivery email failure is unresolved.",
         sourceType: "order_email",
         recordId: row.id,
         sourceAt: row.updatedAt,
         now,
         freshness: "DATABASE_DERIVED",
         href: reconHref("order_email", row.id),
-        recommendedAction: "Use controlled email resend from Reconciliation when eligible.",
+        recommendedAction: staleSending
+          ? "Use Clear stuck send from Reconciliation when eligible. Do not automatically resend."
+          : "Use controlled email resend from Reconciliation when eligible.",
       })
     );
   }
   for (const row of emailAssignments) {
-    if (!isFailedEmailDelivery(row.emailDeliveryStatus)) continue;
+    if (
+      !isOrderEmailInboxMatch(row.emailDeliveryStatus, row.updatedAt, {
+        status: row.status,
+        reconciliationResolvedAt: row.reconciliationResolvedAt,
+        now,
+      })
+    ) {
+      continue;
+    }
     if (!oldestEmailFailure || row.updatedAt < oldestEmailFailure) {
       oldestEmailFailure = row.updatedAt;
     }
+    const staleSending = isStaleSendingEmailDelivery(
+      row.emailDeliveryStatus,
+      row.updatedAt,
+      now
+    );
     pushUnique(
       alerts,
       makeAlert({
         category: "EMAIL",
         code: "EMAIL_ORDER_FAILED",
         severity: "WARNING",
-        title: "Failed order email",
-        description: "An assignment delivery email failure is unresolved.",
+        title: staleSending
+          ? "Uncertain assignment email delivery"
+          : "Failed order email",
+        description: staleSending
+          ? "An assignment install email has been stuck in sending longer than 15 minutes. Delivery is not verified."
+          : "An assignment delivery email failure is unresolved.",
         sourceType: "order_email",
-        recordId: row.id,
+        recordId: `assignment:${row.id}`,
         sourceAt: row.updatedAt,
         now,
         freshness: "DATABASE_DERIVED",
-        href: reconHref("order_email", row.id),
-        recommendedAction: "Use controlled email resend from Reconciliation when eligible.",
+        href: reconHref("order_email", `assignment:${row.id}`),
+        recommendedAction: staleSending
+          ? "Use Clear stuck send from Reconciliation when eligible. Do not automatically resend."
+          : "Use controlled email resend from Reconciliation when eligible.",
       })
     );
   }

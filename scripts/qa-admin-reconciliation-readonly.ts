@@ -8,6 +8,11 @@ import { join } from "node:path";
 import {
   classifyReconciliationCase,
   categoryMatchesFilter,
+  isInboxStaleSendingEmailDelivery,
+  isOrderEmailInboxMatch,
+  isStaleSendingEmailDelivery,
+  isVisibleOrderEmailDelivery,
+  orderEmailInboxStatusOr,
   parseReconciliationFilter,
   RECONCILIATION_FILTERS,
   RECONCILIATION_STUCK_AGE_MS,
@@ -124,6 +129,104 @@ function main() {
     updatedAt: new Date(),
   });
   assert.equal(emailCat, "ORDER_EMAIL_FAILED");
+
+  const now = new Date("2026-08-19T12:00:00.000Z");
+  const exactlyStale = new Date(now.getTime() - RECONCILIATION_STUCK_AGE_MS);
+  const justFresh = new Date(now.getTime() - RECONCILIATION_STUCK_AGE_MS + 1);
+  const fourteenMin = new Date(now.getTime() - 14 * 60 * 1000);
+  assert.equal(isStaleSendingEmailDelivery("sending", exactlyStale, now), true);
+  assert.equal(isStaleSendingEmailDelivery("sending", justFresh, now), false);
+  assert.equal(isStaleSendingEmailDelivery("sending", fourteenMin, now), false);
+  assert.equal(isStaleSendingEmailDelivery("failed", exactlyStale, now), false);
+  assert.equal(isStaleSendingEmailDelivery(null, exactlyStale, now), false);
+  assert.equal(isVisibleOrderEmailDelivery("failed", now, now), true);
+  assert.equal(isVisibleOrderEmailDelivery("invalid_email", now, now), true);
+  assert.equal(isVisibleOrderEmailDelivery("sending", fourteenMin, now), false);
+  assert.equal(isVisibleOrderEmailDelivery("sending", exactlyStale, now), true);
+  assert.equal(isVisibleOrderEmailDelivery("not_configured", exactlyStale, now), false);
+  assert.equal(isVisibleOrderEmailDelivery(null, exactlyStale, now), false);
+
+  const sendingArm = orderEmailInboxStatusOr(now).find(
+    (arm) => arm.emailDeliveryStatus === "sending"
+  );
+  assert.ok(sendingArm);
+  assert.equal(sendingArm.status, "COMPLETED");
+  assert.equal(sendingArm.reconciliationResolvedAt, null);
+  assert.ok(sendingArm.updatedAt?.lte instanceof Date);
+  const failedArm = orderEmailInboxStatusOr(now).find(
+    (arm) => typeof arm.emailDeliveryStatus === "object"
+  );
+  assert.ok(failedArm);
+  assert.equal(failedArm.status, undefined);
+  assert.equal(failedArm.reconciliationResolvedAt, undefined);
+  assert.equal(
+    isInboxStaleSendingEmailDelivery("sending", exactlyStale, {
+      status: "COMPLETED",
+      now,
+    }),
+    true
+  );
+  assert.equal(
+    isInboxStaleSendingEmailDelivery("sending", exactlyStale, {
+      status: "COMPLETED",
+      reconciliationResolvedAt: now,
+      now,
+    }),
+    false
+  );
+  assert.equal(
+    isInboxStaleSendingEmailDelivery("sending", exactlyStale, {
+      status: "FUNDS_RESERVED",
+      now,
+    }),
+    false
+  );
+  assert.equal(
+    isInboxStaleSendingEmailDelivery("sending", fourteenMin, {
+      status: "COMPLETED",
+      now,
+    }),
+    false
+  );
+  assert.equal(
+    isOrderEmailInboxMatch("failed", now, {
+      status: "FUNDS_RESERVED",
+      now,
+    }),
+    true
+  );
+  assert.equal(
+    isOrderEmailInboxMatch("sending", exactlyStale, {
+      status: "COMPLETED",
+      reconciliationResolvedAt: now,
+      now,
+    }),
+    false
+  );
+  assert.equal(
+    isOrderEmailInboxMatch("sending", exactlyStale, {
+      status: "COMPLETED",
+      now,
+    }),
+    true
+  );
+
+  const staleSendingCat = classifyReconciliationCase({
+    sourceType: "wallet_purchase",
+    status: "COMPLETED",
+    emailDeliveryStatus: "sending",
+    updatedAt: exactlyStale,
+    now,
+  });
+  assert.equal(staleSendingCat, "ORDER_EMAIL_FAILED");
+  const freshSendingCat = classifyReconciliationCase({
+    sourceType: "wallet_purchase",
+    status: "COMPLETED",
+    emailDeliveryStatus: "sending",
+    updatedAt: fourteenMin,
+    now,
+  });
+  assert.equal(freshSendingCat, "PROVIDER_UNKNOWN");
   console.log("PASS classifier_local_db_only");
 
   assert.match(service, /import "server-only"/);
@@ -145,6 +248,10 @@ function main() {
   assert.match(service, /FUNDS_RESERVED/);
   assert.match(service, /emailNotificationStatus/);
   assert.match(service, /iccidHash:\s*null/);
+  assert.match(service, /orderEmailInboxStatusOr|emailDeliveryStatus:\s*"sending"/);
+  assert.match(service, /isOrderEmailInboxMatch/);
+  assert.match(service, /sending \(uncertain\)/);
+  assert.doesNotMatch(service, /emailDeliveryStatus:\s*"sending"[\s\S]{0,80}deliverOrderEmail/);
   console.log("PASS reconciliation_service_readonly_no_vesim");
 
   assert.match(listPage, /requireActiveAdminForReconciliation/);
@@ -210,6 +317,10 @@ function main() {
   assert.doesNotMatch(persist, /checkout\/credit/);
   assert.doesNotMatch(classify, /fetch\(|getBrokerToken|executeCreditCheckout/i);
   assert.match(classify, /no Prisma, no VeSIM/);
+  assert.match(
+    classify,
+    /emailDeliveryStatus:\s*"sending",[\s\S]*?status:\s*"COMPLETED",[\s\S]*?reconciliationResolvedAt:\s*null/
+  );
   console.log("PASS no_provider_call_in_classify_or_persist");
 
   console.log("ALL_QA_PASSED=12");

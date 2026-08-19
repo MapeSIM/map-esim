@@ -32,6 +32,9 @@ import {
   categoryMatchesFilter,
   isFailedEmailDelivery,
   isFailedWalletNotification,
+  isOrderEmailInboxMatch,
+  isVisibleOrderEmailDelivery,
+  orderEmailInboxStatusOr,
   RECONCILIATION_STUCK_AGE_MS,
   type ReconciliationCategory,
   type ReconciliationSourceType,
@@ -430,8 +433,8 @@ async function collectReconciliationCases(now: Date): Promise<{
     }),
     prisma.walletEsimPurchase.findMany({
       where: {
-        emailDeliveryStatus: { in: ["failed", "invalid_email"] },
         reconciliationResolvedAt: null,
+        OR: orderEmailInboxStatusOr(now),
       },
       orderBy: { updatedAt: "desc" },
       take: METRICS_TAKE,
@@ -457,8 +460,8 @@ async function collectReconciliationCases(now: Date): Promise<{
     }),
     prisma.adminPackageAssignment.findMany({
       where: {
-        emailDeliveryStatus: { in: ["failed", "invalid_email"] },
         reconciliationResolvedAt: null,
+        OR: orderEmailInboxStatusOr(now),
       },
       orderBy: { updatedAt: "desc" },
       take: METRICS_TAKE,
@@ -589,6 +592,15 @@ async function collectReconciliationCases(now: Date): Promise<{
     );
   }
   for (const row of emailPurchases) {
+    if (
+      !isOrderEmailInboxMatch(row.emailDeliveryStatus, row.updatedAt, {
+        status: row.status,
+        reconciliationResolvedAt: row.reconciliationResolvedAt,
+        now,
+      })
+    ) {
+      continue;
+    }
     cases.push(
       toMetricCase({
         sourceType: "order_email",
@@ -598,6 +610,15 @@ async function collectReconciliationCases(now: Date): Promise<{
     );
   }
   for (const row of emailAssignments) {
+    if (
+      !isOrderEmailInboxMatch(row.emailDeliveryStatus, row.updatedAt, {
+        status: row.status,
+        reconciliationResolvedAt: row.reconciliationResolvedAt,
+        now,
+      })
+    ) {
+      continue;
+    }
     cases.push(
       toMetricCase({
         sourceType: "order_email",
@@ -718,7 +739,7 @@ function summarizeReconciliation(
   };
 }
 
-async function collectEmailTimestamps(): Promise<{
+async function collectEmailTimestamps(now: Date): Promise<{
   latestSuccess: Date | null;
   latestFailure: Date | null;
   oldestUnresolvedFailure: Date | null;
@@ -732,7 +753,7 @@ async function collectEmailTimestamps(): Promise<{
         select: { emailNotifiedAt: true },
       }),
       prisma.walletEsimPurchase.findFirst({
-        where: { emailDeliveryStatus: { in: ["failed", "invalid_email"] } },
+        where: { OR: orderEmailInboxStatusOr(now) },
         orderBy: { updatedAt: "desc" },
         select: { updatedAt: true },
       }),
@@ -900,7 +921,7 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
   if (db.status === "HEALTHY") {
     const [{ cases, truncated }, emailTs, providerTs, mig] = await Promise.all([
       collectReconciliationCases(checkedAt),
-      collectEmailTimestamps(),
+      collectEmailTimestamps(checkedAt),
       collectProviderObservationTimestamps(),
       readLatestMigration(),
     ]);
@@ -1065,6 +1086,7 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
 export const __opsHealthQaHooks = {
   isFailedEmailDelivery,
   isFailedWalletNotification,
+  isVisibleOrderEmailDelivery,
   mapDatabaseProbeToStatus,
   sanitizeHealthStatus,
 };

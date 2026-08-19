@@ -12,6 +12,7 @@ import {
   resendReconciliationEmailAction,
   resolveReconciliationCaseAction,
   unlockReconciliationCaseAction,
+  clearStuckReconciliationSendAction,
   type CaseManagementFormState,
 } from "@/app/lib/admin/reconciliationCaseActions";
 import {
@@ -24,6 +25,7 @@ import {
   REFUND_PARTNER_FUNDS_PHRASE,
   REFUND_WALLET_FUNDS_PHRASE,
   RESEND_EMAIL_PHRASE,
+  CLEAR_STUCK_SEND_PHRASE,
   RESOLUTION_CODES,
   RESOLVE_CASE_PHRASE,
   UNLOCK_CASE_PHRASE,
@@ -95,6 +97,9 @@ export default function CaseManagementPanel(props: {
   emailResendSupported: boolean;
   emailResendAllowed: boolean;
   emailResendMessage: string;
+  clearStuckSendSupported: boolean;
+  clearStuckSendAllowed: boolean;
+  clearStuckSendMessage: string;
   iccidBackfillSupported: boolean;
   iccidBackfillAllowed: boolean;
   iccidBackfillMessage: string;
@@ -132,6 +137,10 @@ export default function CaseManagementPanel(props: {
     resendReconciliationEmailAction,
     initial
   );
+  const [clearStuckState, clearStuckAction, clearStuckPending] = useActionState(
+    clearStuckReconciliationSendAction,
+    initial
+  );
   const [iccidState, iccidAction, iccidPending] = useActionState(
     backfillReconciliationIccidAction,
     initial
@@ -155,6 +164,7 @@ export default function CaseManagementPanel(props: {
     deescalatePending ||
     resolvePending ||
     resendPending ||
+    clearStuckPending ||
     iccidPending ||
     finalizePending ||
     refundPending ||
@@ -477,6 +487,48 @@ export default function CaseManagementPanel(props: {
                 className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
               >
                 {deescalatePending ? "De-escalating…" : "De-escalate case"}
+              </button>
+            </form>
+          ) : null}
+
+          {props.clearStuckSendAllowed ? (
+            <form action={clearStuckAction} className="space-y-3">
+              <h3 className="text-sm font-semibold text-[var(--heading)]">
+                Clear stuck send
+              </h3>
+              <p className="text-sm text-[var(--text-muted)]">
+                {props.clearStuckSendMessage}
+              </p>
+              <p className="text-sm font-medium text-[var(--danger-text)]">
+                The original delivery may already have succeeded. Clearing this
+                state does not send an email. If you resend afterward, the
+                customer may receive duplicate installation details.
+              </p>
+              <input type="hidden" name="sourceType" value={props.sourceType} />
+              <input type="hidden" name="attemptId" value={props.attemptId} />
+              <div>
+                <label
+                  htmlFor="clear-stuck-confirm"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Type {CLEAR_STUCK_SEND_PHRASE}
+                </label>
+                <input
+                  id="clear-stuck-confirm"
+                  name="confirmPhrase"
+                  required
+                  disabled={busy}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                />
+                <FieldError state={clearStuckState} field="confirmPhrase" />
+              </div>
+              <ActionMessage state={clearStuckState} />
+              <button
+                type="submit"
+                disabled={busy}
+                className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {clearStuckPending ? "Clearing…" : "Clear stuck send"}
               </button>
             </form>
           ) : null}

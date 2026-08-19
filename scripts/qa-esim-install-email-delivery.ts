@@ -165,6 +165,11 @@ function main() {
     eligibility,
     /emailStatus === "sending"[\s\S]{0,80}email_send_in_progress/
   );
+  assert.match(eligibility, /CLEAR_STUCK_SEND_PHRASE/);
+  assert.match(
+    eligibility,
+    /emailStatus !== "sending"[\s\S]{0,200}email_not_sending|email_not_sending/
+  );
   console.log("PASS admin_resend_compatible_account_email_only");
 
   assert.doesNotMatch(billing, /qrValue|activationCode|LPA:1\$/);

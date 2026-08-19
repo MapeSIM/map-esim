@@ -14,7 +14,9 @@ import {
   canRaiseOrKeepEscalation,
   canLowerEscalation,
   caseManagementStateLabel,
+  clearStuckSendBlockerLabel,
   emailResendBlockerLabel,
+  evaluateClearStuckSendEligibility,
   evaluateEmailResendEligibility,
   evaluateIccidBackfillLocalEligibility,
   evaluateLocalFinalizationEligibility,
@@ -127,6 +129,9 @@ export type CaseManagementUiState = {
   emailResendSupported: boolean;
   emailResendAllowed: boolean;
   emailResendMessage: string;
+  clearStuckSendSupported: boolean;
+  clearStuckSendAllowed: boolean;
+  clearStuckSendMessage: string;
   iccidBackfillSupported: boolean;
   iccidBackfillAllowed: boolean;
   iccidBackfillMessage: string;
@@ -144,6 +149,7 @@ export type CaseManagementUiState = {
 const PUBLIC_ERROR = "Unable to update this case right now.";
 
 const CASE_FIELD_SELECT = {
+  updatedAt: true,
   reconciliationResolvedAt: true,
   reconciliationResolvedByAdminId: true,
   reconciliationResolutionReason: true,
@@ -305,6 +311,7 @@ function isRefreshInProgress(row: {
   emailDeliveryStatus?: string | null;
   emailNotificationStatus?: string | null;
   customerEmail?: string | null;
+  updatedAt?: Date | null;
   amountCents?: number | null;
   balanceAfterCents?: number | null;
   iccidHash?: string | null;
@@ -636,6 +643,17 @@ export async function getCaseManagementEligibility(options: {
       })
     : null;
 
+  const clearStuckSupported = ids.sourceType === "order_email";
+  const clearStuckEligibility = clearStuckSupported
+    ? evaluateClearStuckSendEligibility({
+        sourceType: ids.sourceType,
+        alreadyResolved: resolved,
+        status: row.status,
+        emailDeliveryStatus: row.emailDeliveryStatus,
+        updatedAt: row.updatedAt,
+      })
+    : null;
+
   const iccidSupported = isIccidBackfillSourceType(ids.sourceType);
   const iccidEligibility = iccidSupported
     ? evaluateIccidBackfillLocalEligibility({
@@ -837,6 +855,13 @@ export async function getCaseManagementEligibility(options: {
           : "Local order evidence is complete. Safe to resend the order email."
         : emailEligibility.blockers.map(emailResendBlockerLabel).join(" ")
       : "Email resend is not available for this case type.",
+    clearStuckSendSupported: clearStuckSupported,
+    clearStuckSendAllowed: Boolean(clearStuckEligibility?.allowed),
+    clearStuckSendMessage: clearStuckEligibility
+      ? clearStuckEligibility.allowed
+        ? "Sending has been in progress for 15 minutes or longer. This marks delivery as failed without sending email. Resend remains a separate action."
+        : clearStuckEligibility.blockers.map(clearStuckSendBlockerLabel).join(" ")
+      : "Clear stuck send is not available for this case type.",
     iccidBackfillSupported: iccidSupported,
     iccidBackfillAllowed: Boolean(iccidEligibility?.allowed),
     iccidBackfillMessage,

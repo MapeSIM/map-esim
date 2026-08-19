@@ -11,6 +11,7 @@ import {
   type CaseActionResult,
 } from "@/app/lib/admin/reconciliationCaseManagement";
 import { resendReconciliationEmail } from "@/app/lib/admin/reconciliationEmailResend";
+import { clearStuckReconciliationSend } from "@/app/lib/admin/reconciliationClearStuckSend";
 import { backfillReconciliationIccid } from "@/app/lib/admin/reconciliationIccidBackfill";
 import { finalizeReconciliationLocalRecord } from "@/app/lib/admin/reconciliationLocalFinalization";
 import { refundReconciliationWalletPurchase } from "@/app/lib/admin/reconciliationWalletRefund";
@@ -147,6 +148,27 @@ export async function resendReconciliationEmailAction(
     sourceType,
     attemptId,
     reason: String(formData.get("reason") ?? ""),
+    confirmPhrase: String(formData.get("confirmPhrase") ?? ""),
+  });
+  if (result.ok) revalidateCase(sourceType, attemptId);
+  return result;
+}
+
+export async function clearStuckReconciliationSendAction(
+  _prev: CaseManagementFormState,
+  formData: FormData
+): Promise<CaseManagementFormState> {
+  const admin = await requireRole("ADMIN");
+  const sourceType = String(formData.get("sourceType") ?? "").trim();
+  const attemptId = String(formData.get("attemptId") ?? "").trim();
+  void formData.get("caseStatus");
+  void formData.get("eligible");
+  void formData.get("reason");
+
+  const result = await clearStuckReconciliationSend({
+    adminUserId: admin.id,
+    sourceType,
+    attemptId,
     confirmPhrase: String(formData.get("confirmPhrase") ?? ""),
   });
   if (result.ok) revalidateCase(sourceType, attemptId);

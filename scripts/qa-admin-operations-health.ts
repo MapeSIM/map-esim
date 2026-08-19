@@ -226,6 +226,10 @@ function main() {
   assert.doesNotMatch(service, /return process\.env\.AUTH_SECRET/);
   assert.doesNotMatch(service, /return process\.env\.DATABASE_URL/);
   assert.doesNotMatch(service, /return process\.env\.VESIM_PASSWORD/);
+  assert.match(service, /orderEmailInboxStatusOr|emailDeliveryStatus:\s*"sending"/);
+  assert.match(service, /isOrderEmailInboxMatch/);
+  assert.match(service, /isVisibleOrderEmailDelivery/);
+  assert.doesNotMatch(service, /sendOrderEmail|deliverOrderEmailAfterCheckout/);
   console.log("PASS no_secret_or_sensitive_exposure");
 
   assert.match(pkg, /qa:admin-operations-health/);
