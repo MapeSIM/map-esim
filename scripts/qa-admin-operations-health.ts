@@ -228,6 +228,7 @@ function main() {
   assert.doesNotMatch(service, /return process\.env\.VESIM_PASSWORD/);
   assert.match(service, /orderEmailInboxStatusOr|emailDeliveryStatus:\s*"sending"/);
   assert.match(service, /isOrderEmailInboxMatch/);
+  assert.match(service, /isInboxNotConfiguredOrderEmailDelivery/);
   assert.match(service, /isVisibleOrderEmailDelivery/);
   assert.doesNotMatch(service, /sendOrderEmail|deliverOrderEmailAfterCheckout/);
   console.log("PASS no_secret_or_sensitive_exposure");

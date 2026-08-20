@@ -39,12 +39,17 @@ import {
 import {
   classifyReconciliationCase,
   isFailedWalletNotification,
+  isNotConfiguredOrderEmailDelivery,
   isStaleSendingEmailDelivery,
   isOrderEmailInboxMatch,
   orderEmailInboxStatusOr,
   type ReconciliationCategory,
   type ReconciliationSourceType,
 } from "@/app/lib/admin/reconciliationClassify";
+import {
+  ORDER_EMAIL_NOT_CONFIGURED_LABEL,
+  ORDER_EMAIL_NOT_CONFIGURED_RESEND_MESSAGE,
+} from "@/app/lib/admin/reconciliationCaseShared";
 import { getOperationalControlsHealthSnapshot } from "@/app/lib/admin/operationalControlsPolicy";
 import {
   MONITORING_THRESHOLDS,
@@ -1322,6 +1327,9 @@ async function collectRecordAlerts(now: Date): Promise<{
     if (!oldestEmailFailure || row.updatedAt < oldestEmailFailure) {
       oldestEmailFailure = row.updatedAt;
     }
+    const notConfigured = isNotConfiguredOrderEmailDelivery(
+      row.emailDeliveryStatus
+    );
     const staleSending = isStaleSendingEmailDelivery(
       row.emailDeliveryStatus,
       row.updatedAt,
@@ -1333,21 +1341,27 @@ async function collectRecordAlerts(now: Date): Promise<{
         category: "EMAIL",
         code: "EMAIL_ORDER_FAILED",
         severity: "WARNING",
-        title: staleSending
-          ? "Uncertain order email delivery"
-          : "Failed order email",
-        description: staleSending
-          ? "An install email has been stuck in sending longer than 15 minutes. Delivery is not verified."
-          : "An order delivery email failure is unresolved.",
+        title: notConfigured
+          ? ORDER_EMAIL_NOT_CONFIGURED_LABEL
+          : staleSending
+            ? "Uncertain order email delivery"
+            : "Failed order email",
+        description: notConfigured
+          ? "Installation email was not sent. Configure the Orders email channel before resending."
+          : staleSending
+            ? "An install email has been stuck in sending longer than 15 minutes. Delivery is not verified."
+            : "An order delivery email failure is unresolved.",
         sourceType: "order_email",
         recordId: row.id,
         sourceAt: row.updatedAt,
         now,
         freshness: "DATABASE_DERIVED",
         href: reconHref("order_email", row.id),
-        recommendedAction: staleSending
-          ? "Use Clear stuck send from Reconciliation when eligible. Do not automatically resend."
-          : "Use controlled email resend from Reconciliation when eligible.",
+        recommendedAction: notConfigured
+          ? ORDER_EMAIL_NOT_CONFIGURED_RESEND_MESSAGE
+          : staleSending
+            ? "Use Clear stuck send from Reconciliation when eligible. Do not automatically resend."
+            : "Use controlled email resend from Reconciliation when eligible.",
       })
     );
   }
@@ -1364,6 +1378,9 @@ async function collectRecordAlerts(now: Date): Promise<{
     if (!oldestEmailFailure || row.updatedAt < oldestEmailFailure) {
       oldestEmailFailure = row.updatedAt;
     }
+    const notConfigured = isNotConfiguredOrderEmailDelivery(
+      row.emailDeliveryStatus
+    );
     const staleSending = isStaleSendingEmailDelivery(
       row.emailDeliveryStatus,
       row.updatedAt,
@@ -1375,21 +1392,27 @@ async function collectRecordAlerts(now: Date): Promise<{
         category: "EMAIL",
         code: "EMAIL_ORDER_FAILED",
         severity: "WARNING",
-        title: staleSending
-          ? "Uncertain assignment email delivery"
-          : "Failed order email",
-        description: staleSending
-          ? "An assignment install email has been stuck in sending longer than 15 minutes. Delivery is not verified."
-          : "An assignment delivery email failure is unresolved.",
+        title: notConfigured
+          ? ORDER_EMAIL_NOT_CONFIGURED_LABEL
+          : staleSending
+            ? "Uncertain assignment email delivery"
+            : "Failed order email",
+        description: notConfigured
+          ? "Installation email was not sent. Configure the Orders email channel before resending."
+          : staleSending
+            ? "An assignment install email has been stuck in sending longer than 15 minutes. Delivery is not verified."
+            : "An assignment delivery email failure is unresolved.",
         sourceType: "order_email",
         recordId: `assignment:${row.id}`,
         sourceAt: row.updatedAt,
         now,
         freshness: "DATABASE_DERIVED",
         href: reconHref("order_email", `assignment:${row.id}`),
-        recommendedAction: staleSending
-          ? "Use Clear stuck send from Reconciliation when eligible. Do not automatically resend."
-          : "Use controlled email resend from Reconciliation when eligible.",
+        recommendedAction: notConfigured
+          ? ORDER_EMAIL_NOT_CONFIGURED_RESEND_MESSAGE
+          : staleSending
+            ? "Use Clear stuck send from Reconciliation when eligible. Do not automatically resend."
+            : "Use controlled email resend from Reconciliation when eligible.",
       })
     );
   }

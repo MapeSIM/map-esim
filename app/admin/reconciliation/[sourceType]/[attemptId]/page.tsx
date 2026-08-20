@@ -6,6 +6,7 @@ import {
   getReconciliationDetail,
   requireActiveAdminForReconciliation,
 } from "@/app/lib/admin/reconciliation";
+import { ORDER_EMAIL_NOT_CONFIGURED_LABEL } from "@/app/lib/admin/reconciliationCaseShared";
 import { getCaseManagementEligibility } from "@/app/lib/admin/reconciliationCaseManagement";
 import { getProviderRefreshUiState } from "@/app/lib/admin/providerRefresh";
 
@@ -163,6 +164,17 @@ export default async function AdminReconciliationDetailPage({
         <DetailRow label="Updated" value={detail.updatedAtLabel} />
         <DetailRow label="Resolution / lock" value={detail.resolutionLabel} />
       </dl>
+
+      {detail.sourceType === "order_email" &&
+      detail.failureLabel === ORDER_EMAIL_NOT_CONFIGURED_LABEL ? (
+        <div
+          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--heading)]"
+          role="status"
+        >
+          Installation email service is not configured. Delivery was not sent.
+          Configure the Orders email channel before resending.
+        </div>
+      ) : null}
 
       {caseUi ? (
         <CaseManagementPanel

@@ -113,7 +113,11 @@ export function isStaleSendingEmailDelivery(
   return isStuckAttemptAge(updatedAt, now, stuckAgeMs);
 }
 
-/** Inbox/detail/health/alerts: failed, invalid_email, or stale sending. Fresh sending stays hidden. */
+/**
+ * Age-agnostic helper: failed, invalid_email, or stale sending.
+ * Inbox/detail/health/alerts use isOrderEmailInboxMatch, which also includes
+ * completed unresolved not_configured. Do not add not_configured here.
+ */
 export function isVisibleOrderEmailDelivery(
   status: string | null | undefined,
   updatedAt: Date | string | null | undefined,
@@ -124,6 +128,29 @@ export function isVisibleOrderEmailDelivery(
     isFailedEmailDelivery(status) ||
     isStaleSendingEmailDelivery(status, updatedAt, now, stuckAgeMs)
   );
+}
+
+/** Order-email not_configured status only. Null/empty/other values are false. */
+export function isNotConfiguredOrderEmailDelivery(
+  status: string | null | undefined
+): boolean {
+  return (status ?? "").trim().toLowerCase() === "not_configured";
+}
+
+/**
+ * Completed, unresolved order-email rows whose delivery status is not_configured.
+ * Null, fresh sending, and wallet-notification not_configured are out of scope.
+ */
+export function isInboxNotConfiguredOrderEmailDelivery(
+  emailDeliveryStatus: string | null | undefined,
+  options: {
+    status?: string | null;
+    reconciliationResolvedAt?: Date | string | null;
+  } = {}
+): boolean {
+  if ((options.status ?? "").trim().toUpperCase() !== "COMPLETED") return false;
+  if (options.reconciliationResolvedAt) return false;
+  return isNotConfiguredOrderEmailDelivery(emailDeliveryStatus);
 }
 
 /**
@@ -159,11 +186,12 @@ export function isOrderEmailInboxMatch(
 ): boolean {
   return (
     isFailedEmailDelivery(emailDeliveryStatus) ||
+    isInboxNotConfiguredOrderEmailDelivery(emailDeliveryStatus, options) ||
     isInboxStaleSendingEmailDelivery(emailDeliveryStatus, updatedAt, options)
   );
 }
 
-/** Prisma OR clause for order-email inbox rows. Does not include null or not_configured. */
+/** Prisma OR clause for order-email inbox rows. Does not include null or fresh sending. */
 export function orderEmailInboxStatusOr(now: Date = new Date()): Array<{
   emailDeliveryStatus: string | { in: string[] };
   updatedAt?: { lte: Date };
@@ -172,6 +200,11 @@ export function orderEmailInboxStatusOr(now: Date = new Date()): Array<{
 }> {
   return [
     { emailDeliveryStatus: { in: ["failed", "invalid_email"] } },
+    {
+      emailDeliveryStatus: "not_configured",
+      status: "COMPLETED",
+      reconciliationResolvedAt: null,
+    },
     {
       emailDeliveryStatus: "sending",
       updatedAt: { lte: new Date(now.getTime() - RECONCILIATION_STUCK_AGE_MS) },

@@ -26,6 +26,7 @@ import {
   isFailedEmailDelivery,
   isFailedWalletNotification,
   isInboxStaleSendingEmailDelivery,
+  isNotConfiguredOrderEmailDelivery,
   isOrderEmailInboxMatch,
   isStaleSendingEmailDelivery,
   isStuckAttemptAge,
@@ -37,6 +38,7 @@ import {
   type ReconciliationPurchaseType,
   type ReconciliationSourceType,
 } from "@/app/lib/admin/reconciliationClassify";
+import { ORDER_EMAIL_NOT_CONFIGURED_LABEL } from "@/app/lib/admin/reconciliationCaseShared";
 import { redirect } from "next/navigation";
 import { formatUsdCents } from "@/app/lib/wallet/display";
 import { requireRole } from "@/app/lib/auth/session";
@@ -178,6 +180,7 @@ function emailDeliveryFailureLabel(
 ): string {
   const v = (status ?? "").trim().toLowerCase();
   if (v === "sending") return "email / sending (uncertain)";
+  if (v === "not_configured") return ORDER_EMAIL_NOT_CONFIGURED_LABEL;
   if (!v) return "email / unknown";
   return `email / ${v}`.slice(0, 80);
 }
@@ -187,7 +190,9 @@ function orderEmailTimelineState(
   updatedAt: Date,
   now: Date
 ): ReconciliationTimelineEvent["state"] {
-  if (isFailedEmailDelivery(status)) return "failed";
+  if (isFailedEmailDelivery(status) || isNotConfiguredOrderEmailDelivery(status)) {
+    return "failed";
+  }
   if (isStaleSendingEmailDelivery(status, updatedAt, now)) return "unknown";
   if ((status ?? "").trim().toLowerCase() === "sending") return "pending";
   if (status) return "done";
@@ -1266,14 +1271,15 @@ export async function getReconciliationDetail(
         const sending =
           (row.emailDeliveryStatus ?? "").trim().toLowerCase() === "sending";
         if (sending && !isStaleSendingCase) return null;
-        const isFailedEmailCase =
-          row.status === WalletEsimPurchaseStatus.COMPLETED &&
-          isFailedEmailDelivery(row.emailDeliveryStatus);
-        if (
-          !isFailedEmailCase &&
-          !isStaleSendingCase &&
-          !row.reconciliationResolvedAt
-        ) {
+        const isInboxEmailCase = isOrderEmailInboxMatch(
+          row.emailDeliveryStatus,
+          row.updatedAt,
+          {
+            status: row.status,
+            reconciliationResolvedAt: row.reconciliationResolvedAt,
+          }
+        );
+        if (!isInboxEmailCase && !row.reconciliationResolvedAt) {
           return null;
         }
       }
@@ -1836,14 +1842,15 @@ async function getAssignmentDetail(
     const sending =
       (row.emailDeliveryStatus ?? "").trim().toLowerCase() === "sending";
     if (sending && !isStaleSendingCase) return null;
-    const isFailedEmailCase =
-      row.status === AdminPackageAssignmentStatus.COMPLETED &&
-      isFailedEmailDelivery(row.emailDeliveryStatus);
-    if (
-      !isFailedEmailCase &&
-      !isStaleSendingCase &&
-      !row.reconciliationResolvedAt
-    ) {
+    const isInboxEmailCase = isOrderEmailInboxMatch(
+      row.emailDeliveryStatus,
+      row.updatedAt,
+      {
+        status: row.status,
+        reconciliationResolvedAt: row.reconciliationResolvedAt,
+      }
+    );
+    if (!isInboxEmailCase && !row.reconciliationResolvedAt) {
       return null;
     }
   } else {

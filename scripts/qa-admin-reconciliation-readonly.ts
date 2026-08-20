@@ -8,6 +8,9 @@ import { join } from "node:path";
 import {
   classifyReconciliationCase,
   categoryMatchesFilter,
+  isFailedEmailDelivery,
+  isFailedWalletNotification,
+  isInboxNotConfiguredOrderEmailDelivery,
   isInboxStaleSendingEmailDelivery,
   isOrderEmailInboxMatch,
   isStaleSendingEmailDelivery,
@@ -17,6 +20,7 @@ import {
   RECONCILIATION_FILTERS,
   RECONCILIATION_STUCK_AGE_MS,
 } from "../app/lib/admin/reconciliationClassify";
+import { ORDER_EMAIL_NOT_CONFIGURED_LABEL } from "../app/lib/admin/reconciliationCaseShared";
 import { maskProviderOrderRef } from "../app/lib/admin/display";
 
 const root = join(__dirname, "..");
@@ -145,6 +149,50 @@ function main() {
   assert.equal(isVisibleOrderEmailDelivery("sending", exactlyStale, now), true);
   assert.equal(isVisibleOrderEmailDelivery("not_configured", exactlyStale, now), false);
   assert.equal(isVisibleOrderEmailDelivery(null, exactlyStale, now), false);
+  assert.equal(isFailedEmailDelivery("not_configured"), false);
+  assert.equal(isFailedEmailDelivery("failed"), true);
+  assert.equal(isFailedWalletNotification("not_configured"), true);
+  assert.equal(
+    isInboxNotConfiguredOrderEmailDelivery("not_configured", {
+      status: "COMPLETED",
+    }),
+    true
+  );
+  assert.equal(
+    isInboxNotConfiguredOrderEmailDelivery("not_configured", {
+      status: "FUNDS_RESERVED",
+    }),
+    false
+  );
+  assert.equal(
+    isInboxNotConfiguredOrderEmailDelivery("not_configured", {
+      status: "COMPLETED",
+      reconciliationResolvedAt: now,
+    }),
+    false
+  );
+  assert.equal(
+    isInboxNotConfiguredOrderEmailDelivery(null, { status: "COMPLETED" }),
+    false
+  );
+  assert.equal(
+    isOrderEmailInboxMatch("not_configured", now, {
+      status: "COMPLETED",
+      now,
+    }),
+    true
+  );
+  assert.equal(
+    isOrderEmailInboxMatch("not_configured", now, {
+      status: "FUNDS_RESERVED",
+      now,
+    }),
+    false
+  );
+  assert.equal(
+    isOrderEmailInboxMatch(null, now, { status: "COMPLETED", now }),
+    false
+  );
 
   const sendingArm = orderEmailInboxStatusOr(now).find(
     (arm) => arm.emailDeliveryStatus === "sending"
@@ -159,6 +207,12 @@ function main() {
   assert.ok(failedArm);
   assert.equal(failedArm.status, undefined);
   assert.equal(failedArm.reconciliationResolvedAt, undefined);
+  const notConfiguredArm = orderEmailInboxStatusOr(now).find(
+    (arm) => arm.emailDeliveryStatus === "not_configured"
+  );
+  assert.ok(notConfiguredArm);
+  assert.equal(notConfiguredArm.status, "COMPLETED");
+  assert.equal(notConfiguredArm.reconciliationResolvedAt, null);
   assert.equal(
     isInboxStaleSendingEmailDelivery("sending", exactlyStale, {
       status: "COMPLETED",
@@ -251,6 +305,8 @@ function main() {
   assert.match(service, /orderEmailInboxStatusOr|emailDeliveryStatus:\s*"sending"/);
   assert.match(service, /isOrderEmailInboxMatch/);
   assert.match(service, /sending \(uncertain\)/);
+  assert.match(service, /ORDER_EMAIL_NOT_CONFIGURED_LABEL|Installation email service is not configured/);
+  assert.match(service, /isNotConfiguredOrderEmailDelivery/);
   assert.doesNotMatch(service, /emailDeliveryStatus:\s*"sending"[\s\S]{0,80}deliverOrderEmail/);
   console.log("PASS reconciliation_service_readonly_no_vesim");
 
@@ -277,6 +333,10 @@ function main() {
   assert.match(detailPage, /requireActiveAdminForReconciliation/);
   assert.match(detailPage, /notFound/);
   assert.match(detailPage, /Timeline/);
+  assert.ok(detailPage.includes(ORDER_EMAIL_NOT_CONFIGURED_LABEL));
+  assert.match(detailPage, /failureLabel === ORDER_EMAIL_NOT_CONFIGURED_LABEL/);
+  assert.match(detailPage, /Delivery was not sent/);
+  assert.match(detailPage, /Configure the Orders email channel before resending/);
   assert.doesNotMatch(detailPage, /"use server"/);
   // Phase 8G-B2 may add Mark resolved (case metadata only). Financial recovery stays forbidden.
   assert.doesNotMatch(

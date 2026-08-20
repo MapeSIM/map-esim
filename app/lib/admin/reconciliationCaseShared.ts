@@ -15,6 +15,40 @@ export const UNLOCK_CASE_PHRASE = "UNLOCK CASE";
 export const RESOLVE_CASE_PHRASE = "RESOLVE CASE";
 export const DEESCALATE_CASE_PHRASE = "DE-ESCALATE CASE";
 export const RESEND_EMAIL_PHRASE = "RESEND EMAIL";
+export const ORDERS_EMAIL_NOT_CONFIGURED_BLOCKER = "orders_email_not_configured";
+export const ORDERS_EMAIL_FAILED_SMTP_UNAVAILABLE_BLOCKER =
+  "orders_email_failed_smtp_unavailable";
+export const ORDER_EMAIL_NOT_CONFIGURED_LABEL =
+  "Installation email service is not configured";
+export const ORDER_EMAIL_NOT_CONFIGURED_RESEND_MESSAGE =
+  "Installation email service is not configured. Delivery was not sent. Configure the Orders email channel before resending.";
+export const ORDER_EMAIL_FAILED_SMTP_UNAVAILABLE_MESSAGE =
+  "Installation email resend is unavailable because the Orders email channel is not configured. Configure it before resending.";
+
+const ORDER_EMAIL_SMTP_OFF_RESEND_STATUSES = ["failed", "not_configured"] as const;
+
+export function isOrderEmailSmtpOffResendStatus(
+  emailDeliveryStatus: string | null | undefined
+): boolean {
+  const v = (emailDeliveryStatus ?? "").trim().toLowerCase();
+  return (ORDER_EMAIL_SMTP_OFF_RESEND_STATUSES as readonly string[]).includes(v);
+}
+
+export function ordersSmtpOffResendMessage(
+  emailDeliveryStatus: string | null | undefined
+): string {
+  const v = (emailDeliveryStatus ?? "").trim().toLowerCase();
+  if (v === "not_configured") return ORDER_EMAIL_NOT_CONFIGURED_RESEND_MESSAGE;
+  return ORDER_EMAIL_FAILED_SMTP_UNAVAILABLE_MESSAGE;
+}
+
+export function isOrdersEmailSmtpOffBlocker(code: string): boolean {
+  return (
+    code === ORDERS_EMAIL_NOT_CONFIGURED_BLOCKER ||
+    code === ORDERS_EMAIL_FAILED_SMTP_UNAVAILABLE_BLOCKER
+  );
+}
+
 export const CLEAR_STUCK_SEND_PHRASE = "CLEAR STUCK SEND";
 export const BACKFILL_ICCID_PHRASE = "BACKFILL ICCID";
 export const FINALIZE_LOCAL_RECORD_PHRASE = "FINALIZE LOCAL RECORD";
@@ -251,6 +285,8 @@ export type EmailResendBlockInput = {
   walletTransactionStatus?: string | null;
   amountCents?: number | null;
   balanceAfterCents?: number | null;
+  /** Order-email only. When false, resend is blocked before CAS. Omit in pure tests that are not asserting the SMTP gate. */
+  ordersEmailConfigured?: boolean;
 };
 
 export type EmailResendEligibility = {
@@ -296,6 +332,16 @@ export function evaluateEmailResendEligibility(
     const email = (input.customerEmail ?? "").trim();
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       blockers.push("customer_email_unavailable");
+    }
+    if (
+      input.ordersEmailConfigured === false &&
+      isOrderEmailSmtpOffResendStatus(emailStatus)
+    ) {
+      blockers.push(
+        emailStatus === "not_configured"
+          ? ORDERS_EMAIL_NOT_CONFIGURED_BLOCKER
+          : ORDERS_EMAIL_FAILED_SMTP_UNAVAILABLE_BLOCKER
+      );
     }
     return {
       allowed: blockers.length === 0,
@@ -359,6 +405,10 @@ export function emailResendBlockerLabel(code: string): string {
       return "Provider reference is missing.";
     case "customer_email_unavailable":
       return "Customer email is unavailable.";
+    case ORDERS_EMAIL_NOT_CONFIGURED_BLOCKER:
+      return ORDER_EMAIL_NOT_CONFIGURED_RESEND_MESSAGE;
+    case ORDERS_EMAIL_FAILED_SMTP_UNAVAILABLE_BLOCKER:
+      return ORDER_EMAIL_FAILED_SMTP_UNAVAILABLE_MESSAGE;
     case "ledger_not_completed":
       return "Wallet ledger entry is not completed.";
     case "incomplete_ledger_snapshot":

@@ -28,7 +28,10 @@ import {
 import {
   emailResendBlockerLabel,
   evaluateEmailResendEligibility,
+  isOrderEmailSmtpOffResendStatus,
+  isOrdersEmailSmtpOffBlocker,
   normalizeCaseManagementSourceType,
+  ordersSmtpOffResendMessage,
   parseCaseReason,
   parseConfirmPhrase,
   RESEND_EMAIL_PHRASE,
@@ -53,6 +56,44 @@ export const EMAIL_RESENT = "reconciliation.email_resent";
 export const EMAIL_ACTION_BLOCKED = "reconciliation.case_action_blocked";
 
 const PUBLIC_ERROR = "Unable to resend email for this case right now.";
+
+function ordersEmailNotConfiguredBlock(): {
+  ok: false;
+  failureCode: "not_configured";
+} | null {
+  if (isEmailConfigured("orders")) return null;
+  return { ok: false, failureCode: "not_configured" };
+}
+
+const ORDERS_SMTP_OFF_AUDIT_METADATA = {
+  action: "email_resend",
+  failureCode: "not_configured",
+} as const;
+
+async function blockOrdersEmailNotConfigured(options: {
+  adminUserId: string;
+  sourceType: string;
+  attemptId: string;
+  targetType: string;
+  targetId: string;
+  emailDeliveryStatus: string | null | undefined;
+}): Promise<CaseActionResult> {
+  await writeAuditLog({
+    actorUserId: options.adminUserId,
+    action: EMAIL_ACTION_BLOCKED,
+    targetType: options.targetType,
+    targetId: options.targetId,
+    metadata: {
+      sourceType: options.sourceType,
+      attemptId: options.attemptId,
+      ...ORDERS_SMTP_OFF_AUDIT_METADATA,
+    },
+  });
+  return {
+    ok: false,
+    error: ordersSmtpOffResendMessage(options.emailDeliveryStatus),
+  };
+}
 
 type JsonRecord = Record<string, unknown>;
 
@@ -190,6 +231,7 @@ export async function getEmailResendEligibility(options: {
   | (EmailResendEligibility & {
       message: string;
       supported: boolean;
+      emailDeliveryStatus?: string | null;
     })
   | null
 > {
@@ -269,10 +311,12 @@ export async function getEmailResendEligibility(options: {
       providerOrderId: row.providerOrderId,
       emailDeliveryStatus: row.emailDeliveryStatus,
       customerEmail: row.customer.deletedAt ? null : row.customer.email,
+      ordersEmailConfigured: isEmailConfigured("orders"),
     });
     return {
       ...eligibility,
       supported: true,
+      emailDeliveryStatus: row.emailDeliveryStatus,
       message: eligibility.allowed
         ? "Local order evidence is complete. Safe to resend the order email."
         : eligibility.blockers.map(emailResendBlockerLabel).join(" "),
@@ -301,10 +345,12 @@ export async function getEmailResendEligibility(options: {
     providerOrderId: row.providerOrderId,
     emailDeliveryStatus: row.emailDeliveryStatus,
     customerEmail: row.customer.deletedAt ? null : row.customer.email,
+    ordersEmailConfigured: isEmailConfigured("orders"),
   });
   return {
     ...eligibility,
     supported: true,
+    emailDeliveryStatus: row.emailDeliveryStatus,
     message: eligibility.allowed
       ? "Local order evidence is complete. Safe to resend the order email."
       : eligibility.blockers.map(emailResendBlockerLabel).join(" "),
@@ -401,6 +447,27 @@ export async function resendReconciliationEmail(options: {
     sourceType: ids.sourceType,
     attemptId: ids.attemptId,
   });
+
+  if (
+    ids.sourceType === "order_email" &&
+    !isEmailConfigured("orders") &&
+    isOrderEmailSmtpOffResendStatus(eligibility?.emailDeliveryStatus)
+  ) {
+    const extraBlockers = (eligibility?.blockers ?? []).filter(
+      (code) => !isOrdersEmailSmtpOffBlocker(code)
+    );
+    if (extraBlockers.length === 0) {
+      return blockOrdersEmailNotConfigured({
+        adminUserId: admin.id,
+        sourceType: ids.sourceType,
+        attemptId: ids.attemptId,
+        targetType: ids.targetType,
+        targetId: ids.recordId,
+        emailDeliveryStatus: eligibility?.emailDeliveryStatus,
+      });
+    }
+  }
+
   if (!eligibility?.allowed) {
     await writeAuditLog({
       actorUserId: admin.id,
@@ -493,22 +560,16 @@ export async function resendReconciliationEmail(options: {
     return { ok: false, error: PUBLIC_ERROR };
   }
 
-  // order_email path
+  // Defense in depth — configuration gate immediately before CAS.
   if (!isEmailConfigured("orders")) {
-    await writeAuditLog({
-      actorUserId: admin.id,
-      action: EMAIL_ACTION_BLOCKED,
+    return blockOrdersEmailNotConfigured({
+      adminUserId: admin.id,
+      sourceType: ids.sourceType,
+      attemptId: ids.attemptId,
       targetType: ids.targetType,
       targetId: ids.recordId,
-      metadata: {
-        sourceType: ids.sourceType,
-        attemptId: ids.attemptId,
-        action: "email_resend",
-        failureCode: "not_configured",
-        reason: reasonParsed.reason.slice(0, 80),
-      },
+      emailDeliveryStatus: eligibility.emailDeliveryStatus,
     });
-    return { ok: false, error: PUBLIC_ERROR };
   }
 
   const sendResult = ids.orderEmailOnAssignment
@@ -535,6 +596,7 @@ export async function resendReconciliationEmail(options: {
     return { ok: true };
   }
 
+  const configBlocked = sendResult.failureCode === "not_configured";
   await writeAuditLog({
     actorUserId: admin.id,
     action: EMAIL_ACTION_BLOCKED,
@@ -547,10 +609,15 @@ export async function resendReconciliationEmail(options: {
       attemptId: ids.attemptId,
       action: "email_resend",
       failureCode: sendResult.failureCode,
-      reason: reasonParsed.reason.slice(0, 80),
+      ...(configBlocked ? {} : { reason: reasonParsed.reason.slice(0, 80) }),
     },
   });
-  return { ok: false, error: PUBLIC_ERROR };
+  return {
+    ok: false,
+    error: configBlocked
+      ? ordersSmtpOffResendMessage(eligibility.emailDeliveryStatus)
+      : PUBLIC_ERROR,
+  };
 }
 
 async function resendPurchaseOrderEmail(
@@ -559,6 +626,9 @@ async function resendPurchaseOrderEmail(
   | { ok: true; deliveryStatus: string }
   | { ok: false; failureCode: string }
 > {
+  const configBlock = ordersEmailNotConfiguredBlock();
+  if (configBlock) return configBlock;
+
   const claimed = await prisma.walletEsimPurchase.updateMany({
     where: {
       id: purchaseId,
@@ -661,6 +731,9 @@ async function resendAssignmentOrderEmail(
   | { ok: true; deliveryStatus: string }
   | { ok: false; failureCode: string }
 > {
+  const configBlock = ordersEmailNotConfiguredBlock();
+  if (configBlock) return configBlock;
+
   const claimed = await prisma.adminPackageAssignment.updateMany({
     where: {
       id: assignmentId,

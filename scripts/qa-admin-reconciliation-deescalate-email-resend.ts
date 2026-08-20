@@ -12,7 +12,13 @@ import {
   emailResendBlockerLabel,
   evaluateEmailResendEligibility,
   evaluateClearStuckSendEligibility,
+  isOrdersEmailSmtpOffBlocker,
   lowerEscalationPriorities,
+  ORDERS_EMAIL_FAILED_SMTP_UNAVAILABLE_BLOCKER,
+  ORDERS_EMAIL_NOT_CONFIGURED_BLOCKER,
+  ORDER_EMAIL_FAILED_SMTP_UNAVAILABLE_MESSAGE,
+  ORDER_EMAIL_NOT_CONFIGURED_RESEND_MESSAGE,
+  ordersSmtpOffResendMessage,
   parseConfirmPhrase,
   parseEscalationPriority,
   RESEND_EMAIL_PHRASE,
@@ -72,6 +78,106 @@ function main() {
     customerEmail: "a@example.com",
   });
   assert.equal(failedEmailOk.allowed, true);
+
+  const notConfiguredOk = evaluateEmailResendEligibility({
+    sourceType: "order_email",
+    alreadyResolved: false,
+    status: "COMPLETED",
+    orderId: "ord_1",
+    orderStatus: "COMPLETED",
+    providerOrderId: "PO-ABC",
+    emailDeliveryStatus: "not_configured",
+    customerEmail: "a@example.com",
+  });
+  assert.equal(notConfiguredOk.allowed, true);
+
+  const smtpOffFailed = evaluateEmailResendEligibility({
+    sourceType: "order_email",
+    alreadyResolved: false,
+    status: "COMPLETED",
+    orderId: "ord_1",
+    orderStatus: "COMPLETED",
+    providerOrderId: "PO-ABC",
+    emailDeliveryStatus: "failed",
+    customerEmail: "a@example.com",
+    ordersEmailConfigured: false,
+  });
+  assert.equal(smtpOffFailed.allowed, false);
+  assert.ok(
+    smtpOffFailed.blockers.includes(ORDERS_EMAIL_FAILED_SMTP_UNAVAILABLE_BLOCKER)
+  );
+  assert.ok(
+    !smtpOffFailed.blockers.includes(ORDERS_EMAIL_NOT_CONFIGURED_BLOCKER)
+  );
+  assert.equal(
+    ordersSmtpOffResendMessage("failed"),
+    ORDER_EMAIL_FAILED_SMTP_UNAVAILABLE_MESSAGE
+  );
+  assert.match(
+    emailResendBlockerLabel(ORDERS_EMAIL_FAILED_SMTP_UNAVAILABLE_BLOCKER),
+    /Orders email channel is not configured/
+  );
+  assert.doesNotMatch(
+    emailResendBlockerLabel(ORDERS_EMAIL_FAILED_SMTP_UNAVAILABLE_BLOCKER),
+    /Delivery was not sent/
+  );
+  assert.doesNotMatch(
+    ORDER_EMAIL_FAILED_SMTP_UNAVAILABLE_MESSAGE,
+    /Delivery was not sent/
+  );
+
+  const smtpOffNotConfigured = evaluateEmailResendEligibility({
+    sourceType: "order_email",
+    alreadyResolved: false,
+    status: "COMPLETED",
+    orderId: "ord_1",
+    orderStatus: "COMPLETED",
+    providerOrderId: "PO-ABC",
+    emailDeliveryStatus: "not_configured",
+    customerEmail: "a@example.com",
+    ordersEmailConfigured: false,
+  });
+  assert.equal(smtpOffNotConfigured.allowed, false);
+  assert.ok(
+    smtpOffNotConfigured.blockers.includes(ORDERS_EMAIL_NOT_CONFIGURED_BLOCKER)
+  );
+  assert.equal(
+    ordersSmtpOffResendMessage("not_configured"),
+    ORDER_EMAIL_NOT_CONFIGURED_RESEND_MESSAGE
+  );
+  assert.match(
+    emailResendBlockerLabel(ORDERS_EMAIL_NOT_CONFIGURED_BLOCKER),
+    /Installation email service is not configured/
+  );
+  assert.match(
+    emailResendBlockerLabel(ORDERS_EMAIL_NOT_CONFIGURED_BLOCKER),
+    /Delivery was not sent/
+  );
+
+  const smtpOnNotConfigured = evaluateEmailResendEligibility({
+    sourceType: "order_email",
+    alreadyResolved: false,
+    status: "COMPLETED",
+    orderId: "ord_1",
+    orderStatus: "COMPLETED",
+    providerOrderId: "PO-ABC",
+    emailDeliveryStatus: "not_configured",
+    customerEmail: "a@example.com",
+    ordersEmailConfigured: true,
+  });
+  assert.equal(smtpOnNotConfigured.allowed, true);
+
+  const walletSmtpIgnored = evaluateEmailResendEligibility({
+    sourceType: "wallet_email",
+    alreadyResolved: false,
+    emailNotificationStatus: "not_configured",
+    walletTransactionStatus: "COMPLETED",
+    amountCents: 500,
+    balanceAfterCents: 1000,
+    customerEmail: "a@example.com",
+    ordersEmailConfigured: false,
+  });
+  assert.equal(walletSmtpIgnored.allowed, true);
 
   const resolvedBlocked = evaluateEmailResendEligibility({
     sourceType: "order_email",
@@ -156,6 +262,41 @@ function main() {
     customerEmail: "bad",
   });
   assert.equal(invalidEmail.allowed, false);
+  assert.ok(invalidEmail.blockers.includes("invalid_email"));
+
+  const invalidEmailSmtpOff = evaluateEmailResendEligibility({
+    sourceType: "order_email",
+    alreadyResolved: false,
+    status: "COMPLETED",
+    orderId: "ord_1",
+    orderStatus: "COMPLETED",
+    providerOrderId: "PO-ABC",
+    emailDeliveryStatus: "invalid_email",
+    customerEmail: "a@example.com",
+    ordersEmailConfigured: false,
+  });
+  assert.equal(invalidEmailSmtpOff.allowed, false);
+  assert.ok(invalidEmailSmtpOff.blockers.includes("invalid_email"));
+  assert.ok(!invalidEmailSmtpOff.blockers.some(isOrdersEmailSmtpOffBlocker));
+  assert.equal(
+    emailResendBlockerLabel("invalid_email"),
+    "Customer email is invalid; correct it before resending."
+  );
+
+  const sendingSmtpOff = evaluateEmailResendEligibility({
+    sourceType: "order_email",
+    alreadyResolved: false,
+    status: "COMPLETED",
+    orderId: "ord_1",
+    orderStatus: "COMPLETED",
+    providerOrderId: "PO-ABC",
+    emailDeliveryStatus: "sending",
+    customerEmail: "a@example.com",
+    ordersEmailConfigured: false,
+  });
+  assert.equal(sendingSmtpOff.allowed, false);
+  assert.ok(sendingSmtpOff.blockers.includes("email_send_in_progress"));
+  assert.ok(!sendingSmtpOff.blockers.some(isOrdersEmailSmtpOffBlocker));
 
   const incompleteOrder = evaluateEmailResendEligibility({
     sourceType: "order_email",
@@ -213,6 +354,86 @@ function main() {
   assert.match(emailResend, /consumeRateLimit/);
   assert.match(emailResend, /sendOrderEmail/);
   assert.match(emailResend, /resendFailedWalletTransactionNotification/);
+  assert.match(emailResend, /isEmailConfigured\("orders"\)/);
+  assert.match(emailResend, /ordersEmailNotConfiguredBlock/);
+  assert.match(emailResend, /ordersSmtpOffResendMessage/);
+  assert.match(emailResend, /blockOrdersEmailNotConfigured/);
+  const resendFn = emailResend.slice(
+    emailResend.indexOf("export async function resendReconciliationEmail")
+  );
+  const eligIdx = resendFn.indexOf(
+    "const eligibility = await getEmailResendEligibility"
+  );
+  const genericIdx = resendFn.indexOf("if (!eligibility?.allowed)");
+  assert.ok(eligIdx >= 0 && genericIdx > eligIdx);
+  const smtpOffLive = resendFn.slice(eligIdx, genericIdx);
+  assert.match(smtpOffLive, /!isEmailConfigured\("orders"\)/);
+  assert.match(smtpOffLive, /isOrderEmailSmtpOffResendStatus/);
+  assert.match(smtpOffLive, /blockOrdersEmailNotConfigured/);
+  assert.doesNotMatch(smtpOffLive, /reason:\s*reasonParsed/);
+  assert.doesNotMatch(smtpOffLive, /reasonParsed\.reason/);
+  assert.doesNotMatch(smtpOffLive, /blockers:/);
+  const genericIneligible = resendFn.slice(
+    genericIdx,
+    resendFn.indexOf('if (ids.sourceType === "wallet_email")')
+  );
+  assert.match(genericIneligible, /reason:\s*reasonParsed\.reason/);
+  const smtpOffAudit = emailResend.slice(
+    emailResend.indexOf("async function blockOrdersEmailNotConfigured"),
+    emailResend.indexOf("type JsonRecord")
+  );
+  assert.match(smtpOffAudit, /sourceType: options\.sourceType/);
+  assert.match(smtpOffAudit, /attemptId: options\.attemptId/);
+  assert.match(smtpOffAudit, /ORDERS_SMTP_OFF_AUDIT_METADATA/);
+  assert.doesNotMatch(smtpOffAudit, /reason:/);
+  assert.doesNotMatch(smtpOffAudit, /blockers:/);
+  assert.doesNotMatch(
+    smtpOffAudit,
+    /qrValue|activationCode|LPA:|emailBody|process\.env/
+  );
+  assert.doesNotMatch(smtpOffAudit, /updateMany|sendOrderEmail/);
+  const smtpMeta = emailResend.slice(
+    emailResend.indexOf("const ORDERS_SMTP_OFF_AUDIT_METADATA"),
+    emailResend.indexOf("async function blockOrdersEmailNotConfigured")
+  );
+  assert.match(smtpMeta, /action:\s*"email_resend"/);
+  assert.match(smtpMeta, /failureCode:\s*"not_configured"/);
+  assert.doesNotMatch(smtpMeta, /reason/);
+  const purchaseCas = emailResend.slice(
+    emailResend.indexOf("async function resendPurchaseOrderEmail")
+  );
+  const purchaseClaim = purchaseCas.indexOf(
+    'emailDeliveryStatus: { in: ["failed", "not_configured"] }'
+  );
+  const purchaseGate = purchaseCas.indexOf("ordersEmailNotConfiguredBlock");
+  assert.ok(purchaseGate >= 0 && purchaseClaim > purchaseGate);
+  const assignmentCas = emailResend.slice(
+    emailResend.indexOf("async function resendAssignmentOrderEmail")
+  );
+  const assignmentClaim = assignmentCas.indexOf(
+    'emailDeliveryStatus: { in: ["failed", "not_configured"] }'
+  );
+  const assignmentGate = assignmentCas.indexOf("ordersEmailNotConfiguredBlock");
+  assert.ok(assignmentGate >= 0 && assignmentClaim > assignmentGate);
+  assert.doesNotMatch(
+    emailResend.slice(
+      emailResend.indexOf("function ordersEmailNotConfiguredBlock"),
+      emailResend.indexOf("async function getEmailResendEligibility")
+    ),
+    /updateMany/
+  );
+  assert.equal(
+    ORDER_EMAIL_NOT_CONFIGURED_RESEND_MESSAGE.includes(
+      "Configure the Orders email channel before resending"
+    ),
+    true
+  );
+  assert.equal(
+    ORDER_EMAIL_FAILED_SMTP_UNAVAILABLE_MESSAGE.includes(
+      "Configure it before resending"
+    ),
+    true
+  );
   assert.match(emailResend, /method:\s*"GET"/);
   assert.doesNotMatch(emailResend, /\/api\/checkout\/credit/);
   assert.doesNotMatch(emailResend, /captureIccid|iccidEncrypted|refundReservedFunds/);

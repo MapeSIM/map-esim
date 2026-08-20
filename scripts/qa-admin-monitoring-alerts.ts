@@ -242,8 +242,17 @@ function main() {
   assert.doesNotMatch(service, /executeCreditCheckout|sendMail|refundReservedFunds/);
   assert.doesNotMatch(service, /method:\s*["']POST["']/);
   assert.match(service, /orderEmailInboxStatusOr|isOrderEmailInboxMatch/);
+  assert.match(service, /isNotConfiguredOrderEmailDelivery/);
+  assert.match(service, /ORDER_EMAIL_NOT_CONFIGURED_LABEL/);
+  assert.match(service, /Installation email was not sent/);
+  assert.match(service, /Configure the Orders email channel before resending/);
   assert.match(service, /Uncertain order email delivery/);
   assert.match(service, /Clear stuck send/);
+  assert.match(service, /isFailedWalletNotification/);
+  assert.match(
+    service,
+    /emailNotificationStatus:\s*\{\s*in:\s*\["failed",\s*"not_configured"\]/
+  );
   assert.match(service, /assignment:\$\{row\.id\}/);
   console.log("PASS codes_and_readonly_service");
 

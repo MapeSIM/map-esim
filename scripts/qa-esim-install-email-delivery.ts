@@ -69,6 +69,13 @@ function main() {
     helper,
     /OR:\s*\[[\s\S]*emailDeliveryStatus:\s*null[\s\S]*skipped_no_install_details/
   );
+  const helperCas = helper.slice(
+    helper.indexOf("const claimed = await prisma.walletEsimPurchase.updateMany"),
+    helper.indexOf("if (claimed.count !== 1)")
+  );
+  assert.match(helperCas, /emailDeliveryStatus:\s*null/);
+  assert.match(helperCas, /skipped_no_install_details/);
+  assert.doesNotMatch(helperCas, /not_configured/);
   assert.match(helper, /customerEmail:\s*true/);
   assert.match(helper, /alternateDeliveryEmail/);
   assert.match(helper, /resolveFrozenInstallDeliveryEmail/);
@@ -150,6 +157,17 @@ function main() {
   assert.doesNotMatch(orders, /where:\s*\{\s*customerEmail/);
   console.log("PASS my_esims_by_user_not_email");
 
+  const resendFn = resend.slice(
+    resend.indexOf("export async function resendReconciliationEmail")
+  );
+  const eligIdx = resendFn.indexOf(
+    "const eligibility = await getEmailResendEligibility"
+  );
+  const genericIdx = resendFn.indexOf("if (!eligibility?.allowed)");
+  assert.ok(eligIdx >= 0 && genericIdx > eligIdx);
+  const smtpOffLive = resendFn.slice(eligIdx, genericIdx);
+  assert.match(smtpOffLive, /!isEmailConfigured\("orders"\)/);
+  assert.doesNotMatch(smtpOffLive, /reason:\s*reasonParsed/);
   assert.match(
     resend,
     /emailDeliveryStatus:\s*\{\s*in:\s*\["failed",\s*"not_configured"\]/

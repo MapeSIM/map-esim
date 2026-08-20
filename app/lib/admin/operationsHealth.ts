@@ -32,6 +32,7 @@ import {
   categoryMatchesFilter,
   isFailedEmailDelivery,
   isFailedWalletNotification,
+  isInboxNotConfiguredOrderEmailDelivery,
   isOrderEmailInboxMatch,
   isVisibleOrderEmailDelivery,
   orderEmailInboxStatusOr,
@@ -1086,6 +1087,8 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
 export const __opsHealthQaHooks = {
   isFailedEmailDelivery,
   isFailedWalletNotification,
+  isInboxNotConfiguredOrderEmailDelivery,
+  isOrderEmailInboxMatch,
   isVisibleOrderEmailDelivery,
   mapDatabaseProbeToStatus,
   sanitizeHealthStatus,
