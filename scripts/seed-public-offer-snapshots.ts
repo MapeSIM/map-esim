@@ -14,7 +14,11 @@
  *
  * Deployment order: backup → migrate while old app is live → deploy
  * publicReadsOn=false → seed dry-run then --apply → verify → guarded enable.
+ *
+ * tsx is not the Next.js server runtime. Register the CLI Next preload
+ * before importing live VeSIM helpers (next/cache + server-only).
  */
+import "./cli-next-runtime.cjs";
 import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
 import {
