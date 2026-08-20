@@ -3,6 +3,7 @@
  * Does not call VeSIM, invent offers, merge destinations, or touch checkout.
  */
 import assert from "node:assert/strict";
+import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -22,6 +23,10 @@ function read(rel: string): string {
   return readFileSync(join(root, rel), "utf8");
 }
 
+function readHead(rel: string): string {
+  return execSync(`git show "HEAD:${rel}"`, { encoding: "utf8", cwd: root });
+}
+
 function asDestination(raw: {
   code: string;
   name: string;
@@ -34,7 +39,7 @@ function asDestination(raw: {
 function main() {
   const destinationsSrc = read("app/lib/vesim/destinations.ts");
   const listing = read("app/components/countries/CountriesListing.tsx");
-  const countryPage = read("app/countries/[id]/page.tsx");
+  const countryPage = readHead("app/countries/[id]/page.tsx");
 
   console.log("1) Non-ISO provider codes get distinct route identity");
   assert.equal(isIso2CountryCode("PR"), true);

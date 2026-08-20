@@ -8,7 +8,7 @@ import {
 } from "@/app/lib/vesim/destinations";
 import { fetchPublicDestinationCatalog } from "@/app/lib/vesim/server";
 
-/** Align with public destination catalog cache (offer-min enrichment). */
+/** Align with public destination catalog cache. */
 export const revalidate = 300;
 
 function staticFallbackDestinations(): VesimDestination[] {

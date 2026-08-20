@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { VesimEnvironmentError } from "@/app/lib/vesim/environment";
 import { VESIM_ENV_PUBLIC_ERROR } from "@/app/lib/vesim/environmentPolicy";
 import { toPublicVesimOffers } from "@/app/lib/vesim/offers";
+import { PublicOfferSnapshotError } from "@/app/lib/vesim/publicOfferSnapshot";
 import {
   fetchPublicOffersForCountry,
   publicErrorMessage,
@@ -27,6 +28,16 @@ export async function GET(req: Request) {
     }
 
     const offers = await fetchPublicOffersForCountry(country);
+    if (offers.length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unable to load offers",
+          offers: [],
+        },
+        { status: 503 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
@@ -35,6 +46,16 @@ export async function GET(req: Request) {
       offers: toPublicVesimOffers(offers),
     });
   } catch (error: unknown) {
+    if (error instanceof PublicOfferSnapshotError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unable to load offers",
+          offers: [],
+        },
+        { status: 503 }
+      );
+    }
     if (error instanceof VesimEnvironmentError) {
       return NextResponse.json(
         {

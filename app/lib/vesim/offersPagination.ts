@@ -78,6 +78,7 @@ export function resolveOffersFetchPlan(payload: unknown): {
 /**
  * Accept HTTP 200 pages. If the documented `success` field is explicitly false,
  * treat as failure. Missing `success` remains allowed for older shapes.
+ * Live checkout/admin fetching keeps this looser parser.
  */
 export function isUsableOffersPage(
   httpOk: boolean,
@@ -88,6 +89,19 @@ export function isUsableOffersPage(
   const success = (payload as Record<string, unknown>).success;
   if (success === false) return false;
   return true;
+}
+
+/**
+ * Public browsing snapshots require an explicit success:true JSON object.
+ * Missing success, non-objects, and non-OK HTTP must not look complete.
+ */
+export function isUsablePublicOffersPage(
+  httpOk: boolean,
+  payload: unknown
+): boolean {
+  if (!httpOk) return false;
+  if (!payload || typeof payload !== "object") return false;
+  return (payload as Record<string, unknown>).success === true;
 }
 
 /** Concatenate `offers` arrays from each page in provider order. */
@@ -107,10 +121,14 @@ export function mergeOfferPageItems(payloads: unknown[]): unknown[] {
  * returns ok:false — never a partial catalog.
  */
 export async function collectAllOfferPagePayloads(
-  fetchPage: (page: number) => Promise<OfferPageFetchResult>
+  fetchPage: (page: number) => Promise<OfferPageFetchResult>,
+  options?: {
+    isPageUsable?: (httpOk: boolean, payload: unknown) => boolean;
+  }
 ): Promise<{ ok: true; payloads: unknown[] } | { ok: false }> {
+  const isPageUsable = options?.isPageUsable ?? isUsableOffersPage;
   const first = await fetchPage(1);
-  if (!isUsableOffersPage(first.httpOk, first.payload)) {
+  if (!isPageUsable(first.httpOk, first.payload)) {
     return { ok: false };
   }
 
@@ -125,7 +143,7 @@ export async function collectAllOfferPagePayloads(
   for (let page = 2; page <= plan.pagesToFetch; page++) {
     // Loop bound is totalPages (capped); never unbounded.
     const next = await fetchPage(page);
-    if (!isUsableOffersPage(next.httpOk, next.payload)) {
+    if (!isPageUsable(next.httpOk, next.payload)) {
       return { ok: false };
     }
     payloads.push(next.payload);

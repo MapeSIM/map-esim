@@ -1323,6 +1323,55 @@ model CustomerRewardRedemption {
   @@index([createdAt])
 }
 
+/// Durable last-good public browse catalog per destination.
+/// Checkout, admin, and partner purchase paths never read this table.
+model PublicDestinationOfferSnapshot {
+  /// Provider destination code (ISO2, region-*, or global).
+  destinationCode String   @id
+  /// Unique offer IDs, sorted. Never a historical union.
+  offerIds        String[]
+  /// Public VesimOffer[] (supplier cost stripped).
+  offersJson      Json
+  offerCount      Int
+  /// sha256 of sorted unique offer IDs.
+  idFingerprint   String
+  /// sha256 of sorted id + priceUSD + durationDays.
+  payloadFingerprint String
+  acceptedAt         DateTime
+  providerCheckedAt  DateTime
+  /// Optimistic concurrency token for compare-and-update.
+  version            Int      @default(0)
+
+  refreshClaimToken      String?
+  refreshClaimedAt       DateTime?
+  refreshClaimExpiresAt  DateTime?
+
+  pendingOfferIds           String[]  @default([])
+  pendingOffersJson         Json?
+  pendingOfferCount         Int?
+  pendingIdFingerprint      String?
+  pendingPayloadFingerprint String?
+  pendingFirstSeenAt        DateTime?
+  pendingConfirmCount       Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([providerCheckedAt])
+  @@index([refreshClaimExpiresAt])
+}
+
+/// Cutover switch for public browse reads. Default off: live strict fetch.
+/// Seed/backfill never flips publicReadsOn.
+model PublicOfferSnapshotControl {
+  id                 String    @id @default("default")
+  publicReadsOn      Boolean   @default(false)
+  seedVerifiedAt     DateTime?
+  expectedCountsJson Json?
+  version            Int       @default(0)
+  updatedAt          DateTime  @updatedAt
+}
+
 /// Append-only customer rewards ledger.
 /// PURCHASE_EARN / PURCHASE_EARN_REVERSAL / REDEMPTION are one-per-purchase via partial unique indexes.
 /// REDEMPTION_RESTORE may exist twice (pre-funding hold release vs post-refund restore), distinguished by idempotencyKey.

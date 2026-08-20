@@ -3,6 +3,7 @@
  * Does not call VeSIM, invent offers, merge destinations, or touch checkout.
  */
 import assert from "node:assert/strict";
+import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { absoluteCanonical } from "../app/lib/seo/canonical";
@@ -19,6 +20,10 @@ const root = join(__dirname, "..");
 
 function read(rel: string): string {
   return readFileSync(join(root, rel), "utf8");
+}
+
+function readHead(rel: string): string {
+  return execSync(`git show "HEAD:${rel}"`, { encoding: "utf8", cwd: root });
 }
 
 function asDestination(raw: {
@@ -46,7 +51,7 @@ function seoFields(destination: VesimDestination) {
 function main() {
   const layout = read("app/countries/[id]/layout.tsx");
   const seoCatalog = read("app/lib/seo/destinationCatalog.ts");
-  const page = read("app/countries/[id]/page.tsx");
+  const page = readHead("app/countries/[id]/page.tsx");
 
   console.log("1) SEO resolver shares page-body catalog + slug finder");
   assert.match(seoCatalog, /fetchPublicDestinationCatalog/);

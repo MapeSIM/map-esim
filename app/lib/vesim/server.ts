@@ -1,6 +1,5 @@
 import {
   normalizeDestinations,
-  withLowestOfferRetailMinPrice,
   type VesimDestination,
 } from "@/app/lib/vesim/destinations";
 import {
@@ -14,8 +13,20 @@ import {
 import {
   buildVesimOffersQuery,
   collectAllOfferPagePayloads,
+  isUsableOffersPage,
+  isUsablePublicOffersPage,
   mergeOfferPageItems,
 } from "@/app/lib/vesim/offersPagination";
+import { prisma } from "@/app/lib/db";
+import {
+  PUBLIC_OFFER_FLAG_OFF_REVALIDATE_SECONDS,
+  PUBLIC_OFFER_REFRESH_TIMEOUT_MS,
+  PublicOfferSnapshotError,
+} from "@/app/lib/vesim/publicOfferSnapshot";
+import {
+  loadPublicOffersForCountry,
+  withPublicOfferRefreshTimeout,
+} from "@/app/lib/vesim/publicOfferSnapshotRefresh";
 import { unstable_cache } from "next/cache";
 import {
   getBrokerToken,
@@ -185,81 +196,68 @@ export async function fetchDestinations(
   return normalizeDestinations(data);
 }
 
-/** Parallel offer lookups while building public Starting-from mins. */
-const PUBLIC_DESTINATION_OFFER_CONCURRENCY = 10;
-/** Revalidate offer-derived destination mins (seconds). */
+/** Revalidate public destination identity list (seconds). */
 const PUBLIC_DESTINATION_CATALOG_REVALIDATE_SECONDS = 300;
 
-async function mapPool<T, R>(
-  items: T[],
-  concurrency: number,
-  mapper: (item: T, index: number) => Promise<R>
-): Promise<R[]> {
-  if (items.length === 0) return [];
-  const results = new Array<R>(items.length);
-  let nextIndex = 0;
-
-  async function worker() {
-    while (nextIndex < items.length) {
-      const index = nextIndex;
-      nextIndex += 1;
-      results[index] = await mapper(items[index], index);
-    }
-  }
-
-  const workers = Math.min(Math.max(1, concurrency), items.length);
-  await Promise.all(Array.from({ length: workers }, () => worker()));
-  return results;
-}
-
 /**
- * Replace entry-tier destination minPrice with the cheapest offer MAP retail.
- * Entry-tier (2%) understates Starting from when the cheapest buyable plan is
- * 502MB/1GB (3% tier) — public catalog must use offer retail once.
+ * Previously fanned out live offer fetches from inside the destination catalog
+ * cache (nested `unstable_cache` writes). That path stays a no-op: listing
+ * "From" uses VeSIM destination minPrice → entry retail, which can differ
+ * from the country-page lowest-offer retail until a separate listing snapshot
+ * exists. Do not restore per-country offer fan-out here.
  */
 export async function enrichDestinationsWithOfferRetailMins(
   destinations: VesimDestination[],
   token?: TokenResult
 ): Promise<VesimDestination[]> {
-  if (destinations.length === 0) return destinations;
-  // `token` retained for call-site compatibility; public offer snapshots
-  // authenticate internally on cache miss via fetchOffersForCountry.
   void token;
-
-  return mapPool(
-    destinations,
-    PUBLIC_DESTINATION_OFFER_CONCURRENCY,
-    async (destination) => {
-      const code = destination.code?.trim();
-      if (!code) return destination;
-      try {
-        // Reuse the public browsing offer snapshot so catalog mins and country
-        // pages agree within the same short revalidation window.
-        const offers = await fetchPublicOffersForCountry(code);
-        return withLowestOfferRetailMinPrice(destination, offers);
-      } catch {
-        // Keep entry-tier fallback when offers are unavailable for this code.
-        return destination;
-      }
-    }
-  );
+  return destinations;
 }
 
 async function loadPublicDestinationCatalog(): Promise<VesimDestination[]> {
   const token = await getBrokerToken();
   const destinations = await fetchDestinations(token);
-  return enrichDestinationsWithOfferRetailMins(destinations, token);
+  if (destinations.length === 0) {
+    throw new PublicOfferSnapshotError("empty_destination_catalog");
+  }
+  return destinations;
 }
 
 /**
- * Public `/api/vesim/destinations` catalog: Starting from = lowest offer retail.
- * Cached so offer enrichment is not paid on every listing request.
+ * Public `/api/vesim/destinations` identity catalog.
+ * Does not fetch or cache per-country offers.
  */
 export const fetchPublicDestinationCatalog = unstable_cache(
   loadPublicDestinationCatalog,
-  ["public-destination-catalog-offer-mins-v2"],
+  ["public-destination-catalog-v3"],
   { revalidate: PUBLIC_DESTINATION_CATALOG_REVALIDATE_SECONDS }
 );
+
+async function collectDestinationOfferPages(
+  destination: string,
+  token: TokenResult | undefined,
+  isPageUsable: (httpOk: boolean, payload: unknown) => boolean,
+  options?: { signal?: AbortSignal }
+) {
+  const baseUrl = getVesimBaseUrl();
+  const signal = options?.signal;
+  return collectAllOfferPagePayloads(async (page) => {
+    const query = buildVesimOffersQuery(destination, page);
+    const url = `${baseUrl}/api/esim/offers?${query.toString()}`;
+    const response = token
+      ? await fetch(url, {
+          headers: {
+            Authorization: `${token.tokenType} ${token.accessToken}`,
+            Accept: "application/json",
+          },
+          cache: "no-store",
+          signal,
+        })
+      : await vesimAuthorizedFetch(url, { signal });
+    const payload = await readJsonSafe(response);
+    return { httpOk: response.ok, payload };
+  }, { isPageUsable });
+}
 
 /**
  * Live provider offer fetch (no-store), all pages.
@@ -270,25 +268,14 @@ export async function fetchOffersForCountry(
   country: string,
   token?: TokenResult
 ): Promise<VesimOffer[]> {
-  const baseUrl = getVesimBaseUrl();
   const destination = country.trim();
   if (!destination) return [];
 
-  const collected = await collectAllOfferPagePayloads(async (page) => {
-    const query = buildVesimOffersQuery(destination, page);
-    const url = `${baseUrl}/api/esim/offers?${query.toString()}`;
-    const response = token
-      ? await fetch(url, {
-          headers: {
-            Authorization: `${token.tokenType} ${token.accessToken}`,
-            Accept: "application/json",
-          },
-          cache: "no-store",
-        })
-      : await vesimAuthorizedFetch(url);
-    const payload = await readJsonSafe(response);
-    return { httpOk: response.ok, payload };
-  });
+  const collected = await collectDestinationOfferPages(
+    destination,
+    token,
+    isUsableOffersPage
+  );
 
   // Fail closed: incomplete pagination must not look like a full catalog.
   if (!collected.ok) {
@@ -299,9 +286,38 @@ export async function fetchOffersForCountry(
   return normalizeOffers({ offers: allRawOffers });
 }
 
-/** Align public browsing offer snapshots with destination catalog TTL. */
-const PUBLIC_OFFERS_REVALIDATE_SECONDS =
-  PUBLIC_DESTINATION_CATALOG_REVALIDATE_SECONDS;
+/**
+ * Strict live public browse fetch. Throws instead of returning an empty list.
+ * Used by the flag-off Data Cache fill and by snapshot refresh/seed.
+ */
+export async function fetchStrictPublicOffersLive(
+  country: string,
+  options?: { signal?: AbortSignal }
+): Promise<VesimOffer[]> {
+  const destination = country.trim();
+  if (!destination) {
+    throw new PublicOfferSnapshotError("invalid_country");
+  }
+
+  const collected = await collectDestinationOfferPages(
+    destination,
+    undefined,
+    isUsablePublicOffersPage,
+    { signal: options?.signal }
+  );
+
+  if (!collected.ok) {
+    throw new PublicOfferSnapshotError("incomplete");
+  }
+
+  const offers = normalizeOffers({
+    offers: mergeOfferPageItems(collected.payloads),
+  });
+  if (offers.length === 0) {
+    throw new PublicOfferSnapshotError("empty");
+  }
+  return offers;
+}
 
 function publicOffersCountryKey(country: string): string {
   const raw = country.trim();
@@ -309,24 +325,48 @@ function publicOffersCountryKey(country: string): string {
   return sanitizeCountryHint(raw) || raw;
 }
 
-const loadCachedPublicOffersForCountry = unstable_cache(
-  async (country: string) => fetchOffersForCountry(country),
-  // v2: complete multi-page lists (invalidates prior single-page snapshots).
-  ["public-country-offers-v2"],
-  { revalidate: PUBLIC_OFFERS_REVALIDATE_SECONDS }
+async function loadFlagOffCachedPublicOffers(
+  country: string
+): Promise<VesimOffer[]> {
+  return withPublicOfferRefreshTimeout(
+    (signal) => fetchStrictPublicOffersLive(country, { signal }),
+    PUBLIC_OFFER_REFRESH_TIMEOUT_MS
+  );
+}
+
+/**
+ * Bounded flag-off / pre-migration public offer cache (300s).
+ * Same loader for country HTML and `/api/vesim/offers`.
+ */
+const loadCachedFlagOffPublicOffersForCountry = unstable_cache(
+  loadFlagOffCachedPublicOffers,
+  ["public-country-offers-v4-strict"],
+  { revalidate: PUBLIC_OFFER_FLAG_OFF_REVALIDATE_SECONDS }
 );
 
 /**
- * Short-lived PUBLIC BROWSING snapshot of destination offers (~300s).
- * Country plans page + `/api/vesim/offers` use this so soft refreshes do not
- * flip between provider list variants. Never use for purchase validation.
+ * PUBLIC BROWSING offers for country pages + `/api/vesim/offers`.
+ * publicReadsOn=false or missing tables: 300s Data Cache of strict live lists.
+ * publicReadsOn=true: durable PostgreSQL snapshot only; missing → throw.
+ * Never use for purchase validation.
  */
 export async function fetchPublicOffersForCountry(
   country: string
 ): Promise<VesimOffer[]> {
   const key = publicOffersCountryKey(country);
-  if (!key) return [];
-  return loadCachedPublicOffersForCountry(key);
+  if (!key) {
+    throw new PublicOfferSnapshotError("invalid_country");
+  }
+  return loadPublicOffersForCountry({
+    client: prisma,
+    country: key,
+    fetchLive: (destination) =>
+      withPublicOfferRefreshTimeout(
+        (signal) => fetchStrictPublicOffersLive(destination, { signal }),
+        PUBLIC_OFFER_REFRESH_TIMEOUT_MS
+      ),
+    loadFlagOffCached: loadCachedFlagOffPublicOffersForCountry,
+  });
 }
 
 export async function verifyOfferAuthoritative(options: {

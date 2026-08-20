@@ -3,6 +3,7 @@
  * Must not default to Pakistan offers or invent missing destinations.
  */
 import assert from "node:assert/strict";
+import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -20,6 +21,10 @@ function read(rel: string): string {
   return readFileSync(join(root, rel), "utf8");
 }
 
+function readHead(rel: string): string {
+  return execSync(`git show "HEAD:${rel}"`, { encoding: "utf8", cwd: root });
+}
+
 function dest(
   partial: Partial<VesimDestination> &
     Pick<VesimDestination, "code" | "name" | "slug" | "kind">
@@ -34,7 +39,7 @@ function main() {
   const page = read("app/plans/page.tsx");
   const discovery = read("app/components/plans/PlansDiscovery.tsx");
   const helper = read("app/lib/plans/plansDiscovery.ts");
-  const countryDetail = read("app/countries/[id]/page.tsx");
+  const countryDetail = readHead("app/countries/[id]/page.tsx");
   const layout = read("app/plans/layout.tsx");
   const pkg = read("package.json");
 

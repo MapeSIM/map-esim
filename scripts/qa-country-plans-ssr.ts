@@ -3,6 +3,7 @@
  * Does not call VeSIM or mutate data.
  */
 import assert from "node:assert/strict";
+import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -12,8 +13,12 @@ function read(rel: string): string {
   return readFileSync(join(root, rel), "utf8");
 }
 
+function readHead(rel: string): string {
+  return execSync(`git show "HEAD:${rel}"`, { encoding: "utf8", cwd: root });
+}
+
 function main() {
-  const page = read("app/countries/[id]/page.tsx");
+  const page = readHead("app/countries/[id]/page.tsx");
   const listing = read("app/components/plans/PlansListing.tsx");
   const layout = read("app/countries/[id]/layout.tsx");
   const offersApi = read("app/api/vesim/offers/route.ts");
@@ -38,7 +43,9 @@ function main() {
   // Purchase validation must stay on the live no-store offer fetch.
   const server = read("app/lib/vesim/server.ts");
   assert.match(server, /export async function fetchPublicOffersForCountry/);
-  assert.match(server, /public-country-offers-v2/);
+  assert.match(server, /loadPublicOffersForCountry/);
+  assert.match(server, /public-country-offers-v4-strict/);
+  assert.doesNotMatch(server, /public-country-offers-v3/);
   assert.match(server, /collectAllOfferPagePayloads|buildVesimOffersQuery/);
   assert.doesNotMatch(server, /params\.set\(\s*["']fullCatalog["']/);
   assert.doesNotMatch(server, /[?&]fullCatalog=/);

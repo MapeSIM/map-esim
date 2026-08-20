@@ -154,7 +154,9 @@ function buildDestination(
         ? item.minPriceUSD
         : null;
   // Raw VeSIM list minPrice is supplier cost. Entry retail uses the same
-  // provider-cost bands; public catalog prefers lowest offer retail when loaded.
+  // provider-cost bands. Listing "From" stays on this destination minPrice
+  // (no offer fan-out). Country pages use lowest offer retail from the public
+  // snapshot and can temporarily disagree with listing From.
   const applyEntryRetail = options?.applyEntryRetail !== false;
   const retailMin =
     applyEntryRetail && rawMin != null

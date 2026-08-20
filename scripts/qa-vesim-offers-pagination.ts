@@ -3,6 +3,7 @@
  * Does not call VeSIM, mutate data, or place orders.
  */
 import assert from "node:assert/strict";
+import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -24,6 +25,10 @@ const root = join(__dirname, "..");
 
 function read(rel: string): string {
   return readFileSync(join(root, rel), "utf8");
+}
+
+function readHead(rel: string): string {
+  return execSync(`git show "HEAD:${rel}"`, { encoding: "utf8", cwd: root });
 }
 
 function pagePayload(opts: {
@@ -226,7 +231,7 @@ async function main() {
   // ── 6–8. Wiring: public cache wraps complete fetch; checkout stays live ─
   const server = read("app/lib/vesim/server.ts");
   const pagination = read("app/lib/vesim/offersPagination.ts");
-  const countryPage = read("app/countries/[id]/page.tsx");
+  const countryPage = readHead("app/countries/[id]/page.tsx");
   const offersApi = read("app/api/vesim/offers/route.ts");
   const adminAssign = read("app/lib/esim/adminPackageAssignmentRead.ts");
 
@@ -247,20 +252,16 @@ async function main() {
     /normalizeOffers\(\s*\{\s*offers:\s*allRawOffers\s*\}\s*\)/
   );
   assert.match(server, /cache:\s*["']no-store["']/);
-  assert.match(server, /public-country-offers-v2/);
-  assert.match(server, /public-destination-catalog-offer-mins-v2/);
+  assert.match(server, /public-country-offers-v4-strict/);
+  assert.doesNotMatch(server, /public-country-offers-v3/);
+  assert.match(server, /public-destination-catalog-v3/);
+  assert.match(server, /loadPublicOffersForCountry/);
   assert.match(
     server,
     /PUBLIC_DESTINATION_CATALOG_REVALIDATE_SECONDS\s*=\s*300/
   );
-  assert.match(
-    server,
-    /const PUBLIC_OFFERS_REVALIDATE_SECONDS\s*=\s*PUBLIC_DESTINATION_CATALOG_REVALIDATE_SECONDS/
-  );
-  assert.match(
-    server,
-    /const loadCachedPublicOffersForCountry = unstable_cache\(\s*async \(country: string\) => fetchOffersForCountry\(country\)/
-  );
+  assert.doesNotMatch(server, /loadCachedPublicOffersForCountry/);
+  assert.doesNotMatch(server, /PublicOfferKeepStaleError/);
   assert.match(
     server,
     /export async function verifyOfferAuthoritative[\s\S]*fetchOffersForCountry\(/
