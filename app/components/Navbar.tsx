@@ -173,6 +173,7 @@ export default function Navbar({
         className="
           mx-auto flex h-16 w-full min-w-0 max-w-[1200px] items-center
           justify-between gap-3 px-3 sm:h-[72px] sm:gap-4 sm:px-6
+          2xl:max-w-[1280px]
         "
         aria-label="Primary"
       >
@@ -211,7 +212,7 @@ export default function Navbar({
           <span className="sr-only">{BRAND_NAME}</span>
         </Link>
 
-        <div className="hidden min-w-0 flex-1 items-center justify-end gap-0.5 lg:flex lg:pl-4 xl:gap-1">
+        <div className="hidden min-w-0 flex-1 items-center justify-end gap-0.5 lg:flex lg:justify-start lg:pl-4 xl:gap-1">
           {navLinks.map((link) => {
             const active = isActive(link.href);
             const stacked = Boolean(link.labelLines);
@@ -251,7 +252,7 @@ export default function Navbar({
             );
           })}
 
-          <div className="ml-2 flex shrink-0 items-center gap-2 xl:ml-3 xl:gap-3">
+          <div className="ml-auto flex shrink-0 items-center gap-2 pl-2 xl:gap-3 xl:pl-3">
             <CurrencySelector />
             <ThemeToggle />
 
