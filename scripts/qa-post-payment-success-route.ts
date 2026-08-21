@@ -47,6 +47,10 @@ function main() {
   const reconFn = readSrc.slice(
     readSrc.indexOf("export async function getReconciliationWalletPurchase")
   );
+  const failedFn = readSrc.slice(
+    readSrc.indexOf("export async function getFailedRefundedWalletPurchase"),
+    readSrc.indexOf("export async function getReconciliationWalletPurchase")
+  );
   assert.match(
     reconFn,
     /isCustomerCompletedPurchaseFundingSource\(row\.fundingSource\)/
@@ -56,6 +60,15 @@ function main() {
   assert.match(reconFn, /WalletEsimPurchaseStatus\.RECONCILIATION_REQUIRED/);
   assert.doesNotMatch(
     reconFn,
+    /fundingSource !== OrderFundingSource\.CUSTOMER_WALLET/
+  );
+  assert.match(
+    failedFn,
+    /isCustomerCompletedPurchaseFundingSource\(row\.fundingSource\)/
+  );
+  assert.match(failedFn, /walletAppliedCents/);
+  assert.doesNotMatch(
+    failedFn,
     /fundingSource !== OrderFundingSource\.CUSTOMER_WALLET/
   );
   console.log("PASS completed_reader_accepts_direct_and_split");

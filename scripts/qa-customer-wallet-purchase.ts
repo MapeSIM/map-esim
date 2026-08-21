@@ -298,7 +298,17 @@ function main() {
   assert.match(reconPage, /customerPurchaseStatusMessage/);
   assert.doesNotMatch(reconPage, /provider result is uncertain/i);
   assert.match(readSrc, /WalletEsimPurchaseStatus\.FUNDED/);
-  assert.match(failedPage, /restored/i);
+  assert.match(failedPage, /Failed — wallet restored/);
+  assert.match(failedPage, /not a refund of a completed eSIM/);
+  assert.match(failedPage, /walletRestored/);
+  assert.match(readSrc, /walletAppliedCents/);
+  assert.match(
+    readSrc.slice(
+      readSrc.indexOf("export async function getFailedRefundedWalletPurchase"),
+      readSrc.indexOf("export async function getReconciliationWalletPurchase")
+    ),
+    /isCustomerCompletedPurchaseFundingSource/
+  );
   assert.ok(!/^["']use server["']/m.test(formState));
   assert.match(actions, /^"use server"/m);
   console.log("PASS automated_qa_no_real_provider_checkout");

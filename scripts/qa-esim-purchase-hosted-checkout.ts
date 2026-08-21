@@ -185,6 +185,20 @@ function main() {
   assert.equal(
     resolveEsimPaymentReturnKind({
       purchaseStatus: "READY",
+      attemptStatus: "PAYMENT_PENDING",
+    }),
+    "not_completed"
+  );
+  assert.equal(
+    resolveEsimPaymentReturnKind({
+      purchaseStatus: "READY",
+      attemptStatus: "AWAITING_PAYMENT",
+    }),
+    "not_completed"
+  );
+  assert.equal(
+    resolveEsimPaymentReturnKind({
+      purchaseStatus: "READY",
       attemptStatus: "FAILED",
     }),
     "not_completed"

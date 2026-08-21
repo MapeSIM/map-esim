@@ -25,25 +25,31 @@ export default async function AccountWalletBuyFailedPage({
   const purchase = await getFailedRefundedWalletPurchase(user.id, purchaseId);
   if (!purchase) notFound();
 
+  const title = purchase.walletRestored
+    ? "Failed — wallet restored"
+    : "Purchase failed";
+  const body = purchase.walletRestored
+    ? "The provider could not complete this purchase. Your wallet amount was restored. This is not a refund of a completed eSIM."
+    : "The provider could not complete this purchase. No eSIM was created.";
+
   return (
     <div className="mx-auto max-w-xl space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Purchase failed</h1>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
-          The provider could not complete this purchase. Your wallet amount was
-          restored.
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+        <p className="mt-2 text-sm text-[var(--text-muted)]">{body}</p>
       </div>
 
       <dl className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 sm:px-5">
-        <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[180px_1fr]">
-          <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Amount restored
-          </dt>
-          <dd className="text-sm font-semibold text-[var(--heading)]">
-            {purchase.amountRestoredLabel}
-          </dd>
-        </div>
+        {purchase.walletRestored && purchase.amountRestoredLabel ? (
+          <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[180px_1fr]">
+            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              Wallet amount restored
+            </dt>
+            <dd className="text-sm font-semibold text-[var(--heading)]">
+              {purchase.amountRestoredLabel}
+            </dd>
+          </div>
+        ) : null}
         <div className="grid gap-1 py-3 sm:grid-cols-[180px_1fr]">
           <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
             Current wallet balance

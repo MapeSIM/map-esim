@@ -358,7 +358,8 @@ export async function getCompletedWalletPurchase(
 
 export type WalletPurchaseFailed = {
   purchaseId: string;
-  amountRestoredLabel: string;
+  walletRestored: boolean;
+  amountRestoredLabel: string | null;
   balanceLabel: string;
 };
 
@@ -375,7 +376,7 @@ export async function getFailedRefundedWalletPurchase(
     select: {
       id: true,
       customerUserId: true,
-      priceCents: true,
+      walletAppliedCents: true,
       status: true,
       fundingSource: true,
       customer: {
@@ -394,14 +395,20 @@ export async function getFailedRefundedWalletPurchase(
     row.customer.role !== Role.CUSTOMER ||
     row.customer.deletedAt ||
     row.status !== WalletEsimPurchaseStatus.FAILED_REFUNDED ||
-    row.fundingSource !== OrderFundingSource.CUSTOMER_WALLET
+    !isCustomerCompletedPurchaseFundingSource(row.fundingSource)
   ) {
     return null;
   }
 
+  const restoredCents = Math.max(0, row.walletAppliedCents ?? 0);
+  const walletRestored = restoredCents > 0;
+
   return {
     purchaseId: row.id,
-    amountRestoredLabel: formatWalletPurchasePriceLabel(row.priceCents),
+    walletRestored,
+    amountRestoredLabel: walletRestored
+      ? formatWalletPurchasePriceLabel(restoredCents)
+      : null,
     balanceLabel: `${formatUsdCents(row.customer.walletAccount?.balanceCents ?? 0)} USD`,
   };
 }

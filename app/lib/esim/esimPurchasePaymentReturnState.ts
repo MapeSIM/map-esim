@@ -36,6 +36,9 @@ export function resolveEsimPaymentReturnKind(input: {
   }
   if (purchase === "FAILED_REFUNDED") return "not_completed";
   if (FAILED_ATTEMPT.has(attempt)) return "not_completed";
+  // READY means unpaid (never paid, or restored after cancel/fail).
+  // Do not show "processing" — that implies verification is still in flight.
+  if (purchase === "READY") return "not_completed";
   return "pending";
 }
 
