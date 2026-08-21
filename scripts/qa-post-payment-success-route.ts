@@ -44,13 +44,34 @@ function main() {
     completedFn,
     /fundingSource !== OrderFundingSource\.CUSTOMER_WALLET/
   );
+  const reconFn = readSrc.slice(
+    readSrc.indexOf("export async function getReconciliationWalletPurchase")
+  );
+  assert.match(
+    reconFn,
+    /isCustomerCompletedPurchaseFundingSource\(row\.fundingSource\)/
+  );
+  assert.match(reconFn, /WalletEsimPurchaseStatus\.FUNDED/);
+  assert.match(reconFn, /WalletEsimPurchaseStatus\.PROVIDER_PENDING/);
+  assert.match(reconFn, /WalletEsimPurchaseStatus\.RECONCILIATION_REQUIRED/);
+  assert.doesNotMatch(
+    reconFn,
+    /fundingSource !== OrderFundingSource\.CUSTOMER_WALLET/
+  );
   console.log("PASS completed_reader_accepts_direct_and_split");
 
-  // Designed flow: return → review (safe) → COMPLETED redirects to success
+  // COMPLETED return redirects to success from durable purchase status, not browser params.
   assert.match(
-    returnView,
-    /\/account\/esim\/buy\/review\?purchase=\$\{encodeURIComponent\(purchaseId\)\}/
+    read("app/account/esim/buy/payment/return/page.tsx"),
+    /kind === "completed"/
   );
+  assert.match(
+    read("app/account/esim/buy/payment/return/[attemptId]/page.tsx"),
+    /esimPurchasePaymentSuccessHref/
+  );
+  assert.match(returnView, /esimPurchasePaymentReviewHref/);
+  assert.match(returnView, /Back to checkout/);
+  // Designed flow: pending/failed return still offers checkout; COMPLETED redirects to success.
   assert.match(
     reviewPage,
     /\/account\/esim\/buy\/success\?purchase=\$\{encodeURIComponent\(review\.purchaseId\)\}/

@@ -57,6 +57,9 @@ export default async function AccountWalletBuyReviewPage({
   if (review.status === WalletEsimPurchaseStatus.FAILED_REFUNDED) {
     redirect(`/account/esim/buy/failed?purchase=${encodeURIComponent(review.purchaseId)}`);
   }
+  // Processing (FUNDED / PROVIDER_PENDING / FUNDS_RESERVED) and
+  // Review Needed (RECONCILIATION_REQUIRED) share this route; copy is
+  // chosen from durable purchase status on the destination page.
   if (
     review.status === WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED ||
     review.status === WalletEsimPurchaseStatus.PROVIDER_PENDING ||

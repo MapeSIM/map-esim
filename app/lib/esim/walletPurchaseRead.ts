@@ -404,6 +404,7 @@ export async function getFailedRefundedWalletPurchase(
 
 export type WalletPurchaseReconciliation = {
   purchaseId: string;
+  status: WalletEsimPurchaseStatus;
   amountReservedLabel: string;
 };
 
@@ -434,9 +435,10 @@ export async function getReconciliationWalletPurchase(
     row.customerUserId !== ownerId ||
     row.customer.role !== Role.CUSTOMER ||
     row.customer.deletedAt ||
-    row.fundingSource !== OrderFundingSource.CUSTOMER_WALLET ||
+    !isCustomerCompletedPurchaseFundingSource(row.fundingSource) ||
     (row.status !== WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED &&
       row.status !== WalletEsimPurchaseStatus.PROVIDER_PENDING &&
+      row.status !== WalletEsimPurchaseStatus.FUNDED &&
       row.status !== WalletEsimPurchaseStatus.FUNDS_RESERVED)
   ) {
     return null;
@@ -444,6 +446,7 @@ export async function getReconciliationWalletPurchase(
 
   return {
     purchaseId: row.id,
+    status: row.status,
     amountReservedLabel: formatWalletPurchasePriceLabel(row.priceCents),
   };
 }

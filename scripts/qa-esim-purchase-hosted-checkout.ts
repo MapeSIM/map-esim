@@ -10,6 +10,13 @@ import {
   SPLIT_PAYMENT_UNAVAILABLE_MESSAGE,
 } from "../app/lib/esim/walletPurchaseFormState";
 import {
+  CUSTOMER_PURCHASE_PROCESSING_MESSAGE,
+  CUSTOMER_PURCHASE_REVIEW_NEEDED_MESSAGE,
+} from "../app/lib/esim/customerPurchaseStatusMessaging";
+import {
+  resolveEsimPaymentReturnKind,
+} from "../app/lib/esim/esimPurchasePaymentReturnState";
+import {
   ESIM_PURCHASE_PAYMENT_CANCEL_PATH,
   ESIM_PURCHASE_PAYMENT_RETURN_PATH,
   esimPurchasePaymentCancelPath,
@@ -147,11 +154,80 @@ function main() {
   );
   assert.match(pathsSrc, /parsePaymentAttemptId/);
   assert.match(pathsSrc, /must not include a query string/);
+  assert.equal(
+    resolveEsimPaymentReturnKind({
+      purchaseStatus: "COMPLETED",
+      attemptStatus: "PAYMENT_CONFIRMED",
+    }),
+    "completed"
+  );
+  assert.equal(
+    resolveEsimPaymentReturnKind({
+      purchaseStatus: "FUNDED",
+      attemptStatus: "PAYMENT_CONFIRMED",
+    }),
+    "verified"
+  );
+  assert.equal(
+    resolveEsimPaymentReturnKind({
+      purchaseStatus: "PROVIDER_PENDING",
+      attemptStatus: "PAYMENT_CONFIRMED",
+    }),
+    "verified"
+  );
+  assert.equal(
+    resolveEsimPaymentReturnKind({
+      purchaseStatus: "AWAITING_GATEWAY_PAYMENT",
+      attemptStatus: "PAYMENT_PENDING",
+    }),
+    "pending"
+  );
+  assert.equal(
+    resolveEsimPaymentReturnKind({
+      purchaseStatus: "READY",
+      attemptStatus: "FAILED",
+    }),
+    "not_completed"
+  );
+  assert.equal(
+    resolveEsimPaymentReturnKind({
+      purchaseStatus: "READY",
+      attemptStatus: "CANCELLED",
+    }),
+    "not_completed"
+  );
+  assert.equal(
+    resolveEsimPaymentReturnKind({
+      purchaseStatus: "READY",
+      attemptStatus: "EXPIRED",
+    }),
+    "not_completed"
+  );
+  assert.equal(
+    resolveEsimPaymentReturnKind({
+      purchaseStatus: "RECONCILIATION_REQUIRED",
+      attemptStatus: "PAYMENT_CONFIRMED",
+    }),
+    "under_review"
+  );
+  assert.equal(
+    resolveEsimPaymentReturnKind({
+      purchaseStatus: "COMPLETED",
+      attemptStatus: "FAILED",
+    }),
+    "completed"
+  );
+  console.log("PASS return_kind_mapping");
+
   assert.match(returnPage, /parsePaymentAttemptId/);
   assert.match(returnPage, /void query\.tracker/);
   assert.match(returnPage, /getOwnedEsimPurchasePaymentAttempt/);
+  assert.match(returnPage, /resolveEsimPaymentReturnKind/);
+  assert.match(returnPage, /esimPurchasePaymentSuccessHref/);
   assert.match(returnAttemptPage, /parsePaymentAttemptId/);
   assert.match(returnAttemptPage, /getOwnedEsimPurchasePaymentAttempt/);
+  assert.match(returnAttemptPage, /resolveEsimPaymentReturnKind/);
+  assert.match(returnAttemptPage, /kind === "completed"/);
   assert.match(
     read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
     /Payment processing/
@@ -160,10 +236,40 @@ function main() {
     read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
     /does not confirm payment/
   );
+  assert.match(
+    read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
+    /Payment not completed/
+  );
+  assert.match(
+    read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
+    /Payment verified/
+  );
+  assert.match(
+    read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
+    /CUSTOMER_PURCHASE_PROCESSING_MESSAGE/
+  );
+  assert.match(
+    read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
+    /CUSTOMER_PURCHASE_REVIEW_NEEDED_MESSAGE/
+  );
+  assert.equal(
+    CUSTOMER_PURCHASE_PROCESSING_MESSAGE,
+    "Your payment is confirmed. Your eSIM is being prepared. We'll notify you once it's ready."
+  );
+  assert.equal(
+    CUSTOMER_PURCHASE_REVIEW_NEEDED_MESSAGE,
+    "Your payment is under review. Please do not make another purchase. We'll update you once the review is complete."
+  );
+  assert.match(
+    read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
+    /Refresh status/
+  );
   assert.doesNotMatch(returnPage, /confirmWalletEsimPurchase|applyVerifiedTopup|executeCreditCheckout/);
   assert.doesNotMatch(returnAttemptPage, /confirmWalletEsimPurchase|applyVerifiedTopup|executeCreditCheckout/);
   assert.doesNotMatch(returnPage, /prisma\.(wallet|order)|reserveWalletPurchaseFunds/);
   assert.doesNotMatch(returnAttemptPage, /prisma\.(wallet|order)|reserveWalletPurchaseFunds/);
+  assert.doesNotMatch(returnPage, /fetchTrackerStatus|fetchPaymentStatus|applyVerifiedEsimPurchasePaymentEvent/);
+  assert.doesNotMatch(returnAttemptPage, /fetchTrackerStatus|fetchPaymentStatus|applyVerifiedEsimPurchasePaymentEvent/);
   assert.match(cancelPage, /parsePaymentAttemptId/);
   assert.match(cancelPage, /getOwnedEsimPurchasePaymentAttempt/);
   assert.match(cancelPage, /maybeReleasePendingGatewayReservation/);

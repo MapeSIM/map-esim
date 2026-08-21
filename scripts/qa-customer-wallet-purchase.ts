@@ -5,6 +5,11 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  CUSTOMER_PURCHASE_PROCESSING_MESSAGE,
+  CUSTOMER_PURCHASE_REVIEW_NEEDED_MESSAGE,
+  resolveCustomerPurchaseStatusMessaging,
+} from "../app/lib/esim/customerPurchaseStatusMessaging";
 import { parseWalletPurchaseIdempotencyKey } from "../app/lib/esim/walletPurchaseValidation";
 import { usdPriceToCents } from "../app/lib/esim/assignmentValidation";
 import { walletTransactionTypeLabel } from "../app/lib/wallet/display";
@@ -231,7 +236,35 @@ function main() {
   assert.ok(!/getBrokerToken\(/.test(read("scripts/qa-customer-wallet-purchase.ts")));
   assert.match(walletPage, /Buy eSIM/);
   assert.match(reviewPage, /getWalletPurchaseReview/);
-  assert.match(reconPage, /under review/i);
+  assert.equal(
+    resolveCustomerPurchaseStatusMessaging("FUNDED"),
+    "processing"
+  );
+  assert.equal(
+    resolveCustomerPurchaseStatusMessaging("PROVIDER_PENDING"),
+    "processing"
+  );
+  assert.equal(
+    resolveCustomerPurchaseStatusMessaging("FUNDS_RESERVED"),
+    "processing"
+  );
+  assert.equal(
+    resolveCustomerPurchaseStatusMessaging("RECONCILIATION_REQUIRED"),
+    "review_needed"
+  );
+  assert.equal(resolveCustomerPurchaseStatusMessaging("COMPLETED"), null);
+  assert.equal(
+    CUSTOMER_PURCHASE_PROCESSING_MESSAGE,
+    "Your payment is confirmed. Your eSIM is being prepared. We'll notify you once it's ready."
+  );
+  assert.equal(
+    CUSTOMER_PURCHASE_REVIEW_NEEDED_MESSAGE,
+    "Your payment is under review. Please do not make another purchase. We'll update you once the review is complete."
+  );
+  assert.match(reconPage, /resolveCustomerPurchaseStatusMessaging/);
+  assert.match(reconPage, /customerPurchaseStatusMessage/);
+  assert.doesNotMatch(reconPage, /provider result is uncertain/i);
+  assert.match(readSrc, /WalletEsimPurchaseStatus\.FUNDED/);
   assert.match(failedPage, /restored/i);
   assert.ok(!/^["']use server["']/m.test(formState));
   assert.match(actions, /^"use server"/m);

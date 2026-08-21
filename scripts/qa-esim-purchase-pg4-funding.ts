@@ -218,7 +218,10 @@ function main() {
   console.log("PASS split_unblocked_full_wallet_unchanged_ui");
 
   assert.match(returnView, /Payment processing/);
+  assert.match(returnView, /Payment not completed/);
+  assert.match(returnView, /Payment verified/);
   assert.match(returnPage, /parsePaymentAttemptId/);
+  assert.match(returnPage, /resolveEsimPaymentReturnKind/);
   assert.doesNotMatch(returnPage, /applyVerifiedEsimPurchasePaymentEvent/);
   assert.doesNotMatch(returnView, /applyVerifiedEsimPurchasePaymentEvent/);
   assert.match(cancelPage, /maybeReleasePendingGatewayReservation/);

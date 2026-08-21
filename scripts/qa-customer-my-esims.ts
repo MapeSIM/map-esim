@@ -56,6 +56,27 @@ function main() {
     "Review needed"
   );
   assert.equal(
+    resolveCustomerEsimStatusBadge({
+      orderStatus: "PENDING",
+      walletPurchaseStatus: "FUNDED",
+    }),
+    "Processing"
+  );
+  assert.equal(
+    resolveCustomerEsimStatusBadge({
+      orderStatus: "PENDING",
+      walletPurchaseStatus: "PROVIDER_PENDING",
+    }),
+    "Processing"
+  );
+  assert.equal(
+    resolveCustomerEsimStatusBadge({
+      orderStatus: "PENDING",
+      walletPurchaseStatus: "RECONCILIATION_REQUIRED",
+    }),
+    "Review needed"
+  );
+  assert.equal(
     customerStatusMatchesFilter("Refunded", "REFUNDED"),
     true
   );

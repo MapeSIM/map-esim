@@ -112,6 +112,7 @@ export function resolveCustomerEsimStatusBadge(input: {
   if (order === "COMPLETED") return "Completed";
   if (
     order === "PENDING" ||
+    purchase === "FUNDED" ||
     purchase === "PROVIDER_PENDING" ||
     purchase === "FUNDS_RESERVED" ||
     purchase === "READY" ||

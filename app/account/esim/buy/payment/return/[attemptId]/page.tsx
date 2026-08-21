@@ -1,14 +1,20 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { EsimPurchasePaymentReturnView } from "@/app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView";
 import { requireRole } from "@/app/lib/auth/session";
 import { getOwnedEsimPurchasePaymentAttempt } from "@/app/lib/esim/esimPurchaseGatewayCheckout";
+import {
+  esimPurchasePaymentSuccessHref,
+  resolveEsimPaymentReturnKind,
+} from "@/app/lib/esim/esimPurchasePaymentReturnState";
 import { parsePaymentAttemptId } from "@/app/lib/payments/safepayCheckoutPaths";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Preferred return route: path-based attempt id so Safepay can append
- * `?tracker=` without mangling query params. Non-authoritative only.
+ * `?tracker=` without mangling query params.
+ * Display follows durable DB statuses only. Query tracker/status are ignored.
+ * Does not mark paid, debit wallet, or create VeSIM orders.
  */
 export default async function EsimPurchasePaymentReturnAttemptPage({
   params,
@@ -31,5 +37,19 @@ export default async function EsimPurchasePaymentReturnAttemptPage({
   const attempt = await getOwnedEsimPurchasePaymentAttempt(user.id, attemptId);
   if (!attempt) notFound();
 
-  return <EsimPurchasePaymentReturnView purchaseId={attempt.purchaseId} />;
+  const kind = resolveEsimPaymentReturnKind({
+    purchaseStatus: attempt.purchaseStatus,
+    attemptStatus: attempt.status,
+  });
+  if (kind === "completed") {
+    redirect(esimPurchasePaymentSuccessHref(attempt.purchaseId));
+  }
+
+  return (
+    <EsimPurchasePaymentReturnView
+      kind={kind}
+      purchaseId={attempt.purchaseId}
+      refreshHref={`/account/esim/buy/payment/return/${encodeURIComponent(attempt.attemptId)}`}
+    />
+  );
 }

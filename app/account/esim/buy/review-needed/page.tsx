@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/app/lib/auth/session";
+import {
+  customerPurchaseStatusMessage,
+  resolveCustomerPurchaseStatusMessaging,
+} from "@/app/lib/esim/customerPurchaseStatusMessaging";
 import { getReconciliationWalletPurchase } from "@/app/lib/esim/walletPurchaseRead";
 
 export const dynamic = "force-dynamic";
@@ -25,28 +29,31 @@ export default async function AccountWalletBuyReviewNeededPage({
   const purchase = await getReconciliationWalletPurchase(user.id, purchaseId);
   if (!purchase) notFound();
 
+  const kind = resolveCustomerPurchaseStatusMessaging(purchase.status);
+  if (!kind) notFound();
+
+  const copy = customerPurchaseStatusMessage(kind);
+  const showReservedAmount = kind === "review_needed";
+
   return (
     <div className="mx-auto max-w-xl space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          Your purchase is under review
-        </h1>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
-          The provider result is uncertain. Do not purchase again. Contact
-          support so we can finish reviewing this request.
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight">{copy.title}</h1>
+        <p className="mt-2 text-sm text-[var(--text-muted)]">{copy.body}</p>
       </div>
 
-      <dl className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 sm:px-5">
-        <div className="grid gap-1 py-3 sm:grid-cols-[180px_1fr]">
-          <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Wallet amount reserved
-          </dt>
-          <dd className="text-sm font-semibold text-[var(--heading)]">
-            {purchase.amountReservedLabel}
-          </dd>
-        </div>
-      </dl>
+      {showReservedAmount ? (
+        <dl className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 sm:px-5">
+          <div className="grid gap-1 py-3 sm:grid-cols-[180px_1fr]">
+            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              Wallet amount reserved
+            </dt>
+            <dd className="text-sm font-semibold text-[var(--heading)]">
+              {purchase.amountReservedLabel}
+            </dd>
+          </div>
+        </dl>
+      ) : null}
 
       <Link
         href="/account/wallet"
