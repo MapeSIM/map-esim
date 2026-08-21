@@ -8,6 +8,8 @@ import { join } from "node:path";
 import {
   CUSTOMER_PURCHASE_PROCESSING_MESSAGE,
   CUSTOMER_PURCHASE_REVIEW_NEEDED_MESSAGE,
+  customerPendingPurchaseHref,
+  resolveCustomerPendingPurchaseVisibility,
   resolveCustomerPurchaseStatusMessaging,
 } from "../app/lib/esim/customerPurchaseStatusMessaging";
 import { parseWalletPurchaseIdempotencyKey } from "../app/lib/esim/walletPurchaseValidation";
@@ -253,6 +255,37 @@ function main() {
     "review_needed"
   );
   assert.equal(resolveCustomerPurchaseStatusMessaging("COMPLETED"), null);
+  assert.equal(
+    resolveCustomerPendingPurchaseVisibility("READY")?.action,
+    "continue_checkout"
+  );
+  assert.equal(
+    resolveCustomerPendingPurchaseVisibility("AWAITING_GATEWAY_PAYMENT")
+      ?.ctaLabel,
+    "Continue checkout"
+  );
+  assert.equal(
+    resolveCustomerPendingPurchaseVisibility("FUNDED")?.action,
+    "view_status"
+  );
+  assert.equal(
+    resolveCustomerPendingPurchaseVisibility("FUNDED")?.body,
+    CUSTOMER_PURCHASE_PROCESSING_MESSAGE
+  );
+  assert.equal(
+    resolveCustomerPendingPurchaseVisibility("RECONCILIATION_REQUIRED")
+      ?.body,
+    CUSTOMER_PURCHASE_REVIEW_NEEDED_MESSAGE
+  );
+  assert.equal(
+    customerPendingPurchaseHref("READY", "abc"),
+    "/account/esim/buy/review?purchase=abc"
+  );
+  assert.equal(
+    customerPendingPurchaseHref("PROVIDER_PENDING", "abc"),
+    "/account/esim/buy/review-needed?purchase=abc"
+  );
+  assert.equal(customerPendingPurchaseHref("COMPLETED", "abc"), null);
   assert.equal(
     CUSTOMER_PURCHASE_PROCESSING_MESSAGE,
     "Your payment is confirmed. Your eSIM is being prepared. We'll notify you once it's ready."

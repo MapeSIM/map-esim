@@ -8,6 +8,10 @@ import {
 import { prisma } from "@/app/lib/db";
 import { calculateCustomerCheckoutFunding } from "@/app/lib/esim/purchaseFunding";
 import { payablePackageCents } from "@/app/lib/promo/promoDiscount";
+import {
+  customerPendingPurchaseHref,
+  resolveCustomerPendingPurchaseVisibility,
+} from "@/app/lib/esim/customerPurchaseStatusMessaging";
 import { formatWalletPurchasePriceLabel } from "@/app/lib/esim/walletPurchase";
 import {
   canEditPurchaseDeliveryEmail,
@@ -449,4 +453,87 @@ export async function getReconciliationWalletPurchase(
     status: row.status,
     amountReservedLabel: formatWalletPurchasePriceLabel(row.priceCents),
   };
+}
+
+export const CUSTOMER_PENDING_PURCHASES_LIMIT = 20;
+
+const PENDING_PURCHASE_STATUSES: WalletEsimPurchaseStatus[] = [
+  WalletEsimPurchaseStatus.READY,
+  WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+  WalletEsimPurchaseStatus.FUNDS_RESERVED,
+  WalletEsimPurchaseStatus.FUNDED,
+  WalletEsimPurchaseStatus.PROVIDER_PENDING,
+  WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED,
+];
+
+export type CustomerPendingWalletPurchase = {
+  purchaseId: string;
+  destination: string;
+  planName: string;
+  priceLabel: string;
+  status: WalletEsimPurchaseStatus;
+  statusLabel: string;
+  ctaLabel: string;
+  href: string;
+  summary: string;
+};
+
+/** Read-only inbox of unfinished self-service purchases. Never prepares, funds, or fulfills. */
+export async function listCustomerPendingWalletPurchases(
+  customerUserId: string
+): Promise<CustomerPendingWalletPurchase[]> {
+  const ownerId = (customerUserId ?? "").trim();
+  if (!ownerId || ownerId.length > 64) return [];
+
+  const owner = await prisma.user.findUnique({
+    where: { id: ownerId },
+    select: { id: true, role: true, deletedAt: true },
+  });
+  if (!owner || owner.deletedAt || owner.role !== Role.CUSTOMER) return [];
+
+  const rows = await prisma.walletEsimPurchase.findMany({
+    where: {
+      customerUserId: owner.id,
+      adminUserId: null,
+      fundingSource: {
+        in: [
+          OrderFundingSource.CUSTOMER_WALLET,
+          OrderFundingSource.CUSTOMER_SPLIT,
+          OrderFundingSource.DIRECT_PAYMENT,
+        ],
+      },
+      status: { in: PENDING_PURCHASE_STATUSES },
+    },
+    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+    take: CUSTOMER_PENDING_PURCHASES_LIMIT,
+    select: {
+      id: true,
+      destinationName: true,
+      destinationCode: true,
+      planName: true,
+      priceCents: true,
+      status: true,
+    },
+  });
+
+  const items: CustomerPendingWalletPurchase[] = [];
+  for (const row of rows) {
+    const vis = resolveCustomerPendingPurchaseVisibility(row.status);
+    const href = customerPendingPurchaseHref(row.status, row.id);
+    if (!vis || !href) continue;
+    items.push({
+      purchaseId: row.id,
+      destination: displayOrUnavailable(
+        row.destinationName || row.destinationCode
+      ),
+      planName: displayOrUnavailable(row.planName),
+      priceLabel: formatWalletPurchasePriceLabel(row.priceCents),
+      status: row.status,
+      statusLabel: vis.statusLabel,
+      ctaLabel: vis.ctaLabel,
+      href,
+      summary: vis.body,
+    });
+  }
+  return items;
 }

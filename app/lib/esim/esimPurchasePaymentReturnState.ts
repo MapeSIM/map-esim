@@ -46,3 +46,7 @@ export function esimPurchasePaymentSuccessHref(purchaseId: string): string {
 export function esimPurchasePaymentReviewHref(purchaseId: string): string {
   return `/account/esim/buy/review?purchase=${encodeURIComponent(purchaseId)}`;
 }
+
+export function esimPurchaseReviewNeededHref(purchaseId: string): string {
+  return `/account/esim/buy/review-needed?purchase=${encodeURIComponent(purchaseId)}`;
+}

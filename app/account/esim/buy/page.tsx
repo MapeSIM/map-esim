@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import WalletPurchaseSelectForm from "@/app/components/account/WalletPurchaseSelectForm";
+import CustomerPendingPurchases from "@/app/components/account/CustomerPendingPurchases";
 import { buildWalletBuyReturnPath } from "@/app/lib/auth/redirects";
 import { requireRole } from "@/app/lib/auth/session";
 import {
@@ -9,6 +10,7 @@ import {
   resolveCustomerAccountStatus,
 } from "@/app/lib/auth/customerAccountStatus";
 import { listAdminAssignmentDestinations } from "@/app/lib/esim/adminPackageAssignmentRead";
+import { listCustomerPendingWalletPurchases } from "@/app/lib/esim/walletPurchaseRead";
 import {
   prepareWalletEsimPurchase,
   WalletEsimPurchaseError,
@@ -50,6 +52,9 @@ export default async function AccountWalletBuyPage({
   let destinations: Awaited<
     ReturnType<typeof listAdminAssignmentDestinations>
   > = [];
+  let pendingPurchases: Awaited<
+    ReturnType<typeof listCustomerPendingWalletPurchases>
+  > = [];
   let hasWallet = false;
   let loadError = false;
   let directOfferError: string | null = null;
@@ -73,6 +78,11 @@ export default async function AccountWalletBuyPage({
     destinations = await listAdminAssignmentDestinations();
   } catch {
     loadError = true;
+  }
+  try {
+    pendingPurchases = await listCustomerPendingWalletPurchases(user.id);
+  } catch {
+    pendingPurchases = [];
   }
 
   // Country-page Buy Now → /account/esim/buy?offerId=&country=
@@ -178,6 +188,8 @@ export default async function AccountWalletBuyPage({
           {directOfferError}
         </div>
       ) : null}
+
+      <CustomerPendingPurchases purchases={pendingPurchases} />
 
       <WalletPurchaseSelectForm destinations={destinations} />
     </div>

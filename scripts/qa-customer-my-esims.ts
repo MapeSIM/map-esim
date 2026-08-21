@@ -107,6 +107,9 @@ function main() {
   assert.match(listPage, /You have not purchased an eSIM yet/);
   assert.match(listPage, /Browse destinations/);
   assert.match(listPage, /listCustomerOrders/);
+  assert.match(listPage, /listCustomerPendingWalletPurchases/);
+  assert.match(listPage, /CustomerPendingPurchases/);
+  assert.match(listPage, /Unfinished purchases|pendingPurchases/);
   assert.match(listPage, /requireSession/);
   assert.match(listPage, /iccidMasked/);
   assert.match(listPage, /View details/);
