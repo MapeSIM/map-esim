@@ -16,6 +16,15 @@ import {
 /** Distinct from admin-status lock class 774201. */
 export const PUBLIC_OFFER_SNAPSHOT_LOCK_CLASS = 774202;
 
+/**
+ * One destination write: advisory lock + JSON persist over remote Prisma Postgres.
+ * Prisma's interactive-transaction default (5s) is too short for seed/refresh inserts.
+ */
+const PUBLIC_OFFER_SNAPSHOT_WRITE_TX = {
+  maxWait: 10_000,
+  timeout: 30_000,
+} as const;
+
 export type SnapshotPrisma = PrismaClient;
 
 function asOfferArray(value: Prisma.JsonValue | null): VesimOffer[] | null {
@@ -305,7 +314,7 @@ export async function insertPublicOfferSnapshotIfAbsent(
         normalized,
         now
       );
-    });
+    }, PUBLIC_OFFER_SNAPSHOT_WRITE_TX);
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -471,5 +480,5 @@ export async function applyPublicOfferSnapshotCandidate(
       payloadReplaced: false,
       offers: parseStoredPublicOffers(current),
     };
-  });
+  }, PUBLIC_OFFER_SNAPSHOT_WRITE_TX);
 }

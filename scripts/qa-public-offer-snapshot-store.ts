@@ -211,6 +211,10 @@ function sourceContracts() {
   assert.match(server, /revalidate:\s*PUBLIC_OFFER_FLAG_OFF_REVALIDATE_SECONDS/);
   assert.equal(PUBLIC_OFFER_FLAG_OFF_REVALIDATE_SECONDS, 300);
   assert.match(read("app/lib/vesim/publicOfferSnapshotStore.ts"), /P2021/);
+  assert.match(
+    read("app/lib/vesim/publicOfferSnapshotStore.ts"),
+    /timeout:\s*30_000/
+  );
   assert.match(api, /fetchPublicOffersForCountry/);
   assert.match(api, /PublicOfferSnapshotError/);
   assert.match(api, /status:\s*503/);
