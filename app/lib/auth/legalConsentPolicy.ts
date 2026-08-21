@@ -87,9 +87,11 @@ export function isAllowedDuringLegalConsent(pathname: string): boolean {
     pathname === "/privacy-policy" ||
     pathname === "/terms-and-conditions" ||
     pathname === "/cookie-policy" ||
+    pathname === "/refund-policy" ||
     pathname.startsWith("/privacy-policy/") ||
     pathname.startsWith("/terms-and-conditions/") ||
-    pathname.startsWith("/cookie-policy/")
+    pathname.startsWith("/cookie-policy/") ||
+    pathname.startsWith("/refund-policy/")
   ) {
     return true;
   }

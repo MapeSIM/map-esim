@@ -152,6 +152,7 @@ function main() {
   assert.equal(isAllowedDuringLegalConsent("/api/auth/callback/google"), true);
   assert.equal(isAllowedDuringLegalConsent("/terms-and-conditions"), true);
   assert.equal(isAllowedDuringLegalConsent("/privacy-policy"), true);
+  assert.equal(isAllowedDuringLegalConsent("/refund-policy"), true);
   assert.equal(isAllowedDuringLegalConsent("/account"), false);
   assert.equal(isAllowedDuringLegalConsent("/account/orders"), false);
   assert.equal(isAllowedDuringLegalConsent("/account/profile"), false);

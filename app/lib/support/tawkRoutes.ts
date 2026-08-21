@@ -32,6 +32,7 @@ const ALLOWED_EXACT = new Set([
   "/privacy-policy",
   "/terms-and-conditions",
   "/cookie-policy",
+  "/refund-policy",
   "/how-it-works",
   "/about",
   "/contact",

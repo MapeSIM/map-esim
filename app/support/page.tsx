@@ -102,9 +102,16 @@ const topics = [
     body: "Successful purchases show order details in your account. Checkout verifies the real offer before an order is created. For status questions, contact support with your order reference and destination only.",
   },
   {
+    title: "Refunds and reviews",
+    icon: HelpCircle,
+    body: "MAP eSIM does not promise automatic refunds. Signed-in customers can request a refund review from Account → Orders. A request starts a review; it does not itself move funds. Wallet reversals after a failed purchase are not the same as a card or payment-provider refund.",
+    href: "/refund-policy",
+    linkLabel: "Read the Refund Policy",
+  },
+  {
     title: "Wallet balance and reversals",
     icon: Wallet,
-    body: "Wallet activity appears in your account wallet history. If a purchase fails after funds were reserved, confirmed failures are reversed according to the wallet purchase flow. Do not share full payment card details by email.",
+    body: "Wallet activity appears in your account wallet history. If a purchase fails after wallet funds were reserved, a confirmed failure may reverse that wallet reservation. That reversal is not a card or payment-provider refund. Do not share full payment card details by email.",
   },
   {
     title: "Connectivity troubleshooting",

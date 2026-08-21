@@ -68,7 +68,7 @@ const sections: LegalSection[] = [
     title: "eSIM order processing",
     paragraphs: [
       `${BRAND_NAME} offers digital eSIM connectivity products. To fulfil an order we process destination, plan and order details. Necessary information is shared with our third-party eSIM provider so the eSIM can be provisioned.`,
-      "Installation information such as QR codes, LPA / activation data or related credentials is treated as sensitive operational data. Access is restricted to protected order channels (for example secure order links or authenticated account views where available). We do not use these details for marketing.",
+      "Installation information such as QR codes, LPA / activation data or related credentials is treated as sensitive operational data. Access is restricted to protected order channels (for example secure order links or authenticated account views where available). Installation details are sent to the email associated with the order — your account email, or a different address you confirmed at purchase if that option was used. We do not use these details for marketing.",
     ],
   },
   {
@@ -111,7 +111,7 @@ const sections: LegalSection[] = [
     id: "sharing",
     title: "Sharing with service providers",
     paragraphs: [
-      "We share personal information only as needed with service providers that help us operate the service, such as our third-party eSIM provider, email delivery infrastructure, hosting and security providers, an optional live-chat provider (Tawk.to) when you use chat after granting marketing cookie consent, and a payment provider once selected. We do not sell your personal information.",
+      "We share personal information only as needed with service providers that help us operate the service, such as our third-party eSIM provider, email delivery infrastructure, hosting and security providers, an optional live-chat provider (Tawk.to) when you use chat after granting marketing cookie consent, and an external payment provider. We do not sell your personal information.",
       "When you use Google Sign-In, Google acts as an identity provider. Google authenticates you and returns limited account identity details so we can create or sign you into your MAP eSIM account. The purpose is account authentication, account security and helping prevent unauthorized access — not marketing.",
       "If you use optional live chat, the chat provider may process the messages and technical data needed to operate the widget. We do not automatically send your account email, order references, QR codes, ICCIDs, activation codes or payment details to the chat provider through the website integration.",
     ],

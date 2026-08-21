@@ -250,6 +250,7 @@ const PUBLIC_ROUTES = [
   "/privacy-policy",
   "/terms-and-conditions",
   "/cookie-policy",
+  "/refund-policy",
 ] as const;
 
 /** Provider-data dependent destination detail routes. */

@@ -66,7 +66,7 @@ const sections: LegalSection[] = [
     title: "Preference cookies",
     paragraphs: [
       "Preference cookies remember choices such as theme or display preferences where implemented. Some preferences may be stored locally in your browser rather than as a server cookie.",
-      "Where preference cookies are non-essential, they should only be used in line with your choices once a consent tool is available.",
+      "Where preference cookies are non-essential, they are used only in line with your Cookie Preferences.",
     ],
   },
   {
@@ -90,7 +90,7 @@ const sections: LegalSection[] = [
     title: "Your choices",
     paragraphs: [
       "Essential cookies are required for account, login and security functionality.",
-      "Analytics and marketing cookies, if introduced, must require consent. Customers will be able to accept, reject or manage non-essential cookies through a consent tool before those cookies are set (except where a different legal basis clearly applies).",
+      "Analytics and marketing cookies, if used, require consent. You can accept, reject or manage non-essential cookies through Cookie Preferences, linked from the website footer, before those cookies are set (except where a different legal basis clearly applies).",
       "You can also use browser controls to block or delete cookies. Blocking essential cookies may affect login, checkout or account features.",
     ],
   },
@@ -116,7 +116,7 @@ export default function CookiePolicyPage() {
   return (
     <LegalDocument
       title="Cookie Policy"
-      summary={`This Cookie Policy explains how ${BRAND_NAME} uses essential cookies today and how non-essential cookies would be handled if introduced later.`}
+      summary={`This Cookie Policy explains how ${BRAND_NAME} uses essential cookies and how you can manage non-essential cookies through Cookie Preferences.`}
       sections={sections}
     />
   );

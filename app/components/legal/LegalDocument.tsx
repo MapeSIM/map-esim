@@ -69,6 +69,13 @@ export default function LegalDocument({
             >
               Cookies
             </Link>
+            {" · "}
+            <Link
+              href="/refund-policy"
+              className="text-[var(--accent-strong)] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+            >
+              Refunds
+            </Link>
           </p>
         </aside>
 

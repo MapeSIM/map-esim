@@ -53,7 +53,7 @@ const sections: LegalSection[] = [
     id: "delivery-installation",
     title: "Delivery, installation and activation",
     paragraphs: [
-      "After a successful order, installation details are delivered by email and/or through protected order access associated with your purchase. Follow the installation instructions provided for your device.",
+      "After a successful order, installation details are delivered by email to the address associated with that order — your account email, or a different address you confirmed at purchase if that option was used — and/or through protected order access associated with your purchase. Follow the installation instructions provided for your device.",
       "Activation, network registration and ongoing connectivity depend on device settings, local network conditions and third-party carrier systems. Keep installation credentials confidential and store QR or activation details securely.",
     ],
   },
@@ -94,7 +94,8 @@ const sections: LegalSection[] = [
     title: "Cancellation and refunds",
     paragraphs: [
       "eSIM products are digital goods. Once an order has been fulfilled or installation credentials have been issued, cancellation and refund options may be limited.",
-      `${BRAND_NAME} does not promise automatic refunds. Activated or installed eSIMs are not described as always refundable. Where a refund review may be considered — for example a confirmed non-delivery, duplicate charge or clear fulfilment failure — contact support with your order reference. Outcomes depend on the facts of the case, provider constraints and applicable law.`,
+      `${BRAND_NAME} does not promise automatic refunds. Activated or installed eSIMs are not described as always refundable. Where a refund review may be considered — for example a confirmed non-delivery, duplicate charge or clear fulfilment failure — signed-in customers may submit a request from Account → Orders, or contact support with your order reference. Submitting a request starts a review; it does not itself move funds or complete a refund.`,
+      "A wallet reversal after a failed purchase is not the same as a card or payment-provider refund. See our Refund Policy for how reviews are requested and handled. Outcomes depend on the facts of the case, provider constraints and applicable law.",
     ],
   },
   {
