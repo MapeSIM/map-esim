@@ -2,12 +2,17 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import CustomerEsimInstallPanel from "@/app/components/orders/CustomerEsimInstallPanel";
+import { CustomerEsimInstallHelpLinks } from "@/app/components/orders/CustomerEsimInstallHelpLinks";
 import CustomerEsimUsagePanel from "@/app/components/orders/CustomerEsimUsagePanel";
 import CustomerRefundRequestForm from "@/app/components/orders/CustomerRefundRequestForm";
 import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
 import { requireSession } from "@/app/lib/auth/session";
 import { getCustomerOwnedOrderDetail } from "@/app/lib/orders/customerOrders";
-import type { CustomerEsimStatusBadge } from "@/app/lib/orders/customerOrderDisplay";
+import {
+  customerEsimStatusHelp,
+  customerEsimStatusLabel,
+  type CustomerEsimStatusBadge,
+} from "@/app/lib/orders/customerOrderDisplay";
 import { listCustomerRefundRequestsForOrder } from "@/app/lib/refunds/refundRequest";
 import {
   isOpenRefundStatus,
@@ -141,9 +146,12 @@ export default async function AccountOrderDetailPage({
           <span
             className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass(detail.statusBadge)}`}
           >
-            {detail.statusBadge}
+            {customerEsimStatusLabel(detail.statusBadge)}
           </span>
         </div>
+        <p className="mt-3 max-w-2xl text-sm text-[var(--text-muted)]">
+          {customerEsimStatusHelp(detail.statusBadge)}
+        </p>
       </div>
 
       {detail.isRefunded ? (
@@ -251,6 +259,7 @@ export default async function AccountOrderDetailPage({
         installEligible={detail.installEligible}
         isRefunded={detail.isRefunded}
       />
+      <CustomerEsimInstallHelpLinks />
 
       {refundJustRequested ? (
         <div

@@ -138,6 +138,45 @@ export function customerStatusMatchesFilter(
   return true;
 }
 
+/** Short customer-facing status shown on My eSIMs cards. */
+export function customerEsimStatusLabel(
+  badge: CustomerEsimStatusBadge
+): string {
+  switch (badge) {
+    case "Completed":
+      return "Ready to install";
+    case "Processing":
+      return "Setting up";
+    case "Review needed":
+      return "Needs a quick check";
+    case "Refunded":
+      return "Refunded";
+    case "Failed":
+      return "Could not complete";
+    default:
+      return badge;
+  }
+}
+
+export function customerEsimStatusHelp(
+  badge: CustomerEsimStatusBadge
+): string {
+  switch (badge) {
+    case "Completed":
+      return "Your eSIM is ready. Install it when you want to go online.";
+    case "Processing":
+      return "We're preparing this eSIM. Installation options appear when it's ready.";
+    case "Review needed":
+      return "This order needs a short review. Support can help if it takes longer than expected.";
+    case "Refunded":
+      return "This eSIM was refunded. Installation is no longer available.";
+    case "Failed":
+      return "This purchase could not be completed. Open details or contact support.";
+    default:
+      return "";
+  }
+}
+
 /** ISO-2 country/region code for flagcdn — empty when unknown. */
 export function normalizeFlagCountryCode(
   code: string | null | undefined

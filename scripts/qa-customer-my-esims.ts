@@ -7,6 +7,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   customerStatusMatchesFilter,
+  customerEsimStatusHelp,
+  customerEsimStatusLabel,
   normalizeCustomerOrderSearch,
   parseCustomerEsimStatusFilter,
   parseCustomerOrderDateFilter,
@@ -84,9 +86,19 @@ function main() {
     customerStatusMatchesFilter("Completed", "FAILED"),
     false
   );
+  assert.equal(customerEsimStatusLabel("Completed"), "Ready to install");
+  assert.equal(customerEsimStatusLabel("Processing"), "Setting up");
+  assert.match(
+    customerEsimStatusHelp("Completed"),
+    /Install it when you want to go online/
+  );
   console.log("PASS display_helpers");
 
   const listPage = read("app/account/orders/page.tsx");
+  const orderCard = read("app/components/orders/CustomerEsimOrderCard.tsx");
+  const helpLinks = read(
+    "app/components/orders/CustomerEsimInstallHelpLinks.tsx"
+  );
   const detailPage = read("app/account/orders/[orderId]/page.tsx");
   const ordersLib = read("app/lib/orders/customerOrders.ts");
   const installLib = read("app/lib/orders/customerOrderInstall.ts");
@@ -111,19 +123,27 @@ function main() {
   assert.doesNotMatch(listPage, /CustomerPendingPurchases/);
   assert.doesNotMatch(listPage, /Unfinished purchases|pendingPurchases/);
   assert.match(listPage, /requireSession/);
-  assert.match(listPage, /iccidMasked/);
-  assert.match(listPage, /View details/);
-  assert.match(listPage, /View QR Code & Details/);
+  assert.match(listPage, /CustomerEsimOrderCard/);
+  assert.match(orderCard, /iccidMasked/);
+  assert.match(orderCard, /View details/);
+  assert.match(orderCard, /View QR Code & Details/);
   assert.match(
-    listPage,
-    /\/account\/orders\/\$\{encodeURIComponent\(order\.id\)\}#install/
+    orderCard,
+    /\/account\/orders\/\$\{encodeURIComponent\(order\.id\)\}|href=\{\`\$\{href\}#install\`\}|#install/
   );
+  assert.match(orderCard, /#install/);
   assert.doesNotMatch(
-    listPage,
+    orderCard,
     /#install\?|carddata=|activationCode=|lpa=|qrValue=/i
   );
   assert.match(listPage, /name="status"/);
   assert.match(listPage, /name="q"/);
+  assert.match(helpLinks, /href="\/install\/iphone"/);
+  assert.match(helpLinks, /href="\/install\/android"/);
+  assert.match(orderCard, /CustomerEsimInstallHelpLinks/);
+  assert.match(orderCard, /customerEsimStatusLabel/);
+  assert.match(detailPage, /customerEsimStatusLabel/);
+  assert.match(detailPage, /CustomerEsimInstallHelpLinks/);
   assert.doesNotMatch(listPage, /Show full ICCID|decryptIccid|IccidRevealPanel/);
   assert.doesNotMatch(
     listPage,
@@ -170,6 +190,7 @@ function main() {
   assert.match(installLib, /RECONCILIATION_REQUIRED/);
   assert.match(installPanel, /View QR Code & Details/);
   assert.match(installPanel, /Install the eSIM only when you are ready to use it/);
+  assert.match(installPanel, /CustomerEsimInstallHelpLinks/);
   assert.match(installPanel, /Order refunded/);
   assert.match(installPanel, /EsimInstallExperience/);
   assert.doesNotMatch(installPanel, /Add data to this eSIM/i);
@@ -191,7 +212,7 @@ function main() {
   const usageLib = read("app/lib/orders/customerEsimUsage.ts");
   const usageApi = read("app/api/account/orders/[orderId]/usage/route.ts");
   const usagePanel = read("app/components/orders/CustomerEsimUsagePanel.tsx");
-  assert.match(listPage, /View usage/);
+  assert.match(orderCard, /View usage/);
   assert.match(detailPage, /CustomerEsimUsagePanel/);
   assert.match(usageLib, /import "server-only"/);
   assert.match(usageLib, /authorizeCustomerOwnedOrderInstall/);

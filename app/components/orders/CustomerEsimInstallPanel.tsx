@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QrCode, Smartphone } from "lucide-react";
 import EsimInstallExperience from "@/app/components/install/EsimInstallExperience";
+import { CustomerEsimInstallHelpLinks } from "@/app/components/orders/CustomerEsimInstallHelpLinks";
 import { useAppleOneTapInstallState } from "@/app/components/install/AppleOneTapInstallButton";
 
 /** Hash-only install intent from My eSIMs — never carries secrets. */
@@ -156,6 +157,7 @@ export default function CustomerEsimInstallPanel({
               Install the eSIM only when you are ready to use it. Sensitive
               details load only after you open QR code and details below.
             </p>
+            <CustomerEsimInstallHelpLinks className="mt-3 text-sm text-[var(--text-muted)]" />
           </div>
         </div>
 
