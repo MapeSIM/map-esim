@@ -149,6 +149,11 @@ const EXISTING_QA: QaJob[] = [
   },
   {
     kind: "npm",
+    script: "qa:safepay-webhook-observability",
+    label: "safepay webhook observability",
+  },
+  {
+    kind: "npm",
     script: "qa:admin-wallet-credit",
     label: "admin wallet credit (read-only)",
   },

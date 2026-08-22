@@ -204,6 +204,7 @@ function buildConfigAlerts(input: {
   iccidKeyConfigured: boolean;
   authUrlSecure: "yes" | "no" | "unknown";
   googleOAuthConfigured: boolean;
+  webhookSecretConfigured: boolean;
   deploymentVersion: string | null;
   controls: Awaited<ReturnType<typeof getOperationalControlsHealthSnapshot>>;
   emailFailureCount: number;
@@ -372,7 +373,9 @@ function buildConfigAlerts(input: {
     }
   }
 
-  const pay = paymentGatewayCardDefaults();
+  const pay = paymentGatewayCardDefaults({
+    webhookSecretConfigured: input.webhookSecretConfigured,
+  });
   pushUnique(
     alerts,
     makeAlert({
@@ -388,21 +391,25 @@ function buildConfigAlerts(input: {
       recommendedAction: "No payment action from Alerts. Track readiness on Operations.",
     })
   );
-  pushUnique(
-    alerts,
-    makeAlert({
-      category: "PAYMENT",
-      code: "PAYMENT_WEBHOOK_NOT_IMPLEMENTED",
-      severity: "INFO",
-      title: "Payment webhook verification not implemented",
-      description: `Webhook verification status is ${pay.webhookVerification}.`,
-      sourceAt: now,
-      now,
-      freshness: "CONFIGURATION_DERIVED",
-      href: "/admin/operations",
-      recommendedAction: "No webhook or payment action from Alerts.",
-    })
-  );
+  if (!input.webhookSecretConfigured) {
+    pushUnique(
+      alerts,
+      makeAlert({
+        category: "PAYMENT",
+        code: "PAYMENT_WEBHOOK_SECRET_NOT_CONFIGURED",
+        severity: "INFO",
+        title: "Payment webhook secret not configured",
+        description:
+          "Safepay webhook signature verification is implemented. Webhook verification status is NOT_CONFIGURED because SAFEPAY_WEBHOOK_SECRET is unset. Hosted checkout remains gated.",
+        sourceAt: now,
+        now,
+        freshness: "CONFIGURATION_DERIVED",
+        href: "/admin/operations",
+        recommendedAction:
+          "Set SAFEPAY_WEBHOOK_SECRET before enabling hosted checkout. Do not enable the gateway from Alerts.",
+      })
+    );
+  }
   pushUnique(
     alerts,
     makeAlert({
@@ -1697,6 +1704,9 @@ export async function collectMonitoringAlerts(options?: {
     googleOAuthConfigured: Boolean(
       (process.env.AUTH_GOOGLE_ID ?? "").trim() &&
         (process.env.AUTH_GOOGLE_SECRET ?? "").trim()
+    ),
+    webhookSecretConfigured: Boolean(
+      (process.env.SAFEPAY_WEBHOOK_SECRET ?? "").trim()
     ),
     deploymentVersion: pickDeploymentVersion({
       MAP_ESIM_DEPLOYMENT_VERSION: process.env.MAP_ESIM_DEPLOYMENT_VERSION,

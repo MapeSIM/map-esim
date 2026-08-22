@@ -379,11 +379,25 @@ export function smtpReadinessStatus(configured: boolean | null): HealthStatus {
   return configured ? "HEALTHY" : "NOT_CONFIGURED";
 }
 
-export function paymentGatewayCardDefaults() {
+/**
+ * Webhook HMAC verification is implemented. Status reflects secret presence
+ * only — never enables checkout and never returns the secret value.
+ */
+export function paymentWebhookVerificationStatus(
+  webhookSecretConfigured: boolean
+): HealthStatus {
+  return webhookSecretConfigured ? "HEALTHY" : "NOT_CONFIGURED";
+}
+
+export function paymentGatewayCardDefaults(input?: {
+  webhookSecretConfigured?: boolean;
+}) {
   return {
     integrationStatus: "NOT_IMPLEMENTED" as HealthStatus,
     productionCredentials: "NOT_CONFIGURED" as HealthStatus,
-    webhookVerification: "NOT_IMPLEMENTED" as HealthStatus,
+    webhookVerification: paymentWebhookVerificationStatus(
+      Boolean(input?.webhookSecretConfigured)
+    ),
     paymentReconciliation: "NOT_IMPLEMENTED" as HealthStatus,
     guestCheckout: "NOT_IMPLEMENTED / DISABLED" as const,
   };

@@ -8,7 +8,7 @@
  * 4. Reconciliation counts appear and link to /admin/reconciliation
  * 5. Email card shows CONFIGURED/NOT_CONFIGURED only (no SMTP secrets)
  * 6. Provider card shows host class / mode (no tokens or full credential URLs)
- * 7. Payment card shows NOT_IMPLEMENTED
+ * 7. Payment integration still NOT_IMPLEMENTED; webhook verification is HEALTHY or NOT_CONFIGURED
  * 8. Security card shows yes/no only for secrets
  * 9. Warnings list with safe links
  * 10. Mobile layout stacks cards
@@ -26,6 +26,7 @@ import {
   classifyHstsExpectation,
   mapDatabaseProbeToStatus,
   paymentGatewayCardDefaults,
+  paymentWebhookVerificationStatus,
   pickDeploymentVersion,
   sanitizeDeploymentVersion,
   sanitizeHealthStatus,
@@ -129,15 +130,25 @@ function main() {
   assert.match(page, /ON_DEMAND|ProviderWalletPanel/);
   console.log("PASS provider_readiness_no_live_mutation");
 
-  // --- Payment NOT IMPLEMENTED ---
+  // --- Payment: checkout still gated; webhook verification is implemented ---
   const pay = paymentGatewayCardDefaults();
   assert.equal(pay.integrationStatus, "NOT_IMPLEMENTED");
-  assert.equal(pay.webhookVerification, "NOT_IMPLEMENTED");
+  assert.equal(pay.webhookVerification, "NOT_CONFIGURED");
   assert.equal(pay.paymentReconciliation, "NOT_IMPLEMENTED");
   assert.equal(pay.guestCheckout, "NOT_IMPLEMENTED / DISABLED");
+  assert.equal(paymentWebhookVerificationStatus(false), "NOT_CONFIGURED");
+  assert.equal(paymentWebhookVerificationStatus(true), "HEALTHY");
+  assert.equal(
+    paymentGatewayCardDefaults({ webhookSecretConfigured: true })
+      .webhookVerification,
+    "HEALTHY"
+  );
   assert.match(page, /NOT_IMPLEMENTED/);
   assert.match(service, /isGuestVesimCheckoutEnabled/);
-  console.log("PASS payment_not_implemented");
+  assert.match(service, /SAFEPAY_WEBHOOK_SECRET/);
+  assert.doesNotMatch(service, /return process\.env\.SAFEPAY_WEBHOOK_SECRET/);
+  assert.doesNotMatch(shared, /webhookVerification:\s*"NOT_IMPLEMENTED"/);
+  console.log("PASS payment_checkout_gated_webhook_verification_status");
 
   // --- Security booleans ---
   assert.match(service, /AUTH_SECRET/);

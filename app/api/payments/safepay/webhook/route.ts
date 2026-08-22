@@ -5,6 +5,12 @@ import {
   normalizeSafepayHeader,
   verifySafepayCardWebhookSignature,
 } from "@/app/lib/payments/safepayWebhookCrypto";
+import {
+  classifySafepayWebhookApplyFailure,
+  classifySafepayWebhookParseIgnore,
+  logSafepayWebhook,
+  peekSafepayWebhookLogFields,
+} from "@/app/lib/payments/safepayWebhookObservability";
 import { parseSafepayCardWebhookEvent } from "@/app/lib/payments/safepayWebhookParse";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +26,12 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   const webhookConfig = resolveSafepayWebhookConfig();
   if (!webhookConfig.ok) {
+    logSafepayWebhook({
+      code: "CONFIG_MISSING",
+      httpStatus: 503,
+      httpOutcome: "rejected",
+      errorCategory: webhookConfig.code,
+    });
     return NextResponse.json({ ok: false }, { status: 503 });
   }
 
@@ -27,9 +39,30 @@ export async function POST(request: Request) {
   try {
     rawBody = await request.text();
   } catch {
+    logSafepayWebhook({
+      code: "BODY_REJECTED",
+      httpStatus: 400,
+      httpOutcome: "rejected",
+      errorCategory: "READ_FAILED",
+    });
     return NextResponse.json({ ok: false }, { status: 400 });
   }
-  if (!rawBody || rawBody.length > 256_000) {
+  if (!rawBody) {
+    logSafepayWebhook({
+      code: "BODY_REJECTED",
+      httpStatus: 400,
+      httpOutcome: "rejected",
+      errorCategory: "EMPTY_BODY",
+    });
+    return NextResponse.json({ ok: false }, { status: 400 });
+  }
+  if (rawBody.length > 256_000) {
+    logSafepayWebhook({
+      code: "BODY_REJECTED",
+      httpStatus: 400,
+      httpOutcome: "rejected",
+      errorCategory: "OVERSIZED_BODY",
+    });
     return NextResponse.json({ ok: false }, { status: 400 });
   }
 
@@ -38,11 +71,21 @@ export async function POST(request: Request) {
     headers[key] = value;
   });
 
+  const peek = peekSafepayWebhookLogFields(rawBody, headers);
+
   const signature = normalizeSafepayHeader(
     headers["x-sfpy-signature"] ?? headers["X-SFPY-SIGNATURE"]
   );
   if (!signature) {
-    console.error("safepay_webhook", "SIGNATURE_REJECTED", "MISSING");
+    logSafepayWebhook({
+      code: "SIGNATURE_REJECTED",
+      httpStatus: 401,
+      httpOutcome: "rejected",
+      errorCategory: "MISSING",
+      eventId: peek.eventId,
+      tracker: peek.tracker,
+      eventType: peek.eventType,
+    });
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
@@ -52,30 +95,67 @@ export async function POST(request: Request) {
     webhookSecret: webhookConfig.config.webhookSecret,
   });
   if (!signatureOk) {
-    console.error("safepay_webhook", "SIGNATURE_REJECTED", "INVALID");
+    logSafepayWebhook({
+      code: "SIGNATURE_REJECTED",
+      httpStatus: 401,
+      httpOutcome: "rejected",
+      errorCategory: "INVALID",
+      eventId: peek.eventId,
+      tracker: peek.tracker,
+      eventType: peek.eventType,
+    });
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
   const event = parseSafepayCardWebhookEvent({ rawBody, headers });
   if (!event) {
+    logSafepayWebhook({
+      code: "PARSE_IGNORED",
+      httpStatus: 200,
+      httpOutcome: "ignored",
+      errorCategory: classifySafepayWebhookParseIgnore(rawBody, headers),
+      eventId: peek.eventId,
+      tracker: peek.tracker,
+      eventType: peek.eventType,
+    });
     // Unsupported/irrelevant event — acknowledge to stop retries.
     return NextResponse.json({ ok: true, ignored: true }, { status: 200 });
   }
 
   try {
     const result = await applyVerifiedPaymentEvent(event);
+    const ignored = result.kind === "ignored";
+    logSafepayWebhook({
+      code: "APPLY_RESULT",
+      httpStatus: 200,
+      httpOutcome: ignored ? "ignored" : "applied",
+      errorCategory: ignored ? result.reason : null,
+      eventId: event.eventId,
+      tracker: event.providerPaymentRef,
+      eventType: peek.eventType,
+      kind: result.kind,
+      outcome: ignored ? result.reason : result.outcome,
+      duplicate: ignored ? false : result.duplicate,
+    });
     return NextResponse.json(
       {
         ok: true,
         kind: result.kind,
-        duplicate: result.kind === "ignored" ? false : result.duplicate,
-        outcome:
-          result.kind === "ignored" ? result.reason : result.outcome,
+        duplicate: ignored ? false : result.duplicate,
+        outcome: ignored ? result.reason : result.outcome,
       },
       { status: 200 }
     );
-  } catch {
-    console.error("safepay_webhook", "APPLY_FAILED");
+  } catch (error) {
+    logSafepayWebhook({
+      code: "APPLY_FAILED",
+      httpStatus: 500,
+      httpOutcome: "failed",
+      errorCategory: classifySafepayWebhookApplyFailure(error),
+      eventId: event.eventId,
+      tracker: event.providerPaymentRef,
+      eventType: peek.eventType,
+    });
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 }

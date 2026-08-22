@@ -1003,7 +1003,12 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
   };
 
   const guestEnabled = isGuestVesimCheckoutEnabled();
-  const paymentDefaults = paymentGatewayCardDefaults();
+  const webhookSecretConfigured = Boolean(
+    (process.env.SAFEPAY_WEBHOOK_SECRET ?? "").trim()
+  );
+  const paymentDefaults = paymentGatewayCardDefaults({
+    webhookSecretConfigured,
+  });
   const payment: PaymentReadinessHealth = {
     checkedAtLabel: nowLabel(checkedAt),
     freshness: "CONFIGURATION_DERIVED",

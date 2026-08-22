@@ -606,8 +606,15 @@ async function main() {
       );
 
       // Payment / guest — guest remains NOT_IMPLEMENTED / DISABLED (controls cannot enable it).
+      // Webhook HMAC verification is implemented; status is secret presence only.
       assert.equal(dashboard.payment.integrationStatus, "NOT_IMPLEMENTED");
-      assert.equal(dashboard.payment.webhookVerification, "NOT_IMPLEMENTED");
+      const webhookSecretConfigured = Boolean(
+        (process.env.SAFEPAY_WEBHOOK_SECRET ?? "").trim()
+      );
+      assert.equal(
+        dashboard.payment.webhookVerification,
+        webhookSecretConfigured ? "HEALTHY" : "NOT_CONFIGURED"
+      );
       const guestEnabled = isGuestVesimCheckoutEnabled();
       assert.equal(
         dashboard.payment.guestCheckout,

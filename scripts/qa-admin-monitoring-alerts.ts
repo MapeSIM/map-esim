@@ -217,7 +217,7 @@ function main() {
     "CONTROL_ALERT_NOTIFICATIONS_PAUSED",
     "CONTROL_STATE_UNAVAILABLE",
     "PAYMENT_GATEWAY_NOT_IMPLEMENTED",
-    "PAYMENT_WEBHOOK_NOT_IMPLEMENTED",
+    "PAYMENT_WEBHOOK_SECRET_NOT_CONFIGURED",
     "PAYMENT_AWAITING_GATEWAY_STALE",
     "GUEST_CHECKOUT_NOT_IMPLEMENTED",
     "SECURITY_AUTH_SECRET_MISSING",
@@ -256,6 +256,9 @@ function main() {
   );
   assert.match(service, /assignment:\$\{row\.id\}/);
   assert.match(service, /PAYMENT_AWAITING_GATEWAY_STALE/);
+  assert.match(service, /PAYMENT_WEBHOOK_SECRET_NOT_CONFIGURED/);
+  assert.doesNotMatch(service, /PAYMENT_WEBHOOK_NOT_IMPLEMENTED/);
+  assert.doesNotMatch(service, /webhook verification not implemented/i);
   assert.match(service, /AWAITING_GATEWAY_PAYMENT/);
   assert.match(service, /esimPurchasePaymentAttempt\.findMany/);
   assert.match(service, /Do not auto-cancel/);
