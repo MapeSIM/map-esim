@@ -14,6 +14,7 @@ import {
   Wifi,
   Zap,
 } from "lucide-react";
+import { HomeTrustSection } from "@/app/components/home/HomeTrustSection";
 import { BRAND_NAME, BRAND_TAGLINE } from "@/app/lib/brand";
 import { absoluteCanonical } from "@/app/lib/seo/canonical";
 
@@ -192,6 +193,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <HomeTrustSection />
 
       {/* Categories */}
       <section className="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 sm:py-20">

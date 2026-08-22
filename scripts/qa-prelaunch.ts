@@ -191,6 +191,11 @@ const EXISTING_QA: QaJob[] = [
   { kind: "npm", script: "qa:plans-discovery", label: "plans discovery" },
   {
     kind: "npm",
+    script: "qa:home-trust-section",
+    label: "homepage trust section",
+  },
+  {
+    kind: "npm",
     script: "qa:affiliates-partnerships",
     label: "affiliates & partnerships",
   },
