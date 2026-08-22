@@ -35,7 +35,7 @@ export type AlertCategory = (typeof ALERT_CATEGORIES)[number];
  * Not provider SLAs. Never accept overrides from URL/forms.
  */
 export const MONITORING_THRESHOLDS = {
-  /** Wallet purchase READY / FUNDS_RESERVED / PROVIDER_PENDING stale age. */
+  /** Wallet purchase READY / FUNDS_RESERVED / PROVIDER_PENDING / AWAITING_GATEWAY stale age. */
   STALE_PURCHASE_AGE_MS: 15 * 60 * 1000,
   /** Assignment READY / PROVIDER_PENDING stale age. */
   STALE_ASSIGNMENT_AGE_MS: 15 * 60 * 1000,
@@ -104,6 +104,7 @@ export type MonitoringAlertCode =
   | "CONTROL_STATE_UNAVAILABLE"
   | "PAYMENT_GATEWAY_NOT_IMPLEMENTED"
   | "PAYMENT_WEBHOOK_NOT_IMPLEMENTED"
+  | "PAYMENT_AWAITING_GATEWAY_STALE"
   | "GUEST_CHECKOUT_NOT_IMPLEMENTED"
   | "SECURITY_AUTH_SECRET_MISSING"
   | "SECURITY_ICCID_KEY_MISSING"

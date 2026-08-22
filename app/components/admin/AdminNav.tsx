@@ -11,6 +11,7 @@ const links = [
   { href: "/admin/partners", label: "Partners", exact: false },
   { href: "/admin/wallet-topups", label: "Wallet top-ups", exact: false },
   { href: "/admin/payments/pending", label: "Pending payments", exact: false },
+  { href: "/admin/payments/failed", label: "Failed payments", exact: false },
   { href: "/admin/refund-requests", label: "Refund requests", exact: false },
   { href: "/admin/promo-codes", label: "Promo Codes", exact: false },
   { href: "/admin/reconciliation", label: "Reconciliation", exact: false },

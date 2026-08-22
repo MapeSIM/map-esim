@@ -10,6 +10,7 @@ import {
   Role,
   WalletEsimPurchaseStatus,
   AdminPackageAssignmentStatus,
+  EsimPurchasePaymentAttemptStatus,
 } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { prisma } from "@/app/lib/db";
@@ -792,6 +793,7 @@ async function collectRecordAlerts(now: Date): Promise<{
     emailAssignments,
     walletEmails,
     iccidOrders,
+    staleGatewayAttempts,
   ] = await Promise.all([
     prisma.walletEsimPurchase.findMany({
       where: {
@@ -936,6 +938,27 @@ async function collectRecordAlerts(now: Date): Promise<{
         reconciliationResolvedAt: true,
         reconciliationLockedAt: true,
         reconciliationEscalationPriority: true,
+        updatedAt: true,
+      },
+    }),
+    prisma.esimPurchasePaymentAttempt.findMany({
+      where: {
+        status: {
+          in: [
+            EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
+            EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING,
+          ],
+        },
+        purchase: {
+          status: WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+        },
+        updatedAt: { lte: stuckPurchaseBefore },
+      },
+      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+      take: TAKE,
+      select: {
+        id: true,
+        status: true,
         updatedAt: true,
       },
     }),
@@ -1465,6 +1488,28 @@ async function collectRecordAlerts(now: Date): Promise<{
     }
   }
 
+  for (const row of staleGatewayAttempts) {
+    pushUnique(
+      alerts,
+      makeAlert({
+        category: "PAYMENT",
+        code: "PAYMENT_AWAITING_GATEWAY_STALE",
+        severity: "WARNING",
+        title: "Gateway payment attempt pending longer than threshold",
+        description:
+          "An AWAITING_GATEWAY_PAYMENT attempt is older than the operational stale threshold. Display only — do not auto-cancel or mark funded.",
+        sourceType: "payment_attempt",
+        recordId: row.id,
+        sourceAt: row.updatedAt,
+        now,
+        freshness: "DATABASE_DERIVED",
+        href: `/admin/payments/pending/${encodeURIComponent(row.id)}`,
+        recommendedAction:
+          "Review on Pending payments. Do not auto-cancel or mark the purchase funded.",
+      })
+    );
+  }
+
   const emailFailureCount =
     emailPurchases.length + emailAssignments.length + walletEmails.length;
   const truncated =
@@ -1473,7 +1518,8 @@ async function collectRecordAlerts(now: Date): Promise<{
     emailPurchases.length >= TAKE ||
     emailAssignments.length >= TAKE ||
     walletEmails.length >= TAKE ||
-    iccidOrders.length >= TAKE;
+    iccidOrders.length >= TAKE ||
+    staleGatewayAttempts.length >= TAKE;
 
   // Aggregate provider uncertain presence
   if (

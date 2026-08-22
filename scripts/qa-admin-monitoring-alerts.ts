@@ -218,6 +218,7 @@ function main() {
     "CONTROL_STATE_UNAVAILABLE",
     "PAYMENT_GATEWAY_NOT_IMPLEMENTED",
     "PAYMENT_WEBHOOK_NOT_IMPLEMENTED",
+    "PAYMENT_AWAITING_GATEWAY_STALE",
     "GUEST_CHECKOUT_NOT_IMPLEMENTED",
     "SECURITY_AUTH_SECRET_MISSING",
     "SECURITY_ICCID_KEY_MISSING",
@@ -254,6 +255,11 @@ function main() {
     /emailNotificationStatus:\s*\{\s*in:\s*\["failed",\s*"not_configured"\]/
   );
   assert.match(service, /assignment:\$\{row\.id\}/);
+  assert.match(service, /PAYMENT_AWAITING_GATEWAY_STALE/);
+  assert.match(service, /AWAITING_GATEWAY_PAYMENT/);
+  assert.match(service, /esimPurchasePaymentAttempt\.findMany/);
+  assert.match(service, /Do not auto-cancel/);
+  assert.doesNotMatch(service, /esimPurchasePaymentAttempt\.(update|delete|create)/);
   console.log("PASS codes_and_readonly_service");
 
   // Sanitization static
