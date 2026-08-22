@@ -3,7 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { X, Globe2, Signal, Clock3, Wifi, MapPinned } from "lucide-react";
+import { X, Globe2, Clock3, Wifi, MapPinned } from "lucide-react";
 import type { VesimOffer } from "@/app/lib/vesim/offers";
 import type { VesimDestination } from "@/app/lib/vesim/destinations";
 import {
@@ -11,14 +11,9 @@ import {
   formatValidityPhrase,
 } from "@/app/lib/plans/plan-utils";
 import {
-  planDetailDescription,
   planDetailFairUseOrTerms,
   planDetailNetworkNames,
-  planDetailNetworkTechnology,
-  planDetailNotes,
-  planDetailOperatorLabel,
 } from "@/app/lib/plans/planOfferPresentation";
-import { PLAN_PURCHASE_TRUST_LINE } from "@/app/lib/plans/planCardConversion";
 import { useCurrency } from "@/app/components/currency/CurrencyProvider";
 
 type PlanDetailsModalProps = {
@@ -52,9 +47,7 @@ function DetailRow({
 export default function PlanDetailsModal({
   offer,
   destination,
-  countryNames = {},
   onClose,
-  coverageFocused = false,
   checkoutHref = buildCheckoutHref,
 }: PlanDetailsModalProps) {
   const { formatPrice } = useCurrency();
@@ -78,15 +71,8 @@ export default function PlanDetailsModal({
 
   if (!offer) return null;
 
-  const covered = offer.coveredCountries || [];
   const networks = planDetailNetworkNames(offer);
-  const operator = planDetailOperatorLabel(offer);
-  const networkTechnology = planDetailNetworkTechnology(offer);
   const fairUseOrTerms = planDetailFairUseOrTerms(offer);
-  const description = planDetailDescription(offer);
-  const notes = planDetailNotes(offer);
-  const isCoverageDestination =
-    destination.kind === "regional" || destination.kind === "global";
 
   return (
     <div
@@ -125,17 +111,15 @@ export default function PlanDetailsModal({
                   <Globe2 className="h-5 w-5" aria-hidden="true" />
                 )}
               </span>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)]/90">
-                  {coverageFocused ? "Coverage details" : destination.name}
+                  {destination.name}
                 </p>
                 <h2
                   id="plan-details-title"
                   className="truncate text-xl font-bold text-[var(--heading)] sm:text-2xl"
                 >
-                  {coverageFocused
-                    ? `${offer.dataFormatted} · ${formatValidityPhrase(offer.durationDays)}`
-                    : offer.name}
+                  {offer.name}
                 </h2>
               </div>
             </div>
@@ -185,88 +169,18 @@ export default function PlanDetailsModal({
                 </span>
               }
             />
-            <DetailRow
-              label="Coverage"
-              value={
-                isCoverageDestination && offer.coveredCountriesCount
-                  ? `${offer.coveredCountriesCount} countries covered`
-                  : destination.name
-              }
-            />
-            {operator ? (
-              <DetailRow
-                label="Operator"
-                value={
-                  <span className="inline-flex items-center gap-1.5">
-                    <Wifi className="h-3.5 w-3.5 text-[var(--accent-strong)]" />
-                    {operator}
-                  </span>
-                }
-              />
-            ) : null}
-            {networkTechnology ? (
-              <DetailRow
-                label="Network technology"
-                value={
-                  <span className="inline-flex items-center gap-1.5">
-                    <Signal className="h-3.5 w-3.5 text-[var(--accent-strong)]" />
-                    {networkTechnology}
-                  </span>
-                }
-              />
-            ) : null}
-            {offer.apn && <DetailRow label="APN" value={offer.apn} />}
-            {offer.hasVoiceSms && (
-              <DetailRow
-                label="Voice & SMS"
-                value={[
-                  offer.voiceMinutes != null
-                    ? `${offer.voiceMinutes} min`
-                    : null,
-                  offer.smsCount != null ? `${offer.smsCount} SMS` : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ") || "Included"}
-              />
-            )}
-            {offer.supportTopUp && (
-              <DetailRow label="Top-up" value="Available" />
-            )}
-            {offer.isRefundable && (
-              <DetailRow label="Refundable" value="Yes" />
-            )}
           </div>
 
-          {isCoverageDestination && covered.length > 0 && (
+          {fairUseOrTerms ? (
             <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-3)] p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--heading)]">
-                <MapPinned className="h-4 w-4 text-[var(--accent-strong)]" />
-                Countries covered ({covered.length})
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {covered.map((code) => {
-                  const roamingEntry = (offer.roaming || []).find(
-                    (entry) => entry.country === code
-                  );
-                  const speeds =
-                    roamingEntry?.dataSpeeds?.filter(Boolean).slice(0, 4) || [];
-                  return (
-                    <span
-                      key={code}
-                      className="rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1 text-xs text-[var(--text)]"
-                      title={
-                        speeds.length > 0
-                          ? `${countryNames[code] || code}: ${speeds.join(", ")}`
-                          : undefined
-                      }
-                    >
-                      {countryNames[code] || code}
-                    </span>
-                  );
-                })}
-              </div>
+              <p className="text-sm font-semibold text-[var(--heading)]">
+                Fair use & speed terms
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
+                {fairUseOrTerms}
+              </p>
             </div>
-          )}
+          ) : null}
 
           {networks.length > 0 && (
             <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-3)] p-4">
@@ -286,29 +200,6 @@ export default function PlanDetailsModal({
               </div>
             </div>
           )}
-
-          {fairUseOrTerms ? (
-            <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-3)] p-4">
-              <p className="text-sm font-semibold text-[var(--heading)]">
-                Fair use & speed terms
-              </p>
-              <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-                {fairUseOrTerms}
-              </p>
-            </div>
-          ) : null}
-
-          {description ? (
-            <p className="mt-4 text-sm leading-relaxed text-[var(--text-muted)]">
-              {description}
-            </p>
-          ) : null}
-
-          {notes ? (
-            <p className="mt-3 text-sm leading-relaxed text-[var(--text-soft)]">
-              {notes}
-            </p>
-          ) : null}
         </div>
 
         <div className="border-t border-[var(--border)] px-5 py-4 sm:px-6">
@@ -322,9 +213,6 @@ export default function PlanDetailsModal({
           >
             Buy Now
           </Link>
-          <p className="mt-3 text-center text-xs leading-relaxed text-[var(--text-muted)]">
-            {PLAN_PURCHASE_TRUST_LINE}
-          </p>
         </div>
       </div>
     </div>

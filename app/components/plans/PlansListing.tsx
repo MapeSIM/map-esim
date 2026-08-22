@@ -46,7 +46,6 @@ import {
 } from "@/app/lib/plans/planOfferPresentation";
 import {
   PLAN_CARD_RECOMMENDED_LABEL,
-  PLAN_PURCHASE_TRUST_LINE,
   PLAN_STICKY_TRUST_LINE,
 } from "@/app/lib/plans/planCardConversion";
 
@@ -454,16 +453,6 @@ export default function PlansListing({
       </section>
 
       <section className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6 sm:py-10">
-        <p className="mb-4 text-sm leading-relaxed text-[var(--text-muted)]">
-          Before buying: confirm your device supports eSIM and is
-          carrier-unlocked.{" "}
-          <Link
-            href="/device-compatibility"
-            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
-          >
-            Check compatibility →
-          </Link>
-        </p>
         <nav
           aria-label="Helpful destination links"
           className="mb-6 flex flex-wrap gap-x-4 gap-y-2 text-sm"
@@ -724,7 +713,10 @@ export default function PlansListing({
                         const secondaryLines = planCardSecondaryLines(offer, {
                           isRegionalOrGlobal,
                           formatValidity: formatValidityPhrase,
-                        });
+                        }).filter(
+                          (line) =>
+                            line.kind === "validity" || line.kind === "operator"
+                        );
                         const isRecommended = offer.id === recommendedOfferId;
                         return (
                           <article
@@ -768,12 +760,15 @@ export default function PlansListing({
                               planCardSecondaryLines — never packageInfo,
                               description, notes, or raw network.
                             */}
-                            <div className="mt-4 flex flex-1 flex-wrap content-start gap-1.5">
+                            <div className="mt-4 flex flex-1 flex-col gap-1.5 text-sm text-[var(--text)]">
                               {secondaryLines.map((line) => (
                                 <p
                                   key={`${offer.id}-${line.kind}`}
-                                  className="max-w-full truncate rounded-full border border-[var(--border-strong)] bg-[var(--surface-2)] px-2.5 py-1 text-xs font-medium text-[var(--text)]"
-                                  title={line.text}
+                                  className={
+                                    line.kind === "operator"
+                                      ? "truncate text-[var(--text-soft)]"
+                                      : undefined
+                                  }
                                 >
                                   <span className="sr-only">
                                     {planCardLineLabel(line.kind)}:{" "}
@@ -783,37 +778,34 @@ export default function PlansListing({
                               ))}
                             </div>
 
-                            <div className="mt-auto flex flex-col gap-2 pt-5">
+                            <div className="mt-auto grid grid-cols-1 gap-3 pt-5 min-[400px]:grid-cols-2">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedOffer(offer)}
+                                className="
+                                  inline-flex min-h-11 items-center justify-center
+                                  rounded-xl bg-white px-3 text-sm font-semibold
+                                  text-neutral-950 transition hover:bg-neutral-100
+                                "
+                              >
+                                {isRegionalOrGlobal
+                                  ? "Coverage details"
+                                  : "Plan Details"}
+                              </button>
                               <Link
                                 href={resolveCheckoutHref(
                                   offer,
                                   destination.code
                                 )}
                                 className="
-                                  inline-flex min-h-12 items-center justify-center
+                                  inline-flex min-h-11 items-center justify-center
                                   rounded-xl bg-[var(--accent-strong)] px-3 text-sm font-bold
                                   text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]
                                 "
                               >
-                                Buy now
+                                Buy Now
                               </Link>
-                              <button
-                                type="button"
-                                onClick={() => setSelectedOffer(offer)}
-                                className="
-                                  inline-flex min-h-10 items-center justify-center
-                                  text-sm font-semibold text-[var(--text-muted)]
-                                  underline-offset-2 hover:text-[var(--heading)] hover:underline
-                                "
-                              >
-                                {isRegionalOrGlobal
-                                  ? "Coverage details"
-                                  : "Plan details"}
-                              </button>
                             </div>
-                            <p className="mt-2 text-center text-[11px] leading-relaxed text-[var(--text-soft)]">
-                              {PLAN_PURCHASE_TRUST_LINE}
-                            </p>
                           </article>
                         );
                       })}
@@ -867,7 +859,7 @@ export default function PlansListing({
                 text-[var(--accent-ink)]
               "
             >
-              Buy now
+                                Buy Now
             </Link>
           </div>
         </div>

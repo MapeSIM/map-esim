@@ -107,8 +107,8 @@ function main() {
   assert.match(cardSource, /offer\.dataFormatted/);
   assert.match(cardSource, /formatPrice\(offer\.priceUSD\)/);
   assert.match(cardSource, /resolveCheckoutHref|buildCheckoutHref/);
-  assert.match(cardSource, /Plan details|Coverage details/);
-  assert.match(cardSource, /Buy now/);
+  assert.match(cardSource, /Plan Details|Coverage details/);
+  assert.match(cardSource, /Buy Now/);
   // Old production bug: raw packageInfo || network under validity.
   assert.doesNotMatch(cardSource, /offer\.packageInfo/);
   assert.doesNotMatch(cardSource, /offer\.description/);
@@ -217,8 +217,8 @@ function main() {
   console.log("3) Plan details keeps Fair Use + omits missing/noise fields");
   assert.match(modal, /planDetailFairUseOrTerms/);
   assert.match(modal, /Fair use & speed terms/);
-  assert.match(modal, /planDetailOperatorLabel/);
-  assert.match(modal, /planDetailNetworkTechnology/);
+  assert.match(modal, /planDetailNetworkNames/);
+  assert.match(modal, /Available networks/);
   const pkOperator = sampleOffer({
     id: "c9b922d6a687dc41955220eb30283c6e",
     dataFormatted: "502 MB",
@@ -270,7 +270,7 @@ function main() {
 
   console.log("5) Shared listing still covers country/regional/global");
   assert.match(listing, /isRegionalOrGlobal/);
-  assert.match(listing, /Coverage details|Plan details/);
+  assert.match(listing, /Coverage details|Plan Details/);
   assert.match(
     listing,
     /resolveCheckoutHref\(\s*(offer|stickyOffer),\s*destination\.code\s*\)|buildCheckoutHref\(\s*offer,\s*destination\.code\s*\)/

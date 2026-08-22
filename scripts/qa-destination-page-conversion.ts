@@ -43,14 +43,20 @@ function main() {
   assert.match(listing, /planCardLineLabel/);
   assert.match(listing, /PLAN_CARD_RECOMMENDED_LABEL/);
   assert.match(listing, /data-plan-recommended/);
-  assert.match(listing, /PLAN_PURCHASE_TRUST_LINE/);
-  assert.match(listing, /sr-only/);
-  assert.match(listing, /Buy now/);
+  assert.doesNotMatch(listing, /PLAN_PURCHASE_TRUST_LINE/);
+  assert.doesNotMatch(listing, /PLAN_CARD_BENEFITS/);
+  assert.match(listing, /Helpful destination links/);
+  assert.match(listing, /Buy Now/);
+  assert.match(listing, /bg-white/);
+  assert.match(listing, /Need more options\?/);
+  assert.doesNotMatch(listing, /device-compatibility/);
+  assert.doesNotMatch(listing, /Check compatibility/);
   assert.match(listing, /href="\/install\/iphone"/);
   assert.match(listing, /href="\/install\/android"/);
   assert.match(listing, /href="\/how-it-works"/);
-  assert.match(listing, /href="\/countries"/);
+  assert.match(listing, /More destinations/);
   assert.match(listing, /relatedRegional/);
+  assert.match(listing, /regional plans/);
   assert.match(listing, /data-plan-sticky-cta/);
   assert.match(listing, /md:hidden/);
   assert.match(
@@ -67,9 +73,10 @@ function main() {
   assert.doesNotMatch(listing, /providerPriceUSD/);
   console.log("PASS listing_conversion_ux");
 
-  assert.match(modal, /PLAN_PURCHASE_TRUST_LINE/);
+  assert.doesNotMatch(modal, /PLAN_PURCHASE_TRUST_LINE/);
   assert.match(modal, /Buy Now/);
-  console.log("PASS modal_trust_near_cta");
+  assert.match(modal, /Available networks/);
+  console.log("PASS modal_simple_layout");
 
   const offer = { id: "ESIM-QA-CONV-1" } as VesimOffer;
   assert.equal(
