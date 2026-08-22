@@ -1,3 +1,4 @@
+import { CountrySeoContent } from "@/app/components/countries/CountrySeoContent";
 import PlansListing from "@/app/components/plans/PlansListing";
 import { countries as staticCountries } from "@/app/data/countries";
 import { toPublicVesimOffers, type VesimOffer } from "@/app/lib/vesim/offers";
@@ -139,6 +140,8 @@ export default async function CountryDetailPage({
       error={error}
       countryNames={countryNames}
       relatedRegional={relatedRegional}
-    />
+    >
+      <CountrySeoContent destination={destination} />
+    </PlansListing>
   );
 }

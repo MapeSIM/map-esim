@@ -6,6 +6,7 @@ import Image from "next/image";
 import {
   ArrowLeft,
   ArrowRight,
+  CheckCircle2,
   Filter,
   Globe2,
   MapPinned,
@@ -40,7 +41,15 @@ import {
   type PlanTypeFilter,
   type SortOption,
 } from "@/app/lib/plans/plan-utils";
-import { planCardSecondaryLines } from "@/app/lib/plans/planOfferPresentation";
+import {
+  planCardLineLabel,
+  planCardSecondaryLines,
+} from "@/app/lib/plans/planOfferPresentation";
+import {
+  PLAN_CARD_BENEFITS,
+  PLAN_PURCHASE_TRUST_LINE,
+  PLAN_STICKY_TRUST_LINE,
+} from "@/app/lib/plans/planCardConversion";
 
 type PlansListingProps = {
   destination: VesimDestination;
@@ -50,6 +59,7 @@ type PlansListingProps = {
   countryNames?: Record<string, string>;
   relatedRegional?: VesimDestination | null;
   checkoutHref?: (offer: VesimOffer, destinationCode: string) => string;
+  children?: ReactNode;
 };
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
@@ -209,6 +219,7 @@ export default function PlansListing({
   countryNames = {},
   relatedRegional = null,
   checkoutHref,
+  children,
 }: PlansListingProps) {
   const isRegionalOrGlobal =
     destination.kind === "regional" || destination.kind === "global";
@@ -358,13 +369,20 @@ export default function PlansListing({
 
   const displayName = destinationDisplayName(destination);
   const heading = `${displayName} eSIM Plans`;
+  const stickyOffer = groups[0]?.plans[0] ?? filtered[0] ?? null;
+  const showStickyBuy =
+    !loading && !error && !selectedOffer && stickyOffer != null;
 
   const heroSummary = loading
     ? "Loading available plans..."
     : `${offers.length} plan${offers.length === 1 ? "" : "s"} available`;
 
   return (
-    <main className="min-h-screen overflow-x-clip bg-[var(--page-bg)] text-[var(--heading)]">
+    <main
+      className={`min-h-screen overflow-x-clip bg-[var(--page-bg)] text-[var(--heading)] ${
+        showStickyBuy ? "pb-44 md:pb-0" : ""
+      }`}
+    >
       <section className="theme-hero border-b border-[var(--border)]">
         {/* Extra mobile top padding keeps hero clear of the sticky navbar. */}
         <div className="mx-auto max-w-[1200px] px-4 pb-5 pt-8 sm:px-6 sm:py-8">
@@ -436,7 +454,7 @@ export default function PlansListing({
       </section>
 
       <section className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6 sm:py-10">
-        <p className="mb-6 text-sm leading-relaxed text-[var(--text-muted)]">
+        <p className="mb-4 text-sm leading-relaxed text-[var(--text-muted)]">
           Before buying: confirm your device supports eSIM and is
           carrier-unlocked.{" "}
           <Link
@@ -446,6 +464,43 @@ export default function PlansListing({
             Check compatibility →
           </Link>
         </p>
+        <nav
+          aria-label="Helpful destination links"
+          className="mb-6 flex flex-wrap gap-x-4 gap-y-2 text-sm"
+        >
+          <Link
+            href="/install/iphone"
+            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+          >
+            iPhone install guide
+          </Link>
+          <Link
+            href="/install/android"
+            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+          >
+            Android install guide
+          </Link>
+          <Link
+            href="/how-it-works"
+            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+          >
+            How MAP eSIM works
+          </Link>
+          <Link
+            href="/countries"
+            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+          >
+            More destinations
+          </Link>
+          {relatedRegional ? (
+            <Link
+              href={destinationPath(relatedRegional)}
+              className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+            >
+              {destinationDisplayName(relatedRegional)} regional plans
+            </Link>
+          ) : null}
+        </nav>
         {loading && (
           <div className="rounded-3xl border border-[var(--border-strong)] bg-[var(--surface)] p-10 text-center text-[var(--text)]">
             Loading eSIM plans...
@@ -684,12 +739,22 @@ export default function PlansListing({
                             "
                           >
                             <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-1">
-                              <h3 className="min-w-0 break-words text-xl font-bold tracking-tight text-[var(--heading)] sm:text-2xl">
-                                {offer.dataFormatted}
-                              </h3>
-                              <p className="shrink-0 text-xl font-bold text-[var(--accent-strong)] sm:text-2xl">
-                                {formatPrice(offer.priceUSD)}
-                              </p>
+                              <div className="min-w-0">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
+                                  Data
+                                </p>
+                                <h3 className="mt-1 min-w-0 break-words text-xl font-bold tracking-tight text-[var(--heading)] sm:text-2xl">
+                                  {offer.dataFormatted}
+                                </h3>
+                              </div>
+                              <div className="shrink-0 text-right">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
+                                  Price
+                                </p>
+                                <p className="mt-1 text-xl font-bold text-[var(--accent-strong)] sm:text-2xl">
+                                  {formatPrice(offer.priceUSD)}
+                                </p>
+                              </div>
                             </div>
 
                             {/*
@@ -707,10 +772,24 @@ export default function PlansListing({
                                       : undefined
                                   }
                                 >
+                                  <span className="font-semibold text-[var(--text-muted)]">
+                                    {planCardLineLabel(line.kind)}:{" "}
+                                  </span>
                                   {line.text}
                                 </p>
                               ))}
                             </div>
+
+                            <ul className="mt-3 flex flex-wrap gap-1.5">
+                              {PLAN_CARD_BENEFITS.map((benefit) => (
+                                <li
+                                  key={benefit}
+                                  className="rounded-full border border-[var(--border-strong)] bg-[var(--surface-2)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text)]"
+                                >
+                                  {benefit}
+                                </li>
+                              ))}
+                            </ul>
 
                             <div className="mt-auto grid grid-cols-1 gap-3 pt-6 min-[400px]:grid-cols-2">
                               <button
@@ -741,6 +820,13 @@ export default function PlansListing({
                                 Buy now
                               </Link>
                             </div>
+                            <p className="mt-3 flex items-start gap-1.5 text-xs leading-relaxed text-[var(--text-muted)]">
+                              <CheckCircle2
+                                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--accent-strong)]"
+                                aria-hidden="true"
+                              />
+                              {PLAN_PURCHASE_TRUST_LINE}
+                            </p>
                           </article>
                         );
                       })}
@@ -753,6 +839,8 @@ export default function PlansListing({
         )}
       </section>
 
+      {children}
+
       <PlanDetailsModal
         offer={selectedOffer}
         destination={destination}
@@ -761,6 +849,42 @@ export default function PlansListing({
         coverageFocused={isRegionalOrGlobal}
         checkoutHref={resolveCheckoutHref}
       />
+
+      {showStickyBuy && stickyOffer ? (
+        <div
+          data-plan-sticky-cta="true"
+          className="
+            fixed inset-x-0 z-40 border-t border-[var(--border-strong)]
+            bg-[var(--surface)]/95 px-4 py-3 pr-[max(1rem,env(safe-area-inset-right))]
+            backdrop-blur-md md:hidden
+            bottom-[calc(5.25rem+env(safe-area-inset-bottom))]
+          "
+        >
+          <div className="mx-auto flex max-w-[1200px] items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-bold text-[var(--heading)]">
+                {stickyOffer.dataFormatted}{" "}
+                <span className="text-[var(--accent-strong)]">
+                  {formatPrice(stickyOffer.priceUSD)}
+                </span>
+              </p>
+              <p className="truncate text-xs text-[var(--text-muted)]">
+                {PLAN_STICKY_TRUST_LINE}
+              </p>
+            </div>
+            <Link
+              href={resolveCheckoutHref(stickyOffer, destination.code)}
+              className="
+                inline-flex min-h-11 shrink-0 items-center justify-center
+                rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-bold
+                text-[var(--accent-ink)]
+              "
+            >
+              Buy now
+            </Link>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

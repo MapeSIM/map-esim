@@ -106,7 +106,7 @@ function main() {
   assert.match(cardSource, /secondaryLines\.map/);
   assert.match(cardSource, /offer\.dataFormatted/);
   assert.match(cardSource, /formatPrice\(offer\.priceUSD\)/);
-  assert.match(cardSource, /buildCheckoutHref/);
+  assert.match(cardSource, /resolveCheckoutHref|buildCheckoutHref/);
   assert.match(cardSource, /Plan details|Coverage details/);
   assert.match(cardSource, /Buy now/);
   // Old production bug: raw packageInfo || network under validity.
@@ -271,7 +271,10 @@ function main() {
   console.log("5) Shared listing still covers country/regional/global");
   assert.match(listing, /isRegionalOrGlobal/);
   assert.match(listing, /Coverage details|Plan details/);
-  assert.match(listing, /buildCheckoutHref\(offer,\s*destination\.code\)|buildCheckoutHref\(\s*offer,\s*destination\.code\s*\)/);
+  assert.match(
+    listing,
+    /resolveCheckoutHref\(\s*(offer|stickyOffer),\s*destination\.code\s*\)|buildCheckoutHref\(\s*offer,\s*destination\.code\s*\)/
+  );
   // Coverage line still available via helper for regional/global.
   const regional = sampleOffer({
     id: "regional-1",

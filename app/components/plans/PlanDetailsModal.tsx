@@ -18,6 +18,7 @@ import {
   planDetailNotes,
   planDetailOperatorLabel,
 } from "@/app/lib/plans/planOfferPresentation";
+import { PLAN_PURCHASE_TRUST_LINE } from "@/app/lib/plans/planCardConversion";
 import { useCurrency } from "@/app/components/currency/CurrencyProvider";
 
 type PlanDetailsModalProps = {
@@ -321,6 +322,9 @@ export default function PlanDetailsModal({
           >
             Buy Now
           </Link>
+          <p className="mt-3 text-center text-xs leading-relaxed text-[var(--text-muted)]">
+            {PLAN_PURCHASE_TRUST_LINE}
+          </p>
         </div>
       </div>
     </div>

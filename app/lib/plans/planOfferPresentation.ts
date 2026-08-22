@@ -74,6 +74,12 @@ export type PlanCardSecondaryLine =
   | { kind: "coverage"; text: string }
   | { kind: "operator"; text: string };
 
+export function planCardLineLabel(kind: PlanCardSecondaryLine["kind"]): string {
+  if (kind === "validity") return "Validity";
+  if (kind === "coverage") return "Coverage";
+  return "Network";
+}
+
 /**
  * Sole secondary-text contract for shared plan cards (below data + price).
  * Callers must not also render packageInfo, description, notes, or raw network.

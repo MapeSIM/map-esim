@@ -125,10 +125,16 @@ const EXISTING_QA: QaJob[] = [
     label: "destination catalog SSR",
   },
   { kind: "npm", script: "qa:country-plans-ssr", label: "country plan SSR" },
+  { kind: "npm", script: "qa:country-page-seo", label: "country page SEO" },
   {
     kind: "npm",
     script: "qa:plan-card-presentation",
     label: "plan-card presentation",
+  },
+  {
+    kind: "npm",
+    script: "qa:destination-page-conversion",
+    label: "destination page conversion UX",
   },
   {
     kind: "tsx",
