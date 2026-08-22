@@ -92,6 +92,11 @@ function main() {
   assert.match(detailSrc, /Customer email|label="Email"/);
   assert.match(detailSrc, /userId=/);
   assert.match(detailSrc, /Recent eSIM Orders/);
+  assert.match(detailSrc, /Support timeline/);
+  assert.match(
+    detailSrc,
+    /\/admin\/customers\/\$\{encodeURIComponent\(detail\.id\)\}\/timeline/
+  );
   assert.match(detailSrc, /getAdminCustomerRecentOrders/);
   assert.match(detailSrc, /No eSIM orders found for this customer/);
   assert.match(detailSrc, /View related order/);

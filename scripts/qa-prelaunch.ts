@@ -159,6 +159,11 @@ const EXISTING_QA: QaJob[] = [
   },
   {
     kind: "npm",
+    script: "qa:admin-customer-support-timeline",
+    label: "admin customer support timeline",
+  },
+  {
+    kind: "npm",
     script: "qa:admin-wallet-credit",
     label: "admin wallet credit (read-only)",
   },

@@ -102,6 +102,19 @@ export default async function AdminCustomerDetailPage({
           Read-only CUSTOMER profile. Password hashes, OAuth tokens, and
           installation secrets are never shown.
         </p>
+        <p className="mt-4 text-sm">
+          <Link
+            href={`/admin/customers/${encodeURIComponent(detail.id)}/timeline`}
+            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+          >
+            Support timeline
+          </Link>
+          <span className="text-[var(--text-muted)]">
+            {" "}
+            — read-only purchases, payments, orders, wallet, refunds, emails, and
+            audits.
+          </span>
+        </p>
       </div>
 
       <dl className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 sm:px-5">
