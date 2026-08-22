@@ -933,6 +933,32 @@ model AuditLog {
   @@index([createdAt])
 }
 
+/// Append-only webhook delivery observability. Not an idempotency key.
+/// Never stores raw body, signatures, secrets, or card data. No payment apply.
+model PaymentWebhookReceipt {
+  id               String                 @id @default(cuid())
+  provider         PaymentGatewayProvider
+  receivedAt       DateTime               @default(now())
+  eventId          String?
+  eventType        String?
+  signatureOk      Boolean
+  parseOk          Boolean
+  httpStatus       Int
+  logCode          String
+  errorCategory    String?
+  applyOutcome     String?
+  /// Claimed local ids only — no FK so unknown references still persist.
+  paymentAttemptId String?
+  topupId          String?
+  trackerMasked    String?
+
+  @@index([receivedAt])
+  @@index([eventId])
+  @@index([logCode])
+  @@index([paymentAttemptId])
+  @@index([topupId])
+}
+
 /// Customer USD wallet account. One per user. Balance is integer cents only.
 model WalletAccount {
   id           String              @id @default(cuid())

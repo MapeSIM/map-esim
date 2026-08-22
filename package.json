@@ -62,6 +62,7 @@
     "qa:esim-purchase-pg4-funding": "tsx scripts/qa-esim-purchase-pg4-funding.ts",
     "qa:admin-pending-payment-verify": "tsx scripts/qa-admin-pending-payment-verify.ts",
     "qa:admin-failed-payments": "tsx scripts/qa-admin-failed-payments.ts",
+    "qa:admin-webhook-receipts": "tsx scripts/qa-admin-webhook-receipts.ts",
     "qa:wallet-topup-foundation": "tsx scripts/qa-wallet-topup-foundation.ts",
     "qa:wallet-topup-funding": "tsx scripts/qa-wallet-topup-funding.ts",
     "qa:refund-request-foundation": "tsx scripts/qa-refund-request-foundation.ts",

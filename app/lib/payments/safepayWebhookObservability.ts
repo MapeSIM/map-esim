@@ -98,7 +98,7 @@ function headerValue(
   return "";
 }
 
-function clipSafeToken(
+export function clipWebhookToken(
   value: string | null | undefined,
   max = 64
 ): string | null {
@@ -307,6 +307,19 @@ export function classifySafepayWebhookApplyFailure(error: unknown): string {
   return "APPLY_EXCEPTION";
 }
 
+export function webhookReceiptVerifyFlags(code: SafepayWebhookLogCode): {
+  signatureOk: boolean;
+  parseOk: boolean;
+} {
+  if (code === "APPLY_RESULT" || code === "APPLY_FAILED") {
+    return { signatureOk: true, parseOk: true };
+  }
+  if (code === "PARSE_IGNORED") {
+    return { signatureOk: true, parseOk: false };
+  }
+  return { signatureOk: false, parseOk: false };
+}
+
 export function formatSafepayWebhookLog(
   input: SafepayWebhookLogInput
 ): {
@@ -317,12 +330,12 @@ export function formatSafepayWebhookLog(
   const payload: SafepayWebhookLogPayload = {
     httpStatus: Number.isInteger(input.httpStatus) ? input.httpStatus : 0,
     httpOutcome: input.httpOutcome,
-    errorCategory: clipSafeToken(input.errorCategory, 64),
-    eventId: clipSafeToken(input.eventId, 64),
+    errorCategory: clipWebhookToken(input.errorCategory, 64),
+    eventId: clipWebhookToken(input.eventId, 64),
     trackerMasked: maskWebhookReference(input.tracker),
-    eventType: clipSafeToken(input.eventType, 64),
-    kind: clipSafeToken(input.kind, 32),
-    outcome: clipSafeToken(input.outcome, 64),
+    eventType: clipWebhookToken(input.eventType, 64),
+    kind: clipWebhookToken(input.kind, 32),
+    outcome: clipWebhookToken(input.outcome, 64),
     duplicate:
       typeof input.duplicate === "boolean" ? input.duplicate : null,
   };

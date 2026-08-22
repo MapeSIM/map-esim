@@ -165,7 +165,7 @@ function main() {
   for (const code of SAFEPAY_WEBHOOK_LOG_CODES) {
     assert.match(route, new RegExp(`code: "${code}"`));
   }
-  assert.match(route, /logSafepayWebhook/);
+  assert.match(route, /observeSafepayWebhookDelivery/);
   assert.match(route, /verifySafepayCardWebhookSignature/);
   assert.match(route, /applyVerifiedPaymentEvent/);
   assert.match(route, /parseSafepayCardWebhookEvent/);

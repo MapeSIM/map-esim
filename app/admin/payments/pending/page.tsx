@@ -43,6 +43,13 @@ export default async function AdminPendingPaymentsPage() {
           >
             Failed payments
           </Link>
+          <span className="text-[var(--text-soft)]"> · </span>
+          <Link
+            href="/admin/payments/webhooks"
+            className="font-semibold text-[var(--accent-strong)]"
+          >
+            Webhook receipts
+          </Link>
         </p>
       </header>
 

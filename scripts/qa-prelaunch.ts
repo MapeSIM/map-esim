@@ -154,6 +154,11 @@ const EXISTING_QA: QaJob[] = [
   },
   {
     kind: "npm",
+    script: "qa:admin-webhook-receipts",
+    label: "admin webhook receipts",
+  },
+  {
+    kind: "npm",
     script: "qa:admin-wallet-credit",
     label: "admin wallet credit (read-only)",
   },

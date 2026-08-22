@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { applyVerifiedPaymentEvent } from "@/app/lib/payments/applyVerifiedPaymentEvent";
+import { observeSafepayWebhookDelivery } from "@/app/lib/payments/paymentWebhookReceipt";
 import { resolveSafepayWebhookConfig } from "@/app/lib/payments/safepayConfig";
 import {
   normalizeSafepayHeader,
@@ -8,7 +9,6 @@ import {
 import {
   classifySafepayWebhookApplyFailure,
   classifySafepayWebhookParseIgnore,
-  logSafepayWebhook,
   peekSafepayWebhookLogFields,
 } from "@/app/lib/payments/safepayWebhookObservability";
 import { parseSafepayCardWebhookEvent } from "@/app/lib/payments/safepayWebhookParse";
@@ -26,7 +26,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   const webhookConfig = resolveSafepayWebhookConfig();
   if (!webhookConfig.ok) {
-    logSafepayWebhook({
+    await observeSafepayWebhookDelivery({
       code: "CONFIG_MISSING",
       httpStatus: 503,
       httpOutcome: "rejected",
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   try {
     rawBody = await request.text();
   } catch {
-    logSafepayWebhook({
+    await observeSafepayWebhookDelivery({
       code: "BODY_REJECTED",
       httpStatus: 400,
       httpOutcome: "rejected",
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
   if (!rawBody) {
-    logSafepayWebhook({
+    await observeSafepayWebhookDelivery({
       code: "BODY_REJECTED",
       httpStatus: 400,
       httpOutcome: "rejected",
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
   if (rawBody.length > 256_000) {
-    logSafepayWebhook({
+    await observeSafepayWebhookDelivery({
       code: "BODY_REJECTED",
       httpStatus: 400,
       httpOutcome: "rejected",
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     headers["x-sfpy-signature"] ?? headers["X-SFPY-SIGNATURE"]
   );
   if (!signature) {
-    logSafepayWebhook({
+    await observeSafepayWebhookDelivery({
       code: "SIGNATURE_REJECTED",
       httpStatus: 401,
       httpOutcome: "rejected",
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
     webhookSecret: webhookConfig.config.webhookSecret,
   });
   if (!signatureOk) {
-    logSafepayWebhook({
+    await observeSafepayWebhookDelivery({
       code: "SIGNATURE_REJECTED",
       httpStatus: 401,
       httpOutcome: "rejected",
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
 
   const event = parseSafepayCardWebhookEvent({ rawBody, headers });
   if (!event) {
-    logSafepayWebhook({
+    await observeSafepayWebhookDelivery({
       code: "PARSE_IGNORED",
       httpStatus: 200,
       httpOutcome: "ignored",
@@ -125,7 +125,7 @@ export async function POST(request: Request) {
   try {
     const result = await applyVerifiedPaymentEvent(event);
     const ignored = result.kind === "ignored";
-    logSafepayWebhook({
+    await observeSafepayWebhookDelivery({
       code: "APPLY_RESULT",
       httpStatus: 200,
       httpOutcome: ignored ? "ignored" : "applied",
@@ -136,6 +136,14 @@ export async function POST(request: Request) {
       kind: result.kind,
       outcome: ignored ? result.reason : result.outcome,
       duplicate: ignored ? false : result.duplicate,
+      paymentAttemptId:
+        result.kind === "esim_purchase" || ignored
+          ? event.paymentAttemptId
+          : null,
+      topupId:
+        result.kind === "wallet_topup"
+          ? event.localTopupId ?? event.paymentAttemptId
+          : null,
     });
     return NextResponse.json(
       {
@@ -147,7 +155,7 @@ export async function POST(request: Request) {
       { status: 200 }
     );
   } catch (error) {
-    logSafepayWebhook({
+    await observeSafepayWebhookDelivery({
       code: "APPLY_FAILED",
       httpStatus: 500,
       httpOutcome: "failed",
@@ -155,6 +163,8 @@ export async function POST(request: Request) {
       eventId: event.eventId,
       tracker: event.providerPaymentRef,
       eventType: peek.eventType,
+      paymentAttemptId: event.paymentAttemptId,
+      topupId: event.localTopupId,
     });
     return NextResponse.json({ ok: false }, { status: 500 });
   }
