@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import {
   HOME_TRUST_ITEMS,
+  HOME_TRUST_SECTION_INTRO,
   HOME_TRUST_SECTION_TITLE,
 } from "@/app/lib/home/homeTrustSection";
 
@@ -26,12 +27,18 @@ export function HomeTrustSection() {
       aria-labelledby="home-trust-heading"
     >
       <div className="mx-auto max-w-[1200px] px-4 py-12 sm:px-6 sm:py-16">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)]">
+          Why travelers choose MAP eSIM
+        </p>
         <h2
           id="home-trust-heading"
-          className="text-3xl font-bold tracking-tight text-[var(--heading)] sm:text-4xl"
+          className="mt-3 text-3xl font-bold tracking-tight text-[var(--heading)] sm:text-4xl"
         >
           {HOME_TRUST_SECTION_TITLE}
         </h2>
+        <p className="mt-3 max-w-2xl text-[var(--text-muted)]">
+          {HOME_TRUST_SECTION_INTRO}
+        </p>
         <ul className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-5">
           {HOME_TRUST_ITEMS.map((item, index) => {
             const Icon = TRUST_ICONS[index] ?? QrCode;

@@ -15,6 +15,9 @@ import {
   Zap,
 } from "lucide-react";
 import { HomeTrustSection } from "@/app/components/home/HomeTrustSection";
+import { HomePopularDestinations } from "@/app/components/home/HomePopularDestinations";
+import { HomeComparisonSection } from "@/app/components/home/HomeComparisonSection";
+import { HomeFinalCta } from "@/app/components/home/HomeFinalCta";
 import { BRAND_NAME, BRAND_TAGLINE } from "@/app/lib/brand";
 import { absoluteCanonical } from "@/app/lib/seo/canonical";
 
@@ -141,7 +144,7 @@ export default function Home() {
                 href="/countries"
                 className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-6 text-sm font-bold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] sm:w-auto"
               >
-                Browse destinations
+                Browse eSIM destinations
                 <ArrowRight className="h-4 w-4 shrink-0" />
               </Link>
               <Link
@@ -195,6 +198,10 @@ export default function Home() {
       </section>
 
       <HomeTrustSection />
+
+      <HomePopularDestinations />
+
+      <HomeComparisonSection />
 
       {/* Categories */}
       <section className="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 sm:py-20">
@@ -401,25 +408,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Final CTA */}
-      <section className="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 sm:py-20">
-        <div className="theme-cta overflow-hidden rounded-[28px] border border-[var(--accent-strong)]/25 px-6 py-10 text-center sm:px-10">
-          <h2 className="text-3xl font-bold tracking-tight text-[var(--heading)] sm:text-4xl">
-            Ready to get your travel eSIM?
-          </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-[var(--text)]">
-            Compare real destination plans and continue to checkout with
-            verified offer pricing.
-          </p>
-          <Link
-            href="/countries"
-            className="mt-8 inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-7 text-sm font-bold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]"
-          >
-            Get started
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </section>
+      <HomeFinalCta />
     </main>
   );
 }

@@ -4,6 +4,9 @@
 
 export const HOME_TRUST_SECTION_TITLE = "Trusted Travel eSIM";
 
+export const HOME_TRUST_SECTION_INTRO =
+  "Clear plan details, digital delivery, and support when you need it.";
+
 export const HOME_TRUST_ITEMS = [
   {
     title: "Instant QR Delivery",

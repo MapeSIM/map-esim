@@ -202,6 +202,11 @@ const EXISTING_QA: QaJob[] = [
   },
   {
     kind: "npm",
+    script: "qa:home-conversion-sections",
+    label: "homepage conversion sections",
+  },
+  {
+    kind: "npm",
     script: "qa:checkout-page-ui",
     label: "checkout page UI",
   },

@@ -89,6 +89,7 @@
     "qa:destination-seo-metadata": "tsx scripts/qa-destination-seo-metadata.ts",
     "qa:plans-discovery": "tsx scripts/qa-plans-discovery.ts",
     "qa:home-trust-section": "tsx scripts/qa-home-trust-section.ts",
+    "qa:home-conversion-sections": "tsx scripts/qa-home-conversion-sections.ts",
     "qa:affiliates-partnerships": "tsx scripts/qa-affiliates-partnerships.ts",
     "qa:about": "tsx scripts/qa-about.ts",
     "qa:navbar-layout": "tsx scripts/qa-navbar-layout.ts",
