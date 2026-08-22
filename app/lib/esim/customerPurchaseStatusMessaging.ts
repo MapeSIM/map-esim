@@ -26,6 +26,12 @@ export const CUSTOMER_PURCHASE_CHECKOUT_MESSAGE =
 export const CUSTOMER_PURCHASE_PAYMENT_PENDING_MESSAGE =
   "Your payment is not completed. Continue checkout to finish paying.";
 
+/** Display-only age for stale checkout copy. Does not expire attempts or release funds. */
+export const CUSTOMER_STALE_CHECKOUT_DISPLAY_MS = 30 * 60 * 1000;
+
+export const CUSTOMER_STALE_CHECKOUT_MESSAGE =
+  "This checkout may no longer be active. You can continue checkout or start again.";
+
 export const CUSTOMER_PENDING_PURCHASE_STATUSES = [
   "READY",
   "AWAITING_GATEWAY_PAYMENT",
@@ -138,4 +144,28 @@ export function customerPendingPurchaseHref(
     return esimPurchasePaymentReviewHref(id);
   }
   return esimPurchaseReviewNeededHref(id);
+}
+
+export function isCustomerStaleCheckoutDisplay(input: {
+  status: string;
+  updatedAt: Date | string | number;
+  now?: Date | number;
+}): boolean {
+  const vis = resolveCustomerPendingPurchaseVisibility(input.status);
+  if (vis?.action !== "continue_checkout") return false;
+  const updatedMs =
+    input.updatedAt instanceof Date
+      ? input.updatedAt.getTime()
+      : typeof input.updatedAt === "number"
+        ? input.updatedAt
+        : Date.parse(String(input.updatedAt));
+  if (!Number.isFinite(updatedMs)) return false;
+  const nowMs =
+    input.now instanceof Date
+      ? input.now.getTime()
+      : typeof input.now === "number"
+        ? input.now
+        : Date.now();
+  if (!Number.isFinite(nowMs)) return false;
+  return nowMs - updatedMs >= CUSTOMER_STALE_CHECKOUT_DISPLAY_MS;
 }

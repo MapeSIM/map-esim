@@ -51,6 +51,11 @@ export default function CustomerPendingPurchases({
                   <p className="mt-2 text-sm text-[var(--text-muted)]">
                     {purchase.summary}
                   </p>
+                  {purchase.staleGuidance ? (
+                    <p className="mt-2 text-sm text-[var(--text)]">
+                      {purchase.staleGuidance}
+                    </p>
+                  ) : null}
                 </div>
                 <p className="shrink-0 text-sm font-bold tabular-nums text-[var(--heading)]">
                   {purchase.priceLabel}

@@ -8,7 +8,9 @@ import { join } from "node:path";
 import {
   CUSTOMER_PURCHASE_PROCESSING_MESSAGE,
   CUSTOMER_PURCHASE_REVIEW_NEEDED_MESSAGE,
+  CUSTOMER_STALE_CHECKOUT_MESSAGE,
   customerPendingPurchaseHref,
+  isCustomerStaleCheckoutDisplay,
   resolveCustomerPendingPurchaseVisibility,
   resolveCustomerPurchaseStatusMessaging,
 } from "../app/lib/esim/customerPurchaseStatusMessaging";
@@ -294,6 +296,23 @@ function main() {
     CUSTOMER_PURCHASE_REVIEW_NEEDED_MESSAGE,
     "Your payment is under review. Please do not make another purchase. We'll update you once the review is complete."
   );
+  assert.equal(
+    CUSTOMER_STALE_CHECKOUT_MESSAGE,
+    "This checkout may no longer be active. You can continue checkout or start again."
+  );
+  assert.equal(
+    isCustomerStaleCheckoutDisplay({
+      status: "FUNDED",
+      updatedAt: 0,
+      now: Date.now(),
+    }),
+    false
+  );
+  const pendingListFn = readSrc.slice(
+    readSrc.indexOf("export async function listCustomerPendingWalletPurchases")
+  );
+  assert.match(pendingListFn, /staleGuidance:/);
+  assert.doesNotMatch(pendingListFn, /EXPIRED/);
   assert.match(reconPage, /resolveCustomerPurchaseStatusMessaging/);
   assert.match(reconPage, /customerPurchaseStatusMessage/);
   assert.doesNotMatch(reconPage, /provider result is uncertain/i);

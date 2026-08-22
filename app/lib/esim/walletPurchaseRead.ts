@@ -9,7 +9,9 @@ import { prisma } from "@/app/lib/db";
 import { calculateCustomerCheckoutFunding } from "@/app/lib/esim/purchaseFunding";
 import { payablePackageCents } from "@/app/lib/promo/promoDiscount";
 import {
+  CUSTOMER_STALE_CHECKOUT_MESSAGE,
   customerPendingPurchaseHref,
+  isCustomerStaleCheckoutDisplay,
   resolveCustomerPendingPurchaseVisibility,
 } from "@/app/lib/esim/customerPurchaseStatusMessaging";
 import { formatWalletPurchasePriceLabel } from "@/app/lib/esim/walletPurchase";
@@ -483,6 +485,7 @@ export type CustomerPendingWalletPurchase = {
   ctaLabel: string;
   href: string;
   summary: string;
+  staleGuidance: string | null;
 };
 
 /** Read-only inbox of unfinished self-service purchases. Never prepares, funds, or fulfills. */
@@ -520,6 +523,7 @@ export async function listCustomerPendingWalletPurchases(
       planName: true,
       priceCents: true,
       status: true,
+      updatedAt: true,
     },
   });
 
@@ -540,6 +544,12 @@ export async function listCustomerPendingWalletPurchases(
       ctaLabel: vis.ctaLabel,
       href,
       summary: vis.body,
+      staleGuidance: isCustomerStaleCheckoutDisplay({
+        status: row.status,
+        updatedAt: row.updatedAt,
+      })
+        ? CUSTOMER_STALE_CHECKOUT_MESSAGE
+        : null,
     });
   }
   return items;
