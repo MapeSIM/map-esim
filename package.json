@@ -49,6 +49,7 @@
     "qa:esim-purchase-split-funding": "tsx scripts/qa-esim-purchase-split-funding.ts",
     "qa:esim-purchase-funding-choice": "tsx scripts/qa-esim-purchase-funding-choice.ts",
     "qa:checkout-currency-display": "tsx scripts/qa-checkout-currency-display.ts",
+    "qa:checkout-page-ui": "tsx scripts/qa-checkout-page-ui.ts",
     "qa:promo-codes": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-promo-codes.ts",
     "qa:promo-hold-lifecycle": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-promo-hold-lifecycle.ts",
     "qa:customer-rewards": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-customer-rewards.ts",

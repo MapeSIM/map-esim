@@ -196,6 +196,11 @@ const EXISTING_QA: QaJob[] = [
   },
   {
     kind: "npm",
+    script: "qa:checkout-page-ui",
+    label: "checkout page UI",
+  },
+  {
+    kind: "npm",
     script: "qa:affiliates-partnerships",
     label: "affiliates & partnerships",
   },

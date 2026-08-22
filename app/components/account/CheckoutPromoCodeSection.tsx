@@ -85,7 +85,7 @@ export default function CheckoutPromoCodeSection({
 
   return (
     <section
-      className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 sm:px-5"
+      className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] px-5 py-5 sm:px-6"
       aria-labelledby={headingId}
     >
       <h2

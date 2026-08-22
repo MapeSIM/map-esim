@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCurrency } from "@/app/components/currency/CurrencyProvider";
+import { CheckoutTrustPanel } from "@/app/components/account/CheckoutTrustPanel";
 
 type VerifiedOffer = {
   offerId: string;
@@ -244,83 +245,135 @@ function CheckoutContent() {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[var(--page-bg)] px-4 py-10 text-[var(--heading)] sm:px-6 sm:py-16">
-      <div className="mx-auto w-full max-w-xl rounded-3xl border border-[var(--border-strong)] bg-[var(--surface)] p-5 sm:p-8">
-        <h1 className="text-center text-2xl font-bold sm:text-4xl">Checkout</h1>
-        <p className="mt-3 text-center text-sm text-[var(--text-muted)] sm:text-base">
+      <div className="mx-auto w-full max-w-5xl">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)]">
+          MAP eSIM checkout
+        </p>
+        <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-4xl">
+          Checkout
+        </h1>
+        <p className="mt-2 max-w-xl text-sm text-[var(--text-muted)] sm:text-base">
           Review your eSIM plan
         </p>
 
-        <div className="mt-6 space-y-3 rounded-2xl bg-[var(--page-bg)] p-4 sm:mt-8 sm:space-y-4 sm:p-6">
-          <h2 className="break-words text-xl font-bold sm:text-2xl">
-            {offer.countryName || offer.name || "eSIM"}
-          </h2>
+        <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
+          <div className="space-y-5">
+            <section
+              className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6"
+              aria-labelledby="guest-plan-heading"
+            >
+              <h2
+                id="guest-plan-heading"
+                className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+              >
+                Plan details
+              </h2>
+              <h3 className="mt-3 break-words text-xl font-bold sm:text-2xl">
+                {offer.countryName || offer.name || "eSIM"}
+              </h3>
+              <dl className="mt-4 space-y-3 text-sm sm:text-base">
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                    Plan
+                  </dt>
+                  <dd className="mt-1 font-semibold">{offer.name}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                    Data
+                  </dt>
+                  <dd className="mt-1 font-semibold">{offer.dataFormatted}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                    Validity
+                  </dt>
+                  <dd className="mt-1 font-semibold">
+                    {offer.durationDays != null
+                      ? `${offer.durationDays} Days`
+                      : "—"}
+                  </dd>
+                </div>
+              </dl>
+            </section>
 
-          <p className="break-words text-sm sm:text-base">
-            Plan: <b>{offer.name}</b>
-          </p>
-
-          <p className="text-sm sm:text-base">
-            Data: <b>{offer.dataFormatted}</b>
-          </p>
-
-          <p className="text-sm sm:text-base">
-            Validity:{" "}
-            <b>
-              {offer.durationDays != null ? `${offer.durationDays} Days` : "—"}
-            </b>
-          </p>
-
-          <p className="text-2xl font-bold text-[var(--accent-strong)] sm:text-3xl">
-            {formatPrice(offer.priceUSD)}
-          </p>
-        </div>
-
-        <div className="mt-6 sm:mt-7">
-          <label htmlFor="customerEmail" className="mb-2 block font-semibold">
-            Customer email
-          </label>
-
-          <input
-            id="customerEmail"
-            type="email"
-            value={customerEmail}
-            onChange={(event) => setCustomerEmail(event.target.value)}
-            placeholder="customer@example.com"
-            autoComplete="email"
-            disabled={payLoading}
-            className="min-h-12 w-full max-w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-4 py-3 text-[var(--heading)] outline-none focus:border-[var(--accent-strong)] disabled:opacity-60 sm:py-4"
-          />
-
-          <p className="mt-2 text-sm text-[var(--text-muted)]">
-            eSIM order details will be associated with this email.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={pay}
-          disabled={payLoading}
-          aria-busy={payLoading}
-          className="mt-6 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 py-3 font-bold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:bg-[var(--accent)] sm:mt-8 sm:py-4"
-        >
-          {payLoading ? "Creating eSIM..." : "Purchase eSIM"}
-        </button>
-
-        {message && (
-          <div className="mt-6 rounded-xl border border-[var(--danger-border)] bg-[var(--danger-bg)] p-4 text-[var(--danger-text)]">
-            {message}
-            {message.toLowerCase().includes("unavailable") ? (
-              <p className="mt-3">
-                <Link
-                  href="/contact"
-                  className="font-semibold underline underline-offset-2"
-                >
-                  Contact support
-                </Link>
+            <section
+              className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6"
+              aria-labelledby="guest-email-heading"
+            >
+              <h2
+                id="guest-email-heading"
+                className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+              >
+                Customer info
+              </h2>
+              <label htmlFor="customerEmail" className="mb-2 block font-semibold">
+                Customer email
+              </label>
+              <input
+                id="customerEmail"
+                type="email"
+                value={customerEmail}
+                onChange={(event) => setCustomerEmail(event.target.value)}
+                placeholder="customer@example.com"
+                autoComplete="email"
+                disabled={payLoading}
+                className="min-h-12 w-full max-w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-4 py-3 text-[var(--heading)] outline-none focus:border-[var(--accent-strong)] disabled:opacity-60 sm:py-4"
+              />
+              <p className="mt-2 text-sm text-[var(--text-muted)]">
+                eSIM order details will be associated with this email.
               </p>
-            ) : null}
+            </section>
           </div>
-        )}
+
+          <aside className="space-y-5 lg:sticky lg:top-6">
+            <section
+              className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6"
+              aria-labelledby="guest-summary-heading"
+            >
+              <h2
+                id="guest-summary-heading"
+                className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+              >
+                Order summary
+              </h2>
+              <p className="mt-4 text-2xl font-bold text-[var(--accent-strong)] sm:text-3xl">
+                {formatPrice(offer.priceUSD)}
+              </p>
+              <p className="mt-2 text-sm text-[var(--text-muted)]">
+                {offer.name}
+              </p>
+            </section>
+
+            <CheckoutTrustPanel />
+
+            <button
+              type="button"
+              onClick={pay}
+              disabled={payLoading}
+              aria-busy={payLoading}
+              className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 py-3 font-bold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:bg-[var(--accent)]"
+            >
+              {payLoading ? "Creating eSIM..." : "Purchase eSIM"}
+            </button>
+
+            {message && (
+              <div className="rounded-xl border border-[var(--danger-border)] bg-[var(--danger-bg)] p-4 text-[var(--danger-text)]">
+                {message}
+                {message.toLowerCase().includes("unavailable") ? (
+                  <p className="mt-3">
+                    <Link
+                      href="/contact"
+                      className="font-semibold underline underline-offset-2"
+                    >
+                      Contact support
+                    </Link>
+                  </p>
+                ) : null}
+              </div>
+            )}
+          </aside>
+        </div>
       </div>
     </main>
   );

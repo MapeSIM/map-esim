@@ -81,7 +81,7 @@ export default async function AccountWalletBuyReviewPage({
   });
 
   return (
-    <div className="mx-auto max-w-xl space-y-8">
+    <div className="space-y-8">
       <div>
         <Link
           href={back.href}
@@ -89,8 +89,8 @@ export default async function AccountWalletBuyReviewPage({
         >
           {back.label}
         </Link>
-        <h1 className="mt-4 text-2xl font-bold tracking-tight">Checkout</h1>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
+        <h1 className="mt-4 text-2xl font-bold tracking-tight text-[var(--heading)] sm:text-3xl">Checkout</h1>
+        <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)] sm:text-[15px]">
           Review your plan and choose how to fund this purchase.
         </p>
       </div>

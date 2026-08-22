@@ -28,6 +28,7 @@ import {
   CheckoutDisplayCurrencyNote,
   CheckoutMoney,
 } from "@/app/components/account/CheckoutMoney";
+import { CheckoutTrustPanel } from "@/app/components/account/CheckoutTrustPanel";
 
 type Props = {
   review: WalletPurchaseReview;
@@ -176,13 +177,18 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
     persistFundingChoice(useWallet && !walletDisabled, checked);
   }
 
+  const cardClass =
+    "rounded-[24px] border border-[var(--border)] bg-[var(--surface)] px-5 py-5 sm:px-6";
+
   return (
-    <form action={formAction} className="space-y-5" noValidate>
+    <form action={formAction} className="space-y-6" noValidate>
       <input type="hidden" name="purchaseId" value={review.purchaseId} />
       <input type="hidden" name="idempotencyKey" value={review.idempotencyKey} />
 
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
+      <div className="space-y-5">
       <section
-        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 sm:px-5"
+        className={cardClass}
         aria-labelledby={planHeadingId}
       >
         <h2
@@ -228,7 +234,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
       </section>
 
       <section
-        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 sm:px-5"
+        className={cardClass}
         aria-labelledby={customerHeadingId}
       >
         <h2
@@ -265,7 +271,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
       />
 
       <section
-        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 sm:px-5"
+        className={cardClass}
         aria-labelledby={rewardsHeadingId}
       >
         <h2
@@ -325,7 +331,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
       </section>
 
       <section
-        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 sm:px-5"
+        className={cardClass}
         aria-labelledby={walletHeadingId}
       >
         <h2
@@ -360,8 +366,56 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         </label>
       </section>
 
+      {gatewayRequired ? (
+        <section
+          className={cardClass}
+          aria-labelledby={paymentHeadingId}
+        >
+          <h2
+            id={paymentHeadingId}
+            className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+          >
+            Payment method
+          </h2>
+          <p className="mt-2 text-sm font-semibold text-[var(--heading)]">
+            Online payment
+          </p>
+          {gatewayReady ? (
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Continue to our secure payment page to pay{" "}
+              <CheckoutMoney cents={preview.gatewayAmountCents} />
+              {preview.walletAppliedCents > 0 ? (
+                <>
+                  {" "}
+                  after applying{" "}
+                  <CheckoutMoney
+                    cents={preview.walletAppliedCents}
+                    variant="wallet-deduction"
+                  />{" "}
+                  from your wallet
+                </>
+              ) : null}
+              . Your eSIM is created only after payment is verified.
+            </p>
+          ) : showGatewayUnavailable ? (
+            <>
+              <p className="mt-1 text-sm text-[var(--text-muted)]" role="status">
+                {CARD_PAYMENT_UNAVAILABLE_MESSAGE}
+              </p>
+              <p className="mt-3 text-sm text-[var(--text-muted)]">
+                Remaining due:{" "}
+                <CheckoutMoney cents={preview.gatewayAmountCents} />.
+              </p>
+            </>
+          ) : null}
+        </section>
+      ) : null}
+
+      </div>
+
+      <aside className="space-y-5 lg:sticky lg:top-6">
       <section
-        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 sm:px-5"
+        className={cardClass}
         aria-labelledby={orderHeadingId}
       >
         <h2
@@ -443,50 +497,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
 
       <CheckoutDisplayCurrencyNote />
 
-      {gatewayRequired ? (
-        <section
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 sm:px-5"
-          aria-labelledby={paymentHeadingId}
-        >
-          <h2
-            id={paymentHeadingId}
-            className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
-          >
-            Payment method
-          </h2>
-          <p className="mt-2 text-sm font-semibold text-[var(--heading)]">
-            Online payment
-          </p>
-          {gatewayReady ? (
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Continue to our secure payment page to pay{" "}
-              <CheckoutMoney cents={preview.gatewayAmountCents} />
-              {preview.walletAppliedCents > 0 ? (
-                <>
-                  {" "}
-                  after applying{" "}
-                  <CheckoutMoney
-                    cents={preview.walletAppliedCents}
-                    variant="wallet-deduction"
-                  />{" "}
-                  from your wallet
-                </>
-              ) : null}
-              . Your eSIM is created only after payment is verified.
-            </p>
-          ) : showGatewayUnavailable ? (
-            <>
-              <p className="mt-1 text-sm text-[var(--text-muted)]" role="status">
-                {CARD_PAYMENT_UNAVAILABLE_MESSAGE}
-              </p>
-              <p className="mt-3 text-sm text-[var(--text-muted)]">
-                Remaining due:{" "}
-                <CheckoutMoney cents={preview.gatewayAmountCents} />.
-              </p>
-            </>
-          ) : null}
-        </section>
-      ) : null}
+      <CheckoutTrustPanel />
 
       {zeroCashConfirm ? (
         <div
@@ -546,7 +557,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
           <button
             type="submit"
             disabled={purchaseBlocked || !confirmed}
-            className="inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] disabled:opacity-60"
+            className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
           >
             {pending
               ? fullWallet
@@ -561,7 +572,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         <button
           type="submit"
           disabled={purchaseBlocked}
-          className="inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] disabled:opacity-60"
+          className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
         >
           {pending ? "Starting secure payment…" : "Continue to Secure Payment"}
         </button>
@@ -569,11 +580,13 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         <button
           type="button"
           disabled
-          className="inline-flex h-11 w-full items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--heading)] opacity-60"
+          className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--heading)] opacity-60"
         >
           Continue to Payment
         </button>
       )}
+      </aside>
+      </div>
     </form>
   );
 }
