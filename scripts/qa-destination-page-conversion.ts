@@ -41,22 +41,21 @@ function main() {
 
   assert.match(listing, /planCardSecondaryLines/);
   assert.match(listing, /planCardLineLabel/);
-  assert.match(listing, /PLAN_CARD_RECOMMENDED_LABEL/);
-  assert.match(listing, /data-plan-recommended/);
+  assert.doesNotMatch(listing, /PLAN_CARD_RECOMMENDED_LABEL/);
+  assert.doesNotMatch(listing, /data-plan-recommended/);
   assert.doesNotMatch(listing, /PLAN_PURCHASE_TRUST_LINE/);
   assert.doesNotMatch(listing, /PLAN_CARD_BENEFITS/);
-  assert.match(listing, /Helpful destination links/);
+  assert.doesNotMatch(listing, /Helpful destination links/);
   assert.match(listing, /Buy Now/);
   assert.match(listing, /bg-white/);
-  assert.match(listing, /Need more options\?/);
-  assert.doesNotMatch(listing, /device-compatibility/);
-  assert.doesNotMatch(listing, /Check compatibility/);
-  assert.match(listing, /href="\/install\/iphone"/);
-  assert.match(listing, /href="\/install\/android"/);
-  assert.match(listing, /href="\/how-it-works"/);
-  assert.match(listing, /More destinations/);
-  assert.match(listing, /relatedRegional/);
-  assert.match(listing, /regional plans/);
+  assert.doesNotMatch(listing, /Need more options\?/);
+  assert.match(listing, /href="\/device-compatibility"/);
+  assert.match(listing, /Check compatibility/);
+  assert.doesNotMatch(listing, /href="\/install\/iphone"/);
+  assert.doesNotMatch(listing, /href="\/install\/android"/);
+  assert.doesNotMatch(listing, /How MAP eSIM works/);
+  assert.doesNotMatch(listing, /More destinations/);
+  assert.doesNotMatch(listing, /how-it-works/);
   assert.match(listing, /data-plan-sticky-cta/);
   assert.match(listing, /md:hidden/);
   assert.match(

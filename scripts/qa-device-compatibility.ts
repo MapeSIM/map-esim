@@ -48,9 +48,10 @@ function main() {
   assert.doesNotMatch(page, /DEVICE_FAMILIES|Likely compatible|Device brand/);
   console.log("   ok");
 
-  console.log("3) Footer entry points");
+  console.log("3) Plan-page + footer entry points");
+  assert.match(plansListing, /href="\/device-compatibility"/);
+  assert.match(plansListing, /Check compatibility/);
   assert.match(footer, /href:\s*["']\/device-compatibility["']/);
-  assert.doesNotMatch(plansListing, /href="\/device-compatibility"/);
   console.log("   ok");
 
   console.log("4) Purchase / payment / provider paths untouched by this QA scope");

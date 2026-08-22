@@ -85,8 +85,8 @@ function main() {
   assert.match(section, /faqPage\(/);
   assert.match(section, /breadcrumbList\(/);
   assert.match(section, /buildCountrySeoContent/);
-  assert.match(section, /href="\/install\/iphone"/);
-  assert.match(section, /href="\/install\/android"/);
+  assert.doesNotMatch(section, /href="\/install\/iphone"/);
+  assert.doesNotMatch(section, /href="\/install\/android"/);
   assert.doesNotMatch(section, /PAYMENT_GATEWAY_ENABLED|applyVerifiedPaymentEvent/);
   console.log("PASS seo_section_structure");
 

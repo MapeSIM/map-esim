@@ -1,4 +1,3 @@
-import Link from "next/link";
 import Breadcrumbs from "@/app/components/seo/Breadcrumbs";
 import JsonLd from "@/app/components/seo/JsonLd";
 import { BRAND_NAME } from "@/app/lib/brand";
@@ -129,22 +128,6 @@ export function CountrySeoContent({
               </li>
             ))}
           </ol>
-          <p className="mt-6 text-sm text-[var(--text-muted)]">
-            Need device steps?{" "}
-            <Link
-              href="/install/iphone"
-              className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-            >
-              iPhone guide
-            </Link>
-            <span className="text-[var(--text-soft)]"> · </span>
-            <Link
-              href="/install/android"
-              className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-            >
-              Android guide
-            </Link>
-          </p>
         </div>
       </section>
 

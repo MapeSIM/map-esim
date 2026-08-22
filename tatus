@@ -1,0 +1,173 @@
+[1mdiff --git a/app/components/countries/CountrySeoContent.tsx b/app/components/countries/CountrySeoContent.tsx[m
+[1mindex 59e87e5..b900948 100644[m
+[1m--- a/app/components/countries/CountrySeoContent.tsx[m
+[1m+++ b/app/components/countries/CountrySeoContent.tsx[m
+[36m@@ -1,4 +1,3 @@[m
+[31m-import Link from "next/link";[m
+ import Breadcrumbs from "@/app/components/seo/Breadcrumbs";[m
+ import JsonLd from "@/app/components/seo/JsonLd";[m
+ import { BRAND_NAME } from "@/app/lib/brand";[m
+[36m@@ -129,22 +128,6 @@[m [mexport function CountrySeoContent({[m
+               </li>[m
+             ))}[m
+           </ol>[m
+[31m-          <p className="mt-6 text-sm text-[var(--text-muted)]">[m
+[31m-            Need device steps?{" "}[m
+[31m-            <Link[m
+[31m-              href="/install/iphone"[m
+[31m-              className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"[m
+[31m-            >[m
+[31m-              iPhone guide[m
+[31m-            </Link>[m
+[31m-            <span className="text-[var(--text-soft)]"> · </span>[m
+[31m-            <Link[m
+[31m-              href="/install/android"[m
+[31m-              className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"[m
+[31m-            >[m
+[31m-              Android guide[m
+[31m-            </Link>[m
+[31m-          </p>[m
+         </div>[m
+       </section>[m
+ [m
+[1mdiff --git a/app/components/plans/PlansListing.tsx b/app/components/plans/PlansListing.tsx[m
+[1mindex a9b6e99..6b231e3 100644[m
+[1m--- a/app/components/plans/PlansListing.tsx[m
+[1m+++ b/app/components/plans/PlansListing.tsx[m
+[36m@@ -5,14 +5,12 @@[m [mimport Link from "next/link";[m
+ import Image from "next/image";[m
+ import {[m
+   ArrowLeft,[m
+[31m-  ArrowRight,[m
+   Filter,[m
+   Globe2,[m
+   MapPinned,[m
+ } from "lucide-react";[m
+ import type { VesimOffer } from "@/app/lib/vesim/offers";[m
+ import type { VesimDestination } from "@/app/lib/vesim/destinations";[m
+[31m-import { destinationPath } from "@/app/lib/vesim/destinations";[m
+ import {[m
+   destinationDisplayName,[m
+   resolveDestinationFlagVisual,[m
+[36m@@ -44,10 +42,7 @@[m [mimport {[m
+   planCardLineLabel,[m
+   planCardSecondaryLines,[m
+ } from "@/app/lib/plans/planOfferPresentation";[m
+[31m-import {[m
+[31m-  PLAN_CARD_RECOMMENDED_LABEL,[m
+[31m-  PLAN_STICKY_TRUST_LINE,[m
+[31m-} from "@/app/lib/plans/planCardConversion";[m
+[32m+[m[32mimport { PLAN_STICKY_TRUST_LINE } from "@/app/lib/plans/planCardConversion";[m
+ [m
+ type PlansListingProps = {[m
+   destination: VesimDestination;[m
+[36m@@ -215,7 +210,7 @@[m [mexport default function PlansListing({[m
+   loading = false,[m
+   error = "",[m
+   countryNames = {},[m
+[31m-  relatedRegional = null,[m
+[32m+[m[32m  relatedRegional: _relatedRegional = null,[m
+   checkoutHref,[m
+   children,[m
+ }: PlansListingProps) {[m
+[36m@@ -368,7 +363,6 @@[m [mexport default function PlansListing({[m
+   const displayName = destinationDisplayName(destination);[m
+   const heading = `${displayName} eSIM Plans`;[m
+   const stickyOffer = groups[0]?.plans[0] ?? filtered[0] ?? null;[m
+[31m-  const recommendedOfferId = stickyOffer?.id ?? null;[m
+   const showStickyBuy =[m
+     !loading && !error && !selectedOffer && stickyOffer != null;[m
+ [m
+[36m@@ -425,71 +419,20 @@[m [mexport default function PlansListing({[m
+               </p>[m
+             </div>[m
+           </div>[m
+[31m-[m
+[31m-          {destination.kind === "country" && relatedRegional && ([m
+[31m-            <Link[m
+[31m-              href={destinationPath(relatedRegional)}[m
+[31m-              className="[m
+[31m-                mt-4 flex items-start justify-between gap-3 rounded-2xl[m
+[31m-                border border-[var(--border-strong)] bg-[var(--surface-3)][m
+[31m-                px-3.5 py-3 text-sm text-[var(--text)] transition[m
+[31m-                hover:border-[var(--accent-strong)]/45 hover:bg-[var(--surface)][m
+[31m-                sm:mt-5 sm:items-center sm:px-4 sm:py-3.5[m
+[31m-              "[m
+[31m-            >[m
+[31m-              <div className="min-w-0">[m
+[31m-                <p className="font-semibold leading-snug text-[var(--heading)]">[m
+[31m-                  Need more options?[m
+[31m-                </p>[m
+[31m-                <p className="mt-0.5 text-[13px] leading-snug text-[var(--text-muted)] sm:text-sm">[m
+[31m-                  Check {destinationDisplayName(relatedRegional)} regional plans — they may offer[m
+[31m-                  better value for your trip.[m
+[31m-                </p>[m
+[31m-              </div>[m
+[31m-              <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-strong)] sm:mt-0" />[m
+[31m-            </Link>[m
+[31m-          )}[m
+         </div>[m
+       </section>[m
+ [m
+       <section className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6 sm:py-10">[m
+[31m-        <nav[m
+[31m-          aria-label="Helpful destination links"[m
+[31m-          className="mb-6 flex flex-wrap gap-x-4 gap-y-2 text-sm"[m
+[31m-        >[m
+[31m-          <Link[m
+[31m-            href="/install/iphone"[m
+[31m-            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"[m
+[31m-          >[m
+[31m-            iPhone install guide[m
+[31m-          </Link>[m
+[31m-          <Link[m
+[31m-            href="/install/android"[m
+[31m-            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"[m
+[31m-          >[m
+[31m-            Android install guide[m
+[31m-          </Link>[m
+[32m+[m[32m        <p className="mb-6 text-sm leading-relaxed text-[var(--text-muted)]">[m
+[32m+[m[32m          Before buying: confirm your device supports eSIM and is[m
+[32m+[m[32m          carrier-unlocked.{" "}[m
+           <Link[m
+[31m-            href="/how-it-works"[m
+[31m-            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"[m
+[32m+[m[32m            href="/device-compatibility"[m
+[32m+[m[32m            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"[m
+           >[m
+[31m-            How MAP eSIM works[m
+[32m+[m[32m            Check compatibility →[m
+           </Link>[m
+[31m-          <Link[m
+[31m-            href="/countries"[m
+[31m-            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"[m
+[31m-          >[m
+[31m-            More destinations[m
+[31m-          </Link>[m
+[31m-          {relatedRegional ? ([m
+[31m-            <Link[m
+[31m-              href={destinationPath(relatedRegional)}[m
+[31m-              className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"[m
+[31m-            >[m
+[31m-              {destinationDisplayName(relatedRegional)} regional plans[m
+[31m-            </Link>[m
+[31m-          ) : null}[m
+[31m-        </nav>[m
+[32m+[m[32m        </p>[m
+         {loading && ([m
+           <div className="rounded-3xl border border-[var(--border-strong)] bg-[var(--surface)] p-10 text-center text-[var(--text)]">[m
+             Loading eSIM plans...[m
+[36m@@ -717,33 +660,19 @@[m [mexport default function PlansListing({[m
+                           (line) =>[m
+                             line.kind === "validity" || line.kind === "operator"[m
+                         );[m
+[31m-                        const isRecommended = offer.id === recommendedOfferId;[m
+                         return ([m
+                           <article[m
+                             key={offer.id}[m
+[31m-                            data-plan-recommended={[m
+[31m-                              isRecommended ? "true" : undefined[m
+[31m-                            }[m
+[31m-                            className={`[m
+[32m+[m[32m                            className="[m
+                      

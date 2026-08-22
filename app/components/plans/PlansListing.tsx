@@ -5,14 +5,12 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   ArrowLeft,
-  ArrowRight,
   Filter,
   Globe2,
   MapPinned,
 } from "lucide-react";
 import type { VesimOffer } from "@/app/lib/vesim/offers";
 import type { VesimDestination } from "@/app/lib/vesim/destinations";
-import { destinationPath } from "@/app/lib/vesim/destinations";
 import {
   destinationDisplayName,
   resolveDestinationFlagVisual,
@@ -44,10 +42,7 @@ import {
   planCardLineLabel,
   planCardSecondaryLines,
 } from "@/app/lib/plans/planOfferPresentation";
-import {
-  PLAN_CARD_RECOMMENDED_LABEL,
-  PLAN_STICKY_TRUST_LINE,
-} from "@/app/lib/plans/planCardConversion";
+import { PLAN_STICKY_TRUST_LINE } from "@/app/lib/plans/planCardConversion";
 
 type PlansListingProps = {
   destination: VesimDestination;
@@ -215,7 +210,7 @@ export default function PlansListing({
   loading = false,
   error = "",
   countryNames = {},
-  relatedRegional = null,
+  relatedRegional: _relatedRegional = null,
   checkoutHref,
   children,
 }: PlansListingProps) {
@@ -368,7 +363,6 @@ export default function PlansListing({
   const displayName = destinationDisplayName(destination);
   const heading = `${displayName} eSIM Plans`;
   const stickyOffer = groups[0]?.plans[0] ?? filtered[0] ?? null;
-  const recommendedOfferId = stickyOffer?.id ?? null;
   const showStickyBuy =
     !loading && !error && !selectedOffer && stickyOffer != null;
 
@@ -425,71 +419,20 @@ export default function PlansListing({
               </p>
             </div>
           </div>
-
-          {destination.kind === "country" && relatedRegional && (
-            <Link
-              href={destinationPath(relatedRegional)}
-              className="
-                mt-4 flex items-start justify-between gap-3 rounded-2xl
-                border border-[var(--border-strong)] bg-[var(--surface-3)]
-                px-3.5 py-3 text-sm text-[var(--text)] transition
-                hover:border-[var(--accent-strong)]/45 hover:bg-[var(--surface)]
-                sm:mt-5 sm:items-center sm:px-4 sm:py-3.5
-              "
-            >
-              <div className="min-w-0">
-                <p className="font-semibold leading-snug text-[var(--heading)]">
-                  Need more options?
-                </p>
-                <p className="mt-0.5 text-[13px] leading-snug text-[var(--text-muted)] sm:text-sm">
-                  Check {destinationDisplayName(relatedRegional)} regional plans — they may offer
-                  better value for your trip.
-                </p>
-              </div>
-              <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-strong)] sm:mt-0" />
-            </Link>
-          )}
         </div>
       </section>
 
       <section className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6 sm:py-10">
-        <nav
-          aria-label="Helpful destination links"
-          className="mb-6 flex flex-wrap gap-x-4 gap-y-2 text-sm"
-        >
+        <p className="mb-6 text-sm leading-relaxed text-[var(--text-muted)]">
+          Before buying: confirm your device supports eSIM and is
+          carrier-unlocked.{" "}
           <Link
-            href="/install/iphone"
-            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+            href="/device-compatibility"
+            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
           >
-            iPhone install guide
+            Check compatibility →
           </Link>
-          <Link
-            href="/install/android"
-            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-          >
-            Android install guide
-          </Link>
-          <Link
-            href="/how-it-works"
-            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-          >
-            How MAP eSIM works
-          </Link>
-          <Link
-            href="/countries"
-            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-          >
-            More destinations
-          </Link>
-          {relatedRegional ? (
-            <Link
-              href={destinationPath(relatedRegional)}
-              className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-            >
-              {destinationDisplayName(relatedRegional)} regional plans
-            </Link>
-          ) : null}
-        </nav>
+        </p>
         {loading && (
           <div className="rounded-3xl border border-[var(--border-strong)] bg-[var(--surface)] p-10 text-center text-[var(--text)]">
             Loading eSIM plans...
@@ -717,33 +660,19 @@ export default function PlansListing({
                           (line) =>
                             line.kind === "validity" || line.kind === "operator"
                         );
-                        const isRecommended = offer.id === recommendedOfferId;
                         return (
                           <article
                             key={offer.id}
-                            data-plan-recommended={
-                              isRecommended ? "true" : undefined
-                            }
-                            className={`
+                            className="
                               group flex h-full min-h-[220px] min-w-0 flex-col rounded-[22px]
-                              border bg-[var(--surface)] p-4
+                              border border-[var(--border)] bg-[var(--surface)] p-4
                               shadow-[0_10px_28px_rgba(0,0,0,0.2)]
                               transition duration-200
-                              hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(0,0,0,0.32)]
+                              hover:-translate-y-1 hover:border-[var(--border-hover)]
+                              hover:shadow-[0_18px_40px_rgba(0,0,0,0.32)]
                               sm:p-5
-                              ${
-                                isRecommended
-                                  ? "border-[var(--accent-strong)]/55"
-                                  : "border-[var(--border)] hover:border-[var(--border-hover)]"
-                              }
-                            `}
+                            "
                           >
-                            {isRecommended ? (
-                              <p className="mb-3 inline-flex w-fit rounded-full bg-[var(--accent-strong)] px-2.5 py-0.5 text-[11px] font-bold text-[var(--accent-ink)]">
-                                {PLAN_CARD_RECOMMENDED_LABEL}
-                              </p>
-                            ) : null}
-
                             <div className="flex min-w-0 items-start justify-between gap-3">
                               <h3 className="min-w-0 break-words text-[1.65rem] font-bold leading-none tracking-tight text-[var(--heading)] sm:text-3xl">
                                 <span className="sr-only">Data </span>
