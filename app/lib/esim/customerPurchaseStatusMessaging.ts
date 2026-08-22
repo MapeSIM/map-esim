@@ -32,6 +32,9 @@ export const CUSTOMER_STALE_CHECKOUT_DISPLAY_MS = 30 * 60 * 1000;
 export const CUSTOMER_STALE_CHECKOUT_MESSAGE =
   "This checkout may no longer be active. You can continue checkout or start again.";
 
+/** Customer UI only. Does not delete rows or change purchase status. */
+export const CUSTOMER_PENDING_PURCHASES_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+
 export const CUSTOMER_PENDING_PURCHASE_STATUSES = [
   "READY",
   "AWAITING_GATEWAY_PAYMENT",
@@ -168,4 +171,25 @@ export function isCustomerStaleCheckoutDisplay(input: {
         : Date.now();
   if (!Number.isFinite(nowMs)) return false;
   return nowMs - updatedMs >= CUSTOMER_STALE_CHECKOUT_DISPLAY_MS;
+}
+
+export function isCustomerPendingPurchaseVisibleInUi(input: {
+  updatedAt: Date | string | number;
+  now?: Date | number;
+}): boolean {
+  const updatedMs =
+    input.updatedAt instanceof Date
+      ? input.updatedAt.getTime()
+      : typeof input.updatedAt === "number"
+        ? input.updatedAt
+        : Date.parse(String(input.updatedAt));
+  if (!Number.isFinite(updatedMs)) return false;
+  const nowMs =
+    input.now instanceof Date
+      ? input.now.getTime()
+      : typeof input.now === "number"
+        ? input.now
+        : Date.now();
+  if (!Number.isFinite(nowMs)) return false;
+  return nowMs - updatedMs <= CUSTOMER_PENDING_PURCHASES_MAX_AGE_MS;
 }

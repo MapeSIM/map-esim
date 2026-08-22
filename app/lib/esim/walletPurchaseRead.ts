@@ -9,8 +9,10 @@ import { prisma } from "@/app/lib/db";
 import { calculateCustomerCheckoutFunding } from "@/app/lib/esim/purchaseFunding";
 import { payablePackageCents } from "@/app/lib/promo/promoDiscount";
 import {
+  CUSTOMER_PENDING_PURCHASES_MAX_AGE_MS,
   CUSTOMER_STALE_CHECKOUT_MESSAGE,
   customerPendingPurchaseHref,
+  isCustomerPendingPurchaseVisibleInUi,
   isCustomerStaleCheckoutDisplay,
   resolveCustomerPendingPurchaseVisibility,
 } from "@/app/lib/esim/customerPurchaseStatusMessaging";
@@ -464,7 +466,7 @@ export async function getReconciliationWalletPurchase(
   };
 }
 
-export const CUSTOMER_PENDING_PURCHASES_LIMIT = 20;
+export const CUSTOMER_PENDING_PURCHASES_LIMIT = 3;
 
 const PENDING_PURCHASE_STATUSES: WalletEsimPurchaseStatus[] = [
   WalletEsimPurchaseStatus.READY,
@@ -501,6 +503,10 @@ export async function listCustomerPendingWalletPurchases(
   });
   if (!owner || owner.deletedAt || owner.role !== Role.CUSTOMER) return [];
 
+  const now = new Date();
+  const visibleAfter = new Date(
+    now.getTime() - CUSTOMER_PENDING_PURCHASES_MAX_AGE_MS
+  );
   const rows = await prisma.walletEsimPurchase.findMany({
     where: {
       customerUserId: owner.id,
@@ -513,6 +519,7 @@ export async function listCustomerPendingWalletPurchases(
         ],
       },
       status: { in: PENDING_PURCHASE_STATUSES },
+      updatedAt: { gte: visibleAfter },
     },
     orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     take: CUSTOMER_PENDING_PURCHASES_LIMIT,
@@ -529,6 +536,14 @@ export async function listCustomerPendingWalletPurchases(
 
   const items: CustomerPendingWalletPurchase[] = [];
   for (const row of rows) {
+    if (
+      !isCustomerPendingPurchaseVisibleInUi({
+        updatedAt: row.updatedAt,
+        now,
+      })
+    ) {
+      continue;
+    }
     const vis = resolveCustomerPendingPurchaseVisibility(row.status);
     const href = customerPendingPurchaseHref(row.status, row.id);
     if (!vis || !href) continue;

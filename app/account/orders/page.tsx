@@ -1,8 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import CustomerPendingPurchases from "@/app/components/account/CustomerPendingPurchases";
 import { requireSession } from "@/app/lib/auth/session";
-import { listCustomerPendingWalletPurchases } from "@/app/lib/esim/walletPurchaseRead";
 import { listCustomerOrders } from "@/app/lib/orders/customerOrders";
 import type { CustomerEsimStatusBadge } from "@/app/lib/orders/customerOrderDisplay";
 
@@ -43,10 +41,6 @@ export default async function AccountOrdersPage({
     from: params.from,
     to: params.to,
   });
-  const pendingPurchases =
-    user.role === "CUSTOMER"
-      ? await listCustomerPendingWalletPurchases(user.id).catch(() => [])
-      : [];
 
   return (
     <div className="min-w-0 space-y-6">
@@ -57,8 +51,6 @@ export default async function AccountOrdersPage({
           options and secure ICCID reveal.
         </p>
       </div>
-
-      <CustomerPendingPurchases purchases={pendingPurchases} />
 
       <form
         method="get"
@@ -143,10 +135,6 @@ export default async function AccountOrdersPage({
           result.from ||
           result.to ? (
             <p>No eSIMs match your filters.</p>
-          ) : pendingPurchases.length > 0 ? (
-            <p className="font-medium text-[var(--heading)]">
-              No completed eSIMs yet. Unfinished purchases are listed above.
-            </p>
           ) : (
             <>
               <p className="font-medium text-[var(--heading)]">

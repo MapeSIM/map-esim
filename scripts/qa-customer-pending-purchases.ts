@@ -7,11 +7,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   CUSTOMER_PENDING_PURCHASE_STATUSES,
+  CUSTOMER_PENDING_PURCHASES_MAX_AGE_MS,
   CUSTOMER_PURCHASE_PROCESSING_MESSAGE,
   CUSTOMER_PURCHASE_REVIEW_NEEDED_MESSAGE,
   CUSTOMER_STALE_CHECKOUT_DISPLAY_MS,
   CUSTOMER_STALE_CHECKOUT_MESSAGE,
   customerPendingPurchaseHref,
+  isCustomerPendingPurchaseVisibleInUi,
   isCustomerStaleCheckoutDisplay,
   resolveCustomerPendingPurchaseVisibility,
 } from "../app/lib/esim/customerPurchaseStatusMessaging";
@@ -144,10 +146,32 @@ function main() {
   );
   console.log("PASS stale_checkout_display_only");
 
+  assert.equal(CUSTOMER_PENDING_PURCHASES_MAX_AGE_MS, 3 * 24 * 60 * 60 * 1000);
+  assert.equal(
+    isCustomerPendingPurchaseVisibleInUi({
+      updatedAt: now - CUSTOMER_PENDING_PURCHASES_MAX_AGE_MS,
+      now,
+    }),
+    true
+  );
+  assert.equal(
+    isCustomerPendingPurchaseVisibleInUi({
+      updatedAt: now - CUSTOMER_PENDING_PURCHASES_MAX_AGE_MS - 1,
+      now,
+    }),
+    false
+  );
+  console.log("PASS pending_ui_age_window_display_only");
+
   const reader = read("app/lib/esim/walletPurchaseRead.ts");
   const listFn = reader.slice(
     reader.indexOf("export const CUSTOMER_PENDING_PURCHASES_LIMIT")
   );
+  assert.match(listFn, /export const CUSTOMER_PENDING_PURCHASES_LIMIT = 3;/);
+  assert.match(listFn, /orderBy:\s*\[\s*\{\s*updatedAt:\s*"desc"/);
+  assert.match(listFn, /take:\s*CUSTOMER_PENDING_PURCHASES_LIMIT/);
+  assert.match(listFn, /updatedAt:\s*\{\s*gte:\s*visibleAfter\s*\}/);
+  assert.match(listFn, /isCustomerPendingPurchaseVisibleInUi/);
   assert.match(listFn, /adminUserId:\s*null/);
   assert.match(listFn, /WalletEsimPurchaseStatus\.READY/);
   assert.match(listFn, /WalletEsimPurchaseStatus\.AWAITING_GATEWAY_PAYMENT/);
@@ -166,6 +190,7 @@ function main() {
   assert.doesNotMatch(listFn, /PAYMENT_GATEWAY_ENABLED|allowProduction/);
   assert.doesNotMatch(listFn, /EXPIRED|cron|setInterval|node-cron|expiresAt/);
   assert.doesNotMatch(listFn, /\.update\(|status:\s*["']EXPIRED["']/);
+  assert.doesNotMatch(listFn, /deleteMany|\.delete\(/);
   console.log("PASS pending_reader_read_only");
 
   const accountPage = read("app/account/page.tsx");
@@ -173,8 +198,11 @@ function main() {
   const buyPage = read("app/account/esim/buy/page.tsx");
   const listUi = read("app/components/account/CustomerPendingPurchases.tsx");
   assert.match(accountPage, /listCustomerPendingWalletPurchases/);
-  assert.match(ordersPage, /listCustomerPendingWalletPurchases/);
-  assert.match(buyPage, /listCustomerPendingWalletPurchases/);
+  assert.match(accountPage, /CustomerPendingPurchases/);
+  assert.doesNotMatch(ordersPage, /listCustomerPendingWalletPurchases/);
+  assert.doesNotMatch(ordersPage, /CustomerPendingPurchases/);
+  assert.doesNotMatch(buyPage, /listCustomerPendingWalletPurchases/);
+  assert.doesNotMatch(buyPage, /CustomerPendingPurchases/);
   assert.match(listUi, /Continue checkout|\{purchase\.ctaLabel\}/);
   assert.match(listUi, /\{purchase\.ctaLabel\}/);
   assert.match(listUi, /\{purchase\.href\}/);
@@ -185,7 +213,7 @@ function main() {
   assert.doesNotMatch(ordersPage, /prepareWalletEsimPurchase|executeCreditCheckout/);
   assert.doesNotMatch(listUi, /prepareWalletEsimPurchase|executeCreditCheckout/);
   assert.match(buyPage, /newIdempotencyKey\(\)/);
-  console.log("PASS account_surfaces_list_existing_only");
+  console.log("PASS account_overview_only");
 
   const messaging = read("app/lib/esim/customerPurchaseStatusMessaging.ts");
   assert.match(messaging, /CUSTOMER_STALE_CHECKOUT_MESSAGE/);

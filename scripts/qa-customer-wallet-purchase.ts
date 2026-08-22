@@ -312,7 +312,12 @@ function main() {
     readSrc.indexOf("export async function listCustomerPendingWalletPurchases")
   );
   assert.match(pendingListFn, /staleGuidance:/);
+  assert.match(pendingListFn, /updatedAt:\s*\{\s*gte:\s*visibleAfter\s*\}/);
+  assert.match(readSrc, /export const CUSTOMER_PENDING_PURCHASES_LIMIT = 3;/);
   assert.doesNotMatch(pendingListFn, /EXPIRED/);
+  assert.doesNotMatch(pendingListFn, /deleteMany|\.delete\(/);
+  assert.doesNotMatch(buyPage, /CustomerPendingPurchases/);
+  assert.doesNotMatch(buyPage, /listCustomerPendingWalletPurchases/);
   assert.match(reconPage, /resolveCustomerPurchaseStatusMessaging/);
   assert.match(reconPage, /customerPurchaseStatusMessage/);
   assert.doesNotMatch(reconPage, /provider result is uncertain/i);
