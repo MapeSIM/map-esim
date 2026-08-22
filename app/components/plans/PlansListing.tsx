@@ -6,7 +6,6 @@ import Image from "next/image";
 import {
   ArrowLeft,
   ArrowRight,
-  CheckCircle2,
   Filter,
   Globe2,
   MapPinned,
@@ -46,7 +45,7 @@ import {
   planCardSecondaryLines,
 } from "@/app/lib/plans/planOfferPresentation";
 import {
-  PLAN_CARD_BENEFITS,
+  PLAN_CARD_RECOMMENDED_LABEL,
   PLAN_PURCHASE_TRUST_LINE,
   PLAN_STICKY_TRUST_LINE,
 } from "@/app/lib/plans/planCardConversion";
@@ -370,6 +369,7 @@ export default function PlansListing({
   const displayName = destinationDisplayName(destination);
   const heading = `${displayName} eSIM Plans`;
   const stickyOffer = groups[0]?.plans[0] ?? filtered[0] ?? null;
+  const recommendedOfferId = stickyOffer?.id ?? null;
   const showStickyBuy =
     !loading && !error && !selectedOffer && stickyOffer != null;
 
@@ -725,36 +725,42 @@ export default function PlansListing({
                           isRegionalOrGlobal,
                           formatValidity: formatValidityPhrase,
                         });
+                        const isRecommended = offer.id === recommendedOfferId;
                         return (
                           <article
                             key={offer.id}
-                            className="
+                            data-plan-recommended={
+                              isRecommended ? "true" : undefined
+                            }
+                            className={`
                               group flex h-full min-h-[220px] min-w-0 flex-col rounded-[22px]
-                              border border-[var(--border)] bg-[var(--surface)]
-                              p-4 shadow-[0_10px_28px_rgba(0,0,0,0.2)]
+                              border bg-[var(--surface)] p-4
+                              shadow-[0_10px_28px_rgba(0,0,0,0.2)]
                               transition duration-200
-                              hover:-translate-y-1 hover:border-[var(--border-hover)]
-                              hover:shadow-[0_18px_40px_rgba(0,0,0,0.32)]
+                              hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(0,0,0,0.32)]
                               sm:p-5
-                            "
+                              ${
+                                isRecommended
+                                  ? "border-[var(--accent-strong)]/55"
+                                  : "border-[var(--border)] hover:border-[var(--border-hover)]"
+                              }
+                            `}
                           >
-                            <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-1">
-                              <div className="min-w-0">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
-                                  Data
-                                </p>
-                                <h3 className="mt-1 min-w-0 break-words text-xl font-bold tracking-tight text-[var(--heading)] sm:text-2xl">
-                                  {offer.dataFormatted}
-                                </h3>
-                              </div>
-                              <div className="shrink-0 text-right">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
-                                  Price
-                                </p>
-                                <p className="mt-1 text-xl font-bold text-[var(--accent-strong)] sm:text-2xl">
-                                  {formatPrice(offer.priceUSD)}
-                                </p>
-                              </div>
+                            {isRecommended ? (
+                              <p className="mb-3 inline-flex w-fit rounded-full bg-[var(--accent-strong)] px-2.5 py-0.5 text-[11px] font-bold text-[var(--accent-ink)]">
+                                {PLAN_CARD_RECOMMENDED_LABEL}
+                              </p>
+                            ) : null}
+
+                            <div className="flex min-w-0 items-start justify-between gap-3">
+                              <h3 className="min-w-0 break-words text-[1.65rem] font-bold leading-none tracking-tight text-[var(--heading)] sm:text-3xl">
+                                <span className="sr-only">Data </span>
+                                {offer.dataFormatted}
+                              </h3>
+                              <p className="shrink-0 text-right text-xl font-bold leading-none text-[var(--accent-strong)] sm:text-2xl">
+                                <span className="sr-only">Price </span>
+                                {formatPrice(offer.priceUSD)}
+                              </p>
                             </div>
 
                             {/*
@@ -762,17 +768,14 @@ export default function PlansListing({
                               planCardSecondaryLines — never packageInfo,
                               description, notes, or raw network.
                             */}
-                            <div className="mt-4 flex flex-1 flex-col gap-2 text-sm text-[var(--text)]">
+                            <div className="mt-4 flex flex-1 flex-wrap content-start gap-1.5">
                               {secondaryLines.map((line) => (
                                 <p
                                   key={`${offer.id}-${line.kind}`}
-                                  className={
-                                    line.kind === "operator"
-                                      ? "truncate text-[var(--text-soft)]"
-                                      : undefined
-                                  }
+                                  className="max-w-full truncate rounded-full border border-[var(--border-strong)] bg-[var(--surface-2)] px-2.5 py-1 text-xs font-medium text-[var(--text)]"
+                                  title={line.text}
                                 >
-                                  <span className="font-semibold text-[var(--text-muted)]">
+                                  <span className="sr-only">
                                     {planCardLineLabel(line.kind)}:{" "}
                                   </span>
                                   {line.text}
@@ -780,51 +783,35 @@ export default function PlansListing({
                               ))}
                             </div>
 
-                            <ul className="mt-3 flex flex-wrap gap-1.5">
-                              {PLAN_CARD_BENEFITS.map((benefit) => (
-                                <li
-                                  key={benefit}
-                                  className="rounded-full border border-[var(--border-strong)] bg-[var(--surface-2)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text)]"
-                                >
-                                  {benefit}
-                                </li>
-                              ))}
-                            </ul>
-
-                            <div className="mt-auto grid grid-cols-1 gap-3 pt-6 min-[400px]:grid-cols-2">
-                              <button
-                                type="button"
-                                onClick={() => setSelectedOffer(offer)}
-                                className="
-                                  inline-flex min-h-11 items-center justify-center
-                                  rounded-xl border border-[var(--border-strong)]
-                                  bg-[var(--surface-2)] px-3 text-sm font-semibold text-[var(--heading)]
-                                  transition hover:border-[var(--accent-strong)]/50
-                                "
-                              >
-                                {isRegionalOrGlobal
-                                  ? "Coverage details"
-                                  : "Plan details"}
-                              </button>
+                            <div className="mt-auto flex flex-col gap-2 pt-5">
                               <Link
                                 href={resolveCheckoutHref(
                                   offer,
                                   destination.code
                                 )}
                                 className="
-                                  inline-flex min-h-11 items-center justify-center
+                                  inline-flex min-h-12 items-center justify-center
                                   rounded-xl bg-[var(--accent-strong)] px-3 text-sm font-bold
                                   text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]
                                 "
                               >
                                 Buy now
                               </Link>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedOffer(offer)}
+                                className="
+                                  inline-flex min-h-10 items-center justify-center
+                                  text-sm font-semibold text-[var(--text-muted)]
+                                  underline-offset-2 hover:text-[var(--heading)] hover:underline
+                                "
+                              >
+                                {isRegionalOrGlobal
+                                  ? "Coverage details"
+                                  : "Plan details"}
+                              </button>
                             </div>
-                            <p className="mt-3 flex items-start gap-1.5 text-xs leading-relaxed text-[var(--text-muted)]">
-                              <CheckCircle2
-                                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--accent-strong)]"
-                                aria-hidden="true"
-                              />
+                            <p className="mt-2 text-center text-[11px] leading-relaxed text-[var(--text-soft)]">
                               {PLAN_PURCHASE_TRUST_LINE}
                             </p>
                           </article>

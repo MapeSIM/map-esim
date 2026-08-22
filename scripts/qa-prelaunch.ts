@@ -216,6 +216,7 @@ const EXISTING_QA: QaJob[] = [
     label: "affiliates & partnerships",
   },
   { kind: "npm", script: "qa:navbar-layout", label: "navbar layout" },
+  { kind: "npm", script: "qa:install-guides", label: "install guide pages" },
 ];
 
 // Optional if present from SEO metadata work-in-progress

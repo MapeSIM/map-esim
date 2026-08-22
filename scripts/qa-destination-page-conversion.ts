@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  PLAN_CARD_BENEFITS,
+  PLAN_CARD_RECOMMENDED_LABEL,
   PLAN_PURCHASE_TRUST_LINE,
   PLAN_STICKY_TRUST_LINE,
 } from "../app/lib/plans/planCardConversion";
@@ -21,8 +21,7 @@ function read(rel: string): string {
 }
 
 function main() {
-  assert.equal(PLAN_CARD_BENEFITS.length, 3);
-  assert.ok(PLAN_CARD_BENEFITS.includes("Digital eSIM"));
+  assert.equal(PLAN_CARD_RECOMMENDED_LABEL, "Recommended");
   assert.match(PLAN_PURCHASE_TRUST_LINE, /QR and install details/);
   assert.match(PLAN_STICKY_TRUST_LINE, /Digital delivery/);
   assert.equal(planCardLineLabel("validity"), "Validity");
@@ -42,10 +41,10 @@ function main() {
 
   assert.match(listing, /planCardSecondaryLines/);
   assert.match(listing, /planCardLineLabel/);
-  assert.match(listing, /PLAN_CARD_BENEFITS/);
+  assert.match(listing, /PLAN_CARD_RECOMMENDED_LABEL/);
+  assert.match(listing, /data-plan-recommended/);
   assert.match(listing, /PLAN_PURCHASE_TRUST_LINE/);
-  assert.match(listing, />\s*Data\s*</);
-  assert.match(listing, />\s*Price\s*</);
+  assert.match(listing, /sr-only/);
   assert.match(listing, /Buy now/);
   assert.match(listing, /href="\/install\/iphone"/);
   assert.match(listing, /href="\/install\/android"/);
@@ -81,8 +80,8 @@ function main() {
   assert.doesNotMatch(conversion, /providerPriceUSD|PAYMENT_GATEWAY_ENABLED/);
   assert.match(pkg, /qa:destination-page-conversion/);
   assert.match(prelaunch, /qa:destination-page-conversion/);
-  assert.doesNotMatch(apply, /PLAN_CARD_BENEFITS|data-plan-sticky-cta/);
-  assert.doesNotMatch(checkout, /PLAN_CARD_BENEFITS|data-plan-sticky-cta/);
+  assert.doesNotMatch(apply, /PLAN_CARD_RECOMMENDED_LABEL|data-plan-sticky-cta/);
+  assert.doesNotMatch(checkout, /PLAN_CARD_RECOMMENDED_LABEL|data-plan-sticky-cta/);
   console.log("PASS payments_checkout_untouched");
 
   console.log("ALL PASS qa-destination-page-conversion");

@@ -9,6 +9,8 @@ export const PLAN_CARD_BENEFITS = [
   "QR after purchase",
 ] as const;
 
+export const PLAN_CARD_RECOMMENDED_LABEL = "Recommended";
+
 export const PLAN_PURCHASE_TRUST_LINE =
   "QR and install details arrive after purchase.";
 

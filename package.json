@@ -96,6 +96,7 @@
     "qa:customer-mobile-nav": "tsx scripts/qa-customer-mobile-nav.ts",
     "qa:seo-canonical": "tsx scripts/qa-seo-canonical.ts",
     "qa:device-compatibility": "tsx scripts/qa-device-compatibility.ts",
+    "qa:install-guides": "tsx scripts/qa-install-guides.ts",
     "qa:vesim-provider-email": "tsx scripts/qa-vesim-provider-email.ts",
     "qa:esim-install-email-delivery": "tsx scripts/qa-esim-install-email-delivery.ts",
     "qa:esim-alternate-delivery-email-schema": "tsx scripts/qa-esim-alternate-delivery-email-schema.ts",
