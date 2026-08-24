@@ -4,7 +4,6 @@
  */
 import "server-only";
 
-import sharp from "sharp";
 import {
   PARTNER_LOGO_MAX_BYTES,
   PARTNER_LOGO_MAX_INPUT_DIMENSION,
@@ -114,6 +113,7 @@ export async function preparePartnerLogoWebp(input: {
   }
 
   try {
+    const sharp = (await import("sharp")).default;
     const image = sharp(bytes, {
       failOn: "error",
       limitInputPixels:
