@@ -176,7 +176,8 @@ export async function preparePartnerLogoWebp(input: {
       ok: true,
       logo: { body, contentType: "image/webp" },
     };
-  } catch {
+  } catch (error) {
+    console.error("partner logo processing failed:", error);
     return {
       ok: false,
       error: PARTNER_LOGO_UNAVAILABLE,
