@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Menu, Smartphone, Wallet, X } from "lucide-react";
 import {
@@ -107,7 +107,6 @@ export default function Navbar({
   const [open, setOpen] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
   const pathname = usePathname();
-  const drawerTitleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const isCustomer = Boolean(customer);
   const isPartner = Boolean(partner);
@@ -328,40 +327,51 @@ export default function Navbar({
               <button
                 type="button"
                 aria-label="Close menu"
-                className="fixed inset-0 z-[100] bg-black/55"
+                className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-[2px]"
                 onClick={closeMenu}
               />
               <div
                 id="mobile-nav"
                 role="dialog"
                 aria-modal="true"
-                aria-labelledby={drawerTitleId}
+                aria-label={BRAND_NAME}
                 className="
                   fixed top-0 right-0 z-[110] flex h-[100dvh] w-[min(92vw,24rem)]
-                  max-w-[24rem] flex-col border-l border-[var(--border)]
+                  max-w-[24rem] flex-col overflow-hidden
+                  rounded-l-[1.75rem] border-l border-[var(--border)]
                   bg-[var(--surface)] text-[var(--heading)]
-                  shadow-[-16px_0_48px_rgba(0,0,0,0.45)]
+                  pt-[env(safe-area-inset-top)]
+                  shadow-[-24px_0_64px_rgba(0,0,0,0.5)]
                 "
               >
-                <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-                  <div className="min-w-0">
-                    <p
-                      id={drawerTitleId}
-                      className="truncate text-sm font-bold text-[var(--heading)]"
-                    >
-                      {BRAND_NAME}
-                    </p>
-                    <p className="text-xs text-[var(--text-soft)]">Menu</p>
-                  </div>
+                <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-4 border-b border-[var(--border)]/70 bg-[var(--surface)] px-5 py-4">
+                  <Image
+                    src={BRAND_LOGO_LIGHT_PUBLIC_PATH}
+                    alt={BRAND_LOGO_ALT}
+                    width={160}
+                    height={40}
+                    className="h-8 w-[128px] max-w-[128px] object-contain object-left dark:hidden"
+                    unoptimized
+                  />
+                  <Image
+                    src={BRAND_LOGO_DARK_PUBLIC_PATH}
+                    alt=""
+                    width={160}
+                    height={40}
+                    className="hidden h-8 w-[128px] max-w-[128px] object-contain object-left dark:block"
+                    unoptimized
+                    aria-hidden="true"
+                  />
                   <button
                     ref={closeButtonRef}
                     type="button"
                     onClick={closeMenu}
                     aria-label="Close menu"
                     className="
-                      inline-flex h-10 w-10 items-center justify-center rounded-[14px]
-                      border border-[var(--border-strong)] bg-[var(--surface-2)]
+                      ml-auto inline-flex h-11 w-11 shrink-0 items-center justify-center
+                      rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)]
                       text-[var(--heading)]
+                      transition-colors hover:border-[var(--border-hover)]
                       focus-visible:outline-none focus-visible:ring-2
                       focus-visible:ring-[var(--accent-strong)]/60
                     "
@@ -370,8 +380,8 @@ export default function Navbar({
                   </button>
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[var(--surface)] px-3 py-4">
-                  <nav className="flex flex-col gap-1" aria-label="Primary mobile">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[var(--surface)] px-5 py-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+                  <nav className="flex flex-col gap-2.5" aria-label="Primary mobile">
                     {navLinks
                       .filter((link) => link.href !== "/support")
                       .map((link) => {
@@ -382,7 +392,7 @@ export default function Navbar({
                             href={link.href}
                             onClick={closeMenu}
                             aria-current={active ? "page" : undefined}
-                            className={`rounded-[14px] px-4 py-3 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 ${mobileNavClass(active)}`}
+                            className={`flex min-h-12 items-center rounded-2xl px-4 text-[15px] font-semibold tracking-[-0.01em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 ${mobileNavClass(active)}`}
                           >
                             <NavLinkLabel link={link} variant="mobile" />
                           </Link>
@@ -390,12 +400,15 @@ export default function Navbar({
                       })}
                   </nav>
 
-                  <div className="mt-4 px-1">
+                  <div className="mt-8">
+                    <p className="mb-2.5 px-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
+                      Currency
+                    </p>
                     <CurrencySelector compact />
                   </div>
 
                   {isCustomer && customer ? (
-                    <div className="mt-5 space-y-3">
+                    <div className="mt-8 space-y-3">
                       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
                         <p className="truncate text-base font-bold text-[var(--heading)]">
                           {customer.name}
@@ -421,7 +434,7 @@ export default function Navbar({
                         </Link>
                       </div>
 
-                      <nav className="flex flex-col gap-1" aria-label="Account">
+                      <nav className="flex flex-col gap-2" aria-label="Account">
                         <Link
                           href="/account/orders"
                           onClick={closeMenu}
@@ -449,7 +462,7 @@ export default function Navbar({
                       </form>
                     </div>
                   ) : isPartner && partner ? (
-                    <div className="mt-5 space-y-3">
+                    <div className="mt-8 space-y-3">
                       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
                         <p className="truncate text-base font-bold text-[var(--heading)]">
                           {partner.name}
@@ -475,7 +488,7 @@ export default function Navbar({
                         </Link>
                       </div>
 
-                      <nav className="flex flex-col gap-1" aria-label="Partner account">
+                      <nav className="flex flex-col gap-2" aria-label="Partner account">
                         <Link
                           href="/partner/orders"
                           onClick={closeMenu}
@@ -502,24 +515,56 @@ export default function Navbar({
                         </button>
                       </form>
                     </div>
-                  ) : (
-                    <div className="mt-5 flex flex-col gap-2">
+                  ) : isLoggedOut ? (
+                    <div className="mt-8 flex gap-3">
                       <Link
                         href={authHref}
                         onClick={closeMenu}
-                        className="rounded-[14px] px-4 py-3 text-base font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--heading)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+                        className="
+                          inline-flex h-12 min-h-12 flex-1 items-center justify-center
+                          rounded-2xl border border-[var(--border-strong)]
+                          bg-[var(--surface-2)] px-3 text-sm font-semibold
+                          text-[var(--heading)] transition-colors
+                          hover:border-[var(--accent-strong)]/40
+                          focus-visible:outline-none focus-visible:ring-2
+                          focus-visible:ring-[var(--accent-strong)]/60
+                        "
                       >
-                        {isLoggedOut ? "Sign in" : authLabel}
+                        Sign In
                       </Link>
-                      {isLoggedOut ? (
-                        <Link
-                          href="/signup"
-                          onClick={closeMenu}
-                          className="rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 py-3 text-center text-base font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
-                        >
-                          Create Account
-                        </Link>
-                      ) : null}
+                      <Link
+                        href="/signup"
+                        onClick={closeMenu}
+                        className="
+                          inline-flex h-12 min-h-12 flex-1 items-center justify-center
+                          rounded-2xl border border-[var(--border-strong)]
+                          bg-[var(--surface-2)] px-3 text-sm font-semibold
+                          text-[var(--heading)] transition-colors
+                          hover:border-[var(--accent-strong)]/40
+                          focus-visible:outline-none focus-visible:ring-2
+                          focus-visible:ring-[var(--accent-strong)]/60
+                        "
+                      >
+                        Register
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="mt-8">
+                      <Link
+                        href={authHref}
+                        onClick={closeMenu}
+                        className="
+                          inline-flex h-12 min-h-12 w-full items-center justify-center
+                          rounded-2xl border border-[var(--border-strong)]
+                          bg-[var(--surface-2)] px-3 text-sm font-semibold
+                          text-[var(--heading)] transition-colors
+                          hover:border-[var(--accent-strong)]/40
+                          focus-visible:outline-none focus-visible:ring-2
+                          focus-visible:ring-[var(--accent-strong)]/60
+                        "
+                      >
+                        {authLabel}
+                      </Link>
                     </div>
                   )}
 
@@ -527,9 +572,10 @@ export default function Navbar({
                     href="/countries"
                     onClick={closeMenu}
                     className="
-                      mt-4 inline-flex w-full items-center justify-center
-                      whitespace-nowrap rounded-[14px] bg-[var(--accent)] px-5 py-3.5
+                      mt-3 inline-flex h-12 min-h-12 w-full items-center justify-center
+                      whitespace-nowrap rounded-2xl bg-[var(--accent)] px-5
                       text-sm font-semibold text-[var(--accent-ink)]
+                      shadow-[0_8px_24px_rgba(124,255,0,0.18)]
                       transition-colors hover:bg-[var(--accent-strong)]
                       focus-visible:outline-none focus-visible:ring-2
                       focus-visible:ring-[var(--accent-strong)]/60
@@ -538,13 +584,13 @@ export default function Navbar({
                     Get eSIM
                   </Link>
 
-                  <div className="mt-6 border-t border-[var(--border)] px-1 pt-4 pb-6">
-                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                  <div className="mt-8 border-t border-[var(--border)]/80 px-0.5 pt-5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                       Need help?
                     </p>
                     <a
                       href={`mailto:${BRAND_SUPPORT_EMAIL}`}
-                      className="mt-1 inline-block text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+                      className="mt-1.5 inline-block text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--heading)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
                     >
                       {BRAND_SUPPORT_EMAIL}
                     </a>
