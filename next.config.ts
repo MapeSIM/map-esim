@@ -27,6 +27,11 @@ const nextConfig: NextConfig = {
         destination: "/countries",
         permanent: true,
       },
+      {
+        source: "/esim",
+        destination: "/countries",
+        permanent: true,
+      },
     ];
   },
 };
