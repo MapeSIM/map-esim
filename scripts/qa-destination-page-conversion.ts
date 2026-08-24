@@ -56,18 +56,16 @@ function main() {
   assert.doesNotMatch(listing, /How MAP eSIM works/);
   assert.doesNotMatch(listing, /More destinations/);
   assert.doesNotMatch(listing, /how-it-works/);
-  assert.match(listing, /data-plan-sticky-cta/);
-  assert.match(listing, /md:hidden/);
+  assert.doesNotMatch(listing, /data-plan-sticky-cta/);
+  assert.doesNotMatch(listing, /showStickyBuy/);
+  assert.doesNotMatch(listing, /stickyOffer/);
+  assert.doesNotMatch(listing, /PLAN_STICKY_TRUST_LINE/);
+  assert.doesNotMatch(listing, /pb-44/);
+  assert.doesNotMatch(listing, /Digital delivery after checkout/);
   assert.match(
     listing,
-    /bottom-\[calc\(5\.25rem\+env\(safe-area-inset-bottom\)\)\]/
+    /resolveCheckoutHref\(\s*offer,\s*destination\.code\s*\)/
   );
-  assert.match(listing, /pr-\[max\(1rem,env\(safe-area-inset-right\)\)\]/);
-  assert.doesNotMatch(
-    listing,
-    /data-plan-sticky-cta[\s\S]{0,400}bottom-0/
-  );
-  assert.match(listing, /resolveCheckoutHref\(stickyOffer, destination\.code\)/);
   assert.doesNotMatch(listing, /offer\.packageInfo/);
   assert.doesNotMatch(listing, /providerPriceUSD/);
   console.log("PASS listing_conversion_ux");

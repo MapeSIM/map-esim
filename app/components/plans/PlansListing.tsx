@@ -42,7 +42,6 @@ import {
   planCardLineLabel,
   planCardSecondaryLines,
 } from "@/app/lib/plans/planOfferPresentation";
-import { PLAN_STICKY_TRUST_LINE } from "@/app/lib/plans/planCardConversion";
 
 type PlansListingProps = {
   destination: VesimDestination;
@@ -362,20 +361,13 @@ export default function PlansListing({
 
   const displayName = destinationDisplayName(destination);
   const heading = `${displayName} eSIM Plans`;
-  const stickyOffer = groups[0]?.plans[0] ?? filtered[0] ?? null;
-  const showStickyBuy =
-    !loading && !error && !selectedOffer && stickyOffer != null;
 
   const heroSummary = loading
     ? "Loading available plans..."
     : `${offers.length} plan${offers.length === 1 ? "" : "s"} available`;
 
   return (
-    <main
-      className={`min-h-screen overflow-x-clip bg-[var(--page-bg)] text-[var(--heading)] ${
-        showStickyBuy ? "pb-44 md:pb-0" : ""
-      }`}
-    >
+    <main className="min-h-screen overflow-x-clip bg-[var(--page-bg)] text-[var(--heading)]">
       <section className="theme-hero border-b border-[var(--border)]">
         {/* Extra mobile top padding keeps hero clear of the sticky navbar. */}
         <div className="mx-auto max-w-[1200px] px-4 pb-5 pt-8 sm:px-6 sm:py-8">
@@ -757,42 +749,6 @@ export default function PlansListing({
         coverageFocused={isRegionalOrGlobal}
         checkoutHref={resolveCheckoutHref}
       />
-
-      {showStickyBuy && stickyOffer ? (
-        <div
-          data-plan-sticky-cta="true"
-          className="
-            fixed inset-x-0 z-40 border-t border-[var(--border-strong)]
-            bg-[var(--surface)]/95 px-4 py-3 pr-[max(1rem,env(safe-area-inset-right))]
-            backdrop-blur-md md:hidden
-            bottom-[calc(5.25rem+env(safe-area-inset-bottom))]
-          "
-        >
-          <div className="mx-auto flex max-w-[1200px] items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold text-[var(--heading)]">
-                {stickyOffer.dataFormatted}{" "}
-                <span className="text-[var(--accent-strong)]">
-                  {formatPrice(stickyOffer.priceUSD)}
-                </span>
-              </p>
-              <p className="truncate text-xs text-[var(--text-muted)]">
-                {PLAN_STICKY_TRUST_LINE}
-              </p>
-            </div>
-            <Link
-              href={resolveCheckoutHref(stickyOffer, destination.code)}
-              className="
-                inline-flex min-h-11 shrink-0 items-center justify-center
-                rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-bold
-                text-[var(--accent-ink)]
-              "
-            >
-                                Buy Now
-            </Link>
-          </div>
-        </div>
-      ) : null}
     </main>
   );
 }
