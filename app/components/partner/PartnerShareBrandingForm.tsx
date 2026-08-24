@@ -48,6 +48,7 @@ export default function PartnerShareBrandingForm({
     saved.buttonTextColor ?? ""
   );
   const fileRef = useRef<HTMLInputElement>(null);
+  const brandingFormRef = useRef<HTMLFormElement>(null);
 
   const previewBg = /^#[0-9a-fA-F]{6}$/.test(buttonBackground)
     ? buttonBackground
@@ -81,8 +82,17 @@ export default function PartnerShareBrandingForm({
     }
   }
 
-  function handleColorScratchSubmit(event: FormEvent<HTMLFormElement>) {
+  function preventNativeFormPost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function submitBranding(form: HTMLFormElement) {
+    formAction(new FormData(form));
+  }
+
+  function handleColorScratchSubmit(event: FormEvent<HTMLFormElement>) {
+    preventNativeFormPost(event);
   }
 
   function handleColorPickerKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -90,7 +100,7 @@ export default function PartnerShareBrandingForm({
   }
 
   function handleBrandingSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+    preventNativeFormPost(event);
     const active = document.activeElement;
     if (active instanceof HTMLInputElement && active.type === "color") {
       return;
@@ -99,12 +109,13 @@ export default function PartnerShareBrandingForm({
     if (submitter instanceof HTMLInputElement && submitter.type === "color") {
       return;
     }
-    const isSave =
-      !submitter ||
-      (submitter instanceof HTMLButtonElement &&
-        submitter.getAttribute("data-branding-save") === "true");
-    if (!isSave) return;
-    formAction(new FormData(event.currentTarget));
+    submitBranding(event.currentTarget);
+  }
+
+  function handleSaveBrandingClick() {
+    const form = brandingFormRef.current;
+    if (!form) return;
+    submitBranding(form);
   }
 
   async function removeLogo() {
@@ -198,13 +209,15 @@ export default function PartnerShareBrandingForm({
 
       <form
         id={COLOR_SCRATCH_FORM_ID}
+        method="dialog"
         onSubmit={handleColorScratchSubmit}
         aria-hidden="true"
         tabIndex={-1}
         className="hidden"
       />
       <form
-        action={formAction}
+        ref={brandingFormRef}
+        method="dialog"
         onSubmit={handleBrandingSubmit}
         className="space-y-5"
       >
@@ -342,9 +355,10 @@ export default function PartnerShareBrandingForm({
         ) : null}
 
         <button
-          type="submit"
+          type="button"
           data-branding-save="true"
           disabled={pending}
+          onClick={handleSaveBrandingClick}
           className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] outline-none hover:bg-[var(--accent)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60 sm:w-auto"
         >
           {pending ? "Saving…" : "Save Branding"}

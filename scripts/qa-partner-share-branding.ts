@@ -301,7 +301,12 @@ async function main() {
   assert.match(formSrc, /data-branding-save/);
   assert.match(formSrc, /partner-share-branding-color-scratch/);
   assert.match(formSrc, /handleBrandingSubmit/);
+  assert.match(formSrc, /handleSaveBrandingClick/);
   assert.match(formSrc, /form=\{COLOR_SCRATCH_FORM_ID\}/);
+  assert.match(formSrc, /method=["']dialog["']/);
+  assert.match(formSrc, /formAction\(new FormData/);
+  assert.doesNotMatch(formSrc, /action=\{formAction\}/);
+  assert.doesNotMatch(formSrc, /type=["']submit["']/);
   assert.match(formSrc, /Upload Logo/);
   assert.match(formSrc, /Replace Logo/);
   assert.match(formSrc, /Remove Logo/);
