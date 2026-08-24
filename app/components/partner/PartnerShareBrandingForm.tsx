@@ -1,6 +1,12 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import {
+  useActionState,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 import {
   removePartnerShareLogoAction,
   updatePartnerShareBrandingAction,
@@ -14,6 +20,9 @@ import {
 
 const inputClass =
   "mt-1 w-full min-w-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]";
+
+/** Dummy form so iOS color-picker OK cannot POST the branding Server Action. */
+const COLOR_SCRATCH_FORM_ID = "partner-share-branding-color-scratch";
 
 export default function PartnerShareBrandingForm({
   initial,
@@ -69,6 +78,36 @@ export default function PartnerShareBrandingForm({
     } finally {
       setLogoBusy(false);
       if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  function handleColorScratchSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+  }
+
+  function handleColorPickerKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") event.preventDefault();
+  }
+
+  function handleBrandingSubmit(event: FormEvent<HTMLFormElement>) {
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement && active.type === "color") {
+      event.preventDefault();
+      return;
+    }
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    if (submitter instanceof HTMLInputElement && submitter.type === "color") {
+      event.preventDefault();
+      return;
+    }
+    if (
+      submitter &&
+      !(
+        submitter instanceof HTMLButtonElement &&
+        submitter.getAttribute("data-branding-save") === "true"
+      )
+    ) {
+      event.preventDefault();
     }
   }
 
@@ -161,7 +200,18 @@ export default function PartnerShareBrandingForm({
         ) : null}
       </div>
 
-      <form action={formAction} className="space-y-5">
+      <form
+        id={COLOR_SCRATCH_FORM_ID}
+        onSubmit={handleColorScratchSubmit}
+        aria-hidden="true"
+        tabIndex={-1}
+        className="hidden"
+      />
+      <form
+        action={formAction}
+        onSubmit={handleBrandingSubmit}
+        className="space-y-5"
+      >
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="min-w-0 text-sm font-medium text-[var(--heading)]">
             Company Name
@@ -207,12 +257,14 @@ export default function PartnerShareBrandingForm({
             <div className="mt-1 flex min-w-0 items-center gap-2">
               <input
                 type="color"
+                form={COLOR_SCRATCH_FORM_ID}
                 value={
                   /^#[0-9a-fA-F]{6}$/.test(buttonBackground)
                     ? buttonBackground
                     : "#84ff00"
                 }
                 onChange={(e) => setButtonBackground(e.target.value)}
+                onKeyDown={handleColorPickerKeyDown}
                 className="h-11 w-12 shrink-0 cursor-pointer rounded-lg border border-[var(--border)] bg-[var(--surface)]"
                 aria-label="Pick button background"
               />
@@ -231,12 +283,14 @@ export default function PartnerShareBrandingForm({
             <div className="mt-1 flex min-w-0 items-center gap-2">
               <input
                 type="color"
+                form={COLOR_SCRATCH_FORM_ID}
                 value={
                   /^#[0-9a-fA-F]{6}$/.test(buttonTextColor)
                     ? buttonTextColor
                     : "#102018"
                 }
                 onChange={(e) => setButtonTextColor(e.target.value)}
+                onKeyDown={handleColorPickerKeyDown}
                 className="h-11 w-12 shrink-0 cursor-pointer rounded-lg border border-[var(--border)] bg-[var(--surface)]"
                 aria-label="Pick button text color"
               />
@@ -293,6 +347,7 @@ export default function PartnerShareBrandingForm({
 
         <button
           type="submit"
+          data-branding-save="true"
           disabled={pending}
           className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] outline-none hover:bg-[var(--accent)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60 sm:w-auto"
         >

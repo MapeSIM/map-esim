@@ -297,6 +297,11 @@ async function main() {
   assert.match(validateSrc, /SHARE_COMPANY_NAME_MAX = 30/);
   assert.match(validateSrc, /Company name must be 30 characters or fewer/);
   assert.match(formSrc, /Save Branding/);
+  assert.match(formSrc, /updatePartnerShareBrandingAction/);
+  assert.match(formSrc, /data-branding-save/);
+  assert.match(formSrc, /partner-share-branding-color-scratch/);
+  assert.match(formSrc, /handleBrandingSubmit/);
+  assert.match(formSrc, /form=\{COLOR_SCRATCH_FORM_ID\}/);
   assert.match(formSrc, /Upload Logo/);
   assert.match(formSrc, /Replace Logo/);
   assert.match(formSrc, /Remove Logo/);
