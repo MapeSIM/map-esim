@@ -13,8 +13,31 @@ const DATA_VALIDITY_DUP_RE =
 const VERBOSE_NETWORK_BLURB_RE =
   /data-only\s+esim|rechargeable\s+online|operates\s+on\s+the|apn\s*:/i;
 
+/** Speed / tech / allowance copy must never be shown as a carrier name. */
+const SPEED_OR_DATA_AS_OPERATOR_RE =
+  /\bup\s*to\b|\b4g\b|\b5g\b|\blte\b|\bspeed\b|\bdata\b/i;
+
+/** Provider junk that has appeared as a fake "Network" label. */
+const JUNK_OPERATOR_LABELS = new Set(["sheesh"]);
+
 /** Max length for a card/modal "operator" chip — longer strings belong in details prose. */
 export const CONCISE_OPERATOR_MAX_LEN = 48;
+
+export function looksLikeSpeedOrDataOperatorLabel(
+  value: string | null | undefined
+): boolean {
+  const v = (value ?? "").trim();
+  if (!v) return false;
+  return SPEED_OR_DATA_AS_OPERATOR_RE.test(v);
+}
+
+export function looksLikeJunkOperatorLabel(
+  value: string | null | undefined
+): boolean {
+  const v = (value ?? "").trim().toLowerCase();
+  if (!v) return false;
+  return JUNK_OPERATOR_LABELS.has(v);
+}
 
 export function looksLikeFairUseOrThrottleText(
   value: string | null | undefined
@@ -47,6 +70,8 @@ export function isConciseOperatorLabel(
   if (looksLikeFairUseOrThrottleText(v)) return false;
   if (looksLikeDataValidityDuplicate(v)) return false;
   if (VERBOSE_NETWORK_BLURB_RE.test(v)) return false;
+  if (looksLikeSpeedOrDataOperatorLabel(v)) return false;
+  if (looksLikeJunkOperatorLabel(v)) return false;
   return true;
 }
 
@@ -136,6 +161,8 @@ export function isForbiddenPlanCardText(
   if (looksLikeFairUseOrThrottleText(v)) return true;
   if (looksLikeDataValidityDuplicate(v)) return true;
   if (VERBOSE_NETWORK_BLURB_RE.test(v)) return true;
+  if (looksLikeSpeedOrDataOperatorLabel(v)) return true;
+  if (looksLikeJunkOperatorLabel(v)) return true;
   if (v.length > CONCISE_OPERATOR_MAX_LEN && /\s/.test(v)) return true;
   return false;
 }

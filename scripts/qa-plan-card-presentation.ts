@@ -212,6 +212,45 @@ function main() {
   assert.equal(planCardOperatorLabel(orphanFup), null);
   assert.equal(cardText(orphanFup), "Valid for 1 day");
   assertCardSafe(orphanFup, "orphan FUP");
+
+  console.log("2b) Junk network + speed packageInfo never render as Network");
+  const sheesh = sampleOffer({
+    id: "pk-sheesh",
+    dataFormatted: "2 GB",
+    durationDays: 15,
+    network: "Sheesh",
+    networks: ["Sheesh"],
+    packageInfo: "Up to 4G speed",
+  });
+  assert.equal(planCardOperatorLabel(sheesh), null);
+  assert.equal(planDetailOperatorLabel(sheesh), null);
+  assert.deepEqual(planDetailNetworkNames(sheesh), []);
+  assert.equal(cardText(sheesh), "Valid for 15 days");
+  assert.doesNotMatch(cardText(sheesh), /Sheesh|Up to 4G|Network/i);
+  assert.equal(
+    planCardSecondaryLines(sheesh, {
+      isRegionalOrGlobal: false,
+      formatValidity: formatValidityPhrase,
+    }).some((line) => line.kind === "operator"),
+    false
+  );
+  assertCardSafe(sheesh, "PK Sheesh");
+
+  const speedOnly = sampleOffer({
+    id: "pk-up-to-4g",
+    dataFormatted: "50 GB",
+    durationDays: 30,
+    network: "Up to 4G speed",
+    packageInfo: "Up to 4G speed",
+  });
+  assert.equal(isConciseOperatorLabel("Up to 4G speed"), false);
+  assert.equal(isConciseOperatorLabel("Sheesh"), false);
+  assert.equal(planCardOperatorLabel(speedOnly), null);
+  assert.equal(cardText(speedOnly), "Valid for 30 days");
+  assert.doesNotMatch(cardText(speedOnly), /4G|speed|Network/i);
+  assert.equal(isForbiddenPlanCardText("Up to 4G speed"), true);
+  assert.equal(isForbiddenPlanCardText("Sheesh"), true);
+  assertCardSafe(speedOnly, "PK Up to 4G speed");
   console.log("   ok");
 
   console.log("3) Plan details keeps Fair Use + omits missing/noise fields");
