@@ -989,6 +989,9 @@ export async function finalizeReconciliationLocalRecord(options: {
         orderId: order.id,
         existed: Boolean(compat.existingOrderId),
       };
+    }, {
+      maxWait: 10000,
+      timeout: 15000,
     });
 
     if (result.status === "blocked") {
