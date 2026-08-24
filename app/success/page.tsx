@@ -262,6 +262,34 @@ function SuccessContent() {
     );
   }
 
+  if (!accessToken) {
+    return (
+      <main className="min-h-screen bg-[var(--page-bg)] px-4 py-16 text-[var(--heading)] sm:px-6">
+        <div className="mx-auto max-w-xl rounded-3xl border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center shadow-[0_20px_50px_rgba(0,0,0,0.35)]">
+          <h1 className="text-3xl font-bold">Order details unavailable</h1>
+          <p className="mt-3 text-sm text-[var(--text-muted)]">
+            Secure order access is missing. Sign in to view your eSIMs, or open
+            the confirmation link from your email.
+          </p>
+          <div className="mt-8 grid gap-3 sm:grid-cols-2">
+            <Link
+              href="/account/orders"
+              className="inline-flex h-12 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface-2)] text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40"
+            >
+              View my eSIMs
+            </Link>
+            <Link
+              href="/countries"
+              className="inline-flex h-12 items-center justify-center rounded-xl bg-[var(--accent-strong)] text-sm font-bold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]"
+            >
+              Browse destinations
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   const toneClass =
     emailInfo.tone === "ok"
       ? "border-[var(--accent-strong)]/35 bg-[var(--accent-strong)]/10"
@@ -354,10 +382,10 @@ function SuccessContent() {
 
         <div className="mt-8 grid gap-3 sm:grid-cols-2">
           <Link
-            href="/dashboard"
+            href="/account/orders"
             className="inline-flex h-12 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface-2)] text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40"
           >
-            View dashboard
+            View my eSIMs
           </Link>
           <Link
             href="/countries"

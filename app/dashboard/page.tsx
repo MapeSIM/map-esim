@@ -1,54 +1,45 @@
-"use client";
-
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getSessionUser } from "@/app/lib/auth/session";
 
-export default function DashboardPage() {
+/**
+ * Legacy public /dashboard used hardcoded demo eSIM data.
+ * Authenticated customers are sent to real /account/orders.
+ * Guests see an empty state — never a fake order.
+ */
+export default async function DashboardPage() {
+  const user = await getSessionUser();
+
+  if (user?.role === "CUSTOMER") {
+    redirect("/account/orders");
+  }
+  if (user?.role === "PARTNER") {
+    redirect("/partner/orders");
+  }
+  if (user?.role === "ADMIN") {
+    redirect("/admin/orders");
+  }
+
   return (
     <main className="min-h-screen bg-[var(--page-bg)] px-6 py-16 text-[var(--heading)]">
-      <section className="mx-auto max-w-5xl">
-        <h1 className="text-center text-5xl font-bold text-[var(--heading)]">
-          My eSIMs
-        </h1>
-
-        <p className="mt-4 text-center text-[var(--text-muted)]">
-          Manage your purchased eSIM plans
+      <section className="mx-auto max-w-xl text-center">
+        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">My eSIMs</h1>
+        <p className="mt-4 text-[var(--text-muted)]">
+          No eSIMs to show. Sign in to view purchased plans, or browse
+          destinations to get started.
         </p>
-
-        <div className="mt-12 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-8 shadow-[var(--shadow)]">
-          <h2 className="text-3xl font-bold text-[var(--heading)]">
-            Pakistan eSIM
-          </h2>
-
-          <div className="mt-6 space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-6 text-[var(--text)]">
-            <p>
-              Data:
-              <b className="text-[var(--heading)]"> 5GB</b>
-            </p>
-
-            <p>
-              Validity:
-              <b className="text-[var(--heading)]"> 30 Days</b>
-            </p>
-
-            <p>
-              Order ID:
-              <b className="text-[var(--accent-soft)]"> MAP-ESIM-58291</b>
-            </p>
-
-            <p>
-              Status:
-              <b className="text-[var(--accent-soft)]"> Active</b>
-            </p>
-          </div>
-
+        <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
           <Link
-            href="/success"
-            className="
-              mt-8 inline-block rounded-xl bg-[var(--accent)]
-              px-8 py-3 font-bold text-[var(--accent-ink)]
-            "
+            href="/signin?callbackUrl=%2Faccount%2Forders"
+            className="inline-flex h-11 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-5 text-sm font-bold text-[var(--accent-ink)] transition hover:opacity-95"
           >
-            View QR Code →
+            Sign in
+          </Link>
+          <Link
+            href="/countries"
+            className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40"
+          >
+            Browse destinations
           </Link>
         </div>
       </section>
