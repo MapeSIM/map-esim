@@ -293,9 +293,9 @@ export async function completeRewardRedemptionInTx(
     select: { pointsBalance: true },
   });
 
-  try {
-    await tx.customerRewardTransaction.create({
-      data: {
+  const inserted = await tx.customerRewardTransaction.createMany({
+    data: [
+      {
         rewardAccountId: current.rewardAccountId,
         customerUserId: current.customerUserId,
         type: CustomerRewardTransactionType.REDEMPTION,
@@ -306,12 +306,10 @@ export async function completeRewardRedemptionInTx(
         orderId: options.orderId,
         idempotencyKey,
       },
-      select: { id: true },
-    });
-  } catch (error) {
-    if (!isUniqueViolation(error)) throw error;
-    return;
-  }
+    ],
+    skipDuplicates: true,
+  });
+  if (inserted.count === 0) return;
 
   await tx.customerRewardAccount.update({
     where: { id: current.rewardAccountId },

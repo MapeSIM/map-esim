@@ -15,13 +15,6 @@ import {
   eligibleRewardSpendCents,
 } from "@/app/lib/rewards/rewardPoints";
 
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === "P2002"
-  );
-}
-
 export type RewardEarnResult = {
   points: number;
   duplicate: boolean;
@@ -97,24 +90,23 @@ export async function awardCustomerPurchaseEarnInTx(
     select: { id: true },
   });
   if (!account) {
-    try {
-      account = await tx.customerRewardAccount.create({
-        data: { customerUserId: customer.id },
-        select: { id: true },
-      });
-    } catch (error) {
-      if (!isUniqueViolation(error)) throw error;
-      account = await tx.customerRewardAccount.findUnique({
-        where: { customerUserId: customer.id },
-        select: { id: true },
-      });
-      if (!account) throw error;
+    // skipDuplicates avoids P2002 aborting this interactive transaction.
+    await tx.customerRewardAccount.createMany({
+      data: [{ customerUserId: customer.id }],
+      skipDuplicates: true,
+    });
+    account = await tx.customerRewardAccount.findUnique({
+      where: { customerUserId: customer.id },
+      select: { id: true },
+    });
+    if (!account) {
+      throw new Error("Reward account was not available after create.");
     }
   }
 
-  try {
-    await tx.customerRewardTransaction.create({
-      data: {
+  const inserted = await tx.customerRewardTransaction.createMany({
+    data: [
+      {
         rewardAccountId: account.id,
         customerUserId: customer.id,
         type: CustomerRewardTransactionType.PURCHASE_EARN,
@@ -125,10 +117,10 @@ export async function awardCustomerPurchaseEarnInTx(
         orderId: options.orderId,
         idempotencyKey,
       },
-      select: { id: true },
-    });
-  } catch (error) {
-    if (!isUniqueViolation(error)) throw error;
+    ],
+    skipDuplicates: true,
+  });
+  if (inserted.count === 0) {
     const raced = await tx.customerRewardTransaction.findUnique({
       where: { idempotencyKey },
       select: { pointsDelta: true },
