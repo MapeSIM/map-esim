@@ -90,25 +90,21 @@ export default function PartnerShareBrandingForm({
   }
 
   function handleBrandingSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     const active = document.activeElement;
     if (active instanceof HTMLInputElement && active.type === "color") {
-      event.preventDefault();
       return;
     }
     const submitter = (event.nativeEvent as SubmitEvent).submitter;
     if (submitter instanceof HTMLInputElement && submitter.type === "color") {
-      event.preventDefault();
       return;
     }
-    if (
-      submitter &&
-      !(
-        submitter instanceof HTMLButtonElement &&
-        submitter.getAttribute("data-branding-save") === "true"
-      )
-    ) {
-      event.preventDefault();
-    }
+    const isSave =
+      !submitter ||
+      (submitter instanceof HTMLButtonElement &&
+        submitter.getAttribute("data-branding-save") === "true");
+    if (!isSave) return;
+    formAction(new FormData(event.currentTarget));
   }
 
   async function removeLogo() {

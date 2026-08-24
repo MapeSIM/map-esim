@@ -138,17 +138,31 @@ export async function updatePartnerShareBranding(
   const before = rowToFields(current);
   const changed = changedFieldNames(before, next);
 
-  await prisma.partnerProfile.update({
-    where: { id: actor.partnerId },
-    data: {
-      shareCompanyName: next.companyName,
-      shareSupportEmail: next.supportEmail,
-      shareWebsiteUrl: next.websiteUrl,
-      shareLogoUrl: next.logoUrl,
-      shareButtonBackground: next.buttonBackground,
-      shareButtonTextColor: next.buttonTextColor,
-    },
-  });
+  try {
+    await prisma.partnerProfile.update({
+      where: { id: actor.partnerId },
+      data: {
+        shareCompanyName: next.companyName,
+        shareSupportEmail: next.supportEmail,
+        shareWebsiteUrl: next.websiteUrl,
+        shareLogoUrl: next.logoUrl,
+        shareButtonBackground: next.buttonBackground,
+        shareButtonTextColor: next.buttonTextColor,
+      },
+    });
+  } catch (error) {
+    const err = error instanceof Error ? error : null;
+    const prismaCode =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code?: unknown }).code ?? "")
+        : "";
+    console.error("PARTNER_SHARE_BRANDING_UPDATE_FAILED", {
+      name: (err?.name ?? "unknown").slice(0, 80),
+      message: (err?.message ?? "unknown").slice(0, 300),
+      prismaCode: prismaCode.slice(0, 32),
+    });
+    return { ok: false, error: "Share branding could not be saved." };
+  }
 
   if (changed.length > 0) {
     await writeAuditLog({
