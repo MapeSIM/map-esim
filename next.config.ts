@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import { buildNextConfigHeaderSources } from "./app/lib/security/headers";
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["sharp"],
   experimental: {
     serverActions: {
       bodySizeLimit: "2mb",
