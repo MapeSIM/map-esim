@@ -1050,7 +1050,14 @@ export async function finalizeReconciliationLocalRecord(options: {
           ? "Local record was already finalized."
           : "Local record finalized from provider evidence.",
     };
-  } catch {
+  } catch (error) {
+    console.error("LOCAL_FINALIZE_TRANSACTION_ERROR:", error);
+
+    const errorMessage =
+      error instanceof Error
+        ? error.message.slice(0, 300)
+        : "Unknown transaction error";
+
     await writeAuditLog({
       actorUserId: admin.id,
       action: LOCAL_FINALIZE_BLOCKED,
@@ -1061,9 +1068,13 @@ export async function finalizeReconciliationLocalRecord(options: {
         attemptId: ids.attemptId,
         action: "local_finalize",
         failureCode: "transaction_failed",
+        errorMessage,
         reason: reasonParsed.reason.slice(0, 80),
       },
     });
-    return { ok: false, error: PUBLIC_ERROR };
+
+    return {
+      ok: false,
+      error: `${PUBLIC_ERROR} (${errorMessage})`,
+    };
   }
-}
