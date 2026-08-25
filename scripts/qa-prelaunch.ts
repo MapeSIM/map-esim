@@ -125,6 +125,7 @@ const EXISTING_QA: QaJob[] = [
     label: "destination catalog SSR",
   },
   { kind: "npm", script: "qa:country-plans-ssr", label: "country plan SSR" },
+  { kind: "npm", script: "qa:pakistan-catalog", label: "Pakistan catalog merchandising" },
   { kind: "npm", script: "qa:country-page-seo", label: "country page SEO" },
   {
     kind: "npm",

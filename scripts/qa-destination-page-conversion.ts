@@ -73,6 +73,8 @@ function main() {
   assert.doesNotMatch(modal, /PLAN_PURCHASE_TRUST_LINE/);
   assert.match(modal, /Buy Now/);
   assert.match(modal, /Available networks/);
+  assert.match(modal, /label="Coverage"/);
+  assert.match(modal, /Package information/);
   console.log("PASS modal_simple_layout");
 
   const offer = { id: "ESIM-QA-CONV-1" } as VesimOffer;

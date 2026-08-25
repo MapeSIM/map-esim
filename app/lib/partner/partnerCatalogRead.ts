@@ -8,6 +8,7 @@ import {
   listAdminAssignmentDestinations,
   type AdminDestinationOption,
 } from "@/app/lib/esim/adminPackageAssignmentRead";
+import { applyPakistanPublicCatalog } from "@/app/lib/plans/pakistanCatalogPolicy";
 import {
   fetchOffersForCountry,
   sanitizeCountryHint,
@@ -45,7 +46,10 @@ export async function listPartnerCatalogOffers(
   if (!code) return [];
 
   try {
-    const offers = await fetchOffersForCountry(code);
+    const offers = applyPakistanPublicCatalog(
+      code,
+      await fetchOffersForCountry(code)
+    );
     const out: PartnerCatalogOffer[] = [];
     for (const offer of offers) {
       const verified = toVerifiedCheckoutOffer(offer, code);

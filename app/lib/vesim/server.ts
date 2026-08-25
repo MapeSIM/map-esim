@@ -7,6 +7,10 @@ import {
   resolveValidatedVesimBaseUrl,
 } from "@/app/lib/vesim/environment";
 import {
+  applyPakistanPublicCatalog,
+  applyPakistanRetailOverride,
+} from "@/app/lib/plans/pakistanCatalogPolicy";
+import {
   normalizeOffers,
   type VesimOffer,
 } from "@/app/lib/vesim/offers";
@@ -139,17 +143,18 @@ export function toVerifiedCheckoutOffer(
   offer: VesimOffer,
   lookupCountry?: string | null
 ): VerifiedCheckoutOffer | null {
-  const offerId = (offer.offerId || offer.id || "").trim();
+  const priced = applyPakistanRetailOverride(offer, lookupCountry);
+  const offerId = (priced.offerId || priced.id || "").trim();
   const retail =
-    typeof offer.priceUSD === "number" && Number.isFinite(offer.priceUSD)
-      ? offer.priceUSD
-      : typeof offer.price === "number" && Number.isFinite(offer.price)
-        ? offer.price
+    typeof priced.priceUSD === "number" && Number.isFinite(priced.priceUSD)
+      ? priced.priceUSD
+      : typeof priced.price === "number" && Number.isFinite(priced.price)
+        ? priced.price
         : null;
   const provider =
-    typeof offer.providerPriceUSD === "number" &&
-    Number.isFinite(offer.providerPriceUSD)
-      ? offer.providerPriceUSD
+    typeof priced.providerPriceUSD === "number" &&
+    Number.isFinite(priced.providerPriceUSD)
+      ? priced.providerPriceUSD
       : retail;
 
   if (!offerId || retail == null || retail < 0 || provider == null || provider < 0) {
@@ -158,17 +163,17 @@ export function toVerifiedCheckoutOffer(
 
   return {
     offerId,
-    name: offer.name,
+    name: priced.name,
     countryCode:
-      sanitizeCountryHint(offer.country) ||
+      sanitizeCountryHint(priced.country) ||
       sanitizeCountryHint(lookupCountry) ||
       null,
-    countryName: offer.countryName || null,
-    dataFormatted: offer.dataFormatted,
-    durationDays: offer.durationDays ?? null,
+    countryName: priced.countryName || null,
+    dataFormatted: priced.dataFormatted,
+    durationDays: priced.durationDays ?? null,
     priceUSD: retail,
     providerPriceUSD: provider,
-    currency: offer.currency || "USD",
+    currency: priced.currency || "USD",
   };
 }
 
@@ -357,7 +362,7 @@ export async function fetchPublicOffersForCountry(
   if (!key) {
     throw new PublicOfferSnapshotError("invalid_country");
   }
-  return loadPublicOffersForCountry({
+  const offers = await loadPublicOffersForCountry({
     client: prisma,
     country: key,
     fetchLive: (destination) =>
@@ -367,6 +372,7 @@ export async function fetchPublicOffersForCountry(
       ),
     loadFlagOffCached: loadCachedFlagOffPublicOffersForCountry,
   });
+  return applyPakistanPublicCatalog(key, offers);
 }
 
 export async function verifyOfferAuthoritative(options: {

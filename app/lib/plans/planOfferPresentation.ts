@@ -174,7 +174,7 @@ export function planDetailOperatorLabel(offer: VesimOffer): string | null {
 
 /**
  * Network technology for details (e.g. 3G / 4G / 5G).
- * Prefers dataSpeeds; only uses packageInfo when it looks like short tech text.
+ * Prefers dataSpeeds; falls back to short tech text in packageInfo / network.
  */
 export function planDetailNetworkTechnology(
   offer: VesimOffer
@@ -184,17 +184,16 @@ export function planDetailNetworkTechnology(
     .filter(Boolean);
   if (speeds.length > 0) return speeds.join(" · ");
 
-  const packageInfo = (offer.packageInfo || "").trim();
-  if (!packageInfo) return null;
-  if (looksLikeFairUseOrThrottleText(packageInfo)) return null;
-  if (looksLikeDataValidityDuplicate(packageInfo, offer.dataFormatted)) {
-    return null;
+  for (const raw of [offer.packageInfo, offer.network]) {
+    const value = (raw || "").trim();
+    if (!value) continue;
+    if (looksLikeFairUseOrThrottleText(value)) continue;
+    if (looksLikeDataValidityDuplicate(value, offer.dataFormatted)) continue;
+    if (value.length > CONCISE_OPERATOR_MAX_LEN) continue;
+    if (!/^(.*\b)?(2G|3G|4G|5G|LTE|NR|Wi-?Fi)(\b.*)?$/i.test(value)) continue;
+    return value;
   }
-  if (packageInfo.length > CONCISE_OPERATOR_MAX_LEN) return null;
-  if (!/^(.*\b)?(2G|3G|4G|5G|LTE|NR|Wi-?Fi)(\b.*)?$/i.test(packageInfo)) {
-    return null;
-  }
-  return packageInfo;
+  return null;
 }
 
 /**
@@ -234,11 +233,15 @@ export function planDetailDescription(offer: VesimOffer): string | null {
 
 /**
  * Concise network brands for chips — drop APN blurbs and long sentences.
+ * Includes roaming carrier names when present.
  */
 export function planDetailNetworkNames(offer: VesimOffer): string[] {
   const seen = new Set<string>();
   const names: string[] = [];
-  for (const item of offer.networks || []) {
+  const roamingNames = (offer.roaming || []).flatMap(
+    (entry) => entry.networks || []
+  );
+  for (const item of [...(offer.networks || []), ...roamingNames]) {
     if (!isConciseOperatorLabel(item)) continue;
     const key = item.trim().toLowerCase();
     if (seen.has(key)) continue;
@@ -247,6 +250,42 @@ export function planDetailNetworkNames(offer: VesimOffer): string[] {
     if (names.length >= 12) break;
   }
   return names;
+}
+
+/** Coverage country codes/names from structured offer fields. */
+export function planDetailCoverageCountries(offer: VesimOffer): string[] {
+  const seen = new Set<string>();
+  const values: string[] = [];
+  for (const item of [
+    ...(offer.coveredCountries || []),
+    ...(offer.roaming || []).map((entry) => entry.country),
+  ]) {
+    const value = (item || "").trim();
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    values.push(value);
+  }
+  return values;
+}
+
+/**
+ * Remaining packageInfo for details when it is not FUP, a data/validity
+ * duplicate, or the same string already used as network technology.
+ */
+export function planDetailPackageInfo(offer: VesimOffer): string | null {
+  const packageInfo = (offer.packageInfo || "").trim();
+  if (!packageInfo) return null;
+  if (looksLikeDataValidityDuplicate(packageInfo, offer.dataFormatted)) {
+    return null;
+  }
+  const fairUse = planDetailFairUseOrTerms(offer);
+  if (fairUse && packageInfo === fairUse) return null;
+  if (looksLikeFairUseOrThrottleText(packageInfo)) return null;
+  const technology = planDetailNetworkTechnology(offer);
+  if (technology && packageInfo === technology) return null;
+  return packageInfo;
 }
 
 /** Optional short plan note that is not APN-only or Fair Use prose. */

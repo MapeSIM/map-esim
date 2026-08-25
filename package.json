@@ -80,6 +80,7 @@
     "control:public-offer-snapshots": "tsx scripts/control-public-offer-snapshots.ts",
     "qa:retail-pricing": "tsx scripts/qa-retail-pricing.ts",
     "qa:country-plans-ssr": "tsx scripts/qa-country-plans-ssr.ts",
+    "qa:pakistan-catalog": "tsx scripts/qa-pakistan-catalog.ts",
     "qa:country-page-seo": "tsx scripts/qa-country-page-seo.ts",
     "qa:plan-card-presentation": "tsx scripts/qa-plan-card-presentation.ts",
     "qa:destination-page-conversion": "tsx scripts/qa-destination-page-conversion.ts",

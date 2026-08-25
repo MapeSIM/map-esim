@@ -16,12 +16,14 @@ import {
   planCardOperatorLabel,
   planCardSecondaryLines,
   planCardSecondaryText,
+  planDetailCoverageCountries,
   planDetailDescription,
   planDetailFairUseOrTerms,
   planDetailNetworkNames,
   planDetailNetworkTechnology,
   planDetailNotes,
   planDetailOperatorLabel,
+  planDetailPackageInfo,
 } from "../app/lib/plans/planOfferPresentation";
 import type { VesimOffer } from "../app/lib/vesim/offers";
 
@@ -225,6 +227,8 @@ function main() {
   assert.equal(planCardOperatorLabel(sheesh), null);
   assert.equal(planDetailOperatorLabel(sheesh), null);
   assert.deepEqual(planDetailNetworkNames(sheesh), []);
+  assert.equal(planDetailNetworkTechnology(sheesh), "Up to 4G speed");
+  assert.equal(planDetailPackageInfo(sheesh), null);
   assert.equal(cardText(sheesh), "Valid for 15 days");
   assert.doesNotMatch(cardText(sheesh), /Sheesh|Up to 4G|Network/i);
   assert.equal(
@@ -258,6 +262,18 @@ function main() {
   assert.match(modal, /Fair use & speed terms/);
   assert.match(modal, /planDetailNetworkNames/);
   assert.match(modal, /Available networks/);
+  assert.match(modal, /planDetailOperatorLabel/);
+  assert.match(modal, /planDetailNetworkTechnology/);
+  assert.match(modal, /planDetailCoverageCountries/);
+  assert.match(modal, /planDetailPackageInfo/);
+  assert.match(modal, /planDetailDescription/);
+  assert.match(modal, /planDetailNotes/);
+  assert.match(modal, /label="Coverage"/);
+  assert.match(modal, /label="Operator"/);
+  assert.match(modal, /Network technology/);
+  assert.match(modal, /Package information/);
+  assert.match(modal, /label="APN"/);
+  assert.match(modal, /Countries covered/);
   const pkOperator = sampleOffer({
     id: "c9b922d6a687dc41955220eb30283c6e",
     dataFormatted: "502 MB",
@@ -272,6 +288,30 @@ function main() {
   ]);
   assert.equal(planDetailNotes(pkOperator), null);
   assert.equal(isConciseOperatorLabel("APN: plus"), false);
+
+  const roamingOnly = sampleOffer({
+    id: "roaming-coverage",
+    dataFormatted: "3 GB",
+    durationDays: 7,
+    networks: [],
+    roaming: [
+      {
+        country: "PK",
+        networks: ["Jazz"],
+        dataSpeeds: ["4G"],
+      },
+      {
+        country: "AE",
+        networks: ["Etisalat"],
+        dataSpeeds: ["5G"],
+      },
+    ],
+    packageInfo: "Works on major local networks.",
+  });
+  assert.deepEqual(planDetailCoverageCountries(roamingOnly), ["PK", "AE"]);
+  assert.deepEqual(planDetailNetworkNames(roamingOnly), ["Jazz", "Etisalat"]);
+  assert.equal(planDetailPackageInfo(roamingOnly), "Works on major local networks.");
+  assert.equal(planDetailPackageInfo(pkFup), null);
 
   const afSohbat = sampleOffer({
     id: "sohbat-mobile-15days-2gb",
