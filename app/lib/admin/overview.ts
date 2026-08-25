@@ -6,6 +6,7 @@ import {
   maskProviderOrderRef,
 } from "@/app/lib/admin/display";
 import { prisma } from "@/app/lib/db";
+import { areAllEmailChannelsConfigured } from "@/app/lib/email/config";
 
 export type AdminRecentOrderRow = {
   createdAtLabel: string;
@@ -105,7 +106,7 @@ function readSystemStatus(databaseOperational: boolean): AdminSystemStatus {
     googleOAuth: envPresent("AUTH_GOOGLE_ID", "AUTH_GOOGLE_SECRET")
       ? "Configured"
       : "Not configured",
-    smtp: envPresent("SMTP_HOST") ? "Configured" : "Not configured",
+    smtp: areAllEmailChannelsConfigured() ? "Configured" : "Not configured",
     vesim: envPresent("VESIM_BASE_URL", "VESIM_EMAIL", "VESIM_PASSWORD")
       ? "Configured"
       : "Not configured",

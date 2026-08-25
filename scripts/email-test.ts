@@ -20,7 +20,10 @@ import {
   isEmailChannel,
   type EmailChannel,
 } from "../app/lib/email/channels";
-import { getEmailConfig } from "../app/lib/email/config";
+import {
+  getEmailChannelsReadiness,
+  getEmailConfig,
+} from "../app/lib/email/config";
 import { sendChannelMail } from "../app/lib/email/transport";
 import {
   renderEmailFooterHtml,
@@ -36,7 +39,7 @@ function fail(message: string): never {
 }
 
 function parseArgs(argv: string[]): {
-  channel: EmailChannel;
+  channel: EmailChannel | "all";
   dryRun: boolean;
 } {
   const tokens = argv.map((a) => a.trim()).filter(Boolean);
@@ -45,16 +48,20 @@ function parseArgs(argv: string[]): {
 
   if (!channelToken) {
     fail(
-      `Missing channel. Use one of: ${EMAIL_CHANNEL_IDS.join(", ")}\n` +
+      `Missing channel. Use one of: ${EMAIL_CHANNEL_IDS.join(", ")}, all\n` +
         "Example: npm run email:test -- security --dry-run"
     );
   }
-  if (!isEmailChannel(channelToken.toLowerCase())) {
+  const normalized = channelToken.toLowerCase();
+  if (normalized === "all") {
+    return { channel: "all", dryRun };
+  }
+  if (!isEmailChannel(normalized)) {
     fail(
-      `Invalid channel "${channelToken}". Use one of: ${EMAIL_CHANNEL_IDS.join(", ")}`
+      `Invalid channel "${channelToken}". Use one of: ${EMAIL_CHANNEL_IDS.join(", ")}, all`
     );
   }
-  return { channel: channelToken.toLowerCase() as EmailChannel, dryRun };
+  return { channel: normalized as EmailChannel, dryRun };
 }
 
 function validateRecipient(raw: string): string {
@@ -83,10 +90,11 @@ function envPresent(name: string): boolean {
   return Boolean((process.env[name] || "").trim());
 }
 
-async function main() {
-  const { channel, dryRun } = parseArgs(process.argv.slice(2));
-  const recipient = validateRecipient(process.env.EMAIL_TEST_RECIPIENT || "");
-
+async function sendOrCheckChannel(
+  channel: EmailChannel,
+  recipient: string,
+  dryRun: boolean
+): Promise<void> {
   const config = getEmailConfig(channel);
   if (!config.configured) {
     fail(
@@ -155,6 +163,35 @@ async function main() {
   }
 
   console.log("Status: sent");
+}
+
+async function main() {
+  const { channel, dryRun } = parseArgs(process.argv.slice(2));
+  const recipient = validateRecipient(process.env.EMAIL_TEST_RECIPIENT || "");
+
+  if (channel === "all") {
+    const readiness = getEmailChannelsReadiness();
+    console.log(
+      `SMTP channels configured: ${readiness.configuredCount}/${readiness.totalCount}`
+    );
+    for (const row of readiness.channels) {
+      console.log(
+        `  ${row.channel}: ${row.configured ? "configured" : row.reason || "not_configured"}`
+      );
+    }
+    if (!readiness.allConfigured) {
+      fail(
+        `Not all channels are configured (${readiness.missingChannels.join(", ")}). ` +
+          "Set SMTP_HOST/SMTP_PORT/SMTP_SECURE and each channel USER/PASSWORD in .env.local."
+      );
+    }
+    for (const id of EMAIL_CHANNEL_IDS) {
+      await sendOrCheckChannel(id, recipient, dryRun);
+    }
+    return;
+  }
+
+  await sendOrCheckChannel(channel, recipient, dryRun);
 }
 
 main().catch(() => {

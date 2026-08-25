@@ -4,6 +4,7 @@
 
 import {
   EMAIL_CHANNELS,
+  EMAIL_CHANNEL_IDS,
   formatChannelFrom,
   formatChannelReplyTo,
   isEmailChannel,
@@ -170,6 +171,50 @@ export function getEmailConfig(channel: EmailChannel): EmailConfig {
 
 export function isEmailConfigured(channel: EmailChannel): boolean {
   return getEmailConfig(channel).configured;
+}
+
+export type EmailChannelReadiness = {
+  channel: EmailChannel;
+  configured: boolean;
+  /** Safe machine reason only — never secrets, mailbox passwords, or raw env values. */
+  reason: string | null;
+};
+
+export type EmailChannelsReadiness = {
+  channels: EmailChannelReadiness[];
+  configuredCount: number;
+  totalCount: number;
+  allConfigured: boolean;
+  missingChannels: EmailChannel[];
+};
+
+/**
+ * Production readiness for all four transactional SMTP channels.
+ * Never falls back across channels and never returns credential values.
+ */
+export function getEmailChannelsReadiness(): EmailChannelsReadiness {
+  const channels: EmailChannelReadiness[] = EMAIL_CHANNEL_IDS.map((channel) => {
+    const config = getEmailConfig(channel);
+    return {
+      channel,
+      configured: config.configured,
+      reason: config.configured ? null : config.reason,
+    };
+  });
+  const missingChannels = channels
+    .filter((row) => !row.configured)
+    .map((row) => row.channel);
+  return {
+    channels,
+    configuredCount: channels.length - missingChannels.length,
+    totalCount: channels.length,
+    allConfigured: missingChannels.length === 0,
+    missingChannels,
+  };
+}
+
+export function areAllEmailChannelsConfigured(): boolean {
+  return getEmailChannelsReadiness().allConfigured;
 }
 
 /**

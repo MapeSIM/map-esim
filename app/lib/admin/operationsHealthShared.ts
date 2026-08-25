@@ -212,6 +212,8 @@ export type OpsWarningInput = {
   refundPendingCount: number;
   failedEmailCount: number;
   billingSmtpConfigured: boolean;
+  /** When set, SMTP warning uses all four channels instead of billing-only. */
+  smtpChannelsConfigured?: boolean;
   vesimConfigValid: boolean;
   vesimMode: ProviderModeLabel;
   vesimHostClass: BrokerHostClass;
@@ -284,11 +286,14 @@ export function buildOperationsWarnings(input: OpsWarningInput): OpsWarning[] {
     });
   }
 
-  if (!input.billingSmtpConfigured) {
+  if (!(input.smtpChannelsConfigured ?? input.billingSmtpConfigured)) {
     warnings.push({
       code: "SMTP_NOT_CONFIGURED",
       severity: "high",
-      message: "Billing SMTP is not configured.",
+      message:
+        input.smtpChannelsConfigured === false
+          ? "One or more transactional SMTP channels (security, orders, billing, support) are not configured."
+          : "Billing SMTP is not configured.",
     });
   }
 
@@ -377,6 +382,19 @@ export function yesNo(value: boolean): "yes" | "no" {
 export function smtpReadinessStatus(configured: boolean | null): HealthStatus {
   if (configured === null) return "UNKNOWN";
   return configured ? "HEALTHY" : "NOT_CONFIGURED";
+}
+
+/** All four transactional channels: HEALTHY / DEGRADED / NOT_CONFIGURED. */
+export function smtpChannelsReadinessStatus(
+  configuredCount: number,
+  totalCount: number
+): HealthStatus {
+  if (!Number.isFinite(configuredCount) || !Number.isFinite(totalCount) || totalCount <= 0) {
+    return "UNKNOWN";
+  }
+  if (configuredCount >= totalCount) return "HEALTHY";
+  if (configuredCount <= 0) return "NOT_CONFIGURED";
+  return "DEGRADED";
 }
 
 /**

@@ -8,7 +8,7 @@
  * 4. Reconciliation counts appear and link to /admin/reconciliation
  * 5. Email card shows CONFIGURED/NOT_CONFIGURED only (no SMTP secrets)
  * 6. Provider card shows host class / mode (no tokens or full credential URLs)
- * 7. Payment integration still NOT_IMPLEMENTED; webhook verification is HEALTHY or NOT_CONFIGURED
+ * 7. Payment webhook verification is HEALTHY or NOT_CONFIGURED (Simpaisa primary)
  * 8. Security card shows yes/no only for secrets
  * 9. Warnings list with safe links
  * 10. Mobile layout stacks cards
@@ -31,6 +31,7 @@ import {
   sanitizeDeploymentVersion,
   sanitizeHealthStatus,
   smtpReadinessStatus,
+  smtpChannelsReadinessStatus,
   HEALTH_STATUSES,
 } from "../app/lib/admin/operationsHealthShared";
 import {
@@ -112,10 +113,18 @@ function main() {
   console.log("PASS reconciliation_counts_reuse_no_mutation");
 
   // --- Email / SMTP sanitized ---
-  assert.match(service, /isEmailConfigured\("billing"\)/);
+  assert.match(service, /getEmailChannelsReadiness/);
+  assert.match(service, /smtpOverallStatus|securitySmtpStatus|ordersSmtpStatus|supportSmtpStatus/);
+  assert.equal(smtpChannelsReadinessStatus(4, 4), "HEALTHY");
+  assert.equal(smtpChannelsReadinessStatus(2, 4), "DEGRADED");
+  assert.equal(smtpChannelsReadinessStatus(0, 4), "NOT_CONFIGURED");
   assert.doesNotMatch(service, /SMTP_PASSWORD|SMTP_BILLING_PASSWORD/);
   assert.doesNotMatch(page, /SMTP_PASSWORD|smtp\.host|nodemailer/i);
   assert.doesNotMatch(service, /sendMail|sendOrderEmail|createTransport/);
+  assert.match(page, /Security SMTP/);
+  assert.match(page, /Orders SMTP/);
+  assert.match(page, /Support SMTP/);
+  assert.match(page, /All SMTP channels/);
   console.log("PASS email_smtp_sanitized_no_send");
 
   // --- VeSIM / provider ---
@@ -145,6 +154,7 @@ function main() {
   );
   assert.match(page, /NOT_IMPLEMENTED/);
   assert.match(service, /isGuestVesimCheckoutEnabled/);
+  assert.match(service, /SIMPAISA_WEBHOOK_SECRET/);
   assert.match(service, /SAFEPAY_WEBHOOK_SECRET/);
   assert.doesNotMatch(service, /return process\.env\.SAFEPAY_WEBHOOK_SECRET/);
   assert.doesNotMatch(shared, /webhookVerification:\s*"NOT_IMPLEMENTED"/);

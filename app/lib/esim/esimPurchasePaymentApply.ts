@@ -26,6 +26,7 @@ import {
   snapshotOrderAlternateDeliveryEmail,
 } from "@/app/lib/esim/esimDeliveryEmail";
 import { deliverCompletedWalletPurchaseInstallEmail } from "@/app/lib/esim/esimPurchaseInstallEmail";
+import { schedulePaymentReceivedPendingNotification } from "@/app/lib/esim/paymentReceivedPendingNotification";
 import type { NormalizedPaymentEvent } from "@/app/lib/payments/types";
 import { executeCreditCheckout } from "@/app/lib/vesim/creditCheckout";
 import {
@@ -745,6 +746,17 @@ export async function fulfillFundedEsimPurchase(
   const id = purchaseId.trim();
   if (!id) return { ok: false };
 
+  try {
+    return await fulfillFundedEsimPurchaseAfterPayment(id);
+  } finally {
+    // After payment is captured: send pending mail only if install/QR did not go out.
+    schedulePaymentReceivedPendingNotification(id);
+  }
+}
+
+async function fulfillFundedEsimPurchaseAfterPayment(
+  id: string
+): Promise<{ ok: boolean; duplicate?: boolean; orderId?: string | null }> {
   const purchase = await prisma.walletEsimPurchase.findUnique({
     where: { id },
     select: {

@@ -359,11 +359,15 @@ function DashboardBody({
 
         <HealthCard
           title="Email & notifications"
-          status={email.billingSmtpStatus}
+          status={email.smtpOverallStatus}
           checkedAtLabel={email.checkedAtLabel}
           freshness={email.freshness}
         >
+          <Metric label="SMTP overall" value={email.smtpOverallStatus} />
+          <Metric label="Security SMTP" value={email.securitySmtpStatus} />
+          <Metric label="Orders SMTP" value={email.ordersSmtpStatus} />
           <Metric label="Billing SMTP" value={email.billingSmtpStatus} />
+          <Metric label="Support SMTP" value={email.supportSmtpStatus} />
           <Metric
             label="Order email failures"
             value={email.orderEmailFailureCount}
@@ -454,7 +458,14 @@ function DashboardBody({
           <Metric label="AUTH_URL secure" value={security.authUrlSecure} />
           <Metric label="HSTS expectation" value={security.hstsExpectation} />
           <Metric label="CSP mode" value={security.cspMode} />
+          <Metric label="Security SMTP" value={security.securitySmtpConfigured} />
+          <Metric label="Orders SMTP" value={security.ordersSmtpConfigured} />
           <Metric label="Billing SMTP" value={security.billingSmtpConfigured} />
+          <Metric label="Support SMTP" value={security.supportSmtpConfigured} />
+          <Metric
+            label="All SMTP channels"
+            value={security.allSmtpChannelsConfigured}
+          />
           <Metric label="Google OAuth" value={security.googleOAuthConfigured} />
           <Metric
             label="VeSIM configuration"

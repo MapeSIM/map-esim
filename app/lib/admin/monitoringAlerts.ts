@@ -15,7 +15,7 @@ import {
 import { redirect } from "next/navigation";
 import { prisma } from "@/app/lib/db";
 import { requireRole } from "@/app/lib/auth/session";
-import { isEmailConfigured } from "@/app/lib/email/config";
+import { getEmailChannelsReadiness } from "@/app/lib/email/config";
 import { isIccidEncryptionConfigured } from "@/app/lib/orders/iccidCrypto";
 import { isGuestVesimCheckoutEnabled } from "@/app/lib/vesim/guestCheckoutGate";
 import {
@@ -197,6 +197,7 @@ function buildConfigAlerts(input: {
   db: { status: HealthStatus; latencyMs: number | null };
   migrationUnknown: boolean;
   billingSmtpConfigured: boolean;
+  allSmtpChannelsConfigured: boolean;
   vesimValid: boolean;
   vesimMode: string;
   vesimHostClass: string;
@@ -269,16 +270,16 @@ function buildConfigAlerts(input: {
     );
   }
 
-  if (!input.billingSmtpConfigured) {
+  if (!input.allSmtpChannelsConfigured) {
     pushUnique(
       alerts,
       makeAlert({
         category: "EMAIL",
         code: "EMAIL_SMTP_NOT_CONFIGURED",
         severity: "WARNING",
-        title: "Billing SMTP not configured",
+        title: "Transactional SMTP not fully configured",
         description:
-          "Billing email delivery is not configured. Failed notifications may accumulate.",
+          "One or more of security, orders, billing, or support SMTP channels are not configured. Failed notifications may accumulate.",
         sourceAt: now,
         now,
         freshness: "CONFIGURATION_DERIVED",
@@ -400,13 +401,13 @@ function buildConfigAlerts(input: {
         severity: "INFO",
         title: "Payment webhook secret not configured",
         description:
-          "Safepay webhook signature verification is implemented. Webhook verification status is NOT_CONFIGURED because SAFEPAY_WEBHOOK_SECRET is unset. Hosted checkout remains gated.",
+          "Simpaisa payin webhook does not require HMAC. Webhook verification status is NOT_CONFIGURED when neither Simpaisa nor Safepay webhook secret is set. Safepay still requires SAFEPAY_WEBHOOK_SECRET. Wallet checkout remains gated until Simpaisa API credentials are configured.",
         sourceAt: now,
         now,
         freshness: "CONFIGURATION_DERIVED",
         href: "/admin/operations",
         recommendedAction:
-          "Set SAFEPAY_WEBHOOK_SECRET before enabling hosted checkout. Do not enable the gateway from Alerts.",
+          "Configure Simpaisa API credentials on Operations. Do not enable the gateway from Alerts.",
       })
     );
   }
@@ -1620,12 +1621,22 @@ export async function collectMonitoringAlerts(options?: {
     migrationUnknown = true;
   }
 
-  let billingSmtpConfigured = false;
+  let smtpReadiness;
   try {
-    billingSmtpConfigured = isEmailConfigured("billing");
+    smtpReadiness = getEmailChannelsReadiness();
   } catch {
-    billingSmtpConfigured = false;
+    smtpReadiness = {
+      channels: [],
+      configuredCount: 0,
+      totalCount: 4,
+      allConfigured: false,
+      missingChannels: ["security", "orders", "billing", "support"] as const,
+    };
   }
+  const billingSmtpConfigured = Boolean(
+    smtpReadiness.channels.find((row) => row.channel === "billing")?.configured
+  );
+  const allSmtpChannelsConfigured = smtpReadiness.allConfigured;
 
   const mode = parseVesimEnvironmentMode(process.env.VESIM_ENVIRONMENT);
   const vesimMode =
@@ -1692,6 +1703,7 @@ export async function collectMonitoringAlerts(options?: {
     db,
     migrationUnknown,
     billingSmtpConfigured,
+    allSmtpChannelsConfigured,
     vesimValid,
     vesimMode,
     vesimHostClass,
@@ -1706,7 +1718,8 @@ export async function collectMonitoringAlerts(options?: {
         (process.env.AUTH_GOOGLE_SECRET ?? "").trim()
     ),
     webhookSecretConfigured: Boolean(
-      (process.env.SAFEPAY_WEBHOOK_SECRET ?? "").trim()
+      (process.env.SIMPAISA_WEBHOOK_SECRET ?? "").trim() ||
+        (process.env.SAFEPAY_WEBHOOK_SECRET ?? "").trim()
     ),
     deploymentVersion: pickDeploymentVersion({
       MAP_ESIM_DEPLOYMENT_VERSION: process.env.MAP_ESIM_DEPLOYMENT_VERSION,

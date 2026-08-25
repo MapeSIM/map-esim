@@ -112,6 +112,7 @@
     "qa:apple-one-tap-esim-install": "tsx scripts/qa-apple-one-tap-esim-install.ts",
     "qa:wallet-transaction-email": "tsx scripts/qa-wallet-transaction-email.ts",
     "qa:payment-failure-email": "tsx scripts/qa-payment-failure-email.ts",
+    "qa:payment-received-pending-email": "tsx scripts/qa-payment-received-pending-email.ts",
     "qa:reconciliation-required-email": "tsx scripts/qa-reconciliation-required-email.ts",
     "qa:admin-reconciliation-readonly": "tsx scripts/qa-admin-reconciliation-readonly.ts",
     "qa:admin-reconciliation-provider-refresh": "tsx scripts/qa-admin-reconciliation-provider-refresh.ts",

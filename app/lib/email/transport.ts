@@ -20,6 +20,14 @@ type CachedTransporter = {
 
 const transporterCache = new Map<EmailChannel, CachedTransporter>();
 
+export const SMTP_TLS_MIN_VERSION = "TLSv1.2";
+
+export const SMTP_TRANSPORT_TIMEOUT_MS = {
+  connection: 15_000,
+  greeting: 15_000,
+  socket: 30_000,
+} as const;
+
 function fingerprintFor(channel: EmailChannel): string | null {
   const config = getEmailConfig(channel);
   if (!config.configured) return null;
@@ -57,6 +65,13 @@ export function getChannelTransporter(
     auth: {
       user: config.smtp.user,
       pass: config.smtp.password,
+    },
+    connectionTimeout: SMTP_TRANSPORT_TIMEOUT_MS.connection,
+    greetingTimeout: SMTP_TRANSPORT_TIMEOUT_MS.greeting,
+    socketTimeout: SMTP_TRANSPORT_TIMEOUT_MS.socket,
+    tls: {
+      minVersion: SMTP_TLS_MIN_VERSION,
+      servername: config.smtp.host,
     },
   });
 

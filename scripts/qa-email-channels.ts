@@ -3,7 +3,7 @@
  * Does not contact SMTP or send mail.
  */
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import {
   EMAIL_CHANNEL_IDS,
@@ -14,11 +14,16 @@ import {
 } from "../app/lib/email/channels";
 import {
   getEmailConfig,
+  getEmailChannelsReadiness,
   isEmailConfigured,
   resolveSmtpTls,
   sanitizeEmailHeaderValue,
 } from "../app/lib/email/config";
-import { clearTransporterCache } from "../app/lib/email/transport";
+import {
+  SMTP_TLS_MIN_VERSION,
+  SMTP_TRANSPORT_TIMEOUT_MS,
+  clearTransporterCache,
+} from "../app/lib/email/transport";
 import { renderOtpEmailHtml, renderOtpEmailText } from "../app/lib/email/otpTemplate";
 import {
   renderOrderEmailHtml,
@@ -104,6 +109,26 @@ function main() {
     assert.equal(ordersMismatch.reason, "mailbox_mismatch");
   }
 
+  console.log("5b) All four channels independently required");
+  process.env.SMTP_ORDERS_USER = "orders@mapesim.com";
+  process.env.SMTP_ORDERS_PASSWORD = "test-password-not-real";
+  process.env.SMTP_BILLING_USER = "billing@mapesim.com";
+  process.env.SMTP_BILLING_PASSWORD = "test-password-not-real";
+  process.env.SMTP_SUPPORT_USER = "support@mapesim.com";
+  process.env.SMTP_SUPPORT_PASSWORD = "test-password-not-real";
+  clearTransporterCache();
+  const readiness = getEmailChannelsReadiness();
+  assert.equal(readiness.totalCount, 4);
+  assert.equal(readiness.allConfigured, true);
+  assert.equal(readiness.missingChannels.length, 0);
+  delete process.env.SMTP_SUPPORT_PASSWORD;
+  clearTransporterCache();
+  const missingSupport = getEmailChannelsReadiness();
+  assert.equal(missingSupport.allConfigured, false);
+  assert.deepEqual(missingSupport.missingChannels, ["support"]);
+  process.env.SMTP_SUPPORT_PASSWORD = "test-password-not-real";
+  clearTransporterCache();
+
   console.log("6) TLS policy");
   assert.equal(resolveSmtpTls(465, "true").ok, true);
   assert.equal(resolveSmtpTls(465, "false").ok, false);
@@ -112,6 +137,18 @@ function main() {
   if (tls587.ok) {
     assert.equal(tls587.tls.requireTLS, true);
   }
+  assert.equal(SMTP_TLS_MIN_VERSION, "TLSv1.2");
+  assert.equal(SMTP_TRANSPORT_TIMEOUT_MS.connection, 15_000);
+  assert.equal(SMTP_TRANSPORT_TIMEOUT_MS.greeting, 15_000);
+  assert.equal(SMTP_TRANSPORT_TIMEOUT_MS.socket, 30_000);
+  const transportSrc = readFileSync(
+    path.join(process.cwd(), "app/lib/email/transport.ts"),
+    "utf8"
+  );
+  assert.match(transportSrc, /minVersion:\s*SMTP_TLS_MIN_VERSION/);
+  assert.match(transportSrc, /connectionTimeout:\s*SMTP_TRANSPORT_TIMEOUT_MS\.connection/);
+  assert.match(transportSrc, /servername:\s*config\.smtp\.host/);
+  assert.doesNotMatch(transportSrc, /rejectUnauthorized:\s*false/);
 
   console.log("7) Header sanitization");
   assert.equal(

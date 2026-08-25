@@ -14,7 +14,7 @@ import {
 import { redirect } from "next/navigation";
 import { prisma } from "@/app/lib/db";
 import { requireRole } from "@/app/lib/auth/session";
-import { isEmailConfigured } from "@/app/lib/email/config";
+import { getEmailChannelsReadiness } from "@/app/lib/email/config";
 import { isIccidEncryptionConfigured } from "@/app/lib/orders/iccidCrypto";
 import { isGuestVesimCheckoutEnabled } from "@/app/lib/vesim/guestCheckoutGate";
 import {
@@ -53,6 +53,7 @@ import {
   pickDeploymentVersion,
   sanitizeHealthStatus,
   smtpReadinessStatus,
+  smtpChannelsReadinessStatus,
   yesNo,
   type AppEnvLabel,
   type BrokerHostClass,
@@ -103,7 +104,11 @@ export type ReconciliationOpsHealth = HealthCardMeta & {
 };
 
 export type EmailNotificationHealth = HealthCardMeta & {
+  smtpOverallStatus: HealthStatus;
+  securitySmtpStatus: HealthStatus;
+  ordersSmtpStatus: HealthStatus;
   billingSmtpStatus: HealthStatus;
+  supportSmtpStatus: HealthStatus;
   orderEmailFailureCount: number;
   walletNotificationFailureCount: number;
   notConfiguredEmailCount: number;
@@ -138,7 +143,11 @@ export type SecurityReadinessHealth = HealthCardMeta & {
   authUrlSecure: "yes" | "no" | "unknown";
   hstsExpectation: HstsExpectation;
   cspMode: CspMode;
+  securitySmtpConfigured: "yes" | "no";
+  ordersSmtpConfigured: "yes" | "no";
   billingSmtpConfigured: "yes" | "no";
+  supportSmtpConfigured: "yes" | "no";
+  allSmtpChannelsConfigured: "yes" | "no";
   googleOAuthConfigured: "yes" | "no";
   vesimConfigurationValid: "yes" | "no";
   guestCheckoutEnabled: "yes" | "no";
@@ -953,18 +962,34 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
     };
   }
 
-  let billingConfigured = false;
+  let smtpReadiness = getEmailChannelsReadiness();
   try {
-    billingConfigured = isEmailConfigured("billing");
+    smtpReadiness = getEmailChannelsReadiness();
   } catch {
-    billingConfigured = false;
+    smtpReadiness = {
+      channels: [],
+      configuredCount: 0,
+      totalCount: 4,
+      allConfigured: false,
+      missingChannels: ["security", "orders", "billing", "support"],
+    };
   }
+  const channelConfigured = (channel: "security" | "orders" | "billing" | "support") =>
+    Boolean(smtpReadiness.channels.find((row) => row.channel === channel)?.configured);
+  const billingConfigured = channelConfigured("billing");
 
   const email: EmailNotificationHealth = {
     checkedAtLabel: nowLabel(checkedAt),
     freshness:
       db.status === "HEALTHY" ? "DATABASE_DERIVED" : "CONFIGURATION_DERIVED",
+    smtpOverallStatus: smtpChannelsReadinessStatus(
+      smtpReadiness.configuredCount,
+      smtpReadiness.totalCount || 4
+    ),
+    securitySmtpStatus: smtpReadinessStatus(channelConfigured("security")),
+    ordersSmtpStatus: smtpReadinessStatus(channelConfigured("orders")),
     billingSmtpStatus: smtpReadinessStatus(billingConfigured),
+    supportSmtpStatus: smtpReadinessStatus(channelConfigured("support")),
     orderEmailFailureCount: reconciliation.orderEmailFailedCount,
     walletNotificationFailureCount: reconciliation.walletNotificationFailedCount,
     notConfiguredEmailCount: emailExtra.notConfiguredCount,
@@ -1004,7 +1029,8 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
 
   const guestEnabled = isGuestVesimCheckoutEnabled();
   const webhookSecretConfigured = Boolean(
-    (process.env.SAFEPAY_WEBHOOK_SECRET ?? "").trim()
+    (process.env.SIMPAISA_WEBHOOK_SECRET ?? "").trim() ||
+      (process.env.SAFEPAY_WEBHOOK_SECRET ?? "").trim()
   );
   const paymentDefaults = paymentGatewayCardDefaults({
     webhookSecretConfigured,
@@ -1042,7 +1068,11 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
       authUrl,
     }),
     cspMode: classifyCspMode(),
+    securitySmtpConfigured: yesNo(channelConfigured("security")),
+    ordersSmtpConfigured: yesNo(channelConfigured("orders")),
     billingSmtpConfigured: yesNo(billingConfigured),
+    supportSmtpConfigured: yesNo(channelConfigured("support")),
+    allSmtpChannelsConfigured: yesNo(smtpReadiness.allConfigured),
     googleOAuthConfigured: yesNo(googleOAuthConfigured),
     vesimConfigurationValid: yesNo(vesimValid),
     guestCheckoutEnabled: yesNo(guestEnabled),
@@ -1060,6 +1090,7 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
     refundPendingCount: reconciliation.refundPendingCount,
     failedEmailCount: reconciliation.failedEmailCount,
     billingSmtpConfigured: billingConfigured,
+    smtpChannelsConfigured: smtpReadiness.allConfigured,
     vesimConfigValid: vesimValid,
     vesimMode: broker.modeLabel,
     vesimHostClass: broker.hostClass,

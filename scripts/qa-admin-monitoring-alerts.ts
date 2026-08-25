@@ -265,6 +265,10 @@ function main() {
   assert.doesNotMatch(service, /esimPurchasePaymentAttempt\.(update|delete|create)/);
   console.log("PASS codes_and_readonly_service");
 
+  assert.match(service, /getEmailChannelsReadiness/);
+  assert.match(service, /allSmtpChannelsConfigured/);
+  console.log("PASS smtp_all_channels_readiness");
+
   // Sanitization static
   for (const blob of [service, page, shared]) {
     assert.doesNotMatch(blob, /DATABASE_URL/);

@@ -13,6 +13,7 @@ import { createOrderAccessToken } from "@/app/lib/vesim/orderAccess";
 import type { VerifiedCheckoutOffer } from "@/app/lib/vesim/server";
 import { classifyAutomaticInstallEmailStatus } from "@/app/lib/esim/esimPurchaseInstallEmailStatus";
 import { resolveFrozenInstallDeliveryEmail } from "@/app/lib/esim/esimDeliveryEmail";
+import { schedulePaymentReceivedPendingNotification } from "@/app/lib/esim/paymentReceivedPendingNotification";
 
 export const WALLET_DELIVERY_EMAIL_FAILED = "esim.wallet_delivery_email_failed";
 export const WALLET_DELIVERY_EMAIL_UNCERTAIN =
@@ -288,6 +289,7 @@ export async function deliverCompletedWalletPurchaseInstallEmail(options: {
     }
 
     if (emailResult.emailDelivery === "skipped_no_install_details") {
+      schedulePaymentReceivedPendingNotification(purchaseId);
       return {
         decision: "skipped_no_install_details",
         emailDeliveryStatus: emailResult.emailDelivery,

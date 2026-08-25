@@ -690,6 +690,9 @@ model WalletEsimPurchase {
   /// Durable once-only customer "order under review" email (RECONCILIATION_REQUIRED).
   reconRequiredEmailNotificationStatus String?
   reconRequiredEmailNotifiedAt     DateTime?
+  /// Durable once-only customer "payment received, eSIM still preparing" email.
+  paymentReceivedEmailNotificationStatus String?
+  paymentReceivedEmailNotifiedAt   DateTime?
   /// Customer-confirmed alternate MAP install-email recipient. Null = account email.
   /// ConfirmedAt is customer attestation only — not email-ownership verification.
   alternateDeliveryEmail            String?
@@ -726,6 +729,7 @@ model WalletEsimPurchase {
   @@index([providerRefreshClaimedAt])
   @@index([providerRefreshResult])
   @@index([reconRequiredEmailNotificationStatus])
+  @@index([paymentReceivedEmailNotificationStatus])
 }
 
 /// Durable PARTNER wallet-funded eSIM purchase attempt (provider write outside Prisma tx).

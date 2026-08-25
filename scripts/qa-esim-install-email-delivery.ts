@@ -93,6 +93,11 @@ function main() {
   );
   assert.match(helper, /WALLET_DELIVERY_EMAIL_FAILED/);
   assert.match(helper, /sending_in_progress/);
+  assert.match(helper, /schedulePaymentReceivedPendingNotification/);
+  assert.match(
+    helper,
+    /skipped_no_install_details[\s\S]{0,180}schedulePaymentReceivedPendingNotification/
+  );
   console.log("PASS helper_cas_frozen_email_no_financial_mutation");
 
   const walletCheckoutCount = (wallet.match(/executeCreditCheckout\(/g) || [])
@@ -128,6 +133,8 @@ function main() {
     /COMPLETED &&[\s\S]{0,80}purchase\.orderId[\s\S]{0,160}deliverFundedPurchaseInstallEmail/
   );
   assert.doesNotMatch(apply, /deliverOrderEmailAfterCheckout/);
+  assert.match(apply, /schedulePaymentReceivedPendingNotification/);
+  assert.match(apply, /fulfillFundedEsimPurchaseAfterPayment/);
   console.log("PASS gateway_split_one_install_email_after_persist");
 
   assert.match(localFinalize, /deliverCompletedWalletPurchaseInstallEmail/);

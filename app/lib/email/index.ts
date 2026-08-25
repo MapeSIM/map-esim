@@ -12,6 +12,8 @@ export {
 export {
   getEmailConfig,
   isEmailConfigured,
+  getEmailChannelsReadiness,
+  areAllEmailChannelsConfigured,
   resolveSmtpTls,
   sanitizeEmailHeaderValue,
 } from "@/app/lib/email/config";
