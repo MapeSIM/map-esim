@@ -92,6 +92,7 @@
     "qa:home-trust-section": "tsx scripts/qa-home-trust-section.ts",
     "qa:home-conversion-sections": "tsx scripts/qa-home-conversion-sections.ts",
     "qa:affiliates-partnerships": "tsx scripts/qa-affiliates-partnerships.ts",
+    "qa:contact-form-email": "tsx scripts/qa-contact-form-email.ts",
     "qa:about": "tsx scripts/qa-about.ts",
     "qa:navbar-layout": "tsx scripts/qa-navbar-layout.ts",
     "qa:customer-mobile-nav": "tsx scripts/qa-customer-mobile-nav.ts",

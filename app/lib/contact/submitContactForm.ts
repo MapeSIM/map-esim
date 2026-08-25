@@ -49,7 +49,8 @@ export async function submitContactFormAction(
   formData: FormData
 ): Promise<ContactFormState> {
   // Honeypot — bots fill hidden fields; humans leave this empty.
-  const honeypot = readField(formData, "company");
+  // Do not use autofill names like "company" (browsers fill those and skip SMTP).
+  const honeypot = readField(formData, "fax_number");
   if (honeypot) {
     return { status: "success" };
   }

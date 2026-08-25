@@ -30,7 +30,9 @@ export type SendContactFormEmailResult =
 
 /**
  * Inbound website contact form → SUPPORT mailbox.
- * Reply-To is the validated customer email only (order mail paths unchanged).
+ * Same channel/recipient as partnership applications.
+ * Reply-To is the validated customer email only.
+ * Does not set a custom SMTP envelope (Hostinger delivers the auto envelope).
  */
 export async function sendContactFormEmail(options: {
   customerName: string;
@@ -97,9 +99,8 @@ ${renderEmailFooterHtml("support")}
 </td></tr>
 </table></td></tr></table></body></html>`;
 
-  const logo = getEmailLogoAttachment();
-
   try {
+    const logo = getEmailLogoAttachment();
     await transporter.sendMail({
       from: config.from,
       to,
@@ -108,14 +109,13 @@ ${renderEmailFooterHtml("support")}
       text,
       html,
       attachments: logo ? [logo] : undefined,
-      envelope: {
-        from: config.mailbox,
-        to,
+      headers: {
+        "X-MAP-ESIM-Form": "contact",
       },
     });
     return { ok: true };
   } catch {
-    console.error("Contact form email send failed");
+    console.error("contact_form_email", "send_failed");
     return { ok: false, reason: "send_failed" };
   }
 }

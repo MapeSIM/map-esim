@@ -108,12 +108,12 @@ export default function ContactForm() {
       ) : null}
 
       <form ref={formRef} action={formAction} className="mt-6 space-y-5" noValidate>
-        {/* Honeypot — hidden from users */}
-        <div className="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden="true">
-          <label htmlFor="company">Company</label>
+        {/* Honeypot — visually hidden, not a real contact field. */}
+        <div className="absolute left-[-10000px] top-auto h-px w-px overflow-hidden" aria-hidden="true">
+          <label htmlFor="fax_number">Fax</label>
           <input
-            id="company"
-            name="company"
+            id="fax_number"
+            name="fax_number"
             type="text"
             tabIndex={-1}
             autoComplete="off"
