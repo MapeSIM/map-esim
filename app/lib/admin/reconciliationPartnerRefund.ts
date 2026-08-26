@@ -37,6 +37,7 @@ import {
   refundPartnerPurchaseFundsInTx,
 } from "@/app/lib/partner/partnerPurchaseWallet";
 import { syncPartnerRefundRequestsForPurchase } from "@/app/lib/partner/partnerRefundRequestSync";
+import { schedulePartnerRefundCompletedNotifications } from "@/app/lib/partner/partnerRefundRequestNotification";
 import { VesimEnvironmentError } from "@/app/lib/vesim/environment";
 import {
   classifyProviderOrderResponse,
@@ -459,11 +460,12 @@ export async function refundReconciliationPartnerPurchase(options: {
     });
     if (ctx.refundTransactionId) {
       try {
-        await syncPartnerRefundRequestsForPurchase(prisma, {
+        const synced = await syncPartnerRefundRequestsForPurchase(prisma, {
           purchaseId: ids.recordId,
           refundTransactionId: ctx.refundTransactionId,
           actorUserId: admin.id,
         });
+        schedulePartnerRefundCompletedNotifications(synced.completedRequestIds);
       } catch {
         // Money already settled; request sync can complete on the next execute.
       }
@@ -635,11 +637,12 @@ export async function refundReconciliationPartnerPurchase(options: {
       });
       if (result.refundTransactionId) {
         try {
-          await syncPartnerRefundRequestsForPurchase(prisma, {
+          const synced = await syncPartnerRefundRequestsForPurchase(prisma, {
             purchaseId: ids.recordId,
             refundTransactionId: result.refundTransactionId,
             actorUserId: admin.id,
           });
+          schedulePartnerRefundCompletedNotifications(synced.completedRequestIds);
         } catch {
           // Money already settled; request sync can complete on the next execute.
         }
@@ -673,11 +676,12 @@ export async function refundReconciliationPartnerPurchase(options: {
     });
     if (result.refundTransactionId) {
       try {
-        await syncPartnerRefundRequestsForPurchase(prisma, {
+        const synced = await syncPartnerRefundRequestsForPurchase(prisma, {
           purchaseId: ids.recordId,
           refundTransactionId: result.refundTransactionId,
           actorUserId: admin.id,
         });
+        schedulePartnerRefundCompletedNotifications(synced.completedRequestIds);
       } catch {
         // Money already settled; request sync can complete on the next execute.
       }

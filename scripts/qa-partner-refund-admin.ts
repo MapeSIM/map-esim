@@ -214,10 +214,10 @@ function runOfflineChecks(): void {
   assert.match(constants, /partner_refund\.rejected/);
   assert.equal(partnerRefundStatusLabel("REQUESTED"), "Refund requested");
   assert.equal(partnerRefundStatusLabel("UNDER_REVIEW"), "Under review");
-  assert.equal(
-    partnerRefundStatusLabel("APPROVED_PENDING_EXECUTION"),
-    "Approved — refund pending"
-  );
+    assert.equal(
+      partnerRefundStatusLabel("APPROVED_PENDING_EXECUTION"),
+      "Approved — pending wallet credit"
+    );
   assert.equal(
     partnerRefundStatusLabel("REJECTED"),
     "Refund request rejected"
@@ -590,7 +590,7 @@ async function main() {
     const rejectedSummary = summaries.find(
       (row) => row.requestId === createdReject.requestId
     );
-    assert.equal(approvedSummary?.statusLabel, "Approved — refund pending");
+    assert.equal(approvedSummary?.statusLabel, "Approved — pending wallet credit");
     assert.equal(rejectedSummary?.statusLabel, "Refund request rejected");
     assert.equal(
       rejectedSummary?.adminDecisionNote,

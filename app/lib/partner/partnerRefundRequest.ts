@@ -22,6 +22,7 @@ import {
   partnerRefundStatusLabel,
   sanitizePartnerRefundNote,
 } from "@/app/lib/partner/partnerRefundRequestConstants";
+import { schedulePartnerRefundStatusNotification } from "@/app/lib/partner/partnerRefundRequestNotification";
 import { formatPartnerOrderDate } from "@/app/lib/partner/partnerOrdersDisplay";
 import { formatUsdCents } from "@/app/lib/wallet/display";
 
@@ -275,6 +276,8 @@ export async function createPartnerRefundRequest(
 
       return row;
     });
+
+    schedulePartnerRefundStatusNotification(created.id, "received");
 
     return {
       requestId: created.id,

@@ -39,6 +39,7 @@
     "qa:partner-refund-request": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-refund-request.ts",
     "qa:partner-refund-admin": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-refund-admin.ts",
     "qa:partner-refund-execution": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-refund-execution.ts",
+    "qa:partner-refund-status-email": "tsx scripts/qa-partner-refund-status-email.ts",
     "qa:partner-ux-unification": "tsx scripts/qa-partner-ux-unification.ts",
     "qa:partner-invite-setup": "tsx scripts/qa-partner-invite-setup.ts",
     "qa:wallet-foundation": "tsx scripts/qa-wallet-foundation.ts",

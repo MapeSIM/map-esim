@@ -31,7 +31,24 @@ export const PARTNER_REFUND_AUDIT = {
   EXECUTION_BLOCKED: "partner_refund.execution_blocked",
   WALLET_REFUNDED: "partner_refund.wallet_refunded",
   REQUEST_COMPLETED: "partner_refund.request_completed",
+  EMAIL_RECEIVED: "partner_refund.email_received",
+  EMAIL_UNDER_REVIEW: "partner_refund.email_under_review",
+  EMAIL_APPROVED_PENDING: "partner_refund.email_approved_pending_execution",
+  EMAIL_REJECTED: "partner_refund.email_rejected",
+  EMAIL_COMPLETED: "partner_refund.email_completed",
 } as const;
+
+/** Partner refund-status email events (execution-failed email not in this slice). */
+export const PARTNER_REFUND_STATUS_EMAIL_EVENTS = [
+  "received",
+  "under_review",
+  "approved_pending_execution",
+  "rejected",
+  "completed",
+] as const;
+
+export type PartnerRefundStatusEmailEvent =
+  (typeof PARTNER_REFUND_STATUS_EMAIL_EVENTS)[number];
 
 /** Partner-facing status copy (Admin queue may use the shared refund labels). */
 export function partnerRefundStatusLabel(status: string): string {
@@ -41,7 +58,7 @@ export function partnerRefundStatusLabel(status: string): string {
     case "UNDER_REVIEW":
       return "Under review";
     case "APPROVED_PENDING_EXECUTION":
-      return "Approved — refund pending";
+      return "Approved — pending wallet credit";
     case "REJECTED":
       return "Refund request rejected";
     case "COMPLETED":

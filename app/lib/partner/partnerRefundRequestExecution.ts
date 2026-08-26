@@ -26,6 +26,10 @@ import {
 } from "@/app/lib/partner/partnerRefundRequestExecutionShared";
 import { syncPartnerRefundRequestsForPurchase } from "@/app/lib/partner/partnerRefundRequestSync";
 import {
+  schedulePartnerRefundCompletedNotifications,
+  schedulePartnerRefundStatusNotification,
+} from "@/app/lib/partner/partnerRefundRequestNotification";
+import {
   PartnerPurchaseWalletError,
   refundPartnerPurchaseFundsInTx,
 } from "@/app/lib/partner/partnerPurchaseWallet";
@@ -269,13 +273,18 @@ export async function executeAdminPartnerRefundRequest(
     if (!refundTransactionId) {
       throwBlocked("FINANCIAL_STATE_MISMATCH");
     }
-    await prisma.$transaction(async (tx) => {
-      await syncPartnerRefundRequestsForPurchase(tx, {
+    const synced = await prisma.$transaction(async (tx) => {
+      return syncPartnerRefundRequestsForPurchase(tx, {
         purchaseId: purchase.id,
         refundTransactionId,
         actorUserId: admin.id,
       });
     });
+    const completedIds =
+      synced.completedRequestIds.length > 0
+        ? synced.completedRequestIds
+        : [request.id];
+    schedulePartnerRefundCompletedNotifications(completedIds);
     return {
       requestId: request.id,
       status: RefundRequestStatus.COMPLETED,
@@ -473,6 +482,8 @@ export async function executeAdminPartnerRefundRequest(
       refundTransactionId: result.refundTransactionId,
       toStatus: RefundRequestStatus.COMPLETED,
     });
+
+    schedulePartnerRefundStatusNotification(request.id, "completed");
 
     return {
       requestId: request.id,

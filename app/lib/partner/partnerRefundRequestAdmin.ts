@@ -18,6 +18,7 @@ import {
   partnerRefundReasonLabel,
   sanitizePartnerRefundNote,
 } from "@/app/lib/partner/partnerRefundRequestConstants";
+import { schedulePartnerRefundStatusNotification } from "@/app/lib/partner/partnerRefundRequestNotification";
 import {
   evaluatePartnerRefundRequestExecutionEligibility,
   partnerRefundExecutionBlockerLabel,
@@ -499,6 +500,7 @@ export async function applyAdminPartnerRefundRequestDecision(
         },
       },
     });
+    schedulePartnerRefundStatusNotification(current.id, "under_review");
     return {
       requestId: current.id,
       status: RefundRequestStatus.UNDER_REVIEW,
@@ -568,6 +570,10 @@ export async function applyAdminPartnerRefundRequestDecision(
         },
       },
     });
+    schedulePartnerRefundStatusNotification(
+      current.id,
+      "approved_pending_execution"
+    );
     return {
       requestId: current.id,
       status: RefundRequestStatus.APPROVED_PENDING_EXECUTION,
@@ -650,6 +656,7 @@ export async function applyAdminPartnerRefundRequestDecision(
       },
     },
   });
+  schedulePartnerRefundStatusNotification(current.id, "rejected");
   return {
     requestId: current.id,
     status: RefundRequestStatus.REJECTED,

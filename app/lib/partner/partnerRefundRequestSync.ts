@@ -16,6 +16,11 @@ const OPEN_FOR_SYNC: RefundRequestStatus[] = [
   RefundRequestStatus.APPROVED_PENDING_EXECUTION,
 ];
 
+export type SyncPartnerRefundRequestsResult = {
+  count: number;
+  completedRequestIds: string[];
+};
+
 export async function syncPartnerRefundRequestsForPurchase(
   client: DbClient,
   options: {
@@ -23,10 +28,12 @@ export async function syncPartnerRefundRequestsForPurchase(
     refundTransactionId: string;
     actorUserId?: string | null;
   }
-): Promise<number> {
+): Promise<SyncPartnerRefundRequestsResult> {
   const purchaseId = options.purchaseId.trim();
   const refundTransactionId = options.refundTransactionId.trim();
-  if (!purchaseId || !refundTransactionId) return 0;
+  if (!purchaseId || !refundTransactionId) {
+    return { count: 0, completedRequestIds: [] };
+  }
 
   const now = new Date();
   let updated: { count: number };
@@ -48,27 +55,32 @@ export async function syncPartnerRefundRequestsForPurchase(
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2021"
     ) {
-      return 0;
+      return { count: 0, completedRequestIds: [] };
     }
     throw error;
   }
 
-  if (updated.count > 0 && options.actorUserId) {
-    const rows = await client.partnerRefundRequest.findMany({
-      where: {
-        partnerEsimPurchaseId: purchaseId,
-        status: RefundRequestStatus.COMPLETED,
-        executedRefundTransactionId: refundTransactionId,
-      },
-      select: {
-        id: true,
-        partnerId: true,
-        orderId: true,
-        partnerChargeCents: true,
-        currency: true,
-      },
-      take: 5,
-    });
+  if (updated.count === 0) {
+    return { count: 0, completedRequestIds: [] };
+  }
+
+  const rows = await client.partnerRefundRequest.findMany({
+    where: {
+      partnerEsimPurchaseId: purchaseId,
+      status: RefundRequestStatus.COMPLETED,
+      executedRefundTransactionId: refundTransactionId,
+    },
+    select: {
+      id: true,
+      partnerId: true,
+      orderId: true,
+      partnerChargeCents: true,
+      currency: true,
+    },
+    take: 5,
+  });
+
+  if (options.actorUserId) {
     for (const row of rows) {
       await client.auditLog.create({
         data: {
@@ -91,5 +103,8 @@ export async function syncPartnerRefundRequestsForPurchase(
     }
   }
 
-  return updated.count;
+  return {
+    count: updated.count,
+    completedRequestIds: rows.map((row) => row.id),
+  };
 }
