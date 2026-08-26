@@ -267,7 +267,10 @@ export type CustomerOrderDetail = {
   isRefunded: boolean;
   refundStatusLabel: string | null;
   refundedAtLabel: string | null;
+  /** Exact MAP Wallet credit when known — never a speculative full price. */
   refundAmountLabel: string | null;
+  walletCreditedLabel: string | null;
+  gatewayRefundLabel: string | null;
   rewardsEarnedPoints: number | null;
   rewardsAppliedPoints: number | null;
 };
@@ -412,6 +415,8 @@ export async function getCustomerOwnedOrderDetail(
   let refundStatusLabel: string | null = null;
   let refundedAtLabel: string | null = null;
   let refundAmountLabel: string | null = null;
+  let walletCreditedLabel: string | null = null;
+  let gatewayRefundLabel: string | null = null;
   if (isRefunded) {
     refundStatusLabel = "Refund completed";
     const refundTx = order.walletEsimPurchase?.refundTransaction;
@@ -420,16 +425,43 @@ export async function getCustomerOwnedOrderDetail(
     } else if (order.walletEsimPurchase?.updatedAt) {
       refundedAtLabel = formatOrderDate(order.walletEsimPurchase.updatedAt);
     }
-    if (refundTx && Number.isInteger(refundTx.amountCents)) {
-      refundAmountLabel = formatUsdCentsAmount(refundTx.amountCents);
-    } else if (
-      order.walletEsimPurchase &&
-      Number.isInteger(order.walletEsimPurchase.priceCents)
+    // Prefer the ledger credit amount; never invent full priceCents.
+    if (
+      refundTx &&
+      Number.isInteger(refundTx.amountCents) &&
+      refundTx.amountCents > 0
     ) {
-      refundAmountLabel = formatUsdCentsAmount(
-        order.walletEsimPurchase.priceCents
-      );
+      walletCreditedLabel = formatUsdCentsAmount(refundTx.amountCents);
+      refundAmountLabel = walletCreditedLabel;
+    } else {
+      const completedRequest = await prisma.refundRequest.findFirst({
+        where: {
+          orderId: order.id,
+          customerUserId: owner.id,
+          status: "COMPLETED",
+          executedAmountCents: { gt: 0 },
+        },
+        orderBy: [{ executedAt: "desc" }, { id: "desc" }],
+        select: {
+          executedAmountCents: true,
+          executedAt: true,
+        },
+      });
+      if (
+        completedRequest &&
+        Number.isInteger(completedRequest.executedAmountCents) &&
+        (completedRequest.executedAmountCents ?? 0) > 0
+      ) {
+        walletCreditedLabel = formatUsdCentsAmount(
+          completedRequest.executedAmountCents!
+        );
+        refundAmountLabel = walletCreditedLabel;
+        if (!refundedAtLabel && completedRequest.executedAt) {
+          refundedAtLabel = formatOrderDate(completedRequest.executedAt);
+        }
+      }
     }
+    gatewayRefundLabel = "Not issued";
   }
 
   return {
@@ -476,6 +508,8 @@ export async function getCustomerOwnedOrderDetail(
     refundStatusLabel,
     refundedAtLabel,
     refundAmountLabel,
+    walletCreditedLabel,
+    gatewayRefundLabel,
     rewardsEarnedPoints,
     rewardsAppliedPoints,
   };

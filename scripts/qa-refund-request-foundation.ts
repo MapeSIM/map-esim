@@ -72,6 +72,7 @@ function main() {
     "REQUESTED",
     "UNDER_REVIEW",
     "APPROVED_PENDING_EXECUTION",
+    "EXECUTION_FAILED",
   ]);
   console.log("PASS reason_and_status_helpers");
 
@@ -131,7 +132,11 @@ function main() {
     service,
     /status:\s*RefundRequestStatus\.APPROVED_PENDING_EXECUTION/
   );
-  assert.doesNotMatch(service, /RefundRequestStatus\.COMPLETED/);
+  // Review service never marks COMPLETED — execution module owns that transition.
+  assert.doesNotMatch(
+    service,
+    /status:\s*RefundRequestStatus\.COMPLETED/
+  );
   assert.match(service, /moneyMoved:\s*false/);
   assert.match(service, /gatewayRefundCalled:\s*false/);
   assert.match(service, /providerRefundCalled:\s*false/);
@@ -159,7 +164,7 @@ function main() {
   assert.doesNotMatch(service, /balanceCents:\s*\{|REFUND_CREDIT|requestRefund\(/);
   assert.doesNotMatch(service, /executeCreditCheckout|getBrokerToken/);
   assert.doesNotMatch(adminActions, /REFUND_CREDIT|requestRefund\(/);
-  assert.doesNotMatch(service, /RefundRequestStatus\.COMPLETED|status:\s*["']COMPLETED["']/);
+  assert.doesNotMatch(service, /status:\s*RefundRequestStatus\.COMPLETED/);
   console.log("PASS no_money_gateway_provider_refund");
 
   assert.match(purchase, /PURCHASE_DEBIT/);

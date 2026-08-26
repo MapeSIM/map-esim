@@ -170,11 +170,14 @@ enum PaymentGatewayProvider {
   MANUAL_TEST
 }
 
-/// Customer refund request workflow (review only — no money movement in this phase).
+/// Shared refund-request status. Customer review is money-free until execution;
+/// customer EXECUTE credits MAP Wallet. Partner execute uses partner wallet credit.
 enum RefundRequestStatus {
   REQUESTED
   UNDER_REVIEW
   APPROVED_PENDING_EXECUTION
+  /// Customer wallet-credit execute failed; retryable. Partner path does not use this.
+  EXECUTION_FAILED
   REJECTED
   COMPLETED
   CANCELLED
@@ -281,6 +284,7 @@ model User {
   refundRequests               RefundRequest[]          @relation("RefundRequestCustomer")
   refundRequestsReviewed       RefundRequest[]          @relation("RefundRequestReviewedBy")
   refundRequestsDecided        RefundRequest[]          @relation("RefundRequestDecidedBy")
+  refundRequestsExecuted       RefundRequest[]          @relation("RefundRequestExecutedBy")
   partnerProfile               PartnerProfile?
   partnerWalletTxCreated       PartnerWalletTransaction[] @relation("PartnerWalletTxCreatedByAdmin")
   promoCodesCreated            PromoCode[]                @relation("PromoCodeCreatedByAdmin")
@@ -1187,38 +1191,48 @@ model AlertNotificationRunnerLock {
   updatedAt      DateTime  @updatedAt
 }
 
-/// Customer-initiated refund request for admin review.
-/// Approve/reject only — never credits wallet or calls gateway/provider refund APIs.
+/// Customer-initiated refund request for admin review + MAP Wallet credit execution.
+/// Approve does not move money. Execute credits refundAmountCents to MAP Wallet only
+/// (never calls Simpaisa/gateway requestRefund as the standard path).
 model RefundRequest {
-  id                   String              @id @default(cuid())
-  orderId              String
-  customerUserId       String
+  id                          String              @id @default(cuid())
+  orderId                     String
+  customerUserId              String
   /// Linked wallet purchase when present (payment composition source).
-  purchaseId           String?
-  reason               RefundRequestReason
+  purchaseId                  String?
+  reason                      RefundRequestReason
   /// Optional short customer explanation (never a refund amount).
-  customerNote         String?
-  status               RefundRequestStatus @default(REQUESTED)
+  customerNote                String?
+  status                      RefundRequestStatus @default(REQUESTED)
   /// Authoritative refundable USD cents from server records at request time.
-  refundAmountCents    Int
-  currency             String              @default("USD")
-  /// Payment composition snapshot for later execution (no money movement here).
-  walletAppliedCents   Int                 @default(0)
-  gatewayAmountCents   Int                 @default(0)
-  fundingSource        OrderFundingSource?
+  refundAmountCents           Int
+  currency                    String              @default("USD")
+  /// Payment composition snapshot (display / evidence). Execute credits refundAmountCents, not this split.
+  walletAppliedCents          Int                 @default(0)
+  gatewayAmountCents          Int                 @default(0)
+  fundingSource               OrderFundingSource?
   /// Equals orderId while open; null when terminal — at most one open request per order.
-  openOrderKey         String?             @unique
-  adminDecisionNote    String?
-  reviewedByAdminId    String?
-  reviewedAt           DateTime?
-  decidedByAdminId     String?
-  decidedAt            DateTime?
-  createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @updatedAt
-  order                Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  customer             User                @relation("RefundRequestCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
-  reviewedByAdmin      User?               @relation("RefundRequestReviewedBy", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
-  decidedByAdmin       User?               @relation("RefundRequestDecidedBy", fields: [decidedByAdminId], references: [id], onDelete: SetNull)
+  openOrderKey                String?             @unique
+  adminDecisionNote           String?
+  reviewedByAdminId           String?
+  reviewedAt                  DateTime?
+  decidedByAdminId            String?
+  decidedAt                   DateTime?
+  /// WalletTransaction id created (or synced) when MAP Wallet credit completed.
+  executedRefundTransactionId String?
+  /// Exact USD cents credited to MAP Wallet on successful execution/sync.
+  executedAmountCents         Int?
+  executedAt                  DateTime?
+  executedByAdminId           String?
+  /// Safe machine reason for last failed execute (no secrets).
+  lastExecutionError          String?
+  createdAt                   DateTime            @default(now())
+  updatedAt                   DateTime            @updatedAt
+  order                       Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customer                    User                @relation("RefundRequestCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
+  reviewedByAdmin             User?               @relation("RefundRequestReviewedBy", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  decidedByAdmin              User?               @relation("RefundRequestDecidedBy", fields: [decidedByAdminId], references: [id], onDelete: SetNull)
+  executedByAdmin             User?               @relation("RefundRequestExecutedBy", fields: [executedByAdminId], references: [id], onDelete: SetNull)
 
   @@index([customerUserId])
   @@index([orderId])
@@ -1226,6 +1240,7 @@ model RefundRequest {
   @@index([createdAt])
   @@index([customerUserId, createdAt])
   @@index([status, createdAt])
+  @@index([executedRefundTransactionId])
 }
 
 /// Admin-managed customer checkout promo. Code is stored normalized (uppercase).

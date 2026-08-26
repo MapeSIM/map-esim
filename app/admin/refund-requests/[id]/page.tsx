@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import AdminCustomerRefundRequestExecute from "@/app/components/admin/AdminCustomerRefundRequestExecute";
 import AdminRefundRequestActions from "@/app/components/admin/AdminRefundRequestActions";
 import { requireRole } from "@/app/lib/auth/session";
 import { getAdminRefundRequestDetail } from "@/app/lib/refunds/refundRequestAdmin";
@@ -66,8 +67,8 @@ export default async function AdminRefundRequestDetailPage({
           Refund request review
         </h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Safe order and payment evidence only. Approving does not execute a
-          refund in this phase.
+          Safe order and payment evidence only. Approving does not move money.
+          Execution credits MAP Wallet with the approved amount.
         </p>
       </div>
 
@@ -82,7 +83,19 @@ export default async function AdminRefundRequestDetailPage({
         <DetailRow label="Destination" value={detail.orderDestination} />
         <DetailRow label="Plan" value={detail.planName} />
         <DetailRow label="Order status" value={detail.orderStatus} />
-        <DetailRow label="Refund amount" value={detail.amountLabel} />
+        <DetailRow label="Approved refund amount" value={detail.amountLabel} />
+        <DetailRow
+          label="MAP Wallet credited"
+          value={detail.executedAmountLabel || "Not credited yet"}
+        />
+        <DetailRow
+          label="Gateway refund"
+          value="Not executed (exceptional / manual only)"
+        />
+        <DetailRow
+          label="Executed at"
+          value={detail.executedAtLabel || "Not yet"}
+        />
         <DetailRow label="Payment composition" value={detail.compositionLabel} />
         <DetailRow
           label="Purchase status"
@@ -139,6 +152,16 @@ export default async function AdminRefundRequestDetailPage({
         canApprove={detail.canApprove}
         canReject={detail.canReject}
       />
+
+      {detail.canExecute ? (
+        <AdminCustomerRefundRequestExecute
+          requestId={detail.id}
+          amountLabel={detail.amountLabel}
+          compositionLabel={detail.compositionLabel}
+          statusLabel={detail.statusLabel}
+          lastExecutionError={detail.lastExecutionError}
+        />
+      ) : null}
     </div>
   );
 }

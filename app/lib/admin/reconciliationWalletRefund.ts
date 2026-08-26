@@ -37,6 +37,7 @@ import {
   refundReservedFundsInTx,
   WalletEsimPurchaseError,
 } from "@/app/lib/esim/walletPurchase";
+import { syncCustomerRefundRequestsForPurchase } from "@/app/lib/refunds/refundRequestSync";
 import { VesimEnvironmentError } from "@/app/lib/vesim/environment";
 import {
   classifyProviderOrderResponse,
@@ -511,10 +512,32 @@ export async function refundReconciliationWalletPurchase(options: {
         };
       }
       if (again.alreadyRefunded) {
+        const existingRefundId = fresh.refundTransactionId;
+        let creditedAmountCents = fresh.priceCents;
+        if (existingRefundId) {
+          const existingTx = await tx.walletTransaction.findUnique({
+            where: { id: existingRefundId },
+            select: { amountCents: true },
+          });
+          if (
+            existingTx &&
+            Number.isInteger(existingTx.amountCents) &&
+            existingTx.amountCents > 0
+          ) {
+            creditedAmountCents = existingTx.amountCents;
+          }
+          await syncCustomerRefundRequestsForPurchase(tx, {
+            purchaseId: ids.recordId,
+            orderId: fresh.orderId,
+            refundTransactionId: existingRefundId,
+            creditedAmountCents,
+            actorUserId: admin.id,
+          });
+        }
         return {
           status: "idempotent" as const,
-          refundTransactionId: fresh.refundTransactionId,
-          amountCents: fresh.priceCents,
+          refundTransactionId: existingRefundId,
+          amountCents: creditedAmountCents,
           currency: fresh.currency,
         };
       }
@@ -572,11 +595,33 @@ export async function refundReconciliationWalletPurchase(options: {
         currency: fresh.currency,
       });
 
+      let creditedAmountCents = fresh.priceCents;
+      if (refund.refundTransactionId) {
+        const creditTx = await tx.walletTransaction.findUnique({
+          where: { id: refund.refundTransactionId },
+          select: { amountCents: true },
+        });
+        if (
+          creditTx &&
+          Number.isInteger(creditTx.amountCents) &&
+          creditTx.amountCents > 0
+        ) {
+          creditedAmountCents = creditTx.amountCents;
+        }
+        await syncCustomerRefundRequestsForPurchase(tx, {
+          purchaseId: ids.recordId,
+          orderId: fresh.orderId,
+          refundTransactionId: refund.refundTransactionId,
+          creditedAmountCents,
+          actorUserId: admin.id,
+        });
+      }
+
       return {
         status: "refunded" as const,
         outcome: refund.outcome,
         refundTransactionId: refund.refundTransactionId,
-        amountCents: fresh.priceCents,
+        amountCents: creditedAmountCents,
         currency: fresh.currency,
       };
     });

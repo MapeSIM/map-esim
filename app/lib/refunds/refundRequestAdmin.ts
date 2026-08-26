@@ -27,10 +27,10 @@ function fundingCompositionLabel(input: {
   const wallet = input.walletAppliedCents;
   const gateway = input.gatewayAmountCents;
   if (wallet > 0 && gateway > 0) {
-    return `Split · wallet ${formatUsdCents(wallet)} + card ${formatUsdCents(gateway)}`;
+    return `Split · wallet ${formatUsdCents(wallet)} + gateway ${formatUsdCents(gateway)}`;
   }
   if (wallet > 0) return `Wallet · ${formatUsdCents(wallet)}`;
-  if (gateway > 0) return `Card · ${formatUsdCents(gateway)}`;
+  if (gateway > 0) return `Gateway · ${formatUsdCents(gateway)}`;
   if (input.fundingSource === "COMPANY_FUNDED") return "Company funded";
   return "Not available";
 }
@@ -117,6 +117,10 @@ export type AdminRefundRequestDetail = {
   canMarkUnderReview: boolean;
   canApprove: boolean;
   canReject: boolean;
+  canExecute: boolean;
+  lastExecutionError: string | null;
+  executedAmountLabel: string | null;
+  executedAtLabel: string | null;
 };
 
 export async function getAdminRefundRequestDetail(
@@ -141,6 +145,10 @@ export async function getAdminRefundRequestDetail(
       createdAt: true,
       reviewedAt: true,
       decidedAt: true,
+      lastExecutionError: true,
+      executedAmountCents: true,
+      executedAt: true,
+      executedRefundTransactionId: true,
       customer: { select: { name: true, email: true, role: true } },
       order: {
         select: {
@@ -178,7 +186,11 @@ export async function getAdminRefundRequestDetail(
     row.status === RefundRequestStatus.UNDER_REVIEW;
   const openForReject =
     openForReview ||
-    row.status === RefundRequestStatus.APPROVED_PENDING_EXECUTION;
+    row.status === RefundRequestStatus.APPROVED_PENDING_EXECUTION ||
+    row.status === RefundRequestStatus.EXECUTION_FAILED;
+  const canExecute =
+    row.status === RefundRequestStatus.APPROVED_PENDING_EXECUTION ||
+    row.status === RefundRequestStatus.EXECUTION_FAILED;
 
   return {
     id: row.id,
@@ -212,5 +224,14 @@ export async function getAdminRefundRequestDetail(
     canMarkUnderReview: openForReview,
     canApprove: openForReview,
     canReject: openForReject,
+    canExecute,
+    lastExecutionError: row.lastExecutionError,
+    executedAmountLabel:
+      row.executedAmountCents != null &&
+      Number.isInteger(row.executedAmountCents) &&
+      row.executedAmountCents > 0
+        ? `${formatUsdCents(row.executedAmountCents)} USD`
+        : null,
+    executedAtLabel: row.executedAt ? formatDate(row.executedAt) : null,
   };
 }

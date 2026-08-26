@@ -49,6 +49,8 @@ function auditActionFor(event: RefundStatusEmailEvent): string {
       return REFUND_AUDIT.EMAIL_APPROVED_PENDING;
     case "rejected":
       return REFUND_AUDIT.EMAIL_REJECTED;
+    case "completed":
+      return REFUND_AUDIT.EMAIL_COMPLETED;
   }
 }
 
@@ -62,6 +64,8 @@ function expectedStatus(event: RefundStatusEmailEvent): RefundRequestStatus {
       return RefundRequestStatus.APPROVED_PENDING_EXECUTION;
     case "rejected":
       return RefundRequestStatus.REJECTED;
+    case "completed":
+      return RefundRequestStatus.COMPLETED;
   }
 }
 
@@ -164,10 +168,12 @@ export async function notifyRefundStatusEmail(
         orderId: true,
         customerUserId: true,
         refundAmountCents: true,
+        executedAmountCents: true,
         currency: true,
         createdAt: true,
         reviewedAt: true,
         decidedAt: true,
+        executedAt: true,
         customer: {
           select: {
             id: true,
@@ -233,7 +239,13 @@ export async function notifyRefundStatusEmail(
     });
 
     const kind = event as RefundStatusEmailKind;
-    const amountLabel = formatUsdCents(Math.max(0, row.refundAmountCents));
+    const creditedCents =
+      event === "completed" &&
+      Number.isInteger(row.executedAmountCents) &&
+      (row.executedAmountCents ?? 0) > 0
+        ? row.executedAmountCents!
+        : row.refundAmountCents;
+    const amountLabel = formatUsdCents(Math.max(0, creditedCents));
     const currencyLabel = (row.currency || "USD").trim().toUpperCase() || "USD";
     const orderUrl = `${BRAND_SITE_URL}/account/orders/${encodeURIComponent(row.orderId)}`;
     const when =
@@ -241,7 +253,9 @@ export async function notifyRefundStatusEmail(
         ? row.createdAt
         : event === "under_review"
           ? row.reviewedAt ?? row.createdAt
-          : row.decidedAt ?? row.createdAt;
+          : event === "completed"
+            ? row.executedAt ?? row.decidedAt ?? row.createdAt
+            : row.decidedAt ?? row.createdAt;
 
     const payload = {
       kind,
@@ -251,6 +265,7 @@ export async function notifyRefundStatusEmail(
       currencyLabel,
       orderUrl,
       requestedAtLabel: formatWalletDateTime(when),
+      walletCreditedLabel: event === "completed" ? amountLabel : undefined,
     };
 
     const subject = refundStatusEmailSubject(kind);

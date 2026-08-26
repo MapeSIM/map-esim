@@ -175,10 +175,21 @@ export default async function AccountOrderDetailPage({
                 <dd className="inline">{detail.refundedAtLabel}</dd>
               </div>
             ) : null}
-            {detail.refundAmountLabel ? (
+            {detail.walletCreditedLabel ? (
+              <div>
+                <dt className="inline font-semibold">MAP Wallet credited: </dt>
+                <dd className="inline">{detail.walletCreditedLabel}</dd>
+              </div>
+            ) : detail.refundAmountLabel ? (
               <div>
                 <dt className="inline font-semibold">Refunded amount: </dt>
                 <dd className="inline">{detail.refundAmountLabel}</dd>
+              </div>
+            ) : null}
+            {detail.gatewayRefundLabel ? (
+              <div>
+                <dt className="inline font-semibold">Gateway refund: </dt>
+                <dd className="inline">{detail.gatewayRefundLabel}</dd>
               </div>
             ) : null}
             <div>

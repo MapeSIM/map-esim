@@ -220,6 +220,7 @@ export async function createCustomerRefundRequest(
             RefundRequestStatus.REQUESTED,
             RefundRequestStatus.UNDER_REVIEW,
             RefundRequestStatus.APPROVED_PENDING_EXECUTION,
+            RefundRequestStatus.EXECUTION_FAILED,
           ],
         },
       },
@@ -534,7 +535,8 @@ export async function applyAdminRefundRequestDecision(options: {
   if (
     current.status !== RefundRequestStatus.REQUESTED &&
     current.status !== RefundRequestStatus.UNDER_REVIEW &&
-    current.status !== RefundRequestStatus.APPROVED_PENDING_EXECUTION
+    current.status !== RefundRequestStatus.APPROVED_PENDING_EXECUTION &&
+    current.status !== RefundRequestStatus.EXECUTION_FAILED
   ) {
     throw new RefundRequestError(
       "INVALID_TRANSITION",
@@ -549,6 +551,7 @@ export async function applyAdminRefundRequestDecision(options: {
           RefundRequestStatus.REQUESTED,
           RefundRequestStatus.UNDER_REVIEW,
           RefundRequestStatus.APPROVED_PENDING_EXECUTION,
+          RefundRequestStatus.EXECUTION_FAILED,
         ],
       },
     },
