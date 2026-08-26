@@ -15,7 +15,7 @@ import {
   Role,
   WalletEsimPurchaseStatus,
 } from "@prisma/client";
-import { calculateRewardPointsToApply } from "../app/lib/rewards/rewardPoints";
+import { calculateRewardPointsToApply, isFullCustomerPurchaseRefundForRewards } from "../app/lib/rewards/rewardPoints";
 import {
   pointsNeededToUnlockRewards,
   purchaseEarnReversalIdempotencyKey,
@@ -73,10 +73,17 @@ function offlineChecks(): void {
     "prisma/migrations/20260817190000_allow_refund_redemption_restore_ledger/migration.sql"
   );
 
+  const walletPurchase = read("app/lib/esim/walletPurchase.ts");
+  const execution = read("app/lib/refunds/refundRequestExecution.ts");
+  const sync = read("app/lib/refunds/refundRequestSync.ts");
+  const points = read("app/lib/rewards/rewardPoints.ts");
+
   assert.match(refund, /restoreCustomerRewardRedemptionForRefundInTx/);
   assert.match(refund, /reverseCustomerPurchaseRewardEarnForRefundInTx/);
   assert.match(refund, /applyCustomerRewardFullRefundEffectsInTx/);
+  assert.match(refund, /applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx/);
   assert.match(refund, /PARTIAL_REFUND_NOT_SUPPORTED/);
+  assert.match(points, /isFullCustomerPurchaseRefundForRewards/);
   assert.match(refund, /Role\.CUSTOMER/);
   assert.match(refund, /PARTNER_EXCLUDED/);
   assert.match(refund, /CustomerRewardRedemptionStatus\.COMPLETED/);
@@ -98,10 +105,31 @@ function offlineChecks(): void {
   assert.match(refundRequest, /APPROVED_PENDING_EXECUTION/);
   assert.doesNotMatch(refundRequest, /applyCustomerRewardFullRefundEffectsInTx/);
   assert.doesNotMatch(refundRequest, /restoreCustomerRewardRedemptionForRefundInTx/);
+  // Payment-apply / recon modules stay free of direct restore calls; post-funding
+  // FULL reward finalization lives in refundReservedFundsInTx (!restoreReady).
   assert.doesNotMatch(apply, /restoreCustomerRewardRedemptionForRefundInTx/);
   assert.doesNotMatch(recon, /restoreCustomerRewardRedemptionForRefundInTx/);
   assert.match(recon, /completeRewardRedemptionInTx/);
   assert.doesNotMatch(walletRefund, /restoreCustomerRewardRedemptionForRefundInTx/);
+  assert.match(
+    walletRefund,
+    /applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx/
+  );
+  assert.match(
+    walletPurchase,
+    /applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx/
+  );
+  assert.match(
+    walletPurchase,
+    /applyPostFundingFullRefundRewardsIfEligible/
+  );
+  assert.match(walletPurchase, /if \(restoreReady\) return/);
+  assert.match(
+    execution,
+    /applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx/
+  );
+  assert.match(sync, /Status-only|authoritative money-finalization/);
+  assert.doesNotMatch(sync, /applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx/);
   assert.doesNotMatch(partnerExec, /applyCustomerRewardFullRefundEffectsInTx/);
   assert.doesNotMatch(partnerPricing, /rewardRefund|rewardPointsRedeemed/);
   assert.doesNotMatch(safepay, /CustomerReward|rewardRefund/);
@@ -110,7 +138,23 @@ function offlineChecks(): void {
   assert.match(schema, /lifetimeRedeemedPoints/);
   assert.doesNotMatch(schema, /@@unique\(\[purchaseId, type\]\)/);
   void REWARDS_AUDIT;
-  console.log("PASS O_P_R_source_no_cash_no_auto_restore_on_uncertain");
+  console.log("PASS O_P_R_source_post_funding_full_refund_rewards_wired");
+
+  assert.equal(
+    isFullCustomerPurchaseRefundForRewards({
+      purchasePriceCents: 1000,
+      refundedAmountCents: 1000,
+    }),
+    true
+  );
+  assert.equal(
+    isFullCustomerPurchaseRefundForRewards({
+      purchasePriceCents: 1000,
+      refundedAmountCents: 400,
+    }),
+    false
+  );
+  console.log("PASS full_refund_amount_guard");
 
   assert.equal(pointsNeededToUnlockRewards(-5), 105);
   assert.equal(

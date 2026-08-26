@@ -32,7 +32,7 @@ import {
 } from "@/app/lib/refunds/refundRequestExecutionShared";
 import { scheduleRefundStatusNotification } from "@/app/lib/refunds/refundRequestNotification";
 import { syncCustomerRefundRequestsForOrder } from "@/app/lib/refunds/refundRequestSync";
-import { applyCustomerRewardFullRefundEffectsInTx } from "@/app/lib/rewards/rewardRefund";
+import { applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx } from "@/app/lib/rewards/rewardRefund";
 import { scheduleWalletTransactionNotification } from "@/app/lib/wallet/transactionNotification";
 
 /** Production DB / Accelerate latency needs more than Prisma's 5s default. */
@@ -335,6 +335,16 @@ export async function executeAdminCustomerRefundRequest(
   ) {
     const credited = purchase.refundTransaction.amountCents;
     await prisma.$transaction(async (tx) => {
+      // Authoritative reward finalization if money already moved without rewards
+      // (idempotent via purchase-scoped restore/reversal keys).
+      await applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx(tx, {
+        customerUserId: purchase.customerUserId,
+        purchaseId: purchase.id,
+        purchasePriceCents: purchase.priceCents,
+        refundedAmountCents: credited,
+        refundRequestId: request.id,
+        actorUserId: admin.id,
+      });
       await syncCustomerRefundRequestsForOrder(tx, {
         orderId: request.orderId,
         refundTransactionId: purchase.refundTransactionId!,
@@ -552,6 +562,7 @@ export async function executeAdminCustomerRefundRequest(
             id: true,
             customerUserId: true,
             refundTransactionId: true,
+            priceCents: true,
           },
         });
         if (
@@ -587,10 +598,11 @@ export async function executeAdminCustomerRefundRequest(
             });
           }
 
-          await applyCustomerRewardFullRefundEffectsInTx(tx, {
+          await applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx(tx, {
             customerUserId: fresh.customerUserId,
             purchaseId: purchaseRow.id,
-            refundKind: "FULL",
+            purchasePriceCents: purchaseRow.priceCents,
+            refundedAmountCents: amountCents,
             refundRequestId: fresh.id,
             actorUserId: admin.id,
           });

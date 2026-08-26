@@ -11,6 +11,7 @@ import {
   purchaseRefundRedemptionRestoreIdempotencyKey,
   REWARDS_AUDIT,
 } from "@/app/lib/rewards/rewardConstants";
+import { isFullCustomerPurchaseRefundForRewards } from "@/app/lib/rewards/rewardPoints";
 
 function isUniqueViolation(error: unknown): boolean {
   return (
@@ -43,9 +44,10 @@ export type CustomerRewardFullRefundEffectsResult = {
 /**
  * Post-funding full-refund reward effects.
  *
- * Customer cash/gateway refund execution does NOT exist yet. A future executor
- * must call `applyCustomerRewardFullRefundEffectsInTx` in the SAME DB transaction
- * as successful refund finalization. Do not expose as a public/admin action.
+ * Call from durable FULL customer refund finalization in the SAME DB transaction
+ * as money movement (or after money already moved, with purchase-scoped idempotency).
+ * Prefer `applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx` so partial
+ * amounts never mutate. Do not expose as a public/admin action.
  *
  * lifetimeRedeemedPoints / lifetimeEarnedPoints are GROSS completed totals.
  * Refund restore/reversal changes pointsBalance only.
@@ -338,3 +340,45 @@ export async function applyCustomerRewardFullRefundEffectsInTx(
     unsupported: null,
   };
 }
+
+/**
+ * Apply post-funding reward effects only when refundedAmountCents exactly equals
+ * purchasePriceCents (FULL). Partial amounts never mutate rewards.
+ * Idempotent via purchase-scoped restore/reversal keys.
+ */
+export async function applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx(
+  tx: Prisma.TransactionClient,
+  options: {
+    customerUserId: string;
+    purchaseId: string;
+    purchasePriceCents: number;
+    refundedAmountCents: number;
+    refundRequestId?: string | null;
+    actorUserId?: string | null;
+  }
+): Promise<CustomerRewardFullRefundEffectsResult> {
+  if (
+    !isFullCustomerPurchaseRefundForRewards({
+      purchasePriceCents: options.purchasePriceCents,
+      refundedAmountCents: options.refundedAmountCents,
+    })
+  ) {
+    return {
+      restoredPoints: 0,
+      reversedEarnPoints: 0,
+      redemptionRestoreDuplicate: false,
+      earnReversalDuplicate: false,
+      unsupported: "PARTIAL_REFUND_NOT_SUPPORTED",
+    };
+  }
+
+  return applyCustomerRewardFullRefundEffectsInTx(tx, {
+    customerUserId: options.customerUserId,
+    purchaseId: options.purchaseId,
+    refundKind: "FULL",
+    refundRequestId: options.refundRequestId,
+    actorUserId: options.actorUserId,
+  });
+}
+
+export { isFullCustomerPurchaseRefundForRewards };

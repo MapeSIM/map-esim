@@ -27,6 +27,22 @@ export function isRewardRedemptionEligible(pointsBalance: number): boolean {
   return Number.isInteger(pointsBalance) && pointsBalance >= REWARD_MIN_REDEMPTION_POINTS;
 }
 
+/**
+ * FULL purchase refund for MAP Rewards = refunded cents exactly equal purchase priceCents.
+ * Do not treat "a RefundRequest exists" or FAILED_REFUNDED alone as FULL.
+ */
+export function isFullCustomerPurchaseRefundForRewards(input: {
+  purchasePriceCents: number;
+  refundedAmountCents: number;
+}): boolean {
+  return (
+    Number.isInteger(input.purchasePriceCents) &&
+    Number.isInteger(input.refundedAmountCents) &&
+    input.purchasePriceCents > 0 &&
+    input.refundedAmountCents === input.purchasePriceCents
+  );
+}
+
 /** 1 point = $0.01 = 1 USD cent. */
 export function rewardValueCentsFromPoints(points: number): number {
   if (!Number.isInteger(points) || points < 0) {

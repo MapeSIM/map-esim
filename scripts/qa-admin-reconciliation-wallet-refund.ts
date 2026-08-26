@@ -241,6 +241,7 @@ function main() {
   assert.match(service, /reconciliation\.case_action_blocked/);
   assert.match(service, /\$transaction/);
   assert.match(service, /refundReservedFundsInTx/);
+  assert.match(service, /applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx/);
   assert.match(service, /method:\s*"GET"/);
   assert.match(service, /classifyProviderOrderResponse/);
   assert.match(walletPurchase, /export async function refundReservedFundsInTx/);

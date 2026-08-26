@@ -1,6 +1,10 @@
 /**
  * Synchronize customer RefundRequest rows after a MAP Wallet refund credit
  * already exists on the purchase (recon / auto failure paths).
+ *
+ * Status-only: MAP Rewards full-refund effects are applied at the authoritative
+ * money-finalization points (`refundReservedFundsInTx` post-funding path and
+ * customer refund execute), not here — avoids duplicate callers.
  */
 import "server-only";
 

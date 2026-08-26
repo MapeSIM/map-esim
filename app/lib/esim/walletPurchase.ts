@@ -48,6 +48,7 @@ import {
   releasePromoRedemptionInTx,
 } from "@/app/lib/promo/promoRedemption";
 import { awardCustomerPurchaseEarnInTx } from "@/app/lib/rewards/rewardEarn";
+import { applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx } from "@/app/lib/rewards/rewardRefund";
 import {
   claimRewardRedemptionInTx,
   completeRewardRedemptionInTx,
@@ -809,12 +810,27 @@ export async function refundReservedFundsInTx(
     );
   }
   const priceCents = reservedWalletCents;
+  const purchaseIdForRewards = purchase.id;
+  const purchasePriceCentsForRewards = purchase.priceCents;
+
+  async function applyPostFundingFullRefundRewardsIfEligible(): Promise<void> {
+    if (restoreReady) return;
+    await applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx(tx, {
+      customerUserId: options.customerUserId,
+      purchaseId: purchaseIdForRewards,
+      purchasePriceCents: purchasePriceCentsForRewards,
+      refundedAmountCents: priceCents,
+      actorUserId: options.actorUserId,
+    });
+  }
 
   if (
     !restoreReady &&
     purchase.status === WalletEsimPurchaseStatus.FAILED_REFUNDED &&
     purchase.refundTransactionId
   ) {
+    // Self-heal rewards if an older refund completed without reward finalization.
+    await applyPostFundingFullRefundRewardsIfEligible();
     return {
       outcome: "already_refunded",
       refundTransactionId: purchase.refundTransactionId,
@@ -849,6 +865,7 @@ export async function refundReservedFundsInTx(
         failureCode: "refunded",
       },
     });
+    await applyPostFundingFullRefundRewardsIfEligible();
     return {
       outcome: "linked_existing",
       refundTransactionId: purchase.refundTransactionId,
@@ -930,6 +947,7 @@ export async function refundReservedFundsInTx(
           data: { status: WalletTransactionStatus.REVERSED },
         });
       }
+      await applyPostFundingFullRefundRewardsIfEligible();
     }
     return {
       outcome: "linked_existing",
@@ -1019,6 +1037,9 @@ export async function refundReservedFundsInTx(
 
   await releasePromoRedemptionInTx(tx, purchase.id);
   await releaseRewardRedemptionInTx(tx, purchase.id);
+  // Post-funding FULL only: COMPLETED redemption restore + earn reversal.
+  // restoreReady / HELD release stays on releaseRewardRedemptionInTx above.
+  await applyPostFundingFullRefundRewardsIfEligible();
 
   await tx.auditLog.create({
     data: {

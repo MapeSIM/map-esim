@@ -38,6 +38,7 @@ import {
   WalletEsimPurchaseError,
 } from "@/app/lib/esim/walletPurchase";
 import { syncCustomerRefundRequestsForPurchase } from "@/app/lib/refunds/refundRequestSync";
+import { applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx } from "@/app/lib/rewards/rewardRefund";
 import { VesimEnvironmentError } from "@/app/lib/vesim/environment";
 import {
   classifyProviderOrderResponse,
@@ -445,6 +446,42 @@ export async function refundReconciliationWalletPurchase(options: {
   }
 
   if (localEligibility.alreadyRefunded) {
+    // Self-heal FULL reward effects + sync open RefundRequests (idempotent).
+    const existingRefundId = ctx.refundTransactionId;
+    if (existingRefundId) {
+      try {
+        await prisma.$transaction(async (tx) => {
+          let creditedAmountCents = ctx.priceCents;
+          const existingTx = await tx.walletTransaction.findUnique({
+            where: { id: existingRefundId },
+            select: { amountCents: true },
+          });
+          if (
+            existingTx &&
+            Number.isInteger(existingTx.amountCents) &&
+            existingTx.amountCents > 0
+          ) {
+            creditedAmountCents = existingTx.amountCents;
+          }
+          await applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx(tx, {
+            customerUserId: ctx.customerUserId,
+            purchaseId: ids.recordId,
+            purchasePriceCents: ctx.priceCents,
+            refundedAmountCents: creditedAmountCents,
+            actorUserId: admin.id,
+          });
+          await syncCustomerRefundRequestsForPurchase(tx, {
+            purchaseId: ids.recordId,
+            orderId: ctx.orderId,
+            refundTransactionId: existingRefundId,
+            creditedAmountCents,
+            actorUserId: admin.id,
+          });
+        });
+      } catch {
+        // Idempotent path: never fail the already-refunded success response.
+      }
+    }
     await writeAuditLog({
       actorUserId: admin.id,
       action: WALLET_REFUNDED,
@@ -526,6 +563,13 @@ export async function refundReconciliationWalletPurchase(options: {
           ) {
             creditedAmountCents = existingTx.amountCents;
           }
+          await applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx(tx, {
+            customerUserId: fresh.customerUserId,
+            purchaseId: ids.recordId,
+            purchasePriceCents: fresh.priceCents,
+            refundedAmountCents: creditedAmountCents,
+            actorUserId: admin.id,
+          });
           await syncCustomerRefundRequestsForPurchase(tx, {
             purchaseId: ids.recordId,
             orderId: fresh.orderId,

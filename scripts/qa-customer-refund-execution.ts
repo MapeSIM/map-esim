@@ -123,7 +123,9 @@ function main() {
   assert.match(execution, /REFUND_CUSTOMER_WALLET_PHRASE|REFUND CUSTOMER WALLET/);
   assert.match(execution, /EXECUTION_FAILED/);
   assert.match(execution, /markExecutionFailed/);
-  assert.match(execution, /applyCustomerRewardFullRefundEffectsInTx/);
+  assert.match(execution, /applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx/);
+  assert.match(execution, /purchasePriceCents/);
+  assert.match(execution, /refundedAmountCents/);
   assert.match(execution, /scheduleRefundStatusNotification\([\s\S]*"completed"/);
   assert.match(execution, /CUSTOMER_REFUND_EXECUTION_TX/);
   assert.match(execution, /maxWait:\s*10_000/);
