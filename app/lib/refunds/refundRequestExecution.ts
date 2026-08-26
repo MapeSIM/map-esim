@@ -27,12 +27,19 @@ import {
 import {
   customerRefundExecutionBlockerLabel,
   evaluateCustomerRefundExecutionEligibility,
+  sanitizeCustomerRefundExecutionFailureReason,
   type CustomerRefundExecutionBlocker,
 } from "@/app/lib/refunds/refundRequestExecutionShared";
 import { scheduleRefundStatusNotification } from "@/app/lib/refunds/refundRequestNotification";
 import { syncCustomerRefundRequestsForOrder } from "@/app/lib/refunds/refundRequestSync";
 import { applyCustomerRewardFullRefundEffectsInTx } from "@/app/lib/rewards/rewardRefund";
 import { scheduleWalletTransactionNotification } from "@/app/lib/wallet/transactionNotification";
+
+/** Production DB / Accelerate latency needs more than Prisma's 5s default. */
+const CUSTOMER_REFUND_EXECUTION_TX = {
+  maxWait: 10_000,
+  timeout: 20_000,
+} as const;
 
 export class CustomerRefundRequestExecutionError extends Error {
   readonly code:
@@ -357,7 +364,7 @@ export async function executeAdminCustomerRefundRequest(
           openOrderKey: null,
         },
       });
-    });
+    }, CUSTOMER_REFUND_EXECUTION_TX);
     scheduleRefundStatusNotification(request.id, "completed");
     return {
       requestId: request.id,
@@ -677,7 +684,7 @@ export async function executeAdminCustomerRefundRequest(
         amountCents,
         created,
       };
-    });
+    }, CUSTOMER_REFUND_EXECUTION_TX);
 
     if (result.status === "blocked") {
       await markExecutionFailed({
@@ -758,7 +765,7 @@ export async function executeAdminCustomerRefundRequest(
       requestId: request.id,
       adminUserId: admin.id,
       orderId: request.orderId,
-      reason: "wallet_credit_failed",
+      reason: sanitizeCustomerRefundExecutionFailureReason(error),
     });
     throw new CustomerRefundRequestExecutionError(
       "EXECUTION_FAILED",

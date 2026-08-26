@@ -63,4 +63,64 @@ export function evaluateCustomerRefundExecutionEligibility(input: {
   return { ok: true, alreadyCompleted: false };
 }
 
+/**
+ * Safe machine reason for lastExecutionError / audit metadata.
+ * Never includes connection strings, SQL payloads, emails, or secrets.
+ */
+export function sanitizeCustomerRefundExecutionFailureReason(
+  error: unknown
+): string {
+  const fallback = "wallet_credit_failed";
+  const raw =
+    error instanceof Error
+      ? `${error.name}: ${error.message}`
+      : typeof error === "string"
+        ? error
+        : fallback;
+
+  let text = String(raw)
+    .replace(/[\r\n\u0000-\u001f]/g, " ")
+    .replace(
+      /\b(?:postgres(?:ql)?|prisma\+?postgres(?:ql)?):\/\/\S+/gi,
+      "[redacted]"
+    )
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[redacted]")
+    .replace(
+      /\b(password|passwd|secret|token|api[_-]?key|authorization)\s*[:=]\s*\S+/gi,
+      "$1=[redacted]"
+    )
+    .replace(/\bBearer\s+\S+/gi, "Bearer [redacted]")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (
+    /timeout for this transaction was|Transaction already closed|Transaction not found|Interactive transaction|expired transaction/i.test(
+      text
+    )
+  ) {
+    return "transaction_timeout";
+  }
+  if (
+    /Timed out fetching a new connection|P2024|connection pool/i.test(text)
+  ) {
+    return "db_pool_timeout";
+  }
+  if (!text) return fallback;
+
+  text = text
+    .replace(/^PrismaClientKnownRequestError:\s*/i, "")
+    .replace(/^Error:\s*/i, "")
+    .replace(/Invalid `prisma\.[\w.]+` invocation:?/gi, "prisma_error")
+    .trim();
+
+  if (!text) return fallback;
+  if (
+    /^(wallet_credit_failed|transaction_timeout|db_pool_timeout)$/i.test(text)
+  ) {
+    return text.toLowerCase();
+  }
+  const labeled = `${fallback}: ${text}`;
+  return labeled.slice(0, 120);
+}
+
 export { REFUND_CUSTOMER_WALLET_PHRASE };

@@ -20,6 +20,7 @@ import {
 import {
   evaluateCustomerRefundExecutionEligibility,
   customerRefundExecutionBlockerLabel,
+  sanitizeCustomerRefundExecutionFailureReason,
 } from "../app/lib/refunds/refundRequestExecutionShared";
 import {
   refundStatusEmailSubject,
@@ -124,6 +125,48 @@ function main() {
   assert.match(execution, /markExecutionFailed/);
   assert.match(execution, /applyCustomerRewardFullRefundEffectsInTx/);
   assert.match(execution, /scheduleRefundStatusNotification\([\s\S]*"completed"/);
+  assert.match(execution, /CUSTOMER_REFUND_EXECUTION_TX/);
+  assert.match(execution, /maxWait:\s*10_000/);
+  assert.match(execution, /timeout:\s*20_000/);
+  const txOptionUses = execution.match(/\}, CUSTOMER_REFUND_EXECUTION_TX\)/g) || [];
+  assert.equal(txOptionUses.length, 2, "both interactive $transaction calls use TX options");
+  assert.match(execution, /sanitizeCustomerRefundExecutionFailureReason/);
+  assert.doesNotMatch(
+    execution,
+    /reason:\s*"wallet_credit_failed"/,
+    "generic wallet_credit_failed-only path replaced"
+  );
+  console.log("   ok");
+
+  console.log("4b) Sanitized execution failure reasons");
+  assert.equal(
+    sanitizeCustomerRefundExecutionFailureReason(
+      new Error(
+        "Transaction already closed: A query cannot be executed on an expired transaction. The timeout for this transaction was 5000 ms, however 5242 ms passed since the start of the transaction."
+      )
+    ),
+    "transaction_timeout"
+  );
+  assert.equal(
+    sanitizeCustomerRefundExecutionFailureReason(
+      new Error("Transaction not found. Transaction ID is invalid")
+    ),
+    "transaction_timeout"
+  );
+  assert.equal(
+    sanitizeCustomerRefundExecutionFailureReason(
+      new Error("Timed out fetching a new connection from the connection pool")
+    ),
+    "db_pool_timeout"
+  );
+  const redacted = sanitizeCustomerRefundExecutionFailureReason(
+    new Error(
+      "connect failed postgres://user:secretpass@db.example/map email admin@mapesim.com password=leak"
+    )
+  );
+  assert.doesNotMatch(redacted, /secretpass|admin@mapesim\.com|password=leak/i);
+  assert.match(redacted, /wallet_credit_failed/);
+  assert.ok(redacted.length <= 120);
   console.log("   ok");
 
   console.log("5) Admin action + UI");
