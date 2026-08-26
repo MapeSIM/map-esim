@@ -2,6 +2,9 @@
 
 export const BRAND_NAME = "MAP eSIM";
 export const BRAND_TAGLINE = "Global eSIM Connectivity";
+/** Standard tagline for all outgoing MAP eSIM email footers. */
+export const BRAND_EMAIL_TAGLINE = "Stay connected, wherever you go.";
+export const BRAND_EMAIL_COPYRIGHT = "© MAP eSIM. All rights reserved.";
 export const BRAND_SITE_HOST = "mapesim.com";
 export const BRAND_SITE_URL = "https://mapesim.com";
 export const BRAND_SUPPORT_EMAIL = "support@mapesim.com";

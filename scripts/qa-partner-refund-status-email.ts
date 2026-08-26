@@ -77,7 +77,8 @@ function main() {
   assert.match(notify, /sendChannelMail/);
   assert.match(notify, /schedulePartnerRefundStatusNotification/);
   assert.match(notify, /renderPartnerRefundStatusEmailHtml/);
-  assert.match(template, /renderEmailFooterHtml\("billing"\)/);
+  assert.match(template, /renderTransactionalEmailLayoutHtml/);
+  assert.match(template, /renderEmailFooterText/);
   assert.match(pkg, /"qa:partner-refund-status-email"/);
   console.log("   ok");
 

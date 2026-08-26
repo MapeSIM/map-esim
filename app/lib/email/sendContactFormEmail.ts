@@ -2,17 +2,12 @@ import "server-only";
 
 import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from "@/app/lib/brand";
 import {
-  BRAND_INK,
-  BRAND_LIME,
-  BORDER,
-  CARD_BG,
   escapeHtml,
-  PAGE_BG,
-  renderEmailFooterHtml,
   renderEmailFooterText,
   TEXT_PRIMARY,
   TEXT_SECONDARY,
 } from "@/app/lib/email/brand";
+import { renderTransactionalEmailLayoutHtml } from "@/app/lib/email/emailLayout";
 import {
   getEmailConfig,
   sanitizeEmailHeaderValue,
@@ -79,25 +74,18 @@ export async function sendContactFormEmail(options: {
     "",
     message,
     "",
-    renderEmailFooterText("support"),
+    renderEmailFooterText(),
   ].join("\n");
 
-  const html = `<!DOCTYPE html>
-<html lang="en"><body style="margin:0;padding:0;background:${PAGE_BG};">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:${PAGE_BG};">
-<tr><td align="center" style="padding:24px 12px;">
-<table role="presentation" width="100%" style="max-width:560px;background:${CARD_BG};border:1px solid ${BORDER};">
-<tr><td align="center" style="background:${BRAND_LIME};padding:20px;">
-<p style="margin:0;font-family:Segoe UI,Helvetica,Arial,sans-serif;font-size:20px;font-weight:800;color:${BRAND_INK};">${escapeHtml(BRAND_NAME)} Contact</p>
-</td></tr>
-<tr><td style="padding:24px;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+  const html = renderTransactionalEmailLayoutHtml({
+    title: `[MAP eSIM Contact] ${subject}`,
+    bannerLabel: `${BRAND_NAME} Contact`,
+    contentHtml: `
 <p style="margin:0 0 8px;font-size:13px;color:${TEXT_SECONDARY};"><strong style="color:${TEXT_PRIMARY};">Name:</strong> ${escapeHtml(name)}</p>
 <p style="margin:0 0 8px;font-size:13px;color:${TEXT_SECONDARY};"><strong style="color:${TEXT_PRIMARY};">Email:</strong> ${escapeHtml(replyTo)}</p>
 <p style="margin:0 0 16px;font-size:13px;color:${TEXT_SECONDARY};"><strong style="color:${TEXT_PRIMARY};">Subject:</strong> ${escapeHtml(subject)}</p>
-<p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:${TEXT_PRIMARY};">${escapeHtml(message).replace(/\n/g, "<br/>")}</p>
-${renderEmailFooterHtml("support")}
-</td></tr>
-</table></td></tr></table></body></html>`;
+<p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:${TEXT_PRIMARY};">${escapeHtml(message).replace(/\n/g, "<br/>")}</p>`,
+  });
 
   try {
     const logo = getEmailLogoAttachment();

@@ -576,7 +576,7 @@ export function renderOrderEmailText(
 
   lines.push(
     "",
-    renderEmailFooterText("orders"),
+    renderEmailFooterText(),
     `© 2026 ${BRAND_NAME}. All rights reserved.`
   );
 

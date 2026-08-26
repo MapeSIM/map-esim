@@ -30,9 +30,20 @@ import {
   getSampleOrderEmailPayload,
 } from "../app/lib/email/template";
 import { renderPasswordChangedEmailHtml } from "../app/lib/email/securityNoticeTemplate";
+import { renderRefundStatusEmailHtml } from "../app/lib/email/refundStatusTemplate";
+import { renderWalletTransactionEmailHtml } from "../app/lib/email/walletTransactionTemplate";
+import { renderPaymentFailureEmailHtml } from "../app/lib/email/paymentFailureTemplate";
+import { renderTransactionalEmailLayoutHtml } from "../app/lib/email/emailLayout";
 import { EMAIL_LOGO_CID, getEmailLogoAttachment } from "../app/lib/email/logo";
 import { ESIM_QR_CID } from "../app/lib/email/qr";
-import { BRAND_NAME, BRAND_SITE_URL, BRAND_TAGLINE } from "../app/lib/brand";
+import {
+  BRAND_EMAIL_COPYRIGHT,
+  BRAND_EMAIL_TAGLINE,
+  BRAND_NAME,
+  BRAND_SITE_URL,
+  BRAND_SUPPORT_EMAIL,
+  BRAND_TAGLINE,
+} from "../app/lib/brand";
 
 function wipeEmailEnv() {
   const keys = [
@@ -57,10 +68,40 @@ function wipeEmailEnv() {
   clearTransporterCache();
 }
 
+function assertUnifiedEmailFooter(html: string, label: string): void {
+  assert.equal(html.includes(BRAND_NAME), true, `${label}: brand name`);
+  assert.equal(
+    html.includes(BRAND_EMAIL_TAGLINE),
+    true,
+    `${label}: email tagline`
+  );
+  assert.equal(html.includes(BRAND_SITE_URL), true, `${label}: site url`);
+  assert.equal(
+    html.includes(BRAND_SUPPORT_EMAIL),
+    true,
+    `${label}: support email`
+  );
+  assert.equal(
+    html.includes(BRAND_EMAIL_COPYRIGHT),
+    true,
+    `${label}: copyright`
+  );
+  assert.equal(
+    html.includes("cid:mapesim-brand-logo@mapesim.com"),
+    true,
+    `${label}: logo cid`
+  );
+  assert.equal(html.includes("MAP eSIM Security"), false, `${label}: no channel footer`);
+  assert.equal(html.includes("MAP eSIM Orders"), false, `${label}: no channel footer`);
+  assert.equal(html.includes("MAP eSIM Billing"), false, `${label}: no channel footer`);
+}
+
 function main() {
   console.log("1) Public brand spelling");
   assert.equal(BRAND_NAME, "MAP eSIM");
   assert.equal(BRAND_TAGLINE, "Global eSIM Connectivity");
+  assert.equal(BRAND_EMAIL_TAGLINE, "Stay connected, wherever you go.");
+  assert.equal(BRAND_EMAIL_COPYRIGHT, "© MAP eSIM. All rights reserved.");
   assert.equal(BRAND_SITE_URL, "https://mapesim.com");
   assert.equal(BRAND_SITE_URL.includes("localhost"), false);
 
@@ -156,7 +197,14 @@ function main() {
     false
   );
 
-  console.log("8) Templates: brand, footer, no localhost, no secrets");
+  console.log("8) Shared layout + unified footer on all templates");
+  const layoutSrc = readFileSync(
+    path.join(process.cwd(), "app/lib/email/emailLayout.ts"),
+    "utf8"
+  );
+  assert.match(layoutSrc, /renderEmailFooterHtml/);
+  assert.match(layoutSrc, /renderTransactionalEmailLayoutHtml/);
+
   const otpHtml = renderOtpEmailHtml({
     kind: "signup",
     code: "123456",
@@ -172,33 +220,69 @@ function main() {
     code: "111222",
     recipientEmail: "admin.invite@mapesim.com",
   });
-  assert.equal(otpHtml.includes("MAP eSIM"), true);
+  assertUnifiedEmailFooter(otpHtml, "otp");
   assert.equal(otpHtml.includes("MAP-eSIM"), false);
-  assert.equal(otpHtml.includes("Global eSIM Connectivity"), true);
-  assert.equal(otpHtml.includes('href="https://mapesim.com"'), true);
   assert.equal(otpHtml.includes("localhost"), false);
-  assert.equal(otpHtml.includes("cid:mapesim-brand-logo@mapesim.com"), true);
-  assert.equal(otpHtml.includes("MAP eSIM Security"), true);
-  assert.equal(otpHtml.includes("security@mapesim.com"), true);
-  assert.equal(otpHtml.includes("billing@mapesim.com"), false);
-  assert.equal(otpText.includes("https://mapesim.com"), true);
+  assert.equal(otpText.includes(BRAND_EMAIL_TAGLINE), true);
+  assert.equal(otpText.includes(BRAND_EMAIL_COPYRIGHT), true);
   assert.equal(otpText.includes("Password reset code"), true);
   assert.equal(otpHtml.includes("SMTP_"), false);
   assert.equal(inviteHtml.includes("Admin account setup code"), true);
   assert.equal(inviteHtml.includes("Password reset code"), false);
-  assert.equal(inviteHtml.includes("MAP eSIM Security"), true);
-  assert.equal(inviteHtml.includes("security@mapesim.com"), true);
 
   const orderHtml = renderOrderEmailHtml(getSampleOrderEmailPayload());
-  assert.equal(orderHtml.includes("MAP eSIM Orders"), true);
-  assert.equal(orderHtml.includes("orders@mapesim.com"), true);
-  assert.equal(orderHtml.includes("security@mapesim.com"), false);
+  assertUnifiedEmailFooter(orderHtml, "order");
   assert.equal(orderHtml.includes("localhost"), false);
-  assert.equal(orderHtml.includes("cid:mapesim-brand-logo@mapesim.com"), true);
 
   const changed = renderPasswordChangedEmailHtml("qa@mapesim.com");
+  assertUnifiedEmailFooter(changed, "password-changed");
   assert.equal(changed.includes("Password changed"), true);
-  assert.equal(changed.includes("MAP eSIM Security"), true);
+
+  const refundHtml = renderRefundStatusEmailHtml({
+    kind: "received",
+    customerName: "Alex",
+    orderReference: "MAP-123",
+    amountLabel: "$10.00",
+    currencyLabel: "USD",
+    orderUrl: "https://mapesim.com/account/orders/x",
+    requestedAtLabel: "Aug 26, 2026",
+  });
+  assertUnifiedEmailFooter(refundHtml, "refund-status");
+
+  const walletHtml = renderWalletTransactionEmailHtml({
+    customerName: "Alex",
+    transactionTypeLabel: "Wallet credit",
+    amountLabel: "$5.00",
+    currencyLabel: "USD",
+    description: "Admin credit",
+    orderReference: null,
+    orderUrl: null,
+    transactionReference: "wt_abc",
+    previousBalanceLabel: "$0.00",
+    newBalanceLabel: "$5.00",
+    occurredAtLabel: "Aug 26, 2026",
+    walletUrl: "https://mapesim.com/account/wallet",
+  });
+  assertUnifiedEmailFooter(walletHtml, "wallet-transaction");
+
+  const paymentFailHtml = renderPaymentFailureEmailHtml({
+    customerName: "Alex",
+    purchaseReference: "pur_1",
+    planLabel: "Europe 5GB",
+    destinationLabel: "France",
+    amountLabel: "$12.00",
+    currencyLabel: "USD",
+    occurredAtLabel: "Aug 26, 2026",
+    walletFundsReturned: true,
+    retryUrl: "https://mapesim.com/account/esim/buy",
+  });
+  assertUnifiedEmailFooter(paymentFailHtml, "payment-failure");
+
+  const shellHtml = renderTransactionalEmailLayoutHtml({
+    title: "QA shell",
+    contentHtml: "<p>Body</p>",
+  });
+  assertUnifiedEmailFooter(shellHtml, "shared-layout");
 
   console.log("\nAll email-channel non-delivery checks passed.");
 }

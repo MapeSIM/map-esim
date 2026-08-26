@@ -1,16 +1,11 @@
 import { BRAND_NAME, BRAND_SITE_URL, BRAND_SUPPORT_EMAIL } from "@/app/lib/brand";
 import {
-  BRAND_INK,
-  BRAND_LIME,
-  BORDER,
-  CARD_BG,
   escapeHtml,
-  PAGE_BG,
-  renderEmailFooterHtml,
   renderEmailFooterText,
   TEXT_PRIMARY,
   TEXT_SECONDARY,
 } from "@/app/lib/email/brand";
+import { renderTransactionalEmailLayoutHtml } from "@/app/lib/email/emailLayout";
 
 export const RECON_REQUIRED_EMAIL_SUBJECT =
   "We’re reviewing your MAP eSIM order";
@@ -37,7 +32,6 @@ export function renderReconciliationRequiredEmailHtml(
   payload: ReconciliationRequiredEmailPayload
 ): string {
   const name = escapeHtml(payload.customerName || "Customer");
-  const footer = renderEmailFooterHtml("billing");
   const support = escapeHtml(BRAND_SUPPORT_EMAIL);
   const planRow = payload.planLabel
     ? detailRow("Plan", payload.planLabel)
@@ -46,27 +40,9 @@ export function renderReconciliationRequiredEmailHtml(
     ? detailRow("Destination", payload.destinationLabel)
     : "";
 
-  return `<!DOCTYPE html>
-<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${escapeHtml(BRAND_NAME)} order under review</title>
-</head>
-<body style="margin:0;padding:0;background:${PAGE_BG};">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:${PAGE_BG};width:100%;">
-    <tr>
-      <td align="center" style="padding:24px 12px;">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;background:${CARD_BG};border:1px solid ${BORDER};">
-          <tr>
-            <td align="center" style="background:${BRAND_LIME};padding:22px 20px;">
-              <p style="margin:0;font-family:Segoe UI,Helvetica,Arial,sans-serif;font-size:22px;font-weight:800;color:${BRAND_INK};">
-                ${escapeHtml(BRAND_NAME)}
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:28px 24px 8px;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+  return renderTransactionalEmailLayoutHtml({
+    title: `${BRAND_NAME} order under review`,
+    contentHtml: `
               <h1 style="margin:0 0 12px;font-size:22px;color:${TEXT_PRIMARY};font-weight:700;">
                 We’re reviewing your order
               </h1>
@@ -95,20 +71,8 @@ export function renderReconciliationRequiredEmailHtml(
               </p>
               <p style="margin:0 0 20px;font-size:13px;line-height:1.5;color:${TEXT_SECONDARY};">
                 <a href="${escapeHtml(payload.accountOrdersUrl)}" style="color:${TEXT_PRIMARY};font-weight:600;">View your account orders</a>
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:0 24px 24px;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-              ${footer}
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+              </p>`,
+  });
 }
 
 export function renderReconciliationRequiredEmailText(
@@ -139,7 +103,7 @@ export function renderReconciliationRequiredEmailText(
     `Support page: ${payload.supportUrl || `${BRAND_SITE_URL}/support`}`,
     `Account orders: ${payload.accountOrdersUrl}`,
     "",
-    renderEmailFooterText("billing")
+    renderEmailFooterText()
   );
   return lines.join("\n");
 }

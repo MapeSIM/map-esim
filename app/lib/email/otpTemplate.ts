@@ -1,16 +1,11 @@
 import { BRAND_NAME } from "@/app/lib/brand";
 import {
-  BRAND_INK,
-  BRAND_LIME,
-  BORDER,
-  CARD_BG,
   escapeHtml,
-  PAGE_BG,
-  renderEmailFooterHtml,
   renderEmailFooterText,
   TEXT_PRIMARY,
   TEXT_SECONDARY,
 } from "@/app/lib/email/brand";
+import { renderTransactionalEmailLayoutHtml } from "@/app/lib/email/emailLayout";
 
 export type OtpEmailKind =
   | "signup"
@@ -93,7 +88,6 @@ export function renderOtpEmailHtml(options: {
   const copy = copyForKind(options.kind);
   const code = escapeHtml(options.code);
   const email = escapeHtml(options.recipientEmail);
-  const footer = renderEmailFooterHtml("security");
   const introHtml = copy.introLines
     .map(
       (line, index) =>
@@ -105,32 +99,7 @@ export function renderOtpEmailHtml(options: {
     )
     .join("\n              ");
 
-  return `<!DOCTYPE html>
-<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="color-scheme" content="light" />
-  <meta name="supported-color-schemes" content="light" />
-  <title>${escapeHtml(copy.subject)}</title>
-</head>
-<body style="margin:0;padding:0;background:${PAGE_BG};">
-  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">
-    ${escapeHtml(copy.preheader)}
-  </div>
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:${PAGE_BG};margin:0;padding:0;width:100%;">
-    <tr>
-      <td align="center" style="padding:24px 12px;">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;width:100%;background:${CARD_BG};border:1px solid ${BORDER};">
-          <tr>
-            <td align="center" style="background:${BRAND_LIME};padding:22px 20px;">
-              <p style="margin:0;font-family:Segoe UI,Helvetica,Arial,sans-serif;font-size:22px;font-weight:800;letter-spacing:0.02em;color:${BRAND_INK};">
-                ${escapeHtml(BRAND_NAME)}
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:28px 24px 8px;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+  const contentHtml = `
               <h1 style="margin:0 0 12px;font-size:22px;line-height:1.3;color:${TEXT_PRIMARY};font-weight:700;">
                 ${escapeHtml(copy.headline)}
               </h1>
@@ -152,16 +121,13 @@ export function renderOtpEmailHtml(options: {
               </p>
               <p style="margin:0 0 8px;font-size:12px;line-height:1.5;color:${TEXT_SECONDARY};">
                 For your security, ${escapeHtml(BRAND_NAME)} will never ask for your password or installation codes by email.
-              </p>
-              ${footer}
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+              </p>`;
+
+  return renderTransactionalEmailLayoutHtml({
+    title: copy.subject,
+    preheader: copy.preheader,
+    contentHtml,
+  });
 }
 
 export function renderOtpEmailText(options: {
@@ -182,7 +148,7 @@ export function renderOtpEmailText(options: {
     `Sent to ${options.recipientEmail}.`,
     copy.ignore,
     "",
-    renderEmailFooterText("security"),
+    renderEmailFooterText(),
   ].join("\n");
 }
 

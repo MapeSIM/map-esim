@@ -1,12 +1,12 @@
 import {
+  BRAND_EMAIL_COPYRIGHT,
+  BRAND_EMAIL_TAGLINE,
   BRAND_NAME,
   BRAND_SITE_HOST,
   BRAND_SITE_URL,
   BRAND_SUPPORT_EMAIL,
-  BRAND_TAGLINE,
 } from "@/app/lib/brand";
 import type { EmailChannel } from "@/app/lib/email/channels";
-import { EMAIL_CHANNELS } from "@/app/lib/email/channels";
 import { EMAIL_LOGO_CID, getEmailLogoCidSrc } from "@/app/lib/email/logo";
 
 export const BRAND_LIME = "#7CFF00";
@@ -32,18 +32,19 @@ export function escapeHtml(value: string): string {
 }
 
 /**
- * Central reusable transactional email footer.
+ * Central reusable MAP eSIM email footer for every outgoing template.
  * Logo is CID-backed for Gmail/Outlook; text remains when images are blocked.
+ *
+ * Channel is accepted for call-site compatibility but does not change footer
+ * content — From / Reply-To routing stays on sendChannelMail.
  */
 export function renderEmailFooterHtml(
-  channel: EmailChannel,
+  _channel?: EmailChannel,
   logoSrc: string = getEmailLogoCidSrc()
 ): string {
-  const def = EMAIL_CHANNELS[channel];
   const site = escapeHtml(BRAND_SITE_HOST);
+  const siteUrl = escapeHtml(BRAND_SITE_URL);
   const support = escapeHtml(BRAND_SUPPORT_EMAIL);
-  const channelName = escapeHtml(def.displayName);
-  const channelMail = escapeHtml(def.mailbox);
   const logo = escapeHtml(logoSrc);
 
   return `
@@ -53,11 +54,11 @@ export function renderEmailFooterHtml(
           <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 14px;">
             <tr>
               <td>
-                <a href="${BRAND_SITE_URL}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;border:0;outline:none;">
+                <a href="${siteUrl}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;border:0;outline:none;">
                   <img
                     src="${logo}"
                     width="${EMAIL_LOGO_DISPLAY_WIDTH}"
-                    alt="MAP eSIM"
+                    alt="${escapeHtml(BRAND_NAME)}"
                     style="display:block;width:${EMAIL_LOGO_DISPLAY_WIDTH}px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;"
                   />
                 </a>
@@ -68,21 +69,16 @@ export function renderEmailFooterHtml(
             ${escapeHtml(BRAND_NAME)}
           </p>
           <p style="margin:0 0 14px;font-size:13px;line-height:1.45;color:${TEXT_SECONDARY};font-weight:600;">
-            ${escapeHtml(BRAND_TAGLINE)}
+            ${escapeHtml(BRAND_EMAIL_TAGLINE)}
           </p>
           <p style="margin:0 0 4px;font-size:12px;line-height:1.5;color:${TEXT_SECONDARY};">
-            Website:
-            <a href="${BRAND_SITE_URL}" target="_blank" rel="noopener noreferrer" style="color:#2f6b00;text-decoration:underline;">${site}</a>
+            <a href="${siteUrl}" target="_blank" rel="noopener noreferrer" style="color:#2f6b00;text-decoration:underline;">${siteUrl}</a>
           </p>
           <p style="margin:0 0 14px;font-size:12px;line-height:1.5;color:${TEXT_SECONDARY};">
-            Customer Support:
             <a href="mailto:${support}" style="color:#2f6b00;text-decoration:underline;">${support}</a>
           </p>
-          <p style="margin:0 0 2px;font-size:12px;line-height:1.5;color:${TEXT_PRIMARY};font-weight:700;">
-            ${channelName}
-          </p>
-          <p style="margin:0;font-size:12px;line-height:1.5;color:${TEXT_SECONDARY};">
-            <a href="mailto:${channelMail}" style="color:#2f6b00;text-decoration:underline;">${channelMail}</a>
+          <p style="margin:0;font-size:11px;line-height:1.5;color:${TEXT_SECONDARY};">
+            ${escapeHtml(BRAND_EMAIL_COPYRIGHT)}
           </p>
         </td>
       </tr>
@@ -90,17 +86,15 @@ export function renderEmailFooterHtml(
   `;
 }
 
-export function renderEmailFooterText(channel: EmailChannel): string {
-  const def = EMAIL_CHANNELS[channel];
+export function renderEmailFooterText(_channel?: EmailChannel): string {
   return [
     BRAND_NAME,
-    BRAND_TAGLINE,
+    BRAND_EMAIL_TAGLINE,
     "",
-    `Website: ${BRAND_SITE_URL}`,
-    `Customer Support: ${BRAND_SUPPORT_EMAIL}`,
+    BRAND_SITE_URL,
+    BRAND_SUPPORT_EMAIL,
     "",
-    def.displayName,
-    def.mailbox,
+    BRAND_EMAIL_COPYRIGHT,
   ].join("\n");
 }
 
