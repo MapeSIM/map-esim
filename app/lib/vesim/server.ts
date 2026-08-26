@@ -7,6 +7,10 @@ import {
   resolveValidatedVesimBaseUrl,
 } from "@/app/lib/vesim/environment";
 import {
+  applyAsiaPublicCatalog,
+  applyAsiaTemporaryRetailMarkup,
+} from "@/app/lib/plans/asiaCatalogPolicy";
+import {
   applyPakistanPublicCatalog,
   applyPakistanRetailOverride,
 } from "@/app/lib/plans/pakistanCatalogPolicy";
@@ -139,11 +143,20 @@ export function findOfferById(
   });
 }
 
+export type VerifiedCheckoutOfferOptions = {
+  /** Customer storefront Asia overlay. Default true; partners pass false. */
+  applyAsiaTemporaryMarkup?: boolean;
+};
+
 export function toVerifiedCheckoutOffer(
   offer: VesimOffer,
-  lookupCountry?: string | null
+  lookupCountry?: string | null,
+  options?: VerifiedCheckoutOfferOptions
 ): VerifiedCheckoutOffer | null {
-  const priced = applyPakistanRetailOverride(offer, lookupCountry);
+  let priced = applyPakistanRetailOverride(offer, lookupCountry);
+  if (options?.applyAsiaTemporaryMarkup !== false) {
+    priced = applyAsiaTemporaryRetailMarkup(priced, lookupCountry);
+  }
   const offerId = (priced.offerId || priced.id || "").trim();
   const retail =
     typeof priced.priceUSD === "number" && Number.isFinite(priced.priceUSD)
@@ -372,12 +385,16 @@ export async function fetchPublicOffersForCountry(
       ),
     loadFlagOffCached: loadCachedFlagOffPublicOffersForCountry,
   });
-  return applyPakistanPublicCatalog(key, offers);
+  return applyAsiaPublicCatalog(
+    key,
+    applyPakistanPublicCatalog(key, offers)
+  );
 }
 
 export async function verifyOfferAuthoritative(options: {
   offerId: string;
   countryHint?: string | null;
+  applyAsiaTemporaryMarkup?: boolean;
 }): Promise<VerifiedCheckoutOffer | null> {
   const offerId = normalizeOfferId(options.offerId);
   if (!offerId || offerId.length > 120) {
@@ -401,7 +418,9 @@ export async function verifyOfferAuthoritative(options: {
     const match = findOfferById(offers, offerId);
     if (!match) continue;
 
-    const verified = toVerifiedCheckoutOffer(match, country);
+    const verified = toVerifiedCheckoutOffer(match, country, {
+      applyAsiaTemporaryMarkup: options.applyAsiaTemporaryMarkup,
+    });
     if (verified) return verified;
   }
 

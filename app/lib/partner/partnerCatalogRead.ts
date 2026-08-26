@@ -52,7 +52,9 @@ export async function listPartnerCatalogOffers(
     );
     const out: PartnerCatalogOffer[] = [];
     for (const offer of offers) {
-      const verified = toVerifiedCheckoutOffer(offer, code);
+      const verified = toVerifiedCheckoutOffer(offer, code, {
+        applyAsiaTemporaryMarkup: false,
+      });
       if (!verified) continue;
       const retailCents = Math.round(verified.priceUSD * 100);
       if (!Number.isFinite(retailCents) || retailCents <= 0) continue;

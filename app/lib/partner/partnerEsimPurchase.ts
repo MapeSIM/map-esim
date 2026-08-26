@@ -347,7 +347,11 @@ export async function preparePartnerEsimPurchase(
 
   await assertPartnerPurchaseInitiationAllowed();
 
-  const verified = await verifyOffer({ offerId, countryHint });
+  const verified = await verifyOffer({
+    offerId,
+    countryHint,
+    applyAsiaTemporaryMarkup: false,
+  });
   if (!verified) {
     throw new PartnerEsimPurchaseError(
       "OFFER_UNAVAILABLE",
@@ -497,6 +501,7 @@ export async function reservePartnerEsimPurchase(
   const verified = await verifyOffer({
     offerId: purchase.offerId,
     countryHint: countryHint ?? purchase.destinationCode,
+    applyAsiaTemporaryMarkup: false,
   });
   if (!verified) {
     throw new PartnerEsimPurchaseError(

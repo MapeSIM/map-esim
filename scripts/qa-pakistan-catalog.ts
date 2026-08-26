@@ -192,13 +192,16 @@ function main() {
   assert.match(server, /fetchPublicOffersForCountry/);
   assert.match(
     server,
+    /return applyAsiaPublicCatalog\(\s*key,\s*applyPakistanPublicCatalog\(key, offers\)\s*\)/
+  );
+  assert.match(
+    server,
     /export async function verifyOfferAuthoritative[\s\S]*fetchOffersForCountry\(/
   );
   assert.doesNotMatch(
     server,
     /verifyOfferAuthoritative[\s\S]*fetchPublicOffersForCountry/
   );
-  assert.match(server, /return applyPakistanPublicCatalog\(key, offers\)/);
   const liveFetch = server.match(
     /export async function fetchOffersForCountry\([\s\S]*?\nexport async function fetchStrictPublicOffersLive/
   )?.[0];
