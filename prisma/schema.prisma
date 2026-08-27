@@ -227,6 +227,22 @@ enum AlertNotificationDeliveryStatus {
   FAILED
 }
 
+/// Customer eSIM package lifecycle emails (expiry / data). One row per (order, kind).
+enum EsimLifecycleNotificationKind {
+  EXPIRY_SOON_24H
+  EXPIRED
+  LOW_DATA
+  DATA_EXHAUSTED
+}
+
+enum EsimLifecycleNotificationDeliveryStatus {
+  PENDING
+  CLAIMED
+  SENT
+  FAILED
+  SKIPPED
+}
+
 model User {
   id                           String                   @id @default(cuid())
   name                         String
@@ -518,6 +534,8 @@ model Order {
   reconciliationEscalatedByAdminId String?
   reconciliationEscalationReason   String?
   reconciliationEscalationPriority String?
+  /// Last successful/attempted VeSIM usage poll for lifecycle emails (cron rotation).
+  lifecycleUsageCheckedAt          DateTime?
   createdAt                        DateTime                @default(now())
   updatedAt                        DateTime                @updatedAt
   user                             User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -529,6 +547,7 @@ model Order {
   partnerRefundRequests            PartnerRefundRequest[]
   promoRedemptions                 PromoCodeRedemption[]
   customerRewardTransactions       CustomerRewardTransaction[]
+  lifecycleNotificationDeliveries  EsimLifecycleNotificationDelivery[]
 
   @@index([customerEmail])
   @@index([userId])
@@ -538,6 +557,7 @@ model Order {
   @@index([reconciliationResolvedAt])
   @@index([reconciliationLockedAt])
   @@index([reconciliationEscalatedAt])
+  @@index([lifecycleUsageCheckedAt])
 }
 
 /// Durable ADMIN company-funded eSIM assignment attempt (provider write outside Prisma tx).
@@ -1444,4 +1464,39 @@ model CustomerRewardTransaction {
   @@index([rewardAccountId, createdAt])
   @@index([type])
   @@index([createdAt])
+}
+
+/// Durable once-only outbox for customer eSIM expiry / data lifecycle emails.
+/// Unique eventKey + CAS claim prevent duplicate sends across cron retries.
+model EsimLifecycleNotificationDelivery {
+  id             String                                   @id @default(cuid())
+  /// Deterministic: esim_lifecycle:{orderId}:{kind}
+  eventKey       String                                   @unique
+  orderId        String
+  kind           EsimLifecycleNotificationKind
+  status         EsimLifecycleNotificationDeliveryStatus  @default(PENDING)
+  attemptCount   Int                                      @default(0)
+  claimToken     String?
+  claimedAt      DateTime?
+  claimExpiresAt DateTime?
+  sentAt         DateTime?
+  /// Allowlisted opaque code only — never raw SMTP text or bodies.
+  lastErrorCode  String?
+  createdAt      DateTime                                 @default(now())
+  updatedAt      DateTime                                 @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, kind])
+  @@index([status, claimedAt])
+  @@index([kind, status])
+}
+
+/// Singleton CAS lock so concurrent lifecycle notification runners do not overlap.
+model EsimLifecycleNotificationRunnerLock {
+  id             String    @id @default("default")
+  claimToken     String?
+  claimedAt      DateTime?
+  claimExpiresAt DateTime?
+  updatedAt      DateTime  @updatedAt
 }

@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/esim-lifecycle-notifications",
+      "schedule": "0 6 * * *"
+    }
+  ]
+}
