@@ -14,6 +14,8 @@ import {
 type Props = {
   balanceLabel: string;
   gatewayStatusLabel: string;
+  /** When true, hide the redundant balance card (used on Wallet dashboard). */
+  embedded?: boolean;
 };
 
 type AmountPreset = "10" | "50" | "100" | "150" | "500" | "custom";
@@ -41,6 +43,7 @@ function newIdempotencyKey(): string {
 export default function WalletTopupForm({
   balanceLabel,
   gatewayStatusLabel,
+  embedded = false,
 }: Props) {
   const [state, formAction, pending] = useActionState(
     createWalletTopupDraftAction,
@@ -73,15 +76,17 @@ export default function WalletTopupForm({
     <form action={formAction} className="space-y-5" noValidate>
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
 
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
-          Current wallet balance
-        </p>
-        <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
-          {balanceLabel}
-        </p>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">USD</p>
-      </div>
+      {!embedded ? (
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
+            Current wallet balance
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
+            {balanceLabel}
+          </p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">USD</p>
+        </div>
+      ) : null}
 
       <div className="space-y-3">
         <p className="block text-sm font-semibold text-[var(--heading)]">

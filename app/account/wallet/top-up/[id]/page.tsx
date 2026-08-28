@@ -35,10 +35,10 @@ export default async function AccountWalletTopUpDetailPage({
     <div className="space-y-8">
       <header>
         <Link
-          href="/account/wallet/top-up"
+          href="/account/wallet"
           className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
         >
-          ← Back to add funds
+          ← Back to wallet dashboard
         </Link>
         <h1 className="mt-4 text-2xl font-bold tracking-tight">
           {view.isCredited
@@ -120,7 +120,7 @@ export default async function AccountWalletTopUpDetailPage({
               : ""}
           </p>
           <Link
-            href="/account/wallet"
+            href="/account/wallet?notice=credited"
             className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)]"
           >
             View wallet
@@ -130,26 +130,44 @@ export default async function AccountWalletTopUpDetailPage({
 
       {view.isPending && !view.isCredited ? (
         <div className="space-y-4">
-          <p className="text-sm text-[var(--text-muted)]">
-            Secure checkout will confirm the PKR amount when a payment provider
-            is available. You cannot mark this payment successful yourself.
-          </p>
+          <div
+            className="rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-bg)] px-4 py-3 text-sm text-[var(--warning-text)]"
+            role="status"
+          >
+            Payment pending. Secure checkout will confirm the PKR amount when a
+            payment provider is available. You cannot mark this payment
+            successful yourself.
+          </div>
           <WalletTopupCheckoutButton
             topupId={view.topupId}
             enabled={view.canAttemptCheckout}
             simpaisaWalletCheckout={view.simpaisaWalletCheckout}
             usdCents={view.creditAmountCents}
           />
+          <Link
+            href="/account/wallet?notice=pending"
+            className="inline-flex h-10 items-center justify-center text-sm font-semibold text-[var(--heading)] underline-offset-2 hover:underline"
+          >
+            Back to wallet dashboard
+          </Link>
         </div>
       ) : null}
 
       {view.isFailedOrExpired ? (
-        <Link
-          href="/account/wallet/top-up"
-          className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border-strong)] px-5 text-sm font-semibold text-[var(--heading)]"
-        >
-          Start a new top-up
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/account/wallet/top-up"
+            className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border-strong)] px-5 text-sm font-semibold text-[var(--heading)]"
+          >
+            Start a new top-up
+          </Link>
+          <Link
+            href="/account/wallet?notice=failed"
+            className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)]"
+          >
+            View wallet
+          </Link>
+        </div>
       ) : null}
     </div>
   );

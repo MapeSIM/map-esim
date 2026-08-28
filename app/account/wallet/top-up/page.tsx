@@ -67,12 +67,12 @@ export default async function AccountWalletTopUpPage() {
           href="/account/wallet"
           className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
         >
-          ← Back to wallet
+          ← Back to wallet dashboard
         </Link>
         <h1 className="mt-4 text-2xl font-bold tracking-tight">Add funds</h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
           {gatewayReady
-            ? "Choose how much USD credit to add to your MAP eSIM wallet."
+            ? "Compatibility page for wallet top-up. The same secure JazzCash / Easypaisa flow is also available on your Wallet dashboard."
             : "Self-serve wallet funding is paused until the payment provider is ready."}
         </p>
       </header>
