@@ -30,6 +30,10 @@ type CreateCheckoutSessionBase = {
   /** Internal relative path only — never arbitrary absolute URLs. */
   returnPath: string;
   cancelPath: string;
+  /** Simpaisa wallet operator id. Ignored by Safepay. */
+  walletOperatorId?: string;
+  /** Customer MSISDN for wallet collection. Ignored by Safepay. */
+  customerMsisdn?: string;
 };
 
 export type CreateWalletTopupCheckoutInput = CreateCheckoutSessionBase & {
@@ -88,6 +92,10 @@ export type WebhookVerificationResult =
  * Crediting / purchase funding requires signatureVerified === true.
  */
 export type NormalizedPaymentEvent = {
+  /**
+   * For Safepay: HMAC signature verified on the postback.
+   * For Simpaisa sandbox: set true only after authoritative Inquire 0000 + field validation.
+   */
   signatureVerified: boolean;
   provider: PaymentGatewayProviderName;
   purpose: PaymentCheckoutPurpose;
@@ -101,6 +109,8 @@ export type NormalizedPaymentEvent = {
   chargeAmountMinor: number;
   confirmedAt: Date | null;
   failureCategory: string | null;
+  /** Simpaisa wallet operator id (100007 / 100008) when parsed from postback. */
+  walletOperatorId?: string | null;
 };
 
 export type FetchPaymentStatusInput = {

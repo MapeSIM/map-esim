@@ -29,6 +29,7 @@ import {
   CheckoutMoney,
 } from "@/app/components/account/CheckoutMoney";
 import { CheckoutTrustPanel } from "@/app/components/account/CheckoutTrustPanel";
+import SimpaisaWalletFields from "@/app/components/account/SimpaisaWalletFields";
 
 type Props = {
   review: WalletPurchaseReview;
@@ -137,6 +138,8 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
   const paymentGatewayConfigured = review.paymentGatewayConfigured === true;
   const gatewayReady = gatewayRequired && paymentGatewayConfigured;
   const showGatewayUnavailable = gatewayRequired && !paymentGatewayConfigured;
+  const simpaisaWalletCheckout =
+    gatewayReady && review.paymentGatewayProvider === "SIMPAISA";
   const balanceAfterPreview = Math.max(
     0,
     review.balanceCents - preview.walletAppliedCents
@@ -381,22 +384,38 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
             Online payment
           </p>
           {gatewayReady ? (
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Continue to our secure payment page to pay{" "}
-              <CheckoutMoney cents={preview.gatewayAmountCents} />
-              {preview.walletAppliedCents > 0 ? (
-                <>
-                  {" "}
-                  after applying{" "}
-                  <CheckoutMoney
-                    cents={preview.walletAppliedCents}
-                    variant="wallet-deduction"
-                  />{" "}
-                  from your wallet
-                </>
+            <>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">
+                {simpaisaWalletCheckout
+                  ? "Pay the remaining amount with a mobile wallet. Your eSIM is created only after payment is verified."
+                  : "Continue to our secure payment page to pay "}
+                {simpaisaWalletCheckout ? null : (
+                  <>
+                    <CheckoutMoney cents={preview.gatewayAmountCents} />
+                    {preview.walletAppliedCents > 0 ? (
+                      <>
+                        {" "}
+                        after applying{" "}
+                        <CheckoutMoney
+                          cents={preview.walletAppliedCents}
+                          variant="wallet-deduction"
+                        />{" "}
+                        from your wallet
+                      </>
+                    ) : null}
+                    . Your eSIM is created only after payment is verified.
+                  </>
+                )}
+              </p>
+              {simpaisaWalletCheckout ? (
+                <SimpaisaWalletFields
+                  usdCents={preview.gatewayAmountCents}
+                  disabled={purchaseBlocked}
+                  operatorError={errorState.ok === false ? errorState.fieldErrors?.walletOperatorId : undefined}
+                  msisdnError={errorState.ok === false ? errorState.fieldErrors?.customerMsisdn : undefined}
+                />
               ) : null}
-              . Your eSIM is created only after payment is verified.
-            </p>
+            </>
           ) : showGatewayUnavailable ? (
             <>
               <p className="mt-1 text-sm text-[var(--text-muted)]" role="status">

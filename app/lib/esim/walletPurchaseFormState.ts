@@ -8,6 +8,8 @@ export type WalletPurchaseActionState =
         offerId?: string;
         confirm?: string;
         useWallet?: string;
+        walletOperatorId?: string;
+        customerMsisdn?: string;
       };
     };
 

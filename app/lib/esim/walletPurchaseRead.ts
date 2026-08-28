@@ -22,7 +22,11 @@ import {
   snapshotOrderAlternateDeliveryEmail,
 } from "@/app/lib/esim/esimDeliveryEmail";
 import { isPurchaseDeliveryEmailLocked } from "@/app/lib/esim/esimDeliveryEmailState";
-import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
+import {
+  getActivePaymentAdapter,
+  isPaymentGatewayConfigured,
+} from "@/app/lib/payments/disabledAdapter";
+import type { PaymentGatewayProviderName } from "@/app/lib/payments/types";
 import { formatUsdCents } from "@/app/lib/wallet/display";
 import { pointsNeededToUnlockRewards } from "@/app/lib/rewards/rewardConstants";
 import { isRewardRedemptionEligible } from "@/app/lib/rewards/rewardPoints";
@@ -70,6 +74,7 @@ export type WalletPurchaseReview = {
   gatewayAmountLabel: string;
   fundingLabel: "Wallet" | "Wallet + card" | "Card";
   paymentGatewayConfigured: boolean;
+  paymentGatewayProvider: PaymentGatewayProviderName;
   idempotencyKey: string;
   status: WalletEsimPurchaseStatus;
   canConfirm: boolean;
@@ -225,6 +230,9 @@ export async function getWalletPurchaseReview(
     gatewayAmountLabel: formatUsdCents(displayFunding.gatewayAmountCents),
     fundingLabel,
     paymentGatewayConfigured: isPaymentGatewayConfigured(),
+    paymentGatewayProvider: isPaymentGatewayConfigured()
+      ? getActivePaymentAdapter().provider
+      : "UNCONFIGURED",
     idempotencyKey: row.idempotencyKey,
     status: row.status,
     canConfirm:

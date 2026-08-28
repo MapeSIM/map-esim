@@ -12,7 +12,8 @@ export type PendingPaymentVerifyFormState =
   PendingPaymentVerifyActionResult | null;
 
 /**
- * Admin verify of an existing Safepay payment attempt via authenticated reporter.
+ * Admin verify of an existing payment attempt via Simpaisa inquiry
+ * (Safepay reporter remains for legacy SAFEPAY attempts).
  * Never accepts browser tracker/amount as authority. Never funds purchases.
  */
 export async function verifyPendingGatewayPaymentAction(

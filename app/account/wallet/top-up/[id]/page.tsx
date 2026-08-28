@@ -137,6 +137,8 @@ export default async function AccountWalletTopUpDetailPage({
           <WalletTopupCheckoutButton
             topupId={view.topupId}
             enabled={view.canAttemptCheckout}
+            simpaisaWalletCheckout={view.simpaisaWalletCheckout}
+            usdCents={view.creditAmountCents}
           />
         </div>
       ) : null}

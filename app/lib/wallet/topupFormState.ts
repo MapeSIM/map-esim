@@ -5,6 +5,8 @@ export type WalletTopupActionState =
       error?: string;
       fieldErrors?: {
         amount?: string;
+        walletOperatorId?: string;
+        customerMsisdn?: string;
       };
     };
 

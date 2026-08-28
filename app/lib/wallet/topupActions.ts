@@ -13,7 +13,11 @@ import {
   startWalletTopupCheckout,
 } from "@/app/lib/wallet/topup";
 import { browserReturnMustNotCreditWallet } from "@/app/lib/wallet/topupConstants";
-import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
+import {
+  getActivePaymentAdapter,
+  isPaymentGatewayConfigured,
+} from "@/app/lib/payments/disabledAdapter";
+import { parseSimpaisaWalletCheckoutFields } from "@/app/lib/payments/simpaisaPkrQuote";
 
 function detailPath(topupId: string): string {
   return `/account/wallet/top-up/${encodeURIComponent(topupId)}`;
@@ -95,6 +99,8 @@ export async function startWalletTopupCheckoutAction(
   void formData.get("paid");
   void formData.get("status");
   void formData.get("gatewayStatus");
+  void formData.get("pkrAmount");
+  void formData.get("fxRate");
   browserReturnMustNotCreditWallet();
 
   if (!isPaymentGatewayConfigured()) {
@@ -109,11 +115,34 @@ export async function startWalletTopupCheckoutAction(
     return { ok: false, error: "This top-up is unavailable." };
   }
 
+  let walletOperatorId: string | undefined;
+  let customerMsisdn: string | undefined;
+  if (getActivePaymentAdapter().provider === "SIMPAISA") {
+    const walletFields = parseSimpaisaWalletCheckoutFields({
+      walletOperatorId: formData.get("walletOperatorId"),
+      customerMsisdn: formData.get("customerMsisdn"),
+    });
+    if (!walletFields.ok) {
+      return {
+        ok: false,
+        fieldErrors: walletFields.fieldErrors,
+        error: walletFields.error,
+      };
+    }
+    walletOperatorId = walletFields.walletOperatorId;
+    customerMsisdn = walletFields.customerMsisdn;
+  } else {
+    void formData.get("walletOperatorId");
+    void formData.get("customerMsisdn");
+  }
+
   let checkout;
   try {
     checkout = await startWalletTopupCheckout({
       customerUserId: customer.id,
       topupId,
+      walletOperatorId,
+      customerMsisdn,
     });
   } catch (error) {
     if (error instanceof WalletTopupError) {

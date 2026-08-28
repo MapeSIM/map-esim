@@ -1,15 +1,17 @@
 import "server-only";
 
-import { EsimPurchasePaymentAttemptStatus, Role } from "@prisma/client";
+import { EsimPurchasePaymentAttemptStatus, PaymentGatewayProvider, Role } from "@prisma/client";
 import {
   buildPendingPaymentEvidenceView,
   decidePendingPaymentVerify,
+  decideSimpaisaPendingPaymentVerify,
   parsePendingPaymentVerifyReason,
   PENDING_PAYMENT_RELEASE_AUDIT,
   PENDING_PAYMENT_VERIFY_AUDIT,
   PENDING_PAYMENT_VERIFY_BLOCKED_AUDIT,
   shouldReleaseSplitReservationOnDecision,
   type PendingPaymentVerifyEvidenceView,
+  type SimpaisaInquiryEvidence,
 } from "@/app/lib/admin/pendingPaymentVerifyShared";
 import { assertSameOriginAdminRequest } from "@/app/lib/admin/reconciliationCaseManagement";
 import { writeAuditLog } from "@/app/lib/auth/audit";
@@ -17,6 +19,12 @@ import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
 import { prisma } from "@/app/lib/db";
 import { maybeReleasePendingGatewayReservation } from "@/app/lib/esim/esimPurchasePaymentApply";
 import { schedulePaymentFailureNotification } from "@/app/lib/esim/paymentFailureNotification";
+import { parsePaymentGatewayProvider } from "@/app/lib/payments/gatewaySelect";
+import { resolveSimpaisaInquiryConfig } from "@/app/lib/payments/simpaisaConfig";
+import {
+  SimpaisaHttpClient,
+  SimpaisaHttpError,
+} from "@/app/lib/payments/simpaisaHttp";
 import {
   SafepayHttpClient,
   SafepayHttpError,
@@ -49,6 +57,32 @@ async function assertActiveAdmin(adminUserId: string) {
   return admin;
 }
 
+async function defaultSimpaisaInquiry(
+  input: { userKey?: string; transactionId?: string }
+): Promise<SimpaisaInquiryEvidence> {
+  const validated = resolveSimpaisaInquiryConfig();
+  if (!validated.ok) {
+    throw new SimpaisaHttpError(
+      "UNAVAILABLE",
+      "Payment provider unavailable."
+    );
+  }
+  const client = new SimpaisaHttpClient(validated.config);
+  return client.inquireTransaction({
+    userKey: input.userKey,
+    transactionId: input.transactionId,
+  });
+}
+
+function attemptUsesSimpaisaInquiry(
+  gatewayProvider: PaymentGatewayProvider | null
+): boolean {
+  if (gatewayProvider === PaymentGatewayProvider.SAFEPAY) return false;
+  if (gatewayProvider === PaymentGatewayProvider.SIMPAISA) return true;
+  return parsePaymentGatewayProvider(process.env.PAYMENT_GATEWAY_PROVIDER) ===
+    "SIMPAISA";
+}
+
 function resolveReporterClient(): SafepayHttpClient | null {
   // Read-only recovery may run while new checkouts stay disabled.
   // Credentials still come from env; enable flag is not flipped in files.
@@ -75,14 +109,20 @@ async function defaultLookupEvidence(
 }
 
 /**
- * Admin-only authenticated Safepay reporter verify for a payment attempt.
+ * Admin-only authenticated payment-provider verify for a payment attempt.
+ * Simpaisa uses inquiry; Safepay reporter remains for legacy SAFEPAY attempts.
  * Never funds purchases, never creates VeSIM orders, never trusts browser money/tracker.
  */
 export async function verifyPendingGatewayPayment(options: {
   adminUserId: string;
   paymentAttemptId: string;
   reason: string;
-  /** Injectable reporter lookup for offline QA. */
+  /** Injectable Simpaisa inquiry for offline QA. */
+  simpaisaLookupFn?: (input: {
+    userKey?: string;
+    transactionId?: string;
+  }) => Promise<SimpaisaInquiryEvidence>;
+  /** Injectable Safepay reporter lookup for offline QA / legacy attempts. */
   lookupFn?: (trackerToken: string) => Promise<SafepayReporterEvidence>;
   /** Injectable release for offline QA. */
   releaseFn?: typeof maybeReleasePendingGatewayReservation;
@@ -165,6 +205,7 @@ export async function verifyPendingGatewayPayment(options: {
       id: true,
       status: true,
       gatewayPaymentRef: true,
+      gatewayProvider: true,
       gatewayAmountCents: true,
       currency: true,
       chargeAmountMinor: true,
@@ -198,34 +239,79 @@ export async function verifyPendingGatewayPayment(options: {
     return { ok: false, error: publicError };
   }
 
+  const useSimpaisa = attemptUsesSimpaisaInquiry(attempt.gatewayProvider);
   const expectedAmount =
     attempt.chargeAmountMinor ?? attempt.gatewayAmountCents;
   const expectedCurrency = (
     attempt.chargeCurrency ??
-    attempt.currency ??
-    "USD"
+    (useSimpaisa ? "PKR" : attempt.currency ?? "USD")
   )
     .trim()
     .toUpperCase();
 
-  const lookup = options.lookupFn ?? defaultLookupEvidence;
+  let decided: ReturnType<typeof decidePendingPaymentVerify>;
   let evidence: SafepayReporterEvidence | null = null;
-  let providerUnavailable = false;
-  try {
-    evidence = await lookup(attempt.gatewayPaymentRef);
-  } catch {
-    providerUnavailable = true;
-    evidence = null;
-  }
 
-  const decided = decidePendingPaymentVerify({
-    localAttemptId: attempt.id,
-    localGatewayPaymentRef: attempt.gatewayPaymentRef,
-    localExpectedAmountMinor: expectedAmount,
-    localExpectedCurrency: expectedCurrency,
-    providerUnavailable,
-    evidence,
-  });
+  if (useSimpaisa) {
+    let inquiry: SimpaisaInquiryEvidence | null = null;
+    let providerUnavailable = false;
+    try {
+      const simpaisaLookup =
+        options.simpaisaLookupFn ?? defaultSimpaisaInquiry;
+      inquiry = await simpaisaLookup({
+        userKey: attempt.id,
+        transactionId: attempt.gatewayPaymentRef,
+      });
+    } catch {
+      providerUnavailable = true;
+      inquiry = null;
+    }
+    decided = decideSimpaisaPendingPaymentVerify({
+      localGatewayPaymentRef: attempt.gatewayPaymentRef,
+      localExpectedAmountMinor: expectedAmount,
+      localExpectedCurrency: expectedCurrency,
+      providerUnavailable,
+      evidence: inquiry,
+    });
+    evidence = inquiry
+      ? {
+          trackerToken:
+            inquiry.providerTransactionId ?? attempt.gatewayPaymentRef,
+          state: `INQUIRY_${inquiry.status.toUpperCase()}`,
+          status:
+            inquiry.status === "confirmed"
+              ? "confirmed"
+              : inquiry.status === "failed"
+                ? "failed"
+                : inquiry.status === "uncertain"
+                  ? "uncertain"
+                  : "pending",
+          quoteAmountMinor: inquiry.chargeAmountMinor,
+          quoteCurrency: inquiry.chargeCurrency,
+          metadataOrderId: null,
+          completionEventTypes: [],
+          hasCaptureEvidence: inquiry.status === "confirmed",
+        }
+      : null;
+  } else {
+    const lookup = options.lookupFn ?? defaultLookupEvidence;
+    let providerUnavailable = false;
+    try {
+      evidence = await lookup(attempt.gatewayPaymentRef);
+    } catch {
+      providerUnavailable = true;
+      evidence = null;
+    }
+
+    decided = decidePendingPaymentVerify({
+      localAttemptId: attempt.id,
+      localGatewayPaymentRef: attempt.gatewayPaymentRef,
+      localExpectedAmountMinor: expectedAmount,
+      localExpectedCurrency: expectedCurrency,
+      providerUnavailable,
+      evidence,
+    });
+  }
 
   let reservationReleased = false;
   const releaseCandidate =

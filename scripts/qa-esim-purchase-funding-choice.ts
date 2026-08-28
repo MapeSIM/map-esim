@@ -260,6 +260,7 @@ function main() {
     confirmForm,
     /walletAppliedCents:\s*0,\s*gatewayAmountCents:\s*review\.priceCents/
   );
+  assert.match(confirmForm, /SimpaisaWalletFields/);
   assert.ok(!/createCheckoutSession|fake payment|Apple Pay|Google Pay|VReward/i.test(confirmForm));
   const promoSection = read(
     "app/components/account/CheckoutPromoCodeSection.tsx"
@@ -271,7 +272,11 @@ function main() {
   assert.match(promoSection, /CheckoutMoney cents=\{totalCents\}/);
   assert.doesNotMatch(promoSection, /formatUsdCents/);
   assert.match(confirmForm, /CheckoutPromoCodeSection/);
-  assert.ok(!/JazzCash|EasyPaisa/i.test(confirmForm));
+  const walletFields = read("app/components/account/SimpaisaWalletFields.tsx");
+  assert.match(walletFields, /Easypaisa/);
+  assert.match(walletFields, /JazzCash/);
+  assert.match(walletFields, /customerMsisdn/);
+  assert.match(walletFields, /walletOperatorId/);
   console.log("PASS checkout_structure_and_fail_closed_cta");
 
   assert.ok(

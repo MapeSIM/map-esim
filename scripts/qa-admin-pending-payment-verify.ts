@@ -7,6 +7,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   decidePendingPaymentVerify,
+  decideSimpaisaPendingPaymentVerify,
   shouldReleaseSplitReservationOnDecision,
   SUCCESS_WEBHOOK_REQUIRED_MESSAGE,
   parsePendingPaymentVerifyReason,
@@ -78,6 +79,7 @@ function main() {
   console.log("PASS unauthorized_admin_cannot_verify_without_admin_role");
 
   assert.match(service, /fetchTrackerEvidence|lookupFn/);
+  assert.match(service, /inquireTransaction|simpaisaLookupFn|defaultSimpaisaInquiry/);
   assert.match(http, /fetchTrackerEvidence/);
   assert.match(http, /parseSafepayReporterPaymentPayload/);
   assert.doesNotMatch(service, /applyVerifiedEsimPurchasePaymentEvent/);
@@ -252,6 +254,58 @@ function main() {
     /applyVerifiedEsimPurchasePaymentEvent[\s\S]{0,40}schedulePaymentFailureNotification/
   );
   console.log("PASS contracts_and_reporter_parse");
+
+  const simpaisaSuccess = decideSimpaisaPendingPaymentVerify({
+    localGatewayPaymentRef: "txn_simpaisa_1",
+    localExpectedAmountMinor: 293000,
+    localExpectedCurrency: "PKR",
+    evidence: {
+      status: "confirmed",
+      providerTransactionId: "txn_simpaisa_1",
+      chargeAmountMinor: 293000,
+      chargeCurrency: "PKR",
+    },
+  });
+  assert.equal(
+    simpaisaSuccess.decision,
+    "VERIFIED_SUCCESS_BUT_WEBHOOK_REQUIRED"
+  );
+  assert.equal(simpaisaSuccess.message, SUCCESS_WEBHOOK_REQUIRED_MESSAGE);
+  assert.equal(
+    shouldReleaseSplitReservationOnDecision(simpaisaSuccess.decision, 100),
+    false
+  );
+
+  const simpaisaFailed = decideSimpaisaPendingPaymentVerify({
+    localGatewayPaymentRef: "txn_simpaisa_1",
+    localExpectedAmountMinor: 293000,
+    localExpectedCurrency: "PKR",
+    evidence: {
+      status: "failed",
+      providerTransactionId: "txn_simpaisa_1",
+      chargeAmountMinor: 293000,
+      chargeCurrency: "PKR",
+    },
+  });
+  assert.equal(simpaisaFailed.decision, "VERIFIED_FAILED");
+  assert.equal(
+    shouldReleaseSplitReservationOnDecision(simpaisaFailed.decision, 150),
+    true
+  );
+
+  const simpaisaMismatch = decideSimpaisaPendingPaymentVerify({
+    localGatewayPaymentRef: "txn_simpaisa_1",
+    localExpectedAmountMinor: 293000,
+    localExpectedCurrency: "PKR",
+    evidence: {
+      status: "confirmed",
+      providerTransactionId: "txn_other",
+      chargeAmountMinor: 293000,
+      chargeCurrency: "PKR",
+    },
+  });
+  assert.equal(simpaisaMismatch.decision, "TRACKER_MISMATCH");
+  console.log("PASS simpaisa_inquiry_never_funds");
 
   console.log("ALL_PG5A_CHECKS_PASSED");
 }

@@ -4,7 +4,14 @@ import { Role, WalletTopupStatus } from "@prisma/client";
 import { notFound } from "next/navigation";
 import { prisma } from "@/app/lib/db";
 import { formatUsdCents, formatWalletDateTime } from "@/app/lib/wallet/display";
-import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
+import {
+  getActivePaymentAdapter,
+  isPaymentGatewayConfigured,
+} from "@/app/lib/payments/disabledAdapter";
+import {
+  formatSimpaisaPkrChargeLabel,
+  quoteSimpaisaPkrChargeFromUsdCents,
+} from "@/app/lib/payments/simpaisaPkrQuote";
 
 export type CustomerTopupView = {
   topupId: string;
@@ -24,6 +31,8 @@ export type CustomerTopupView = {
   isPending: boolean;
   isFailedOrExpired: boolean;
   isReconciliation: boolean;
+  simpaisaWalletCheckout: boolean;
+  pkrChargeLabel: string | null;
 };
 
 function statusLabel(status: WalletTopupStatus): string {
@@ -114,6 +123,14 @@ export async function getCustomerTopupView(
       "Your payment is under review. Please contact support and do not pay again for this top-up.";
   }
 
+  const simpaisaWalletCheckout =
+    isPaymentGatewayConfigured() &&
+    getActivePaymentAdapter().provider === "SIMPAISA";
+  const pkrQuote = quoteSimpaisaPkrChargeFromUsdCents(row.creditAmountCents);
+  const pkrChargeLabel = pkrQuote
+    ? formatSimpaisaPkrChargeLabel(pkrQuote.pkrRupees)
+    : null;
+
   return {
     topupId: row.id,
     status: row.status,
@@ -151,5 +168,7 @@ export async function getCustomerTopupView(
       row.status === WalletTopupStatus.CANCELLED,
     isReconciliation:
       row.status === WalletTopupStatus.RECONCILIATION_REQUIRED,
+    simpaisaWalletCheckout,
+    pkrChargeLabel,
   };
 }

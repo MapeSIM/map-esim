@@ -15,7 +15,7 @@ export const PENDING_PAYMENT_RELEASE_AUDIT =
   "admin.pending_payment_reservation_release";
 
 export const SUCCESS_WEBHOOK_REQUIRED_MESSAGE =
-  "Safepay reports successful payment, but authoritative payment webhook is still required.";
+  "Payment provider reports successful payment, but authoritative payment webhook is still required.";
 
 export const PENDING_PAYMENT_VERIFY_DECISIONS = [
   "VERIFIED_SUCCESS_BUT_WEBHOOK_REQUIRED",
@@ -94,21 +94,21 @@ function messageForDecision(decision: PendingPaymentVerifyDecision): string {
     case "VERIFIED_SUCCESS_BUT_WEBHOOK_REQUIRED":
       return SUCCESS_WEBHOOK_REQUIRED_MESSAGE;
     case "VERIFIED_FAILED":
-      return "Safepay reports a failed payment. Split wallet reservation may be released when safe.";
+      return "Payment provider reports a failed payment. Split wallet reservation may be released when safe.";
     case "VERIFIED_CANCELLED_OR_EXPIRED":
-      return "Safepay reports a cancelled or expired payment. Split wallet reservation may be released when safe.";
+      return "Payment provider reports a cancelled or expired payment. Split wallet reservation may be released when safe.";
     case "PENDING":
-      return "Safepay reports the payment is still pending.";
+      return "Payment provider reports the payment is still pending.";
     case "AMOUNT_MISMATCH":
-      return "Safepay amount does not match the local payment attempt.";
+      return "Payment provider amount does not match the local payment attempt.";
     case "CURRENCY_MISMATCH":
-      return "Safepay currency does not match the local payment attempt.";
+      return "Payment provider currency does not match the local payment attempt.";
     case "TRACKER_MISMATCH":
-      return "Safepay tracker ownership does not match this payment attempt.";
+      return "Payment provider reference does not match this payment attempt.";
     case "PROVIDER_UNAVAILABLE":
       return "Payment provider lookup is unavailable. No local payment state was changed.";
     default:
-      return "Safepay payment state could not be classified. No local payment state was changed.";
+      return "Payment provider state could not be classified. No local payment state was changed.";
   }
 }
 
@@ -241,6 +241,126 @@ export function decidePendingPaymentVerify(input: {
     message: messageForDecision("UNKNOWN"),
     trackerTokenMatch: true,
     metadataOrderIdMatch,
+  };
+}
+
+export type SimpaisaInquiryEvidence = {
+  status: "confirmed" | "pending" | "failed" | "uncertain";
+  providerTransactionId: string | null;
+  chargeAmountMinor: number | null;
+  chargeCurrency: string | null;
+};
+
+/**
+ * Simpaisa inquiry decision. Success never funds — webhook remains required.
+ */
+export function decideSimpaisaPendingPaymentVerify(input: {
+  localGatewayPaymentRef: string | null;
+  localExpectedAmountMinor: number;
+  localExpectedCurrency: string;
+  providerUnavailable?: boolean;
+  evidence: SimpaisaInquiryEvidence | null;
+}): {
+  decision: PendingPaymentVerifyDecision;
+  message: string;
+  trackerTokenMatch: boolean;
+  metadataOrderIdMatch: boolean | null;
+} {
+  if (input.providerUnavailable || !input.evidence) {
+    return {
+      decision: "PROVIDER_UNAVAILABLE",
+      message: messageForDecision("PROVIDER_UNAVAILABLE"),
+      trackerTokenMatch: false,
+      metadataOrderIdMatch: null,
+    };
+  }
+
+  const storedRef = (input.localGatewayPaymentRef ?? "").trim();
+  const observedRef = (input.evidence.providerTransactionId ?? "").trim();
+  const trackerTokenMatch = Boolean(
+    storedRef && (!observedRef || storedRef === observedRef)
+  );
+
+  if (!storedRef || (observedRef && storedRef !== observedRef)) {
+    return {
+      decision: "TRACKER_MISMATCH",
+      message: messageForDecision("TRACKER_MISMATCH"),
+      trackerTokenMatch: false,
+      metadataOrderIdMatch: null,
+    };
+  }
+
+  const expectedCurrency = input.localExpectedCurrency.trim().toUpperCase();
+  const observedCurrency = (input.evidence.chargeCurrency ?? "")
+    .trim()
+    .toUpperCase();
+  if (
+    observedCurrency &&
+    expectedCurrency &&
+    observedCurrency !== expectedCurrency
+  ) {
+    return {
+      decision: "CURRENCY_MISMATCH",
+      message: messageForDecision("CURRENCY_MISMATCH"),
+      trackerTokenMatch: true,
+      metadataOrderIdMatch: null,
+    };
+  }
+
+  if (
+    input.evidence.chargeAmountMinor != null &&
+    Number.isInteger(input.localExpectedAmountMinor) &&
+    input.evidence.chargeAmountMinor !== input.localExpectedAmountMinor
+  ) {
+    return {
+      decision: "AMOUNT_MISMATCH",
+      message: messageForDecision("AMOUNT_MISMATCH"),
+      trackerTokenMatch: true,
+      metadataOrderIdMatch: null,
+    };
+  }
+
+  if (input.evidence.status === "confirmed") {
+    return {
+      decision: "VERIFIED_SUCCESS_BUT_WEBHOOK_REQUIRED",
+      message: messageForDecision("VERIFIED_SUCCESS_BUT_WEBHOOK_REQUIRED"),
+      trackerTokenMatch: true,
+      metadataOrderIdMatch: null,
+    };
+  }
+
+  if (input.evidence.status === "failed") {
+    return {
+      decision: "VERIFIED_FAILED",
+      message: messageForDecision("VERIFIED_FAILED"),
+      trackerTokenMatch: true,
+      metadataOrderIdMatch: null,
+    };
+  }
+
+  if (input.evidence.status === "pending") {
+    return {
+      decision: "PENDING",
+      message: messageForDecision("PENDING"),
+      trackerTokenMatch: true,
+      metadataOrderIdMatch: null,
+    };
+  }
+
+  if (input.evidence.status === "uncertain") {
+    return {
+      decision: "UNKNOWN",
+      message: messageForDecision("UNKNOWN"),
+      trackerTokenMatch: true,
+      metadataOrderIdMatch: null,
+    };
+  }
+
+  return {
+    decision: "UNKNOWN",
+    message: messageForDecision("UNKNOWN"),
+    trackerTokenMatch: true,
+    metadataOrderIdMatch: null,
   };
 }
 

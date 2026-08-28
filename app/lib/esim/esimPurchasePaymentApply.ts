@@ -79,14 +79,23 @@ function amountsMatch(input: {
   );
 }
 
+function prismaGatewayFromEvent(
+  provider: NormalizedPaymentEvent["provider"]
+): PaymentGatewayProvider | null {
+  if (provider === "SAFEPAY") return PaymentGatewayProvider.SAFEPAY;
+  if (provider === "SIMPAISA") return PaymentGatewayProvider.SIMPAISA;
+  return null;
+}
+
 /**
- * Apply a signature-verified Safepay event to an eSIM payment attempt.
+ * Apply a signature-verified Safepay or Simpaisa event to an eSIM payment attempt.
  * Never call from browser return URLs.
  */
 export async function applyVerifiedEsimPurchasePaymentEvent(
   event: NormalizedPaymentEvent
 ): Promise<ApplyVerifiedEsimPaymentResult> {
-  if (!event.signatureVerified || event.provider !== "SAFEPAY") {
+  const gatewayProvider = prismaGatewayFromEvent(event.provider);
+  if (!event.signatureVerified || !gatewayProvider) {
     return {
       duplicate: false,
       purchaseId: null,
@@ -170,7 +179,7 @@ export async function applyVerifiedEsimPurchasePaymentEvent(
   let attempt = await prisma.esimPurchasePaymentAttempt.findFirst({
     where: {
       gatewayPaymentRef: tracker,
-      gatewayProvider: PaymentGatewayProvider.SAFEPAY,
+      gatewayProvider,
     },
     orderBy: { createdAt: "desc" },
     select: {
@@ -243,7 +252,7 @@ export async function applyVerifiedEsimPurchasePaymentEvent(
     });
   }
 
-  if (!attempt || attempt.gatewayProvider !== PaymentGatewayProvider.SAFEPAY) {
+  if (!attempt || attempt.gatewayProvider !== gatewayProvider) {
     return {
       duplicate: false,
       purchaseId: null,

@@ -25,7 +25,7 @@ export default function PendingPaymentVerifyForm(props: {
     <section className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
       <h2 className="text-lg font-semibold tracking-tight">Verify payment</h2>
       <p className="text-sm text-[var(--text-muted)]">
-        Looks up this attempt with an authenticated Safepay reporter check.
+        Looks up this attempt with the active payment provider (Simpaisa inquiry).
         Browser return data is ignored. This never marks a purchase funded and
         never creates an eSIM order.
       </p>

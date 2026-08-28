@@ -34,7 +34,11 @@ import {
   listAdminAssignmentOffers,
   type AdminOfferOption,
 } from "@/app/lib/esim/adminPackageAssignmentRead";
-import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
+import {
+  getActivePaymentAdapter,
+  isPaymentGatewayConfigured,
+} from "@/app/lib/payments/disabledAdapter";
+import { parseSimpaisaWalletCheckoutFields } from "@/app/lib/payments/simpaisaPkrQuote";
 import {
   normalizeOfferId,
   sanitizeCountryHint,
@@ -65,6 +69,25 @@ function failedPath(purchaseId: string): string {
 function reconciliationPath(purchaseId: string): string {
   const params = new URLSearchParams({ purchase: purchaseId });
   return `/account/esim/buy/review-needed?${params.toString()}`;
+}
+
+function readSimpaisaWalletCheckoutFromForm(formData: FormData):
+  | { ok: true; walletOperatorId?: string; customerMsisdn?: string }
+  | {
+      ok: false;
+      fieldErrors: { walletOperatorId?: string; customerMsisdn?: string };
+      error: string;
+    } {
+  if (
+    !isPaymentGatewayConfigured() ||
+    getActivePaymentAdapter().provider !== "SIMPAISA"
+  ) {
+    return { ok: true };
+  }
+  return parseSimpaisaWalletCheckoutFields({
+    walletOperatorId: formData.get("walletOperatorId"),
+    customerMsisdn: formData.get("customerMsisdn"),
+  });
 }
 
 export async function prepareWalletEsimPurchaseAction(
@@ -213,6 +236,8 @@ export async function confirmWalletEsimPurchaseAction(
   void formData.get("deliveryEmailConfirm");
   void formData.get("deliveryEmailAttestation");
   void formData.get("useAlternateDeliveryEmail");
+  void formData.get("pkrAmount");
+  void formData.get("fxRate");
 
   if (!purchaseId || purchaseId.length > 64) {
     return { ok: false, error: "This purchase is unavailable." };
@@ -254,6 +279,14 @@ export async function confirmWalletEsimPurchaseAction(
       if (!isPaymentGatewayConfigured()) {
         return { ok: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE };
       }
+      const walletFields = readSimpaisaWalletCheckoutFromForm(formData);
+      if (!walletFields.ok) {
+        return {
+          ok: false,
+          fieldErrors: walletFields.fieldErrors,
+          error: walletFields.error,
+        };
+      }
 
       let checkout;
       try {
@@ -262,6 +295,8 @@ export async function confirmWalletEsimPurchaseAction(
           purchaseId,
           useWallet,
           useRewards,
+          walletOperatorId: walletFields.walletOperatorId,
+          customerMsisdn: walletFields.customerMsisdn,
         });
       } catch (error) {
         if (error instanceof EsimPurchaseGatewayCheckoutError) {
@@ -285,11 +320,21 @@ export async function confirmWalletEsimPurchaseAction(
       if (!isPaymentGatewayConfigured()) {
         return { ok: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE };
       }
+      const walletFields = readSimpaisaWalletCheckoutFromForm(formData);
+      if (!walletFields.ok) {
+        return {
+          ok: false,
+          fieldErrors: walletFields.fieldErrors,
+          error: walletFields.error,
+        };
+      }
       checkout = await startEsimPurchaseHostedCheckout({
         customerUserId: customer.id,
         purchaseId,
         useWallet,
         useRewards,
+        walletOperatorId: walletFields.walletOperatorId,
+        customerMsisdn: walletFields.customerMsisdn,
       });
     } catch (error) {
       if (error instanceof EsimPurchaseGatewayCheckoutError) {

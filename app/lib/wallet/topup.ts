@@ -16,6 +16,12 @@ import type {
 } from "@/app/lib/payments/adapter";
 import { getActivePaymentAdapter } from "@/app/lib/payments/disabledAdapter";
 import { resumeSafepayHostedCheckout } from "@/app/lib/payments/safepayAdapter";
+import { resumeSimpaisaWalletCheckout } from "@/app/lib/payments/simpaisaAdapter";
+import {
+  parseSimpaisaWalletCheckoutFields,
+  quoteSimpaisaPkrChargeFromUsdCents,
+  simpaisaChargeMatchesQuote,
+} from "@/app/lib/payments/simpaisaPkrQuote";
 import {
   WALLET_TOPUP_MAX_CENTS,
   WALLET_TOPUP_MIN_CENTS,
@@ -363,6 +369,8 @@ export async function expireWalletTopupCheckout(options: {
 export async function startWalletTopupCheckout(options: {
   customerUserId: string;
   topupId: string;
+  walletOperatorId?: string;
+  customerMsisdn?: string;
 }): Promise<StartWalletTopupCheckoutResult> {
   const customerUserId = options.customerUserId.trim();
   const topupId = options.topupId.trim();
@@ -446,6 +454,31 @@ export async function startWalletTopupCheckout(options: {
     );
   }
 
+  if (
+    Boolean(existingRef) &&
+    topup.status === WalletTopupStatus.AWAITING_PAYMENT &&
+    topup.gatewayProvider === PaymentGatewayProvider.SIMPAISA &&
+    adapter.provider === "SIMPAISA"
+  ) {
+    const resumed = resumeSimpaisaWalletCheckout({ returnPath });
+    if (!resumed.ok) {
+      throw new WalletTopupError(
+        resumed.code === "MISCONFIGURED" ||
+          resumed.code === "GATEWAY_UNAVAILABLE"
+          ? "GATEWAY_UNAVAILABLE"
+          : "UNAVAILABLE",
+        resumed.message
+      );
+    }
+    return {
+      topupId: topup.id,
+      checkoutUrl: resumed.checkoutUrl,
+      reusedTracker: true,
+      chargeCurrency: (topup.chargeCurrency || "PKR").toUpperCase(),
+      chargeAmountMinor: topup.chargeAmountMinor ?? topup.creditAmountCents,
+    };
+  }
+
   const provider = providerFromName(adapter.provider);
   if (!provider || provider === PaymentGatewayProvider.MANUAL_TEST) {
     throw new WalletTopupError(
@@ -454,17 +487,49 @@ export async function startWalletTopupCheckout(options: {
     );
   }
 
-  const result = await adapter.createCheckoutSession({
-    purpose: "WALLET_TOPUP",
-    localTopupId: topup.id,
-    customerUserId,
-    // Authoritative wallet credit amount — never taken from browser.
-    chargeAmountMinor: topup.creditAmountCents,
-    chargeCurrency: "USD",
-    checkoutIdempotencyKey: topup.checkoutIdempotencyKey,
-    returnPath,
-    cancelPath,
-  });
+  const result =
+    adapter.provider === "SIMPAISA"
+      ? await (async () => {
+          const quote = quoteSimpaisaPkrChargeFromUsdCents(
+            topup.creditAmountCents
+          );
+          if (!quote) {
+            throw new WalletTopupError(
+              "GATEWAY_UNAVAILABLE",
+              "Payment checkout quote is unavailable. Please try again."
+            );
+          }
+          const walletFields = parseSimpaisaWalletCheckoutFields({
+            walletOperatorId: options.walletOperatorId,
+            customerMsisdn: options.customerMsisdn,
+          });
+          if (!walletFields.ok) {
+            throw new WalletTopupError("UNAVAILABLE", walletFields.error);
+          }
+          return adapter.createCheckoutSession({
+            purpose: "WALLET_TOPUP",
+            localTopupId: topup.id,
+            customerUserId,
+            chargeAmountMinor: quote.chargeAmountMinor,
+            chargeCurrency: quote.chargeCurrency,
+            checkoutIdempotencyKey: topup.checkoutIdempotencyKey,
+            returnPath,
+            cancelPath,
+            walletOperatorId: walletFields.walletOperatorId,
+            customerMsisdn: walletFields.customerMsisdn,
+          });
+        })()
+      : await adapter.createCheckoutSession({
+          purpose: "WALLET_TOPUP",
+          localTopupId: topup.id,
+          customerUserId,
+          // Authoritative wallet credit amount — never taken from browser.
+          chargeAmountMinor: topup.creditAmountCents,
+          chargeCurrency: "USD",
+          checkoutIdempotencyKey: topup.checkoutIdempotencyKey,
+          returnPath,
+          cancelPath,
+        });
 
   if (!result.ok) {
     throw new WalletTopupError("GATEWAY_UNAVAILABLE", result.message);
@@ -473,7 +538,22 @@ export async function startWalletTopupCheckout(options: {
   const providerRef = (result.providerPaymentRef ?? "").trim();
   const chargeCurrency = result.chargeCurrency.trim().toUpperCase();
   const chargeAmountMinor = result.chargeAmountMinor;
-  if (
+  if (adapter.provider === "SIMPAISA") {
+    if (
+      !providerRef ||
+      !Number.isInteger(chargeAmountMinor) ||
+      !simpaisaChargeMatchesQuote({
+        usdCents: topup.creditAmountCents,
+        chargeCurrency,
+        chargeAmountMinor,
+      })
+    ) {
+      throw new WalletTopupError(
+        "GATEWAY_UNAVAILABLE",
+        "Payment checkout quote did not match the PKR charge. Please try again."
+      );
+    }
+  } else if (
     !providerRef ||
     chargeCurrency !== "USD" ||
     !Number.isInteger(chargeAmountMinor) ||
@@ -836,13 +916,26 @@ export async function applyVerifiedTopupPaymentEvent(
 
   // Confirmed payment path — exact charge snapshot match required.
   // Credit amount is always the persisted top-up creditAmountCents (not webhook alone).
+  const safepaySnapshotMissing =
+    topup.gatewayProvider === PaymentGatewayProvider.SAFEPAY &&
+    (topup.chargeAmountMinor !== topup.creditAmountCents ||
+      (topup.chargeCurrency ?? "").toUpperCase() !== "USD");
+  const simpaisaSnapshotMissing =
+    topup.gatewayProvider === PaymentGatewayProvider.SIMPAISA &&
+    (topup.chargeCurrency == null ||
+      topup.chargeAmountMinor == null ||
+      !simpaisaChargeMatchesQuote({
+        usdCents: topup.creditAmountCents,
+        chargeCurrency: topup.chargeCurrency,
+        chargeAmountMinor: topup.chargeAmountMinor,
+      }));
   if (
     !openForConfirmedCredit ||
     topup.chargeCurrency == null ||
     topup.chargeAmountMinor == null ||
     topup.gatewayProvider == null ||
-    topup.chargeAmountMinor !== topup.creditAmountCents ||
-    topup.chargeCurrency.toUpperCase() !== "USD"
+    safepaySnapshotMissing ||
+    simpaisaSnapshotMissing
   ) {
     await prisma.walletTopup.updateMany({
       where: {
