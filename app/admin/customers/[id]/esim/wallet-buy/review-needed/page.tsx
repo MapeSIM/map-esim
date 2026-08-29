@@ -75,12 +75,20 @@ export default async function AdminCustomerWalletBuyReviewNeededPage({
         </div>
       </dl>
 
-      <Link
-        href={`/admin/customers/${encodeURIComponent(purchase.customerId)}`}
-        className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border-strong)] px-5 text-sm font-semibold text-[var(--heading)]"
-      >
-        Back to customer
-      </Link>
+      <div className="flex flex-wrap gap-3">
+        <Link
+          href={`/admin/reconciliation/wallet_purchase/${encodeURIComponent(purchase.purchaseId)}`}
+          className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent-strong)] px-5 text-sm font-semibold text-white"
+        >
+          Open reconciliation case
+        </Link>
+        <Link
+          href={`/admin/customers/${encodeURIComponent(purchase.customerId)}`}
+          className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border-strong)] px-5 text-sm font-semibold text-[var(--heading)]"
+        >
+          Back to customer
+        </Link>
+      </div>
     </div>
   );
 }

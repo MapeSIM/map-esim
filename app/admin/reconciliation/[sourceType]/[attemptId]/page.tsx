@@ -6,6 +6,7 @@ import {
   getReconciliationDetail,
   requireActiveAdminForReconciliation,
 } from "@/app/lib/admin/reconciliation";
+import { isValidReconciliationSourceType } from "@/app/lib/admin/reconciliationClassify";
 import { ORDER_EMAIL_NOT_CONFIGURED_LABEL } from "@/app/lib/admin/reconciliationCaseShared";
 import { getCaseManagementEligibility } from "@/app/lib/admin/reconciliationCaseManagement";
 import { getProviderRefreshUiState } from "@/app/lib/admin/providerRefresh";
@@ -14,6 +15,21 @@ export const dynamic = "force-dynamic";
 
 const UNAVAILABLE =
   "Reconciliation data is temporarily unavailable. Please refresh shortly.";
+
+const CASE_UNAVAILABLE_TITLE = "Reconciliation case unavailable";
+const CASE_UNAVAILABLE_MESSAGE =
+  "This reconciliation case could not be opened. It may already be resolved, may no longer require reconciliation, or the reference may be incorrect.";
+
+/** Structurally valid attempt ids (cuid / assignment:cuid). Not a DB existence check. */
+function isStructurallyValidAttemptId(raw: string): boolean {
+  const id = (raw ?? "").trim();
+  if (!id || id.length > 96) return false;
+  if (id.startsWith("assignment:")) {
+    const rest = id.slice("assignment:".length);
+    return Boolean(rest) && /^[A-Za-z0-9_-]+$/.test(rest) && rest.length <= 64;
+  }
+  return /^[A-Za-z0-9_-]+$/.test(id);
+}
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
@@ -88,7 +104,57 @@ export default async function AdminReconciliationDetailPage({
     );
   }
 
-  if (!detail) notFound();
+  if (!detail) {
+    // Supported source + structurally valid id, but case not loadable/eligible:
+    // show a read-only unavailable panel instead of a raw Next.js 404.
+    if (
+      isValidReconciliationSourceType(sourceType) &&
+      isStructurallyValidAttemptId(attemptId)
+    ) {
+      return (
+        <div className="space-y-6">
+          <div>
+            <Link
+              href="/admin/reconciliation"
+              className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+            >
+              ← Back to reconciliation
+            </Link>
+            <h1 className="mt-4 text-2xl font-bold tracking-tight">
+              {CASE_UNAVAILABLE_TITLE}
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
+              {CASE_UNAVAILABLE_MESSAGE}
+            </p>
+          </div>
+          <div
+            className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
+            role="status"
+          >
+            <p className="text-sm font-medium text-[var(--heading)]">
+              No recovery actions were started. Opening this page never moves
+              funds, contacts the provider, or changes purchase status.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/admin/reconciliation"
+              className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent-strong)] px-5 text-sm font-semibold text-white"
+            >
+              Back to Reconciliation
+            </Link>
+            <Link
+              href="/admin"
+              className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border-strong)] px-5 text-sm font-semibold text-[var(--heading)]"
+            >
+              Back to Admin
+            </Link>
+          </div>
+        </div>
+      );
+    }
+    notFound();
+  }
 
   const [refreshUi, caseUi] = await Promise.all([
     getProviderRefreshUiState({
