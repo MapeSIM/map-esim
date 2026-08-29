@@ -87,8 +87,34 @@ export type SendChannelMailResult =
     };
 
 /**
+ * Normalize optional CC list. Empty/omitted → [].
+ * Any invalid address fails closed (caller must not send).
+ */
+export function normalizeOptionalCc(
+  cc: string[] | undefined
+): { ok: true; cc: string[] } | { ok: false } {
+  if (cc == null) return { ok: true, cc: [] };
+  if (!Array.isArray(cc)) return { ok: false };
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of cc) {
+    const addr = String(raw ?? "")
+      .trim()
+      .toLowerCase();
+    if (!addr) continue;
+    if (!isValidEmail(addr) || addr.length > 254) return { ok: false };
+    if (seen.has(addr)) continue;
+    seen.add(addr);
+    out.push(addr);
+    if (out.length > 20) return { ok: false };
+  }
+  return { ok: true, cc: out };
+}
+
+/**
  * Send mail through a fixed channel identity.
  * From / Reply-To are taken from the channel registry — never from callers.
+ * Optional `cc` is validated; omitting it preserves legacy single-recipient behavior.
  */
 export async function sendChannelMail(options: {
   channel: EmailChannel;
@@ -96,6 +122,8 @@ export async function sendChannelMail(options: {
   subject: string;
   text: string;
   html: string;
+  /** Optional CC recipients. Omitted/empty = legacy behavior. Invalid → invalid_recipient. */
+  cc?: string[];
   attachments?: Attachment[];
   headers?: Record<string, string>;
   messageId?: string;
@@ -104,6 +132,12 @@ export async function sendChannelMail(options: {
   if (!to || !isValidEmail(to)) {
     return { ok: false, reason: "invalid_recipient" };
   }
+
+  const ccParsed = normalizeOptionalCc(options.cc);
+  if (!ccParsed.ok) {
+    return { ok: false, reason: "invalid_recipient" };
+  }
+  const cc = ccParsed.cc.filter((addr) => addr !== to.toLowerCase());
 
   const config = getEmailConfig(options.channel);
   if (!config.configured) {
@@ -131,11 +165,14 @@ export async function sendChannelMail(options: {
     ...extra.filter((item) => item.cid !== EMAIL_LOGO_CID),
   ];
 
+  const envelopeTo = cc.length ? [to, ...cc] : [to];
+
   try {
     await transporter.sendMail({
       from: config.from,
       replyTo: config.replyTo,
       to,
+      ...(cc.length ? { cc } : {}),
       subject,
       text: options.text,
       html: options.html,
@@ -144,7 +181,7 @@ export async function sendChannelMail(options: {
       messageId: options.messageId,
       envelope: {
         from: config.mailbox,
-        to,
+        to: envelopeTo,
       },
     });
     return { ok: true };

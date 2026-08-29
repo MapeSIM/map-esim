@@ -8,6 +8,7 @@ import {
   refundStatusLabel,
 } from "@/app/lib/refunds/refundRequestConstants";
 import { shortCustomerOrderReference } from "@/app/lib/orders/customerOrderDisplay";
+import { hasSuccessfulVesimReviewEmail } from "@/app/lib/refunds/refundRequestVesimReview";
 
 function formatDate(date: Date): string {
   return (
@@ -118,6 +119,8 @@ export type AdminRefundRequestDetail = {
   canApprove: boolean;
   canReject: boolean;
   canExecute: boolean;
+  /** Admin may send VeSIM review when not already successfully emailed. */
+  vesimReviewAlreadySent: boolean;
   lastExecutionError: string | null;
   executedAmountLabel: string | null;
   executedAtLabel: string | null;
@@ -191,6 +194,7 @@ export async function getAdminRefundRequestDetail(
   const canExecute =
     row.status === RefundRequestStatus.APPROVED_PENDING_EXECUTION ||
     row.status === RefundRequestStatus.EXECUTION_FAILED;
+  const vesimReviewAlreadySent = await hasSuccessfulVesimReviewEmail(row.id);
 
   return {
     id: row.id,
@@ -225,6 +229,7 @@ export async function getAdminRefundRequestDetail(
     canApprove: openForReview,
     canReject: openForReject,
     canExecute,
+    vesimReviewAlreadySent,
     lastExecutionError: row.lastExecutionError,
     executedAmountLabel:
       row.executedAmountCents != null &&

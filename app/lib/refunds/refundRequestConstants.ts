@@ -67,7 +67,30 @@ export const REFUND_AUDIT = {
   EMAIL_APPROVED_PENDING: "refund.email_approved_pending_execution",
   EMAIL_REJECTED: "refund.email_rejected",
   EMAIL_COMPLETED: "refund.email_completed",
+  /** Admin → VeSIM provider review email (informational; not a status change). */
+  VESIM_REVIEW_EMAIL_SENDING: "refund.vesim_review_email_sending",
+  VESIM_REVIEW_EMAIL_SENT: "refund.vesim_review_email_sent",
+  VESIM_REVIEW_EMAIL_FAILED: "refund.vesim_review_email_failed",
 } as const;
+
+export const VESIM_REVIEW_EMAIL_SENDING = "sending";
+export const VESIM_REVIEW_EMAIL_SENT = "sent";
+export const VESIM_REVIEW_EMAIL_FAILED = "failed";
+
+export const VESIM_REVIEW_ICCID_UNAVAILABLE_MESSAGE =
+  "VeSIM review cannot be sent because the order ICCID is not available yet.";
+
+export const VESIM_REVIEW_PROVIDER_REF_UNAVAILABLE_MESSAGE =
+  "VeSIM review cannot be sent because the provider order reference is not available.";
+
+export const VESIM_REVIEW_ALREADY_SENT_MESSAGE =
+  "This refund request has already been sent to VeSIM for review.";
+
+export const VESIM_REVIEW_SENT_SUCCESS_MESSAGE =
+  "Refund review request sent to VeSIM successfully.";
+
+export const VESIM_REVIEW_CONFIRM_MESSAGE =
+  "Send this refund request to VeSIM for provider-side eligibility review?";
 
 /** Customer refund-status email events. */
 export const REFUND_STATUS_EMAIL_EVENTS = [

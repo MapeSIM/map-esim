@@ -70,6 +70,7 @@
     "qa:wallet-topup-funding": "tsx scripts/qa-wallet-topup-funding.ts",
     "qa:refund-request-foundation": "tsx scripts/qa-refund-request-foundation.ts",
     "qa:refund-status-email": "tsx scripts/qa-refund-status-email.ts",
+    "qa:vesim-refund-review-email": "tsx scripts/qa-vesim-refund-review-email.ts",
     "qa:customer-refund-execution": "tsx scripts/qa-customer-refund-execution.ts",
     "qa:guest-checkout-gate": "tsx scripts/qa-guest-checkout-gate.ts",
     "qa:vesim-environment": "tsx scripts/qa-vesim-environment.ts",
