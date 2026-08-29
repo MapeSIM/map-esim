@@ -332,6 +332,19 @@ function main() {
   assert.doesNotMatch(listPage, /iccidEncrypted|activationCode|qrValue/i);
   assert.match(detailPage, /requireActiveAdminForReconciliation/);
   assert.match(detailPage, /notFound/);
+  assert.match(detailPage, /isValidReconciliationSourceType/);
+  assert.match(detailPage, /Reconciliation case unavailable/);
+  assert.match(
+    detailPage,
+    /may already be resolved, may no longer require reconciliation/
+  );
+  assert.match(detailPage, /Back to Reconciliation/);
+  assert.match(detailPage, /Back to Admin/);
+  assert.match(
+    detailPage,
+    /Opening this page never moves/
+  );
+  assert.match(detailPage, /funds/);
   assert.match(detailPage, /Timeline/);
   assert.ok(detailPage.includes(ORDER_EMAIL_NOT_CONFIGURED_LABEL));
   assert.match(detailPage, /failureLabel === ORDER_EMAIL_NOT_CONFIGURED_LABEL/);
@@ -346,6 +359,24 @@ function main() {
   assert.match(nav, /Reconciliation/);
   assert.match(nav, /\/admin\/reconciliation/);
   console.log("PASS readonly_ui_and_nav");
+
+  const reviewNeeded = read(
+    "app/admin/customers/[id]/esim/wallet-buy/review-needed/page.tsx"
+  );
+  assert.match(reviewNeeded, /Open reconciliation case/);
+  assert.match(
+    reviewNeeded,
+    /\/admin\/reconciliation\/wallet_purchase\/\$\{encodeURIComponent\(purchase\.purchaseId\)\}/
+  );
+  assert.doesNotMatch(reviewNeeded, /orderId|paymentAttempt|attemptId/);
+  assert.doesNotMatch(reviewNeeded, /"use server"/);
+  assert.doesNotMatch(
+    reviewNeeded,
+    /confirmWalletEsimPurchase|finalizeReconciliation|providerRefresh|refundWallet/i
+  );
+  assert.match(reviewNeeded, /Back to customer/);
+  assert.match(service, /href: `\/admin\/reconciliation\/wallet_purchase\/\$\{row\.id\}`/);
+  console.log("PASS wallet_review_needed_recon_link");
 
   assert.match(layout, /requireRole\("ADMIN"\)/);
   assert.match(layout, /robots:\s*\{\s*index:\s*false/);
