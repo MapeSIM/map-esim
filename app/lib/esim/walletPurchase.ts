@@ -44,14 +44,14 @@ import {
   revalidatePurchasePromo,
 } from "@/app/lib/promo/promoCustomer";
 import {
-  completePromoRedemptionInTx,
+  completePromoRedemptionBestEffort,
   releasePromoRedemptionInTx,
 } from "@/app/lib/promo/promoRedemption";
-import { awardCustomerPurchaseEarnInTx } from "@/app/lib/rewards/rewardEarn";
+import { awardCustomerPurchaseEarnBestEffort } from "@/app/lib/rewards/rewardEarn";
 import { applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx } from "@/app/lib/rewards/rewardRefund";
 import {
   claimRewardRedemptionInTx,
-  completeRewardRedemptionInTx,
+  completeRewardRedemptionBestEffort,
   loadCustomerRewardPointsBalance,
   releaseRewardRedemptionInTx,
   RewardRedemptionError,
@@ -1169,6 +1169,34 @@ async function markReconciliationRequired(options: {
 }
 
 /**
+ * After critical Order/debit/purchase commit: promo + rewards side effects.
+ * Each step is independently idempotent and must never reverse money/order state.
+ */
+export async function runWalletPurchasePostCommitSideEffects(options: {
+  purchaseId: string;
+  orderId: string;
+  customerUserId: string;
+  actorUserId?: string | null;
+}): Promise<void> {
+  await completePromoRedemptionBestEffort({
+    purchaseId: options.purchaseId,
+    orderId: options.orderId,
+    actorUserId: options.actorUserId,
+  });
+  await completeRewardRedemptionBestEffort({
+    purchaseId: options.purchaseId,
+    orderId: options.orderId,
+    actorUserId: options.actorUserId,
+  });
+  await awardCustomerPurchaseEarnBestEffort({
+    customerUserId: options.customerUserId,
+    purchaseId: options.purchaseId,
+    orderId: options.orderId,
+    actorUserId: options.actorUserId,
+  });
+}
+
+/**
  * Confirm purchase: reserve wallet funds, then call provider once.
  * Never uses ADMIN debit helpers. Never mutates company-funded orders.
  */
@@ -1616,115 +1644,121 @@ export async function confirmWalletEsimPurchase(
     { kind: "success" }
   >;
 
-  // Confirmed success — finalize local order + complete debit.
+  // Durable provider-success evidence BEFORE local money/order finalization.
+  // If finalize crashes afterward: observation remains, VeSIM is never retried,
+  // and Admin local-only recovery can proceed from stored providerOrderId.
+  try {
+    await persistWalletPurchaseProviderObservation(purchase.id, {
+      providerOrderId: successCheckout.providerOrderId,
+      providerResultKind: "success",
+      safeProviderStatusCode: "provider_success",
+    });
+  } catch (error) {
+    console.error("WALLET_PROVIDER_SUCCESS_OBSERVATION_PERSIST_FAILED", {
+      purchaseId: purchase.id,
+      code:
+        error instanceof Error
+          ? error.name.slice(0, 64)
+          : "unknown_error",
+    });
+  }
+
+  // Confirmed success — critical tx: Order + debit COMPLETED + purchase COMPLETED only.
   let orderId: string | null = null;
   try {
     let completedDebitTransactionId: string | null = null;
-    const finalized = await prisma.$transaction(async (tx) => {
-      const current = await tx.walletEsimPurchase.findUnique({
-        where: { id: purchase.id },
-        select: {
-          status: true,
-          debitTransactionId: true,
-          orderId: true,
-          alternateDeliveryEmail: true,
-          alternateDeliveryEmailConfirmedAt: true,
-        },
-      });
-      if (
-        current?.status === WalletEsimPurchaseStatus.COMPLETED &&
-        current.orderId
-      ) {
-        return { id: current.orderId };
-      }
-      if (current?.status !== WalletEsimPurchaseStatus.PROVIDER_PENDING) {
-        throw new WalletEsimPurchaseError(
-          "RECONCILIATION_REQUIRED",
-          "Your purchase is under review. Do not buy again. Contact support for help."
-        );
-      }
-
-      const order = await persistAssignedOrder(tx, {
-        providerOrderId: successCheckout.providerOrderId,
-        customerUserId: customer.id,
-        customerEmail: customer.email,
-        alternateDeliveryEmail: snapshotOrderAlternateDeliveryEmail(current),
-        verifiedOffer,
-        fundingSource: OrderFundingSource.CUSTOMER_WALLET,
-        status: OrderStatus.COMPLETED,
-        checkoutPayload: successCheckout.payload,
-      });
-
-      if (current.debitTransactionId) {
-        await tx.walletTransaction.update({
-          where: { id: current.debitTransactionId },
-          data: { status: WalletTransactionStatus.COMPLETED },
+    const finalized = await prisma.$transaction(
+      async (tx) => {
+        const current = await tx.walletEsimPurchase.findUnique({
+          where: { id: purchase.id },
+          select: {
+            status: true,
+            debitTransactionId: true,
+            orderId: true,
+            alternateDeliveryEmail: true,
+            alternateDeliveryEmailConfirmedAt: true,
+          },
         });
-        completedDebitTransactionId = current.debitTransactionId;
-      }
+        if (
+          current?.status === WalletEsimPurchaseStatus.COMPLETED &&
+          current.orderId
+        ) {
+          return { id: current.orderId };
+        }
+        if (current?.status !== WalletEsimPurchaseStatus.PROVIDER_PENDING) {
+          throw new WalletEsimPurchaseError(
+            "RECONCILIATION_REQUIRED",
+            "Your purchase is under review. Do not buy again. Contact support for help."
+          );
+        }
 
-      await tx.walletEsimPurchase.update({
-        where: { id: purchase.id },
-        data: {
-          status: WalletEsimPurchaseStatus.COMPLETED,
-          orderId: order.id,
-          providerOrderId: order.providerOrderId,
-          providerResultKind: "success",
-          providerObservedAt: new Date(),
-          completedAt: new Date(),
-          failureCategory: null,
-          failureCode: null,
-          reconciliationState: null,
-        },
-      });
+        const order = await persistAssignedOrder(tx, {
+          providerOrderId: successCheckout.providerOrderId,
+          customerUserId: customer.id,
+          customerEmail: customer.email,
+          alternateDeliveryEmail: snapshotOrderAlternateDeliveryEmail(current),
+          verifiedOffer,
+          fundingSource: OrderFundingSource.CUSTOMER_WALLET,
+          status: OrderStatus.COMPLETED,
+          checkoutPayload: successCheckout.payload,
+        });
 
-      await completePromoRedemptionInTx(tx, {
-        purchaseId: purchase.id,
-        orderId: order.id,
-        actorUserId,
-      });
+        if (current.debitTransactionId) {
+          await tx.walletTransaction.update({
+            where: { id: current.debitTransactionId },
+            data: { status: WalletTransactionStatus.COMPLETED },
+          });
+          completedDebitTransactionId = current.debitTransactionId;
+        }
 
-      await completeRewardRedemptionInTx(tx, {
-        purchaseId: purchase.id,
-        orderId: order.id,
-        actorUserId,
-      });
-
-      await awardCustomerPurchaseEarnInTx(tx, {
-        customerUserId,
-        purchaseId: purchase.id,
-        orderId: order.id,
-        actorUserId,
-      });
-
-      await tx.auditLog.create({
-        data: {
-          actorUserId,
-          action: WALLET_PURCHASE_COMPLETED,
-          targetType: "WalletEsimPurchase",
-          targetId: purchase.id,
-          metadata: {
-            method: purchaseAuditMethod(isAssisted),
-            fundingSource: OrderFundingSource.CUSTOMER_WALLET,
-            purchaseId: purchase.id,
+        await tx.walletEsimPurchase.update({
+          where: { id: purchase.id },
+          data: {
+            status: WalletEsimPurchaseStatus.COMPLETED,
             orderId: order.id,
-            offerId: snapshot.offerId,
-            amountCents: snapshot.priceCents,
-            currency: snapshot.currency,
-            walletTransactionId: current.debitTransactionId,
-            ...(isAssisted
-              ? {
-                  targetUserId: customerUserId,
-                  adminUserId: assistedAdminUserId,
-                  reason: purchase.assistedPurchaseReason,
-                }
-              : {}),
-          } satisfies Prisma.InputJsonValue,
-        },
-      });
+            providerOrderId: order.providerOrderId,
+            providerResultKind: "success",
+            providerObservedAt: new Date(),
+            completedAt: new Date(),
+            failureCategory: null,
+            failureCode: null,
+            reconciliationState: null,
+          },
+        });
 
-      return order;
-    });
+        await tx.auditLog.create({
+          data: {
+            actorUserId,
+            action: WALLET_PURCHASE_COMPLETED,
+            targetType: "WalletEsimPurchase",
+            targetId: purchase.id,
+            metadata: {
+              method: purchaseAuditMethod(isAssisted),
+              fundingSource: OrderFundingSource.CUSTOMER_WALLET,
+              purchaseId: purchase.id,
+              orderId: order.id,
+              offerId: snapshot.offerId,
+              amountCents: snapshot.priceCents,
+              currency: snapshot.currency,
+              walletTransactionId: current.debitTransactionId,
+              ...(isAssisted
+                ? {
+                    targetUserId: customerUserId,
+                    adminUserId: assistedAdminUserId,
+                    reason: purchase.assistedPurchaseReason,
+                  }
+                : {}),
+            } satisfies Prisma.InputJsonValue,
+          },
+        });
+
+        return order;
+      },
+      {
+        maxWait: 10000,
+        timeout: 15000,
+      }
+    );
     orderId = finalized.id;
     if (completedDebitTransactionId) {
       scheduleWalletTransactionNotification(completedDebitTransactionId);
@@ -1746,8 +1780,14 @@ export async function confirmWalletEsimPurchase(
     });
   }
 
-  // Best-effort install email after Order persist — never reverses purchase or retries provider.
+  // Post-commit side effects — never reverse Order/debit or retry VeSIM.
   if (orderId) {
+    await runWalletPurchasePostCommitSideEffects({
+      purchaseId: purchase.id,
+      orderId,
+      customerUserId,
+      actorUserId,
+    });
     await deliverCompletedWalletPurchaseInstallEmail({
       purchaseId: purchase.id,
       checkoutPayload: successCheckout.payload,

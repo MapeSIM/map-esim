@@ -93,11 +93,12 @@ function offlineChecks(): void {
   assert.match(redeem, /CustomerRewardRedemptionStatus\.HELD/);
   assert.match(redeem, /REDEMPTION_RESTORE/);
   assert.match(redeem, /lifetimeRedeemedPoints/);
+  assert.match(redeem, /completeRewardRedemptionBestEffort/);
   assert.match(wallet, /claimRewardRedemptionInTx/);
-  assert.match(wallet, /completeRewardRedemptionInTx/);
+  assert.match(wallet, /completeRewardRedemptionBestEffort/);
   assert.match(wallet, /releaseRewardRedemptionInTx/);
   assert.match(apply, /claimRewardRedemptionInTx/);
-  assert.match(apply, /completeRewardRedemptionInTx/);
+  assert.match(apply, /runWalletPurchasePostCommitSideEffects/);
   assert.match(apply, /releaseRewardRedemptionInTx/);
   assert.match(gateway, /claimRewardRedemptionInTx/);
   const fundingChoice = wallet.split("setWalletPurchaseFundingChoice")[1]?.slice(0, 3500) ?? "";

@@ -207,10 +207,52 @@ function main() {
   console.log("PASS no_email_sent_during_qa");
 
   assert.ok(!/stripe|paypal|webhook|impersonat/i.test(service));
-  assert.match(service, /awardCustomerPurchaseEarnInTx/);
+  assert.match(service, /awardCustomerPurchaseEarnBestEffort/);
+  assert.match(service, /completePromoRedemptionBestEffort/);
+  assert.match(service, /completeRewardRedemptionBestEffort/);
+  assert.match(service, /runWalletPurchasePostCommitSideEffects/);
   assert.match(service, /claimPurchasePromoInTx|promoDiscountCents/);
   assert.ok(!/admin.*wallet.*purchase|wallet.*admin.*assign/i.test(buyPage));
   console.log("PASS no_payment_gateway_admin_wallet_purchase");
+
+  // Local finalization safety: provider success persisted before critical tx;
+  // promo/rewards/earn are post-commit and cannot roll back Order/debit.
+  const confirmFn = service.slice(
+    service.indexOf("export async function confirmWalletEsimPurchase")
+  );
+  const successFinalize = confirmFn.slice(
+    confirmFn.indexOf('kind: "success"')
+  );
+  const criticalTx = successFinalize.slice(
+    0,
+    successFinalize.indexOf("runWalletPurchasePostCommitSideEffects")
+  );
+  assert.match(
+    criticalTx,
+    /persistWalletPurchaseProviderObservation[\s\S]*providerResultKind:\s*"success"[\s\S]*prisma\.\$transaction/
+  );
+  assert.match(criticalTx, /timeout:\s*15000/);
+  assert.match(criticalTx, /persistAssignedOrder/);
+  assert.match(criticalTx, /WalletTransactionStatus\.COMPLETED/);
+  assert.match(criticalTx, /WalletEsimPurchaseStatus\.COMPLETED/);
+  assert.match(criticalTx, /WALLET_PURCHASE_COMPLETED/);
+  assert.doesNotMatch(criticalTx, /completePromoRedemptionInTx/);
+  assert.doesNotMatch(criticalTx, /completeRewardRedemptionInTx/);
+  assert.doesNotMatch(criticalTx, /awardCustomerPurchaseEarnInTx/);
+  assert.doesNotMatch(criticalTx, /deliverCompletedWalletPurchaseInstallEmail/);
+  assert.match(
+    successFinalize,
+    /runWalletPurchasePostCommitSideEffects[\s\S]*deliverCompletedWalletPurchaseInstallEmail/
+  );
+  assert.match(
+    successFinalize,
+    /local_finalize_failed[\s\S]*order_persist_error[\s\S]*providerResultKind:\s*"success"/
+  );
+  assert.match(
+    service,
+    /export async function runWalletPurchasePostCommitSideEffects/
+  );
+  console.log("PASS provider_success_local_finalize_shrink");
 
   assert.ok(!/migrate reset|db push|migrate dev/.test(service));
   assert.ok(
@@ -375,7 +417,7 @@ function main() {
   assert.match(service, /assertCustomerFinancialActivityAllowed/);
   console.log("PASS buy_esim_destination_launcher");
 
-  console.log("ALL_QA_PASSED=32");
+  console.log("ALL_QA_PASSED=33");
 }
 
 main();

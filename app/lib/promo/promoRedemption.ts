@@ -207,7 +207,33 @@ export async function completePromoRedemptionBestEffort(options: {
     await prisma.$transaction(async (tx) => {
       await completePromoRedemptionInTx(tx, options);
     });
-  } catch {
+  } catch (error) {
     // Never fail purchase finalization because of promo completion.
+    console.error("PROMO_REDEMPTION_COMPLETION_BEST_EFFORT_FAILED", {
+      purchaseId: options.purchaseId,
+      orderId: options.orderId,
+      code:
+        error instanceof Error
+          ? error.name.slice(0, 64)
+          : "unknown_error",
+    });
+    try {
+      const { prisma } = await import("@/app/lib/db");
+      await prisma.auditLog.create({
+        data: {
+          actorUserId: options.actorUserId ?? null,
+          action: "promo.redemption_completion_failed",
+          targetType: "WalletEsimPurchase",
+          targetId: options.purchaseId,
+          metadata: {
+            purchaseId: options.purchaseId,
+            orderId: options.orderId,
+            retryable: true,
+          },
+        },
+      });
+    } catch {
+      // Audit must never escalate a best-effort failure.
+    }
   }
 }

@@ -135,6 +135,13 @@ function main() {
   assert.match(apply, /executeCreditCheckout/);
   assert.match(apply, /PROVIDER_PENDING/);
   assert.match(apply, /provider_declined_after_funding|local_finalize_failed/);
+  assert.match(apply, /persistWalletPurchaseProviderObservation/);
+  assert.match(apply, /runWalletPurchasePostCommitSideEffects/);
+  assert.match(apply, /timeout:\s*15000/);
+  assert.doesNotMatch(
+    apply.slice(apply.indexOf("fulfillFundedEsimPurchaseAfterPayment")),
+    /completePromoRedemptionInTx|completeRewardRedemptionInTx|awardCustomerPurchaseEarnInTx/
+  );
   assert.match(apply, /maybeReleasePendingGatewayReservation/);
   assert.doesNotMatch(apply, /requestRefund\(/);
   // Completed split debit notifies post-commit; PENDING reservation must not.
