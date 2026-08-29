@@ -7,6 +7,7 @@ import {
   RefundRequestError,
   type AdminRefundDecisionAction,
 } from "@/app/lib/refunds/refundRequest";
+import { sendVesimRefundReviewEmail } from "@/app/lib/refunds/refundRequestVesimReview";
 
 export type AdminRefundRequestFormState =
   | null
@@ -81,4 +82,50 @@ export async function adminRefundRequestDecisionAction(
       error: "Refund request update is temporarily unavailable.",
     };
   }
+}
+
+export type AdminVesimReviewFormState =
+  | null
+  | { ok: true; message: string; alreadySent?: boolean }
+  | { ok: false; error: string };
+
+/**
+ * Admin-only: send provider refund-review email to VeSIM.
+ * Does not change refund status or move money.
+ */
+export async function adminSendVesimRefundReviewAction(
+  _prev: AdminVesimReviewFormState,
+  formData: FormData
+): Promise<AdminVesimReviewFormState> {
+  const admin = await requireRole("ADMIN");
+
+  // Never accept money-movement or status flags from the browser.
+  void formData.get("creditWallet");
+  void formData.get("executeRefund");
+  void formData.get("approve");
+  void formData.get("reject");
+  void formData.get("iccid");
+
+  const requestId = String(formData.get("requestId") ?? "").trim();
+  if (!requestId || requestId.length > 64) {
+    return { ok: false, error: "This refund request action is invalid." };
+  }
+
+  const result = await sendVesimRefundReviewEmail({
+    adminUserId: admin.id,
+    requestId,
+  });
+
+  revalidatePath("/admin/refund-requests");
+  revalidatePath(`/admin/refund-requests/${encodeURIComponent(requestId)}`);
+
+  if (result.ok) {
+    return {
+      ok: true,
+      message: result.message,
+      alreadySent: result.status === "already_sent",
+    };
+  }
+
+  return { ok: false, error: result.message };
 }

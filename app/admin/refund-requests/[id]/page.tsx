@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AdminCustomerRefundRequestExecute from "@/app/components/admin/AdminCustomerRefundRequestExecute";
 import AdminRefundRequestActions from "@/app/components/admin/AdminRefundRequestActions";
+import AdminVesimRefundReviewSend from "@/app/components/admin/AdminVesimRefundReviewSend";
 import { requireRole } from "@/app/lib/auth/session";
 import { getAdminRefundRequestDetail } from "@/app/lib/refunds/refundRequestAdmin";
 
@@ -151,6 +152,11 @@ export default async function AdminRefundRequestDetailPage({
         canMarkUnderReview={detail.canMarkUnderReview}
         canApprove={detail.canApprove}
         canReject={detail.canReject}
+      />
+
+      <AdminVesimRefundReviewSend
+        requestId={detail.id}
+        alreadySent={detail.vesimReviewAlreadySent}
       />
 
       {detail.canExecute ? (
