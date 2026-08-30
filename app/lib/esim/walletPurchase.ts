@@ -1644,18 +1644,94 @@ export async function confirmWalletEsimPurchase(
     { kind: "success" }
   >;
 
+  return finalizeWalletPurchaseAfterProviderSuccess({
+    purchaseId: purchase.id,
+    customerUserId,
+    customerEmail: customer.email,
+    actorUserId,
+    assisted: isAssisted,
+    assistedAdminUserId,
+    assistedReason: purchase.assistedPurchaseReason,
+    snapshot: {
+      offerId: snapshot.offerId,
+      priceCents: snapshot.priceCents,
+      currency: snapshot.currency,
+    },
+    verifiedOffer,
+    successCheckout: {
+      providerOrderId: successCheckout.providerOrderId,
+      payload: successCheckout.payload,
+    },
+  });
+}
+
+export type FinalizeWalletPurchaseAfterProviderSuccessInput = {
+  purchaseId: string;
+  customerUserId: string;
+  customerEmail: string;
+  actorUserId: string;
+  assisted: boolean;
+  assistedAdminUserId?: string | null;
+  assistedReason?: string | null;
+  snapshot: {
+    offerId: string;
+    priceCents: number;
+    currency: string;
+  };
+  verifiedOffer: VerifiedCheckoutOffer;
+  successCheckout: {
+    providerOrderId: string;
+    payload: Record<string, unknown>;
+  };
+  /**
+   * Preview-only UAT hooks. Must be accompanied by assertPreviewWalletFinalizeUatGate
+   * at the call site; this function also re-checks when any uat flag is set.
+   */
+  uat?: {
+    skipEmail?: boolean;
+    skipWalletNotification?: boolean;
+    skipPostCommitSideEffects?: boolean;
+    injectCriticalTxFailure?: boolean;
+    injectPostCommitPromoFailure?: boolean;
+  };
+};
+
+/**
+ * Shared post-provider-success local finalization.
+ * Persists durable provider observation, then critical Order/debit/purchase tx,
+ * then post-commit promo/reward/email side effects.
+ * Never calls VeSIM.
+ */
+export async function finalizeWalletPurchaseAfterProviderSuccess(
+  input: FinalizeWalletPurchaseAfterProviderSuccessInput
+): Promise<ConfirmWalletPurchaseResult> {
+  const purchaseId = input.purchaseId.trim();
+  const customerUserId = input.customerUserId.trim();
+  const actorUserId = input.actorUserId.trim();
+  const isAssisted = input.assisted;
+  const assistedAdminUserId = input.assistedAdminUserId?.trim() || null;
+  const successCheckout = input.successCheckout;
+  const verifiedOffer = input.verifiedOffer;
+  const snapshot = input.snapshot;
+  const uat = input.uat;
+
+  if (uat) {
+    const { assertPreviewWalletFinalizeUatGate } = await import(
+      "@/app/lib/esim/previewWalletFinalizeUatGate"
+    );
+    assertPreviewWalletFinalizeUatGate();
+  }
+
   // Durable provider-success evidence BEFORE local money/order finalization.
-  // If finalize crashes afterward: observation remains, VeSIM is never retried,
-  // and Admin local-only recovery can proceed from stored providerOrderId.
   try {
-    await persistWalletPurchaseProviderObservation(purchase.id, {
+    await persistWalletPurchaseProviderObservation(purchaseId, {
       providerOrderId: successCheckout.providerOrderId,
       providerResultKind: "success",
       safeProviderStatusCode: "provider_success",
     });
   } catch (error) {
     console.error("WALLET_PROVIDER_SUCCESS_OBSERVATION_PERSIST_FAILED", {
-      purchaseId: purchase.id,
+      purchaseId,
       code:
         error instanceof Error
           ? error.name.slice(0, 64)
@@ -1663,14 +1739,17 @@ export async function confirmWalletEsimPurchase(
     });
   }
 
-  // Confirmed success — critical tx: Order + debit COMPLETED + purchase COMPLETED only.
   let orderId: string | null = null;
   try {
     let completedDebitTransactionId: string | null = null;
     const finalized = await prisma.$transaction(
       async (tx) => {
+        if (uat?.injectCriticalTxFailure) {
+          throw new Error("UAT_INJECTED_CRITICAL_FINALIZE_FAILURE");
+        }
+
         const current = await tx.walletEsimPurchase.findUnique({
-          where: { id: purchase.id },
+          where: { id: purchaseId },
           select: {
             status: true,
             debitTransactionId: true,
@@ -1694,8 +1773,8 @@ export async function confirmWalletEsimPurchase(
 
         const order = await persistAssignedOrder(tx, {
           providerOrderId: successCheckout.providerOrderId,
-          customerUserId: customer.id,
-          customerEmail: customer.email,
+          customerUserId,
+          customerEmail: input.customerEmail,
           alternateDeliveryEmail: snapshotOrderAlternateDeliveryEmail(current),
           verifiedOffer,
           fundingSource: OrderFundingSource.CUSTOMER_WALLET,
@@ -1712,7 +1791,7 @@ export async function confirmWalletEsimPurchase(
         }
 
         await tx.walletEsimPurchase.update({
-          where: { id: purchase.id },
+          where: { id: purchaseId },
           data: {
             status: WalletEsimPurchaseStatus.COMPLETED,
             orderId: order.id,
@@ -1731,11 +1810,11 @@ export async function confirmWalletEsimPurchase(
             actorUserId,
             action: WALLET_PURCHASE_COMPLETED,
             targetType: "WalletEsimPurchase",
-            targetId: purchase.id,
+            targetId: purchaseId,
             metadata: {
               method: purchaseAuditMethod(isAssisted),
               fundingSource: OrderFundingSource.CUSTOMER_WALLET,
-              purchaseId: purchase.id,
+              purchaseId,
               orderId: order.id,
               offerId: snapshot.offerId,
               amountCents: snapshot.priceCents,
@@ -1745,7 +1824,7 @@ export async function confirmWalletEsimPurchase(
                 ? {
                     targetUserId: customerUserId,
                     adminUserId: assistedAdminUserId,
-                    reason: purchase.assistedPurchaseReason,
+                    reason: input.assistedReason ?? null,
                   }
                 : {}),
             } satisfies Prisma.InputJsonValue,
@@ -1760,13 +1839,13 @@ export async function confirmWalletEsimPurchase(
       }
     );
     orderId = finalized.id;
-    if (completedDebitTransactionId) {
+    if (completedDebitTransactionId && !uat?.skipWalletNotification) {
       scheduleWalletTransactionNotification(completedDebitTransactionId);
     }
   } catch (error) {
     if (error instanceof WalletEsimPurchaseError) throw error;
     await markReconciliationRequired({
-      purchaseId: purchase.id,
+      purchaseId,
       customerUserId,
       actorUserId,
       assisted: isAssisted,
@@ -1780,25 +1859,46 @@ export async function confirmWalletEsimPurchase(
     });
   }
 
-  // Post-commit side effects — never reverse Order/debit or retry VeSIM.
   if (orderId) {
-    await runWalletPurchasePostCommitSideEffects({
-      purchaseId: purchase.id,
-      orderId,
-      customerUserId,
-      actorUserId,
-    });
-    await deliverCompletedWalletPurchaseInstallEmail({
-      purchaseId: purchase.id,
-      checkoutPayload: successCheckout.payload,
-      verifiedOffer,
-      actorUserId,
-      assistedWalletPurchaseNotice: isAssisted,
-    });
+    if (!uat?.skipPostCommitSideEffects) {
+      if (uat?.injectPostCommitPromoFailure) {
+        console.error("UAT_INJECTED_POST_COMMIT_PROMO_FAILURE", {
+          purchaseId,
+          orderId,
+        });
+        await completeRewardRedemptionBestEffort({
+          purchaseId,
+          orderId,
+          actorUserId,
+        });
+        await awardCustomerPurchaseEarnBestEffort({
+          customerUserId,
+          purchaseId,
+          orderId,
+          actorUserId,
+        });
+      } else {
+        await runWalletPurchasePostCommitSideEffects({
+          purchaseId,
+          orderId,
+          customerUserId,
+          actorUserId,
+        });
+      }
+    }
+    if (!uat?.skipEmail) {
+      await deliverCompletedWalletPurchaseInstallEmail({
+        purchaseId,
+        checkoutPayload: successCheckout.payload,
+        verifiedOffer,
+        actorUserId,
+        assistedWalletPurchaseNotice: isAssisted,
+      });
+    }
   }
 
   return {
-    purchaseId: purchase.id,
+    purchaseId,
     customerUserId,
     orderId,
     status: WalletEsimPurchaseStatus.COMPLETED,
