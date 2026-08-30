@@ -56,8 +56,12 @@ export type CustomerRewardFullRefundEffectsResult = {
  * Future earns increment the same balance and therefore offset the debt first.
  * Do not take cash to compensate. Checkout treats a negative balance as ineligible.
  *
- * Pre-funding HELD → RELEASED uses the existing hold-release primitive and a
- * different restore idempotency key. This module restores COMPLETED redemptions only.
+ * Pre-funding cancel HELD → RELEASED uses the existing hold-release primitive and a
+ * different restore idempotency key.
+ *
+ * Post-funding FULL refund also restores HELD redemptions that never completed
+ * after Order/debit commit (post-commit side-effect failure). Those are marked
+ * RELEASED after restore so a later best-effort complete cannot double-apply.
  */
 
 async function requireCustomerPurchase(
@@ -100,7 +104,7 @@ async function requireCustomerPurchase(
 }
 
 /**
- * Restore snapshotted COMPLETED redemption points after a full refund.
+ * Restore snapshotted COMPLETED (or stuck HELD) redemption points after a full refund.
  * Does not use hold-release. Does not decrement lifetimeRedeemedPoints (gross).
  */
 export async function restoreCustomerRewardRedemptionForRefundInTx(
@@ -135,9 +139,12 @@ export async function restoreCustomerRewardRedemptionForRefundInTx(
       customerUserId: true,
     },
   });
+  const restorable =
+    redemption?.status === CustomerRewardRedemptionStatus.COMPLETED ||
+    redemption?.status === CustomerRewardRedemptionStatus.HELD;
   if (
     !redemption ||
-    redemption.status !== CustomerRewardRedemptionStatus.COMPLETED ||
+    !restorable ||
     redemption.customerUserId !== owned.customerId ||
     redemption.pointsHeld <= 0
   ) {
@@ -182,6 +189,20 @@ export async function restoreCustomerRewardRedemptionForRefundInTx(
     data: { balanceAfter: updated.pointsBalance },
   });
 
+  // Stuck HELD after successful purchase must not remain redeemable/completable.
+  if (redemption.status === CustomerRewardRedemptionStatus.HELD) {
+    await tx.customerRewardRedemption.updateMany({
+      where: {
+        id: redemption.id,
+        status: CustomerRewardRedemptionStatus.HELD,
+      },
+      data: {
+        status: CustomerRewardRedemptionStatus.RELEASED,
+        completedAt: null,
+      },
+    });
+  }
+
   await tx.auditLog.create({
     data: {
       actorUserId: options.actorUserId ?? null,
@@ -193,6 +214,7 @@ export async function restoreCustomerRewardRedemptionForRefundInTx(
         purchaseId: owned.purchaseId,
         refundRequestId: options.refundRequestId ?? null,
         pointsRestored: redemption.pointsHeld,
+        priorRedemptionStatus: redemption.status,
       },
     },
   });

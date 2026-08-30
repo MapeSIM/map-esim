@@ -87,6 +87,8 @@ function offlineChecks(): void {
   assert.match(refund, /Role\.CUSTOMER/);
   assert.match(refund, /PARTNER_EXCLUDED/);
   assert.match(refund, /CustomerRewardRedemptionStatus\.COMPLETED/);
+  assert.match(refund, /CustomerRewardRedemptionStatus\.HELD/);
+  assert.match(refund, /priorRedemptionStatus/);
   assert.doesNotMatch(refund, /await releaseRewardRedemptionInTx\(/);
   assert.doesNotMatch(
     refund,

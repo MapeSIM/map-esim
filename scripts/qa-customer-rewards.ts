@@ -92,8 +92,9 @@ function offlineChecks(): void {
   assert.match(earn, /formData\?\.get\("points"\)/);
   assert.match(earn, /idempotencyKey/);
   assert.match(earn, /REWARDS_AUDIT\.purchaseEarned/);
-  assert.match(wallet, /awardCustomerPurchaseEarnInTx/);
-  assert.match(gateway, /awardCustomerPurchaseEarnInTx/);
+  assert.match(earn, /awardCustomerPurchaseEarnBestEffort/);
+  assert.match(wallet, /awardCustomerPurchaseEarnBestEffort/);
+  assert.match(gateway, /runWalletPurchasePostCommitSideEffects/);
   assert.match(recovery, /awardCustomerPurchaseEarnInTx/);
   assert.doesNotMatch(partnerProvider, /awardCustomerPurchaseEarnInTx|rewardEarn/);
   assert.doesNotMatch(partnerPricing, /reward|RewardAccount/);

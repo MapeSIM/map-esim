@@ -117,7 +117,11 @@ function main() {
     wallet,
     /status === WalletEsimPurchaseStatus\.COMPLETED[\s\S]{0,280}deliverCompletedWalletPurchaseInstallEmail/
   );
-  assert.match(wallet, /if \(orderId\) \{\s*await deliverCompletedWalletPurchaseInstallEmail/);
+  assert.match(wallet, /if \(orderId\) \{\s*await runWalletPurchasePostCommitSideEffects/);
+  assert.match(
+    wallet,
+    /runWalletPurchasePostCommitSideEffects[\s\S]*deliverCompletedWalletPurchaseInstallEmail/
+  );
   assert.doesNotMatch(wallet, /deliverOrderEmailAfterCheckout/);
   console.log("PASS full_wallet_one_install_email_after_persist");
 

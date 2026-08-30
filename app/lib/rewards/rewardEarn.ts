@@ -161,3 +161,48 @@ export async function awardCustomerPurchaseEarnInTx(
 
   return { points, duplicate: false };
 }
+
+/**
+ * Post-commit purchase earn. Idempotent via purchaseEarnIdempotencyKey.
+ * Requires purchase already COMPLETED. Never rolls back Order / wallet debit.
+ */
+export async function awardCustomerPurchaseEarnBestEffort(options: {
+  customerUserId: string;
+  purchaseId: string;
+  orderId: string | null;
+  actorUserId?: string | null;
+}): Promise<void> {
+  try {
+    const { prisma } = await import("@/app/lib/db");
+    await prisma.$transaction(async (tx) => {
+      await awardCustomerPurchaseEarnInTx(tx, options);
+    });
+  } catch (error) {
+    console.error("REWARD_PURCHASE_EARN_BEST_EFFORT_FAILED", {
+      purchaseId: options.purchaseId,
+      orderId: options.orderId,
+      code:
+        error instanceof Error
+          ? error.name.slice(0, 64)
+          : "unknown_error",
+    });
+    try {
+      const { prisma } = await import("@/app/lib/db");
+      await prisma.auditLog.create({
+        data: {
+          actorUserId: options.actorUserId ?? null,
+          action: "rewards.purchase_earn_failed",
+          targetType: "WalletEsimPurchase",
+          targetId: options.purchaseId,
+          metadata: {
+            purchaseId: options.purchaseId,
+            orderId: options.orderId,
+            retryable: true,
+          },
+        },
+      });
+    } catch {
+      // Audit must never escalate a best-effort failure.
+    }
+  }
+}
