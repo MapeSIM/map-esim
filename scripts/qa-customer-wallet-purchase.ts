@@ -252,26 +252,7 @@ function main() {
     service,
     /export async function runWalletPurchasePostCommitSideEffects/
   );
-  assert.match(
-    service,
-    /export async function finalizeWalletPurchaseAfterProviderSuccess/
-  );
   console.log("PASS provider_success_local_finalize_shrink");
-
-  const uatGate = read("app/lib/esim/previewWalletFinalizeUatGate.ts");
-  const uat = read("app/lib/esim/previewWalletFinalizeUat.ts");
-  const uatPage = read("app/admin/uat/wallet-finalize/page.tsx");
-  assert.match(uatGate, /PREVIEW_WALLET_FINALIZE_UAT/);
-  assert.match(uatGate, /fix\/wallet-esim-local-finalization/);
-  assert.match(uatGate, /mapesim\.com/);
-  assert.match(uatGate, /vesim_live|VESIM_ENVIRONMENT/);
-  assert.match(uat, /finalizeWalletPurchaseAfterProviderSuccess/);
-  assert.doesNotMatch(uat, /executeCreditCheckout/);
-  assert.doesNotMatch(uat, /deliverCompletedWalletPurchaseInstallEmail/);
-  assert.match(uat, /TEST-WLF|uat-wlf\.invalid/);
-  assert.match(uatPage, /requireRole\("ADMIN"/);
-  assert.match(uatPage, /isPreviewWalletFinalizeUatUiEnabled/);
-  console.log("PASS preview_wallet_finalize_uat_harness_guards");
 
   assert.ok(!/migrate reset|db push|migrate dev/.test(service));
   assert.ok(
@@ -436,7 +417,7 @@ function main() {
   assert.match(service, /assertCustomerFinancialActivityAllowed/);
   console.log("PASS buy_esim_destination_launcher");
 
-  console.log("ALL_QA_PASSED=34");
+  console.log("ALL_QA_PASSED=33");
 }
 
 main();
