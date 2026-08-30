@@ -7,8 +7,8 @@ import {
   resolveValidatedVesimBaseUrl,
 } from "@/app/lib/vesim/environment";
 import {
+  applyAsiaCustomerRetailPrice,
   applyAsiaPublicCatalog,
-  applyAsiaTemporaryRetailMarkup,
 } from "@/app/lib/plans/asiaCatalogPolicy";
 import {
   applyPakistanPublicCatalog,
@@ -155,7 +155,7 @@ export function toVerifiedCheckoutOffer(
 ): VerifiedCheckoutOffer | null {
   let priced = applyPakistanRetailOverride(offer, lookupCountry);
   if (options?.applyAsiaTemporaryMarkup !== false) {
-    priced = applyAsiaTemporaryRetailMarkup(priced, lookupCountry);
+    priced = applyAsiaCustomerRetailPrice(priced, lookupCountry);
   }
   const offerId = (priced.offerId || priced.id || "").trim();
   const retail =
