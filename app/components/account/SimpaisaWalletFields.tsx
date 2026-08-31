@@ -84,7 +84,7 @@ export default function SimpaisaWalletFields({
                 <Check className="h-3 w-3" strokeWidth={3} />
               </span>
 
-              <span className="flex h-16 w-full items-center justify-center">
+              <span className="flex h-[4.5rem] w-full items-center justify-center">
                 <img
                   src={method.logoSrc}
                   alt=""
