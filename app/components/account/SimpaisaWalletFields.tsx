@@ -39,15 +39,11 @@ export default function SimpaisaWalletFields({
           id={legendId}
           className="text-sm font-semibold text-[var(--heading)]"
         >
-          Mobile wallet
+          Choose Payment Method
         </legend>
         <p className="text-sm leading-relaxed text-[var(--text-muted)]">
-          Choose Easypaisa or JazzCash. Enter the 10-digit mobile number
+          Select Easypaisa or JazzCash. Enter the 10-digit mobile number
           (without country code) that will receive the payment request.
-        </p>
-        <p className="text-xs leading-relaxed text-[var(--text-soft)]">
-          Wallet icons are temporary sandbox placeholders — not official
-          Easypaisa or JazzCash brand assets.
         </p>
 
         <div
@@ -58,15 +54,15 @@ export default function SimpaisaWalletFields({
           aria-describedby={
             operatorError ? `${operatorGroupId}-error` : undefined
           }
-          className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+          className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2"
         >
           {SIMPAISA_MOBILE_WALLET_METHODS.map((method) => (
             <label
               key={method.id}
               className={[
-                "group relative flex min-h-[5.5rem] min-w-0 cursor-pointer items-start gap-3 rounded-2xl border bg-[var(--surface)] p-4 text-left transition",
-                "border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]",
-                "has-[:checked]:border-[var(--accent-strong)] has-[:checked]:bg-[color-mix(in_srgb,var(--accent-strong)_10%,var(--surface))]",
+                "group relative flex min-h-[9.5rem] min-w-0 cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border bg-[#071e2e] px-4 py-5 text-center transition",
+                "border-[#1a4a63] hover:border-[#2f6f90]",
+                "has-[:checked]:border-[var(--accent-strong)] has-[:checked]:bg-[color-mix(in_srgb,var(--accent-strong)_10%,#071e2e)]",
                 "has-[:checked]:shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent-strong)_35%,transparent)]",
                 "focus-within:outline-none focus-within:ring-2 focus-within:ring-[var(--accent-strong)]/60 focus-within:ring-offset-2 focus-within:ring-offset-[var(--surface)]",
                 disabled ? "cursor-not-allowed opacity-60" : "",
@@ -82,40 +78,26 @@ export default function SimpaisaWalletFields({
               />
 
               <span
-                className={[
-                  "relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[var(--border)] bg-gradient-to-br",
-                  method.accentClass,
-                  "group-has-[:checked]:border-[var(--accent-strong)]/40",
-                ].join(" ")}
+                aria-hidden="true"
+                className="absolute top-3 right-3 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#1e5470] bg-[#082433] text-transparent transition group-has-[:checked]:border-[var(--accent-strong)] group-has-[:checked]:bg-[var(--accent-strong)] group-has-[:checked]:text-[var(--accent-ink)]"
               >
+                <Check className="h-3 w-3" strokeWidth={3} />
+              </span>
+
+              <span className="flex h-16 w-full items-center justify-center">
                 <img
-                  src={method.placeholderMarkSrc}
+                  src={method.logoSrc}
                   alt=""
-                  width={32}
-                  height={32}
-                  className="h-8 w-8 object-contain"
+                  className={method.logoClassName}
                   aria-hidden="true"
                 />
               </span>
 
-              <span className="min-w-0 flex-1 pt-0.5">
-                <span className="flex items-start justify-between gap-2">
-                  <span className="block text-sm font-semibold text-[var(--heading)]">
-                    {method.label}
-                  </span>
-                  <span
-                    aria-hidden="true"
-                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--border-strong)] bg-[var(--surface-2)] text-transparent transition group-has-[:checked]:border-[var(--accent-strong)] group-has-[:checked]:bg-[var(--accent-strong)] group-has-[:checked]:text-[var(--accent-ink)]"
-                  >
-                    <Check className="h-3 w-3" strokeWidth={3} />
-                  </span>
-                </span>
-                <span className="mt-1 block text-xs leading-relaxed text-[var(--text-muted)]">
-                  {method.description}
-                </span>
+              <span className="block text-sm font-semibold text-white">
+                {method.label}
               </span>
 
-              <span className="sr-only">{method.placeholderMarkAlt}</span>
+              <span className="sr-only">{method.logoAlt}</span>
             </label>
           ))}
 
