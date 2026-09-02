@@ -98,9 +98,85 @@ function shouldRetryHttpStatus(status: number): boolean {
   return status >= 500 && status <= 599;
 }
 
+const SIMPAISA_SANDBOX_TRACE_PREFIX = "simpaisa_sandbox_trace";
+const SANDBOX_TRACE_MESSAGE_MAX = 160;
+
+function sandboxEndpointName(path: string): "verify" | "inquiry" | "refund" | "unknown" {
+  if (path === SIMPAISA_VERIFY_PATH) return "verify";
+  if (path === SIMPAISA_INQUIRY_PATH) return "inquiry";
+  if (path === SIMPAISA_REFUND_PATH) return "refund";
+  return "unknown";
+}
+
+function clipTraceText(value: unknown, max = 64): string | null {
+  const text = asString(value);
+  if (!text) return null;
+  return text.length > max ? text.slice(0, max) : text;
+}
+
+function sandboxTraceAmount(value: unknown): string | number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  return clipTraceText(value, 24);
+}
+
+/** Truncate provider messages; strip digits/MSISDN-like runs; drop secret-like text. */
+function sanitizeSimpaisaResponseMessage(raw: string | null): string | null {
+  if (!raw) return null;
+  let text = raw.replace(/\s+/g, " ").trim();
+  if (!text) return null;
+  if (
+    /(password|secret|bearer\s|authorization|api[_-]?key|token\s*[:=])/i.test(
+      text
+    )
+  ) {
+    return "[redacted]";
+  }
+  text = text.replace(/\+?92\d{7,}/g, "[msisdn]");
+  text = text.replace(/\b0?3\d{8,}\b/g, "[msisdn]");
+  text = text.replace(/\d{8,}/g, "[digits]");
+  if (text.length > SANDBOX_TRACE_MESSAGE_MAX) {
+    text = text.slice(0, SANDBOX_TRACE_MESSAGE_MAX);
+  }
+  return text;
+}
+
+function logSimpaisaSandboxTrace(input: {
+  environment: string;
+  endpoint: "verify" | "inquiry" | "refund" | "unknown";
+  mapReference: string | null;
+  merchantId: string | null;
+  operatorId: string | null;
+  amount: string | number | null;
+  currency: string | null;
+  transactionId: string | null;
+  httpStatus: number | null;
+  responseCode: string | null;
+  responseMessage: string | null;
+  requestId: string | null;
+}): void {
+  if (input.environment !== "sandbox") return;
+  console.info(SIMPAISA_SANDBOX_TRACE_PREFIX, {
+    timestamp: new Date().toISOString(),
+    environment: "sandbox",
+    endpoint: input.endpoint,
+    mapReference: input.mapReference,
+    merchantId: input.merchantId,
+    operatorId: input.operatorId,
+    amount: input.amount,
+    currency: input.currency,
+    transactionId: input.transactionId,
+    httpStatus: input.httpStatus,
+    responseCode: input.responseCode,
+    responseMessage: input.responseMessage,
+    requestId: input.requestId,
+  });
+}
+
 /**
  * Thin direct HTTP client for Simpaisa PK wallet collection (v3 contract).
  * Secrets stay in memory only; never log request/response bodies, MSISDN, or tokens.
+ * Temporary sandbox-only allowlisted traces use prefix simpaisa_sandbox_trace.
+ * Production never emits those traces.
  * Non-OTP Verify accepts only 0037 Transaction-Pending — never a paid signal.
  * Unexpected Verify 0000 is not authoritative payment success.
  */
@@ -320,6 +396,85 @@ export class SimpaisaHttpClient {
     };
   }
 
+  private sandboxTrace(
+    path: string,
+    body: Record<string, unknown>,
+    extraHeaders: Record<string, string>,
+    httpStatus: number | null,
+    json: SimpaisaJson | null
+  ): void {
+    if (this.config.environment !== "sandbox") return;
+    try {
+      const data = json ? nestedData(json) : null;
+      const responseCode = json
+        ? normalizeSimpaisaResponseCode(
+            (data
+              ? firstString(data, ["responseCode", "response_code", "status"])
+              : null) ??
+              firstString(json, ["responseCode", "response_code", "status"])
+          )
+        : null;
+      const rawMessage = json
+        ? (data
+            ? firstString(data, [
+                "responseMessage",
+                "response_message",
+                "message",
+                "msg",
+              ])
+            : null) ??
+          firstString(json, [
+            "responseMessage",
+            "response_message",
+            "message",
+            "msg",
+          ])
+        : null;
+      const amount =
+        body.amount ??
+        data?.amount ??
+        data?.transactionAmount ??
+        json?.amount ??
+        json?.transactionAmount;
+      const currency =
+        body.currency ?? data?.currency ?? json?.currency ?? null;
+      const transactionId =
+        body.transactionId ??
+        (data
+          ? firstString(data, ["transactionId", "transaction_id"])
+          : null) ??
+        (json
+          ? firstString(json, ["transactionId", "transaction_id"])
+          : null);
+      const operatorId =
+        body.operatorId ??
+        extraHeaders.operatorID ??
+        (data
+          ? firstString(data, ["operatorId", "operator_id", "operatorID"])
+          : null) ??
+        (json
+          ? firstString(json, ["operatorId", "operator_id", "operatorID"])
+          : null);
+
+      logSimpaisaSandboxTrace({
+        environment: this.config.environment,
+        endpoint: sandboxEndpointName(path),
+        mapReference: clipTraceText(body.userKey, 64),
+        merchantId: clipTraceText(body.merchantId, 32),
+        operatorId: clipTraceText(operatorId, 16),
+        amount: sandboxTraceAmount(amount),
+        currency: clipTraceText(currency, 8),
+        transactionId: clipTraceText(transactionId, 190),
+        httpStatus,
+        responseCode: responseCode || null,
+        responseMessage: sanitizeSimpaisaResponseMessage(rawMessage),
+        requestId: clipTraceText(extraHeaders["Request-Id"], 128),
+      });
+    } catch {
+      // Tracing must never change Verify / Inquire / Refund behavior.
+    }
+  }
+
   private async requestJson(
     method: "POST",
     path: string,
@@ -347,6 +502,7 @@ export class SimpaisaHttpClient {
           await sleep(HTTP_RETRY_DELAYS_MS[attempt] ?? 1500);
           continue;
         }
+        this.sandboxTrace(path, body, extraHeaders, lastStatus, null);
         console.error("simpaisa_http", "NETWORK_ERROR", method, path);
         throw new SimpaisaHttpError(
           "UNAVAILABLE",
@@ -361,6 +517,7 @@ export class SimpaisaHttpClient {
       }
 
       if (!response.ok) {
+        this.sandboxTrace(path, body, extraHeaders, response.status, null);
         console.error(
           "simpaisa_http",
           "HTTP_ERROR",
@@ -378,6 +535,7 @@ export class SimpaisaHttpClient {
       try {
         json = await response.json();
       } catch {
+        this.sandboxTrace(path, body, extraHeaders, response.status, null);
         console.error("simpaisa_http", "INVALID_JSON", method, path);
         throw new SimpaisaHttpError(
           "UNAVAILABLE",
@@ -387,14 +545,17 @@ export class SimpaisaHttpClient {
 
       const record = asRecord(json);
       if (!record) {
+        this.sandboxTrace(path, body, extraHeaders, response.status, null);
         throw new SimpaisaHttpError(
           "UNAVAILABLE",
           "Payment provider unavailable."
         );
       }
+      this.sandboxTrace(path, body, extraHeaders, response.status, record);
       return record;
     }
 
+    this.sandboxTrace(path, body, extraHeaders, lastStatus, null);
     console.error(
       "simpaisa_http",
       "HTTP_ERROR",
