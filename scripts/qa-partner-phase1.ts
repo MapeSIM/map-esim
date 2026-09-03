@@ -9,6 +9,10 @@ import {
   formatDiscountBpsAsPercent,
   parseDiscountPercentToBps,
 } from "../app/lib/partner/discount";
+import {
+  parsePartnerAdminCreditAmountToCents,
+  parsePartnerAdminDebitAmountToCents,
+} from "../app/lib/partner/partnerWalletAmount";
 import { coerceAppRole } from "../app/lib/auth/appRole";
 
 const root = join(__dirname, "..");
@@ -294,11 +298,23 @@ async function main() {
   console.log("PASS partner_wallet_concurrent_cas_model");
 
   const amountLimits = read("app/lib/partner/partnerWalletAmount.ts");
-  assert.match(amountLimits, /PARTNER_ADMIN_CREDIT_MAX_CENTS\s*=\s*5_000_000/);
-  assert.match(amountLimits, /PARTNER_ADMIN_DEBIT_MAX_CENTS\s*=\s*5_000_000/);
+  const {
+    parsePartnerAdminCreditAmountToCents,
+    parsePartnerAdminDebitAmountToCents,
+  } = await import("../app/lib/partner/partnerWalletAmount");
+  assert.equal(parsePartnerAdminCreditAmountToCents("0.09").ok, false);
+  assert.equal(parsePartnerAdminCreditAmountToCents("0.10").ok, true);
+  assert.equal(parsePartnerAdminCreditAmountToCents("500").ok, true);
+  assert.equal(parsePartnerAdminCreditAmountToCents("500.01").ok, false);
+  assert.equal(parsePartnerAdminDebitAmountToCents("0.09").ok, false);
+  assert.equal(parsePartnerAdminDebitAmountToCents("0.10").ok, true);
+  assert.equal(parsePartnerAdminDebitAmountToCents("500").ok, true);
+  assert.equal(parsePartnerAdminDebitAmountToCents("500.01").ok, false);
+  assert.match(amountLimits, /PARTNER_ADMIN_CREDIT_MAX_CENTS\s*=\s*50_000/);
+  assert.match(amountLimits, /PARTNER_ADMIN_DEBIT_MAX_CENTS\s*=\s*50_000/);
   assert.doesNotMatch(amountLimits, /balanceCents\s*>\s*PARTNER_ADMIN|MAX_BALANCE|balanceCap/);
   assert.doesNotMatch(wallet, /balanceCents\s*>\s*PARTNER_ADMIN_CREDIT_MAX|MAX_BALANCE|wallet balance cap/i);
-  console.log("PASS partner_wallet_50k_is_per_operation_only");
+  console.log("PASS partner_wallet_500_is_per_operation_only");
 
   const actions = read("app/lib/partner/partnersActions.ts");
   assert.match(actions, /requireRole\(["']ADMIN["']\)/);

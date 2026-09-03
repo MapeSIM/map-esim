@@ -98,7 +98,7 @@ function PartnerWalletCreditForm({
           </p>
         ) : (
           <p className="text-xs text-[var(--text-soft)]">
-            Minimum $0.10 · Maximum $50,000.00
+            Minimum $0.10 · Maximum $500.00
           </p>
         )}
       </div>
@@ -244,7 +244,7 @@ function PartnerWalletDebitForm({
           </p>
         ) : (
           <p className="text-xs text-[var(--text-soft)]">
-            Cannot exceed available balance · Max $50,000.00
+            Cannot exceed available balance · Max $500.00
           </p>
         )}
       </div>

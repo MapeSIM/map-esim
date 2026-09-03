@@ -79,17 +79,18 @@ function main() {
   assert.match(detailPage, /getCustomerTopupView/);
   console.log("PASS ownership_scoped_topup_reads");
 
-  assert.equal(WALLET_TOPUP_MIN_CENTS, 1000);
+  assert.equal(WALLET_TOPUP_MIN_CENTS, 10);
   assert.equal(WALLET_TOPUP_MAX_CENTS, 50_000);
+  assert.equal(parseTopupUsdAmountToCents("0.10").ok, true);
   assert.equal(parseTopupUsdAmountToCents("10").ok, true);
   assert.equal(parseTopupUsdAmountToCents("10.00").ok, true);
   assert.equal(parseTopupUsdAmountToCents("500").ok, true);
   assert.equal(parseTopupUsdAmountToCents("500.00").ok, true);
-  assert.equal(parseTopupUsdAmountToCents("9.99").ok, false);
+  assert.equal(parseTopupUsdAmountToCents("0.09").ok, false);
   assert.equal(parseTopupUsdAmountToCents("500.01").ok, false);
   assert.equal(parseTopupUsdAmountToCents("0").ok, false);
   assert.equal(parseTopupUsdAmountToCents("-10").ok, false);
-  console.log("PASS minimum_10_maximum_500");
+  console.log("PASS minimum_0_10_maximum_500");
 
   assert.match(form, /data-topup-preset=\{preset\.id\}/);
   assert.match(form, /\{ id: "10", label: "\$10", value: "10" \}/);
@@ -115,7 +116,8 @@ function main() {
 
   assert.match(form, /setSelectedPreset\("custom"\)/);
   assert.equal(parseTopupUsdAmountToCents("25.50").ok, true);
-  assert.equal(parseTopupUsdAmountToCents("9.99").ok, false);
+  assert.equal(parseTopupUsdAmountToCents("0.09").ok, false);
+  assert.equal(parseTopupUsdAmountToCents("0.10").ok, true);
   assert.equal(parseTopupUsdAmountToCents("500.01").ok, false);
   assert.equal(parseTopupUsdAmountToCents("10.001").ok, false);
   console.log("PASS custom_retains_normal_validation");

@@ -10,7 +10,7 @@ export const ADMIN_DEBIT_MAX_CENTS = 50_000; // $500.00
 export const ADMIN_CREDIT_REASON_MIN = 5;
 export const ADMIN_CREDIT_REASON_MAX = 200;
 export const ADMIN_CREDIT_REFERENCE_MAX = 100;
-export const WALLET_TOPUP_MIN_CENTS = 1_000; // $10.00
+export const WALLET_TOPUP_MIN_CENTS = 10; // $0.10
 export const WALLET_TOPUP_MAX_CENTS = 50_000; // $500.00
 
 export type ParseUsdCentsResult =
@@ -183,14 +183,14 @@ export function parseAdminDebitInternalReference(
 
 /**
  * Parse a USD decimal amount into positive integer cents for CUSTOMER wallet top-up.
- * Min $10.00 / max $500.00. Rejects zero, negative, exponents, and >2 decimals.
+ * Min $0.10 / max $500.00. Rejects zero, negative, exponents, and >2 decimals.
  */
 export function parseTopupUsdAmountToCents(raw: unknown): ParseUsdCentsResult {
   const parsed = parsePositiveUsdCentsRaw(raw);
   if (!parsed.ok) return parsed;
 
   if (parsed.cents < WALLET_TOPUP_MIN_CENTS) {
-    return { ok: false, error: "Minimum wallet top-up is $10.00." };
+    return { ok: false, error: "Minimum wallet top-up is $0.10." };
   }
   if (parsed.cents > WALLET_TOPUP_MAX_CENTS) {
     return { ok: false, error: "Maximum wallet top-up is $500.00." };

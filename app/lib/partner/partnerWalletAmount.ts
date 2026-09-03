@@ -1,5 +1,5 @@
 /**
- * Partner admin wallet credit/debit amount limits ($50,000 max).
+ * Partner admin wallet credit/debit amount limits ($500 max).
  */
 
 import {
@@ -9,9 +9,9 @@ import {
 } from "@/app/lib/wallet/amount";
 
 export const PARTNER_ADMIN_CREDIT_MIN_CENTS = 10; // $0.10
-export const PARTNER_ADMIN_CREDIT_MAX_CENTS = 5_000_000; // $50,000.00
+export const PARTNER_ADMIN_CREDIT_MAX_CENTS = 50_000; // $500.00
 export const PARTNER_ADMIN_DEBIT_MIN_CENTS = 10; // $0.10
-export const PARTNER_ADMIN_DEBIT_MAX_CENTS = 5_000_000; // $50,000.00
+export const PARTNER_ADMIN_DEBIT_MAX_CENTS = 50_000; // $500.00
 
 export {
   ADMIN_CREDIT_REASON_MIN as PARTNER_ADMIN_REASON_MIN,
@@ -74,7 +74,7 @@ export function parsePartnerAdminCreditAmountToCents(
     return { ok: false, error: "Minimum manual credit is $0.10." };
   }
   if (parsed.cents > PARTNER_ADMIN_CREDIT_MAX_CENTS) {
-    return { ok: false, error: "Maximum manual credit is $50,000.00." };
+    return { ok: false, error: "Maximum manual credit is $500.00." };
   }
 
   return parsed;
@@ -91,7 +91,7 @@ export function parsePartnerAdminDebitAmountToCents(
     return { ok: false, error: "Minimum manual debit is $0.10." };
   }
   if (parsed.cents > PARTNER_ADMIN_DEBIT_MAX_CENTS) {
-    return { ok: false, error: "Maximum manual debit is $50,000.00." };
+    return { ok: false, error: "Maximum manual debit is $500.00." };
   }
 
   if (

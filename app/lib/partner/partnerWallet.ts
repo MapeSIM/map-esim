@@ -8,7 +8,9 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
 import {
+  PARTNER_ADMIN_CREDIT_MAX_CENTS,
   PARTNER_ADMIN_CREDIT_MIN_CENTS,
+  PARTNER_ADMIN_DEBIT_MAX_CENTS,
   PARTNER_ADMIN_DEBIT_MIN_CENTS,
 } from "@/app/lib/partner/partnerWalletAmount";
 import { formatUsdCents } from "@/app/lib/wallet/display";
@@ -273,7 +275,8 @@ export async function creditPartnerWalletByAdmin(
   if (
     !Number.isInteger(amountCents) ||
     !Number.isSafeInteger(amountCents) ||
-    amountCents < PARTNER_ADMIN_CREDIT_MIN_CENTS
+    amountCents < PARTNER_ADMIN_CREDIT_MIN_CENTS ||
+    amountCents > PARTNER_ADMIN_CREDIT_MAX_CENTS
   ) {
     throw new PartnerWalletCreditError(
       "INVALID_AMOUNT",
@@ -537,7 +540,8 @@ export async function debitPartnerWalletByAdmin(
   if (
     !Number.isInteger(amountCents) ||
     !Number.isSafeInteger(amountCents) ||
-    amountCents < PARTNER_ADMIN_DEBIT_MIN_CENTS
+    amountCents < PARTNER_ADMIN_DEBIT_MIN_CENTS ||
+    amountCents > PARTNER_ADMIN_DEBIT_MAX_CENTS
   ) {
     throw new PartnerWalletDebitError(
       "INVALID_AMOUNT",

@@ -202,7 +202,7 @@ export async function createWalletTopupDraft(
   ) {
     throw new WalletTopupError(
       "INVALID_AMOUNT",
-      "Enter a top-up amount between $10.00 and $500.00."
+      "Enter a top-up amount between $0.10 and $500.00."
     );
   }
 
