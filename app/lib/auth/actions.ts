@@ -267,6 +267,12 @@ export async function signinAction(
     });
   } catch (error) {
     if (isPrismaUnavailable(error)) {
+      const err = error as { name?: string; code?: string; message?: string };
+      console.error("signin_prisma_unavailable", {
+        name: err?.name || "Error",
+        code: err?.code || null,
+        message: String(err?.message || error).slice(0, 240),
+      });
       return { ok: false, error: PRISMA_TEMPORARY_UNAVAILABLE };
     }
     throw error;
@@ -302,6 +308,12 @@ export async function signinAction(
     });
   } catch (error) {
     if (isPrismaUnavailable(error)) {
+      const err = error as { name?: string; code?: string; message?: string };
+      console.error("signin_prisma_unavailable_after_auth", {
+        name: err?.name || "Error",
+        code: err?.code || null,
+        message: String(err?.message || error).slice(0, 240),
+      });
       return { ok: false, error: PRISMA_TEMPORARY_UNAVAILABLE };
     }
     if (error instanceof AuthError) {
