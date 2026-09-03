@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/app/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
  * Temporary Preview-only database probe for signin debugging.
+ * Uses the same Prisma singleton as auth signin.
  * Returns sanitized connectivity metadata only — never the connection string.
  */
 export async function GET() {
@@ -14,20 +15,17 @@ export async function GET() {
   }
 
   const url = (process.env.DATABASE_URL || "").trim();
-  const meta: {
-    hasDatabaseUrl: boolean;
-    databaseUrlLength: number;
-    prefixOk: boolean;
-    host: string | null;
-    port: string | null;
-    sslmode: string | null;
-  } = {
+  const meta = {
     hasDatabaseUrl: Boolean(url),
     databaseUrlLength: url.length,
     prefixOk: /^postgres(ql)?:\/\//.test(url),
-    host: null,
-    port: null,
-    sslmode: null,
+    host: null as string | null,
+    port: null as string | null,
+    sslmode: null as string | null,
+    hasAuthSecret: Boolean((process.env.AUTH_SECRET || "").trim()),
+    authSecretLength: (process.env.AUTH_SECRET || "").trim().length,
+    hasAuthUrl: Boolean((process.env.AUTH_URL || "").trim()),
+    authUrlHost: null as string | null,
   };
 
   if (meta.prefixOk) {
@@ -38,6 +36,15 @@ export async function GET() {
       meta.sslmode = parsed.searchParams.get("sslmode");
     } catch {
       meta.prefixOk = false;
+    }
+  }
+
+  const authUrl = (process.env.AUTH_URL || "").trim();
+  if (authUrl) {
+    try {
+      meta.authUrlHost = new URL(authUrl).host;
+    } catch {
+      meta.authUrlHost = "invalid";
     }
   }
 
@@ -56,26 +63,33 @@ export async function GET() {
     );
   }
 
-  const prisma = new PrismaClient({
-    datasources: { db: { url } },
-  });
-
   try {
     const started = Date.now();
     await prisma.$queryRaw`SELECT 1`;
-    await prisma.user.findFirst({ select: { id: true } });
+    // Same call shape as signinAction.
+    await prisma.user.findUnique({
+      where: { email: "probe-nonexistent@example.com" },
+      select: {
+        id: true,
+        role: true,
+        passwordHash: true,
+        emailVerifiedAt: true,
+        deletedAt: true,
+      },
+    });
     return NextResponse.json({
       ok: true,
-      stage: "query",
+      stage: "signin_shaped_query",
       meta,
       latencyMs: Date.now() - started,
+      singleton: true,
     });
   } catch (error) {
     const err = error as { name?: string; code?: string; message?: string };
     return NextResponse.json(
       {
         ok: false,
-        stage: "query",
+        stage: "signin_shaped_query",
         meta,
         error: {
           name: err?.name || "Error",
@@ -85,7 +99,5 @@ export async function GET() {
       },
       { status: 503 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }
