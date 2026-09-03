@@ -10,6 +10,7 @@ import { safeCallbackPath } from "@/app/lib/auth/redirects";
  * and Google legal-consent gating flags already stored on the JWT.
  */
 export const authConfig = {
+  trustHost: true,
   pages: {
     signIn: "/signin",
     error: "/signin",

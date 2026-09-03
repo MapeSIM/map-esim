@@ -32,7 +32,7 @@ import {
 } from "@/app/lib/auth/resetAuth";
 import { getSessionUser } from "@/app/lib/auth/session";
 import {
-  isPrismaPoolTimeout,
+  isPrismaUnavailable,
   PRISMA_TEMPORARY_UNAVAILABLE,
   prisma,
 } from "@/app/lib/db";
@@ -266,7 +266,7 @@ export async function signinAction(
       },
     });
   } catch (error) {
-    if (isPrismaPoolTimeout(error)) {
+    if (isPrismaUnavailable(error)) {
       return { ok: false, error: PRISMA_TEMPORARY_UNAVAILABLE };
     }
     throw error;
@@ -301,7 +301,7 @@ export async function signinAction(
       redirectTo,
     });
   } catch (error) {
-    if (isPrismaPoolTimeout(error)) {
+    if (isPrismaUnavailable(error)) {
       return { ok: false, error: PRISMA_TEMPORARY_UNAVAILABLE };
     }
     if (error instanceof AuthError) {
