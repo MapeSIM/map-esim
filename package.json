@@ -62,6 +62,7 @@
     "qa:login-return-to-checkout": "tsx scripts/qa-login-return-to-checkout.ts",
     "qa:safepay-foundation": "tsx scripts/qa-safepay-foundation.ts",
     "qa:simpaisa-foundation": "tsx scripts/qa-simpaisa-foundation.ts",
+    "qa:simpaisa-cards-foundation": "tsx scripts/qa-simpaisa-cards-foundation.ts",
     "qa:safepay-webhook-observability": "tsx scripts/qa-safepay-webhook-observability.ts",
     "qa:esim-purchase-hosted-checkout": "tsx scripts/qa-esim-purchase-hosted-checkout.ts",
     "qa:post-payment-success-route": "tsx scripts/qa-post-payment-success-route.ts",

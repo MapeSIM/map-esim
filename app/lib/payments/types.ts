@@ -5,6 +5,7 @@
 
 export type PaymentGatewayProviderName =
   | "SIMPAISA"
+  | "SIMPAISA_CARDS"
   | "PAYFAST"
   | "SAFEPAY"
   | "JAZZCASH"
