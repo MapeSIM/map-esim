@@ -38,147 +38,177 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: { confirm?: string; purchaseId?: string } = {};
   try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
-  }
-  if ((body.confirm ?? "").trim() !== CONFIRM_PHRASE) {
-    return NextResponse.json(
-      { ok: false, error: "confirm_phrase_required" },
-      { status: 400 }
-    );
-  }
-  const purchaseId = (body.purchaseId ?? TARGET_PURCHASE_ID).trim();
-  if (purchaseId !== TARGET_PURCHASE_ID) {
-    return NextResponse.json(
-      { ok: false, error: "unexpected_purchase_id" },
-      { status: 400 }
-    );
-  }
+    let body: { confirm?: string; purchaseId?: string } = {};
+    try {
+      body = (await request.json()) as typeof body;
+    } catch {
+      body = {};
+    }
+    const url = new URL(request.url);
+    const confirm = (
+      body.confirm ??
+      url.searchParams.get("confirm") ??
+      ""
+    ).trim();
+    if (confirm !== CONFIRM_PHRASE) {
+      return NextResponse.json(
+        { ok: false, error: "confirm_phrase_required" },
+        { status: 400 }
+      );
+    }
+    const purchaseId = (
+      body.purchaseId ??
+      url.searchParams.get("purchaseId") ??
+      TARGET_PURCHASE_ID
+    ).trim();
+    if (purchaseId !== TARGET_PURCHASE_ID) {
+      return NextResponse.json(
+        { ok: false, error: "unexpected_purchase_id" },
+        { status: 400 }
+      );
+    }
 
-  const before = await prisma.partnerEsimPurchase.findUnique({
-    where: { id: purchaseId },
-    select: {
-      status: true,
-      partnerChargeCents: true,
-      partnerId: true,
-      providerOrderId: true,
-      orderId: true,
-      providerRefreshClaimedAt: true,
-      providerResultKind: true,
-      debitTransactionId: true,
-      refundTransactionId: true,
-      partner: {
-        select: {
-          userId: true,
-          walletAccount: { select: { balanceCents: true } },
+    const before = await prisma.partnerEsimPurchase.findUnique({
+      where: { id: purchaseId },
+      select: {
+        status: true,
+        partnerChargeCents: true,
+        partnerId: true,
+        providerOrderId: true,
+        orderId: true,
+        providerRefreshClaimedAt: true,
+        providerResultKind: true,
+        debitTransactionId: true,
+        refundTransactionId: true,
+        partner: {
+          select: {
+            userId: true,
+            walletAccount: { select: { balanceCents: true } },
+          },
         },
       },
-    },
-  });
-  if (!before) {
-    return NextResponse.json(
-      { ok: false, error: "purchase_not_found", hashPrefix },
-      { status: 404 }
-    );
-  }
+    });
+    if (!before) {
+      return NextResponse.json(
+        { ok: false, error: "purchase_not_found", hashPrefix },
+        { status: 404 }
+      );
+    }
 
-  const balanceBefore = before.partner.walletAccount?.balanceCents ?? null;
-  const partnerUserId = before.partner.userId;
-  if (
-    (before.providerOrderId ?? "").trim() ||
-    (before.orderId ?? "").trim() ||
-    before.providerRefreshClaimedAt ||
-    (before.providerResultKind ?? "").trim()
-  ) {
+    const balanceBefore = before.partner.walletAccount?.balanceCents ?? null;
+    const partnerUserId = before.partner.userId;
+    if (
+      (before.providerOrderId ?? "").trim() ||
+      (before.orderId ?? "").trim() ||
+      before.providerRefreshClaimedAt ||
+      (before.providerResultKind ?? "").trim()
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "provider_evidence_present_abort",
+          hashPrefix,
+          balanceBeforeCents: balanceBefore,
+          status: before.status,
+        },
+        { status: 409 }
+      );
+    }
+
+    if (
+      before.status !== PartnerEsimPurchaseStatus.PROVIDER_PENDING &&
+      !(
+        before.status === PartnerEsimPurchaseStatus.FAILED_REFUNDED &&
+        before.refundTransactionId
+      )
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "unexpected_purchase_state",
+          hashPrefix,
+          status: before.status,
+          balanceBeforeCents: balanceBefore,
+        },
+        { status: 409 }
+      );
+    }
+
+    if (
+      before.status === PartnerEsimPurchaseStatus.PROVIDER_PENDING &&
+      (before.partnerChargeCents !== EXPECTED_CHARGE_CENTS ||
+        !before.debitTransactionId)
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "unexpected_purchase_state",
+          hashPrefix,
+          status: before.status,
+          partnerChargeCents: before.partnerChargeCents,
+          balanceBeforeCents: balanceBefore,
+        },
+        { status: 409 }
+      );
+    }
+
+    const first = await refundNeverStartedPartnerEsimPurchase({
+      purchaseId,
+      partnerUserId,
+      expectedPartnerChargeCents: EXPECTED_CHARGE_CENTS,
+    });
+    const second = await refundNeverStartedPartnerEsimPurchase({
+      purchaseId,
+      partnerUserId,
+      expectedPartnerChargeCents: EXPECTED_CHARGE_CENTS,
+    });
+
+    const after = await prisma.partnerEsimPurchase.findUnique({
+      where: { id: purchaseId },
+      select: {
+        status: true,
+        refundTransactionId: true,
+        partner: {
+          select: { walletAccount: { select: { balanceCents: true } } },
+        },
+      },
+    });
+    const balanceAfter = after?.partner.walletAccount?.balanceCents ?? null;
+
+    return NextResponse.json({
+      ok: true,
+      hashPrefix,
+      purchaseId,
+      statusBefore: before.status,
+      statusAfter: after?.status ?? null,
+      balanceBeforeCents: balanceBefore,
+      balanceAfterCents: balanceAfter,
+      balanceAfterRepeatCents: balanceAfter,
+      refundTransactionId: first.refundTransactionId,
+      repeatRefundTransactionId: second.refundTransactionId,
+      firstIdempotent: first.idempotent,
+      repeatIdempotent: second.idempotent,
+      refundIdempotencyKey: `partner_esim_refund_${purchaseId}`,
+      expectedBalanceAfterCents: 1000,
+    });
+  } catch (error) {
+    const code =
+      error instanceof Error && "code" in error
+        ? String((error as { code?: unknown }).code ?? "")
+        : "";
     return NextResponse.json(
       {
         ok: false,
-        error: "provider_evidence_present_abort",
+        error: "recovery_failed",
+        code: code || "unknown",
+        message:
+          error instanceof Error
+            ? error.message.slice(0, 160)
+            : "unknown_error",
         hashPrefix,
-        balanceBeforeCents: balanceBefore,
-        status: before.status,
       },
-      { status: 409 }
+      { status: 500 }
     );
   }
-
-  if (
-    before.status !== PartnerEsimPurchaseStatus.PROVIDER_PENDING &&
-    !(
-      before.status === PartnerEsimPurchaseStatus.FAILED_REFUNDED &&
-      before.refundTransactionId
-    )
-  ) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "unexpected_purchase_state",
-        hashPrefix,
-        status: before.status,
-        balanceBeforeCents: balanceBefore,
-      },
-      { status: 409 }
-    );
-  }
-
-  if (
-    before.status === PartnerEsimPurchaseStatus.PROVIDER_PENDING &&
-    (before.partnerChargeCents !== EXPECTED_CHARGE_CENTS ||
-      !before.debitTransactionId)
-  ) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "unexpected_purchase_state",
-        hashPrefix,
-        status: before.status,
-        partnerChargeCents: before.partnerChargeCents,
-        balanceBeforeCents: balanceBefore,
-      },
-      { status: 409 }
-    );
-  }
-
-  const first = await refundNeverStartedPartnerEsimPurchase({
-    purchaseId,
-    partnerUserId,
-    expectedPartnerChargeCents: EXPECTED_CHARGE_CENTS,
-  });
-  const second = await refundNeverStartedPartnerEsimPurchase({
-    purchaseId,
-    partnerUserId,
-    expectedPartnerChargeCents: EXPECTED_CHARGE_CENTS,
-  });
-
-  const after = await prisma.partnerEsimPurchase.findUnique({
-    where: { id: purchaseId },
-    select: {
-      status: true,
-      refundTransactionId: true,
-      partner: {
-        select: { walletAccount: { select: { balanceCents: true } } },
-      },
-    },
-  });
-  const balanceAfter = after?.partner.walletAccount?.balanceCents ?? null;
-
-  return NextResponse.json({
-    ok: true,
-    hashPrefix,
-    purchaseId,
-    statusBefore: before.status,
-    statusAfter: after?.status ?? null,
-    balanceBeforeCents: balanceBefore,
-    balanceAfterCents: balanceAfter,
-    balanceAfterRepeatCents: balanceAfter,
-    refundTransactionId: first.refundTransactionId,
-    repeatRefundTransactionId: second.refundTransactionId,
-    firstIdempotent: first.idempotent,
-    repeatIdempotent: second.idempotent,
-    refundIdempotencyKey: `partner_esim_refund_${purchaseId}`,
-    expectedBalanceAfterCents: 1000,
-  });
 }
