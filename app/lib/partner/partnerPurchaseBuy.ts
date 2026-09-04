@@ -12,6 +12,7 @@ import {
   type PartnerOfferVerifier,
 } from "@/app/lib/partner/partnerEsimPurchase";
 import {
+  compensateNeverStartedPartnerPurchaseIfEligible,
   executePartnerEsimProviderPurchase,
   type PartnerProviderCheckoutExecutor,
 } from "@/app/lib/partner/partnerEsimPurchaseProvider";
@@ -29,6 +30,8 @@ export type BuyPartnerEsimPurchaseInput = {
   /** Test seams only. */
   verifyOffer?: PartnerOfferVerifier;
   providerCheckout?: PartnerProviderCheckoutExecutor;
+  /** Test seam — abort after reserve/debit before provider claim. */
+  beforeProviderClaim?: () => Promise<void>;
 };
 
 /**
@@ -105,24 +108,45 @@ export async function buyPartnerEsimPurchase(
     }
 
     if (status === PartnerEsimPurchaseStatus.PROVIDER_PENDING) {
-      const executed = await executePartnerEsimProviderPurchase({
-        partnerUserId: actor.userId,
-        purchaseId: purchaseId!,
-        providerCheckout: input.providerCheckout,
-      });
+      try {
+        const executed = await executePartnerEsimProviderPurchase({
+          partnerUserId: actor.userId,
+          purchaseId: purchaseId!,
+          providerCheckout: input.providerCheckout,
+          beforeProviderClaim: input.beforeProviderClaim,
+        });
 
-      if (executed.status === PartnerEsimPurchaseStatus.COMPLETED) {
-        return {
-          ok: true,
-          kind: executed.duplicate ? "duplicate_success" : "success",
-          purchaseId: executed.purchaseId,
-          message: executed.duplicate
-            ? "This eSIM purchase was already completed."
-            : "Your eSIM purchase completed successfully.",
-        };
+        if (executed.status === PartnerEsimPurchaseStatus.COMPLETED) {
+          return {
+            ok: true,
+            kind: executed.duplicate ? "duplicate_success" : "success",
+            purchaseId: executed.purchaseId,
+            message: executed.duplicate
+              ? "This eSIM purchase was already completed."
+              : "Your eSIM purchase completed successfully.",
+          };
+        }
+
+        return mapPartnerPurchaseErrorCode("UNAVAILABLE", executed.purchaseId);
+      } catch (error) {
+        // Gap after debit / before claim: ensure never-started rows are compensated.
+        try {
+          const compensated =
+            await compensateNeverStartedPartnerPurchaseIfEligible({
+              purchaseId: purchaseId!,
+              partnerUserId: actor.userId,
+            });
+          if (compensated) {
+            return mapPartnerPurchaseErrorCode("PROVIDER_FAILED", purchaseId);
+          }
+        } catch {
+          // Fall through to original error mapping.
+        }
+        if (error instanceof PartnerEsimPurchaseError) {
+          return mapPartnerPurchaseErrorCode(error.code, purchaseId);
+        }
+        return mapPartnerPurchaseErrorCode("UNAVAILABLE", purchaseId);
       }
-
-      return mapPartnerPurchaseErrorCode("UNAVAILABLE", executed.purchaseId);
     }
 
     if (status === PartnerEsimPurchaseStatus.COMPLETED) {
@@ -136,6 +160,20 @@ export async function buyPartnerEsimPurchase(
 
     return mapPartnerPurchaseErrorCode("INVALID_STATE", purchaseId);
   } catch (error) {
+    if (purchaseId) {
+      try {
+        const compensated =
+          await compensateNeverStartedPartnerPurchaseIfEligible({
+            purchaseId,
+            partnerUserId: actor.userId,
+          });
+        if (compensated) {
+          return mapPartnerPurchaseErrorCode("PROVIDER_FAILED", purchaseId);
+        }
+      } catch {
+        // Fall through.
+      }
+    }
     if (error instanceof PartnerEsimPurchaseError) {
       return mapPartnerPurchaseErrorCode(error.code, purchaseId);
     }

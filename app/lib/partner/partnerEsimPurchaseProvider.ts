@@ -55,6 +55,11 @@ export type ExecutePartnerEsimProviderPurchaseInput = {
   /** Test seam only — defaults to executeCreditCheckout. */
   providerCheckout?: PartnerProviderCheckoutExecutor;
   /**
+   * Test seam only — runs after pre-debit gates and before provider claim.
+   * Throw to simulate abort between debit and claim.
+   */
+  beforeProviderClaim?: () => Promise<void>;
+  /**
    * Test seam only — runs inside the success finalization transaction after Order persist.
    * Throw to force full tx rollback (no Order linkage).
    */
@@ -506,6 +511,132 @@ export async function refundNeverStartedPartnerEsimPurchase(options: {
   return { refundTransactionId, idempotent: false };
 }
 
+/** Evidence that VeSIM claim/checkout never started after wallet debit. */
+export function isNeverStartedPartnerPurchaseEvidence(purchase: {
+  status: PartnerEsimPurchaseStatus | string;
+  debitTransactionId?: string | null;
+  refundTransactionId?: string | null;
+  providerOrderId?: string | null;
+  orderId?: string | null;
+  providerRefreshClaimedAt?: Date | null;
+  providerResultKind?: string | null;
+}): boolean {
+  if (purchase.status !== PartnerEsimPurchaseStatus.PROVIDER_PENDING) {
+    return false;
+  }
+  if (!(purchase.debitTransactionId ?? "").trim()) return false;
+  if ((purchase.refundTransactionId ?? "").trim()) return false;
+  if ((purchase.providerOrderId ?? "").trim()) return false;
+  if ((purchase.orderId ?? "").trim()) return false;
+  if (purchase.providerRefreshClaimedAt) return false;
+  if ((purchase.providerResultKind ?? "").trim()) return false;
+  return true;
+}
+
+/**
+ * Compensate PROVIDER_PENDING + debit with never-started evidence exactly once.
+ * No-op when ineligible (claimed / provider ref / already refunded / wrong state).
+ */
+export async function compensateNeverStartedPartnerPurchaseIfEligible(options: {
+  purchaseId: string;
+  partnerUserId: string;
+}): Promise<{ refundTransactionId: string; idempotent: boolean } | null> {
+  const purchaseId = options.purchaseId.trim();
+  if (!purchaseId || purchaseId.length > 64) return null;
+
+  const purchase = await prisma.partnerEsimPurchase.findUnique({
+    where: { id: purchaseId },
+    select: {
+      id: true,
+      status: true,
+      partnerChargeCents: true,
+      debitTransactionId: true,
+      refundTransactionId: true,
+      providerOrderId: true,
+      orderId: true,
+      providerRefreshClaimedAt: true,
+      providerResultKind: true,
+    },
+  });
+  if (!purchase) return null;
+
+  if (
+    purchase.status === PartnerEsimPurchaseStatus.FAILED_REFUNDED &&
+    purchase.refundTransactionId
+  ) {
+    return {
+      refundTransactionId: purchase.refundTransactionId,
+      idempotent: true,
+    };
+  }
+
+  if (!isNeverStartedPartnerPurchaseEvidence(purchase)) {
+    return null;
+  }
+
+  return refundNeverStartedPartnerEsimPurchase({
+    purchaseId: purchase.id,
+    partnerUserId: options.partnerUserId,
+    expectedPartnerChargeCents: purchase.partnerChargeCents,
+  });
+}
+
+/** Default age before never-started PROVIDER_PENDING rows are auto-recovered. */
+export const PARTNER_NEVER_STARTED_STALE_MS = 90_000;
+
+/**
+ * Recover stale never-started Partner purchases (debit + no claim/provider order).
+ * Safe / idempotent — skips claimed or provider-referenced rows.
+ */
+export async function recoverStaleNeverStartedPartnerPurchases(options?: {
+  partnerId?: string;
+  olderThanMs?: number;
+  limit?: number;
+}): Promise<{ recovered: number; purchaseIds: string[] }> {
+  const olderThanMs = options?.olderThanMs ?? PARTNER_NEVER_STARTED_STALE_MS;
+  const limit = Math.min(Math.max(options?.limit ?? 20, 1), 50);
+  const cutoff = new Date(Date.now() - olderThanMs);
+
+  const rows = await prisma.partnerEsimPurchase.findMany({
+    where: {
+      status: PartnerEsimPurchaseStatus.PROVIDER_PENDING,
+      debitTransactionId: { not: null },
+      refundTransactionId: null,
+      providerOrderId: null,
+      orderId: null,
+      providerRefreshClaimedAt: null,
+      providerResultKind: null,
+      updatedAt: { lt: cutoff },
+      ...(options?.partnerId ? { partnerId: options.partnerId } : {}),
+    },
+    orderBy: { updatedAt: "asc" },
+    take: limit,
+    select: {
+      id: true,
+      partnerChargeCents: true,
+      partner: { select: { userId: true } },
+    },
+  });
+
+  const purchaseIds: string[] = [];
+  for (const row of rows) {
+    try {
+      const result = await refundNeverStartedPartnerEsimPurchase({
+        purchaseId: row.id,
+        partnerUserId: row.partner.userId,
+        expectedPartnerChargeCents: row.partnerChargeCents,
+      });
+      if (result.refundTransactionId) {
+        purchaseIds.push(row.id);
+      }
+    } catch {
+      // Skip contested/ineligible rows; do not fail the batch.
+    }
+  }
+
+  return { recovered: purchaseIds.length, purchaseIds };
+}
+
 /**
  * Execute provider PURCHASE for an existing PROVIDER_PENDING Partner purchase.
  * Never debits. Confirmed decline → exact partnerChargeCents refund.
@@ -599,255 +730,326 @@ export async function executePartnerEsimProviderPurchase(
 
   assertPositiveCommercial(purchase);
 
-  // Defense in depth: pre-VeSIM gates should already have passed before debit.
-  // If they fail here with never-started provider evidence, compensate exactly once.
+  let executionClaimed = false;
   try {
-    await assertPartnerPreDebitProviderGates();
-  } catch (error) {
-    const neverStarted =
-      !purchase.providerOrderId &&
-      !purchase.orderId &&
-      !purchase.providerRefreshClaimedAt;
-    if (neverStarted && isDeterministicPreProviderGateError(error)) {
-      await refundConfirmedProviderFailure({
-        purchaseId: purchase.id,
-        partnerId: partner.partnerId,
-        partnerUserId: partner.partnerUserId,
-        partnerChargeCents: purchase.partnerChargeCents,
-        providerObservation: {
-          providerOrderId: null,
-          providerResultKind: "declined",
-          safeProviderStatusCode: "pre_provider_gate_blocked",
-        },
-        afterRefundInTx: input.afterRefundInTx,
-      });
-      throw new PartnerEsimPurchaseError(
-        "PROVIDER_FAILED",
-        "The provider could not complete this purchase. The Partner wallet amount was restored."
-      );
-    }
-    throwMappedPreProviderGateError(error);
-  }
-
-  const claimed = await claimPartnerProviderExecution(purchase.id);
-  if (!claimed) {
-    const again = await prisma.partnerEsimPurchase.findUnique({
-      where: { id: purchase.id },
-      select: {
-        status: true,
-        orderId: true,
-        refundTransactionId: true,
-        providerRefreshClaimedAt: true,
-      },
-    });
-    if (again?.status === PartnerEsimPurchaseStatus.COMPLETED && again.orderId) {
-      return {
-        purchaseId: purchase.id,
-        partnerId: partner.partnerId,
-        status: PartnerEsimPurchaseStatus.COMPLETED,
-        orderId: again.orderId,
-        refundTransactionId: null,
-        duplicate: true,
-      };
-    }
-    if (
-      again?.status === PartnerEsimPurchaseStatus.FAILED_REFUNDED &&
-      again.refundTransactionId
-    ) {
-      throw new PartnerEsimPurchaseError(
-        "PROVIDER_FAILED",
-        "This purchase failed and the Partner wallet amount was restored."
-      );
-    }
-    if (again?.status === PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED) {
-      throw new PartnerEsimPurchaseError(
-        "RECONCILIATION_REQUIRED",
-        "This purchase requires reconciliation. Do not retry."
-      );
-    }
-    throw new PartnerEsimPurchaseError(
-      "PROVIDER_IN_FLIGHT",
-      "This purchase is already being processed. Do not retry."
-    );
-  }
-
-  // External provider write — outside Prisma transaction. Never blind-retry.
-  const checkout = await checkoutFn({
-    offerId: purchase.offerId,
-    customerEmail: partner.partnerEmail,
-  });
-
-  if (checkout.kind === "declined") {
+    // Defense in depth: pre-VeSIM gates should already have passed before debit.
+    // If they fail here with never-started provider evidence, compensate exactly once.
     try {
-      await refundConfirmedProviderFailure({
-        purchaseId: purchase.id,
-        partnerId: partner.partnerId,
-        partnerUserId: partner.partnerUserId,
-        partnerChargeCents: purchase.partnerChargeCents,
-        providerObservation: {
-          providerOrderId: null,
-          providerResultKind: "declined",
-          safeProviderStatusCode: `http_${checkout.httpStatus}`,
-        },
-        afterRefundInTx: input.afterRefundInTx,
-      });
+      await assertPartnerPreDebitProviderGates();
     } catch (error) {
-      if (error instanceof PartnerEsimPurchaseError) throw error;
-      await markPartnerReconciliationRequired({
-        purchaseId: purchase.id,
-        partnerUserId: partner.partnerUserId,
-        category: "refund_failed",
-        code: "partner_refund_tx_error",
-        providerObservation: {
-          providerOrderId: null,
-          providerResultKind: "declined",
-          safeProviderStatusCode: `http_${checkout.httpStatus}`,
-        },
-      });
+      const neverStarted =
+        !purchase.providerOrderId &&
+        !purchase.orderId &&
+        !purchase.providerRefreshClaimedAt;
+      if (neverStarted && isDeterministicPreProviderGateError(error)) {
+        await refundConfirmedProviderFailure({
+          purchaseId: purchase.id,
+          partnerId: partner.partnerId,
+          partnerUserId: partner.partnerUserId,
+          partnerChargeCents: purchase.partnerChargeCents,
+          providerObservation: {
+            providerOrderId: null,
+            providerResultKind: "declined",
+            safeProviderStatusCode: "pre_provider_gate_blocked",
+          },
+          afterRefundInTx: input.afterRefundInTx,
+        });
+        throw new PartnerEsimPurchaseError(
+          "PROVIDER_FAILED",
+          "The provider could not complete this purchase. The Partner wallet amount was restored."
+        );
+      }
+      throwMappedPreProviderGateError(error);
     }
-    throw new PartnerEsimPurchaseError(
-      "PROVIDER_FAILED",
-      "The provider could not complete this purchase. The Partner wallet amount was restored."
-    );
-  }
 
-  if (checkout.kind !== "success") {
-    await markPartnerReconciliationRequired({
-      purchaseId: purchase.id,
-      partnerUserId: partner.partnerUserId,
-      category: checkout.category,
-      code: checkout.code,
-      providerObservation: {
-        providerOrderId: checkout.providerOrderId ?? null,
-        providerResultKind: "uncertain",
-        safeProviderStatusCode: checkout.code,
-      },
-    });
-    throw new PartnerEsimPurchaseError(
-      "RECONCILIATION_REQUIRED",
-      "This purchase requires reconciliation. Do not retry."
-    );
-  }
+    // Test seam: abort after debit / gates but before durable provider claim.
+    if (input.beforeProviderClaim) {
+      await input.beforeProviderClaim();
+    }
 
-  const successCheckout = checkout;
-  const verifiedOffer = verifiedOfferFromPartnerPurchase(purchase);
-
-  let orderId: string | null = null;
-  try {
-    const finalized = await prisma.$transaction(async (tx) => {
-      const current = await tx.partnerEsimPurchase.findUnique({
+    const claimed = await claimPartnerProviderExecution(purchase.id);
+    if (!claimed) {
+      const again = await prisma.partnerEsimPurchase.findUnique({
         where: { id: purchase.id },
         select: {
           status: true,
           orderId: true,
-          debitTransactionId: true,
-          partnerChargeCents: true,
+          refundTransactionId: true,
+          providerRefreshClaimedAt: true,
         },
       });
-      if (
-        current?.status === PartnerEsimPurchaseStatus.COMPLETED &&
-        current.orderId
-      ) {
-        return { id: current.orderId };
+      if (again?.status === PartnerEsimPurchaseStatus.COMPLETED && again.orderId) {
+        return {
+          purchaseId: purchase.id,
+          partnerId: partner.partnerId,
+          status: PartnerEsimPurchaseStatus.COMPLETED,
+          orderId: again.orderId,
+          refundTransactionId: null,
+          duplicate: true,
+        };
       }
-      if (current?.status !== PartnerEsimPurchaseStatus.PROVIDER_PENDING) {
+      if (
+        again?.status === PartnerEsimPurchaseStatus.FAILED_REFUNDED &&
+        again.refundTransactionId
+      ) {
+        throw new PartnerEsimPurchaseError(
+          "PROVIDER_FAILED",
+          "This purchase failed and the Partner wallet amount was restored."
+        );
+      }
+      if (again?.status === PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED) {
         throw new PartnerEsimPurchaseError(
           "RECONCILIATION_REQUIRED",
           "This purchase requires reconciliation. Do not retry."
         );
       }
-
-      const order = await persistAssignedOrder(tx, {
-        providerOrderId: successCheckout.providerOrderId,
-        customerUserId: partner.partnerUserId,
-        customerEmail: partner.partnerEmail,
-        verifiedOffer,
-        fundingSource: OrderFundingSource.PARTNER_BALANCE,
-        status: OrderStatus.COMPLETED,
-        checkoutPayload: successCheckout.payload,
+      // Still never-started (claim lost / aborted) → compensate instead of hanging.
+      const compensated = await compensateNeverStartedPartnerPurchaseIfEligible({
+        purchaseId: purchase.id,
+        partnerUserId: partner.partnerUserId,
       });
-
-      if (input.afterOrderPersistInTx) {
-        await input.afterOrderPersistInTx(tx);
+      if (compensated) {
+        throw new PartnerEsimPurchaseError(
+          "PROVIDER_FAILED",
+          "The provider could not complete this purchase. The Partner wallet amount was restored."
+        );
       }
-
-      await persistPartnerPurchaseProviderObservation(
-        purchase.id,
-        {
-          providerOrderId: order.providerOrderId,
-          providerResultKind: "success",
-          safeProviderStatusCode: "completed",
-        },
-        tx
+      throw new PartnerEsimPurchaseError(
+        "PROVIDER_IN_FLIGHT",
+        "This purchase is already being processed. Do not retry."
       );
+    }
+    executionClaimed = true;
 
-      await tx.partnerEsimPurchase.update({
-        where: { id: purchase.id },
-        data: {
-          status: PartnerEsimPurchaseStatus.COMPLETED,
-          orderId: order.id,
-          providerOrderId: order.providerOrderId,
-          completedAt: new Date(),
-          failureCategory: null,
-          failureCode: null,
-          reconciliationState: null,
-          providerRefreshClaimedAt: null,
+    // External provider write — outside Prisma transaction. Never blind-retry.
+    const checkout = await checkoutFn({
+      offerId: purchase.offerId,
+      customerEmail: partner.partnerEmail,
+    });
+
+    if (checkout.kind === "declined") {
+      try {
+        await refundConfirmedProviderFailure({
+          purchaseId: purchase.id,
+          partnerId: partner.partnerId,
+          partnerUserId: partner.partnerUserId,
+          partnerChargeCents: purchase.partnerChargeCents,
+          providerObservation: {
+            providerOrderId: null,
+            providerResultKind: "declined",
+            safeProviderStatusCode: `http_${checkout.httpStatus}`,
+          },
+          afterRefundInTx: input.afterRefundInTx,
+        });
+      } catch (error) {
+        if (error instanceof PartnerEsimPurchaseError) throw error;
+        await markPartnerReconciliationRequired({
+          purchaseId: purchase.id,
+          partnerUserId: partner.partnerUserId,
+          category: "refund_failed",
+          code: "partner_refund_tx_error",
+          providerObservation: {
+            providerOrderId: null,
+            providerResultKind: "declined",
+            safeProviderStatusCode: `http_${checkout.httpStatus}`,
+          },
+        });
+      }
+      throw new PartnerEsimPurchaseError(
+        "PROVIDER_FAILED",
+        "The provider could not complete this purchase. The Partner wallet amount was restored."
+      );
+    }
+
+    if (checkout.kind !== "success") {
+      await markPartnerReconciliationRequired({
+        purchaseId: purchase.id,
+        partnerUserId: partner.partnerUserId,
+        category: checkout.category,
+        code: checkout.code,
+        providerObservation: {
+          providerOrderId: checkout.providerOrderId ?? null,
+          providerResultKind: "uncertain",
+          safeProviderStatusCode: checkout.code,
         },
       });
+      throw new PartnerEsimPurchaseError(
+        "RECONCILIATION_REQUIRED",
+        "This purchase requires reconciliation. Do not retry."
+      );
+    }
 
-      await tx.auditLog.create({
-        data: {
-          actorUserId: partner.partnerUserId,
-          action: PARTNER_ESIM_PURCHASE_COMPLETED_AUDIT,
-          targetType: "PartnerEsimPurchase",
-          targetId: purchase.id,
-          metadata: {
-            purchaseId: purchase.id,
+    const successCheckout = checkout;
+    const verifiedOffer = verifiedOfferFromPartnerPurchase(purchase);
+
+    let orderId: string | null = null;
+    try {
+      const finalized = await prisma.$transaction(async (tx) => {
+        const current = await tx.partnerEsimPurchase.findUnique({
+          where: { id: purchase.id },
+          select: {
+            status: true,
+            orderId: true,
+            debitTransactionId: true,
+            partnerChargeCents: true,
+          },
+        });
+        if (
+          current?.status === PartnerEsimPurchaseStatus.COMPLETED &&
+          current.orderId
+        ) {
+          return { id: current.orderId };
+        }
+        if (current?.status !== PartnerEsimPurchaseStatus.PROVIDER_PENDING) {
+          throw new PartnerEsimPurchaseError(
+            "RECONCILIATION_REQUIRED",
+            "This purchase requires reconciliation. Do not retry."
+          );
+        }
+
+        const order = await persistAssignedOrder(tx, {
+          providerOrderId: successCheckout.providerOrderId,
+          customerUserId: partner.partnerUserId,
+          customerEmail: partner.partnerEmail,
+          verifiedOffer,
+          fundingSource: OrderFundingSource.PARTNER_BALANCE,
+          status: OrderStatus.COMPLETED,
+          checkoutPayload: successCheckout.payload,
+        });
+
+        if (input.afterOrderPersistInTx) {
+          await input.afterOrderPersistInTx(tx);
+        }
+
+        await persistPartnerPurchaseProviderObservation(
+          purchase.id,
+          {
+            providerOrderId: order.providerOrderId,
+            providerResultKind: "success",
+            safeProviderStatusCode: "completed",
+          },
+          tx
+        );
+
+        await tx.partnerEsimPurchase.update({
+          where: { id: purchase.id },
+          data: {
+            status: PartnerEsimPurchaseStatus.COMPLETED,
             orderId: order.id,
-            offerId: purchase.offerId,
-            fundingSource: OrderFundingSource.PARTNER_BALANCE,
-            partnerChargeCents: purchase.partnerChargeCents,
-            retailPriceCents: purchase.retailPriceCents,
-            debitTransactionId: current.debitTransactionId,
-          } satisfies Prisma.InputJsonValue,
+            providerOrderId: order.providerOrderId,
+            completedAt: new Date(),
+            failureCategory: null,
+            failureCode: null,
+            reconciliationState: null,
+            providerRefreshClaimedAt: null,
+          },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            actorUserId: partner.partnerUserId,
+            action: PARTNER_ESIM_PURCHASE_COMPLETED_AUDIT,
+            targetType: "PartnerEsimPurchase",
+            targetId: purchase.id,
+            metadata: {
+              purchaseId: purchase.id,
+              orderId: order.id,
+              offerId: purchase.offerId,
+              fundingSource: OrderFundingSource.PARTNER_BALANCE,
+              partnerChargeCents: purchase.partnerChargeCents,
+              retailPriceCents: purchase.retailPriceCents,
+              debitTransactionId: current.debitTransactionId,
+            } satisfies Prisma.InputJsonValue,
+          },
+        });
+
+        return order;
+      });
+      orderId = finalized.id;
+    } catch (error) {
+      // After claim + provider success response: never auto-refund on persist failure.
+      if (error instanceof PartnerEsimPurchaseError) throw error;
+      const classified = classifyOrderPersistError(error);
+      console.error(
+        "Partner local finalize persist failed",
+        classified.persistErrorCode
+      );
+      await markPartnerReconciliationRequired({
+        purchaseId: purchase.id,
+        partnerUserId: partner.partnerUserId,
+        category: "local_finalize_failed",
+        code: "order_persist_error",
+        persistDiagnostic: {
+          persistErrorCode: classified.persistErrorCode,
+          family: classified.family,
+          targetEntity: classified.targetEntity,
+          providerOrderId: successCheckout.providerOrderId,
+        },
+        providerObservation: {
+          providerOrderId: successCheckout.providerOrderId,
+          providerResultKind: "uncertain",
+          safeProviderStatusCode: "local_finalize_failed",
         },
       });
+    }
 
-      return order;
-    });
-    orderId = finalized.id;
-  } catch (error) {
-    if (error instanceof PartnerEsimPurchaseError) throw error;
-    const persistDiagnostic = classifyOrderPersistError(error);
-    console.error(
-      "Partner local finalize persist failed",
-      persistDiagnostic.persistErrorCode
-    );
-    await markPartnerReconciliationRequired({
+    return {
       purchaseId: purchase.id,
-      partnerUserId: partner.partnerUserId,
-      category: "local_finalize_failed",
-      code: "order_persist_error",
-      persistDiagnostic: {
-        persistErrorCode: persistDiagnostic.persistErrorCode,
-        family: persistDiagnostic.family,
-        targetEntity: persistDiagnostic.targetEntity,
-        providerOrderId: successCheckout.providerOrderId,
-      },
-      providerObservation: {
-        providerOrderId: successCheckout.providerOrderId,
-        providerResultKind: "success",
-        safeProviderStatusCode: "local_finalize_failed",
-      },
-    });
+      partnerId: partner.partnerId,
+      status: PartnerEsimPurchaseStatus.COMPLETED,
+      orderId,
+      refundTransactionId: null,
+      duplicate: false,
+    };
+  } catch (error) {
+    // Debit committed but provider claim never started → refund exactly once.
+    if (!executionClaimed) {
+      try {
+        const compensated = await compensateNeverStartedPartnerPurchaseIfEligible(
+          {
+            purchaseId: purchase.id,
+            partnerUserId: partner.partnerUserId,
+          }
+        );
+        if (compensated) {
+          throw new PartnerEsimPurchaseError(
+            "PROVIDER_FAILED",
+            "The provider could not complete this purchase. The Partner wallet amount was restored."
+          );
+        }
+      } catch (compensateError) {
+        if (compensateError instanceof PartnerEsimPurchaseError) {
+          throw compensateError;
+        }
+      }
+    } else if (
+      !(error instanceof PartnerEsimPurchaseError) ||
+      (error.code !== "PROVIDER_FAILED" &&
+        error.code !== "RECONCILIATION_REQUIRED")
+    ) {
+      // Claimed / may have contacted provider — never auto-refund unknown outcomes.
+      try {
+        const current = await prisma.partnerEsimPurchase.findUnique({
+          where: { id: purchase.id },
+          select: { status: true },
+        });
+        if (current?.status === PartnerEsimPurchaseStatus.PROVIDER_PENDING) {
+          await markPartnerReconciliationRequired({
+            purchaseId: purchase.id,
+            partnerUserId: partner.partnerUserId,
+            category: "provider_uncertain",
+            code: "post_claim_unexpected_error",
+            providerObservation: {
+              providerOrderId: null,
+              providerResultKind: "uncertain",
+              safeProviderStatusCode: "post_claim_unexpected_error",
+            },
+          });
+        }
+      } catch (reconError) {
+        if (reconError instanceof PartnerEsimPurchaseError) throw reconError;
+      }
+    }
+    throw error;
   }
-
-  return {
-    purchaseId: purchase.id,
-    partnerId: partner.partnerId,
-    status: PartnerEsimPurchaseStatus.COMPLETED,
-    orderId,
-    refundTransactionId: null,
-    duplicate: false,
-  };
 }

@@ -15,6 +15,9 @@ import { prisma } from "@/app/lib/db";
 import { customerFlagImageUrl } from "@/app/lib/orders/customerOrderDisplay";
 import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
 import {
+  recoverStaleNeverStartedPartnerPurchases,
+} from "@/app/lib/partner/partnerEsimPurchaseProvider";
+import {
   PARTNER_ORDERS_PAGE_LIMIT,
   displayOrUnavailable,
   formatPartnerOrderDate,
@@ -111,6 +114,16 @@ export async function listPartnerOrdersPage(
 ): Promise<PartnerOrdersPageData | null> {
   const actor = await requireActivePartnerActor(partnerUserId);
   if (!actor) return null;
+
+  // Safety net: never leave stale never-started PROVIDER_PENDING rows forever.
+  try {
+    await recoverStaleNeverStartedPartnerPurchases({
+      partnerId: actor.partnerId,
+      limit: 10,
+    });
+  } catch {
+    // Listing must still succeed even if recovery is contested.
+  }
 
   const purchases = await prisma.partnerEsimPurchase.findMany({
     where: {

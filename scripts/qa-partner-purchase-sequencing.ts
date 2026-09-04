@@ -22,6 +22,7 @@ import {
 import {
   executePartnerEsimProviderPurchase,
   refundNeverStartedPartnerEsimPurchase,
+  recoverStaleNeverStartedPartnerPurchases,
   type PartnerProviderCheckoutExecutor,
 } from "../app/lib/partner/partnerEsimPurchaseProvider";
 import { evaluatePartnerRefundLocalEligibility } from "../app/lib/admin/reconciliationCaseShared";
@@ -481,6 +482,102 @@ async function main() {
     });
     assert.equal(elig.allowed, true);
     console.log("PASS 6_duplicate_and_never_started_idempotent");
+
+    // 8. Exception after debit before provider claim → refund once, no VeSIM call
+    providerCalls = 0;
+    const bal8 = await balance();
+    const prep8 = await preparePartnerEsimPurchase({
+      partnerUserId,
+      offerId: offerState.offerId,
+      idempotencyKey: idem("8"),
+      verifyOffer,
+    });
+    await reservePartnerEsimPurchase({
+      partnerUserId,
+      purchaseId: prep8.purchaseId,
+      verifyOffer,
+    });
+    const charge8 = (
+      await prisma.partnerEsimPurchase.findUniqueOrThrow({
+        where: { id: prep8.purchaseId },
+        select: { partnerChargeCents: true },
+      })
+    ).partnerChargeCents;
+    try {
+      await executePartnerEsimProviderPurchase({
+        partnerUserId,
+        purchaseId: prep8.purchaseId,
+        providerCheckout,
+        beforeProviderClaim: async () => {
+          throw new Error("simulated_abort_before_claim");
+        },
+      });
+      assert.fail("expected PROVIDER_FAILED");
+    } catch (error) {
+      assert.ok(error instanceof PartnerEsimPurchaseError);
+      assert.equal(error.code, "PROVIDER_FAILED");
+    }
+    assert.equal(providerCalls, 0);
+    const row8 = await prisma.partnerEsimPurchase.findUniqueOrThrow({
+      where: { id: prep8.purchaseId },
+    });
+    assert.equal(row8.status, PartnerEsimPurchaseStatus.FAILED_REFUNDED);
+    assert.ok(row8.refundTransactionId);
+    assert.equal(row8.providerRefreshClaimedAt, null);
+    assert.equal(await balance(), bal8);
+    const refundCount8 = await prisma.partnerWalletTransaction.count({
+      where: {
+        wallet: { partnerId },
+        type: PartnerWalletTransactionType.ESIM_PURCHASE_REFUND,
+        referenceId: prep8.purchaseId,
+      },
+    });
+    assert.equal(refundCount8, 1);
+    console.log("PASS 8_abort_before_claim_refund_once");
+
+    // 9. Stale never-started recovery → refund once
+    const prep9 = await preparePartnerEsimPurchase({
+      partnerUserId,
+      offerId: offerState.offerId,
+      idempotencyKey: idem("9"),
+      verifyOffer,
+    });
+    await reservePartnerEsimPurchase({
+      partnerUserId,
+      purchaseId: prep9.purchaseId,
+      verifyOffer,
+    });
+    // Age the row so stale recovery is eligible.
+    await prisma.partnerEsimPurchase.update({
+      where: { id: prep9.purchaseId },
+      data: { updatedAt: new Date(Date.now() - 120_000) },
+    });
+    const bal9 = await balance();
+    const charge9 = (
+      await prisma.partnerEsimPurchase.findUniqueOrThrow({
+        where: { id: prep9.purchaseId },
+        select: { partnerChargeCents: true },
+      })
+    ).partnerChargeCents;
+    const recovered = await recoverStaleNeverStartedPartnerPurchases({
+      partnerId,
+      olderThanMs: 60_000,
+      limit: 20,
+    });
+    assert.ok(recovered.purchaseIds.includes(prep9.purchaseId));
+    const row9 = await prisma.partnerEsimPurchase.findUniqueOrThrow({
+      where: { id: prep9.purchaseId },
+    });
+    assert.equal(row9.status, PartnerEsimPurchaseStatus.FAILED_REFUNDED);
+    assert.equal(await balance(), bal9 + charge9);
+    const recoveredAgain = await recoverStaleNeverStartedPartnerPurchases({
+      partnerId,
+      olderThanMs: 60_000,
+      limit: 20,
+    });
+    assert.equal(recoveredAgain.purchaseIds.includes(prep9.purchaseId), false);
+    assert.equal(await balance(), bal9 + charge9);
+    console.log("PASS 9_stale_never_started_recovery");
 
     console.log("ALL PASS qa-partner-purchase-sequencing");
   } finally {
