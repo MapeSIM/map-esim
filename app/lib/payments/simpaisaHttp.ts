@@ -2,11 +2,16 @@ import "server-only";
 
 import type { SimpaisaValidatedConfig } from "@/app/lib/payments/simpaisaConfig";
 import {
-  classifySimpaisaWalletResponseCode,
+  nestedInquiryData,
+  parseSimpaisaInquiryResponse,
+  pickAmountRawFromRecords,
+  SIMPAISA_INQUIRY_PARSE_CURRENCY_KEYS,
+  SIMPAISA_INQUIRY_PARSE_RESPONSE_CODE_KEYS,
+} from "@/app/lib/payments/simpaisaInquiryParse";
+import {
   isSimpaisaAcceptedVerifyCode,
   isSimpaisaPendingCode,
   isSimpaisaWalletOperatorId,
-  mapSimpaisaClassificationToPaymentStatus,
   normalizeSimpaisaResponseCode,
   SIMPAISA_API_HEADER_MODE,
   SIMPAISA_API_HEADER_REGION,
@@ -19,7 +24,6 @@ import {
   SIMPAISA_WEBHOOK_PATH,
   normalizeSimpaisaMsisdn,
   simpaisaMajorAmountFromMinor,
-  simpaisaMinorAmountFromMajor,
   type SimpaisaWalletOperatorId,
 } from "@/app/lib/payments/simpaisaPolicy";
 import type { PaymentCheckoutPurpose } from "@/app/lib/payments/types";
@@ -87,7 +91,87 @@ function firstString(record: SimpaisaJson, keys: string[]): string | null {
 }
 
 function nestedData(json: SimpaisaJson): SimpaisaJson {
-  return asRecord(json.data) ?? json;
+  return nestedInquiryData(json);
+}
+
+function inquiryFieldRecordsLocal(json: SimpaisaJson): SimpaisaJson[] {
+  // Prefer nested `transaction` (official Inquire) before root fallbacks.
+  const records: SimpaisaJson[] = [];
+  const nested = nestedData(json);
+  if (nested !== json) records.push(nested);
+  records.push(json);
+  return records;
+}
+
+const RESPONSE_CODE_KEYS = SIMPAISA_INQUIRY_PARSE_RESPONSE_CODE_KEYS;
+const CURRENCY_KEYS = SIMPAISA_INQUIRY_PARSE_CURRENCY_KEYS;
+
+const SANDBOX_TRACE_KEY_ALLOWLIST = [
+  "responseCode",
+  "response_code",
+  "status",
+  "responseMessage",
+  "response_message",
+  "message",
+  "msg",
+  "merchantId",
+  "merchant_id",
+  "operatorId",
+  "operator_id",
+  "operatorID",
+  "userKey",
+  "user_key",
+  "transactionId",
+  "transaction_id",
+  "transactionType",
+  "transaction_type",
+  "amount",
+  "transactionAmount",
+  "transAmount",
+  "txnAmount",
+  "transaction_amount",
+  "paidAmount",
+  "requestedAmount",
+  "currency",
+  "currencyCode",
+  "currency_code",
+  "curr",
+  "productReference",
+  "data",
+  "result",
+  "transaction",
+  "payload",
+  "success",
+] as const;
+
+function allowlistedPresentKeys(record: SimpaisaJson | null): string[] {
+  if (!record) return [];
+  const present = new Set(Object.keys(record).map((key) => key.toLowerCase()));
+  const matched: string[] = [];
+  for (const key of SANDBOX_TRACE_KEY_ALLOWLIST) {
+    if (present.has(key.toLowerCase()) && !matched.includes(key)) {
+      matched.push(key);
+    }
+  }
+  return matched;
+}
+
+function pickStringFromRecords(
+  records: SimpaisaJson[],
+  keys: readonly string[] | string[]
+): string | null {
+  for (const record of records) {
+    for (const key of keys) {
+      const direct = asString(record[key]);
+      if (direct) return direct;
+      for (const [k, v] of Object.entries(record)) {
+        if (k.toLowerCase() !== key.toLowerCase()) continue;
+        const s = asString(v);
+        if (s) return s;
+      }
+    }
+  }
+  return null;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -153,6 +237,13 @@ function logSimpaisaSandboxTrace(input: {
   responseCode: string | null;
   responseMessage: string | null;
   requestId: string | null;
+  amountSource?: string | null;
+  currencySource?: string | null;
+  amountValueType?: string | null;
+  responseKeys?: string[] | null;
+  dataKeys?: string[] | null;
+  dataIsArray?: boolean | null;
+  hasResponseCode?: boolean | null;
 }): void {
   if (input.environment !== "sandbox") return;
   console.info(SIMPAISA_SANDBOX_TRACE_PREFIX, {
@@ -169,6 +260,13 @@ function logSimpaisaSandboxTrace(input: {
     responseCode: input.responseCode,
     responseMessage: input.responseMessage,
     requestId: input.requestId,
+    amountSource: input.amountSource ?? null,
+    currencySource: input.currencySource ?? null,
+    amountValueType: input.amountValueType ?? null,
+    responseKeys: input.responseKeys ?? null,
+    dataKeys: input.dataKeys ?? null,
+    dataIsArray: input.dataIsArray ?? null,
+    hasResponseCode: input.hasResponseCode ?? null,
   });
 }
 
@@ -281,6 +379,7 @@ export class SimpaisaHttpClient {
   async inquireTransaction(input: {
     userKey?: string | null;
     transactionId?: string | null;
+    operatorId?: string | null;
   }): Promise<SimpaisaInquiryResult> {
     const userKey = (input.userKey ?? "").trim();
     const transactionId = (input.transactionId ?? "").trim();
@@ -295,70 +394,47 @@ export class SimpaisaHttpClient {
       );
     }
 
+    const operatorIdInput = (input.operatorId ?? "").trim();
     const body: Record<string, unknown> = {
       merchantId: this.config.merchantId,
     };
     if (userKey) body.userKey = userKey;
     if (transactionId) body.transactionId = transactionId;
 
+    const extraHeaders: Record<string, string> = {
+      mode: SIMPAISA_API_HEADER_MODE,
+      region: SIMPAISA_API_HEADER_REGION,
+      version: SIMPAISA_API_HEADER_VERSION,
+      "Request-Id": userKey || transactionId,
+    };
+    if (operatorIdInput && isSimpaisaWalletOperatorId(operatorIdInput)) {
+      extraHeaders.operatorID = operatorIdInput;
+    }
+
     const json = await this.requestJson(
       "POST",
       SIMPAISA_INQUIRY_PATH,
       body,
-      {
-        region: SIMPAISA_API_HEADER_REGION,
-      }
+      extraHeaders
     );
-    const data = nestedData(json);
-    const responseCode = normalizeSimpaisaResponseCode(
-      firstString(data, ["responseCode", "response_code", "status"]) ??
-        firstString(json, ["responseCode", "response_code", "status"])
-    );
-    if (!responseCode) {
+    const parsed = parseSimpaisaInquiryResponse(json, {
+      userKey,
+      transactionId,
+    });
+    if (!parsed) {
       throw new SimpaisaHttpError("UNAVAILABLE", "Payment provider unavailable.");
     }
 
-    const classification = classifySimpaisaWalletResponseCode(responseCode);
-    const status: SimpaisaInquiryResult["status"] = classification
-      ? mapSimpaisaClassificationToPaymentStatus(classification)
-      : "uncertain";
-
-    const amountRaw =
-      data.amount ?? data.transactionAmount ?? json.amount ?? json.transactionAmount;
-    const currency =
-      firstString(data, ["currency"]) ?? firstString(json, ["currency"]);
-
-    const merchantId =
-      firstString(data, ["merchantId", "merchant_id"]) ??
-      firstString(json, ["merchantId", "merchant_id"]);
-    const operatorId =
-      firstString(data, ["operatorId", "operator_id", "operatorID"]) ??
-      firstString(json, ["operatorId", "operator_id", "operatorID"]);
-    const inquiryUserKey =
-      firstString(data, ["userKey", "user_key"]) ??
-      firstString(json, ["userKey", "user_key"]) ??
-      (userKey || null);
-    const transactionType =
-      firstString(data, ["transactionType", "transaction_type"]) ??
-      firstString(json, ["transactionType", "transaction_type"]);
-
     return {
-      responseCode,
-      status,
-      providerTransactionId:
-        firstString(data, ["transactionId", "transaction_id"]) ??
-        firstString(json, ["transactionId", "transaction_id"]) ??
-        (transactionId || null),
-      chargeAmountMinor: simpaisaMinorAmountFromMajor(
-        typeof amountRaw === "number" || typeof amountRaw === "string"
-          ? amountRaw
-          : null
-      ),
-      chargeCurrency: currency ? currency.toUpperCase() : SIMPAISA_CHARGE_CURRENCY,
-      merchantId,
-      operatorId,
-      userKey: inquiryUserKey,
-      transactionType,
+      responseCode: parsed.responseCode,
+      status: parsed.status,
+      providerTransactionId: parsed.providerTransactionId,
+      chargeAmountMinor: parsed.chargeAmountMinor,
+      chargeCurrency: parsed.chargeCurrency,
+      merchantId: parsed.merchantId,
+      operatorId: parsed.operatorId,
+      userKey: parsed.userKey,
+      transactionType: parsed.transactionType,
     };
   }
 
@@ -405,60 +481,55 @@ export class SimpaisaHttpClient {
   ): void {
     if (this.config.environment !== "sandbox") return;
     try {
+      const records = json ? inquiryFieldRecordsLocal(json) : [];
       const data = json ? nestedData(json) : null;
       const responseCode = json
         ? normalizeSimpaisaResponseCode(
-            (data
-              ? firstString(data, ["responseCode", "response_code", "status"])
-              : null) ??
-              firstString(json, ["responseCode", "response_code", "status"])
+            pickStringFromRecords(records, RESPONSE_CODE_KEYS)
           )
         : null;
       const rawMessage = json
-        ? (data
-            ? firstString(data, [
-                "responseMessage",
-                "response_message",
-                "message",
-                "msg",
-              ])
-            : null) ??
-          firstString(json, [
+        ? pickStringFromRecords(records, [
             "responseMessage",
             "response_message",
             "message",
             "msg",
           ])
         : null;
+      const endpoint = sandboxEndpointName(path);
+      const amountPick = json
+        ? pickAmountRawFromRecords(records)
+        : { value: null, source: null, valueType: "missing" };
+      const requestAmount =
+        typeof body.amount === "number" || typeof body.amount === "string"
+          ? body.amount
+          : null;
       const amount =
-        body.amount ??
-        data?.amount ??
-        data?.transactionAmount ??
-        json?.amount ??
-        json?.transactionAmount;
+        endpoint === "inquiry"
+          ? amountPick.value
+          : (requestAmount ?? amountPick.value);
+      const currencyFromResponse = json
+        ? pickStringFromRecords(records, CURRENCY_KEYS)
+        : null;
       const currency =
-        body.currency ?? data?.currency ?? json?.currency ?? null;
+        endpoint === "inquiry"
+          ? currencyFromResponse
+          : clipTraceText(body.currency, 8) ?? currencyFromResponse;
       const transactionId =
         body.transactionId ??
-        (data
-          ? firstString(data, ["transactionId", "transaction_id"])
-          : null) ??
-        (json
-          ? firstString(json, ["transactionId", "transaction_id"])
-          : null);
+        pickStringFromRecords(records, ["transactionId", "transaction_id"]);
       const operatorId =
         body.operatorId ??
         extraHeaders.operatorID ??
-        (data
-          ? firstString(data, ["operatorId", "operator_id", "operatorID"])
-          : null) ??
-        (json
-          ? firstString(json, ["operatorId", "operator_id", "operatorID"])
-          : null);
+        pickStringFromRecords(records, [
+          "operatorId",
+          "operator_id",
+          "operatorID",
+        ]);
 
       logSimpaisaSandboxTrace({
         environment: this.config.environment,
-        endpoint: sandboxEndpointName(path),
+        endpoint,
         mapReference: clipTraceText(body.userKey, 64),
         merchantId: clipTraceText(body.merchantId, 32),
         operatorId: clipTraceText(operatorId, 16),
@@ -469,6 +540,25 @@ export class SimpaisaHttpClient {
         responseCode: responseCode || null,
         responseMessage: sanitizeSimpaisaResponseMessage(rawMessage),
         requestId: clipTraceText(extraHeaders["Request-Id"], 128),
+        amountSource:
+          endpoint === "inquiry"
+            ? amountPick.source
+            : requestAmount != null
+              ? "request"
+              : amountPick.source,
+        currencySource:
+          currencyFromResponse
+            ? "response"
+            : endpoint === "inquiry"
+              ? "missing"
+              : body.currency
+                ? "request"
+                : "missing",
+        amountValueType: amountPick.valueType,
+        responseKeys: json ? allowlistedPresentKeys(json) : [],
+        dataKeys: data && data !== json ? allowlistedPresentKeys(data) : [],
+        dataIsArray: json ? Array.isArray(json.data) : null,
+        hasResponseCode: Boolean(responseCode),
       });
     } catch {
       // Tracing must never change Verify / Inquire / Refund behavior.

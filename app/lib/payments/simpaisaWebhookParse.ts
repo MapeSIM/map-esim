@@ -64,6 +64,8 @@ function resolvePurpose(_userKey: string): PaymentCheckoutPurpose {
  * Parse a JSON Simpaisa payin postback payload.
  * Returns null for malformed bodies or missing required fields.
  * signatureVerified on the returned event reflects caller verification only.
+ * Nested `transaction` fields (official Inquire-style envelopes) are accepted
+ * when present so amount/status/operator can be read from the nested object.
  */
 export function parseSimpaisaWebhookEvent(input: {
   rawBody: string;
@@ -74,10 +76,15 @@ export function parseSimpaisaWebhookEvent(input: {
   void input.headers;
   const root = parseBody(input.rawBody);
   if (!root) return null;
-  const data = asRecord(root.data) ?? root;
+  const nestedTxn = asRecord(root.transaction);
+  const data = asRecord(root.data) ?? nestedTxn ?? root;
+  // Prefer nested transaction for amount/status when both root and nested exist.
+  const amountSource = nestedTxn ?? data;
+  const statusSource = nestedTxn ?? data;
 
   const responseCode = normalizeSimpaisaResponseCode(
-    firstString(data, ["responseCode", "response_code", "status"]) ??
+    firstString(statusSource, ["responseCode", "response_code", "status"]) ??
+      firstString(data, ["responseCode", "response_code", "status"]) ??
       firstString(root, ["responseCode", "response_code", "status"])
   );
   const classification = classifySimpaisaWalletResponseCode(responseCode);
@@ -87,19 +94,28 @@ export function parseSimpaisaWebhookEvent(input: {
 
   const merchantId =
     firstString(data, ["merchantId", "merchant_id"]) ??
-    firstString(root, ["merchantId", "merchant_id"]);
+    firstString(root, ["merchantId", "merchant_id"]) ??
+    (nestedTxn
+      ? firstString(nestedTxn, ["merchantId", "merchant_id"])
+      : null);
   if (!merchantId || merchantId !== input.expectedConfig.merchantId.trim()) {
     return null;
   }
 
   const operatorId =
     firstString(data, ["operatorId", "operator_id", "operatorID"]) ??
-    firstString(root, ["operatorId", "operator_id", "operatorID"]);
+    firstString(root, ["operatorId", "operator_id", "operatorID"]) ??
+    (nestedTxn
+      ? firstString(nestedTxn, ["operatorId", "operator_id", "operatorID"])
+      : null);
   if (!operatorId) return null;
 
   const transactionTypeRaw =
     firstString(data, ["transactionType", "transaction_type"]) ??
-    firstString(root, ["transactionType", "transaction_type"]);
+    firstString(root, ["transactionType", "transaction_type"]) ??
+    (nestedTxn
+      ? firstString(nestedTxn, ["transactionType", "transaction_type"])
+      : null);
   if (
     transactionTypeRaw &&
     transactionTypeRaw.trim() !== SIMPAISA_WALLET_TRANSACTION_TYPE
@@ -109,15 +125,21 @@ export function parseSimpaisaWebhookEvent(input: {
 
   const userKey =
     firstString(data, ["userKey", "user_key"]) ??
-    firstString(root, ["userKey", "user_key"]);
+    firstString(root, ["userKey", "user_key"]) ??
+    (nestedTxn ? firstString(nestedTxn, ["userKey", "user_key"]) : null);
   if (!userKey || userKey.length > 64) return null;
 
   const transactionId =
     firstString(data, ["transactionId", "transaction_id"]) ??
-    firstString(root, ["transactionId", "transaction_id"]);
+    firstString(root, ["transactionId", "transaction_id"]) ??
+    (nestedTxn
+      ? firstString(nestedTxn, ["transactionId", "transaction_id"])
+      : null);
   if (!transactionId || transactionId.length > 190) return null;
 
   const amountRaw =
+    amountSource.amount ??
+    amountSource.transactionAmount ??
     data.amount ??
     data.transactionAmount ??
     root.amount ??
@@ -128,6 +150,7 @@ export function parseSimpaisaWebhookEvent(input: {
       : null
   );
   const currency = (
+    firstString(amountSource, ["currency"]) ??
     firstString(data, ["currency"]) ??
     firstString(root, ["currency"]) ??
     SIMPAISA_CHARGE_CURRENCY
@@ -171,9 +194,11 @@ export function parseSimpaisaWebhookEvent(input: {
 export function peekSimpaisaWebhookResponseCode(rawBody: string): string | null {
   const root = parseBody(rawBody);
   if (!root) return null;
-  const data = asRecord(root.data) ?? root;
+  const nestedTxn = asRecord(root.transaction);
+  const data = asRecord(root.data) ?? nestedTxn ?? root;
   return normalizeSimpaisaResponseCode(
-    firstString(data, ["responseCode", "response_code", "status"]) ??
+    firstString(nestedTxn ?? data, ["responseCode", "response_code", "status"]) ??
+      firstString(data, ["responseCode", "response_code", "status"]) ??
       firstString(root, ["responseCode", "response_code", "status"])
   );
 }

@@ -43,6 +43,7 @@ import { convertFromUsd } from "../app/lib/currency/format";
 import { FALLBACK_USD_RATES } from "../app/lib/currency/currencies";
 import { parseSimpaisaWebhookEvent } from "../app/lib/payments/simpaisaWebhookParse";
 import { validateSimpaisaAuthoritativeInquiry } from "../app/lib/payments/simpaisaInquiryValidate";
+import { parseSimpaisaInquiryResponse } from "../app/lib/payments/simpaisaInquiryParse";
 
 const root = join(__dirname, "..");
 
@@ -345,6 +346,19 @@ function main() {
   assert.doesNotMatch(http, /userKey:\s*this\.config/);
   assert.match(http, /HTTP_RETRY_DELAYS_MS/);
   assert.match(http, /never log request\/response bodies, MSISDN, or tokens/);
+  assert.match(http, /amountSource/);
+  assert.match(http, /hasResponseCode/);
+  assert.match(http, /SIMPAISA_INQUIRY_PATH/);
+  assert.match(http, /parseSimpaisaInquiryResponse/);
+  assert.match(http, /operatorID = operatorIdInput/);
+  assert.doesNotMatch(http, /JSON\.stringify\(json\)/);
+  assert.match(route, /INQUIRY_UNAVAILABLE/);
+  assert.match(route, /inquiryErrorCode/);
+  assert.match(route, /operatorId: event.walletOperatorId/);
+  assert.match(
+    read("app/lib/payments/simpaisaInquiryParse.ts"),
+    /AMOUNT_KEYS/
+  );
   assert.match(http, /Non-OTP Verify accepts only 0037/);
   assert.match(http, /simpaisaMajorAmountFromMinor/);
   assert.match(adapter, /createCheckoutSession/);
@@ -433,6 +447,73 @@ function main() {
   assert.equal(badAmount.ok, false);
   if (!badAmount.ok) assert.equal(badAmount.reason, "AMOUNT_MISMATCH");
   console.log("PASS authoritative_inquiry_validation");
+
+  // Exact sandbox Inquire envelope from merchant screenshot (nested transaction).
+  const screenshotInquiry = {
+    merchantId: "2001226",
+    transactionId: "95271258",
+    userKey: "cmtlvl6x20001l505aoxmwn4r",
+    transaction: {
+      status: "0000",
+      message: "Success",
+      operatorId: "100007",
+      merchantId: "2001226",
+      transactionId: "95271258",
+      amount: "29",
+      userKey: "cmtlvl6x20001l505aoxmwn4r",
+      transactionType: "0",
+    },
+  };
+  const parsedScreenshot = parseSimpaisaInquiryResponse(screenshotInquiry);
+  assert.ok(parsedScreenshot);
+  assert.equal(parsedScreenshot!.responseCode, "0000");
+  assert.equal(parsedScreenshot!.status, "confirmed");
+  assert.equal(parsedScreenshot!.chargeAmountMinor, 2900);
+  assert.equal(parsedScreenshot!.chargeCurrency, "PKR");
+  assert.equal(parsedScreenshot!.currencySource, "default_pkr");
+  assert.equal(parsedScreenshot!.usedNestedTransaction, true);
+  assert.equal(parsedScreenshot!.amountSource, "amount");
+  assert.equal(parsedScreenshot!.operatorId, "100007");
+  assert.equal(parsedScreenshot!.userKey, "cmtlvl6x20001l505aoxmwn4r");
+  assert.equal(parsedScreenshot!.providerTransactionId, "95271258");
+  assert.equal(parsedScreenshot!.transactionType, "0");
+  assert.equal(parsedScreenshot!.responseMessage, "Success");
+  const screenshotValidate = validateSimpaisaAuthoritativeInquiry({
+    inquiry: {
+      status: parsedScreenshot!.status,
+      merchantId: parsedScreenshot!.merchantId,
+      operatorId: parsedScreenshot!.operatorId,
+      userKey: parsedScreenshot!.userKey,
+      providerTransactionId: parsedScreenshot!.providerTransactionId,
+      chargeAmountMinor: parsedScreenshot!.chargeAmountMinor,
+      chargeCurrency: parsedScreenshot!.chargeCurrency,
+      transactionType: parsedScreenshot!.transactionType,
+    },
+    expected: {
+      merchantId: "2001226",
+      operatorId: "100007",
+      userKey: "cmtlvl6x20001l505aoxmwn4r",
+      transactionId: "95271258",
+      chargeAmountMinor: 2900,
+      chargeCurrency: "PKR",
+    },
+  });
+  assert.equal(screenshotValidate.ok, true);
+  const nestedWebhook = parseSimpaisaWebhookEvent({
+    rawBody: JSON.stringify(screenshotInquiry),
+    headers: {},
+    expectedConfig: { merchantId: "2001226" },
+    signatureVerified: false,
+  });
+  assert.ok(nestedWebhook);
+  assert.equal(nestedWebhook!.paymentStatus, "confirmed");
+  assert.equal(nestedWebhook!.chargeAmountMinor, 2900);
+  assert.equal(nestedWebhook!.providerPaymentRef, "95271258");
+  assert.equal(nestedWebhook!.paymentAttemptId, "cmtlvl6x20001l505aoxmwn4r");
+  assert.equal(nestedWebhook!.walletOperatorId, "100007");
+  assert.match(read("app/lib/payments/simpaisaHttp.ts"), /parseSimpaisaInquiryResponse/);
+  assert.match(read("app/lib/payments/simpaisaInquiryParse.ts"), /usedNestedTransaction/);
+  console.log("PASS inquire_nested_transaction_screenshot_shape");
 
   assert.match(disabled, /PAYMENT_GATEWAY_ENABLED/);
   assert.match(disabled, /tryCreateSafepayAdapter/);

@@ -5,7 +5,10 @@ import {
   resolveSimpaisaInquiryConfig,
   resolveSimpaisaWebhookConfig,
 } from "@/app/lib/payments/simpaisaConfig";
-import { SimpaisaHttpClient } from "@/app/lib/payments/simpaisaHttp";
+import {
+  SimpaisaHttpClient,
+  SimpaisaHttpError,
+} from "@/app/lib/payments/simpaisaHttp";
 import { validateSimpaisaAuthoritativeInquiry } from "@/app/lib/payments/simpaisaInquiryValidate";
 import {
   isSimpaisaSandboxUnsignedWebhookAllowed,
@@ -235,8 +238,12 @@ export async function POST(request: Request) {
     inquiryResult = await inquiryClient.inquireTransaction({
       userKey: event.paymentAttemptId,
       transactionId: event.providerPaymentRef,
+      operatorId: event.walletOperatorId,
     });
-  } catch {
+  } catch (error) {
+    const inquiryErrorCode =
+      error instanceof SimpaisaHttpError ? error.code : "UNKNOWN";
+    console.error("simpaisa_webhook", "INQUIRY_UNAVAILABLE", inquiryErrorCode);
     await observeSimpaisaWebhookDelivery({
       code: "APPLY_FAILED",
       httpStatus: 500,
