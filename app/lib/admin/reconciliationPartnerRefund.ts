@@ -86,6 +86,8 @@ type PurchaseContext = {
   debitStatus: string | null;
   refundTransactionId: string | null;
   fulfilmentIccidPresent: boolean;
+  /** Provider claim/checkout never started — safe never-started refund path. */
+  providerNeverStarted: boolean;
 };
 
 function resolveIds(
@@ -159,6 +161,7 @@ async function loadPurchaseContext(
       providerRefreshCompletedAt: true,
       providerRefreshResult: true,
       providerRefreshInstallData: true,
+      providerResultKind: true,
       debitTransaction: { select: { amountCents: true } },
       order: {
         select: {
@@ -185,6 +188,12 @@ async function loadPurchaseContext(
     );
   }
 
+  const providerNeverStarted =
+    !providerOrderId &&
+    !(row.orderId ?? "").trim() &&
+    !row.providerRefreshClaimedAt &&
+    !(row.providerResultKind ?? "").trim();
+
   return {
     caseResolved: Boolean(row.reconciliationResolvedAt),
     caseLocked: Boolean(row.reconciliationLockedAt),
@@ -206,6 +215,7 @@ async function loadPurchaseContext(
     debitStatus: row.debitTransaction ? "COMPLETED" : null,
     refundTransactionId: row.refundTransactionId,
     fulfilmentIccidPresent,
+    providerNeverStarted,
   };
 }
 
@@ -234,6 +244,7 @@ function localEligibilityFromContext(
     fulfilmentIccidPresent: ctx.fulfilmentIccidPresent,
     providerInstallDataPresent: ctx.providerInstallDataPresent,
     providerRefreshInProgress: ctx.providerRefreshInProgress,
+    providerNeverStarted: ctx.providerNeverStarted,
   });
 }
 
@@ -479,18 +490,20 @@ export async function refundReconciliationPartnerPurchase(options: {
 
   const confirmFn =
     options.confirmProviderFailureFn ?? confirmProviderFailure;
-  const providerOk = await confirmFn({
-    providerOrderId: ctx.providerOrderId,
-    expectedOfferId: ctx.offerId,
-  });
-  if (!providerOk.ok) {
-    await auditBlocked({
-      adminId: admin.id,
-      ids,
-      failureCode: providerOk.blocker,
-      reason: reasonParsed.reason,
+  if (!ctx.providerNeverStarted) {
+    const providerOk = await confirmFn({
+      providerOrderId: ctx.providerOrderId,
+      expectedOfferId: ctx.offerId,
     });
-    return { ok: false, error: partnerRefundBlockerLabel(providerOk.blocker) };
+    if (!providerOk.ok) {
+      await auditBlocked({
+        adminId: admin.id,
+        ids,
+        failureCode: providerOk.blocker,
+        reason: reasonParsed.reason,
+      });
+      return { ok: false, error: partnerRefundBlockerLabel(providerOk.blocker) };
+    }
   }
 
   try {
@@ -518,12 +531,19 @@ export async function refundReconciliationPartnerPurchase(options: {
         };
       }
       if (
+        !fresh.providerNeverStarted &&
         fresh.providerOrderId.toUpperCase() !==
-        ctx.providerOrderId.toUpperCase()
+          ctx.providerOrderId.toUpperCase()
       ) {
         return {
           status: "blocked" as const,
           failureCode: "provider_reference_mismatch",
+        };
+      }
+      if (fresh.providerNeverStarted !== ctx.providerNeverStarted) {
+        return {
+          status: "blocked" as const,
+          failureCode: "cas_conflict",
         };
       }
       // Immutable amount assertion: both reads must match the persisted snapshot.

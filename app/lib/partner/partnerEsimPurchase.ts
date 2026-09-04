@@ -13,7 +13,6 @@ import {
 import {
   OperationalControlBlockedError,
   OperationalControlUnavailableError,
-  assertNewRiskyTransactionAllowed,
 } from "@/app/lib/admin/operationalControlsPolicy";
 import { OPERATIONAL_CONTROL_UNAVAILABLE_MESSAGE } from "@/app/lib/admin/operationalControlsShared";
 import { usdPriceToCents } from "@/app/lib/esim/assignmentValidation";
@@ -23,9 +22,14 @@ import {
   PARTNER_PRICING_UNAVAILABLE_MESSAGE,
 } from "@/app/lib/partner/partnerPricing";
 import {
+  assertPartnerPreDebitProviderGates,
+  assertPartnerPurchaseInitiationAllowed,
+} from "@/app/lib/partner/partnerPurchaseGuards";
+import {
   PartnerPurchaseWalletError,
   reservePartnerPurchaseFundsInTx,
 } from "@/app/lib/partner/partnerPurchaseWallet";
+import { VesimEnvironmentError } from "@/app/lib/vesim/environment";
 import {
   sanitizeCountryHint,
   verifyOfferAuthoritative,
@@ -105,29 +109,6 @@ type CommercialSnapshot = {
   currency: string;
 };
 
-function throwIfOperationalControlBlocks(error: unknown): never {
-  if (
-    error instanceof OperationalControlBlockedError ||
-    error instanceof OperationalControlUnavailableError
-  ) {
-    throw new PartnerEsimPurchaseError(
-      "UNAVAILABLE",
-      OPERATIONAL_CONTROL_UNAVAILABLE_MESSAGE
-    );
-  }
-  throw error;
-}
-
-async function assertPartnerPurchaseInitiationAllowed() {
-  try {
-    await assertNewRiskyTransactionAllowed("partner_wallet_purchase", {
-      includeProviderOrder: false,
-    });
-  } catch (error) {
-    throwIfOperationalControlBlocks(error);
-  }
-}
-
 function assertIdempotencyKey(raw: string): string {
   const idempotencyKey = raw.trim();
   if (
@@ -167,6 +148,41 @@ function mapWalletError(error: unknown): never {
     throw new PartnerEsimPurchaseError("UNAVAILABLE", error.message);
   }
   throw error;
+}
+
+function throwIfPreDebitGateBlocks(error: unknown): never {
+  if (
+    error instanceof OperationalControlBlockedError ||
+    error instanceof OperationalControlUnavailableError
+  ) {
+    throw new PartnerEsimPurchaseError(
+      "UNAVAILABLE",
+      OPERATIONAL_CONTROL_UNAVAILABLE_MESSAGE
+    );
+  }
+  if (error instanceof VesimEnvironmentError) {
+    throw new PartnerEsimPurchaseError(
+      "UNAVAILABLE",
+      "Provider configuration is unavailable. Please try again later."
+    );
+  }
+  throw error;
+}
+
+async function runPartnerPurchaseInitiationGate(): Promise<void> {
+  try {
+    await assertPartnerPurchaseInitiationAllowed();
+  } catch (error) {
+    throwIfPreDebitGateBlocks(error);
+  }
+}
+
+async function runPartnerPreDebitProviderGates(): Promise<void> {
+  try {
+    await assertPartnerPreDebitProviderGates();
+  } catch (error) {
+    throwIfPreDebitGateBlocks(error);
+  }
 }
 
 async function loadActivePartnerForPurchase(partnerUserId: string) {
@@ -345,7 +361,7 @@ export async function preparePartnerEsimPurchase(
     };
   }
 
-  await assertPartnerPurchaseInitiationAllowed();
+  await runPartnerPurchaseInitiationGate();
 
   const verified = await verifyOffer({
     offerId,
@@ -447,7 +463,7 @@ export async function reservePartnerEsimPurchase(
   const verifyOffer = input.verifyOffer ?? verifyOfferAuthoritative;
 
   const partner = await loadActivePartnerForPurchase(input.partnerUserId);
-  await assertPartnerPurchaseInitiationAllowed();
+  await runPartnerPurchaseInitiationGate();
 
   const purchase = await prisma.partnerEsimPurchase.findUnique({
     where: { id: purchaseId },
@@ -527,6 +543,9 @@ export async function reservePartnerEsimPurchase(
       "Package pricing changed. Please refresh and try again."
     );
   }
+
+  // Provider-order gate + VeSIM config must pass BEFORE permanent wallet debit.
+  await runPartnerPreDebitProviderGates();
 
   try {
     const reserved = await prisma.$transaction(async (tx) => {

@@ -775,6 +775,12 @@ export async function getCaseManagementEligibility(options: {
   }
 
   const partnerRefundSupported = isPartnerRefundSourceType(ids.sourceType);
+  const partnerProviderNeverStarted =
+    partnerRefundSupported &&
+    !(row.providerOrderId ?? "").trim() &&
+    !(row.orderId ?? "").trim() &&
+    !row.providerRefreshClaimedAt &&
+    !(row.providerResultKind ?? "").trim();
   const partnerRefundEligibility = partnerRefundSupported
     ? evaluatePartnerRefundLocalEligibility({
         sourceType: ids.sourceType,
@@ -797,6 +803,7 @@ export async function getCaseManagementEligibility(options: {
         fulfilmentIccidPresent: Boolean(row.iccidHash || row.iccidCapturedAt),
         providerInstallDataPresent: row.providerInstallDataPresent,
         providerRefreshInProgress: refreshInProgress,
+        providerNeverStarted: partnerProviderNeverStarted,
       })
     : null;
 
@@ -810,6 +817,9 @@ export async function getCaseManagementEligibility(options: {
     } else if (partnerRefundEligibility.alreadyRefunded) {
       partnerRefundMessage =
         "Partner funds already refunded. Submit only confirms idempotent success.";
+    } else if (partnerProviderNeverStarted) {
+      partnerRefundMessage =
+        "Provider execution never started for this purchase. This action restores the immutable Partner charge exactly once using the existing Partner refund path. It changes financial state.";
     } else {
       partnerRefundMessage =
         "This action restores the immutable Partner charge exactly once after confirmed provider failure. It changes financial state. Provider evidence will be re-verified on submit.";

@@ -14,7 +14,6 @@ import {
 import {
   OperationalControlBlockedError,
   OperationalControlUnavailableError,
-  assertNewRiskyTransactionAllowed,
 } from "@/app/lib/admin/operationalControlsPolicy";
 import { OPERATIONAL_CONTROL_UNAVAILABLE_MESSAGE } from "@/app/lib/admin/operationalControlsShared";
 import { prisma } from "@/app/lib/db";
@@ -25,6 +24,7 @@ import {
 import { persistAssignedOrder } from "@/app/lib/orders/persistAssignedOrder";
 import { classifyOrderPersistError } from "@/app/lib/orders/orderPersistError";
 import { PartnerEsimPurchaseError } from "@/app/lib/partner/partnerEsimPurchase";
+import { assertPartnerPreDebitProviderGates } from "@/app/lib/partner/partnerPurchaseGuards";
 import {
   PartnerPurchaseWalletError,
   refundPartnerPurchaseFundsInTx,
@@ -34,6 +34,7 @@ import {
   executeCreditCheckout,
   type CreditCheckoutResult,
 } from "@/app/lib/vesim/creditCheckout";
+import { VesimEnvironmentError } from "@/app/lib/vesim/environment";
 import type { VerifiedCheckoutOffer } from "@/app/lib/vesim/server";
 
 export const PARTNER_ESIM_PURCHASE_COMPLETED_AUDIT =
@@ -74,29 +75,6 @@ export type ExecutePartnerEsimProviderPurchaseResult = {
   duplicate: boolean;
 };
 
-function throwIfOperationalControlBlocks(error: unknown): never {
-  if (
-    error instanceof OperationalControlBlockedError ||
-    error instanceof OperationalControlUnavailableError
-  ) {
-    throw new PartnerEsimPurchaseError(
-      "UNAVAILABLE",
-      OPERATIONAL_CONTROL_UNAVAILABLE_MESSAGE
-    );
-  }
-  throw error;
-}
-
-async function assertPartnerProviderExecutionAllowed() {
-  try {
-    await assertNewRiskyTransactionAllowed("partner_wallet_purchase", {
-      includeProviderOrder: true,
-    });
-  } catch (error) {
-    throwIfOperationalControlBlocks(error);
-  }
-}
-
 function mapWalletError(error: unknown): never {
   if (error instanceof PartnerPurchaseWalletError) {
     if (error.code === "WALLET_UNAVAILABLE") {
@@ -112,6 +90,34 @@ function mapWalletError(error: unknown): never {
       );
     }
     throw new PartnerEsimPurchaseError("UNAVAILABLE", error.message);
+  }
+  throw error;
+}
+
+function isDeterministicPreProviderGateError(error: unknown): boolean {
+  return (
+    error instanceof OperationalControlBlockedError ||
+    error instanceof OperationalControlUnavailableError ||
+    error instanceof VesimEnvironmentError ||
+    (error instanceof PartnerEsimPurchaseError && error.code === "UNAVAILABLE")
+  );
+}
+
+function throwMappedPreProviderGateError(error: unknown): never {
+  if (
+    error instanceof OperationalControlBlockedError ||
+    error instanceof OperationalControlUnavailableError
+  ) {
+    throw new PartnerEsimPurchaseError(
+      "UNAVAILABLE",
+      OPERATIONAL_CONTROL_UNAVAILABLE_MESSAGE
+    );
+  }
+  if (error instanceof VesimEnvironmentError) {
+    throw new PartnerEsimPurchaseError(
+      "UNAVAILABLE",
+      "Provider configuration is unavailable. Please try again later."
+    );
   }
   throw error;
 }
@@ -420,6 +426,87 @@ async function refundConfirmedProviderFailure(options: {
 }
 
 /**
+ * Safe recovery when VeSIM was never claimed/called (no providerOrderId).
+ * Uses the same confirmed-failure refund path + partner_esim_refund_<id> idempotency.
+ */
+export async function refundNeverStartedPartnerEsimPurchase(options: {
+  purchaseId: string;
+  partnerUserId: string;
+  expectedPartnerChargeCents: number;
+}): Promise<{ refundTransactionId: string; idempotent: boolean }> {
+  const purchaseId = options.purchaseId.trim();
+  const purchase = await prisma.partnerEsimPurchase.findUnique({
+    where: { id: purchaseId },
+    select: {
+      id: true,
+      partnerId: true,
+      status: true,
+      partnerChargeCents: true,
+      debitTransactionId: true,
+      refundTransactionId: true,
+      providerOrderId: true,
+      orderId: true,
+      providerRefreshClaimedAt: true,
+      providerResultKind: true,
+    },
+  });
+  if (!purchase) {
+    throw new PartnerEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is unavailable."
+    );
+  }
+  if (
+    purchase.status === PartnerEsimPurchaseStatus.FAILED_REFUNDED &&
+    purchase.refundTransactionId
+  ) {
+    return {
+      refundTransactionId: purchase.refundTransactionId,
+      idempotent: true,
+    };
+  }
+  if (purchase.status !== PartnerEsimPurchaseStatus.PROVIDER_PENDING) {
+    throw new PartnerEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is unavailable."
+    );
+  }
+  if (
+    purchase.providerOrderId ||
+    purchase.orderId ||
+    purchase.providerRefreshClaimedAt ||
+    purchase.providerResultKind
+  ) {
+    throw new PartnerEsimPurchaseError(
+      "RECONCILIATION_REQUIRED",
+      "This purchase requires reconciliation. Do not retry."
+    );
+  }
+  if (
+    !purchase.debitTransactionId ||
+    purchase.partnerChargeCents !== options.expectedPartnerChargeCents
+  ) {
+    throw new PartnerEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is unavailable."
+    );
+  }
+
+  const refundTransactionId = await refundConfirmedProviderFailure({
+    purchaseId: purchase.id,
+    partnerId: purchase.partnerId,
+    partnerUserId: options.partnerUserId,
+    partnerChargeCents: purchase.partnerChargeCents,
+    providerObservation: {
+      providerOrderId: null,
+      providerResultKind: "declined",
+      safeProviderStatusCode: "provider_never_started",
+    },
+  });
+  return { refundTransactionId, idempotent: false };
+}
+
+/**
  * Execute provider PURCHASE for an existing PROVIDER_PENDING Partner purchase.
  * Never debits. Confirmed decline → exact partnerChargeCents refund.
  * Uncertain → RECONCILIATION_REQUIRED (no refund).
@@ -512,7 +599,35 @@ export async function executePartnerEsimProviderPurchase(
 
   assertPositiveCommercial(purchase);
 
-  await assertPartnerProviderExecutionAllowed();
+  // Defense in depth: pre-VeSIM gates should already have passed before debit.
+  // If they fail here with never-started provider evidence, compensate exactly once.
+  try {
+    await assertPartnerPreDebitProviderGates();
+  } catch (error) {
+    const neverStarted =
+      !purchase.providerOrderId &&
+      !purchase.orderId &&
+      !purchase.providerRefreshClaimedAt;
+    if (neverStarted && isDeterministicPreProviderGateError(error)) {
+      await refundConfirmedProviderFailure({
+        purchaseId: purchase.id,
+        partnerId: partner.partnerId,
+        partnerUserId: partner.partnerUserId,
+        partnerChargeCents: purchase.partnerChargeCents,
+        providerObservation: {
+          providerOrderId: null,
+          providerResultKind: "declined",
+          safeProviderStatusCode: "pre_provider_gate_blocked",
+        },
+        afterRefundInTx: input.afterRefundInTx,
+      });
+      throw new PartnerEsimPurchaseError(
+        "PROVIDER_FAILED",
+        "The provider could not complete this purchase. The Partner wallet amount was restored."
+      );
+    }
+    throwMappedPreProviderGateError(error);
+  }
 
   const claimed = await claimPartnerProviderExecution(purchase.id);
   if (!claimed) {
@@ -608,12 +723,13 @@ export async function executePartnerEsimProviderPurchase(
         safeProviderStatusCode: checkout.code,
       },
     });
+    throw new PartnerEsimPurchaseError(
+      "RECONCILIATION_REQUIRED",
+      "This purchase requires reconciliation. Do not retry."
+    );
   }
 
-  const successCheckout = checkout as Extract<
-    typeof checkout,
-    { kind: "success" }
-  >;
+  const successCheckout = checkout;
   const verifiedOffer = verifiedOfferFromPartnerPurchase(purchase);
 
   let orderId: string | null = null;

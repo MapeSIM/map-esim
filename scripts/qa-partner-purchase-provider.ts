@@ -613,9 +613,21 @@ async function main() {
     assert.equal(providerCalls, 0);
     console.log("PASS K_invalid_status_no_provider");
 
-    // L. paused provider order creation → provider not called
+    // L. paused provider order creation after debit (legacy stuck path) →
+    // never-started refund once; provider not called.
     providerCalls = 0;
     const purchaseL = await prepareAndReserve("l");
+    const balBeforeL = (
+      await prisma.partnerWalletAccount.findUniqueOrThrow({
+        where: { partnerId },
+      })
+    ).balanceCents;
+    const chargeL = (
+      await prisma.partnerEsimPurchase.findUniqueOrThrow({
+        where: { id: purchaseL },
+        select: { partnerChargeCents: true },
+      })
+    ).partnerChargeCents;
     await prisma.operationalControl.update({
       where: { key: OperationalControlKey.PROVIDER_ORDER_CREATION },
       data: { paused: true },
@@ -626,17 +638,72 @@ async function main() {
         purchaseId: purchaseL,
         providerCheckout,
       });
-      assert.fail("expected UNAVAILABLE");
+      assert.fail("expected PROVIDER_FAILED");
     } catch (error) {
       assert.ok(error instanceof PartnerEsimPurchaseError);
-      assert.equal(error.code, "UNAVAILABLE");
+      assert.equal(error.code, "PROVIDER_FAILED");
     }
     assert.equal(providerCalls, 0);
+    const rowL = await prisma.partnerEsimPurchase.findUniqueOrThrow({
+      where: { id: purchaseL },
+    });
+    assert.equal(rowL.status, PartnerEsimPurchaseStatus.FAILED_REFUNDED);
+    assert.ok(rowL.refundTransactionId);
+    const balAfterL = (
+      await prisma.partnerWalletAccount.findUniqueOrThrow({
+        where: { partnerId },
+      })
+    ).balanceCents;
+    assert.equal(balAfterL, balBeforeL + chargeL);
     await prisma.operationalControl.update({
       where: { key: OperationalControlKey.PROVIDER_ORDER_CREATION },
       data: { paused: false },
     });
-    console.log("PASS L_provider_creation_paused");
+    console.log("PASS L_provider_creation_paused_never_started_refund");
+
+    // L2. paused BEFORE debit → no permanent wallet debit / no PROVIDER_PENDING
+    await prisma.operationalControl.update({
+      where: { key: OperationalControlKey.PROVIDER_ORDER_CREATION },
+      data: { paused: true },
+    });
+    const balBeforeL2 = (
+      await prisma.partnerWalletAccount.findUniqueOrThrow({
+        where: { partnerId },
+      })
+    ).balanceCents;
+    const prepL2 = await preparePartnerEsimPurchase({
+      partnerUserId,
+      offerId: offerState.offerId,
+      idempotencyKey: idem("l2"),
+      verifyOffer,
+    });
+    try {
+      await reservePartnerEsimPurchase({
+        partnerUserId,
+        purchaseId: prepL2.purchaseId,
+        verifyOffer,
+      });
+      assert.fail("expected UNAVAILABLE before debit");
+    } catch (error) {
+      assert.ok(error instanceof PartnerEsimPurchaseError);
+      assert.equal(error.code, "UNAVAILABLE");
+    }
+    const rowL2 = await prisma.partnerEsimPurchase.findUniqueOrThrow({
+      where: { id: prepL2.purchaseId },
+    });
+    assert.notEqual(rowL2.status, PartnerEsimPurchaseStatus.PROVIDER_PENDING);
+    assert.equal(rowL2.debitTransactionId, null);
+    const balAfterL2 = (
+      await prisma.partnerWalletAccount.findUniqueOrThrow({
+        where: { partnerId },
+      })
+    ).balanceCents;
+    assert.equal(balAfterL2, balBeforeL2);
+    await prisma.operationalControl.update({
+      where: { key: OperationalControlKey.PROVIDER_ORDER_CREATION },
+      data: { paused: false },
+    });
+    console.log("PASS L2_provider_creation_paused_before_debit");
 
     // M. customer wallet untouched
     const customerWalletAfter = (

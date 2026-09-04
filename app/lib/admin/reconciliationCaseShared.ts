@@ -1183,6 +1183,11 @@ export type PartnerRefundLocalInput = Omit<
 > & {
   partnerId?: string | null;
   partnerChargeCents?: number | null;
+  /**
+   * True when provider execution never started (no claim / no provider order /
+   * no local order). Allows refund without providerOrderId.
+   */
+  providerNeverStarted?: boolean;
 };
 
 export type PartnerRefundEligibility = WalletRefundEligibility;
@@ -1194,6 +1199,7 @@ export function evaluatePartnerRefundLocalEligibility(
   const status = (input.status ?? "").trim().toUpperCase();
   const hasRefund = Boolean((input.refundTransactionId ?? "").trim());
   const alreadyRefunded = status === "FAILED_REFUNDED" && hasRefund;
+  const neverStarted = Boolean(input.providerNeverStarted);
 
   if (!isPartnerRefundSourceType(input.sourceType)) {
     return {
@@ -1220,7 +1226,7 @@ export function evaluatePartnerRefundLocalEligibility(
   if ((input.fundingSource ?? "").trim().toUpperCase() !== "PARTNER_BALANCE") {
     blockers.push("not_partner_balance_funded");
   }
-  if (!(input.providerOrderId ?? "").trim()) {
+  if (!(input.providerOrderId ?? "").trim() && !neverStarted) {
     blockers.push("missing_provider_reference");
   }
   if (!(input.offerId ?? "").trim()) blockers.push("missing_package_evidence");
@@ -1252,6 +1258,9 @@ export function evaluatePartnerRefundLocalEligibility(
   const orderId = (input.orderId ?? "").trim();
   const orderStatus = (input.orderStatus ?? "").trim().toUpperCase();
   if (orderId && orderStatus !== "FAILED") {
+    blockers.push("usable_local_order_exists");
+  }
+  if (neverStarted && orderId) {
     blockers.push("usable_local_order_exists");
   }
 
