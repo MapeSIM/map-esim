@@ -265,7 +265,7 @@ async function main() {
     const debitCount3 = await prisma.partnerWalletTransaction.count({
       where: {
         wallet: { partnerId },
-        type: PartnerWalletTransactionType.ESIM_PURCHASE,
+        type: PartnerWalletTransactionType.ESIM_PURCHASE_DEBIT,
         referenceId: prep3.purchaseId,
       },
     });
@@ -278,7 +278,6 @@ async function main() {
       kind: "uncertain",
       category: "provider_timeout",
       code: "timeout",
-      providerOrderId: null,
     };
     const bal4 = await balance();
     const prep4 = await preparePartnerEsimPurchase({
