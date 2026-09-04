@@ -142,7 +142,7 @@ export async function GET() {
     const windowEnd = new Date(full.updatedAt.getTime() + 180_000);
     const nearbyOrders = await prisma.order.findMany({
       where: {
-        customerUserId: full.partner.userId,
+        userId: full.partner.userId,
         createdAt: { gte: windowStart, lte: windowEnd },
       },
       select: {
