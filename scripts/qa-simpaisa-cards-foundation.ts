@@ -207,7 +207,9 @@ function main() {
     expectedChargeCurrency: "PKR",
   });
   assert.equal(session.contractStatus, "WAITING_FOR_SIMPAISA");
-  assert.equal(session.mayFund, undefined);
+  // Hosted-session fixture has no funding signal — mayFund exists only on
+  // browser-return mocks (always false) and lifecycle gates, never on session.
+  assert.equal(Object.hasOwn(session, "mayFund"), false);
   const browser = createMockSimpaisaCardsBrowserReturn("attempt_cards_1");
   assert.equal(browser.mayFund, false);
   assert.deepEqual(browser.untrustedQuery, {});

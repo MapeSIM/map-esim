@@ -288,12 +288,8 @@ function main() {
     });
     assert.equal(rejected.funded, false);
     assert.equal(rejected.outcome, "failed_not_paid");
-    assert.equal(
-      mapSimpaisaClassificationToPaymentStatus(
-        classifySimpaisaWalletResponseCode("0012")
-      ),
-      "failed"
-    );
+    assert.equal(classifySimpaisaWalletResponseCode("0012"), "failed");
+    assert.equal(mapSimpaisaClassificationToPaymentStatus("failed"), "failed");
     assert.equal(classifySimpaisaWalletResponseCode("0091"), "failed");
     record("01_payment_rejected", "PASS");
   }
