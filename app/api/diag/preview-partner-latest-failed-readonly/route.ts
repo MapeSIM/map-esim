@@ -4,13 +4,8 @@
  */
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { PartnerEsimPurchaseStatus } from "@prisma/client";
+import { PartnerEsimPurchaseStatus, type OperationalControlKey } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
-import {
-  getOperationalControlsHealthSnapshot,
-  loadOperationalControlPausedMapSoft,
-} from "@/app/lib/admin/operationalControlsPolicy";
-import { getVesimBaseUrl } from "@/app/lib/vesim/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,10 +69,16 @@ export async function GET() {
           (p.status === PartnerEsimPurchaseStatus.FAILED_REFUNDED ||
             p.status === PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED ||
             p.status === PartnerEsimPurchaseStatus.PROVIDER_PENDING)
-      ) ?? recent.find((p) => !KNOWN_PRIOR.has(p.id)) ?? recent[0];
+      ) ??
+      recent.find((p) => !KNOWN_PRIOR.has(p.id)) ??
+      recent[0];
 
     if (!focus) {
-      return NextResponse.json({ ok: false, error: "no_purchases", hashPrefix });
+      return NextResponse.json({
+        ok: false,
+        error: "no_purchases",
+        hashPrefix,
+      });
     }
 
     const full = await prisma.partnerEsimPurchase.findUnique({
@@ -154,30 +155,17 @@ export async function GET() {
       take: 10,
     });
 
-    let vesimConfig: { ok: boolean; code?: string } = { ok: false };
-    try {
-      getVesimBaseUrl();
-      vesimConfig = { ok: true };
-    } catch (error) {
-      vesimConfig = {
-        ok: false,
-        code:
-          error && typeof error === "object" && "code" in error
-            ? String((error as { code?: unknown }).code ?? "unknown")
-            : "unknown",
-      };
-    }
+    const opsRows = await prisma.operationalControl.findMany({
+      select: { key: true, paused: true, updatedAt: true },
+      take: 20,
+    });
 
-    const opsPaused = await loadOperationalControlPausedMapSoft();
-    let opsHealth: unknown = null;
-    try {
-      opsHealth = await getOperationalControlsHealthSnapshot();
-    } catch (error) {
-      opsHealth = {
-        error:
-          error instanceof Error ? error.message.slice(0, 120) : "ops_failed",
-      };
-    }
+    const vesimEnv = {
+      VESIM_ENVIRONMENT: process.env.VESIM_ENVIRONMENT ? "set" : "missing",
+      VESIM_BASE_URL: process.env.VESIM_BASE_URL ? "set" : "missing",
+      VESIM_EMAIL: process.env.VESIM_EMAIL ? "set" : "missing",
+      VESIM_PASSWORD: process.env.VESIM_PASSWORD ? "set" : "missing",
+    };
 
     return NextResponse.json({
       ok: true,
@@ -217,9 +205,12 @@ export async function GET() {
       refundByKeyCount,
       audits,
       nearbyOrders,
-      vesimConfig,
-      opsPaused,
-      opsHealth,
+      opsRows: opsRows.map((r) => ({
+        key: r.key as OperationalControlKey,
+        paused: r.paused,
+        updatedAt: r.updatedAt,
+      })),
+      vesimEnv,
     });
   } catch (error) {
     return NextResponse.json(
