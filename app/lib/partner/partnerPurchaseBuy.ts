@@ -16,6 +16,7 @@ import {
   executePartnerEsimProviderPurchase,
   type PartnerProviderCheckoutExecutor,
 } from "@/app/lib/partner/partnerEsimPurchaseProvider";
+import { logPartnerProviderPreclaimError } from "@/app/lib/partner/partnerPurchasePreclaimLog";
 import {
   mapPartnerPurchaseErrorCode,
   type PartnerPurchaseActionState,
@@ -130,6 +131,12 @@ export async function buyPartnerEsimPurchase(
         return mapPartnerPurchaseErrorCode("UNAVAILABLE", executed.purchaseId);
       } catch (error) {
         // Gap after debit / before claim: ensure never-started rows are compensated.
+        logPartnerProviderPreclaimError({
+          purchaseId: purchaseId!,
+          stage: "before_claim",
+          executionClaimed: false,
+          error,
+        });
         try {
           const compensated =
             await compensateNeverStartedPartnerPurchaseIfEligible({
@@ -161,6 +168,12 @@ export async function buyPartnerEsimPurchase(
     return mapPartnerPurchaseErrorCode("INVALID_STATE", purchaseId);
   } catch (error) {
     if (purchaseId) {
+      logPartnerProviderPreclaimError({
+        purchaseId,
+        stage: "before_claim",
+        executionClaimed: false,
+        error,
+      });
       try {
         const compensated =
           await compensateNeverStartedPartnerPurchaseIfEligible({

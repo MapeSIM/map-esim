@@ -29,6 +29,10 @@ import {
   PartnerPurchaseWalletError,
   refundPartnerPurchaseFundsInTx,
 } from "@/app/lib/partner/partnerPurchaseWallet";
+import {
+  logPartnerProviderPreclaimError,
+  type PartnerProviderPreclaimStage,
+} from "@/app/lib/partner/partnerPurchasePreclaimLog";
 import { schedulePartnerReconciliationRequiredNotification } from "@/app/lib/partner/partnerReconciliationRequiredNotification";
 import {
   executeCreditCheckout,
@@ -731,12 +735,29 @@ export async function executePartnerEsimProviderPurchase(
   assertPositiveCommercial(purchase);
 
   let executionClaimed = false;
+  let preclaimStage: PartnerProviderPreclaimStage = "pre_provider_gate";
+  let preclaimErrorLogged = false;
+  const logPreclaimOnce = (
+    error: unknown,
+    stage: PartnerProviderPreclaimStage
+  ) => {
+    if (preclaimErrorLogged) return;
+    preclaimErrorLogged = true;
+    logPartnerProviderPreclaimError({
+      purchaseId: purchase.id,
+      stage,
+      executionClaimed,
+      error,
+    });
+  };
+
   try {
     // Defense in depth: pre-VeSIM gates should already have passed before debit.
     // If they fail here with never-started provider evidence, compensate exactly once.
     try {
       await assertPartnerPreDebitProviderGates();
     } catch (error) {
+      logPreclaimOnce(error, "pre_provider_gate");
       const neverStarted =
         !purchase.providerOrderId &&
         !purchase.orderId &&
@@ -763,12 +784,32 @@ export async function executePartnerEsimProviderPurchase(
     }
 
     // Test seam: abort after debit / gates but before durable provider claim.
+    preclaimStage = "before_claim";
     if (input.beforeProviderClaim) {
-      await input.beforeProviderClaim();
+      try {
+        await input.beforeProviderClaim();
+      } catch (error) {
+        logPreclaimOnce(error, "before_claim");
+        throw error;
+      }
     }
 
-    const claimed = await claimPartnerProviderExecution(purchase.id);
+    preclaimStage = "claim";
+    let claimed = false;
+    try {
+      claimed = await claimPartnerProviderExecution(purchase.id);
+    } catch (error) {
+      logPreclaimOnce(error, "claim");
+      throw error;
+    }
     if (!claimed) {
+      logPreclaimOnce(
+        new PartnerEsimPurchaseError(
+          "PROVIDER_IN_FLIGHT",
+          "Provider execution claim was not acquired."
+        ),
+        "claim"
+      );
       const again = await prisma.partnerEsimPurchase.findUnique({
         where: { id: purchase.id },
         select: {
@@ -820,6 +861,7 @@ export async function executePartnerEsimProviderPurchase(
       );
     }
     executionClaimed = true;
+    preclaimStage = "after_claim";
 
     // External provider write — outside Prisma transaction. Never blind-retry.
     const checkout = await checkoutFn({
@@ -1004,6 +1046,7 @@ export async function executePartnerEsimProviderPurchase(
   } catch (error) {
     // Debit committed but provider claim never started → refund exactly once.
     if (!executionClaimed) {
+      logPreclaimOnce(error, preclaimStage);
       try {
         const compensated = await compensateNeverStartedPartnerPurchaseIfEligible(
           {
@@ -1028,6 +1071,12 @@ export async function executePartnerEsimProviderPurchase(
         error.code !== "RECONCILIATION_REQUIRED")
     ) {
       // Claimed / may have contacted provider — never auto-refund unknown outcomes.
+      logPartnerProviderPreclaimError({
+        purchaseId: purchase.id,
+        stage: "after_claim",
+        executionClaimed: true,
+        error,
+      });
       try {
         const current = await prisma.partnerEsimPurchase.findUnique({
           where: { id: purchase.id },
