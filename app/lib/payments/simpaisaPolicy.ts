@@ -322,6 +322,15 @@ export function normalizeSimpaisaMsisdn(
   return national;
 }
 
+/** Customer-safe MSISDN mask: 300****4567. Never returns the full number. */
+export function maskSimpaisaMsisdn(
+  raw: string | undefined | null
+): string | null {
+  const national = normalizeSimpaisaMsisdn(raw);
+  if (!national) return null;
+  return `${national.slice(0, 3)}****${national.slice(-4)}`;
+}
+
 function nonEmptySecret(raw: string | undefined | null, max = 512): string | null {
   const value = (raw ?? "").trim();
   if (!value || value.length > max) return null;

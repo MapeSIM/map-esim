@@ -1065,6 +1065,10 @@ model WalletTopup {
   gatewayProvider                  PaymentGatewayProvider?
   /// Stored only when required for reconciliation; masked in customer UI.
   gatewayPaymentRef                String?
+  /// Simpaisa wallet operator id (Easypaisa/JazzCash) after Verify — display/retry UX only.
+  walletOperatorId                 String?
+  /// Masked national MSISDN for pending UX (never full number).
+  customerMsisdnMasked             String?
   status                           WalletTopupStatus       @default(DRAFT)
   checkoutIdempotencyKey           String                  @unique
   /// Unique verified webhook/event id when available.

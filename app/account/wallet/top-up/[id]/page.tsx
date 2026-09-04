@@ -3,6 +3,7 @@ import { requireRole } from "@/app/lib/auth/session";
 import { getCustomerTopupView } from "@/app/lib/wallet/topupRead";
 import { browserReturnMustNotCreditWallet } from "@/app/lib/wallet/topupConstants";
 import WalletTopupCheckoutButton from "@/app/components/account/WalletTopupCheckoutButton";
+import WalletTopupPendingPoller from "@/app/components/account/WalletTopupPendingPoller";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,16 @@ export default async function AccountWalletTopUpDetailPage({
 
   const view = await getCustomerTopupView(user.id, id);
 
+  const pageTitle = view.isCredited
+    ? "Payment successful"
+    : view.awaitingWalletApproval
+      ? "Awaiting wallet approval"
+      : view.isReconciliation
+        ? "Top-up under review"
+        : view.isFailedOrExpired
+          ? "Top-up not completed"
+          : "Top-up status";
+
   return (
     <div className="space-y-8">
       <header>
@@ -40,15 +51,7 @@ export default async function AccountWalletTopUpDetailPage({
         >
           ← Back to wallet dashboard
         </Link>
-        <h1 className="mt-4 text-2xl font-bold tracking-tight">
-          {view.isCredited
-            ? "Top-up credited"
-            : view.isReconciliation
-              ? "Top-up under review"
-              : view.isFailedOrExpired
-                ? "Top-up not completed"
-                : "Top-up status"}
-        </h1>
+        <h1 className="mt-4 text-2xl font-bold tracking-tight">{pageTitle}</h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
           Values are loaded from your account records. Refreshing this page does
           not process payment or change your balance.
@@ -78,12 +81,45 @@ export default async function AccountWalletTopUpDetailPage({
             {view.balanceLabel} USD
           </dd>
         </div>
-        <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[180px_1fr]">
-          <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            PKR payment
-          </dt>
-          <dd className="font-semibold text-[var(--heading)]">{view.chargeNotice}</dd>
-        </div>
+        {view.paymentMethodLabel ? (
+          <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[180px_1fr]">
+            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              Payment method
+            </dt>
+            <dd className="font-semibold text-[var(--heading)]">
+              {view.paymentMethodLabel}
+            </dd>
+          </div>
+        ) : null}
+        {view.pkrAmountLabel ? (
+          <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[180px_1fr]">
+            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              PKR amount
+            </dt>
+            <dd className="font-semibold text-[var(--heading)]">
+              {view.pkrAmountLabel}
+            </dd>
+          </div>
+        ) : (
+          <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[180px_1fr]">
+            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              PKR payment
+            </dt>
+            <dd className="font-semibold text-[var(--heading)]">
+              {view.chargeNotice}
+            </dd>
+          </div>
+        )}
+        {view.customerMsisdnMasked ? (
+          <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[180px_1fr]">
+            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              Mobile number
+            </dt>
+            <dd className="font-semibold text-[var(--heading)]">
+              {view.customerMsisdnMasked}
+            </dd>
+          </div>
+        ) : null}
         <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[180px_1fr]">
           <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
             Gateway
@@ -113,12 +149,26 @@ export default async function AccountWalletTopUpDetailPage({
 
       {view.isCredited ? (
         <div className="space-y-3 text-sm text-[var(--text-muted)]">
-          <p>
-            Your wallet was credited after a verified payment confirmation.
-            {view.walletCreditedAtLabel
-              ? ` Credited at ${view.walletCreditedAtLabel}.`
-              : ""}
-          </p>
+          <div
+            className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--heading)]"
+            role="status"
+            data-topup-state="credited"
+          >
+            <p className="font-semibold">Payment successful</p>
+            <p className="mt-1">
+              Your wallet was credited
+              {view.creditAmountLabel
+                ? ` with ${view.creditAmountLabel} USD`
+                : ""}
+              .
+              {view.walletCreditedAtLabel
+                ? ` Credited at ${view.walletCreditedAtLabel}.`
+                : ""}
+            </p>
+            <p className="mt-2 font-semibold">
+              Updated wallet balance: {view.balanceLabel} USD
+            </p>
+          </div>
           <Link
             href="/account/wallet?notice=credited"
             className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)]"
@@ -128,15 +178,42 @@ export default async function AccountWalletTopUpDetailPage({
         </div>
       ) : null}
 
-      {view.isPending && !view.isCredited ? (
-        <div className="space-y-4">
+      {view.awaitingWalletApproval ? (
+        <div className="space-y-4" data-topup-state="awaiting-wallet-approval">
+          <WalletTopupPendingPoller enabled />
           <div
             className="rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-bg)] px-4 py-3 text-sm text-[var(--warning-text)]"
             role="status"
           >
-            Payment pending. Secure checkout will confirm the PKR amount when a
-            payment provider is available. You cannot mark this payment
-            successful yourself.
+            <p className="font-semibold">
+              Payment request sent to{" "}
+              {view.paymentMethodLabel ?? "JazzCash/Easypaisa"}.
+            </p>
+            <p className="mt-1">
+              Please approve the request in your wallet app. This page updates
+              automatically when payment is confirmed. Do not submit another
+              payment request for this top-up.
+            </p>
+          </div>
+          <Link
+            href="/account/wallet?notice=pending"
+            className="inline-flex h-10 items-center justify-center text-sm font-semibold text-[var(--heading)] underline-offset-2 hover:underline"
+          >
+            Back to wallet dashboard
+          </Link>
+        </div>
+      ) : null}
+
+      {view.isPending &&
+      !view.isCredited &&
+      !view.awaitingWalletApproval ? (
+        <div className="space-y-4" data-topup-state="checkout-ready">
+          <div
+            className="rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-bg)] px-4 py-3 text-sm text-[var(--warning-text)]"
+            role="status"
+          >
+            Choose your mobile wallet and continue to send a payment request.
+            You cannot mark this payment successful yourself.
           </div>
           <WalletTopupCheckoutButton
             topupId={view.topupId}
@@ -154,16 +231,20 @@ export default async function AccountWalletTopUpDetailPage({
       ) : null}
 
       {view.isFailedOrExpired ? (
-        <div className="flex flex-wrap gap-3">
+        <div
+          className="flex flex-wrap gap-3"
+          data-topup-state="failed-or-expired"
+        >
           <Link
             href="/account/wallet/top-up"
-            className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border-strong)] px-5 text-sm font-semibold text-[var(--heading)]"
+            className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)]"
+            data-topup-action="retry-payment"
           >
-            Start a new top-up
+            Retry payment
           </Link>
           <Link
             href="/account/wallet?notice=failed"
-            className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)]"
+            className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border-strong)] px-5 text-sm font-semibold text-[var(--heading)]"
           >
             View wallet
           </Link>

@@ -17,6 +17,7 @@ import type {
 import { getActivePaymentAdapter } from "@/app/lib/payments/disabledAdapter";
 import { resumeSafepayHostedCheckout } from "@/app/lib/payments/safepayAdapter";
 import { resumeSimpaisaWalletCheckout } from "@/app/lib/payments/simpaisaAdapter";
+import { maskSimpaisaMsisdn } from "@/app/lib/payments/simpaisaPolicy";
 import {
   parseSimpaisaWalletCheckoutFields,
   quoteSimpaisaPkrChargeFromUsdCents,
@@ -565,6 +566,23 @@ export async function startWalletTopupCheckout(options: {
     );
   }
 
+  const simpaisaDisplay =
+    adapter.provider === "SIMPAISA"
+      ? (() => {
+          const walletFields = parseSimpaisaWalletCheckoutFields({
+            walletOperatorId: options.walletOperatorId,
+            customerMsisdn: options.customerMsisdn,
+          });
+          if (!walletFields.ok) return null;
+          return {
+            walletOperatorId: walletFields.walletOperatorId,
+            customerMsisdnMasked: maskSimpaisaMsisdn(
+              walletFields.customerMsisdn
+            ),
+          };
+        })()
+      : null;
+
   await prisma.$transaction(async (tx) => {
     const updated = await tx.walletTopup.updateMany({
       where: {
@@ -585,6 +603,12 @@ export async function startWalletTopupCheckout(options: {
         expiresAt: result.expiresAt,
         failureCategory: null,
         failureCode: null,
+        ...(simpaisaDisplay
+          ? {
+              walletOperatorId: simpaisaDisplay.walletOperatorId,
+              customerMsisdnMasked: simpaisaDisplay.customerMsisdnMasked,
+            }
+          : {}),
       },
     });
     if (updated.count !== 1) {

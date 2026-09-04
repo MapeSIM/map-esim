@@ -17,6 +17,7 @@ import {
   TOPUP_WEBHOOK_DUPLICATE,
   browserReturnMustNotCreditWallet,
 } from "../app/lib/wallet/topupConstants";
+import { maskSimpaisaMsisdn } from "../app/lib/payments/simpaisaPolicy";
 
 const root = join(__dirname, "..");
 
@@ -77,7 +78,46 @@ function main() {
   assert.match(readSrc, /customerUserId !== customer\.id|row\.customerUserId !== customer/);
   assert.match(readSrc, /notFound\(\)/);
   assert.match(detailPage, /getCustomerTopupView/);
+  assert.match(detailPage, /awaitingWalletApproval/);
+  assert.match(detailPage, /data-topup-state="awaiting-wallet-approval"/);
+  assert.match(detailPage, /Payment request sent to/);
+  assert.match(detailPage, /Please approve the request in your wallet/);
+  assert.match(detailPage, /data-topup-state="credited"/);
+  assert.match(detailPage, /Payment successful/);
+  assert.match(detailPage, /WalletTopupPendingPoller/);
+  assert.match(detailPage, /data-topup-action="retry-payment"/);
+  assert.match(detailPage, /Retry payment/);
+  assert.match(readSrc, /awaitingWalletApproval/);
+  assert.match(readSrc, /customerMsisdnMasked/);
+  assert.match(readSrc, /isSimpaisaSession/);
+  assert.match(readSrc, /canAttemptCheckout/);
+  assert.match(
+    readSrc,
+    /AWAITING_PAYMENT && !isSimpaisaSession|!isSimpaisaSession\)/
+  );
+  assert.match(topupSrc, /customerMsisdnMasked/);
+  assert.match(topupSrc, /walletOperatorId/);
+  assert.match(topupSrc, /maskSimpaisaMsisdn/);
+  assert.doesNotMatch(topupSrc, /createCheckoutSession\([\s\S]*router\.refresh/);
+  const poller = read("app/components/account/WalletTopupPendingPoller.tsx");
+  assert.match(poller, /router\.refresh\(\)/);
+  assert.match(poller, /POLL_INTERVAL_MS/);
+  assert.doesNotMatch(poller, /createCheckoutSession|verifyWalletTransaction|inquireTransaction/);
+  assert.match(schema, /walletOperatorId/);
+  assert.match(schema, /customerMsisdnMasked/);
+  assert.match(
+    read(
+      "prisma/migrations/20260904120000_add_wallet_topup_simpaisa_display_fields/migration.sql"
+    ),
+    /customerMsisdnMasked/
+  );
+  const policy = read("app/lib/payments/simpaisaPolicy.ts");
+  assert.match(policy, /maskSimpaisaMsisdn/);
+  assert.equal(maskSimpaisaMsisdn("3001234567"), "300****4567");
+  assert.equal(maskSimpaisaMsisdn("03001234567"), "300****4567");
+  assert.equal(maskSimpaisaMsisdn(null), null);
   console.log("PASS ownership_scoped_topup_reads");
+  console.log("PASS simpaisa_pending_ux_0037_refresh_safe");
 
   assert.equal(WALLET_TOPUP_MIN_CENTS, 10);
   assert.equal(WALLET_TOPUP_MAX_CENTS, 50_000);

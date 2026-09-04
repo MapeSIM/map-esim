@@ -1,6 +1,10 @@
 import "server-only";
 
-import { Role, WalletTopupStatus } from "@prisma/client";
+import {
+  PaymentGatewayProvider,
+  Role,
+  WalletTopupStatus,
+} from "@prisma/client";
 import { notFound } from "next/navigation";
 import { prisma } from "@/app/lib/db";
 import { formatUsdCents, formatWalletDateTime } from "@/app/lib/wallet/display";
@@ -8,6 +12,11 @@ import {
   getActivePaymentAdapter,
   isPaymentGatewayConfigured,
 } from "@/app/lib/payments/disabledAdapter";
+import {
+  SIMPAISA_WALLET_OPERATORS,
+  isSimpaisaWalletOperatorId,
+  simpaisaMajorAmountFromMinor,
+} from "@/app/lib/payments/simpaisaPolicy";
 import {
   formatSimpaisaPkrChargeLabel,
   quoteSimpaisaPkrChargeFromUsdCents,
@@ -27,6 +36,11 @@ export type CustomerTopupView = {
   paymentConfirmedAtLabel: string | null;
   walletCreditedAtLabel: string | null;
   canAttemptCheckout: boolean;
+  /** Simpaisa Verify already sent — show waiting UI; do not re-show pay form. */
+  awaitingWalletApproval: boolean;
+  paymentMethodLabel: string | null;
+  customerMsisdnMasked: string | null;
+  pkrAmountLabel: string | null;
   isCredited: boolean;
   isPending: boolean;
   isFailedOrExpired: boolean;
@@ -60,6 +74,16 @@ function statusLabel(status: WalletTopupStatus): string {
   }
 }
 
+function paymentMethodLabelForOperator(
+  operatorId: string | null | undefined
+): string | null {
+  const id = (operatorId ?? "").trim();
+  if (!id || !isSimpaisaWalletOperatorId(id)) return null;
+  if (id === SIMPAISA_WALLET_OPERATORS.EASYPAISA) return "Easypaisa";
+  if (id === SIMPAISA_WALLET_OPERATORS.JAZZCASH) return "JazzCash";
+  return null;
+}
+
 async function assertOwner(customerUserId: string, topupId: string) {
   const customer = await prisma.user.findUnique({
     where: { id: customerUserId },
@@ -83,6 +107,10 @@ async function assertOwner(customerUserId: string, topupId: string) {
       paymentConfirmedAt: true,
       walletCreditedAt: true,
       expiresAt: true,
+      gatewayProvider: true,
+      gatewayPaymentRef: true,
+      walletOperatorId: true,
+      customerMsisdnMasked: true,
     },
   });
   if (!row || row.customerUserId !== customer.id) {
@@ -111,10 +139,10 @@ export async function getCustomerTopupView(
   let failureMessage: string | null = null;
   if (row.status === WalletTopupStatus.FAILED) {
     failureMessage =
-      "Payment was not completed. No funds were added to your wallet.";
+      "Payment was not completed or was rejected. No funds were added to your wallet.";
   } else if (row.status === WalletTopupStatus.EXPIRED) {
     failureMessage =
-      "This checkout expired. No funds were added to your wallet.";
+      "This payment request expired. No funds were added to your wallet.";
   } else if (row.status === WalletTopupStatus.CANCELLED) {
     failureMessage =
       "This top-up was cancelled. No funds were added to your wallet.";
@@ -131,10 +159,40 @@ export async function getCustomerTopupView(
     ? formatSimpaisaPkrChargeLabel(pkrQuote.pkrRupees)
     : null;
 
+  const gatewayRef = (row.gatewayPaymentRef ?? "").trim();
+  const isSimpaisaSession =
+    row.gatewayProvider === PaymentGatewayProvider.SIMPAISA &&
+    Boolean(gatewayRef);
+  const awaitingWalletApproval =
+    isSimpaisaSession &&
+    (row.status === WalletTopupStatus.AWAITING_PAYMENT ||
+      row.status === WalletTopupStatus.PAYMENT_PENDING);
+
+  const notExpired = !row.expiresAt || row.expiresAt.getTime() > Date.now();
+  const canAttemptCheckout =
+    notExpired &&
+    (row.status === WalletTopupStatus.DRAFT ||
+      (row.status === WalletTopupStatus.AWAITING_PAYMENT && !isSimpaisaSession));
+
+  let pkrAmountLabel: string | null = null;
+  if (
+    hasQuote &&
+    (row.chargeCurrency ?? "").trim().toUpperCase() === "PKR" &&
+    typeof row.chargeAmountMinor === "number"
+  ) {
+    const major = simpaisaMajorAmountFromMinor(row.chargeAmountMinor);
+    pkrAmountLabel = major ? formatSimpaisaPkrChargeLabel(Number(major)) : null;
+  }
+  if (!pkrAmountLabel) pkrAmountLabel = pkrChargeLabel;
+
+  const methodLabel = paymentMethodLabelForOperator(row.walletOperatorId);
+
   return {
     topupId: row.id,
     status: row.status,
-    statusLabel: statusLabel(row.status),
+    statusLabel: awaitingWalletApproval
+      ? "Awaiting approval"
+      : statusLabel(row.status),
     creditAmountCents: row.creditAmountCents,
     creditAmountLabel: formatUsdCents(row.creditAmountCents),
     balanceLabel: formatUsdCents(wallet?.balanceCents ?? 0),
@@ -152,10 +210,11 @@ export async function getCustomerTopupView(
     walletCreditedAtLabel: row.walletCreditedAt
       ? formatWalletDateTime(row.walletCreditedAt)
       : null,
-    canAttemptCheckout:
-      (row.status === WalletTopupStatus.DRAFT ||
-        row.status === WalletTopupStatus.AWAITING_PAYMENT) &&
-      (!row.expiresAt || row.expiresAt.getTime() > Date.now()),
+    canAttemptCheckout,
+    awaitingWalletApproval,
+    paymentMethodLabel: methodLabel,
+    customerMsisdnMasked: (row.customerMsisdnMasked ?? "").trim() || null,
+    pkrAmountLabel,
     isCredited: row.status === WalletTopupStatus.CREDITED,
     isPending:
       row.status === WalletTopupStatus.AWAITING_PAYMENT ||
