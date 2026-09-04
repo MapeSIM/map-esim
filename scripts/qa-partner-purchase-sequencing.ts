@@ -134,7 +134,8 @@ async function main() {
         partnerProfile: {
           create: {
             discountBps: 500,
-            discountVersion: 1,
+            // Match Partner create / schema default (0). Provider must accept this.
+            discountVersion: 0,
             walletAccount: {
               create: { balanceCents: 50_000, version: 0 },
             },

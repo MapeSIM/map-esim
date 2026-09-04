@@ -30,6 +30,7 @@
     "qa:partner-purchase-state": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-purchase-state.ts",
     "qa:partner-purchase-provider": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-purchase-provider.ts",
     "qa:partner-purchase-sequencing": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-purchase-sequencing.ts",
+    "qa:partner-preclaim-forensic": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-preclaim-forensic.ts",
     "qa:partner-preclaim-log": "tsx scripts/qa-partner-preclaim-log.ts",
     "qa:partner-catalog-buy": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-catalog-buy.ts",
     "qa:partner-orders": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-orders.ts",

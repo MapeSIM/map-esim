@@ -148,7 +148,8 @@ function assertPositiveCommercial(purchase: {
     !Number.isInteger(purchase.discountBps) ||
     purchase.discountBps < 0 ||
     !Number.isInteger(purchase.discountVersion) ||
-    purchase.discountVersion < 1
+    // PartnerProfile.discountVersion defaults to 0 at create; 0 is a valid snapshot.
+    purchase.discountVersion < 0
   ) {
     throw new PartnerEsimPurchaseError(
       "INVALID_STATE",
