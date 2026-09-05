@@ -4,11 +4,14 @@ import { redirect } from "next/navigation";
 import { requireRole } from "@/app/lib/auth/session";
 import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
 import {
-  PartnerWalletTopupError,
   createPartnerWalletTopupDraft,
+  isPartnerWalletTopupError,
   startPartnerWalletTopupCheckout,
 } from "@/app/lib/partner/partnerWalletTopup";
-import { browserReturnMustNotCreditPartnerWallet } from "@/app/lib/partner/partnerWalletTopupConstants";
+import {
+  browserReturnMustNotCreditPartnerWallet,
+  logPartnerTopupFailure,
+} from "@/app/lib/partner/partnerWalletTopupConstants";
 import type { PartnerWalletTopupActionState } from "@/app/lib/partner/partnerWalletTopupFormState";
 import {
   getActivePaymentAdapter,
@@ -100,7 +103,7 @@ export async function startPartnerWalletAddFundsAction(
       checkoutIdempotencyKey: idempotencyParsed.value,
     });
   } catch (error) {
-    if (error instanceof PartnerWalletTopupError) {
+    if (isPartnerWalletTopupError(error)) {
       if (error.code === "INVALID_AMOUNT") {
         return {
           ok: false,
@@ -110,6 +113,7 @@ export async function startPartnerWalletAddFundsAction(
       }
       return { ok: false, error: error.message };
     }
+    logPartnerTopupFailure({ step: "action_create_draft", error });
     return {
       ok: false,
       error:
@@ -136,13 +140,17 @@ export async function startPartnerWalletAddFundsAction(
       customerMsisdn,
     });
   } catch (error) {
-    if (error instanceof PartnerWalletTopupError) {
+    if (isPartnerWalletTopupError(error)) {
       // Draft exists — send Partner to status page for retry messaging.
-      if (error.code === "TOPUP_UNAVAILABLE" || error.code === "GATEWAY_UNAVAILABLE") {
+      if (
+        error.code === "TOPUP_UNAVAILABLE" ||
+        error.code === "GATEWAY_UNAVAILABLE"
+      ) {
         redirect(detailPath(draft.topupId));
       }
       return { ok: false, error: error.message };
     }
+    logPartnerTopupFailure({ step: "action_start_checkout", error });
     return {
       ok: false,
       error: "Payment gateway is not available yet. Please try again later.",
@@ -218,9 +226,10 @@ export async function startPartnerWalletTopupCheckoutAction(
       customerMsisdn,
     });
   } catch (error) {
-    if (error instanceof PartnerWalletTopupError) {
+    if (isPartnerWalletTopupError(error)) {
       return { ok: false, error: error.message };
     }
+    logPartnerTopupFailure({ step: "action_retry_checkout", error });
     return {
       ok: false,
       error: "Payment gateway is not available yet. Please try again later.",

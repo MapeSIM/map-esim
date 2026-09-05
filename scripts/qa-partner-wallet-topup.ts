@@ -282,6 +282,12 @@ function main() {
   );
   console.log("PASS cards_and_production_untouched_shape");
 
+  assert.match(constants, /logPartnerTopupFailure/);
+  assert.match(constants, /VERCEL_ENV === "preview"/);
+  assert.match(core, /SCHEMA_UNAVAILABLE|isMissingPartnerTopupSchema/);
+  assert.match(actions, /isPartnerWalletTopupError|logPartnerTopupFailure/);
+  console.log("PASS partner_topup_diag_and_schema_guard");
+
   assert.match(pkg, /"qa:partner-wallet-topup"/);
   assert.ok(
     existsSync(

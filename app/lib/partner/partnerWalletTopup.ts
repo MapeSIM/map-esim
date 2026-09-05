@@ -39,6 +39,7 @@ import {
   PARTNER_TOPUP_RECONCILIATION,
   PARTNER_TOPUP_WEBHOOK_DUPLICATE,
   browserReturnMustNotCreditPartnerWallet,
+  logPartnerTopupFailure,
   parsePartnerTopupIdFromMerchantUserKey,
   partnerTopupCreditIdempotencyKey,
 } from "@/app/lib/partner/partnerWalletTopupConstants";
@@ -94,6 +95,7 @@ export class PartnerWalletTopupError extends Error {
     | "INVALID_IDEMPOTENCY"
     | "GATEWAY_UNAVAILABLE"
     | "TOPUP_UNAVAILABLE"
+    | "SCHEMA_UNAVAILABLE"
     | "UNAVAILABLE";
 
   constructor(code: PartnerWalletTopupError["code"], message: string) {
@@ -103,10 +105,49 @@ export class PartnerWalletTopupError extends Error {
   }
 }
 
+export function isPartnerWalletTopupError(
+  error: unknown
+): error is PartnerWalletTopupError {
+  if (error instanceof PartnerWalletTopupError) return true;
+  if (!error || typeof error !== "object") return false;
+  const name = (error as { name?: unknown }).name;
+  const code = (error as { code?: unknown }).code;
+  return name === "PartnerWalletTopupError" && typeof code === "string";
+}
+
 function isUniqueViolation(error: unknown): boolean {
   return (
     error instanceof Prisma.PrismaClientKnownRequestError &&
     error.code === "P2002"
+  );
+}
+
+/** Prisma P2021 / missing PartnerWalletTopup relation or table. */
+function isMissingPartnerTopupSchema(error: unknown): boolean {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2021"
+  ) {
+    return true;
+  }
+  const msg = error instanceof Error ? error.message : String(error ?? "");
+  return (
+    /PartnerWalletTopup/i.test(msg) &&
+    /does not exist|P2021/i.test(msg)
+  );
+}
+
+function mapDraftPersistenceError(error: unknown): PartnerWalletTopupError {
+  logPartnerTopupFailure({ step: "create_draft", error });
+  if (isMissingPartnerTopupSchema(error)) {
+    return new PartnerWalletTopupError(
+      "SCHEMA_UNAVAILABLE",
+      "Partner wallet top-up is not ready on this database yet (schema/migration). Please contact support."
+    );
+  }
+  return new PartnerWalletTopupError(
+    "UNAVAILABLE",
+    "Partner wallet top-up is temporarily unavailable. Please try again shortly."
   );
 }
 
@@ -205,34 +246,34 @@ export async function createPartnerWalletTopupDraft(
     );
   }
 
-  const existing = await prisma.partnerWalletTopup.findUnique({
-    where: { checkoutIdempotencyKey: idempotencyKey },
-    select: {
-      id: true,
-      partnerId: true,
-      baseAmountCents: true,
-      status: true,
-    },
-  });
-  if (existing) {
-    if (existing.partnerId !== partnerId) {
-      throw new PartnerWalletTopupError(
-        "INVALID_IDEMPOTENCY",
-        "This top-up request could not be processed. Please reload and try again."
-      );
-    }
-    return {
-      duplicate: true,
-      topupId: existing.id,
-      baseAmountCents: existing.baseAmountCents,
-      baseAmountLabel: formatUsdCents(existing.baseAmountCents),
-      status: existing.status,
-    };
-  }
-
   await assertActivePartnerProfile(partnerId);
 
   try {
+    const existing = await prisma.partnerWalletTopup.findUnique({
+      where: { checkoutIdempotencyKey: idempotencyKey },
+      select: {
+        id: true,
+        partnerId: true,
+        baseAmountCents: true,
+        status: true,
+      },
+    });
+    if (existing) {
+      if (existing.partnerId !== partnerId) {
+        throw new PartnerWalletTopupError(
+          "INVALID_IDEMPOTENCY",
+          "This top-up request could not be processed. Please reload and try again."
+        );
+      }
+      return {
+        duplicate: true,
+        topupId: existing.id,
+        baseAmountCents: existing.baseAmountCents,
+        baseAmountLabel: formatUsdCents(existing.baseAmountCents),
+        status: existing.status,
+      };
+    }
+
     const created = await prisma.$transaction(async (tx) => {
       const wallet = await tx.partnerWalletAccount.findUnique({
         where: { partnerId },
@@ -293,30 +334,32 @@ export async function createPartnerWalletTopupDraft(
       status: created.status,
     };
   } catch (error) {
+    if (error instanceof PartnerWalletTopupError) throw error;
     if (isUniqueViolation(error)) {
-      const again = await prisma.partnerWalletTopup.findUnique({
-        where: { checkoutIdempotencyKey: idempotencyKey },
-        select: {
-          id: true,
-          partnerId: true,
-          baseAmountCents: true,
-          status: true,
-        },
-      });
-      if (again && again.partnerId === partnerId) {
-        return {
-          duplicate: true,
-          topupId: again.id,
-          baseAmountCents: again.baseAmountCents,
-          baseAmountLabel: formatUsdCents(again.baseAmountCents),
-          status: again.status,
-        };
+      try {
+        const again = await prisma.partnerWalletTopup.findUnique({
+          where: { checkoutIdempotencyKey: idempotencyKey },
+          select: {
+            id: true,
+            partnerId: true,
+            baseAmountCents: true,
+            status: true,
+          },
+        });
+        if (again && again.partnerId === partnerId) {
+          return {
+            duplicate: true,
+            topupId: again.id,
+            baseAmountCents: again.baseAmountCents,
+            baseAmountLabel: formatUsdCents(again.baseAmountCents),
+            status: again.status,
+          };
+        }
+      } catch (lookupError) {
+        throw mapDraftPersistenceError(lookupError);
       }
     }
-    throw new PartnerWalletTopupError(
-      "UNAVAILABLE",
-      "Partner wallet top-up is temporarily unavailable. Please try again shortly."
-    );
+    throw mapDraftPersistenceError(error);
   }
 }
 
@@ -431,6 +474,12 @@ export async function startPartnerWalletTopupCheckout(options: {
 
   const adapter = getActivePaymentAdapter();
   if (!adapter.enabled || adapter.provider !== "SIMPAISA") {
+    logPartnerTopupFailure({
+      step: "start_checkout_adapter",
+      error: new Error(
+        `adapter_unavailable provider=${adapter.provider} enabled=${adapter.enabled}`
+      ),
+    });
     throw new PartnerWalletTopupError(
       "GATEWAY_UNAVAILABLE",
       "Payment gateway is not available yet. Please try again after payment provider setup is complete."
@@ -491,6 +540,10 @@ export async function startPartnerWalletTopupCheckout(options: {
   });
 
   if (!result.ok) {
+    logPartnerTopupFailure({
+      step: "start_checkout_verify",
+      error: new Error(`${result.code}:${result.message}`),
+    });
     throw new PartnerWalletTopupError("GATEWAY_UNAVAILABLE", result.message);
   }
 

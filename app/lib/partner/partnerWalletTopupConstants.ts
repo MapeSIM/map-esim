@@ -45,3 +45,53 @@ export function partnerTopupCreditIdempotencyKey(topupId: string): string {
 export function browserReturnMustNotCreditPartnerWallet(): void {
   // Marker for QA + call sites — funding only via verified Inquire webhook path.
 }
+
+/** Preview/dev-only diagnostics — never enable on Production. */
+export function isPartnerTopupDiagEnabled(): boolean {
+  return (
+    process.env.NODE_ENV === "development" ||
+    process.env.VERCEL_ENV === "preview"
+  );
+}
+
+/**
+ * Safe Partner top-up failure log for Preview/dev.
+ * Never logs secrets, DATABASE_URL, passwords, API keys, or full MSISDN.
+ */
+export function logPartnerTopupFailure(input: {
+  step: string;
+  error: unknown;
+}): void {
+  if (!isPartnerTopupDiagEnabled()) return;
+  const err = input.error;
+  const errorClass =
+    err instanceof Error
+      ? err.name || "Error"
+      : err === null
+        ? "null"
+        : typeof err;
+  let errorCode: string | null = null;
+  let errorMessage = "";
+  if (err && typeof err === "object" && "code" in err) {
+    const code = (err as { code?: unknown }).code;
+    if (typeof code === "string" && code.length <= 32) errorCode = code;
+  }
+  if (err instanceof Error) {
+    errorMessage = err.message;
+  } else if (typeof err === "string") {
+    errorMessage = err;
+  } else {
+    errorMessage = "non_error";
+  }
+  // Strip long digit runs (possible MSISDN) and truncate.
+  errorMessage = errorMessage
+    .replace(/\d{8,}/g, "[digits]")
+    .replace(/(postgres(ql)?:\/\/)[^\s]+/gi, "$1[redacted]")
+    .slice(0, 280);
+  console.error("partner_wallet_topup_failure", {
+    step: input.step.slice(0, 64),
+    errorClass: String(errorClass).slice(0, 64),
+    errorCode,
+    errorMessage,
+  });
+}
