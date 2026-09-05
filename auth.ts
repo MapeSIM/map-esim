@@ -25,6 +25,7 @@ import { setAdminSessionEndedNotice } from "@/app/lib/auth/adminSession";
 import { writeAuditLog } from "@/app/lib/auth/audit";
 import { MapEsimPrismaAdapter } from "@/app/lib/auth/prismaAdapter";
 import { verifyPassword } from "@/app/lib/auth/password";
+import { logPreviewCredentialsAuthorizeNull } from "@/app/lib/auth/previewCredentialsAuthorizeDiag";
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
 import { prisma } from "@/app/lib/db";
 
@@ -58,8 +59,12 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         remember: { label: "Remember", type: "text" },
       },
       async authorize(credentials) {
+        // TEMPORARY: Preview/dev null-reason logs — remove after auth debug.
         const parsed = credentialsSchema.safeParse(credentials);
-        if (!parsed.success) return null;
+        if (!parsed.success) {
+          logPreviewCredentialsAuthorizeNull({ reason: "zod_fail" });
+          return null;
+        }
 
         const email = normalizeEmail(parsed.data.email);
         const rate = consumeRateLimit({
@@ -67,27 +72,75 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           limit: 10,
           windowMs: 15 * 60 * 1000,
         });
-        if (!rate.ok) return null;
+        if (!rate.ok) {
+          logPreviewCredentialsAuthorizeNull({
+            reason: "rate_limit",
+            email,
+            retryAfterSec: rate.retryAfterSec,
+          });
+          return null;
+        }
 
         const user = await prisma.user.findUnique({ where: { email } });
         // Null passwordHash (OAuth-only) → same failure as unknown user.
-        if (!user?.passwordHash) return null;
-        if (user.deletedAt) return null;
-        if (!user.emailVerifiedAt) return null;
+        if (!user?.passwordHash) {
+          logPreviewCredentialsAuthorizeNull({
+            reason: "no_user_or_hash",
+            email,
+          });
+          return null;
+        }
+        if (user.deletedAt) {
+          logPreviewCredentialsAuthorizeNull({
+            reason: "deleted",
+            email,
+            role: user.role,
+          });
+          return null;
+        }
+        if (!user.emailVerifiedAt) {
+          logPreviewCredentialsAuthorizeNull({
+            reason: "email_unverified",
+            email,
+            role: user.role,
+          });
+          return null;
+        }
         // Disabled admins must not sign in.
-        if (user.role === "ADMIN" && user.adminDisabledAt) return null;
+        if (user.role === "ADMIN" && user.adminDisabledAt) {
+          logPreviewCredentialsAuthorizeNull({
+            reason: "admin_disabled",
+            email,
+            role: user.role,
+          });
+          return null;
+        }
         // Disabled partners must not sign in.
         if (user.role === "PARTNER") {
           const partner = await prisma.partnerProfile.findUnique({
             where: { userId: user.id },
             select: { disabledAt: true },
           });
-          if (!partner || partner.disabledAt) return null;
+          if (!partner || partner.disabledAt) {
+            logPreviewCredentialsAuthorizeNull({
+              reason: "partner_missing_or_disabled",
+              email,
+              role: user.role,
+            });
+            return null;
+          }
         }
 
         const passwordHash = user.passwordHash;
         const valid = await verifyPassword(parsed.data.password, passwordHash);
-        if (!valid) return null;
+        if (!valid) {
+          logPreviewCredentialsAuthorizeNull({
+            reason: "bcrypt_failure",
+            email,
+            role: user.role,
+          });
+          return null;
+        }
 
         // Single active ADMIN session: rotate generation before JWT is issued.
         if (user.role === "ADMIN") {
@@ -105,7 +158,14 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         }
 
         const role = coerceAppRole(user.role);
-        if (!role) return null;
+        if (!role) {
+          logPreviewCredentialsAuthorizeNull({
+            reason: "role_coerce_fail",
+            email,
+            role: user.role,
+          });
+          return null;
+        }
 
         return {
           id: user.id,
