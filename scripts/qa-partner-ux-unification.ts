@@ -40,7 +40,9 @@ function main() {
   assert.match(partnerHome, /Share Branding/);
   assert.match(partnerHome, /Quick Actions/);
   assert.doesNotMatch(partnerHome, /Reward Points|rewardPoints/i);
-  assert.doesNotMatch(partnerWallet, /Reward Points|rewardPoints|Add funds/i);
+  assert.doesNotMatch(partnerWallet, /Reward Points|rewardPoints/i);
+  assert.match(partnerWallet, /Add Funds|PartnerWalletAddFundsForm/);
+  assert.doesNotMatch(partnerWallet, /Self top-up is not available yet/);
   assert.doesNotMatch(partnerWallet, /href=["']\/account\/wallet\/top-up["']/);
   assert.match(partnerWallet, /Available Partner Balance/);
   assert.match(partnerOrders, /My eSIMs/);

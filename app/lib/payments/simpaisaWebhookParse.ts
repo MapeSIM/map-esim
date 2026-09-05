@@ -55,8 +55,12 @@ function parseBody(rawBody: string): Record<string, unknown> | null {
   }
 }
 
-function resolvePurpose(_userKey: string): PaymentCheckoutPurpose {
-  // applyVerifiedPaymentEvent resolves wallet top-up vs eSIM by DB lookup on userKey.
+function resolvePurpose(userKey: string): PaymentCheckoutPurpose {
+  // Partner Add Funds uses distinct ptop_ merchant userKey namespace.
+  if (userKey.trim().startsWith("ptop_")) {
+    return "PARTNER_WALLET_TOPUP";
+  }
+  // Customer wallet top-up vs eSIM resolved by DB lookup on userKey in dispatch.
   return "ESIM_PURCHASE";
 }
 
@@ -168,6 +172,12 @@ export function parseSimpaisaWebhookEvent(input: {
   if (eventId.length > 190) return null;
 
   const purpose = resolvePurpose(userKey);
+  const partnerTopupId =
+    purpose === "PARTNER_WALLET_TOPUP"
+      ? userKey.startsWith("ptop_")
+        ? userKey.slice("ptop_".length).trim() || null
+        : null
+      : null;
 
   return {
     signatureVerified: input.signatureVerified,
@@ -175,7 +185,7 @@ export function parseSimpaisaWebhookEvent(input: {
     purpose,
     eventId,
     providerPaymentRef: transactionId,
-    localTopupId: null,
+    localTopupId: partnerTopupId,
     paymentAttemptId: userKey,
     purchaseId: null,
     paymentStatus,

@@ -350,9 +350,11 @@ async function applySimpaisaWebhookEvent(
       outcome: ignored ? result.reason : result.outcome,
       duplicate: ignored ? false : result.duplicate,
       paymentAttemptId:
-        result.kind === "esim_purchase" || ignored ? event.paymentAttemptId : null,
+        result.kind === "esim_purchase" || ignored
+          ? event.paymentAttemptId
+          : null,
       topupId:
-        result.kind === "wallet_topup"
+        result.kind === "wallet_topup" || result.kind === "partner_wallet_topup"
           ? event.localTopupId ?? event.paymentAttemptId
           : null,
     });

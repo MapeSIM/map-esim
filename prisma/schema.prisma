@@ -20,6 +20,21 @@ enum PartnerWalletTransactionType {
   ESIM_PURCHASE_DEBIT
   /// Automated confirmed-failure / restore refund of a Partner eSIM purchase debit.
   ESIM_PURCHASE_REFUND
+  /// Self-service Simpaisa wallet Add Funds credit (base amount only; never fee).
+  TOPUP_CREDIT
+}
+
+/// Partner self-service wallet top-up (parallel to customer WalletTopup; never shared rows).
+enum PartnerWalletTopupStatus {
+  DRAFT
+  AWAITING_PAYMENT
+  PAYMENT_PENDING
+  PAYMENT_CONFIRMED
+  CREDITED
+  FAILED
+  EXPIRED
+  CANCELLED
+  RECONCILIATION_REQUIRED
 }
 
 enum OrderClaimStatus {
@@ -340,6 +355,7 @@ model PartnerProfile {
   esimPurchases   PartnerEsimPurchase[]
   esimShareTokens PartnerEsimShareToken[]
   refundRequests  PartnerRefundRequest[]
+  walletTopups    PartnerWalletTopup[]
 
   @@index([disabledAt])
   @@index([createdAt])
@@ -378,10 +394,67 @@ model PartnerWalletTransaction {
   createdByAdmin         User?                         @relation("PartnerWalletTxCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: SetNull)
   purchaseAsDebit        PartnerEsimPurchase?          @relation("PartnerPurchaseDebitTx")
   purchaseAsRefund       PartnerEsimPurchase?          @relation("PartnerPurchaseRefundTx")
+  topupAsCredit          PartnerWalletTopup?           @relation("PartnerTopupCreditTx")
 
   @@index([partnerWalletAccountId, createdAt])
   @@index([createdByAdminId])
   @@index([createdAt])
+}
+
+/// Gateway Partner wallet Add Funds attempt (Simpaisa Easypaisa/JazzCash).
+/// Never shares rows with customer WalletTopup. Credit = baseAmountCents only.
+model PartnerWalletTopup {
+  id                               String                   @id @default(cuid())
+  partnerId                        String
+  /// USD cents credited to PartnerWalletAccount (never includes processing fee).
+  baseAmountCents                  Int
+  /// Reserved for future Payment Processing Fee (v1 always 0).
+  processingFeeAmountCents         Int                      @default(0)
+  /// USD cents used for gateway quote (base + fee). v1 equals baseAmountCents.
+  totalPayableCents                Int
+  /// Null while fee policy disabled.
+  feePolicyVersion                 String?
+  chargeCurrency                   String?
+  chargeAmountMinor                Int?
+  fxRateSnapshot                   String?
+  gatewayProvider                  PaymentGatewayProvider?
+  gatewayPaymentRef                String?
+  walletOperatorId                 String?
+  /// Masked national MSISDN only — never full number.
+  customerMsisdnMasked             String?
+  status                           PartnerWalletTopupStatus @default(DRAFT)
+  checkoutIdempotencyKey           String                   @unique
+  webhookEventId                   String?                  @unique
+  walletTransactionId              String?                  @unique
+  failureCategory                  String?
+  failureCode                      String?
+  reconciliationResolvedAt         DateTime?
+  reconciliationResolvedByAdminId  String?
+  reconciliationResolutionReason   String?
+  reconciliationResolutionCode     String?
+  reconciliationLockedAt           DateTime?
+  reconciliationLockedByAdminId    String?
+  reconciliationLockReason         String?
+  reconciliationEscalatedAt        DateTime?
+  reconciliationEscalatedByAdminId String?
+  reconciliationEscalationReason   String?
+  reconciliationEscalationPriority String?
+  expiresAt                        DateTime?
+  paymentConfirmedAt               DateTime?
+  walletCreditedAt                 DateTime?
+  createdAt                        DateTime                 @default(now())
+  updatedAt                        DateTime                 @updatedAt
+  partner                          PartnerProfile           @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  walletTransaction                PartnerWalletTransaction? @relation("PartnerTopupCreditTx", fields: [walletTransactionId], references: [id], onDelete: SetNull)
+
+  @@index([partnerId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([partnerId, createdAt])
+  @@index([gatewayProvider])
+  @@index([reconciliationResolvedAt])
+  @@index([reconciliationLockedAt])
+  @@index([reconciliationEscalatedAt])
 }
 
 model EmailOtp {

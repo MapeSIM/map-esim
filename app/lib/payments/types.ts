@@ -13,7 +13,10 @@ export type PaymentGatewayProviderName =
   | "MANUAL_TEST"
   | "UNCONFIGURED";
 
-export type PaymentCheckoutPurpose = "WALLET_TOPUP" | "ESIM_PURCHASE";
+export type PaymentCheckoutPurpose =
+  | "WALLET_TOPUP"
+  | "PARTNER_WALLET_TOPUP"
+  | "ESIM_PURCHASE";
 
 export type NormalizedPaymentStatus =
   | "confirmed"
@@ -42,6 +45,11 @@ export type CreateWalletTopupCheckoutInput = CreateCheckoutSessionBase & {
   localTopupId: string;
 };
 
+export type CreatePartnerWalletTopupCheckoutInput = CreateCheckoutSessionBase & {
+  purpose: "PARTNER_WALLET_TOPUP";
+  localPartnerTopupId: string;
+};
+
 export type CreateEsimPurchaseCheckoutInput = CreateCheckoutSessionBase & {
   purpose: "ESIM_PURCHASE";
   paymentAttemptId: string;
@@ -53,6 +61,7 @@ export type CreateEsimPurchaseCheckoutInput = CreateCheckoutSessionBase & {
 
 export type CreateCheckoutSessionInput =
   | CreateWalletTopupCheckoutInput
+  | CreatePartnerWalletTopupCheckoutInput
   | CreateEsimPurchaseCheckoutInput;
 
 export type CreateCheckoutSessionResult =

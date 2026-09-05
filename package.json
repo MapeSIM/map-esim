@@ -44,6 +44,7 @@
     "qa:partner-refund-execution": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-partner-refund-execution.ts",
     "qa:partner-refund-status-email": "tsx scripts/qa-partner-refund-status-email.ts",
     "qa:partner-ux-unification": "tsx scripts/qa-partner-ux-unification.ts",
+    "qa:partner-wallet-topup": "tsx scripts/qa-partner-wallet-topup.ts",
     "qa:partner-invite-setup": "tsx scripts/qa-partner-invite-setup.ts",
     "qa:wallet-foundation": "tsx scripts/qa-wallet-foundation.ts",
     "qa:admin-wallet-credit": "tsx scripts/qa-admin-wallet-credit.ts",

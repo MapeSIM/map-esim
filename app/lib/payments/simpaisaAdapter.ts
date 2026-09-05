@@ -23,6 +23,7 @@ import { SIMPAISA_PKR_USD_RATE } from "@/app/lib/payments/simpaisaPkrQuote";
 import { parseSimpaisaWebhookEvent } from "@/app/lib/payments/simpaisaWebhookParse";
 import { verifySimpaisaWebhookSignature } from "@/app/lib/payments/simpaisaWebhookCrypto";
 import { simpaisaSignatureHeader } from "@/app/lib/payments/simpaisaWebhookObservability";
+import { partnerTopupMerchantUserKey } from "@/app/lib/partner/partnerWalletTopupConstants";
 import type {
   CreateCheckoutSessionInput,
   CreateCheckoutSessionResult,
@@ -60,11 +61,17 @@ function absoluteAppUrl(relativePath: string): string {
 
 function merchantUserKey(input: CreateCheckoutSessionInput): string {
   if (input.purpose === "WALLET_TOPUP") return input.localTopupId.trim();
+  if (input.purpose === "PARTNER_WALLET_TOPUP") {
+    return partnerTopupMerchantUserKey(input.localPartnerTopupId);
+  }
   return input.paymentAttemptId.trim();
 }
 
 function productReference(input: CreateCheckoutSessionInput): string {
   if (input.purpose === "WALLET_TOPUP") return input.localTopupId.trim();
+  if (input.purpose === "PARTNER_WALLET_TOPUP") {
+    return partnerTopupMerchantUserKey(input.localPartnerTopupId);
+  }
   return input.purchaseId.trim();
 }
 
@@ -99,6 +106,13 @@ function validateCheckoutInput(
   if (input.purpose === "WALLET_TOPUP") {
     if (!input.localTopupId.trim() || input.localTopupId.length > 64) {
       return "Invalid top-up reference.";
+    }
+  } else if (input.purpose === "PARTNER_WALLET_TOPUP") {
+    if (
+      !input.localPartnerTopupId.trim() ||
+      input.localPartnerTopupId.length > 64
+    ) {
+      return "Invalid partner top-up reference.";
     }
   } else if (input.purpose === "ESIM_PURCHASE") {
     if (
