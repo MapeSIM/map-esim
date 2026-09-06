@@ -205,6 +205,8 @@ function partnerTxTypeLabel(type: PartnerWalletTransactionType): string {
       return "Purchase debit";
     case PartnerWalletTransactionType.ESIM_PURCHASE_REFUND:
       return "Purchase refund";
+    case PartnerWalletTransactionType.TOPUP_CREDIT:
+      return "Add Funds";
     default:
       return "Transaction";
   }

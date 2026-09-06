@@ -20,6 +20,8 @@ enum PartnerWalletTransactionType {
   ESIM_PURCHASE_DEBIT
   /// Automated confirmed-failure / restore refund of a Partner eSIM purchase debit.
   ESIM_PURCHASE_REFUND
+  /// Self-service Simpaisa wallet Add Funds credit (base amount only; never fee).
+  TOPUP_CREDIT
 }
 
 enum OrderClaimStatus {
