@@ -555,7 +555,9 @@ async function main() {
       path.join(root, "app/partner/(portal)/layout.tsx"),
       "utf8"
     );
-    assert.ok(layoutSrc.includes('href: "/partner/catalog"'));
+    assert.ok(layoutSrc.includes('href: "/countries"'));
+    assert.ok(layoutSrc.includes('label: "Catalog"'));
+    assert.ok(!layoutSrc.includes('href: "/partner/catalog"'));
     assert.ok(layoutSrc.includes('href: "/partner/orders"'));
     assert.equal(layoutSrc.includes('label: "Orders", disabled: true'), false);
     console.log("PASS nav_catalog_and_orders_enabled");
