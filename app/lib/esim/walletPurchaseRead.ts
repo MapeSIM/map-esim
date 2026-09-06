@@ -23,6 +23,7 @@ import {
 } from "@/app/lib/esim/esimDeliveryEmail";
 import { isPurchaseDeliveryEmailLocked } from "@/app/lib/esim/esimDeliveryEmailState";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
+import { parsePaymentGatewayProvider } from "@/app/lib/payments/gatewaySelect";
 import { formatUsdCents } from "@/app/lib/wallet/display";
 import { pointsNeededToUnlockRewards } from "@/app/lib/rewards/rewardConstants";
 import { isRewardRedemptionEligible } from "@/app/lib/rewards/rewardPoints";
@@ -30,6 +31,15 @@ import { isRewardRedemptionEligible } from "@/app/lib/rewards/rewardPoints";
 function displayOrUnavailable(value: string | null | undefined): string {
   const trimmed = (value ?? "").trim();
   return trimmed ? trimmed : "Not available";
+}
+
+function resolveActivePaymentProviderLabel(): "SAFEPAY" | "SIMPAISA" | null {
+  if (!isPaymentGatewayConfigured()) return null;
+  const selected = parsePaymentGatewayProvider(
+    process.env.PAYMENT_GATEWAY_PROVIDER
+  );
+  if (selected === "SIMPAISA" || selected === "SAFEPAY") return selected;
+  return null;
 }
 
 export type WalletPurchaseReview = {
@@ -68,8 +78,10 @@ export type WalletPurchaseReview = {
   walletAppliedLabel: string;
   gatewayAmountCents: number;
   gatewayAmountLabel: string;
-  fundingLabel: "Wallet" | "Wallet + card" | "Card";
+  fundingLabel: "Wallet" | "Wallet + mobile payment" | "Mobile payment" | "Wallet + card" | "Card";
   paymentGatewayConfigured: boolean;
+  /** Active hosted-checkout provider when configured; drives Simpaisa wallet fields. */
+  activePaymentProvider: "SAFEPAY" | "SIMPAISA" | null;
   idempotencyKey: string;
   status: WalletEsimPurchaseStatus;
   canConfirm: boolean;
@@ -176,11 +188,13 @@ export async function getWalletPurchaseReview(
       ? Math.max(0, balanceCents - displayFunding.walletAppliedCents)
       : balanceCents;
 
+  const activePaymentProvider = resolveActivePaymentProviderLabel();
+  const mobileLabels = activePaymentProvider === "SIMPAISA";
   let fundingLabel: WalletPurchaseReview["fundingLabel"] = "Wallet";
   if (displayFunding.gatewayAmountCents > 0 && displayFunding.walletAppliedCents > 0) {
-    fundingLabel = "Wallet + card";
+    fundingLabel = mobileLabels ? "Wallet + mobile payment" : "Wallet + card";
   } else if (displayFunding.gatewayAmountCents > 0) {
-    fundingLabel = "Card";
+    fundingLabel = mobileLabels ? "Mobile payment" : "Card";
   }
 
   return {
@@ -225,6 +239,7 @@ export async function getWalletPurchaseReview(
     gatewayAmountLabel: formatUsdCents(displayFunding.gatewayAmountCents),
     fundingLabel,
     paymentGatewayConfigured: isPaymentGatewayConfigured(),
+    activePaymentProvider,
     idempotencyKey: row.idempotencyKey,
     status: row.status,
     canConfirm:

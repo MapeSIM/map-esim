@@ -27,14 +27,16 @@ import {
 import type { DeliveryEmailActionState } from "@/app/lib/esim/esimDeliveryEmailFormState";
 import {
   parseUseRewardsChoice,
-  parseUseWalletChoice,
   parseWalletPurchaseIdempotencyKey,
+  resolveCustomerCheckoutUseWallet,
 } from "@/app/lib/esim/walletPurchaseValidation";
 import {
   listAdminAssignmentOffers,
   type AdminOfferOption,
 } from "@/app/lib/esim/adminPackageAssignmentRead";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
+import { parsePaymentGatewayProvider } from "@/app/lib/payments/gatewaySelect";
+import { parseSimpaisaWalletCheckoutFields } from "@/app/lib/payments/simpaisaPkrQuote";
 import {
   normalizeOfferId,
   sanitizeCountryHint,
@@ -142,7 +144,15 @@ export async function setWalletPurchaseFundingChoiceAction(
 ): Promise<WalletPurchaseActionState> {
   const customer = await requireRole("CUSTOMER");
   const purchaseId = String(formData.get("purchaseId") ?? "").trim();
-  const useWallet = parseUseWalletChoice(formData.get("useWallet"));
+  const resolved = resolveCustomerCheckoutUseWallet(formData);
+  if (resolved.error) {
+    return {
+      ok: false,
+      fieldErrors: { paymentMode: resolved.error },
+      error: resolved.error,
+    };
+  }
+  const useWallet = resolved.useWallet;
   const useRewards = parseUseRewardsChoice(formData.get("useRewards"));
 
   void formData.get("walletAppliedCents");
@@ -153,6 +163,7 @@ export async function setWalletPurchaseFundingChoiceAction(
   void formData.get("rewardPoints");
   void formData.get("rewardPointsRedeemed");
   void formData.get("pointsBalance");
+  void formData.get("useWallet");
 
   if (!purchaseId || purchaseId.length > 64) {
     return { ok: false, error: "This purchase is unavailable." };
@@ -189,8 +200,18 @@ export async function confirmWalletEsimPurchaseAction(
     formData.get("idempotencyKey")
   );
   const confirmed = formData.get("confirm") === "on";
-  const useWallet = parseUseWalletChoice(formData.get("useWallet"));
+  const resolved = resolveCustomerCheckoutUseWallet(formData);
+  if (resolved.error) {
+    return {
+      ok: false,
+      fieldErrors: { paymentMode: resolved.error },
+      error: resolved.error,
+    };
+  }
+  const useWallet = resolved.useWallet;
   const useRewards = parseUseRewardsChoice(formData.get("useRewards"));
+  const walletOperatorIdRaw = formData.get("walletOperatorId");
+  const customerMsisdnRaw = formData.get("customerMsisdn");
 
   // Never trust browser money fields or delivery-email fields.
   void formData.get("price");
@@ -213,6 +234,7 @@ export async function confirmWalletEsimPurchaseAction(
   void formData.get("deliveryEmailConfirm");
   void formData.get("deliveryEmailAttestation");
   void formData.get("useAlternateDeliveryEmail");
+  void formData.get("useWallet");
 
   if (!purchaseId || purchaseId.length > 64) {
     return { ok: false, error: "This purchase is unavailable." };
@@ -249,59 +271,119 @@ export async function confirmWalletEsimPurchaseAction(
     }
   }
 
+  const startHostedCheckout = async (): Promise<
+    | { ok: true; checkout: Awaited<ReturnType<typeof startEsimPurchaseHostedCheckout>> }
+    | {
+        ok: false;
+        error: string;
+        code?: EsimPurchaseGatewayCheckoutError["code"];
+        fieldErrors?: {
+          walletOperatorId?: string;
+          customerMsisdn?: string;
+        };
+      }
+  > => {
+    let walletOperatorId: string | undefined;
+    let customerMsisdn: string | undefined;
+
+    const selected = parsePaymentGatewayProvider(
+      process.env.PAYMENT_GATEWAY_PROVIDER
+    );
+    if (selected === "SIMPAISA") {
+      const walletFields = parseSimpaisaWalletCheckoutFields({
+        walletOperatorId: walletOperatorIdRaw,
+        customerMsisdn: customerMsisdnRaw,
+      });
+      if (!walletFields.ok) {
+        return {
+          ok: false,
+          fieldErrors: walletFields.fieldErrors,
+          error: walletFields.error,
+        };
+      }
+      walletOperatorId = walletFields.walletOperatorId;
+      customerMsisdn = walletFields.customerMsisdn;
+    }
+
+    try {
+      const checkout = await startEsimPurchaseHostedCheckout({
+        customerUserId: customer.id,
+        purchaseId,
+        useWallet,
+        useRewards,
+        walletOperatorId,
+        customerMsisdn,
+      });
+      return { ok: true, checkout };
+    } catch (error) {
+      if (error instanceof EsimPurchaseGatewayCheckoutError) {
+        if (error.message === "Select Easypaisa or JazzCash.") {
+          return {
+            ok: false,
+            code: error.code,
+            fieldErrors: { walletOperatorId: error.message },
+            error: error.message,
+          };
+        }
+        if (error.message.includes("mobile number")) {
+          return {
+            ok: false,
+            code: error.code,
+            fieldErrors: { customerMsisdn: error.message },
+            error: error.message,
+          };
+        }
+        return { ok: false, code: error.code, error: error.message };
+      }
+      return {
+        ok: false,
+        error: CARD_PAYMENT_UNAVAILABLE_MESSAGE,
+      };
+    }
+  };
+
   if (funding) {
     if (funding.gatewayAmountCents > 0) {
       if (!isPaymentGatewayConfigured()) {
         return { ok: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE };
       }
 
-      let checkout;
-      try {
-        checkout = await startEsimPurchaseHostedCheckout({
-          customerUserId: customer.id,
-          purchaseId,
-          useWallet,
-          useRewards,
-        });
-      } catch (error) {
-        if (error instanceof EsimPurchaseGatewayCheckoutError) {
-          return { ok: false, error: error.message };
-        }
+      const started = await startHostedCheckout();
+      if (!started.ok) {
         return {
           ok: false,
-          error: CARD_PAYMENT_UNAVAILABLE_MESSAGE,
+          error: started.error,
+          fieldErrors: started.fieldErrors,
         };
       }
       // Must stay outside try/catch — redirect() throws NEXT_REDIRECT.
-      // External Safepay Hosted Checkout — never log checkoutUrl/tokens.
-      redirect(checkout.checkoutUrl);
+      // External hosted checkout — never log checkoutUrl/tokens.
+      redirect(started.checkout.checkoutUrl);
     }
   } else {
     // READY funding persist failed (likely AWAITING_GATEWAY_PAYMENT).
-    // Attempt gateway resume when card payment is still required.
-    let checkout;
+    // Attempt gateway resume when gateway payment is still required.
     let resumeInvalidState = false;
-    try {
-      if (!isPaymentGatewayConfigured()) {
-        return { ok: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE };
-      }
-      checkout = await startEsimPurchaseHostedCheckout({
-        customerUserId: customer.id,
-        purchaseId,
-        useWallet,
-        useRewards,
-      });
-    } catch (error) {
-      if (error instanceof EsimPurchaseGatewayCheckoutError) {
-        if (error.code === "INVALID_STATE") {
-          // May be full-wallet after funding change while awaiting — fall through.
-          resumeInvalidState = true;
-        } else {
-          return { ok: false, error: error.message };
-        }
+    let checkout: Awaited<
+      ReturnType<typeof startEsimPurchaseHostedCheckout>
+    > | null = null;
+    if (!isPaymentGatewayConfigured()) {
+      return { ok: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE };
+    }
+    const started = await startHostedCheckout();
+    if (!started.ok) {
+      if (started.code === "INVALID_STATE" && !started.fieldErrors) {
+        // May be full-wallet after funding change while awaiting — fall through.
+        resumeInvalidState = true;
       } else {
-        return { ok: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE };
+        return {
+          ok: false,
+          error: started.error,
+          fieldErrors: started.fieldErrors,
+        };
       }
+    } else {
+      checkout = started.checkout;
     }
     if (!resumeInvalidState && checkout) {
       // Must stay outside try/catch — redirect() throws NEXT_REDIRECT.
