@@ -2,6 +2,8 @@ import "server-only";
 
 import { prisma } from "@/app/lib/db";
 import { applyVerifiedEsimPurchasePaymentEvent } from "@/app/lib/esim/esimPurchasePaymentApply";
+import { parsePartnerTopupIdFromMerchantUserKey } from "@/app/lib/partner/partnerWalletTopupConstants";
+import { applyVerifiedPartnerTopupPaymentEvent } from "@/app/lib/partner/partnerWalletTopup";
 import type { NormalizedPaymentEvent } from "@/app/lib/payments/types";
 import { applyVerifiedTopupPaymentEvent } from "@/app/lib/wallet/topup";
 
@@ -17,14 +19,19 @@ export type ApplyVerifiedPaymentEventResult =
       outcome: string;
     }
   | {
+      kind: "partner_wallet_topup";
+      duplicate: boolean;
+      outcome: string;
+    }
+  | {
       kind: "ignored";
       reason: "unknown_reference";
     };
 
 /**
- * Route a signature-verified normalized payment event to wallet top-up or
- * eSIM purchase funding. Gateway adapters may set purpose explicitly; when
- * metadata only carries a local id (e.g. Safepay order_id), resolve by DB.
+ * Route a signature-verified normalized payment event to Partner top-up,
+ * customer wallet top-up, or eSIM purchase funding.
+ * Partner `ptop_` namespace is resolved before customer WalletTopup / eSIM lookup.
  * Never creates VeSIM orders from top-up events.
  */
 export async function applyVerifiedPaymentEvent(
@@ -36,6 +43,40 @@ export async function applyVerifiedPaymentEvent(
 
   const topupId = (event.localTopupId ?? "").trim();
   const attemptId = (event.paymentAttemptId ?? "").trim();
+
+  // Partner Add Funds first — distinct ptop_ namespace; never collide with customer/eSIM.
+  const partnerTopupId =
+    (event.purpose === "PARTNER_WALLET_TOPUP" ? topupId : "") ||
+    parsePartnerTopupIdFromMerchantUserKey(attemptId) ||
+    parsePartnerTopupIdFromMerchantUserKey(topupId) ||
+    "";
+
+  if (partnerTopupId) {
+    const partnerRow = await prisma.partnerWalletTopup.findUnique({
+      where: { id: partnerTopupId },
+      select: { id: true },
+    });
+    if (partnerRow) {
+      const result = await applyVerifiedPartnerTopupPaymentEvent({
+        ...event,
+        purpose: "PARTNER_WALLET_TOPUP",
+        localTopupId: partnerRow.id,
+        paymentAttemptId:
+          parsePartnerTopupIdFromMerchantUserKey(attemptId) === partnerRow.id
+            ? attemptId
+            : attemptId || null,
+        purchaseId: null,
+      });
+      return {
+        kind: "partner_wallet_topup",
+        duplicate: result.duplicate,
+        outcome: result.status,
+      };
+    }
+    if (event.purpose === "PARTNER_WALLET_TOPUP") {
+      return { kind: "ignored", reason: "unknown_reference" };
+    }
+  }
 
   if (event.purpose === "WALLET_TOPUP" && topupId) {
     const result = await applyVerifiedTopupPaymentEvent(event);

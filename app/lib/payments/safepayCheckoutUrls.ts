@@ -25,7 +25,8 @@ export function assertSafePaymentReturnPath(path: string): string {
     !(
       isEsimPurchasePaymentReturnPath(safe) ||
       isEsimPurchasePaymentCancelPath(safe) ||
-      safe.startsWith("/account/wallet/top-up/")
+      safe.startsWith("/account/wallet/top-up/") ||
+      safe.startsWith("/partner/wallet/top-up/")
     )
   ) {
     throw new Error("INVALID_RETURN_PATH");

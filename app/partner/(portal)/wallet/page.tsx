@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { getPartnerPortalSummary } from "@/app/lib/partner/partnerAccess";
 import { requireRole } from "@/app/lib/auth/session";
+import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
+import { parsePaymentGatewayProvider } from "@/app/lib/payments/gatewaySelect";
+import PartnerWalletAddFundsForm from "@/app/components/partner/PartnerWalletAddFundsForm";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +52,13 @@ export default async function PartnerWalletPage() {
     );
   }
 
+  // Partner Add Funds is Simpaisa-only; do not show a live form while Safepay is active.
+  const selectedProvider = parsePaymentGatewayProvider(
+    process.env.PAYMENT_GATEWAY_PROVIDER
+  );
+  const gatewayReady =
+    selectedProvider === "SIMPAISA" && isPaymentGatewayConfigured();
+
   return (
     <div className="min-w-0 w-full max-w-full space-y-8">
       <header className="flex min-w-0 flex-wrap items-end justify-between gap-3">
@@ -80,9 +90,14 @@ export default async function PartnerWalletPage() {
             {summary.discountPercentLabel}
           </span>
           . Applied automatically when you buy. Admin funding continues to
-          credit this wallet. Self top-up is not available yet.
+          credit this wallet.
         </p>
       </div>
+
+      <PartnerWalletAddFundsForm
+        balanceLabel={summary.balanceLabel}
+        gatewayReady={gatewayReady}
+      />
 
       <section className="min-w-0 w-full max-w-full space-y-4">
         <h2 className="text-lg font-semibold tracking-tight">

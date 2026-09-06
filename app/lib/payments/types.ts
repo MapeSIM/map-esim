@@ -5,6 +5,7 @@
 
 export type PaymentGatewayProviderName =
   | "SIMPAISA"
+  | "SIMPAISA_CARDS"
   | "PAYFAST"
   | "SAFEPAY"
   | "JAZZCASH"
@@ -12,7 +13,10 @@ export type PaymentGatewayProviderName =
   | "MANUAL_TEST"
   | "UNCONFIGURED";
 
-export type PaymentCheckoutPurpose = "WALLET_TOPUP" | "ESIM_PURCHASE";
+export type PaymentCheckoutPurpose =
+  | "WALLET_TOPUP"
+  | "PARTNER_WALLET_TOPUP"
+  | "ESIM_PURCHASE";
 
 export type NormalizedPaymentStatus =
   | "confirmed"
@@ -30,11 +34,20 @@ type CreateCheckoutSessionBase = {
   /** Internal relative path only — never arbitrary absolute URLs. */
   returnPath: string;
   cancelPath: string;
+  /** Simpaisa wallet operator id. Ignored by Safepay. */
+  walletOperatorId?: string;
+  /** Customer MSISDN for wallet collection. Ignored by Safepay. */
+  customerMsisdn?: string;
 };
 
 export type CreateWalletTopupCheckoutInput = CreateCheckoutSessionBase & {
   purpose: "WALLET_TOPUP";
   localTopupId: string;
+};
+
+export type CreatePartnerWalletTopupCheckoutInput = CreateCheckoutSessionBase & {
+  purpose: "PARTNER_WALLET_TOPUP";
+  localPartnerTopupId: string;
 };
 
 export type CreateEsimPurchaseCheckoutInput = CreateCheckoutSessionBase & {
@@ -48,6 +61,7 @@ export type CreateEsimPurchaseCheckoutInput = CreateCheckoutSessionBase & {
 
 export type CreateCheckoutSessionInput =
   | CreateWalletTopupCheckoutInput
+  | CreatePartnerWalletTopupCheckoutInput
   | CreateEsimPurchaseCheckoutInput;
 
 export type CreateCheckoutSessionResult =
@@ -88,6 +102,10 @@ export type WebhookVerificationResult =
  * Crediting / purchase funding requires signatureVerified === true.
  */
 export type NormalizedPaymentEvent = {
+  /**
+   * For Safepay: HMAC signature verified on the postback.
+   * For Simpaisa sandbox: set true only after authoritative Inquire 0000 + field validation.
+   */
   signatureVerified: boolean;
   provider: PaymentGatewayProviderName;
   purpose: PaymentCheckoutPurpose;
@@ -101,6 +119,8 @@ export type NormalizedPaymentEvent = {
   chargeAmountMinor: number;
   confirmedAt: Date | null;
   failureCategory: string | null;
+  /** Simpaisa wallet operator id (100007 / 100008) when parsed from postback. */
+  walletOperatorId?: string | null;
 };
 
 export type FetchPaymentStatusInput = {

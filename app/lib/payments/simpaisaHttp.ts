@@ -1,0 +1,668 @@
+import "server-only";
+
+import type { SimpaisaValidatedConfig } from "@/app/lib/payments/simpaisaConfig";
+import {
+  nestedInquiryData,
+  parseSimpaisaInquiryResponse,
+  pickAmountRawFromRecords,
+  SIMPAISA_INQUIRY_PARSE_CURRENCY_KEYS,
+  SIMPAISA_INQUIRY_PARSE_RESPONSE_CODE_KEYS,
+} from "@/app/lib/payments/simpaisaInquiryParse";
+import {
+  isSimpaisaAcceptedVerifyCode,
+  isSimpaisaPendingCode,
+  isSimpaisaWalletOperatorId,
+  normalizeSimpaisaResponseCode,
+  SIMPAISA_API_HEADER_MODE,
+  SIMPAISA_API_HEADER_REGION,
+  SIMPAISA_API_HEADER_VERSION,
+  SIMPAISA_CHARGE_CURRENCY,
+  SIMPAISA_INQUIRY_PATH,
+  SIMPAISA_REFUND_PATH,
+  SIMPAISA_VERIFY_PATH,
+  SIMPAISA_WALLET_TRANSACTION_TYPE,
+  SIMPAISA_WEBHOOK_PATH,
+  normalizeSimpaisaMsisdn,
+  simpaisaMajorAmountFromMinor,
+  type SimpaisaWalletOperatorId,
+} from "@/app/lib/payments/simpaisaPolicy";
+import type { PaymentCheckoutPurpose } from "@/app/lib/payments/types";
+
+export type SimpaisaVerifyInput = {
+  chargeAmountMinor: number;
+  chargeCurrency: string;
+  purpose: PaymentCheckoutPurpose;
+  checkoutIdempotencyKey: string;
+  /** MAP payment/order reference — sent as userKey (not an API secret). */
+  merchantUserKey: string;
+  productReference: string;
+  walletOperatorId: string;
+  customerMsisdn: string;
+};
+
+export type SimpaisaVerifyResult = {
+  merchantUserKey: string;
+  providerTransactionId: string;
+  responseCode: string;
+  pending: boolean;
+};
+
+export type SimpaisaInquiryResult = {
+  responseCode: string;
+  status: "confirmed" | "pending" | "failed" | "uncertain";
+  providerTransactionId: string | null;
+  chargeAmountMinor: number | null;
+  chargeCurrency: string | null;
+  merchantId: string | null;
+  operatorId: string | null;
+  userKey: string | null;
+  transactionType: string | null;
+};
+
+export type SimpaisaRefundResult = {
+  providerRefundRef: string | null;
+};
+
+type SimpaisaJson = Record<string, unknown>;
+
+const HTTP_RETRY_DELAYS_MS = [250, 750, 1500] as const;
+const HTTP_MAX_ATTEMPTS = HTTP_RETRY_DELAYS_MS.length + 1;
+
+function asRecord(value: unknown): SimpaisaJson | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as SimpaisaJson;
+}
+
+function asString(value: unknown): string | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value).trim() || null;
+  }
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function firstString(record: SimpaisaJson, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = asString(record[key]);
+    if (value) return value;
+  }
+  return null;
+}
+
+function nestedData(json: SimpaisaJson): SimpaisaJson {
+  return nestedInquiryData(json);
+}
+
+function inquiryFieldRecordsLocal(json: SimpaisaJson): SimpaisaJson[] {
+  // Prefer nested `transaction` (official Inquire) before root fallbacks.
+  const records: SimpaisaJson[] = [];
+  const nested = nestedData(json);
+  if (nested !== json) records.push(nested);
+  records.push(json);
+  return records;
+}
+
+const RESPONSE_CODE_KEYS = SIMPAISA_INQUIRY_PARSE_RESPONSE_CODE_KEYS;
+const CURRENCY_KEYS = SIMPAISA_INQUIRY_PARSE_CURRENCY_KEYS;
+
+const SANDBOX_TRACE_KEY_ALLOWLIST = [
+  "responseCode",
+  "response_code",
+  "status",
+  "responseMessage",
+  "response_message",
+  "message",
+  "msg",
+  "merchantId",
+  "merchant_id",
+  "operatorId",
+  "operator_id",
+  "operatorID",
+  "userKey",
+  "user_key",
+  "transactionId",
+  "transaction_id",
+  "transactionType",
+  "transaction_type",
+  "amount",
+  "transactionAmount",
+  "transAmount",
+  "txnAmount",
+  "transaction_amount",
+  "paidAmount",
+  "requestedAmount",
+  "currency",
+  "currencyCode",
+  "currency_code",
+  "curr",
+  "productReference",
+  "data",
+  "result",
+  "transaction",
+  "payload",
+  "success",
+] as const;
+
+function allowlistedPresentKeys(record: SimpaisaJson | null): string[] {
+  if (!record) return [];
+  const present = new Set(Object.keys(record).map((key) => key.toLowerCase()));
+  const matched: string[] = [];
+  for (const key of SANDBOX_TRACE_KEY_ALLOWLIST) {
+    if (present.has(key.toLowerCase()) && !matched.includes(key)) {
+      matched.push(key);
+    }
+  }
+  return matched;
+}
+
+function pickStringFromRecords(
+  records: SimpaisaJson[],
+  keys: readonly string[] | string[]
+): string | null {
+  for (const record of records) {
+    for (const key of keys) {
+      const direct = asString(record[key]);
+      if (direct) return direct;
+      for (const [k, v] of Object.entries(record)) {
+        if (k.toLowerCase() !== key.toLowerCase()) continue;
+        const s = asString(v);
+        if (s) return s;
+      }
+    }
+  }
+  return null;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function shouldRetryHttpStatus(status: number): boolean {
+  return status >= 500 && status <= 599;
+}
+
+const SIMPAISA_SANDBOX_TRACE_PREFIX = "simpaisa_sandbox_trace";
+const SANDBOX_TRACE_MESSAGE_MAX = 160;
+
+function sandboxEndpointName(path: string): "verify" | "inquiry" | "refund" | "unknown" {
+  if (path === SIMPAISA_VERIFY_PATH) return "verify";
+  if (path === SIMPAISA_INQUIRY_PATH) return "inquiry";
+  if (path === SIMPAISA_REFUND_PATH) return "refund";
+  return "unknown";
+}
+
+function clipTraceText(value: unknown, max = 64): string | null {
+  const text = asString(value);
+  if (!text) return null;
+  return text.length > max ? text.slice(0, max) : text;
+}
+
+function sandboxTraceAmount(value: unknown): string | number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  return clipTraceText(value, 24);
+}
+
+/** Truncate provider messages; strip digits/MSISDN-like runs; drop secret-like text. */
+function sanitizeSimpaisaResponseMessage(raw: string | null): string | null {
+  if (!raw) return null;
+  let text = raw.replace(/\s+/g, " ").trim();
+  if (!text) return null;
+  if (
+    /(password|secret|bearer\s|authorization|api[_-]?key|token\s*[:=])/i.test(
+      text
+    )
+  ) {
+    return "[redacted]";
+  }
+  text = text.replace(/\+?92\d{7,}/g, "[msisdn]");
+  text = text.replace(/\b0?3\d{8,}\b/g, "[msisdn]");
+  text = text.replace(/\d{8,}/g, "[digits]");
+  if (text.length > SANDBOX_TRACE_MESSAGE_MAX) {
+    text = text.slice(0, SANDBOX_TRACE_MESSAGE_MAX);
+  }
+  return text;
+}
+
+function logSimpaisaSandboxTrace(input: {
+  environment: string;
+  endpoint: "verify" | "inquiry" | "refund" | "unknown";
+  mapReference: string | null;
+  merchantId: string | null;
+  operatorId: string | null;
+  amount: string | number | null;
+  currency: string | null;
+  transactionId: string | null;
+  httpStatus: number | null;
+  responseCode: string | null;
+  responseMessage: string | null;
+  requestId: string | null;
+  amountSource?: string | null;
+  currencySource?: string | null;
+  amountValueType?: string | null;
+  responseKeys?: string[] | null;
+  dataKeys?: string[] | null;
+  dataIsArray?: boolean | null;
+  hasResponseCode?: boolean | null;
+}): void {
+  if (input.environment !== "sandbox") return;
+  console.info(SIMPAISA_SANDBOX_TRACE_PREFIX, {
+    timestamp: new Date().toISOString(),
+    environment: "sandbox",
+    endpoint: input.endpoint,
+    mapReference: input.mapReference,
+    merchantId: input.merchantId,
+    operatorId: input.operatorId,
+    amount: input.amount,
+    currency: input.currency,
+    transactionId: input.transactionId,
+    httpStatus: input.httpStatus,
+    responseCode: input.responseCode,
+    responseMessage: input.responseMessage,
+    requestId: input.requestId,
+    amountSource: input.amountSource ?? null,
+    currencySource: input.currencySource ?? null,
+    amountValueType: input.amountValueType ?? null,
+    responseKeys: input.responseKeys ?? null,
+    dataKeys: input.dataKeys ?? null,
+    dataIsArray: input.dataIsArray ?? null,
+    hasResponseCode: input.hasResponseCode ?? null,
+  });
+}
+
+/**
+ * Thin direct HTTP client for Simpaisa PK wallet collection (v3 contract).
+ * Secrets stay in memory only; never log request/response bodies, MSISDN, or tokens.
+ * Temporary sandbox-only allowlisted traces use prefix simpaisa_sandbox_trace.
+ * Production never emits those traces.
+ * Non-OTP Verify accepts only 0037 Transaction-Pending — never a paid signal.
+ * Unexpected Verify 0000 is not authoritative payment success.
+ */
+export class SimpaisaHttpClient {
+  constructor(private readonly config: SimpaisaValidatedConfig) {}
+
+  webhookCallbackPath(): string {
+    return SIMPAISA_WEBHOOK_PATH;
+  }
+
+  async verifyWalletTransaction(
+    input: SimpaisaVerifyInput
+  ): Promise<SimpaisaVerifyResult> {
+    const currency = input.chargeCurrency.trim().toUpperCase();
+    if (currency !== SIMPAISA_CHARGE_CURRENCY) {
+      throw new SimpaisaHttpError(
+        "INVALID_REQUEST",
+        "Simpaisa wallet collection requires PKR."
+      );
+    }
+    const amount = simpaisaMajorAmountFromMinor(input.chargeAmountMinor);
+    if (!amount) {
+      throw new SimpaisaHttpError("INVALID_REQUEST", "Invalid charge amount.");
+    }
+    if (!isSimpaisaWalletOperatorId(input.walletOperatorId)) {
+      throw new SimpaisaHttpError(
+        "INVALID_REQUEST",
+        "Unsupported wallet operator."
+      );
+    }
+    const msisdn = normalizeSimpaisaMsisdn(input.customerMsisdn);
+    if (!msisdn) {
+      throw new SimpaisaHttpError("INVALID_REQUEST", "Invalid mobile number.");
+    }
+    const merchantUserKey = input.merchantUserKey.trim();
+    if (!merchantUserKey || merchantUserKey.length > 64) {
+      throw new SimpaisaHttpError(
+        "INVALID_REQUEST",
+        "Invalid payment reference."
+      );
+    }
+    const productReference = input.productReference.trim();
+    if (!productReference || productReference.length > 64) {
+      throw new SimpaisaHttpError(
+        "INVALID_REQUEST",
+        "Invalid product reference."
+      );
+    }
+    const requestId = input.checkoutIdempotencyKey.trim();
+    if (!requestId || requestId.length > 128) {
+      throw new SimpaisaHttpError("INVALID_REQUEST", "Invalid checkout key.");
+    }
+
+    const operatorId: SimpaisaWalletOperatorId = input.walletOperatorId;
+    const json = await this.requestJson(
+      "POST",
+      SIMPAISA_VERIFY_PATH,
+      {
+        merchantId: this.config.merchantId,
+        operatorId,
+        userKey: merchantUserKey,
+        msisdn,
+        transactionType: SIMPAISA_WALLET_TRANSACTION_TYPE,
+        amount,
+        productReference,
+      },
+      {
+        operatorID: operatorId,
+        "Request-Id": requestId,
+        mode: SIMPAISA_API_HEADER_MODE,
+        region: SIMPAISA_API_HEADER_REGION,
+        version: SIMPAISA_API_HEADER_VERSION,
+      }
+    );
+
+    const data = nestedData(json);
+    const responseCode = normalizeSimpaisaResponseCode(
+      firstString(data, ["responseCode", "response_code", "status"]) ??
+        firstString(json, ["responseCode", "response_code", "status"])
+    );
+    if (!isSimpaisaAcceptedVerifyCode(responseCode)) {
+      // Non-OTP Verify must return 0037. Unexpected 0000/other is never treated as paid.
+      throw new SimpaisaHttpError(
+        "UNAVAILABLE",
+        "Payment provider did not accept the wallet request as pending."
+      );
+    }
+
+    const providerTransactionId =
+      firstString(data, ["transactionId", "transaction_id"]) ??
+      firstString(json, ["transactionId", "transaction_id"]) ??
+      merchantUserKey;
+
+    return {
+      merchantUserKey,
+      providerTransactionId,
+      responseCode,
+      pending: isSimpaisaPendingCode(responseCode),
+    };
+  }
+
+  async inquireTransaction(input: {
+    userKey?: string | null;
+    transactionId?: string | null;
+    operatorId?: string | null;
+  }): Promise<SimpaisaInquiryResult> {
+    const userKey = (input.userKey ?? "").trim();
+    const transactionId = (input.transactionId ?? "").trim();
+    if (
+      (!userKey && !transactionId) ||
+      userKey.length > 64 ||
+      transactionId.length > 190
+    ) {
+      throw new SimpaisaHttpError(
+        "INVALID_REQUEST",
+        "Invalid payment reference."
+      );
+    }
+
+    const operatorIdInput = (input.operatorId ?? "").trim();
+    const body: Record<string, unknown> = {
+      merchantId: this.config.merchantId,
+    };
+    if (userKey) body.userKey = userKey;
+    if (transactionId) body.transactionId = transactionId;
+
+    const extraHeaders: Record<string, string> = {
+      mode: SIMPAISA_API_HEADER_MODE,
+      region: SIMPAISA_API_HEADER_REGION,
+      version: SIMPAISA_API_HEADER_VERSION,
+      "Request-Id": userKey || transactionId,
+    };
+    if (operatorIdInput && isSimpaisaWalletOperatorId(operatorIdInput)) {
+      extraHeaders.operatorID = operatorIdInput;
+    }
+
+    const json = await this.requestJson(
+      "POST",
+      SIMPAISA_INQUIRY_PATH,
+      body,
+      extraHeaders
+    );
+    const parsed = parseSimpaisaInquiryResponse(json, {
+      userKey,
+      transactionId,
+    });
+    if (!parsed) {
+      throw new SimpaisaHttpError("UNAVAILABLE", "Payment provider unavailable.");
+    }
+
+    return {
+      responseCode: parsed.responseCode,
+      status: parsed.status,
+      providerTransactionId: parsed.providerTransactionId,
+      chargeAmountMinor: parsed.chargeAmountMinor,
+      chargeCurrency: parsed.chargeCurrency,
+      merchantId: parsed.merchantId,
+      operatorId: parsed.operatorId,
+      userKey: parsed.userKey,
+      transactionType: parsed.transactionType,
+    };
+  }
+
+  async refundTransaction(input: {
+    transactionId: string;
+    amountMinor: number;
+    currency: string;
+  }): Promise<SimpaisaRefundResult> {
+    const ref = input.transactionId.trim();
+    const currency = input.currency.trim().toUpperCase();
+    const amount = simpaisaMajorAmountFromMinor(input.amountMinor);
+    if (!ref || ref.length > 190 || !amount || currency !== SIMPAISA_CHARGE_CURRENCY) {
+      throw new SimpaisaHttpError("INVALID_REQUEST", "Invalid refund request.");
+    }
+
+    const json = await this.requestJson("POST", SIMPAISA_REFUND_PATH, {
+      merchantId: this.config.merchantId,
+      transactionId: ref,
+      amount,
+      currency,
+    });
+    const data = nestedData(json);
+    const responseCode = normalizeSimpaisaResponseCode(
+      firstString(data, ["responseCode", "response_code", "status"]) ??
+        firstString(json, ["responseCode", "response_code", "status"])
+    );
+    if (!responseCode || responseCode !== "0000") {
+      throw new SimpaisaHttpError("UNAVAILABLE", "Refund was not accepted.");
+    }
+
+    return {
+      providerRefundRef:
+        firstString(data, ["refundId", "refund_id", "transactionId"]) ??
+        firstString(json, ["refundId", "refund_id", "transactionId"]),
+    };
+  }
+
+  private sandboxTrace(
+    path: string,
+    body: Record<string, unknown>,
+    extraHeaders: Record<string, string>,
+    httpStatus: number | null,
+    json: SimpaisaJson | null
+  ): void {
+    if (this.config.environment !== "sandbox") return;
+    try {
+      const records = json ? inquiryFieldRecordsLocal(json) : [];
+      const data = json ? nestedData(json) : null;
+      const responseCode = json
+        ? normalizeSimpaisaResponseCode(
+            pickStringFromRecords(records, RESPONSE_CODE_KEYS)
+          )
+        : null;
+      const rawMessage = json
+        ? pickStringFromRecords(records, [
+            "responseMessage",
+            "response_message",
+            "message",
+            "msg",
+          ])
+        : null;
+      const endpoint = sandboxEndpointName(path);
+      const amountPick = json
+        ? pickAmountRawFromRecords(records)
+        : { value: null, source: null, valueType: "missing" };
+      const requestAmount =
+        typeof body.amount === "number" || typeof body.amount === "string"
+          ? body.amount
+          : null;
+      const amount =
+        endpoint === "inquiry"
+          ? amountPick.value
+          : (requestAmount ?? amountPick.value);
+      const currencyFromResponse = json
+        ? pickStringFromRecords(records, CURRENCY_KEYS)
+        : null;
+      const currency =
+        endpoint === "inquiry"
+          ? currencyFromResponse
+          : clipTraceText(body.currency, 8) ?? currencyFromResponse;
+      const transactionId =
+        body.transactionId ??
+        pickStringFromRecords(records, ["transactionId", "transaction_id"]);
+      const operatorId =
+        body.operatorId ??
+        extraHeaders.operatorID ??
+        pickStringFromRecords(records, [
+          "operatorId",
+          "operator_id",
+          "operatorID",
+        ]);
+
+      logSimpaisaSandboxTrace({
+        environment: this.config.environment,
+        endpoint,
+        mapReference: clipTraceText(body.userKey, 64),
+        merchantId: clipTraceText(body.merchantId, 32),
+        operatorId: clipTraceText(operatorId, 16),
+        amount: sandboxTraceAmount(amount),
+        currency: clipTraceText(currency, 8),
+        transactionId: clipTraceText(transactionId, 190),
+        httpStatus,
+        responseCode: responseCode || null,
+        responseMessage: sanitizeSimpaisaResponseMessage(rawMessage),
+        requestId: clipTraceText(extraHeaders["Request-Id"], 128),
+        amountSource:
+          endpoint === "inquiry"
+            ? amountPick.source
+            : requestAmount != null
+              ? "request"
+              : amountPick.source,
+        currencySource:
+          currencyFromResponse
+            ? "response"
+            : endpoint === "inquiry"
+              ? "missing"
+              : body.currency
+                ? "request"
+                : "missing",
+        amountValueType: amountPick.valueType,
+        responseKeys: json ? allowlistedPresentKeys(json) : [],
+        dataKeys: data && data !== json ? allowlistedPresentKeys(data) : [],
+        dataIsArray: json ? Array.isArray(json.data) : null,
+        hasResponseCode: Boolean(responseCode),
+      });
+    } catch {
+      // Tracing must never change Verify / Inquire / Refund behavior.
+    }
+  }
+
+  private async requestJson(
+    method: "POST",
+    path: string,
+    body: Record<string, unknown>,
+    extraHeaders: Record<string, string> = {}
+  ): Promise<SimpaisaJson> {
+    const url = `${this.config.apiBaseUrl}${path}`;
+    let lastStatus: number | null = null;
+
+    for (let attempt = 0; attempt < HTTP_MAX_ATTEMPTS; attempt++) {
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          method,
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            ...extraHeaders,
+          },
+          body: JSON.stringify(body),
+          cache: "no-store",
+        });
+      } catch {
+        if (attempt < HTTP_MAX_ATTEMPTS - 1) {
+          await sleep(HTTP_RETRY_DELAYS_MS[attempt] ?? 1500);
+          continue;
+        }
+        this.sandboxTrace(path, body, extraHeaders, lastStatus, null);
+        console.error("simpaisa_http", "NETWORK_ERROR", method, path);
+        throw new SimpaisaHttpError(
+          "UNAVAILABLE",
+          "Payment provider unavailable."
+        );
+      }
+
+      lastStatus = response.status;
+      if (shouldRetryHttpStatus(response.status) && attempt < HTTP_MAX_ATTEMPTS - 1) {
+        await sleep(HTTP_RETRY_DELAYS_MS[attempt] ?? 1500);
+        continue;
+      }
+
+      if (!response.ok) {
+        this.sandboxTrace(path, body, extraHeaders, response.status, null);
+        console.error(
+          "simpaisa_http",
+          "HTTP_ERROR",
+          method,
+          path,
+          response.status
+        );
+        throw new SimpaisaHttpError(
+          "UNAVAILABLE",
+          "Payment provider unavailable."
+        );
+      }
+
+      let json: unknown;
+      try {
+        json = await response.json();
+      } catch {
+        this.sandboxTrace(path, body, extraHeaders, response.status, null);
+        console.error("simpaisa_http", "INVALID_JSON", method, path);
+        throw new SimpaisaHttpError(
+          "UNAVAILABLE",
+          "Payment provider unavailable."
+        );
+      }
+
+      const record = asRecord(json);
+      if (!record) {
+        this.sandboxTrace(path, body, extraHeaders, response.status, null);
+        throw new SimpaisaHttpError(
+          "UNAVAILABLE",
+          "Payment provider unavailable."
+        );
+      }
+      this.sandboxTrace(path, body, extraHeaders, response.status, record);
+      return record;
+    }
+
+    this.sandboxTrace(path, body, extraHeaders, lastStatus, null);
+    console.error(
+      "simpaisa_http",
+      "HTTP_ERROR",
+      method,
+      path,
+      lastStatus ?? "unknown"
+    );
+    throw new SimpaisaHttpError("UNAVAILABLE", "Payment provider unavailable.");
+  }
+}
+
+export class SimpaisaHttpError extends Error {
+  readonly code: "INVALID_REQUEST" | "UNAVAILABLE";
+
+  constructor(code: "INVALID_REQUEST" | "UNAVAILABLE", message: string) {
+    super(message);
+    this.name = "SimpaisaHttpError";
+    this.code = code;
+  }
+}
