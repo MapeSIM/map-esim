@@ -37,6 +37,12 @@ import {
   esimPurchasePaymentReturnPath,
 } from "@/app/lib/payments/safepayCheckoutPaths";
 import { resumeSafepayHostedCheckout } from "@/app/lib/payments/safepayAdapter";
+import { resumeSimpaisaWalletCheckout } from "@/app/lib/payments/simpaisaAdapter";
+import {
+  parseSimpaisaWalletCheckoutFields,
+  quoteSimpaisaPkrChargeFromUsdCents,
+  simpaisaChargeMatchesQuote,
+} from "@/app/lib/payments/simpaisaPkrQuote";
 import {
   assertCustomerFinancialActivityAllowed,
   CustomerAccountRestrictedError,
@@ -67,6 +73,10 @@ export type StartEsimPurchaseHostedCheckoutInput = {
   useWallet: boolean;
   /** Server-parsed useRewards choice from the checkout form (never points/money fields). */
   useRewards: boolean;
+  /** Required for Simpaisa mobile-wallet remainder; ignored by Safepay. */
+  walletOperatorId?: string;
+  /** Required for Simpaisa mobile-wallet remainder; ignored by Safepay. */
+  customerMsisdn?: string;
 };
 
 export type StartEsimPurchaseHostedCheckoutResult = {
@@ -318,12 +328,56 @@ export async function startEsimPurchaseHostedCheckout(
     );
   }
 
+  const adapter = getActivePaymentAdapter();
+  if (!adapter.enabled) {
+    throw new EsimPurchaseGatewayCheckoutError(
+      "GATEWAY_UNAVAILABLE",
+      CARD_PAYMENT_UNAVAILABLE_MESSAGE
+    );
+  }
+
+  const isSimpaisa = adapter.provider === "SIMPAISA";
+  const gatewayProvider = isSimpaisa
+    ? PaymentGatewayProvider.SIMPAISA
+    : PaymentGatewayProvider.SAFEPAY;
+
+  let chargeAmountMinor = funding.gatewayAmountCents;
+  let chargeCurrency = currency;
+  let fxRateSnapshot: string | null = null;
+  let walletOperatorId: string | undefined;
+  let customerMsisdn: string | undefined;
+
+  if (isSimpaisa) {
+    const quote = quoteSimpaisaPkrChargeFromUsdCents(funding.gatewayAmountCents);
+    if (!quote) {
+      throw new EsimPurchaseGatewayCheckoutError(
+        "GATEWAY_UNAVAILABLE",
+        "Payment checkout quote is unavailable. Please try again."
+      );
+    }
+    const walletFields = parseSimpaisaWalletCheckoutFields({
+      walletOperatorId: input.walletOperatorId,
+      customerMsisdn: input.customerMsisdn,
+    });
+    if (!walletFields.ok) {
+      throw new EsimPurchaseGatewayCheckoutError(
+        "INVALID_STATE",
+        walletFields.error
+      );
+    }
+    chargeAmountMinor = quote.chargeAmountMinor;
+    chargeCurrency = quote.chargeCurrency;
+    fxRateSnapshot = quote.fxRateSnapshot;
+    walletOperatorId = walletFields.walletOperatorId;
+    customerMsisdn = walletFields.customerMsisdn;
+  }
+
   const fundingSource =
     funding.walletAppliedCents > 0
       ? OrderFundingSource.CUSTOMER_SPLIT
       : OrderFundingSource.DIRECT_PAYMENT;
 
-  // Split: reserve walletAppliedCents before Safepay redirect (exact-once).
+  // Split: reserve walletAppliedCents before gateway redirect (exact-once).
   if (funding.walletAppliedCents > 0) {
     try {
       await reserveSplitWalletBeforeGatewayCheckout({
@@ -474,7 +528,7 @@ export async function startEsimPurchaseHostedCheckout(
           purchaseId: purchase.id,
           gatewayAmountCents: funding.gatewayAmountCents,
           currency,
-          gatewayProvider: PaymentGatewayProvider.SAFEPAY,
+          gatewayProvider,
           status: EsimPurchasePaymentAttemptStatus.DRAFT,
           checkoutIdempotencyKey: checkoutKey,
         },
@@ -536,6 +590,41 @@ export async function startEsimPurchaseHostedCheckout(
       attempt.status === EsimPurchasePaymentAttemptStatus.DRAFT);
 
   if (canResumeTracker && existingRef) {
+    if (attempt.gatewayProvider === PaymentGatewayProvider.SIMPAISA) {
+      const resumed = resumeSimpaisaWalletCheckout({ returnPath });
+      if (!resumed.ok) {
+        throw new EsimPurchaseGatewayCheckoutError(
+          resumed.code === "MISCONFIGURED" ||
+            resumed.code === "GATEWAY_UNAVAILABLE"
+            ? "GATEWAY_UNAVAILABLE"
+            : "UNAVAILABLE",
+          resumed.message
+        );
+      }
+
+      await prisma.walletEsimPurchase.updateMany({
+        where: {
+          id: purchase.id,
+          customerUserId,
+          status: {
+            in: [
+              WalletEsimPurchaseStatus.READY,
+              WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+            ],
+          },
+        },
+        data: { status: WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT },
+      });
+
+      return {
+        purchaseId: purchase.id,
+        paymentAttemptId: attempt.id,
+        checkoutUrl: resumed.checkoutUrl,
+        reusedAttempt,
+        reusedTracker: true,
+      };
+    }
+
     const resumed = await resumeSafepayHostedCheckout({
       trackerToken: existingRef,
       returnPath,
@@ -574,7 +663,6 @@ export async function startEsimPurchaseHostedCheckout(
     };
   }
 
-  const adapter = getActivePaymentAdapter();
   let session;
   try {
     session = await adapter.createCheckoutSession({
@@ -582,11 +670,13 @@ export async function startEsimPurchaseHostedCheckout(
       customerUserId,
       purchaseId: purchase.id,
       paymentAttemptId: attempt.id,
-      chargeAmountMinor: funding.gatewayAmountCents,
-      chargeCurrency: currency,
+      chargeAmountMinor,
+      chargeCurrency,
       checkoutIdempotencyKey: checkoutKey,
       returnPath,
       cancelPath,
+      walletOperatorId,
+      customerMsisdn,
     });
   } catch {
     await releaseSplitReservationAfterSessionFailure({
@@ -615,6 +705,8 @@ export async function startEsimPurchaseHostedCheckout(
   }
 
   const providerRef = (session.providerPaymentRef ?? "").trim();
+  const sessionChargeCurrency = session.chargeCurrency.trim().toUpperCase();
+  const sessionChargeAmountMinor = session.chargeAmountMinor;
   if (!providerRef) {
     await releaseSplitReservationAfterSessionFailure({
       purchaseId: purchase.id,
@@ -627,15 +719,35 @@ export async function startEsimPurchaseHostedCheckout(
     );
   }
 
+  if (
+    isSimpaisa &&
+    (!Number.isInteger(sessionChargeAmountMinor) ||
+      !simpaisaChargeMatchesQuote({
+        usdCents: funding.gatewayAmountCents,
+        chargeCurrency: sessionChargeCurrency,
+        chargeAmountMinor: sessionChargeAmountMinor,
+      }))
+  ) {
+    await releaseSplitReservationAfterSessionFailure({
+      purchaseId: purchase.id,
+      customerUserId,
+      walletAppliedCents: funding.walletAppliedCents,
+    }).catch(() => undefined);
+    throw new EsimPurchaseGatewayCheckoutError(
+      "GATEWAY_UNAVAILABLE",
+      "Payment checkout quote did not match the PKR charge. Please try again."
+    );
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.esimPurchasePaymentAttempt.update({
       where: { id: attempt!.id },
       data: {
-        gatewayProvider: PaymentGatewayProvider.SAFEPAY,
+        gatewayProvider,
         gatewayPaymentRef: providerRef,
-        chargeCurrency: session.chargeCurrency,
-        chargeAmountMinor: session.chargeAmountMinor,
-        fxRateSnapshot: session.fxRateSnapshot,
+        chargeCurrency: sessionChargeCurrency,
+        chargeAmountMinor: sessionChargeAmountMinor,
+        fxRateSnapshot: session.fxRateSnapshot ?? fxRateSnapshot,
         expiresAt: session.expiresAt,
         status: EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
         failureCategory: null,
