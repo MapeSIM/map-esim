@@ -168,10 +168,15 @@ export async function applyVerifiedEsimPurchasePaymentEvent(
     };
   }
 
+  const lookupProvider =
+    event.provider === "SIMPAISA"
+      ? PaymentGatewayProvider.SIMPAISA
+      : PaymentGatewayProvider.SAFEPAY;
+
   let attempt = await prisma.esimPurchasePaymentAttempt.findFirst({
     where: {
       gatewayPaymentRef: tracker,
-      gatewayProvider: PaymentGatewayProvider.SAFEPAY,
+      gatewayProvider: lookupProvider,
     },
     orderBy: { createdAt: "desc" },
     select: {
