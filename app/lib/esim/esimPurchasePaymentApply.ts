@@ -82,7 +82,12 @@ function amountsMatch(input: {
 export async function applyVerifiedEsimPurchasePaymentEvent(
   event: NormalizedPaymentEvent
 ): Promise<ApplyVerifiedEsimPaymentResult> {
-  if (!event.signatureVerified || event.provider !== "SAFEPAY") {
+  // Webhook-only funding: browser return must never call this path.
+  // Accept Safepay (card) and Simpaisa (Easypaisa/JazzCash) when signature-verified.
+  if (
+    !event.signatureVerified ||
+    (event.provider !== "SAFEPAY" && event.provider !== "SIMPAISA")
+  ) {
     return {
       duplicate: false,
       purchaseId: null,
@@ -239,7 +244,22 @@ export async function applyVerifiedEsimPurchasePaymentEvent(
     });
   }
 
-  if (!attempt || attempt.gatewayProvider !== PaymentGatewayProvider.SAFEPAY) {
+  if (
+    !attempt ||
+    (attempt.gatewayProvider !== PaymentGatewayProvider.SAFEPAY &&
+      attempt.gatewayProvider !== PaymentGatewayProvider.SIMPAISA)
+  ) {
+    return {
+      duplicate: false,
+      purchaseId: null,
+      paymentAttemptId: null,
+      purchaseStatus: null,
+      attemptStatus: null,
+      outcome: "ignored",
+    };
+  }
+
+  if (event.provider !== attempt.gatewayProvider) {
     return {
       duplicate: false,
       purchaseId: null,
@@ -267,13 +287,17 @@ export async function applyVerifiedEsimPurchasePaymentEvent(
     eventCurrency: event.chargeCurrency,
   });
 
-  // Also accept authoritative USD gateway amount when quote snapshot differs.
-  const usdMatch = amountsMatch({
-    expectedAmount: attempt.gatewayAmountCents,
-    expectedCurrency: (attempt.currency || "USD").trim().toUpperCase(),
-    eventAmount: event.chargeAmountMinor,
-    eventCurrency: event.chargeCurrency,
-  });
+  // Safepay: also accept authoritative USD gateway amount when quote snapshot differs.
+  // Simpaisa: PKR chargeAmountMinor is authoritative — do not match USD cents to PKR.
+  const usdMatch =
+    attempt.gatewayProvider === PaymentGatewayProvider.SAFEPAY
+      ? amountsMatch({
+          expectedAmount: attempt.gatewayAmountCents,
+          expectedCurrency: (attempt.currency || "USD").trim().toUpperCase(),
+          eventAmount: event.chargeAmountMinor,
+          eventCurrency: event.chargeCurrency,
+        })
+      : false;
 
   if (!match && !usdMatch) {
     await prisma.$transaction(async (tx) => {
