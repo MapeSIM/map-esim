@@ -39,7 +39,9 @@ export const runtime = "nodejs";
  *
  * Sandbox (SIMPAISA_ENVIRONMENT=sandbox):
  * - Unsigned postbacks are accepted as Inquire triggers only.
- * - Never fund on webhook payload alone — authoritative Inquire 0000 required.
+ * - Pending postbacks are ignored (no Inquire).
+ * - Failed/uncertain/confirmed postbacks require authoritative Inquire before apply.
+ * - Never fund or release on webhook payload alone.
  *
  * Production:
  * - Fail-closed until Simpaisa provides/approves signature contract.
@@ -195,40 +197,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, ignored: true }, { status: 200 });
   }
 
-  if (
-    event.paymentStatus === "pending" ||
-    event.paymentStatus === "uncertain" ||
-    event.paymentStatus === "failed"
-  ) {
-    const outcome =
-      event.paymentStatus === "pending"
-        ? "pending_not_paid"
-        : event.paymentStatus === "uncertain"
-          ? "uncertain_not_paid"
-          : "failed_not_paid";
+  // Pending = in-flight only. Never Inquire/fund/release from a pending postback.
+  if (event.paymentStatus === "pending") {
     await observeSimpaisaWebhookDelivery({
       code: "APPLY_RESULT",
       httpStatus: 200,
       httpOutcome: "ignored",
-      errorCategory:
-        event.paymentStatus === "pending"
-          ? "PENDING_NOT_PAID"
-          : event.paymentStatus === "uncertain"
-            ? "UNCERTAIN_NOT_PAID"
-            : "FAILED_NOT_PAID",
+      errorCategory: "PENDING_NOT_PAID",
       eventId: event.eventId,
       tracker: event.providerPaymentRef,
       eventType: peekSimpaisaWebhookResponseCode(rawBody),
       kind: "ignored",
-      outcome,
+      outcome: "pending_not_paid",
       duplicate: false,
       paymentAttemptId: event.paymentAttemptId,
       topupId: event.localTopupId,
     });
-    return NextResponse.json({ ok: true, ignored: true, outcome }, { status: 200 });
+    return NextResponse.json(
+      { ok: true, ignored: true, outcome: "pending_not_paid" },
+      { status: 200 }
+    );
   }
 
-  if (event.paymentStatus !== "confirmed") {
+  // confirmed / failed / uncertain → authoritative Inquire only.
+  // Never apply raw failed/uncertain postbacks; never bypass signature/Inquire gates.
+  if (
+    event.paymentStatus !== "confirmed" &&
+    event.paymentStatus !== "failed" &&
+    event.paymentStatus !== "uncertain"
+  ) {
     return NextResponse.json({ ok: true, ignored: true }, { status: 200 });
   }
 
