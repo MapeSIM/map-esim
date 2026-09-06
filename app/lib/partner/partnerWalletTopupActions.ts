@@ -11,6 +11,7 @@ import {
 import {
   browserReturnMustNotCreditPartnerWallet,
   logPartnerTopupFailure,
+  parsePartnerTopupUsdAmountToCents,
 } from "@/app/lib/partner/partnerWalletTopupConstants";
 import type { PartnerWalletTopupActionState } from "@/app/lib/partner/partnerWalletTopupFormState";
 import {
@@ -18,10 +19,7 @@ import {
   isPaymentGatewayConfigured,
 } from "@/app/lib/payments/disabledAdapter";
 import { parseSimpaisaWalletCheckoutFields } from "@/app/lib/payments/simpaisaPkrQuote";
-import {
-  parseTopupCheckoutIdempotencyKey,
-  parseTopupUsdAmountToCents,
-} from "@/app/lib/wallet/amount";
+import { parseTopupCheckoutIdempotencyKey } from "@/app/lib/wallet/amount";
 
 function detailPath(topupId: string): string {
   return `/partner/wallet/top-up/${encodeURIComponent(topupId)}`;
@@ -57,7 +55,7 @@ export async function startPartnerWalletAddFundsAction(
     };
   }
 
-  const amountParsed = parseTopupUsdAmountToCents(formData.get("amount"));
+  const amountParsed = parsePartnerTopupUsdAmountToCents(formData.get("amount"));
   const idempotencyParsed = parseTopupCheckoutIdempotencyKey(
     formData.get("idempotencyKey")
   );

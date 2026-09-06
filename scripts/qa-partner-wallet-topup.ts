@@ -11,6 +11,7 @@ import {
   PARTNER_TOPUP_USER_KEY_PREFIX,
   browserReturnMustNotCreditPartnerWallet,
   parsePartnerTopupIdFromMerchantUserKey,
+  parsePartnerTopupUsdAmountToCents,
   partnerTopupCreditIdempotencyKey,
   partnerTopupMerchantUserKey,
 } from "../app/lib/partner/partnerWalletTopupConstants";
@@ -95,17 +96,22 @@ function main() {
   assert.match(core, /PartnerWalletTopupStatus\.DRAFT/);
   console.log("PASS partner_draft_creation");
 
-  // 2–3 min/max
+  // 2–3 min/max (Partner $0.10–$500; customer wallet remains $10–$500)
   assert.equal(PARTNER_TOPUP_MIN_CENTS, 10);
   assert.equal(PARTNER_TOPUP_MAX_CENTS, 50_000);
-  assert.equal(PARTNER_TOPUP_MIN_CENTS, WALLET_TOPUP_MIN_CENTS);
-  assert.equal(PARTNER_TOPUP_MAX_CENTS, WALLET_TOPUP_MAX_CENTS);
-  assert.equal(parseTopupUsdAmountToCents("0.09").ok, false);
-  assert.equal(parseTopupUsdAmountToCents("0.10").ok, true);
-  assert.equal(parseTopupUsdAmountToCents("500").ok, true);
-  assert.equal(parseTopupUsdAmountToCents("500.01").ok, false);
+  assert.equal(WALLET_TOPUP_MIN_CENTS, 1_000);
+  assert.equal(WALLET_TOPUP_MAX_CENTS, 50_000);
+  assert.notEqual(PARTNER_TOPUP_MIN_CENTS, WALLET_TOPUP_MIN_CENTS);
+  assert.equal(parsePartnerTopupUsdAmountToCents("0.09").ok, false);
+  assert.equal(parsePartnerTopupUsdAmountToCents("0.10").ok, true);
+  assert.equal(parsePartnerTopupUsdAmountToCents("500").ok, true);
+  assert.equal(parsePartnerTopupUsdAmountToCents("500.01").ok, false);
+  assert.equal(parseTopupUsdAmountToCents("0.10").ok, false);
+  assert.equal(parseTopupUsdAmountToCents("10").ok, true);
   assert.match(core, /PARTNER_TOPUP_MIN_CENTS/);
   assert.match(core, /PARTNER_TOPUP_MAX_CENTS/);
+  assert.match(actions, /parsePartnerTopupUsdAmountToCents/);
+  assert.doesNotMatch(actions, /parseTopupUsdAmountToCents/);
   console.log("PASS min_max_amount_bounds");
 
   // 4 ownership

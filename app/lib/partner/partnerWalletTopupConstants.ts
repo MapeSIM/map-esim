@@ -2,12 +2,40 @@
  * Partner wallet Add Funds constants — merchant key namespace + audit labels.
  * Distinct from customer WalletTopup ids (never collide with cuid topup/attempt ids).
  */
+import {
+  parsePositiveUsdCentsRaw,
+  type ParseUsdCentsResult,
+} from "@/app/lib/wallet/amount";
+
 export const PARTNER_TOPUP_USER_KEY_PREFIX = "ptop_" as const;
 
 export const PARTNER_TOPUP_CREDIT_REFERENCE_TYPE = "PARTNER_WALLET_TOPUP";
 
 export const PARTNER_TOPUP_MIN_CENTS = 10; // $0.10
 export const PARTNER_TOPUP_MAX_CENTS = 50_000; // $500.00
+
+/**
+ * Partner Add Funds amount parse — min $0.10 / max $500.00.
+ * Do not reuse customer parseTopupUsdAmountToCents ($10 min).
+ */
+export function parsePartnerTopupUsdAmountToCents(
+  raw: unknown
+): ParseUsdCentsResult {
+  const parsed = parsePositiveUsdCentsRaw(raw);
+  if (!parsed.ok) return parsed;
+
+  if (parsed.cents < PARTNER_TOPUP_MIN_CENTS) {
+    return { ok: false, error: "Minimum Partner top-up is $0.10." };
+  }
+  if (parsed.cents > PARTNER_TOPUP_MAX_CENTS) {
+    return { ok: false, error: "Maximum Partner top-up is $500.00." };
+  }
+  if (parsed.cents <= 0) {
+    return { ok: false, error: "Enter a valid USD amount." };
+  }
+
+  return parsed;
+}
 
 export const PARTNER_TOPUP_DRAFT_CREATED = "partner.wallet_topup_draft_created";
 export const PARTNER_TOPUP_CHECKOUT_CREATED =

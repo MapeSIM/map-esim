@@ -17,7 +17,8 @@ export type ParseUsdCentsResult =
   | { ok: true; cents: number }
   | { ok: false; error: string };
 
-function parsePositiveUsdCentsRaw(raw: unknown): ParseUsdCentsResult {
+/** Shared positive USD→cents parse (no min/max policy). */
+export function parsePositiveUsdCentsRaw(raw: unknown): ParseUsdCentsResult {
   if (typeof raw !== "string" && typeof raw !== "number") {
     return { ok: false, error: "Enter a valid USD amount." };
   }
