@@ -10,6 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import {
   confirmWalletEsimPurchaseAction,
+  cancelPendingEsimGatewayCheckoutAction,
   setWalletPurchaseFundingChoiceAction,
 } from "@/app/lib/esim/walletPurchaseActions";
 import {
@@ -24,6 +25,7 @@ import {
 import type { CustomerEsimPaymentMode } from "@/app/lib/esim/walletPurchaseValidation";
 import { useWalletFromPaymentMode } from "@/app/lib/esim/walletPurchaseValidation";
 import type { WalletPurchaseReview } from "@/app/lib/esim/walletPurchaseRead";
+import { WalletEsimPurchaseStatus } from "@prisma/client";
 import CheckoutPromoCodeSection from "@/app/components/account/CheckoutPromoCodeSection";
 import CheckoutDeliveryEmailSection from "@/app/components/account/CheckoutDeliveryEmailSection";
 import {
@@ -247,7 +249,42 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         : "hover:border-[var(--border-strong)]",
     ].join(" ");
 
+  const awaitingGatewayPayment =
+    review.status === WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT;
+
   return (
+    <div className="space-y-6">
+      {awaitingGatewayPayment ? (
+        <div
+          className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 py-4 sm:px-5"
+          role="status"
+        >
+          <p className="text-sm font-medium text-[var(--heading)]">
+            Mobile payment is still pending. Wallet funds stay reserved until
+            payment is verified or you cancel.
+          </p>
+          <form
+            action={cancelPendingEsimGatewayCheckoutAction}
+            className="mt-3"
+          >
+            <input type="hidden" name="purchaseId" value={review.purchaseId} />
+            {review.pendingGatewayAttemptId ? (
+              <input
+                type="hidden"
+                name="attemptId"
+                value={review.pendingGatewayAttemptId}
+              />
+            ) : null}
+            <button
+              type="submit"
+              className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface)]/80"
+            >
+              Cancel payment & unlock wallet
+            </button>
+          </form>
+        </div>
+      ) : null}
+
     <form action={formAction} className="space-y-6" noValidate>
       <input type="hidden" name="purchaseId" value={review.purchaseId} />
       <input type="hidden" name="idempotencyKey" value={review.idempotencyKey} />
@@ -753,5 +790,6 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         </aside>
       </div>
     </form>
+    </div>
   );
 }

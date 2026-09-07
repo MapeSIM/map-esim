@@ -1069,6 +1069,90 @@ async function fulfillFundedEsimPurchaseAfterPayment(
 }
 
 /**
+ * Resolve an owned payment attempt that may still hold a pre-funding reservation.
+ * Prefers in-flight attempt statuses, then any latest attempt for heal/cancel paths.
+ */
+export async function findOwnedReleasableGatewayAttempt(options: {
+  customerUserId: string;
+  purchaseId: string;
+  attemptId?: string | null;
+}): Promise<{ attemptId: string; purchaseId: string } | null> {
+  const customerUserId = options.customerUserId.trim();
+  const purchaseId = options.purchaseId.trim();
+  const preferredAttemptId = (options.attemptId ?? "").trim();
+  if (!customerUserId || !purchaseId) return null;
+
+  if (preferredAttemptId) {
+    const preferred = await prisma.esimPurchasePaymentAttempt.findUnique({
+      where: { id: preferredAttemptId },
+      select: {
+        id: true,
+        purchaseId: true,
+        purchase: { select: { customerUserId: true } },
+      },
+    });
+    if (
+      preferred &&
+      preferred.purchaseId === purchaseId &&
+      preferred.purchase.customerUserId === customerUserId
+    ) {
+      return { attemptId: preferred.id, purchaseId: preferred.purchaseId };
+    }
+  }
+
+  const pending = await prisma.esimPurchasePaymentAttempt.findFirst({
+    where: {
+      purchaseId,
+      purchase: { customerUserId },
+      status: {
+        in: [
+          EsimPurchasePaymentAttemptStatus.DRAFT,
+          EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
+          EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING,
+        ],
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, purchaseId: true },
+  });
+  if (pending) {
+    return { attemptId: pending.id, purchaseId: pending.purchaseId };
+  }
+
+  const latest = await prisma.esimPurchasePaymentAttempt.findFirst({
+    where: {
+      purchaseId,
+      purchase: { customerUserId },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, purchaseId: true },
+  });
+  if (!latest) return null;
+  return { attemptId: latest.id, purchaseId: latest.purchaseId };
+}
+
+/**
+ * Purchase-scoped wrapper for cancel/abandon UI (review + return).
+ * Resolves attempt ownership, then reuses the CAS release primitive.
+ */
+export async function maybeReleasePendingGatewayReservationForPurchase(options: {
+  customerUserId: string;
+  purchaseId: string;
+  attemptId?: string | null;
+}): Promise<{ released: boolean; attemptId: string | null }> {
+  const resolved = await findOwnedReleasableGatewayAttempt(options);
+  if (!resolved) {
+    return { released: false, attemptId: null };
+  }
+  const result = await maybeReleasePendingGatewayReservation({
+    customerUserId: options.customerUserId,
+    purchaseId: resolved.purchaseId,
+    attemptId: resolved.attemptId,
+  });
+  return { released: result.released, attemptId: resolved.attemptId };
+}
+
+/**
  * Idempotent release of a still-pending split reservation when cancel is authenticated.
  * Never marks gateway payment failed if a success webhook may still arrive —
  * only releases wallet when attempt is not payment-confirmed.

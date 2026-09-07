@@ -227,12 +227,18 @@ function main() {
   assert.match(returnView, /Payment processing/);
   assert.match(returnView, /Payment not completed/);
   assert.match(returnView, /Payment verified/);
+  assert.match(returnView, /Cancel payment & unlock wallet/);
+  assert.match(returnView, /cancelHref/);
   assert.match(returnPage, /parsePaymentAttemptId/);
   assert.match(returnPage, /resolveEsimPaymentReturnKind/);
+  assert.match(returnPage, /maybeReleasePendingGatewayReservation/);
   assert.doesNotMatch(returnPage, /applyVerifiedEsimPurchasePaymentEvent/);
   assert.doesNotMatch(returnView, /applyVerifiedEsimPurchasePaymentEvent/);
   assert.match(cancelPage, /maybeReleasePendingGatewayReservation/);
   assert.match(cancelView, /Payment not completed/);
+  assert.match(apply, /maybeReleasePendingGatewayReservationForPurchase/);
+  assert.match(actions, /cancelPendingEsimGatewayCheckoutAction/);
+  assert.match(confirmForm, /Cancel payment & unlock wallet/);
   console.log("PASS browser_return_non_authoritative_cancel_safe_release");
 
   assert.match(adapter, /verifySafepayCardWebhookSignature/);

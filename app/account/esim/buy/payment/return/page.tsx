@@ -2,11 +2,15 @@ import { notFound, redirect } from "next/navigation";
 import { EsimPurchasePaymentReturnView } from "@/app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView";
 import { requireRole } from "@/app/lib/auth/session";
 import { getOwnedEsimPurchasePaymentAttempt } from "@/app/lib/esim/esimPurchaseGatewayCheckout";
+import { maybeReleasePendingGatewayReservation } from "@/app/lib/esim/esimPurchasePaymentApply";
 import {
   esimPurchasePaymentSuccessHref,
   resolveEsimPaymentReturnKind,
 } from "@/app/lib/esim/esimPurchasePaymentReturnState";
-import { parsePaymentAttemptId } from "@/app/lib/payments/safepayCheckoutPaths";
+import {
+  esimPurchasePaymentCancelPath,
+  parsePaymentAttemptId,
+} from "@/app/lib/payments/safepayCheckoutPaths";
 
 export const dynamic = "force-dynamic";
 
@@ -49,11 +53,27 @@ export default async function EsimPurchasePaymentReturnPage({
     redirect(esimPurchasePaymentSuccessHref(attempt.purchaseId));
   }
 
+  // Heal path: terminal unpaid return may still hold a pre-funding reservation
+  // when a failure webhook never arrived (common for abandoned Simpaisa flows).
+  // Idempotent CAS release — never touches funded/confirmed purchases.
+  if (kind === "not_completed") {
+    await maybeReleasePendingGatewayReservation({
+      customerUserId: user.id,
+      purchaseId: attempt.purchaseId,
+      attemptId: attempt.attemptId,
+    }).catch(() => undefined);
+  }
+
   return (
     <EsimPurchasePaymentReturnView
       kind={kind}
       purchaseId={attempt.purchaseId}
       refreshHref={`/account/esim/buy/payment/return?attempt=${encodeURIComponent(attempt.attemptId)}`}
+      cancelHref={
+        kind === "pending"
+          ? esimPurchasePaymentCancelPath(attempt.attemptId)
+          : null
+      }
     />
   );
 }

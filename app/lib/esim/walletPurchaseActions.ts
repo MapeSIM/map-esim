@@ -6,12 +6,14 @@ import {
   EsimPurchaseGatewayCheckoutError,
   startEsimPurchaseHostedCheckout,
 } from "@/app/lib/esim/esimPurchaseGatewayCheckout";
+import { maybeReleasePendingGatewayReservationForPurchase } from "@/app/lib/esim/esimPurchasePaymentApply";
 import {
   WalletEsimPurchaseError,
   confirmWalletEsimPurchase,
   prepareWalletEsimPurchase,
   setWalletPurchaseFundingChoice,
 } from "@/app/lib/esim/walletPurchase";
+import { esimPurchasePaymentCancelPath } from "@/app/lib/payments/safepayCheckoutPaths";
 import {
   CARD_PAYMENT_UNAVAILABLE_MESSAGE,
   type WalletPurchaseActionState,
@@ -492,4 +494,31 @@ export async function clearWalletPurchaseAlternateDeliveryEmailAction(
   } catch (error) {
     return mapDeliveryEmailError(error);
   }
+}
+
+/**
+ * Customer abandon path for hybrid checkout: release a still-pending wallet
+ * reservation without marking the purchase funded and without refund APIs.
+ * Redirects to the existing cancel page after the CAS release attempt.
+ */
+export async function cancelPendingEsimGatewayCheckoutAction(
+  formData: FormData
+): Promise<void> {
+  const customer = await requireRole("CUSTOMER");
+  const purchaseId = String(formData.get("purchaseId") ?? "").trim();
+  const attemptIdRaw = String(formData.get("attemptId") ?? "").trim();
+  if (!purchaseId || purchaseId.length > 64) {
+    redirect("/account/esim/buy");
+  }
+
+  const result = await maybeReleasePendingGatewayReservationForPurchase({
+    customerUserId: customer.id,
+    purchaseId,
+    attemptId: attemptIdRaw || null,
+  }).catch(() => ({ released: false, attemptId: null as string | null }));
+
+  if (result.attemptId) {
+    redirect(esimPurchasePaymentCancelPath(result.attemptId));
+  }
+  redirect(reviewPath(purchaseId));
 }
