@@ -828,3 +828,30 @@ async function resendAssignmentOrderEmail(
   }
   return { ok: false, failureCode: result.emailDelivery };
 }
+
+/**
+ * Admin Email Center: retry failed install/QR email for a completed wallet
+ * purchase. Reuses the reconciliation resend send path. Never retries
+ * checkout, wallet debit, or payment capture.
+ */
+export async function adminRetryFailedPurchaseInstallEmail(
+  purchaseId: string
+): Promise<
+  | { ok: true; deliveryStatus: string }
+  | { ok: false; failureCode: string }
+> {
+  return resendPurchaseOrderEmail(purchaseId);
+}
+
+/**
+ * Admin Email Center: retry failed install/QR email for a completed admin
+ * package assignment. Never retries provider checkout.
+ */
+export async function adminRetryFailedAssignmentInstallEmail(
+  assignmentId: string
+): Promise<
+  | { ok: true; deliveryStatus: string }
+  | { ok: false; failureCode: string }
+> {
+  return resendAssignmentOrderEmail(assignmentId);
+}
