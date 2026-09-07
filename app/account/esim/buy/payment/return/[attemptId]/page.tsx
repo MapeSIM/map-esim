@@ -2,11 +2,15 @@ import { notFound, redirect } from "next/navigation";
 import { EsimPurchasePaymentReturnView } from "@/app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView";
 import { requireRole } from "@/app/lib/auth/session";
 import { getOwnedEsimPurchasePaymentAttempt } from "@/app/lib/esim/esimPurchaseGatewayCheckout";
+import { maybeReleasePendingGatewayReservation } from "@/app/lib/esim/esimPurchasePaymentApply";
 import {
   esimPurchasePaymentSuccessHref,
   resolveEsimPaymentReturnKind,
 } from "@/app/lib/esim/esimPurchasePaymentReturnState";
-import { parsePaymentAttemptId } from "@/app/lib/payments/safepayCheckoutPaths";
+import {
+  esimPurchasePaymentCancelPath,
+  parsePaymentAttemptId,
+} from "@/app/lib/payments/safepayCheckoutPaths";
 
 export const dynamic = "force-dynamic";
 
@@ -45,11 +49,24 @@ export default async function EsimPurchasePaymentReturnAttemptPage({
     redirect(esimPurchasePaymentSuccessHref(attempt.purchaseId));
   }
 
+  if (kind === "not_completed") {
+    await maybeReleasePendingGatewayReservation({
+      customerUserId: user.id,
+      purchaseId: attempt.purchaseId,
+      attemptId: attempt.attemptId,
+    }).catch(() => undefined);
+  }
+
   return (
     <EsimPurchasePaymentReturnView
       kind={kind}
       purchaseId={attempt.purchaseId}
       refreshHref={`/account/esim/buy/payment/return/${encodeURIComponent(attempt.attemptId)}`}
+      cancelHref={
+        kind === "pending"
+          ? esimPurchasePaymentCancelPath(attempt.attemptId)
+          : null
+      }
     />
   );
 }

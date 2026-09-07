@@ -12,10 +12,13 @@ export function EsimPurchasePaymentReturnView({
   kind,
   purchaseId,
   refreshHref,
+  cancelHref = null,
 }: {
   kind: Exclude<EsimPaymentReturnKind, "completed">;
   purchaseId: string;
   refreshHref: string;
+  /** Authenticated cancel URL — releases a still-pending wallet reservation. */
+  cancelHref?: string | null;
 }) {
   const reviewHref = esimPurchasePaymentReviewHref(purchaseId);
 
@@ -50,7 +53,8 @@ export function EsimPurchasePaymentReturnView({
         </p>
         <StatusCard>
           You can return to checkout and try again when you are ready. This
-          page does not charge your wallet or card.
+          page does not charge your wallet or card. Any reserved wallet amount
+          is restored when cancel completes.
         </StatusCard>
         <ActionRow>
           <PrimaryLink href={reviewHref}>Back to checkout</PrimaryLink>
@@ -94,11 +98,17 @@ export function EsimPurchasePaymentReturnView({
       <StatusCard>
         You will be able to access your eSIM only after payment is verified.
         No wallet funds were charged from this return page. Refresh this page
-        in a moment, or return to checkout if you still need to pay.
+        in a moment. If you abandon mobile payment, cancel below to unlock any
+        reserved wallet funds.
       </StatusCard>
       <ActionRow>
         <PrimaryLink href={refreshHref}>Refresh status</PrimaryLink>
         <SecondaryLink href={reviewHref}>Back to checkout</SecondaryLink>
+        {cancelHref ? (
+          <SecondaryLink href={cancelHref}>
+            Cancel payment & unlock wallet
+          </SecondaryLink>
+        ) : null}
         <SecondaryLink href="/account">Account</SecondaryLink>
       </ActionRow>
     </ReturnShell>

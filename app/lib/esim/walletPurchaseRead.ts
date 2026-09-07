@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  EsimPurchasePaymentAttemptStatus,
   OrderFundingSource,
   Role,
   WalletEsimPurchaseStatus,
@@ -85,6 +86,8 @@ export type WalletPurchaseReview = {
   idempotencyKey: string;
   status: WalletEsimPurchaseStatus;
   canConfirm: boolean;
+  /** Latest in-flight gateway attempt when checkout is awaiting mobile payment. */
+  pendingGatewayAttemptId: string | null;
   alternateDeliveryEmail: string | null;
   deliveryEmailLocked: boolean;
   deliveryEmailEditable: boolean;
@@ -197,6 +200,25 @@ export async function getWalletPurchaseReview(
     fundingLabel = mobileLabels ? "Mobile payment" : "Card";
   }
 
+  let pendingGatewayAttemptId: string | null = null;
+  if (row.status === WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT) {
+    const pendingAttempt = await prisma.esimPurchasePaymentAttempt.findFirst({
+      where: {
+        purchaseId: row.id,
+        status: {
+          in: [
+            EsimPurchasePaymentAttemptStatus.DRAFT,
+            EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
+            EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING,
+          ],
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+    pendingGatewayAttemptId = pendingAttempt?.id ?? null;
+  }
+
   return {
     purchaseId: row.id,
     customerId: owner.id,
@@ -245,6 +267,7 @@ export async function getWalletPurchaseReview(
     canConfirm:
       row.status === WalletEsimPurchaseStatus.READY ||
       row.status === WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+    pendingGatewayAttemptId,
     alternateDeliveryEmail: snapshotOrderAlternateDeliveryEmail(row),
     deliveryEmailLocked: isPurchaseDeliveryEmailLocked(
       row.alternateDeliveryEmailLockedAt
