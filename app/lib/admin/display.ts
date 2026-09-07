@@ -36,6 +36,9 @@ const METADATA_ALLOWLIST = new Set([
   "attemptId",
   "refreshResult",
   "providerRefMasked",
+  "deliveryStatus",
+  "notificationType",
+  "emailEvent",
 ]);
 
 export type AdminOrderStatusFilter = "ALL" | "COMPLETED" | "PENDING" | "FAILED";

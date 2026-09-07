@@ -307,6 +307,60 @@ async function markFailureEmail(id: string, status: string): Promise<void> {
   });
 }
 
+/**
+ * Admin Email Center retry: reclaim failed/not_configured → sending, then
+ * reuse the same dispatch path. Does not change payment attempt status or
+ * refund/wallet money movement.
+ */
+export async function resendFailedPaymentFailureEmail(
+  paymentAttemptId: string
+): Promise<PaymentFailureNotifyResult> {
+  const id = (paymentAttemptId ?? "").trim();
+  if (!id || id.length > 64 || !/^[A-Za-z0-9_-]+$/.test(id)) {
+    return { status: "skipped", reason: "invalid_id" };
+  }
+
+  try {
+    const claimed = await prisma.esimPurchasePaymentAttempt.updateMany({
+      where: {
+        id,
+        status: { in: TERMINAL_FAILURE_STATUSES },
+        failureEmailNotificationStatus: {
+          in: [
+            PAYMENT_FAILURE_EMAIL_FAILED,
+            PAYMENT_FAILURE_EMAIL_NOT_CONFIGURED,
+          ],
+        },
+      },
+      data: {
+        failureEmailNotificationStatus: PAYMENT_FAILURE_EMAIL_SENDING,
+      },
+    });
+
+    if (claimed.count !== 1) {
+      return { status: "skipped", reason: "not_retryable_or_in_progress" };
+    }
+
+    return await dispatchPaymentFailureEmail(id);
+  } catch {
+    console.error("payment_failure_email", "resend_error");
+    try {
+      await prisma.esimPurchasePaymentAttempt.updateMany({
+        where: {
+          id,
+          failureEmailNotificationStatus: PAYMENT_FAILURE_EMAIL_SENDING,
+        },
+        data: {
+          failureEmailNotificationStatus: PAYMENT_FAILURE_EMAIL_FAILED,
+        },
+      });
+    } catch {
+      // ignore
+    }
+    return { status: "failed", reason: "dispatch_error" };
+  }
+}
+
 /** Fire-and-forget — never affects payment/wallet mutation callers. */
 export function schedulePaymentFailureNotification(
   paymentAttemptId: string,
