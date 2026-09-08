@@ -366,6 +366,7 @@ export async function listPendingGatewayPaymentAttempts(limit = 30): Promise<
     purchaseId: string;
     attemptStatus: string;
     purchaseStatus: string;
+    gatewayProvider: string | null;
     gatewayAmountCents: number;
     currency: string;
     walletAppliedCents: number;
@@ -389,6 +390,7 @@ export async function listPendingGatewayPaymentAttempts(limit = 30): Promise<
     select: {
       id: true,
       status: true,
+      gatewayProvider: true,
       gatewayAmountCents: true,
       currency: true,
       gatewayPaymentRef: true,
@@ -408,6 +410,7 @@ export async function listPendingGatewayPaymentAttempts(limit = 30): Promise<
     purchaseId: row.purchaseId,
     attemptStatus: row.status,
     purchaseStatus: row.purchase.status,
+    gatewayProvider: row.gatewayProvider,
     gatewayAmountCents: row.gatewayAmountCents,
     currency: row.currency,
     walletAppliedCents: row.purchase.walletAppliedCents,
@@ -423,6 +426,7 @@ export async function getPendingGatewayPaymentAttemptDetail(
   purchaseId: string;
   attemptStatus: string;
   purchaseStatus: string;
+  gatewayProvider: string | null;
   gatewayAmountCents: number;
   currency: string;
   chargeAmountMinor: number | null;
@@ -440,6 +444,7 @@ export async function getPendingGatewayPaymentAttemptDetail(
     select: {
       id: true,
       status: true,
+      gatewayProvider: true,
       gatewayAmountCents: true,
       currency: true,
       chargeAmountMinor: true,
@@ -463,6 +468,7 @@ export async function getPendingGatewayPaymentAttemptDetail(
     purchaseId: row.purchaseId,
     attemptStatus: row.status,
     purchaseStatus: row.purchase.status,
+    gatewayProvider: row.gatewayProvider,
     gatewayAmountCents: row.gatewayAmountCents,
     currency: row.currency,
     chargeAmountMinor: row.chargeAmountMinor,

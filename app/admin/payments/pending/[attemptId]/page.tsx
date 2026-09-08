@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import PendingPaymentVerifyForm from "@/app/components/admin/PendingPaymentVerifyForm";
+import PendingSimpaisaInvestigateForm from "@/app/components/admin/PendingSimpaisaInvestigateForm";
 import { getPendingGatewayPaymentAttemptDetail } from "@/app/lib/admin/pendingPaymentVerify";
 import { requireRole } from "@/app/lib/auth/session";
 
@@ -15,6 +16,8 @@ export default async function AdminPendingPaymentDetailPage({
   const { attemptId: raw } = await params;
   const detail = await getPendingGatewayPaymentAttemptDetail(raw);
   if (!detail) notFound();
+
+  const isSimpaisa = detail.gatewayProvider === "SIMPAISA";
 
   return (
     <div className="space-y-8">
@@ -31,8 +34,9 @@ export default async function AdminPendingPaymentDetailPage({
           Payment attempt
         </h1>
         <p className="text-sm text-[var(--text-muted)]">
-          Read-only local state plus authenticated Safepay verification. Funding
-          remains webhook-authoritative.
+          {isSimpaisa
+            ? "Read-only local state plus authenticated Simpaisa Inquire. Funding remains webhook-authoritative."
+            : "Read-only local state plus authenticated Safepay verification. Funding remains webhook-authoritative."}
         </p>
       </header>
 
@@ -52,6 +56,14 @@ export default async function AdminPendingPaymentDetailPage({
             </dt>
             <dd className="mt-1 font-medium text-[var(--heading)]">
               {detail.purchaseId}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              Gateway
+            </dt>
+            <dd className="mt-1 font-medium text-[var(--heading)]">
+              {detail.gatewayProvider ?? "unknown"}
             </dd>
           </div>
           <div>
@@ -92,7 +104,7 @@ export default async function AdminPendingPaymentDetailPage({
           </div>
           <div>
             <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              Tracker
+              {isSimpaisa ? "Transaction" : "Tracker"}
             </dt>
             <dd className="mt-1 text-[var(--heading)]">
               {detail.trackerRefMasked}
@@ -109,10 +121,18 @@ export default async function AdminPendingPaymentDetailPage({
         </dl>
       </section>
 
-      <PendingPaymentVerifyForm
-        paymentAttemptId={detail.attemptId}
-        trackerRefMasked={detail.trackerRefMasked}
-      />
+      {isSimpaisa ? (
+        <PendingSimpaisaInvestigateForm
+          paymentAttemptId={detail.attemptId}
+          transactionRefMasked={detail.trackerRefMasked}
+          walletAppliedCents={detail.walletAppliedCents}
+        />
+      ) : (
+        <PendingPaymentVerifyForm
+          paymentAttemptId={detail.attemptId}
+          trackerRefMasked={detail.trackerRefMasked}
+        />
+      )}
     </div>
   );
 }
