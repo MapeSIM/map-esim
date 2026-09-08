@@ -8,7 +8,10 @@ import { join } from "node:path";
 import {
   HOME_COMPARISON_COLUMNS,
   HOME_COMPARISON_ROWS,
+  HOME_DISCOVERY_CTA_HREF,
+  HOME_DISCOVERY_CTA_LABEL,
   HOME_FINAL_CTA_PRIMARY_HREF,
+  HOME_FINAL_CTA_PRIMARY_LABEL,
   HOME_FINAL_CTA_SECONDARY_HREF,
   HOME_POPULAR_DESTINATIONS,
 } from "../app/lib/home/homeConversionSections";
@@ -29,7 +32,11 @@ function main() {
     "Airport SIM shop",
   ]);
   assert.ok(HOME_COMPARISON_ROWS.length >= 4);
-  assert.equal(HOME_FINAL_CTA_PRIMARY_HREF, "/countries");
+  // B1.1: shared discovery CTA
+  assert.equal(HOME_DISCOVERY_CTA_LABEL, "Get eSIM");
+  assert.equal(HOME_DISCOVERY_CTA_HREF, "/countries");
+  assert.equal(HOME_FINAL_CTA_PRIMARY_HREF, HOME_DISCOVERY_CTA_HREF);
+  assert.equal(HOME_FINAL_CTA_PRIMARY_LABEL, HOME_DISCOVERY_CTA_LABEL);
   assert.equal(HOME_FINAL_CTA_SECONDARY_HREF, "/how-it-works");
   console.log("PASS conversion_copy");
 
@@ -43,6 +50,7 @@ function main() {
   const cta = read("app/components/home/HomeFinalCta.tsx");
   const copy = read("app/lib/home/homeConversionSections.ts");
   const trust = read("app/components/home/HomeTrustSection.tsx");
+  const navbar = read("app/components/Navbar.tsx");
   const pkg = read("package.json");
   const prelaunch = read("scripts/qa-prelaunch.ts");
   const apply = read("app/lib/payments/applyVerifiedPaymentEvent.ts");
@@ -67,11 +75,28 @@ function main() {
   assert.match(popular, /href=\{`\/countries\/\$\{destination\.id\}`\}/);
   assert.match(popular, /href="\/countries\?filter=Popular"/);
   assert.doesNotMatch(popular, /startingPrice|providerPriceUSD|priceUSD/);
+
+  // B1.1 discovery CTA wired on hero + final + navbar + comparison
+  assert.match(home, /HOME_DISCOVERY_CTA_LABEL/);
+  assert.match(home, /HOME_DISCOVERY_CTA_HREF/);
+  assert.doesNotMatch(home, /Browse eSIM destinations/);
+  assert.match(cta, /HOME_DISCOVERY_CTA_LABEL/);
+  assert.match(cta, /href=\{HOME_DISCOVERY_CTA_HREF\}/);
+  assert.match(cta, /href=\{HOME_FINAL_CTA_SECONDARY_HREF\}/);
+  assert.match(navbar, /HOME_DISCOVERY_CTA_LABEL/);
+  assert.match(navbar, /href=\{HOME_DISCOVERY_CTA_HREF\}/);
+  assert.match(navbar, /Buy eSIM/);
+
+  // B1.2 comparison: desktop table + mobile cards + no forced min-width scroll
   assert.match(comparison, /<table/);
   assert.match(comparison, /HOME_COMPARISON_ROWS/);
-  assert.match(cta, /HOME_FINAL_CTA_PRIMARY_LABEL/);
-  assert.match(cta, /href=\{HOME_FINAL_CTA_PRIMARY_HREF\}/);
-  assert.match(cta, /href=\{HOME_FINAL_CTA_SECONDARY_HREF\}/);
+  assert.match(comparison, /md:hidden/);
+  assert.match(comparison, /md:block/);
+  assert.doesNotMatch(comparison, /min-w-\[720px\]/);
+  assert.doesNotMatch(comparison, /overflow-x-auto/);
+  assert.match(comparison, /HOME_DISCOVERY_CTA_LABEL/);
+  assert.match(comparison, /href=\{HOME_DISCOVERY_CTA_HREF\}/);
+
   assert.doesNotMatch(cta, /href="\/checkout"|href="\/payment"/);
   assert.doesNotMatch(copy, /providerPriceUSD|PAYMENT_GATEWAY_ENABLED/);
   console.log("PASS section_structure");

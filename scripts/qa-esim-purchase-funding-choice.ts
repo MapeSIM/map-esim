@@ -154,9 +154,12 @@ function main() {
   console.log("PASS direct_buy_now_prepare_and_redirect");
 
   // Generic entry points keep package selection; navbar Get eSIM → destinations.
-  assert.match(navbar, /Get eSIM/);
-  assert.match(navbar, /href="\/countries"/);
-  assert.doesNotMatch(navbar, /Get eSIM[\s\S]{0,120}href="\/account\/esim\/buy"/);
+  assert.match(navbar, /HOME_DISCOVERY_CTA_LABEL|Get eSIM/);
+  assert.match(navbar, /href=\{HOME_DISCOVERY_CTA_HREF\}|href="\/countries"/);
+  assert.doesNotMatch(
+    navbar,
+    /HOME_DISCOVERY_CTA_HREF[\s\S]{0,200}href="\/account\/esim\/buy"|Get eSIM[\s\S]{0,120}href="\/account\/esim\/buy"/
+  );
   assert.match(accountLayout, /label: "Buy eSIM"/);
   assert.match(accountLayout, /AccountMenu/);
   assert.doesNotMatch(accountLayout, /Buy with wallet/);

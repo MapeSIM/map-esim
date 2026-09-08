@@ -103,10 +103,9 @@ function main() {
     /return\s+`\/checkout\?/
   );
   const navbar = read("app/components/Navbar.tsx");
-  // Public Get eSIM CTA routes to destinations; guest checkout stays disabled.
-  assert.match(navbar, /Get eSIM/);
-  assert.match(navbar, /href="\/countries"/);
-  assert.doesNotMatch(navbar, /href="\/account\/esim\/buy"/);
+  // B1.1: public discovery CTA uses shared Get eSIM → /countries
+  assert.match(navbar, /HOME_DISCOVERY_CTA_LABEL/);
+  assert.match(navbar, /href=\{HOME_DISCOVERY_CTA_HREF\}/);
   assert.doesNotMatch(navbar, /href="\/checkout"/);
   const paymentPage = read("app/payment/page.tsx");
   assert.doesNotMatch(paymentPage, />\s*Pay Now\s*</);

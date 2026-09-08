@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import {
+  HOME_DISCOVERY_CTA_HREF,
+  HOME_DISCOVERY_CTA_LABEL,
   HOME_FINAL_CTA_BODY,
   HOME_FINAL_CTA_POINTS,
-  HOME_FINAL_CTA_PRIMARY_HREF,
-  HOME_FINAL_CTA_PRIMARY_LABEL,
   HOME_FINAL_CTA_SECONDARY_HREF,
   HOME_FINAL_CTA_SECONDARY_LABEL,
   HOME_FINAL_CTA_TITLE,
@@ -39,15 +39,15 @@ export function HomeFinalCta() {
         </ul>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
-            href={HOME_FINAL_CTA_PRIMARY_HREF}
-            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-7 text-sm font-bold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] sm:w-auto"
+            href={HOME_DISCOVERY_CTA_HREF}
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-7 text-sm font-bold text-[var(--accent-ink)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 sm:w-auto"
           >
-            {HOME_FINAL_CTA_PRIMARY_LABEL}
+            {HOME_DISCOVERY_CTA_LABEL}
             <ArrowRight className="h-4 w-4" />
           </Link>
           <Link
             href={HOME_FINAL_CTA_SECONDARY_HREF}
-            className="inline-flex h-12 w-full items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-7 text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--border-hover)] sm:w-auto"
+            className="inline-flex h-12 w-full items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-7 text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--border-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 sm:w-auto"
           >
             {HOME_FINAL_CTA_SECONDARY_LABEL}
           </Link>

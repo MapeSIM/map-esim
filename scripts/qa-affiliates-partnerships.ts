@@ -52,7 +52,7 @@ function main() {
     /href:\s*["']\/affiliates-and-partnerships["']/
   );
   assert.match(navbar, /Affiliates & Partnerships/);
-  assert.match(navbar, /Get eSIM/);
+  assert.match(navbar, /HOME_DISCOVERY_CTA_LABEL|Get eSIM/);
   assert.match(navbar, /href=["']\/countries["']/);
   assert.match(navbar, /authHref|Sign in|Account/);
   assert.doesNotMatch(footer, /label:\s*["']Plans["']/);

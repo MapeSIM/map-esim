@@ -2,6 +2,10 @@
  * Homepage conversion copy (offline-QA safe; no Prisma / payments / prices).
  */
 
+/** Shared public discovery CTA (Navbar, hero, final CTA, comparison follow-up). */
+export const HOME_DISCOVERY_CTA_LABEL = "Get eSIM";
+export const HOME_DISCOVERY_CTA_HREF = "/countries";
+
 export const HOME_POPULAR_SECTION_EYEBROW = "Destinations";
 export const HOME_POPULAR_SECTION_TITLE = "Popular destinations";
 export const HOME_POPULAR_SECTION_INTRO =
@@ -67,8 +71,8 @@ export const HOME_COMPARISON_ROWS = [
 export const HOME_FINAL_CTA_TITLE = "Ready to stay connected abroad?";
 export const HOME_FINAL_CTA_BODY =
   "Browse destination plans, compare data and validity, then continue to checkout with verified offer details.";
-export const HOME_FINAL_CTA_PRIMARY_HREF = "/countries";
-export const HOME_FINAL_CTA_PRIMARY_LABEL = "Browse eSIM destinations";
+export const HOME_FINAL_CTA_PRIMARY_HREF = HOME_DISCOVERY_CTA_HREF;
+export const HOME_FINAL_CTA_PRIMARY_LABEL = HOME_DISCOVERY_CTA_LABEL;
 export const HOME_FINAL_CTA_SECONDARY_HREF = "/how-it-works";
 export const HOME_FINAL_CTA_SECONDARY_LABEL = "See how it works";
 export const HOME_FINAL_CTA_POINTS = [

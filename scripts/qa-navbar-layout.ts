@@ -4,6 +4,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  HOME_DISCOVERY_CTA_HREF,
+  HOME_DISCOVERY_CTA_LABEL,
+} from "../app/lib/home/homeConversionSections";
 
 const root = join(__dirname, "..");
 
@@ -29,19 +33,14 @@ function main() {
   assert.match(navbar, /labelLines/);
   assert.match(navbar, /variant="desktop"/);
   assert.match(navbar, /variant="mobile"/);
-  assert.match(navbar, /href=["']\/countries["']/);
-  assert.match(navbar, /Get eSIM/);
-  // Get eSIM accent CTAs target /countries (catalog), not wallet buy.
-  const getEsimCtas = [
-    ...navbar.matchAll(
-      /href=(?:\{)?["']([^"']+)["'](?:\})?[\s\S]{0,900}?>\s*\r?\n\s*Get eSIM\s*\r?\n/g
-    ),
-  ].map((m) => m[1]);
-  assert.ok(getEsimCtas.length >= 1, "Get eSIM CTA missing");
-  assert.ok(
-    getEsimCtas.every((href) => href === "/countries"),
-    `Get eSIM must link to /countries, got: ${getEsimCtas.join(", ")}`
-  );
+  // Destinations nav link and/or shared discovery CTA target /countries
+  assert.match(navbar, /href:\s*["']\/countries["']|HOME_DISCOVERY_CTA_HREF/);
+  // B1.1: public discovery CTA uses shared Get eSIM constants → /countries
+  assert.equal(HOME_DISCOVERY_CTA_LABEL, "Get eSIM");
+  assert.equal(HOME_DISCOVERY_CTA_HREF, "/countries");
+  assert.match(navbar, /HOME_DISCOVERY_CTA_LABEL/);
+  assert.match(navbar, /href=\{HOME_DISCOVERY_CTA_HREF\}/);
+  assert.match(navbar, /\{HOME_DISCOVERY_CTA_LABEL\}/);
   // Sprint A: account drawer includes Buy eSIM → /account/esim/buy
   assert.match(navbar, /href=["']\/account\/esim\/buy["']/);
   assert.match(navbar, /Buy eSIM/);
@@ -54,7 +53,7 @@ function main() {
   assert.match(navbar, /whitespace-nowrap rounded-\[14px\] bg-\[var\(--accent\)\]/);
   assert.match(
     navbar,
-    /whitespace-nowrap rounded-\[14px\] bg-\[var\(--accent\)\][\s\S]{0,800}Get eSIM/
+    /whitespace-nowrap rounded-\[14px\] bg-\[var\(--accent\)\][\s\S]{0,800}HOME_DISCOVERY_CTA_LABEL/
   );
   assert.match(navbar, /flex-1 items-center justify-end/);
   assert.match(pkg, /"qa:navbar-layout"/);
