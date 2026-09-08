@@ -37,6 +37,13 @@ export default async function AdminFailedPaymentsPage() {
         </p>
         <p className="mt-2 text-sm">
           <Link
+            href="/admin/payments"
+            className="font-semibold text-[var(--accent-strong)]"
+          >
+            Payments hub
+          </Link>
+          <span className="text-[var(--text-soft)]"> · </span>
+          <Link
             href="/admin/payments/pending"
             className="font-semibold text-[var(--accent-strong)]"
           >
@@ -82,14 +89,22 @@ export default async function AdminFailedPaymentsPage() {
                     {row.purchaseId}
                   </p>
                 </div>
-                {row.customerHref ? (
+                <div className="flex flex-col gap-2 sm:items-end">
                   <Link
-                    href={row.customerHref}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)]"
+                    href={`/admin/payments/${encodeURIComponent(row.attemptId)}`}
+                    className="inline-flex h-10 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-white"
                   >
-                    View customer
+                    Open payment
                   </Link>
-                ) : null}
+                  {row.customerHref ? (
+                    <Link
+                      href={row.customerHref}
+                      className="inline-flex h-10 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)]"
+                    >
+                      View customer
+                    </Link>
+                  ) : null}
+                </div>
               </div>
             </li>
           ))}

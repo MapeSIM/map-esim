@@ -32,11 +32,18 @@ export default async function AdminPaymentWebhooksPage() {
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Webhook receipts</h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Delivery observability for signed Safepay webhooks and rejected
+          Delivery observability for payment gateway webhooks and rejected
           posts. This list is read-only. It does not replay events, fund a
           purchase, or enable the payment gateway.
         </p>
         <p className="mt-2 text-sm">
+          <Link
+            href="/admin/payments"
+            className="font-semibold text-[var(--accent-strong)]"
+          >
+            Payments hub
+          </Link>
+          <span className="text-[var(--text-soft)]"> · </span>
           <Link
             href="/admin/payments/pending"
             className="font-semibold text-[var(--accent-strong)]"

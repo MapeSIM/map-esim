@@ -78,7 +78,7 @@ export async function listPaymentWebhookReceipts(
       paymentAttemptId,
       topupId,
       attemptHref: paymentAttemptId
-        ? `/admin/payments/pending/${paymentAttemptId}`
+        ? `/admin/payments/${paymentAttemptId}`
         : null,
       topupHref: topupId ? `/admin/wallet-topups/${topupId}` : null,
     };

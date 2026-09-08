@@ -38,6 +38,13 @@ export default async function AdminPendingPaymentsPage() {
         </p>
         <p className="mt-2 text-sm">
           <Link
+            href="/admin/payments"
+            className="font-semibold text-[var(--accent-strong)]"
+          >
+            Payments hub
+          </Link>
+          <span className="text-[var(--text-soft)]"> · </span>
+          <Link
             href="/admin/payments/failed"
             className="font-semibold text-[var(--accent-strong)]"
           >
@@ -87,7 +94,7 @@ export default async function AdminPendingPaymentsPage() {
                   </p>
                 </div>
                 <Link
-                  href={`/admin/payments/pending/${encodeURIComponent(row.attemptId)}`}
+                  href={`/admin/payments/${encodeURIComponent(row.attemptId)}`}
                   className="inline-flex h-10 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-white"
                 >
                   Open

@@ -1511,7 +1511,7 @@ async function collectRecordAlerts(now: Date): Promise<{
         sourceAt: row.updatedAt,
         now,
         freshness: "DATABASE_DERIVED",
-        href: `/admin/payments/pending/${encodeURIComponent(row.id)}`,
+        href: `/admin/payments/${encodeURIComponent(row.id)}`,
         recommendedAction:
           "Review on Pending payments. Do not auto-cancel or mark the purchase funded.",
       })

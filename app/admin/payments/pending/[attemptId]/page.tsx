@@ -24,10 +24,17 @@ export default async function AdminPendingPaymentDetailPage({
       <header className="space-y-2">
         <p className="text-sm">
           <Link
+            href="/admin/payments"
+            className="font-semibold text-[var(--accent-strong)]"
+          >
+            ← Payments
+          </Link>
+          <span className="text-[var(--text-soft)]"> · </span>
+          <Link
             href="/admin/payments/pending"
             className="font-semibold text-[var(--accent-strong)]"
           >
-            ← Pending payments
+            Pending payments
           </Link>
         </p>
         <h1 className="text-2xl font-bold tracking-tight">
