@@ -66,6 +66,7 @@
     "qa:admin-pending-payment-verify": "tsx scripts/qa-admin-pending-payment-verify.ts",
     "qa:admin-pending-simpaisa-investigate": "tsx scripts/qa-admin-pending-simpaisa-investigate.ts",
     "qa:admin-payment-dashboard": "tsx scripts/qa-admin-payment-dashboard.ts",
+    "qa:admin-wallet-ledger": "tsx scripts/qa-admin-wallet-ledger.ts",
     "qa:admin-failed-payments": "tsx scripts/qa-admin-failed-payments.ts",
     "qa:admin-webhook-receipts": "tsx scripts/qa-admin-webhook-receipts.ts",
     "qa:admin-customer-support-timeline": "tsx scripts/qa-admin-customer-support-timeline.ts",

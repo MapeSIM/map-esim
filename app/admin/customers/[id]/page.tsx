@@ -470,8 +470,13 @@ export default async function AdminCustomerDetailPage({
                   ))}
                 </ul>
               )}
-              <p className="text-sm text-[var(--text-soft)]">
-                Full admin wallet history coming soon
+              <p className="text-sm">
+                <Link
+                  href={`/admin/customers/${encodeURIComponent(detail.id)}/wallet`}
+                  className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                >
+                  View full wallet ledger
+                </Link>
               </p>
             </div>
           </>
