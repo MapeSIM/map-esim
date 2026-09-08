@@ -42,7 +42,7 @@ import {
   type PlanTypeFilter,
   type SortOption,
 } from "@/app/lib/plans/plan-utils";
-import { PLAN_PURCHASE_TRUST_LINE } from "@/app/lib/plans/planCardConversion";
+import { planPurchaseTrustLine } from "@/app/lib/plans/planCardConversion";
 import {
   planCardLineLabel,
   planCardSecondaryLines,
@@ -229,15 +229,19 @@ export default function PlansListing({
   const [sort, setSort] = useState<SortOption>("price-asc");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState<VesimOffer | null>(null);
+  const [signedIn, setSignedIn] = useState(false);
   const [partnerCheckout, setPartnerCheckout] = useState(false);
   const { formatPrice } = useCurrency();
+  const purchaseTrustLine = planPurchaseTrustLine(signedIn);
 
   useEffect(() => {
     let cancelled = false;
     fetch("/api/auth/session", { cache: "no-store" })
       .then((res) => res.json())
       .then((session: { user?: { role?: string } } | null) => {
-        if (!cancelled && session?.user?.role === "PARTNER") {
+        if (cancelled || !session?.user) return;
+        setSignedIn(true);
+        if (session.user.role === "PARTNER") {
           setPartnerCheckout(true);
         }
       })
@@ -720,57 +724,83 @@ export default function PlansListing({
                               planCardSecondaryLines — never packageInfo,
                               description, notes, or raw network.
                             */}
-                            <div className="mt-4 flex flex-1 flex-col gap-1.5 text-sm text-[var(--text)]">
+                            <div className="mt-4 flex flex-1 flex-col gap-1.5 text-sm">
                               {secondaryLines.map((line) => (
                                 <p
                                   key={`${offer.id}-${line.kind}`}
                                   className={
-                                    line.kind === "operator"
-                                      ? "truncate text-[var(--text-soft)]"
-                                      : undefined
+                                    line.kind === "validity"
+                                      ? "text-[var(--heading)]"
+                                      : line.kind === "operator"
+                                        ? "truncate text-[var(--text-soft)]"
+                                        : "text-[var(--text)]"
                                   }
                                 >
-                                  <span className="sr-only">
-                                    {planCardLineLabel(line.kind)}:{" "}
+                                  <span
+                                    className={
+                                      line.kind === "validity"
+                                        ? "font-semibold text-[var(--heading)]"
+                                        : "font-medium text-[var(--text-soft)]"
+                                    }
+                                  >
+                                    {planCardLineLabel(line.kind)}
                                   </span>
-                                  {line.text}
+                                  <span className="text-[var(--text-soft)]">
+                                    {" "}
+                                    ·{" "}
+                                  </span>
+                                  <span
+                                    className={
+                                      line.kind === "validity"
+                                        ? "font-medium"
+                                        : undefined
+                                    }
+                                  >
+                                    {line.text}
+                                  </span>
                                 </p>
                               ))}
                             </div>
 
                             <div className="mt-auto space-y-2 pt-5">
+                              {/*
+                                Mobile (1-col): Buy Now first, Plan Details second.
+                                Wider (≥400px 2-col): Details left, Buy Now right.
+                              */}
                               <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedOffer(offer)}
-                                  className="
-                                    inline-flex min-h-11 items-center justify-center
-                                    rounded-xl border border-[var(--border-strong)]
-                                    bg-[var(--surface)] px-3 text-sm font-semibold
-                                    text-[var(--heading)] transition
-                                    hover:bg-[var(--surface-2)]
-                                  "
-                                >
-                                  {isRegionalOrGlobal
-                                    ? "Coverage details"
-                                    : "Plan Details"}
-                                </button>
                                 <Link
                                   href={resolveCheckoutHref(
                                     offer,
                                     destination.code
                                   )}
                                   className="
-                                    inline-flex min-h-11 items-center justify-center
+                                    order-1 inline-flex min-h-11 items-center justify-center
                                     rounded-xl bg-[var(--accent-strong)] px-3 text-sm font-bold
                                     text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]
+                                    min-[400px]:order-2
                                   "
                                 >
                                   Buy Now
                                 </Link>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedOffer(offer)}
+                                  className="
+                                    order-2 inline-flex min-h-11 items-center justify-center
+                                    rounded-xl border border-[var(--border-strong)]
+                                    bg-[var(--surface)] px-3 text-sm font-semibold
+                                    text-[var(--heading)] transition
+                                    hover:bg-[var(--surface-2)]
+                                    min-[400px]:order-1
+                                  "
+                                >
+                                  {isRegionalOrGlobal
+                                    ? "Coverage details"
+                                    : "Plan Details"}
+                                </button>
                               </div>
                               <p className="text-center text-[11px] leading-snug text-[var(--text-soft)]">
-                                {PLAN_PURCHASE_TRUST_LINE}
+                                {purchaseTrustLine}
                               </p>
                             </div>
                           </article>
@@ -829,6 +859,7 @@ export default function PlansListing({
         onClose={() => setSelectedOffer(null)}
         coverageFocused={isRegionalOrGlobal}
         checkoutHref={resolveCheckoutHref}
+        purchaseTrustLine={purchaseTrustLine}
       />
     </main>
   );
