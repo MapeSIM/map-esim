@@ -8,7 +8,10 @@ import { join } from "node:path";
 import {
   PLAN_CARD_RECOMMENDED_LABEL,
   PLAN_PURCHASE_TRUST_LINE,
+  PLAN_PURCHASE_TRUST_LINE_AUTHENTICATED,
+  PLAN_PURCHASE_TRUST_LINE_GUEST,
   PLAN_STICKY_TRUST_LINE,
+  planPurchaseTrustLine,
 } from "../app/lib/plans/planCardConversion";
 import { planCardLineLabel } from "../app/lib/plans/planOfferPresentation";
 import { buildCheckoutHref } from "../app/lib/plans/plan-utils";
@@ -22,11 +25,25 @@ function read(rel: string): string {
 
 function main() {
   assert.equal(PLAN_CARD_RECOMMENDED_LABEL, "Recommended");
-  assert.match(PLAN_PURCHASE_TRUST_LINE, /QR and install details/);
-  assert.match(PLAN_PURCHASE_TRUST_LINE, /Sign in to buy/);
+  assert.equal(
+    PLAN_PURCHASE_TRUST_LINE_GUEST,
+    "Sign in to buy. QR and install details arrive after purchase."
+  );
+  assert.equal(
+    PLAN_PURCHASE_TRUST_LINE_AUTHENTICATED,
+    "QR and install details arrive after purchase."
+  );
+  assert.equal(PLAN_PURCHASE_TRUST_LINE, PLAN_PURCHASE_TRUST_LINE_GUEST);
+  assert.equal(planPurchaseTrustLine(false), PLAN_PURCHASE_TRUST_LINE_GUEST);
+  assert.equal(
+    planPurchaseTrustLine(true),
+    PLAN_PURCHASE_TRUST_LINE_AUTHENTICATED
+  );
+  assert.doesNotMatch(PLAN_PURCHASE_TRUST_LINE_AUTHENTICATED, /Sign in to buy/);
   assert.match(PLAN_STICKY_TRUST_LINE, /Digital delivery/);
   assert.equal(planCardLineLabel("validity"), "Validity");
   assert.equal(planCardLineLabel("coverage"), "Coverage");
+  assert.equal(planCardLineLabel("voice"), "Voice & SMS");
   assert.equal(planCardLineLabel("operator"), "Network");
   console.log("PASS conversion_copy");
 
@@ -44,9 +61,15 @@ function main() {
   assert.match(listing, /planCardLineLabel/);
   assert.doesNotMatch(listing, /PLAN_CARD_RECOMMENDED_LABEL/);
   assert.doesNotMatch(listing, /data-plan-recommended/);
-  // Sprint B0: near-Buy expectation copy (display only).
-  assert.match(listing, /PLAN_PURCHASE_TRUST_LINE/);
+  // Sprint B1.4: auth-aware purchase trust (display only).
+  assert.match(listing, /planPurchaseTrustLine/);
+  assert.match(listing, /purchaseTrustLine/);
+  assert.match(listing, /setSignedIn/);
   assert.doesNotMatch(listing, /PLAN_CARD_BENEFITS/);
+  // Sprint B1.4: mobile Buy Now first via order utilities.
+  assert.match(listing, /order-1[\s\S]*?Buy Now|Buy Now[\s\S]*?order-1/);
+  assert.match(listing, /min-\[400px\]:order-2/);
+  assert.match(listing, /min-\[400px\]:order-1/);
   // Sprint B1.3: neutral related regional section (existing data only).
   assert.doesNotMatch(listing, /Helpful destination links/);
   assert.match(listing, /Related regional plans/);
@@ -95,7 +118,8 @@ function main() {
   assert.match(countryPage, /relatedRegional=\{relatedRegional\}/);
   console.log("PASS listing_conversion_ux");
 
-  assert.match(modal, /PLAN_PURCHASE_TRUST_LINE/);
+  assert.match(modal, /purchaseTrustLine/);
+  assert.match(modal, /PLAN_PURCHASE_TRUST_LINE_GUEST/);
   assert.match(modal, /Buy Now/);
   assert.match(modal, /Available networks/);
   assert.match(modal, /label="Coverage"/);
@@ -109,6 +133,8 @@ function main() {
   );
   assert.doesNotMatch(helpers, /providerPriceUSD/);
   assert.doesNotMatch(conversion, /providerPriceUSD|PAYMENT_GATEWAY_ENABLED/);
+  assert.match(helpers, /planCardVoiceSmsLine/);
+  assert.match(helpers, /kind: "voice"/);
   assert.match(pkg, /qa:destination-page-conversion/);
   assert.match(prelaunch, /qa:destination-page-conversion/);
   assert.doesNotMatch(apply, /PLAN_CARD_RECOMMENDED_LABEL|data-plan-sticky-cta/);

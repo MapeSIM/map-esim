@@ -10,7 +10,7 @@ import {
   buildCheckoutHref,
   formatValidityPhrase,
 } from "@/app/lib/plans/plan-utils";
-import { PLAN_PURCHASE_TRUST_LINE } from "@/app/lib/plans/planCardConversion";
+import { PLAN_PURCHASE_TRUST_LINE_GUEST } from "@/app/lib/plans/planCardConversion";
 import {
   planDetailCoverageCountries,
   planDetailDescription,
@@ -31,6 +31,8 @@ type PlanDetailsModalProps = {
   /** Prefer coverage-first copy for regional/global destinations. */
   coverageFocused?: boolean;
   checkoutHref?: (offer: VesimOffer, destinationCode: string) => string;
+  /** Auth-aware Buy Now helper (display only). */
+  purchaseTrustLine?: string;
 };
 
 function DetailRow({
@@ -58,6 +60,7 @@ export default function PlanDetailsModal({
   onClose,
   coverageFocused = false,
   checkoutHref = buildCheckoutHref,
+  purchaseTrustLine = PLAN_PURCHASE_TRUST_LINE_GUEST,
 }: PlanDetailsModalProps) {
   const { formatPrice } = useCurrency();
 
@@ -346,7 +349,7 @@ export default function PlanDetailsModal({
             Buy Now
           </Link>
           <p className="text-center text-[11px] leading-snug text-[var(--text-soft)]">
-            {PLAN_PURCHASE_TRUST_LINE}
+            {purchaseTrustLine}
           </p>
         </div>
       </div>

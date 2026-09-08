@@ -16,6 +16,7 @@ import {
   planCardOperatorLabel,
   planCardSecondaryLines,
   planCardSecondaryText,
+  planCardVoiceSmsLine,
   planDetailCoverageCountries,
   planDetailDescription,
   planDetailFairUseOrTerms,
@@ -90,7 +91,9 @@ function assertCardSafe(offer: VesimOffer, label: string) {
       assert.equal(isConciseOperatorLabel(line.text), true, label);
     }
     assert.equal(
-      isForbiddenPlanCardText(line.text) && line.kind !== "validity",
+      isForbiddenPlanCardText(line.text) &&
+        line.kind !== "validity" &&
+        line.kind !== "voice",
       false,
       `${label}: forbidden ${line.kind} line: ${line.text}`
     );
@@ -367,6 +370,56 @@ function main() {
     "Valid for 30 days\n12 countries covered\nOrange"
   );
   assert.match(listing, /PlanDetailsModal/);
+  console.log("   ok");
+
+  console.log("6) Voice/SMS metadata on cards when available (existing fields only)");
+  const voiceOffer = sampleOffer({
+    id: "voice-1",
+    dataFormatted: "3 GB",
+    durationDays: 7,
+    hasVoiceSms: true,
+    voiceMinutes: 100,
+    smsCount: 50,
+    networks: ["Jazz"],
+  });
+  assert.equal(planCardVoiceSmsLine(voiceOffer), "100 min · 50 SMS");
+  assert.equal(
+    cardText(voiceOffer),
+    "Valid for 7 days\n100 min · 50 SMS\nJazz"
+  );
+  assertCardSafe(voiceOffer, "voice+sms");
+
+  const voiceOnly = sampleOffer({
+    id: "voice-2",
+    hasVoiceSms: true,
+    voiceMinutes: 60,
+    smsCount: null,
+    networks: ["Jazz"],
+  });
+  assert.equal(planCardVoiceSmsLine(voiceOnly), "60 min");
+  assert.match(cardText(voiceOnly), /60 min/);
+  assert.doesNotMatch(cardText(voiceOnly), /SMS/);
+
+  const voiceFlagOnly = sampleOffer({
+    id: "voice-3",
+    hasVoiceSms: true,
+    networks: ["Jazz"],
+  });
+  assert.equal(planCardVoiceSmsLine(voiceFlagOnly), "Voice & SMS included");
+  assert.match(cardText(voiceFlagOnly), /Voice & SMS included/);
+
+  const dataOnly = sampleOffer({
+    id: "data-only",
+    hasVoiceSms: false,
+    voiceMinutes: 100,
+    smsCount: 50,
+    networks: ["Jazz"],
+  });
+  assert.equal(planCardVoiceSmsLine(dataOnly), null);
+  assert.equal(cardText(dataOnly), "Valid for 7 days\nJazz");
+  assert.doesNotMatch(cardText(pkFup), /Voice|SMS|min/);
+  assert.match(helpers, /kind: "voice"/);
+  assert.match(cardSource, /planCardLineLabel\(line\.kind\)/);
   console.log("   ok");
 
   console.log("PASS plan_card_presentation_qa");

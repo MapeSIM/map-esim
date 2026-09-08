@@ -97,12 +97,30 @@ export function planCardOperatorLabel(offer: VesimOffer): string | null {
 export type PlanCardSecondaryLine =
   | { kind: "validity"; text: string }
   | { kind: "coverage"; text: string }
+  | { kind: "voice"; text: string }
   | { kind: "operator"; text: string };
 
 export function planCardLineLabel(kind: PlanCardSecondaryLine["kind"]): string {
   if (kind === "validity") return "Validity";
   if (kind === "coverage") return "Coverage";
+  if (kind === "voice") return "Voice & SMS";
   return "Network";
+}
+
+/**
+ * Card Voice/SMS line from existing offer fields only.
+ * Returns null when hasVoiceSms is not set / false.
+ */
+export function planCardVoiceSmsLine(offer: VesimOffer): string | null {
+  if (offer.hasVoiceSms !== true) return null;
+  const parts: string[] = [];
+  if (offer.voiceMinutes != null && Number.isFinite(offer.voiceMinutes)) {
+    parts.push(`${offer.voiceMinutes} min`);
+  }
+  if (offer.smsCount != null && Number.isFinite(offer.smsCount)) {
+    parts.push(`${offer.smsCount} SMS`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : "Voice & SMS included";
 }
 
 /**
@@ -129,6 +147,11 @@ export function planCardSecondaryLines(
       kind: "coverage",
       text: `${offer.coveredCountriesCount} countries covered`,
     });
+  }
+
+  const voice = planCardVoiceSmsLine(offer);
+  if (voice) {
+    lines.push({ kind: "voice", text: voice });
   }
 
   const operator = planCardOperatorLabel(offer);
