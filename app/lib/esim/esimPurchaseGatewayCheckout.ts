@@ -92,6 +92,8 @@ export type OwnedPaymentAttemptView = {
   purchaseId: string;
   status: EsimPurchasePaymentAttemptStatus;
   purchaseStatus: WalletEsimPurchaseStatus;
+  /** Display-only provider for return/cancel copy. Never used to mark paid. */
+  gatewayProvider: PaymentGatewayProvider | null;
 };
 
 /** Ownership-scoped attempt read for return/cancel informational pages only. */
@@ -109,6 +111,7 @@ export async function getOwnedEsimPurchasePaymentAttempt(
     select: {
       id: true,
       status: true,
+      gatewayProvider: true,
       purchase: {
         select: {
           id: true,
@@ -138,6 +141,7 @@ export async function getOwnedEsimPurchasePaymentAttempt(
     purchaseId: row.purchase.id,
     status: row.status,
     purchaseStatus: row.purchase.status,
+    gatewayProvider: row.gatewayProvider ?? null,
   };
 }
 

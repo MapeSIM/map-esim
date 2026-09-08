@@ -529,7 +529,9 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                       : "Online payment only"}
                   </span>
                   <span className="mt-1 block text-[var(--text-muted)]">
-                    Ignore wallet balance and pay the full amount online.
+                    {simpaisaCheckout
+                      ? "Pay the full amount with Easypaisa or JazzCash. Your wallet balance will not be used for this purchase."
+                      : "Pay the full amount on our secure payment page. Your wallet balance will not be used for this purchase."}
                   </span>
                 </span>
               </label>
@@ -640,10 +642,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                     Rewards applied
                   </dt>
                   <dd className="font-semibold text-[var(--heading)]">
-                    <CheckoutMoney
-                      cents={preview.rewardPointsRedeemed}
-                      signed
-                    />
+                    <CheckoutMoney cents={preview.rewardPointsRedeemed} signed />
                   </dd>
                 </div>
               ) : null}
@@ -663,7 +662,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               ) : null}
               <div
                 className={`grid gap-1 py-3 sm:grid-cols-[180px_1fr]${
-                  fullWallet || zeroCashConfirm
+                  fullWallet || zeroCashConfirm || walletFundsApplied
                     ? " border-b border-[var(--border)]"
                     : ""
                 }`}
@@ -675,7 +674,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                   <CheckoutMoney cents={preview.gatewayAmountCents} />
                 </dd>
               </div>
-              {fullWallet ? (
+              {fullWallet || walletFundsApplied ? (
                 <div className="grid gap-1 py-3 sm:grid-cols-[180px_1fr]">
                   <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
                     Balance after purchase

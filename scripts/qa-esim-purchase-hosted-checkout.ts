@@ -62,8 +62,14 @@ function main() {
   assert.match(gateway, /getActivePaymentAdapter/);
   assert.match(gateway, /createCheckoutSession/);
   assert.match(gateway, /purpose:\s*"ESIM_PURCHASE"/);
-  assert.match(gateway, /chargeAmountMinor:\s*funding\.gatewayAmountCents/);
-  assert.match(gateway, /chargeCurrency:\s*currency/);
+  // USD gateway cents are the Safepay default; Simpaisa may override with PKR quote.
+  assert.match(gateway, /let chargeAmountMinor = funding\.gatewayAmountCents/);
+  assert.match(gateway, /let chargeCurrency = currency/);
+  assert.match(
+    gateway,
+    /quoteSimpaisaPkrChargeFromUsdCents\(funding\.gatewayAmountCents\)/
+  );
+  assert.match(gateway, /chargeAmountMinor = quote\.chargeAmountMinor/);
   assert.match(gateway, /esimPurchasePaymentReturnPath/);
   assert.match(gateway, /esimPurchasePaymentCancelPath/);
   assert.match(gateway, /checkoutIdempotencyKey/);

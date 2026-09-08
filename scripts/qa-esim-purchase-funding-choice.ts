@@ -106,7 +106,8 @@ function main() {
   console.log("PASS useWallet_boolean_parser");
 
   assert.match(actions, /setWalletPurchaseFundingChoice/);
-  assert.match(actions, /parseUseWalletChoice\(formData\.get\("useWallet"\)\)/);
+  assert.match(actions, /resolveCustomerCheckoutUseWallet\(formData\)/);
+  assert.match(actions, /void formData\.get\("useWallet"\)/);
   assert.match(actions, /void formData\.get\("walletAppliedCents"\)/);
   assert.match(actions, /void formData\.get\("gatewayAmountCents"\)/);
   assert.match(actions, /void formData\.get\("priceCents"\)/);
@@ -123,7 +124,7 @@ function main() {
     actions.indexOf("startEsimPurchaseHostedCheckout") <
       actions.indexOf("confirmWalletEsimPurchase({")
   );
-  console.log("PASS server_accepts_useWallet_only_and_gates_gateway");
+  console.log("PASS server_accepts_paymentMode_useWallet_and_gates_gateway");
 
   assert.match(service, /export async function setWalletPurchaseFundingChoice/);
   assert.match(service, /status:\s*WalletEsimPurchaseStatus\.READY/);
@@ -233,7 +234,7 @@ function main() {
   assert.match(confirmForm, /Plan summary/);
   assert.match(confirmForm, /Customer/);
   assert.match(confirmForm, /customerEmail/);
-  assert.match(confirmForm, /Use wallet balance/);
+  assert.match(confirmForm, /Full wallet|Wallet \+ mobile payment|How do you want to pay/);
   assert.match(confirmForm, /Order summary/);
   assert.match(confirmForm, /Wallet applied/);
   assert.match(confirmForm, /Pay now/);
@@ -246,7 +247,7 @@ function main() {
   assert.match(confirmForm, /gatewayRequired/);
   assert.match(confirmForm, /walletFundsApplied/);
   assert.match(confirmForm, /fullWallet = !gatewayRequired && walletFundsApplied/);
-  assert.match(confirmForm, /Payment method/);
+  assert.match(confirmForm, /Payment method|How do you want to pay/);
   assert.match(confirmForm, /CARD_PAYMENT_UNAVAILABLE_MESSAGE/);
   assert.match(confirmForm, /Continue to Payment/);
   assert.match(confirmForm, /Continue to Secure Payment/);
@@ -260,7 +261,9 @@ function main() {
     confirmForm,
     /walletAppliedCents:\s*0,\s*gatewayAmountCents:\s*review\.priceCents/
   );
-  assert.ok(!/createCheckoutSession|fake payment|Apple Pay|Google Pay|VReward/i.test(confirmForm));
+  assert.ok(!/fake payment|Apple Pay|Google Pay|VReward/i.test(confirmForm));
+  // Simpaisa checkout intentionally names JazzCash / Easypaisa in helper copy.
+  assert.match(confirmForm, /JazzCash|Easypaisa/);
   const promoSection = read(
     "app/components/account/CheckoutPromoCodeSection.tsx"
   );
@@ -271,7 +274,6 @@ function main() {
   assert.match(promoSection, /CheckoutMoney cents=\{totalCents\}/);
   assert.doesNotMatch(promoSection, /formatUsdCents/);
   assert.match(confirmForm, /CheckoutPromoCodeSection/);
-  assert.ok(!/JazzCash|EasyPaisa/i.test(confirmForm));
   console.log("PASS checkout_structure_and_fail_closed_cta");
 
   assert.ok(

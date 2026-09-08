@@ -13,6 +13,24 @@ function parsePurchaseId(raw: string | undefined): string | null {
   return id;
 }
 
+function successSubtitle(input: {
+  fundingSource: OrderFundingSource;
+  paymentProvider: "SIMPAISA" | "SAFEPAY" | null;
+}): string {
+  const mobile = input.paymentProvider === "SIMPAISA";
+  if (input.fundingSource === OrderFundingSource.DIRECT_PAYMENT) {
+    return mobile
+      ? "Your mobile-paid eSIM package is ready."
+      : "Your card-paid eSIM package is ready.";
+  }
+  if (input.fundingSource === OrderFundingSource.CUSTOMER_SPLIT) {
+    return mobile
+      ? "Your wallet + mobile payment eSIM package is ready."
+      : "Your wallet + card eSIM package is ready.";
+  }
+  return "Your wallet-funded eSIM package is ready.";
+}
+
 export default async function AccountWalletBuySuccessPage({
   searchParams,
 }: {
@@ -36,12 +54,10 @@ export default async function AccountWalletBuySuccessPage({
   const purchase = await getCompletedWalletPurchase(user.id, purchaseId);
   if (!purchase) notFound();
 
-  const subtitle =
-    purchase.fundingSource === OrderFundingSource.DIRECT_PAYMENT
-      ? "Your card-paid eSIM package is ready."
-      : purchase.fundingSource === OrderFundingSource.CUSTOMER_SPLIT
-        ? "Your wallet + card eSIM package is ready."
-        : "Your wallet-funded eSIM package is ready.";
+  const subtitle = successSubtitle({
+    fundingSource: purchase.fundingSource,
+    paymentProvider: purchase.paymentProvider,
+  });
 
   return (
     <div className="mx-auto max-w-xl space-y-8">
@@ -96,7 +112,7 @@ export default async function AccountWalletBuySuccessPage({
         {purchase.gatewayPaidLabel ? (
           <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[180px_1fr]">
             <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              Card payment
+              {purchase.gatewayPaymentMethodLabel ?? "Card payment"}
             </dt>
             <dd className="text-sm font-semibold text-[var(--heading)]">
               {purchase.gatewayPaidLabel}
