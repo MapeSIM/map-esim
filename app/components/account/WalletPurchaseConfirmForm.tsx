@@ -285,7 +285,11 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         </div>
       ) : null}
 
-    <form action={formAction} className="space-y-6" noValidate>
+    <form
+      action={formAction}
+      className="space-y-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0"
+      noValidate
+    >
       <input type="hidden" name="purchaseId" value={review.purchaseId} />
       <input type="hidden" name="idempotencyKey" value={review.idempotencyKey} />
       <input type="hidden" name="paymentMode" value={paymentMode} />
@@ -692,8 +696,6 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
 
           <CheckoutDisplayCurrencyNote />
 
-          <CheckoutTrustPanel />
-
           {zeroCashConfirm ? (
             <div
               className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-4 text-sm text-[var(--text-muted)]"
@@ -786,8 +788,64 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               Continue to Payment
             </button>
           )}
+
+          {/* Trust sits below Pay CTA so mobile users see action first. */}
+          <CheckoutTrustPanel />
         </aside>
       </div>
+
+      {/* Mobile sticky pay action — mirrors aside CTA without changing funding logic. */}
+      {!awaitingGatewayPayment ? (
+      <div
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden"
+        role="region"
+        aria-label="Checkout payment action"
+      >
+        <div className="mx-auto flex max-w-5xl items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              Pay now
+            </p>
+            <p className="truncate text-sm font-semibold text-[var(--heading)]">
+              <CheckoutMoney cents={preview.gatewayAmountCents} />
+            </p>
+          </div>
+          {zeroCashConfirm ? (
+            <button
+              type="submit"
+              disabled={purchaseBlocked || !confirmed}
+              className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
+            >
+              {pending
+                ? "Working…"
+                : fullWallet
+                  ? "Buy with Wallet"
+                  : "Complete"}
+            </button>
+          ) : gatewayReady ? (
+            <button
+              type="submit"
+              disabled={purchaseBlocked}
+              className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
+            >
+              {pending
+                ? "Working…"
+                : simpaisaCheckout
+                  ? "Continue"
+                  : "Pay securely"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 text-sm font-semibold text-[var(--heading)] opacity-60"
+            >
+              Unavailable
+            </button>
+          )}
+        </div>
+      </div>
+      ) : null}
     </form>
     </div>
   );

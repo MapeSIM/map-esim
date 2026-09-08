@@ -5,7 +5,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Menu, Smartphone, Wallet, X } from "lucide-react";
+import {
+  Gift,
+  Menu,
+  Shield,
+  ShoppingBag,
+  Smartphone,
+  UserRound,
+  Wallet,
+  X,
+} from "lucide-react";
 import {
   BRAND_LOGO_ALT,
   BRAND_LOGO_DARK_PUBLIC_PATH,
@@ -382,9 +391,7 @@ export default function Navbar({
 
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[var(--surface)] px-5 py-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
                   <nav className="flex flex-col gap-2.5" aria-label="Primary mobile">
-                    {navLinks
-                      .filter((link) => link.href !== "/support")
-                      .map((link) => {
+                    {navLinks.map((link) => {
                         const active = isActive(link.href);
                         return (
                           <Link
@@ -436,12 +443,59 @@ export default function Navbar({
 
                       <nav className="flex flex-col gap-2" aria-label="Account">
                         <Link
+                          href="/account/esim/buy"
+                          onClick={closeMenu}
+                          className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-3.5 text-base font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 ${mobileNavClass(isActive("/account/esim/buy"), true)}`}
+                        >
+                          <ShoppingBag className="h-4 w-4 text-[var(--accent-strong)]" />
+                          Buy eSIM
+                        </Link>
+                        <Link
                           href="/account/orders"
                           onClick={closeMenu}
                           className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-3.5 text-base font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 ${mobileNavClass(isActive("/account/orders"), true)}`}
                         >
                           <Smartphone className="h-4 w-4 text-[var(--accent-strong)]" />
                           My eSIMs
+                        </Link>
+                        <Link
+                          href="/account/wallet"
+                          onClick={closeMenu}
+                          className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-3 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 ${mobileNavClass(isActive("/account/wallet"))}`}
+                        >
+                          <Wallet className="h-4 w-4 text-[var(--accent-strong)]" />
+                          Wallet
+                        </Link>
+                        <Link
+                          href="/account/rewards"
+                          onClick={closeMenu}
+                          className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-3 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 ${mobileNavClass(isActive("/account/rewards"))}`}
+                        >
+                          <Gift className="h-4 w-4 text-[var(--accent-strong)]" />
+                          Rewards
+                        </Link>
+                        <Link
+                          href="/account/profile"
+                          onClick={closeMenu}
+                          className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-3 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 ${mobileNavClass(isActive("/account/profile"))}`}
+                        >
+                          <UserRound className="h-4 w-4 text-[var(--accent-strong)]" />
+                          Profile
+                        </Link>
+                        <Link
+                          href="/account/security"
+                          onClick={closeMenu}
+                          className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-3 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 ${mobileNavClass(isActive("/account/security"))}`}
+                        >
+                          <Shield className="h-4 w-4 text-[var(--accent-strong)]" />
+                          Security
+                        </Link>
+                        <Link
+                          href="/support"
+                          onClick={closeMenu}
+                          className={`rounded-[14px] px-4 py-3 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 ${mobileNavClass(isActive("/support"))}`}
+                        >
+                          Support
                         </Link>
                         <Link
                           href="/account"

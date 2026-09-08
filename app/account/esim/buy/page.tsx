@@ -14,6 +14,8 @@ import {
   WalletEsimPurchaseError,
 } from "@/app/lib/esim/walletPurchase";
 import { prisma } from "@/app/lib/db";
+import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
+import { resolveCheckoutBackHref } from "@/app/lib/plans/checkoutBackHref";
 import {
   normalizeOfferId,
   sanitizeCountryHint,
@@ -28,6 +30,59 @@ function reviewPath(purchaseId: string): string {
 
 function newIdempotencyKey(): string {
   return randomBytes(16).toString("hex");
+}
+
+function BuyRecoveryActions({
+  countryHint,
+  showAddFunds,
+}: {
+  countryHint: string | null;
+  showAddFunds: boolean;
+}) {
+  const hint = (countryHint ?? "").trim();
+  const back = resolveCheckoutBackHref(
+    hint.length === 2
+      ? { destinationCode: hint }
+      : { destinationName: hint || null }
+  );
+  const backHref = back.href.startsWith("/countries/")
+    ? back.href
+    : "/countries";
+  const backLabel = back.href.startsWith("/countries/")
+    ? "Back to destination plans"
+    : "Browse destinations";
+
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+      {showAddFunds ? (
+        <Link
+          href="/account/wallet/top-up"
+          className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95"
+        >
+          Add funds
+        </Link>
+      ) : (
+        <Link
+          href="/account/wallet"
+          className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95"
+        >
+          Go to wallet
+        </Link>
+      )}
+      <Link
+        href={backHref}
+        className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface-2)]"
+      >
+        {backLabel}
+      </Link>
+      <Link
+        href="/support"
+        className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface-2)]"
+      >
+        Contact support
+      </Link>
+    </div>
+  );
 }
 
 export default async function AccountWalletBuyPage({
@@ -46,6 +101,7 @@ export default async function AccountWalletBuyPage({
   );
   const offerIdHint = normalizeOfferId(query.offerId);
   const countryHint = sanitizeCountryHint(query.country);
+  const gatewayReady = isPaymentGatewayConfigured();
 
   let destinations: Awaited<
     ReturnType<typeof listAdminAssignmentDestinations>
@@ -90,12 +146,22 @@ export default async function AccountWalletBuyPage({
           </Link>
           <h1 className="text-2xl font-bold tracking-tight">Buy eSIM</h1>
           <div
-            className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
+            className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-6"
             role="status"
           >
             <p className="text-sm font-medium text-[var(--heading)]">
               A wallet is required before purchasing an eSIM.
             </p>
+            <p className="mt-2 text-sm text-[var(--text-muted)]">
+              Add funds or open your wallet, or return to destinations to browse
+              plans.
+            </p>
+            <div className="mt-4">
+              <BuyRecoveryActions
+                countryHint={countryHint}
+                showAddFunds={gatewayReady}
+              />
+            </div>
           </div>
         </div>
       );
@@ -133,12 +199,18 @@ export default async function AccountWalletBuyPage({
           ← Back to wallet
         </Link>
         <div
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
+          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-6"
           role="status"
         >
           <p className="text-sm font-medium text-[var(--heading)]">
             Purchase is temporarily unavailable. Please try again shortly.
           </p>
+          <div className="mt-4">
+            <BuyRecoveryActions
+              countryHint={countryHint}
+              showAddFunds={false}
+            />
+          </div>
         </div>
       </div>
     );
@@ -172,10 +244,14 @@ export default async function AccountWalletBuyPage({
 
       {directOfferError ? (
         <div
-          className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--heading)]"
+          className="space-y-4 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 py-4"
           role="alert"
         >
-          {directOfferError}
+          <p className="text-sm text-[var(--heading)]">{directOfferError}</p>
+          <BuyRecoveryActions
+            countryHint={countryHint}
+            showAddFunds={gatewayReady}
+          />
         </div>
       ) : null}
 

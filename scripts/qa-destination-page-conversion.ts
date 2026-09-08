@@ -47,7 +47,12 @@ function main() {
   assert.doesNotMatch(listing, /PLAN_CARD_BENEFITS/);
   assert.doesNotMatch(listing, /Helpful destination links/);
   assert.match(listing, /Buy Now/);
-  assert.match(listing, /bg-white/);
+  // Sprint A: Plan Details uses design tokens (no theme-breaking bg-white).
+  assert.match(
+    listing,
+    /border-\[var\(--border-strong\)\][\s\S]*?bg-\[var\(--surface\)\][\s\S]*?Plan Details|Coverage details/
+  );
+  assert.doesNotMatch(listing, /bg-white/);
   assert.doesNotMatch(listing, /Need more options\?/);
   assert.match(listing, /href="\/device-compatibility"/);
   assert.match(listing, /Check compatibility/);

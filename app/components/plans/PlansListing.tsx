@@ -705,8 +705,10 @@ export default function PlansListing({
                                 onClick={() => setSelectedOffer(offer)}
                                 className="
                                   inline-flex min-h-11 items-center justify-center
-                                  rounded-xl bg-white px-3 text-sm font-semibold
-                                  text-neutral-950 transition hover:bg-neutral-100
+                                  rounded-xl border border-[var(--border-strong)]
+                                  bg-[var(--surface)] px-3 text-sm font-semibold
+                                  text-[var(--heading)] transition
+                                  hover:bg-[var(--surface-2)]
                                 "
                               >
                                 {isRegionalOrGlobal

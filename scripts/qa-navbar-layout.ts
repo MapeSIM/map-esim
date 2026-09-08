@@ -31,7 +31,20 @@ function main() {
   assert.match(navbar, /variant="mobile"/);
   assert.match(navbar, /href=["']\/countries["']/);
   assert.match(navbar, /Get eSIM/);
-  assert.doesNotMatch(navbar, /href=["']\/account\/esim\/buy["']/);
+  // Get eSIM accent CTAs target /countries (catalog), not wallet buy.
+  const getEsimCtas = [
+    ...navbar.matchAll(
+      /href=(?:\{)?["']([^"']+)["'](?:\})?[\s\S]{0,900}?>\s*\r?\n\s*Get eSIM\s*\r?\n/g
+    ),
+  ].map((m) => m[1]);
+  assert.ok(getEsimCtas.length >= 1, "Get eSIM CTA missing");
+  assert.ok(
+    getEsimCtas.every((href) => href === "/countries"),
+    `Get eSIM must link to /countries, got: ${getEsimCtas.join(", ")}`
+  );
+  // Sprint A: account drawer includes Buy eSIM → /account/esim/buy
+  assert.match(navbar, /href=["']\/account\/esim\/buy["']/);
+  assert.match(navbar, /Buy eSIM/);
   console.log("   ok");
 
   console.log("2) Logo spacing + Get eSIM no-wrap");

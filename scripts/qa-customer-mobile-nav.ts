@@ -1,5 +1,5 @@
 /**
- * Offline QA: professional customer mobile drawer + compact account UX (#8C).
+ * Offline QA: professional customer mobile drawer + compact account UX (#8C / Sprint A).
  * Static source checks only — no auth/session/wallet mutation.
  */
 import assert from "node:assert/strict";
@@ -19,6 +19,7 @@ function main() {
   const accountMenu = read("app/components/account/AccountMenu.tsx");
   const accountPage = read("app/account/page.tsx");
   const ordersPage = read("app/account/orders/page.tsx");
+  const orderCard = read("app/components/orders/CustomerEsimOrderCard.tsx");
   const installPanel = read(
     "app/components/orders/CustomerEsimInstallPanel.tsx"
   );
@@ -37,32 +38,48 @@ function main() {
   assert.match(navbar, /Get eSIM/);
   assert.match(navbar, /Need help\?/);
   assert.match(navbar, /support@mapesim\.com|BRAND_SUPPORT_EMAIL/);
-  // Mobile drawer omits primary Support (help stays via bottom mailto + Contact).
-  assert.match(navbar, /\.filter\(\(link\) => link\.href !== "\/support"\)/);
+  // Primary mobile includes Support (Sprint A account nav also lists Support).
+  assert.match(navbar, /label: "Support"/);
   console.log("PASS logged_out_drawer");
 
-  // B) Logged-in drawer — identity, My eSIMs first-class, wallet, sign out
+  // B) Logged-in drawer — complete Sprint A account navigation
   assert.match(navbar, /customer\.name|customer\?\.name|customerName/);
-  assert.match(navbar, /My eSIMs/);
-  assert.match(navbar, /\/account\/orders/);
-  assert.match(navbar, /My Account|\/account"/);
-  assert.match(navbar, /Wallet|\/account\/wallet/);
   assert.match(navbar, /signOutAction|Sign out/);
   assert.match(navbar, /walletBalanceLabel|balanceLabel/);
-  // Wallet is only via the balance card — no redundant Account-nav Wallet row.
+
   const customerDrawer = navbar.slice(
     navbar.indexOf("isCustomer && customer"),
     navbar.indexOf("isPartner && partner")
   );
+  const accountNavMatch = customerDrawer.match(
+    /aria-label="Account">([\s\S]*?)<\/nav>/
+  );
+  assert.ok(accountNavMatch, "customer Account nav missing");
+  const accountNav = accountNavMatch![1];
+
+  assert.match(accountNav, /Buy eSIM/);
+  assert.match(accountNav, /\/account\/esim\/buy/);
+  assert.match(accountNav, /My eSIMs/);
+  assert.match(accountNav, /\/account\/orders/);
+  assert.match(accountNav, /Wallet/);
+  assert.match(accountNav, /\/account\/wallet/);
+  assert.match(accountNav, /Rewards/);
+  assert.match(accountNav, /\/account\/rewards/);
+  assert.match(accountNav, /Profile/);
+  assert.match(accountNav, /\/account\/profile/);
+  assert.match(accountNav, /Security/);
+  assert.match(accountNav, /\/account\/security/);
+  assert.match(accountNav, /Support/);
+  assert.match(accountNav, /\/support/);
+  assert.match(accountNav, /My Account/);
+  assert.match(accountNav, /href="\/account"/);
+  // Order: Buy eSIM → My eSIMs → Wallet → Rewards → Profile → Security → Support → My Account
   assert.match(
-    customerDrawer,
-    /aria-label="Account">[\s\S]*?My eSIMs[\s\S]*?My Account[\s\S]*?<\/nav>/
+    accountNav,
+    /Buy eSIM[\s\S]*?My eSIMs[\s\S]*?Wallet[\s\S]*?Rewards[\s\S]*?Profile[\s\S]*?Security[\s\S]*?Support[\s\S]*?My Account/
   );
-  assert.doesNotMatch(
-    customerDrawer,
-    /aria-label="Account">[\s\S]*?Wallet[\s\S]*?<\/nav>/
-  );
-  assert.doesNotMatch(navbar, /reward|Reward points|Add data to this eSIM/i);
+  // No sensitive install / reward-ledger leakage in the drawer
+  assert.doesNotMatch(navbar, /Reward points|Add data to this eSIM/i);
   assert.doesNotMatch(navbar, /activationCode|qrValue|lpa|carddata|iccid/i);
   console.log("PASS logged_in_drawer");
 
@@ -82,9 +99,9 @@ function main() {
   assert.match(accountLayout, /AccountMenu/);
   console.log("PASS no_duplicate_mobile_account_menu");
 
-  // C) My eSIMs journey + #install preserved
+  // C) My eSIMs journey + #install preserved (order card → install panel)
   assert.match(ordersPage, /My eSIMs/);
-  assert.match(ordersPage, /#install/);
+  assert.match(orderCard, /#install/);
   assert.match(installPanel, /hasInstallHashIntent|location\.hash/);
   assert.match(installPanel, /autoOpenStarted/);
   console.log("PASS my_esims_install_journey");
@@ -97,6 +114,8 @@ function main() {
   assert.match(accountPage, /\/account\/security/);
   assert.match(accountPage, /view, install, and manage|install and manage/i);
   assert.match(accountPage, /Email verified|EmailVerified/);
+  // Sprint A: actionable verify / resend when unverified
+  assert.match(accountPage, /Verify \/ resend code|verify-email/);
   assert.doesNotMatch(accountPage, /\{user\.name\}/);
   assert.doesNotMatch(accountPage, /\{user\.email\}/);
   console.log("PASS compact_account_page");
