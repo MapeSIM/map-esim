@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  PLAN_CARD_BENEFITS,
   PLAN_CARD_RECOMMENDED_LABEL,
   PLAN_PURCHASE_TRUST_LINE,
   PLAN_PURCHASE_TRUST_LINE_AUTHENTICATED,
@@ -25,6 +26,11 @@ function read(rel: string): string {
 
 function main() {
   assert.equal(PLAN_CARD_RECOMMENDED_LABEL, "Recommended");
+  assert.deepEqual([...PLAN_CARD_BENEFITS], [
+    "Digital eSIM",
+    "Keep your SIM",
+    "QR after purchase",
+  ]);
   assert.equal(
     PLAN_PURCHASE_TRUST_LINE_GUEST,
     "Sign in to buy. QR and install details arrive after purchase."
@@ -65,7 +71,11 @@ function main() {
   assert.match(listing, /planPurchaseTrustLine/);
   assert.match(listing, /purchaseTrustLine/);
   assert.match(listing, /setSignedIn/);
-  assert.doesNotMatch(listing, /PLAN_CARD_BENEFITS/);
+  // Sprint B1.4 Phase 2: controlled benefits micro-row (existing constant only).
+  assert.match(listing, /PLAN_CARD_BENEFITS/);
+  assert.match(listing, /aria-label="Plan benefits"/);
+  assert.match(listing, /formatValidityCardValue/);
+  assert.match(listing, /text-xs leading-snug text-\[var\(--text-muted\)\]/);
   // Sprint B1.4: mobile Buy Now first via order utilities.
   assert.match(listing, /order-1[\s\S]*?Buy Now|Buy Now[\s\S]*?order-1/);
   assert.match(listing, /min-\[400px\]:order-2/);
@@ -124,6 +134,16 @@ function main() {
   assert.match(modal, /Available networks/);
   assert.match(modal, /label="Coverage"/);
   assert.match(modal, /Package information/);
+  // Sprint B1.4 Phase 2: consistent modal title/eyebrow.
+  assert.match(modal, /destinationDisplayName/);
+  assert.match(modal, /planDetailsExtraName/);
+  assert.match(modal, /displayDestinationName/);
+  assert.match(
+    modal,
+    /offer\.dataFormatted\} · \$\{formatValidityPhrase\(offer\.durationDays\)\}/
+  );
+  assert.doesNotMatch(modal, /coverageFocused \? "Coverage details"/);
+  assert.doesNotMatch(modal, /coverageFocused\s*\?\s*`\$\{offer\.dataFormatted\}/);
   console.log("PASS modal_simple_layout");
 
   const offer = { id: "ESIM-QA-CONV-1" } as VesimOffer;
@@ -134,6 +154,7 @@ function main() {
   assert.doesNotMatch(helpers, /providerPriceUSD/);
   assert.doesNotMatch(conversion, /providerPriceUSD|PAYMENT_GATEWAY_ENABLED/);
   assert.match(helpers, /planCardVoiceSmsLine/);
+  assert.match(helpers, /planDetailsExtraName/);
   assert.match(helpers, /kind: "voice"/);
   assert.match(pkg, /qa:destination-page-conversion/);
   assert.match(prelaunch, /qa:destination-page-conversion/);

@@ -263,6 +263,18 @@ export function formatValidityPhrase(days: number | null | undefined): string {
   return `Valid for ${days} days`;
 }
 
+/**
+ * Short validity value for plan cards that already show a "Validity" label
+ * (avoids "Validity · Valid for N days").
+ */
+export function formatValidityCardValue(
+  days: number | null | undefined
+): string {
+  if (days == null || days <= 0) return "Varies";
+  if (days === 1) return "1 day";
+  return `${days} days`;
+}
+
 export function formatValidityPill(days: number): string {
   return validityLabel(days);
 }

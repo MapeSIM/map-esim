@@ -27,7 +27,7 @@ import {
   buildCheckoutHref,
   buildPartnerCheckoutHref,
   filterOffers,
-  formatValidityPhrase,
+  formatValidityCardValue,
   formatValidityPill,
   groupOffersByDuration,
   isUnlimitedOffer,
@@ -42,7 +42,7 @@ import {
   type PlanTypeFilter,
   type SortOption,
 } from "@/app/lib/plans/plan-utils";
-import { planPurchaseTrustLine } from "@/app/lib/plans/planCardConversion";
+import { PLAN_CARD_BENEFITS, planPurchaseTrustLine } from "@/app/lib/plans/planCardConversion";
 import {
   planCardLineLabel,
   planCardSecondaryLines,
@@ -693,7 +693,7 @@ export default function PlansListing({
                         // never invent coverage; helpers only emit existing counts.
                         const secondaryLines = planCardSecondaryLines(offer, {
                           isRegionalOrGlobal,
-                          formatValidity: formatValidityPhrase,
+                          formatValidity: formatValidityCardValue,
                         });
                         return (
                           <article
@@ -733,7 +733,9 @@ export default function PlansListing({
                                       ? "text-[var(--heading)]"
                                       : line.kind === "operator"
                                         ? "truncate text-[var(--text-soft)]"
-                                        : "text-[var(--text)]"
+                                        : line.kind === "voice"
+                                          ? "break-words text-[var(--text)]"
+                                          : "text-[var(--text)]"
                                   }
                                 >
                                   <span
@@ -753,7 +755,9 @@ export default function PlansListing({
                                     className={
                                       line.kind === "validity"
                                         ? "font-medium"
-                                        : undefined
+                                        : line.kind === "voice"
+                                          ? "break-words"
+                                          : undefined
                                     }
                                   >
                                     {line.text}
@@ -762,7 +766,22 @@ export default function PlansListing({
                               ))}
                             </div>
 
-                            <div className="mt-auto space-y-2 pt-5">
+                            <div className="mt-auto space-y-2.5 pt-5">
+                              <ul className="flex flex-wrap gap-1.5" aria-label="Plan benefits">
+                                {PLAN_CARD_BENEFITS.map((benefit) => (
+                                  <li
+                                    key={benefit}
+                                    className="
+                                      rounded-full border border-[var(--border)]
+                                      bg-[var(--surface-2)] px-2.5 py-1
+                                      text-[11px] font-medium leading-none
+                                      text-[var(--text-muted)] sm:text-xs
+                                    "
+                                  >
+                                    {benefit}
+                                  </li>
+                                ))}
+                              </ul>
                               {/*
                                 Mobile (1-col): Buy Now first, Plan Details second.
                                 Wider (≥400px 2-col): Details left, Buy Now right.
@@ -799,7 +818,7 @@ export default function PlansListing({
                                     : "Plan Details"}
                                 </button>
                               </div>
-                              <p className="text-center text-[11px] leading-snug text-[var(--text-soft)]">
+                              <p className="text-center text-xs leading-snug text-[var(--text-muted)]">
                                 {purchaseTrustLine}
                               </p>
                             </div>
