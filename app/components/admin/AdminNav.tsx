@@ -10,6 +10,7 @@ const links = [
   { href: "/admin/customers", label: "Customers", exact: false },
   { href: "/admin/partners", label: "Partners", exact: false },
   { href: "/admin/wallet-topups", label: "Wallet top-ups", exact: false },
+  { href: "/admin/payments", label: "Payments", exact: true },
   { href: "/admin/payments/pending", label: "Pending payments", exact: false },
   { href: "/admin/payments/failed", label: "Failed payments", exact: false },
   { href: "/admin/payments/webhooks", label: "Webhook receipts", exact: false },
@@ -25,6 +26,19 @@ const links = [
 ] as const;
 
 function isActive(pathname: string, href: string, exact: boolean): boolean {
+  if (href === "/admin/payments") {
+    if (pathname === "/admin/payments") return true;
+    // Canonical detail: /admin/payments/[attemptId] — not pending/failed/webhooks.
+    if (
+      pathname.startsWith("/admin/payments/") &&
+      !pathname.startsWith("/admin/payments/pending") &&
+      !pathname.startsWith("/admin/payments/failed") &&
+      !pathname.startsWith("/admin/payments/webhooks")
+    ) {
+      return true;
+    }
+    return false;
+  }
   if (exact) return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
