@@ -56,10 +56,14 @@ function main() {
   assert.match(guest, /Purchase eSIM/);
   assert.match(guest, /customerEmail/);
   assert.match(guest, /guestCheckoutEnabled/);
+  // Sprint B0: guest Pay CTA before trust (parity with logged-in).
+  assert.match(guest, /Purchase eSIM[\s\S]*?CheckoutTrustPanel/);
   console.log("PASS guest_checkout_two_column");
 
   assert.match(trust, /HOME_TRUST_ITEMS/);
   assert.match(trust, /aria-labelledby="checkout-trust-heading"/);
+  assert.match(trust, /Verified Payments|Support Available/);
+  assert.match(trust, /return "\/support"/);
   assert.doesNotMatch(trust, /applyVerifiedPaymentEvent|PAYMENT_GATEWAY_ENABLED/);
   console.log("PASS trust_panel_display_only");
 

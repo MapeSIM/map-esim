@@ -345,8 +345,6 @@ function CheckoutContent() {
               </p>
             </section>
 
-            <CheckoutTrustPanel />
-
             <button
               type="button"
               onClick={pay}
@@ -356,6 +354,9 @@ function CheckoutContent() {
             >
               {payLoading ? "Creating eSIM..." : "Purchase eSIM"}
             </button>
+
+            {/* Trust sits below Pay CTA (parity with logged-in checkout). */}
+            <CheckoutTrustPanel />
 
             {message && (
               <div className="rounded-xl border border-[var(--danger-border)] bg-[var(--danger-bg)] p-4 text-[var(--danger-text)]">

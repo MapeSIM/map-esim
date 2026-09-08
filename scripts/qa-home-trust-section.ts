@@ -34,15 +34,15 @@ function main() {
     HOME_TRUST_ITEMS[2]?.description,
     "Use digital connectivity without swapping SIM cards."
   );
-  assert.equal(HOME_TRUST_ITEMS[3]?.title, "Secure Payments");
+  assert.equal(HOME_TRUST_ITEMS[3]?.title, "Verified Payments");
   assert.equal(
     HOME_TRUST_ITEMS[3]?.description,
-    "Safe and reliable payment experience."
+    "Payment is confirmed before your eSIM is delivered."
   );
-  assert.equal(HOME_TRUST_ITEMS[4]?.title, "24/7 Support");
+  assert.equal(HOME_TRUST_ITEMS[4]?.title, "Support Available");
   assert.equal(
     HOME_TRUST_ITEMS[4]?.description,
-    "Help available when you need it."
+    "Get help from our Support Center when you need it."
   );
   console.log("PASS trust_copy");
 
@@ -72,6 +72,10 @@ function main() {
   assert.match(section, /aria-hidden="true"/);
   assert.match(section, /HOME_TRUST_SECTION_TITLE/);
   assert.match(section, /HOME_TRUST_ITEMS/);
+  // Sprint B0: Support / Destinations trust cards link to existing routes (no fake proof).
+  assert.match(section, /return "\/support"/);
+  assert.match(section, /return "\/countries"/);
+  assert.match(section, /href=\{href\}/);
   assert.doesNotMatch(section, /href="\/checkout"|href="\/payment"/);
   assert.doesNotMatch(section, /PAYMENT_GATEWAY_ENABLED|applyVerifiedPaymentEvent/);
   console.log("PASS trust_section_accessible_layout");
