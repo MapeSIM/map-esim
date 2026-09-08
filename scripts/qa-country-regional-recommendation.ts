@@ -3,6 +3,8 @@
  * Run: npx tsx scripts/qa-country-regional-recommendation.ts
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   regionalCodeForCountryIso,
 } from "../app/lib/vesim/countryRegionalMap";
@@ -11,6 +13,8 @@ import {
   findRelatedRegionalDestination,
   type VesimDestination,
 } from "../app/lib/vesim/destinations";
+
+const root = join(__dirname, "..");
 
 function country(
   code: string,
@@ -107,6 +111,15 @@ function main() {
   // Generic region-regional is never recommended via ISO fallback.
   assert.notEqual(regionalCodeForCountryIso("PK"), "region-regional");
 
+  // B1.3: listing must render related regional (not discard the prop).
+  const listing = readFileSync(
+    join(root, "app/components/plans/PlansListing.tsx"),
+    "utf8"
+  );
+  assert.match(listing, /Related regional plans/);
+  assert.match(listing, /destinationPath\(relatedRegional\)/);
+  assert.doesNotMatch(listing, /_relatedRegional/);
+
   console.log("PASS pakistan_asia");
   console.log("PASS france_western_europe");
   console.log("PASS usa_north_america");
@@ -114,6 +127,7 @@ function main() {
   console.log("PASS no_invented_region");
   console.log("PASS metadata_preferred");
   console.log("PASS no_regional_global_self");
+  console.log("PASS listing_wires_related_regional");
   console.log("ALL_QA_PASSED=country-regional-recommendation");
 }
 

@@ -5,12 +5,16 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   ArrowLeft,
+  ArrowRight,
   Filter,
   Globe2,
   MapPinned,
 } from "lucide-react";
 import type { VesimOffer } from "@/app/lib/vesim/offers";
-import type { VesimDestination } from "@/app/lib/vesim/destinations";
+import {
+  destinationPath,
+  type VesimDestination,
+} from "@/app/lib/vesim/destinations";
 import {
   destinationDisplayName,
   resolveDestinationFlagVisual,
@@ -210,7 +214,7 @@ export default function PlansListing({
   loading = false,
   error = "",
   countryNames = {},
-  relatedRegional: _relatedRegional = null,
+  relatedRegional = null,
   checkoutHref,
   children,
 }: PlansListingProps) {
@@ -377,6 +381,30 @@ export default function PlansListing({
     : heroFromPrice
       ? `From ${heroFromPrice} · ${planCountLabel}`
       : planCountLabel;
+
+  const relatedRegionalHref = relatedRegional
+    ? destinationPath(relatedRegional)
+    : null;
+  const relatedRegionalName = relatedRegional
+    ? destinationDisplayName(relatedRegional)
+    : null;
+  const relatedRegionalFromPrice =
+    relatedRegional?.minPrice != null &&
+    Number.isFinite(relatedRegional.minPrice)
+      ? formatPrice(relatedRegional.minPrice)
+      : null;
+  const relatedRegionalPlanCount =
+    relatedRegional?.offerCount != null && relatedRegional.offerCount > 0
+      ? `${relatedRegional.offerCount} plan${
+          relatedRegional.offerCount === 1 ? "" : "s"
+        } available`
+      : null;
+  const relatedRegionalMeta = [
+    relatedRegionalFromPrice ? `From ${relatedRegionalFromPrice}` : null,
+    relatedRegionalPlanCount,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <main className="min-h-screen overflow-x-clip bg-[var(--page-bg)] text-[var(--heading)]">
@@ -756,6 +784,41 @@ export default function PlansListing({
           </>
         )}
       </section>
+
+      {relatedRegional && relatedRegionalHref && relatedRegionalName ? (
+        <section
+          className="mx-auto max-w-[1200px] px-4 pb-8 sm:px-6 sm:pb-10"
+          aria-labelledby="related-regional-heading"
+        >
+          <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6">
+            <h2
+              id="related-regional-heading"
+              className="text-lg font-bold tracking-tight text-[var(--heading)] sm:text-xl"
+            >
+              Related regional plans
+            </h2>
+            <Link
+              href={relatedRegionalHref}
+              className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 transition hover:border-[var(--border-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-base font-semibold text-[var(--heading)]">
+                  {relatedRegionalName}
+                </p>
+                {relatedRegionalMeta ? (
+                  <p className="mt-1 text-sm text-[var(--text-muted)]">
+                    {relatedRegionalMeta}
+                  </p>
+                ) : null}
+              </div>
+              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-[var(--accent-strong)]">
+                View plans
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </span>
+            </Link>
+          </div>
+        </section>
+      ) : null}
 
       {children}
 

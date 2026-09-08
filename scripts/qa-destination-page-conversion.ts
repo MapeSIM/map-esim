@@ -47,7 +47,12 @@ function main() {
   // Sprint B0: near-Buy expectation copy (display only).
   assert.match(listing, /PLAN_PURCHASE_TRUST_LINE/);
   assert.doesNotMatch(listing, /PLAN_CARD_BENEFITS/);
+  // Sprint B1.3: neutral related regional section (existing data only).
   assert.doesNotMatch(listing, /Helpful destination links/);
+  assert.match(listing, /Related regional plans/);
+  assert.match(listing, /related-regional-heading/);
+  assert.match(listing, /destinationPath\(relatedRegional\)/);
+  assert.doesNotMatch(listing, /_relatedRegional/);
   assert.match(listing, /Buy Now/);
   // Sprint B0: show existing coverage lines on cards (no inventing).
   assert.doesNotMatch(
@@ -84,6 +89,10 @@ function main() {
   );
   assert.doesNotMatch(listing, /offer\.packageInfo/);
   assert.doesNotMatch(listing, /providerPriceUSD/);
+  // Country page still resolves + passes relatedRegional (display wired in listing).
+  const countryPage = read("app/countries/[id]/page.tsx");
+  assert.match(countryPage, /findRelatedRegionalDestination/);
+  assert.match(countryPage, /relatedRegional=\{relatedRegional\}/);
   console.log("PASS listing_conversion_ux");
 
   assert.match(modal, /PLAN_PURCHASE_TRUST_LINE/);
