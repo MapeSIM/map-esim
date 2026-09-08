@@ -80,8 +80,8 @@ function main() {
   assert.match(section, /country-seo-why-heading/);
   assert.match(section, /country-seo-steps-heading/);
   assert.match(section, /country-seo-faq-heading/);
-  assert.match(section, /<details/);
-  assert.match(section, /<summary/);
+  assert.match(section, /FaqAccordion/);
+  assert.match(section, /items=\{content\.faqs\}/);
   assert.match(section, /faqPage\(/);
   assert.match(section, /breadcrumbList\(/);
   assert.match(section, /buildCountrySeoContent/);
@@ -89,6 +89,12 @@ function main() {
   assert.doesNotMatch(section, /href="\/install\/android"/);
   assert.doesNotMatch(section, /PAYMENT_GATEWAY_ENABLED|applyVerifiedPaymentEvent/);
   console.log("PASS seo_section_structure");
+
+  const accordion = read("app/components/faq/FaqAccordion.tsx");
+  assert.match(accordion, /defaultOpenFirst/);
+  assert.match(accordion, /aria-expanded/);
+  assert.match(accordion, /current === index \? null : index/);
+  console.log("PASS faq_accordion_behavior");
 
   assert.match(graph, /export function faqPage/);
   assert.match(graph, /"@type": "FAQPage"/);

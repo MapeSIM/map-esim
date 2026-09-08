@@ -91,6 +91,7 @@
     "qa:pakistan-catalog": "tsx scripts/qa-pakistan-catalog.ts",
     "qa:asia-catalog": "tsx scripts/qa-asia-catalog.ts",
     "qa:country-page-seo": "tsx scripts/qa-country-page-seo.ts",
+    "qa:faq-accordion": "tsx scripts/qa-faq-accordion.ts",
     "qa:plan-card-presentation": "tsx scripts/qa-plan-card-presentation.ts",
     "qa:destination-page-conversion": "tsx scripts/qa-destination-page-conversion.ts",
     "qa:destination-catalog-ssr": "tsx scripts/qa-destination-catalog-ssr.ts",

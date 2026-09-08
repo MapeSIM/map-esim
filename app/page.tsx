@@ -18,6 +18,7 @@ import { HomeTrustSection } from "@/app/components/home/HomeTrustSection";
 import { HomePopularDestinations } from "@/app/components/home/HomePopularDestinations";
 import { HomeComparisonSection } from "@/app/components/home/HomeComparisonSection";
 import { HomeFinalCta } from "@/app/components/home/HomeFinalCta";
+import { FaqAccordion } from "@/app/components/faq/FaqAccordion";
 import { BRAND_NAME, BRAND_TAGLINE } from "@/app/lib/brand";
 import {
   HOME_DISCOVERY_CTA_HREF,
@@ -366,25 +367,8 @@ export default function Home() {
             </h2>
           </div>
 
-          <div className="mt-10 space-y-3">
-            {faqs.map((faq) => (
-              <details
-                key={faq.question}
-                className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4 open:border-[var(--border-hover)]"
-              >
-                <summary className="cursor-pointer list-none text-base font-semibold text-[var(--heading)] marker:content-none">
-                  <span className="flex items-center justify-between gap-4">
-                    {faq.question}
-                    <span className="text-[var(--accent-strong)] transition group-open:rotate-45">
-                      +
-                    </span>
-                  </span>
-                </summary>
-                <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
-                  {faq.answer}
-                </p>
-              </details>
-            ))}
+          <div className="mt-10">
+            <FaqAccordion items={faqs} />
           </div>
           <p className="mt-8 text-center text-sm text-[var(--text-muted)]">
             Need more help?{" "}
