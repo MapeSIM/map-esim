@@ -7,6 +7,7 @@ import {
   UserRound,
   Wallet,
 } from "lucide-react";
+import Link from "next/link";
 import AccountActionRow from "@/app/components/account/AccountActionRow";
 import CustomerPendingPurchases from "@/app/components/account/CustomerPendingPurchases";
 import { requireSession } from "@/app/lib/auth/session";
@@ -71,13 +72,25 @@ export default async function AccountOverviewPage() {
             Email verified
           </span>
         ) : (
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full border border-[var(--warning-border)] bg-[var(--warning-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--warning-text)]"
-            aria-label="Email verification status: Not verified"
-          >
-            <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            Email not verified
-          </span>
+          <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--warning-border)] bg-[var(--warning-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--warning-text)]"
+              aria-label="Email verification status: Not verified"
+            >
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              Email not verified
+            </span>
+            <Link
+              href={
+                user.email
+                  ? `/verify-email?email=${encodeURIComponent(user.email)}`
+                  : "/verify-email"
+              }
+              className="inline-flex h-9 items-center justify-center rounded-[14px] bg-[var(--accent-strong)] px-3 text-xs font-semibold text-[var(--accent-ink)] transition hover:opacity-95"
+            >
+              Verify / resend code
+            </Link>
+          </div>
         )}
       </div>
 
