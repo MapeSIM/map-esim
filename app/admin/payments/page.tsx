@@ -83,6 +83,13 @@ export default async function AdminPaymentsHubPage({
           </Link>
           <span className="text-[var(--text-soft)]"> · </span>
           <Link
+            href="/admin/payments/recovery"
+            className="font-semibold text-[var(--accent-strong)]"
+          >
+            Payment recovery
+          </Link>
+          <span className="text-[var(--text-soft)]"> · </span>
+          <Link
             href="/admin/payments/failed"
             className="font-semibold text-[var(--accent-strong)]"
           >
@@ -100,7 +107,7 @@ export default async function AdminPaymentsHubPage({
 
       <section
         aria-label="Payment KPIs"
-        className="grid gap-3 sm:grid-cols-3"
+        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
       >
         <KpiCard label="Pending" value={data.kpis.pendingCount} />
         <KpiCard
@@ -110,6 +117,10 @@ export default async function AdminPaymentsHubPage({
         <KpiCard
           label="Webhook missing (pending)"
           value={data.kpis.webhookMissingAmongPendingCount}
+        />
+        <KpiCard
+          label="Recovery candidates"
+          value={data.kpis.recoveryCandidateCount}
         />
       </section>
 

@@ -13,6 +13,7 @@ const links = [
   { href: "/admin/payments", label: "Payments", exact: true },
   { href: "/admin/payments/pending", label: "Pending payments", exact: false },
   { href: "/admin/payments/failed", label: "Failed payments", exact: false },
+  { href: "/admin/payments/recovery", label: "Payment recovery", exact: false },
   { href: "/admin/payments/webhooks", label: "Webhook receipts", exact: false },
   { href: "/admin/refund-requests", label: "Refund requests", exact: false },
   { href: "/admin/emails", label: "Email Center", exact: false },
@@ -33,6 +34,7 @@ function isActive(pathname: string, href: string, exact: boolean): boolean {
       pathname.startsWith("/admin/payments/") &&
       !pathname.startsWith("/admin/payments/pending") &&
       !pathname.startsWith("/admin/payments/failed") &&
+      !pathname.startsWith("/admin/payments/recovery") &&
       !pathname.startsWith("/admin/payments/webhooks")
     ) {
       return true;

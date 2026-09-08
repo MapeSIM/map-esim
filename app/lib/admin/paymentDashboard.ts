@@ -28,6 +28,7 @@ import {
   type PaymentDashboardStatusFilter,
   type PaymentDashboardWebhookFilter,
 } from "@/app/lib/admin/paymentDashboardShared";
+import { countPaymentRecoveryCandidates } from "@/app/lib/admin/paymentRecovery";
 import { prisma } from "@/app/lib/db";
 import { formatUsdCents } from "@/app/lib/wallet/display";
 import { maskSafepayTrackerRef } from "@/app/lib/payments/safepayReporterParse";
@@ -36,6 +37,7 @@ export type AdminPaymentDashboardKpis = {
   pendingCount: number;
   failedLast24hCount: number;
   webhookMissingAmongPendingCount: number;
+  recoveryCandidateCount: number;
 };
 
 export type AdminPaymentListRow = {
@@ -198,44 +200,50 @@ export async function getAdminPaymentDashboardKpis(): Promise<AdminPaymentDashbo
   ];
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  const [pendingCount, failedLast24hCount, webhookMissingAmongPendingCount] =
-    await Promise.all([
-      prisma.esimPurchasePaymentAttempt.count({
-        where: { status: { in: pendingStatuses } },
-      }),
-      prisma.esimPurchasePaymentAttempt.count({
-        where: {
-          status: {
-            in: [
-              EsimPurchasePaymentAttemptStatus.FAILED,
-              EsimPurchasePaymentAttemptStatus.CANCELLED,
-            ],
-          },
-          OR: [
-            { failedAt: { gte: since } },
-            { cancelledAt: { gte: since } },
-            {
-              AND: [
-                { failedAt: null },
-                { cancelledAt: null },
-                { updatedAt: { gte: since } },
-              ],
-            },
+  const [
+    pendingCount,
+    failedLast24hCount,
+    webhookMissingAmongPendingCount,
+    recoveryCandidateCount,
+  ] = await Promise.all([
+    prisma.esimPurchasePaymentAttempt.count({
+      where: { status: { in: pendingStatuses } },
+    }),
+    prisma.esimPurchasePaymentAttempt.count({
+      where: {
+        status: {
+          in: [
+            EsimPurchasePaymentAttemptStatus.FAILED,
+            EsimPurchasePaymentAttemptStatus.CANCELLED,
           ],
         },
-      }),
-      prisma.esimPurchasePaymentAttempt.count({
-        where: {
-          status: { in: pendingStatuses },
-          webhookEventId: null,
-        },
-      }),
-    ]);
+        OR: [
+          { failedAt: { gte: since } },
+          { cancelledAt: { gte: since } },
+          {
+            AND: [
+              { failedAt: null },
+              { cancelledAt: null },
+              { updatedAt: { gte: since } },
+            ],
+          },
+        ],
+      },
+    }),
+    prisma.esimPurchasePaymentAttempt.count({
+      where: {
+        status: { in: pendingStatuses },
+        webhookEventId: null,
+      },
+    }),
+    countPaymentRecoveryCandidates(),
+  ]);
 
   return {
     pendingCount,
     failedLast24hCount,
     webhookMissingAmongPendingCount,
+    recoveryCandidateCount,
   };
 }
 
