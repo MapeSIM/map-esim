@@ -33,8 +33,8 @@ export default async function AdminPendingPaymentsPage() {
         <h1 className="text-2xl font-bold tracking-tight">Pending payments</h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
           Inspect gateway payment attempts with authenticated Safepay reporter
-          checks. Successful evidence still requires an authoritative webhook
-          before funding.
+          or Simpaisa Inquire checks. Successful evidence still requires an
+          authoritative webhook before funding. Admin never funds or marks paid.
         </p>
         <p className="mt-2 text-sm">
           <Link
@@ -71,6 +71,9 @@ export default async function AdminPendingPaymentsPage() {
                   </p>
                   <p className="text-[var(--text-muted)]">
                     Purchase {row.purchaseId}
+                    {row.gatewayProvider
+                      ? ` · ${row.gatewayProvider}`
+                      : ""}
                   </p>
                   <p className="text-[var(--text-muted)]">
                     {row.gatewayAmountCents} {row.currency} · attempt{" "}
