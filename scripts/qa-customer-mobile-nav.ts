@@ -35,7 +35,7 @@ function main() {
   assert.match(navbar, /CurrencySelector/);
   assert.match(navbar, /Sign [Ii]n|\/signin/);
   assert.match(navbar, /Create Account|Register|\/signup/);
-  assert.match(navbar, /Get eSIM/);
+  assert.match(navbar, /HOME_DISCOVERY_CTA_LABEL|Get eSIM/);
   assert.match(navbar, /Need help\?/);
   assert.match(navbar, /support@mapesim\.com|BRAND_SUPPORT_EMAIL/);
   // Primary mobile includes Support (Sprint A account nav also lists Support).

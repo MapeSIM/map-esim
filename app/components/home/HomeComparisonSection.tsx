@@ -1,9 +1,13 @@
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import {
   HOME_COMPARISON_COLUMNS,
   HOME_COMPARISON_EYEBROW,
   HOME_COMPARISON_INTRO,
   HOME_COMPARISON_ROWS,
   HOME_COMPARISON_TITLE,
+  HOME_DISCOVERY_CTA_HREF,
+  HOME_DISCOVERY_CTA_LABEL,
 } from "@/app/lib/home/homeConversionSections";
 
 export function HomeComparisonSection() {
@@ -26,8 +30,47 @@ export function HomeComparisonSection() {
           {HOME_COMPARISON_INTRO}
         </p>
 
-        <div className="mt-8 overflow-x-auto rounded-[24px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_12px_30px_rgba(0,0,0,0.2)]">
-          <table className="min-w-[720px] w-full border-collapse text-left text-sm">
+        {/* Mobile: stacked cards — no horizontal scroll. */}
+        <ul className="mt-8 space-y-4 md:hidden">
+          {HOME_COMPARISON_ROWS.map((row) => (
+            <li
+              key={row.feature}
+              className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.2)]"
+            >
+              <p className="text-sm font-bold text-[var(--heading)]">
+                {row.feature}
+              </p>
+              <dl className="mt-4 space-y-3">
+                {HOME_COMPARISON_COLUMNS.map((column, index) => (
+                  <div key={`${row.feature}-${column}`}>
+                    <dt
+                      className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${
+                        index === 0
+                          ? "text-[var(--accent-strong)]"
+                          : "text-[var(--text-soft)]"
+                      }`}
+                    >
+                      {column}
+                    </dt>
+                    <dd
+                      className={`mt-1 text-sm leading-relaxed ${
+                        index === 0
+                          ? "font-medium text-[var(--heading)]"
+                          : "text-[var(--text-muted)]"
+                      }`}
+                    >
+                      {row.values[index]}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </li>
+          ))}
+        </ul>
+
+        {/* Desktop: comparison table (unchanged structure). */}
+        <div className="mt-8 hidden overflow-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_12px_30px_rgba(0,0,0,0.2)] md:block">
+          <table className="w-full border-collapse text-left text-sm">
             <caption className="sr-only">
               Comparison of MAP eSIM, typical roaming, and airport SIM shops
             </caption>
@@ -76,6 +119,20 @@ export function HomeComparisonSection() {
               ))}
             </tbody>
           </table>
+        </div>
+
+        <div className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+          <Link
+            href={HOME_DISCOVERY_CTA_HREF}
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-7 text-sm font-bold text-[var(--accent-ink)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+          >
+            {HOME_DISCOVERY_CTA_LABEL}
+            <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+          </Link>
+          <p className="text-sm text-[var(--text-muted)]">
+            Browse destination plans next — compare data and validity on each
+            country page.
+          </p>
         </div>
       </div>
     </section>

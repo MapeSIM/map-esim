@@ -29,6 +29,10 @@ import {
 } from "@/app/lib/seo/siteGraph";
 import ThemeToggle from "./ThemeToggle";
 import CurrencySelector from "./currency/CurrencySelector";
+import {
+  HOME_DISCOVERY_CTA_HREF,
+  HOME_DISCOVERY_CTA_LABEL,
+} from "@/app/lib/home/homeConversionSections";
 
 type NavLink = {
   href: string;
@@ -279,7 +283,7 @@ export default function Navbar({
             </Link>
 
             <Link
-              href="/countries"
+              href={HOME_DISCOVERY_CTA_HREF}
               className="
                 inline-flex shrink-0 items-center justify-center
                 whitespace-nowrap rounded-[14px] bg-[var(--accent)]
@@ -293,7 +297,7 @@ export default function Navbar({
                 focus-visible:ring-offset-[var(--page-bg)]
               "
             >
-              Get eSIM
+              {HOME_DISCOVERY_CTA_LABEL}
             </Link>
           </div>
         </div>
@@ -623,7 +627,7 @@ export default function Navbar({
                   )}
 
                   <Link
-                    href="/countries"
+                    href={HOME_DISCOVERY_CTA_HREF}
                     onClick={closeMenu}
                     className="
                       mt-3 inline-flex h-12 min-h-12 w-full items-center justify-center
@@ -635,7 +639,7 @@ export default function Navbar({
                       focus-visible:ring-[var(--accent-strong)]/60
                     "
                   >
-                    Get eSIM
+                    {HOME_DISCOVERY_CTA_LABEL}
                   </Link>
 
                   <div className="mt-8 border-t border-[var(--border)]/80 px-0.5 pt-5">

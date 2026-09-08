@@ -19,6 +19,10 @@ import { HomePopularDestinations } from "@/app/components/home/HomePopularDestin
 import { HomeComparisonSection } from "@/app/components/home/HomeComparisonSection";
 import { HomeFinalCta } from "@/app/components/home/HomeFinalCta";
 import { BRAND_NAME, BRAND_TAGLINE } from "@/app/lib/brand";
+import {
+  HOME_DISCOVERY_CTA_HREF,
+  HOME_DISCOVERY_CTA_LABEL,
+} from "@/app/lib/home/homeConversionSections";
 import { absoluteCanonical } from "@/app/lib/seo/canonical";
 
 const homeCanonical = absoluteCanonical("/");
@@ -141,15 +145,15 @@ export default function Home() {
 
             <div className="mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row">
               <Link
-                href="/countries"
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-6 text-sm font-bold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] sm:w-auto"
+                href={HOME_DISCOVERY_CTA_HREF}
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-6 text-sm font-bold text-[var(--accent-ink)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 sm:w-auto"
               >
-                Browse eSIM destinations
+                {HOME_DISCOVERY_CTA_LABEL}
                 <ArrowRight className="h-4 w-4 shrink-0" />
               </Link>
               <Link
                 href="/countries?filter=Regional"
-                className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-6 text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--border-hover)] sm:w-auto"
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-6 text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--border-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 sm:w-auto"
               >
                 View regional plans
               </Link>
