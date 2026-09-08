@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   Globe2,
   Headphones,
@@ -19,6 +20,12 @@ const TRUST_ICONS: LucideIcon[] = [
   ShieldCheck,
   Headphones,
 ];
+
+function trustItemHref(title: string): string | null {
+  if (title === "Support Available") return "/support";
+  if (title === "200+ Destinations") return "/countries";
+  return null;
+}
 
 export function HomeTrustSection() {
   return (
@@ -42,19 +49,32 @@ export function HomeTrustSection() {
         <ul className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-5">
           {HOME_TRUST_ITEMS.map((item, index) => {
             const Icon = TRUST_ICONS[index] ?? QrCode;
+            const href = trustItemHref(item.title);
+            const body = (
+              <article className="h-full rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.2)] sm:p-6">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--accent-strong)]">
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <h3 className="mt-4 text-base font-bold text-[var(--heading)] sm:text-lg">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
+                  {item.description}
+                </p>
+              </article>
+            );
             return (
               <li key={item.title}>
-                <article className="h-full rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.2)] sm:p-6">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--accent-strong)]">
-                    <Icon className="h-5 w-5" aria-hidden="true" />
-                  </div>
-                  <h3 className="mt-4 text-base font-bold text-[var(--heading)] sm:text-lg">
-                    {item.title}
-                  </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-                    {item.description}
-                  </p>
-                </article>
+                {href ? (
+                  <Link
+                    href={href}
+                    className="block h-full rounded-[24px] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+                  >
+                    {body}
+                  </Link>
+                ) : (
+                  body
+                )}
               </li>
             );
           })}

@@ -21,11 +21,11 @@ export const HOME_TRUST_ITEMS = [
     description: "Use digital connectivity without swapping SIM cards.",
   },
   {
-    title: "Secure Payments",
-    description: "Safe and reliable payment experience.",
+    title: "Verified Payments",
+    description: "Payment is confirmed before your eSIM is delivered.",
   },
   {
-    title: "24/7 Support",
-    description: "Help available when you need it.",
+    title: "Support Available",
+    description: "Get help from our Support Center when you need it.",
   },
 ] as const;

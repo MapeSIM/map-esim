@@ -10,6 +10,7 @@ import {
   buildCheckoutHref,
   formatValidityPhrase,
 } from "@/app/lib/plans/plan-utils";
+import { PLAN_PURCHASE_TRUST_LINE } from "@/app/lib/plans/planCardConversion";
 import {
   planDetailCoverageCountries,
   planDetailDescription,
@@ -333,7 +334,7 @@ export default function PlanDetailsModal({
           ) : null}
         </div>
 
-        <div className="border-t border-[var(--border)] px-5 py-4 sm:px-6">
+        <div className="space-y-2 border-t border-[var(--border)] px-5 py-4 sm:px-6">
           <Link
             href={checkoutHref(offer, destination.code)}
             className="
@@ -344,6 +345,9 @@ export default function PlanDetailsModal({
           >
             Buy Now
           </Link>
+          <p className="text-center text-[11px] leading-snug text-[var(--text-soft)]">
+            {PLAN_PURCHASE_TRUST_LINE}
+          </p>
         </div>
       </div>
     </div>

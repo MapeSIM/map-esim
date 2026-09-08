@@ -38,6 +38,7 @@ import {
   type PlanTypeFilter,
   type SortOption,
 } from "@/app/lib/plans/plan-utils";
+import { PLAN_PURCHASE_TRUST_LINE } from "@/app/lib/plans/planCardConversion";
 import {
   planCardLineLabel,
   planCardSecondaryLines,
@@ -362,9 +363,20 @@ export default function PlansListing({
   const displayName = destinationDisplayName(destination);
   const heading = `${displayName} eSIM Plans`;
 
+  const planCountLabel = `${offers.length} plan${
+    offers.length === 1 ? "" : "s"
+  } available`;
+  const heroFromPrice =
+    !loading &&
+    destination.minPrice != null &&
+    Number.isFinite(destination.minPrice)
+      ? formatPrice(destination.minPrice)
+      : null;
   const heroSummary = loading
     ? "Loading available plans..."
-    : `${offers.length} plan${offers.length === 1 ? "" : "s"} available`;
+    : heroFromPrice
+      ? `From ${heroFromPrice} · ${planCountLabel}`
+      : planCountLabel;
 
   return (
     <main className="min-h-screen overflow-x-clip bg-[var(--page-bg)] text-[var(--heading)]">
@@ -645,13 +657,12 @@ export default function PlansListing({
 
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                       {group.plans.map((offer) => {
+                        // Include coverage when present (regional/global) —
+                        // never invent coverage; helpers only emit existing counts.
                         const secondaryLines = planCardSecondaryLines(offer, {
                           isRegionalOrGlobal,
                           formatValidity: formatValidityPhrase,
-                        }).filter(
-                          (line) =>
-                            line.kind === "validity" || line.kind === "operator"
-                        );
+                        });
                         return (
                           <article
                             key={offer.id}
@@ -699,35 +710,40 @@ export default function PlansListing({
                               ))}
                             </div>
 
-                            <div className="mt-auto grid grid-cols-1 gap-3 pt-5 min-[400px]:grid-cols-2">
-                              <button
-                                type="button"
-                                onClick={() => setSelectedOffer(offer)}
-                                className="
-                                  inline-flex min-h-11 items-center justify-center
-                                  rounded-xl border border-[var(--border-strong)]
-                                  bg-[var(--surface)] px-3 text-sm font-semibold
-                                  text-[var(--heading)] transition
-                                  hover:bg-[var(--surface-2)]
-                                "
-                              >
-                                {isRegionalOrGlobal
-                                  ? "Coverage details"
-                                  : "Plan Details"}
-                              </button>
-                              <Link
-                                href={resolveCheckoutHref(
-                                  offer,
-                                  destination.code
-                                )}
-                                className="
-                                  inline-flex min-h-11 items-center justify-center
-                                  rounded-xl bg-[var(--accent-strong)] px-3 text-sm font-bold
-                                  text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]
-                                "
-                              >
-                                Buy Now
-                              </Link>
+                            <div className="mt-auto space-y-2 pt-5">
+                              <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedOffer(offer)}
+                                  className="
+                                    inline-flex min-h-11 items-center justify-center
+                                    rounded-xl border border-[var(--border-strong)]
+                                    bg-[var(--surface)] px-3 text-sm font-semibold
+                                    text-[var(--heading)] transition
+                                    hover:bg-[var(--surface-2)]
+                                  "
+                                >
+                                  {isRegionalOrGlobal
+                                    ? "Coverage details"
+                                    : "Plan Details"}
+                                </button>
+                                <Link
+                                  href={resolveCheckoutHref(
+                                    offer,
+                                    destination.code
+                                  )}
+                                  className="
+                                    inline-flex min-h-11 items-center justify-center
+                                    rounded-xl bg-[var(--accent-strong)] px-3 text-sm font-bold
+                                    text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]
+                                  "
+                                >
+                                  Buy Now
+                                </Link>
+                              </div>
+                              <p className="text-center text-[11px] leading-snug text-[var(--text-soft)]">
+                                {PLAN_PURCHASE_TRUST_LINE}
+                              </p>
                             </div>
                           </article>
                         );

@@ -23,6 +23,7 @@ function read(rel: string): string {
 function main() {
   assert.equal(PLAN_CARD_RECOMMENDED_LABEL, "Recommended");
   assert.match(PLAN_PURCHASE_TRUST_LINE, /QR and install details/);
+  assert.match(PLAN_PURCHASE_TRUST_LINE, /Sign in to buy/);
   assert.match(PLAN_STICKY_TRUST_LINE, /Digital delivery/);
   assert.equal(planCardLineLabel("validity"), "Validity");
   assert.equal(planCardLineLabel("coverage"), "Coverage");
@@ -43,10 +44,20 @@ function main() {
   assert.match(listing, /planCardLineLabel/);
   assert.doesNotMatch(listing, /PLAN_CARD_RECOMMENDED_LABEL/);
   assert.doesNotMatch(listing, /data-plan-recommended/);
-  assert.doesNotMatch(listing, /PLAN_PURCHASE_TRUST_LINE/);
+  // Sprint B0: near-Buy expectation copy (display only).
+  assert.match(listing, /PLAN_PURCHASE_TRUST_LINE/);
   assert.doesNotMatch(listing, /PLAN_CARD_BENEFITS/);
   assert.doesNotMatch(listing, /Helpful destination links/);
   assert.match(listing, /Buy Now/);
+  // Sprint B0: show existing coverage lines on cards (no inventing).
+  assert.doesNotMatch(
+    listing,
+    /line\.kind === "validity" \|\| line\.kind === "operator"/
+  );
+  // Sprint B0: hero From price from existing destination.minPrice + plan count.
+  assert.match(listing, /destination\.minPrice/);
+  assert.match(listing, /From \$\{heroFromPrice\}/);
+  assert.match(listing, /planCountLabel/);
   // Sprint A: Plan Details uses design tokens (no theme-breaking bg-white).
   assert.match(
     listing,
@@ -75,7 +86,7 @@ function main() {
   assert.doesNotMatch(listing, /providerPriceUSD/);
   console.log("PASS listing_conversion_ux");
 
-  assert.doesNotMatch(modal, /PLAN_PURCHASE_TRUST_LINE/);
+  assert.match(modal, /PLAN_PURCHASE_TRUST_LINE/);
   assert.match(modal, /Buy Now/);
   assert.match(modal, /Available networks/);
   assert.match(modal, /label="Coverage"/);
