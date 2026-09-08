@@ -3,6 +3,11 @@ import { notFound } from "next/navigation";
 import PendingPaymentVerifyForm from "@/app/components/admin/PendingPaymentVerifyForm";
 import PendingSimpaisaInvestigateForm from "@/app/components/admin/PendingSimpaisaInvestigateForm";
 import { getAdminPaymentDetail } from "@/app/lib/admin/paymentDashboard";
+import { getAdminPaymentRecoveryDetailExtras } from "@/app/lib/admin/paymentRecovery";
+import {
+  PAYMENT_RECOVERY_BANNER_TITLE,
+  PAYMENT_RECOVERY_POLICY_BLURB,
+} from "@/app/lib/admin/paymentRecoveryShared";
 import { requireRole } from "@/app/lib/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +22,8 @@ export default async function AdminPaymentDetailPage({
   const detail = await getAdminPaymentDetail(raw);
   if (!detail) notFound();
 
+  const recovery = await getAdminPaymentRecoveryDetailExtras(detail.attemptId);
+
   return (
     <div className="space-y-8">
       <header className="space-y-2">
@@ -27,6 +34,17 @@ export default async function AdminPaymentDetailPage({
           >
             ← Payments
           </Link>
+          {recovery?.isRecoveryCandidate ? (
+            <>
+              <span className="text-[var(--text-soft)]"> · </span>
+              <Link
+                href="/admin/payments/recovery"
+                className="font-semibold text-[var(--accent-strong)]"
+              >
+                Payment recovery
+              </Link>
+            </>
+          ) : null}
         </p>
         <h1 className="text-2xl font-bold tracking-tight">Payment detail</h1>
         <p className="text-sm text-[var(--text-muted)]">
@@ -34,6 +52,44 @@ export default async function AdminPaymentDetailPage({
           paid. Funding remains webhook-authoritative.
         </p>
       </header>
+
+      {recovery?.isRecoveryCandidate ? (
+        <section
+          className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm sm:p-5"
+          aria-label={PAYMENT_RECOVERY_BANNER_TITLE}
+        >
+          <h2 className="text-base font-semibold text-[var(--heading)]">
+            {PAYMENT_RECOVERY_BANNER_TITLE}
+          </h2>
+          <p className="mt-2 text-[var(--text-muted)]">
+            {PAYMENT_RECOVERY_POLICY_BLURB}
+          </p>
+          <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                Last investigation decision
+              </dt>
+              <dd className="mt-1 text-[var(--heading)]">
+                {recovery.lastDecisionLabel}
+                {recovery.lastDecisionAtLabel ? (
+                  <span className="text-[var(--text-soft)]">
+                    {" "}
+                    · {recovery.lastDecisionAtLabel}
+                  </span>
+                ) : null}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                Suggested safe action
+              </dt>
+              <dd className="mt-1 text-[var(--heading)]">
+                {recovery.suggestedSafeAction}
+              </dd>
+            </div>
+          </dl>
+        </section>
+      ) : null}
 
       <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm sm:p-5">
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -190,6 +246,46 @@ export default async function AdminPaymentDetailPage({
             className="font-semibold text-[var(--accent-strong)]"
           >
             Legacy pending page
+          </Link>
+        </p>
+      </section>
+
+      <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm sm:p-5">
+        <h2 className="text-base font-semibold text-[var(--heading)]">
+          Webhook receipts for this attempt
+        </h2>
+        <p className="mt-1 text-xs text-[var(--text-soft)]">
+          Read-only observability. Receipts do not authorize admin funding or
+          webhook replay.
+        </p>
+        {!recovery || recovery.receipts.length === 0 ? (
+          <p className="mt-3 text-[var(--text-muted)]">
+            No webhook receipts claimed for this attempt id.
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {recovery.receipts.map((receipt) => (
+              <li
+                key={receipt.id}
+                className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
+              >
+                <p className="font-medium text-[var(--heading)]">
+                  {receipt.receivedAtLabel} · {receipt.providerLabel}
+                </p>
+                <p className="text-xs text-[var(--text-soft)]">
+                  signature {receipt.signatureLabel} · parse {receipt.parseLabel}{" "}
+                  · HTTP {receipt.httpStatusLabel} · {receipt.outcomeLabel}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-3">
+          <Link
+            href="/admin/payments/webhooks"
+            className="font-semibold text-[var(--accent-strong)]"
+          >
+            All webhook receipts
           </Link>
         </p>
       </section>
