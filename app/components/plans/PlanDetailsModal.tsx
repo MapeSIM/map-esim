@@ -14,6 +14,7 @@ import { PLAN_PURCHASE_TRUST_LINE_GUEST } from "@/app/lib/plans/planCardConversi
 import {
   planDetailCoverageCountries,
   planDetailDescription,
+  planDetailsExtraName,
   planDetailFairUseOrTerms,
   planDetailNetworkNames,
   planDetailNetworkTechnology,
@@ -21,6 +22,7 @@ import {
   planDetailOperatorLabel,
   planDetailPackageInfo,
 } from "@/app/lib/plans/planOfferPresentation";
+import { destinationDisplayName } from "@/app/lib/vesim/destinationPresentation";
 import { useCurrency } from "@/app/components/currency/CurrencyProvider";
 
 type PlanDetailsModalProps = {
@@ -28,7 +30,7 @@ type PlanDetailsModalProps = {
   destination: VesimDestination;
   countryNames?: Record<string, string>;
   onClose: () => void;
-  /** Prefer coverage-first copy for regional/global destinations. */
+  /** Prefer coverage-first body sections for regional/global destinations. */
   coverageFocused?: boolean;
   checkoutHref?: (offer: VesimOffer, destinationCode: string) => string;
   /** Auth-aware Buy Now helper (display only). */
@@ -58,7 +60,6 @@ export default function PlanDetailsModal({
   destination,
   countryNames = {},
   onClose,
-  coverageFocused = false,
   checkoutHref = buildCheckoutHref,
   purchaseTrustLine = PLAN_PURCHASE_TRUST_LINE_GUEST,
 }: PlanDetailsModalProps) {
@@ -93,6 +94,9 @@ export default function PlanDetailsModal({
   const notes = planDetailNotes(offer);
   const isCoverageDestination =
     destination.kind === "regional" || destination.kind === "global";
+  const displayDestinationName = destinationDisplayName(destination);
+  const planTitle = `${offer.dataFormatted} · ${formatValidityPhrase(offer.durationDays)}`;
+  const extraPlanName = planDetailsExtraName(offer, planTitle);
 
   return (
     <div
@@ -133,16 +137,19 @@ export default function PlanDetailsModal({
               </span>
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)]/90">
-                  {coverageFocused ? "Coverage details" : destination.name}
+                  {displayDestinationName}
                 </p>
                 <h2
                   id="plan-details-title"
-                  className="truncate text-xl font-bold text-[var(--heading)] sm:text-2xl"
+                  className="text-xl font-bold leading-snug text-[var(--heading)] sm:text-2xl"
                 >
-                  {coverageFocused
-                    ? `${offer.dataFormatted} · ${formatValidityPhrase(offer.durationDays)}`
-                    : offer.name}
+                  {planTitle}
                 </h2>
+                {extraPlanName ? (
+                  <p className="mt-1 break-words text-sm text-[var(--text-muted)]">
+                    {extraPlanName}
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>
@@ -197,7 +204,7 @@ export default function PlanDetailsModal({
                 covered.length > 1 ||
                 (isCoverageDestination && offer.coveredCountriesCount)
                   ? `${offer.coveredCountriesCount || covered.length} countries covered`
-                  : destination.name
+                  : displayDestinationName
               }
             />
             {operator ? (

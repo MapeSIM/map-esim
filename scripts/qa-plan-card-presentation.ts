@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   buildCheckoutHref,
-  formatValidityPhrase,
+  formatValidityCardValue,
 } from "../app/lib/plans/plan-utils";
 import {
   isConciseOperatorLabel,
@@ -19,6 +19,7 @@ import {
   planCardVoiceSmsLine,
   planDetailCoverageCountries,
   planDetailDescription,
+  planDetailsExtraName,
   planDetailFairUseOrTerms,
   planDetailNetworkNames,
   planDetailNetworkTechnology,
@@ -27,6 +28,7 @@ import {
   planDetailPackageInfo,
 } from "../app/lib/plans/planOfferPresentation";
 import type { VesimOffer } from "../app/lib/vesim/offers";
+import { PLAN_CARD_BENEFITS } from "../app/lib/plans/planCardConversion";
 
 const root = join(__dirname, "..");
 
@@ -63,7 +65,7 @@ function extractCardArticleSource(listing: string): string {
 function cardText(offer: VesimOffer, isRegionalOrGlobal = false): string {
   return planCardSecondaryText(offer, {
     isRegionalOrGlobal,
-    formatValidity: formatValidityPhrase,
+    formatValidity: formatValidityCardValue,
   });
 }
 
@@ -85,7 +87,7 @@ function assertCardSafe(offer: VesimOffer, label: string) {
   );
   for (const line of planCardSecondaryLines(offer, {
     isRegionalOrGlobal: false,
-    formatValidity: formatValidityPhrase,
+    formatValidity: formatValidityCardValue,
   })) {
     if (line.kind === "operator") {
       assert.equal(isConciseOperatorLabel(line.text), true, label);
@@ -130,6 +132,16 @@ function main() {
   );
   assert.match(listing, /min-h-\[220px\]/);
   assert.match(listing, /mt-auto/);
+  assert.match(listing, /PLAN_CARD_BENEFITS/);
+  assert.match(cardSource, /Plan benefits|aria-label="Plan benefits"/);
+  assert.deepEqual([...PLAN_CARD_BENEFITS], [
+    "Digital eSIM",
+    "Keep your SIM",
+    "QR after purchase",
+  ]);
+  assert.doesNotMatch(cardSource, /PLAN_CARD_RECOMMENDED_LABEL|Recommended/);
+  assert.match(listing, /formatValidityCardValue/);
+  assert.match(cardSource, /break-words/);
   console.log("   ok");
 
   console.log("2) Production PK/AF FUP payloads never appear on card text");
@@ -152,7 +164,7 @@ function main() {
 
   assert.equal(planCardOperatorLabel(pkFup), "Jazz");
   assertCardSafe(pkFup, "PK P8HM06KTX");
-  assert.equal(cardText(pkFup), "Valid for 1 day\nJazz");
+  assert.equal(cardText(pkFup), "1 day\nJazz");
   assert.ok(planDetailFairUseOrTerms(pkFup)?.includes("Fair use"));
 
   const pkFup2 = sampleOffer({
@@ -181,7 +193,7 @@ function main() {
     dataSpeeds: ["4G", "3G"],
   });
   assertCardSafe(pkDup, "PK P96CDAE48");
-  assert.equal(cardText(pkDup), "Valid for 7 days\nJazz");
+  assert.equal(cardText(pkDup), "7 days\nJazz");
   assert.doesNotMatch(cardText(pkDup), /102 MB/);
 
   const afFup = sampleOffer({
@@ -198,7 +210,7 @@ function main() {
     dataSpeeds: ["3G"],
   });
   assertCardSafe(afFup, "AF PDIRBQAQE");
-  assert.equal(cardText(afFup), "Valid for 1 day\nRoshan");
+  assert.equal(cardText(afFup), "1 day\nRoshan");
   assert.equal(planDetailOperatorLabel(afFup), "Roshan");
   assert.equal(planDetailNetworkTechnology(afFup), "3G");
   assert.ok(planDetailFairUseOrTerms(afFup)?.includes("Fair use"));
@@ -215,7 +227,7 @@ function main() {
     description: PROD_PK_FUP.replace("1.0 GB", "3.0 GB"),
   });
   assert.equal(planCardOperatorLabel(orphanFup), null);
-  assert.equal(cardText(orphanFup), "Valid for 1 day");
+  assert.equal(cardText(orphanFup), "1 day");
   assertCardSafe(orphanFup, "orphan FUP");
 
   console.log("2b) Junk network + speed packageInfo never render as Network");
@@ -232,12 +244,12 @@ function main() {
   assert.deepEqual(planDetailNetworkNames(sheesh), []);
   assert.equal(planDetailNetworkTechnology(sheesh), "Up to 4G speed");
   assert.equal(planDetailPackageInfo(sheesh), null);
-  assert.equal(cardText(sheesh), "Valid for 15 days");
+  assert.equal(cardText(sheesh), "15 days");
   assert.doesNotMatch(cardText(sheesh), /Sheesh|Up to 4G|Network/i);
   assert.equal(
     planCardSecondaryLines(sheesh, {
       isRegionalOrGlobal: false,
-      formatValidity: formatValidityPhrase,
+      formatValidity: formatValidityCardValue,
     }).some((line) => line.kind === "operator"),
     false
   );
@@ -253,7 +265,7 @@ function main() {
   assert.equal(isConciseOperatorLabel("Up to 4G speed"), false);
   assert.equal(isConciseOperatorLabel("Sheesh"), false);
   assert.equal(planCardOperatorLabel(speedOnly), null);
-  assert.equal(cardText(speedOnly), "Valid for 30 days");
+  assert.equal(cardText(speedOnly), "30 days");
   assert.doesNotMatch(cardText(speedOnly), /4G|speed|Network/i);
   assert.equal(isForbiddenPlanCardText("Up to 4G speed"), true);
   assert.equal(isForbiddenPlanCardText("Sheesh"), true);
@@ -367,7 +379,7 @@ function main() {
   });
   assert.equal(
     cardText(regional, true),
-    "Valid for 30 days\n12 countries covered\nOrange"
+    "30 days\n12 countries covered\nOrange"
   );
   assert.match(listing, /PlanDetailsModal/);
   console.log("   ok");
@@ -385,7 +397,7 @@ function main() {
   assert.equal(planCardVoiceSmsLine(voiceOffer), "100 min · 50 SMS");
   assert.equal(
     cardText(voiceOffer),
-    "Valid for 7 days\n100 min · 50 SMS\nJazz"
+    "7 days\n100 min · 50 SMS\nJazz"
   );
   assertCardSafe(voiceOffer, "voice+sms");
 
@@ -416,10 +428,44 @@ function main() {
     networks: ["Jazz"],
   });
   assert.equal(planCardVoiceSmsLine(dataOnly), null);
-  assert.equal(cardText(dataOnly), "Valid for 7 days\nJazz");
+  assert.equal(cardText(dataOnly), "7 days\nJazz");
   assert.doesNotMatch(cardText(pkFup), /Voice|SMS|min/);
   assert.match(helpers, /kind: "voice"/);
   assert.match(cardSource, /planCardLineLabel\(line\.kind\)/);
+  console.log("   ok");
+
+  console.log("7) Modal title helpers stay non-duplicate");
+  const structured = "1 GB · Valid for 7 days";
+  assert.equal(
+    planDetailsExtraName(
+      sampleOffer({ name: "1 GB · Valid for 7 days", dataFormatted: "1 GB" }),
+      structured
+    ),
+    null
+  );
+  assert.equal(
+    planDetailsExtraName(
+      sampleOffer({ name: "1 GB • 7 Days", dataFormatted: "1 GB" }),
+      structured
+    ),
+    null
+  );
+  assert.equal(
+    planDetailsExtraName(
+      sampleOffer({
+        name: "Pakistan Traveler Pack",
+        dataFormatted: "1 GB",
+        id: "abc",
+      }),
+      structured
+    ),
+    "Pakistan Traveler Pack"
+  );
+  assert.match(modal, /destinationDisplayName/);
+  assert.match(modal, /planDetailsExtraName/);
+  assert.match(modal, /planTitle/);
+  assert.doesNotMatch(modal, /coverageFocused \? "Coverage details"/);
+  assert.doesNotMatch(modal, /: offer\.name\}/);
   console.log("   ok");
 
   console.log("PASS plan_card_presentation_qa");

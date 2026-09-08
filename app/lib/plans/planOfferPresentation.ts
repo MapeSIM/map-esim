@@ -124,6 +124,37 @@ export function planCardVoiceSmsLine(offer: VesimOffer): string | null {
 }
 
 /**
+ * Optional modal subtitle from offer.name when it adds non-duplicate info.
+ * Title should already be dataFormatted · validity.
+ */
+export function planDetailsExtraName(
+  offer: VesimOffer,
+  structuredTitle: string
+): string | null {
+  const name = (offer.name || "").trim();
+  if (!name) return null;
+
+  const normalized = name.toLowerCase();
+  if (normalized === structuredTitle.trim().toLowerCase()) return null;
+  if (normalized === (offer.dataFormatted || "").trim().toLowerCase()) {
+    return null;
+  }
+  if (normalized === (offer.id || "").trim().toLowerCase()) return null;
+  if (looksLikeDataValidityDuplicate(name, offer.dataFormatted)) return null;
+
+  // Provider often repeats "X GB · N Days" with alternate separators.
+  const compact = normalized.replace(/\s+/g, " ");
+  const structuredCompact = structuredTitle.trim().toLowerCase().replace(/\s+/g, " ");
+  if (compact === structuredCompact) return null;
+  if (compact.replace(/[•·\-–]/g, " ").replace(/\s+/g, " ") ===
+      structuredCompact.replace(/[•·\-–]/g, " ").replace(/\s+/g, " ")) {
+    return null;
+  }
+
+  return name;
+}
+
+/**
  * Sole secondary-text contract for shared plan cards (below data + price).
  * Callers must not also render packageInfo, description, notes, or raw network.
  */
