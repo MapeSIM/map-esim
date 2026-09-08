@@ -3,6 +3,7 @@ import "server-only";
 import {
   EsimPurchasePaymentAttemptStatus,
   OrderFundingSource,
+  PaymentGatewayProvider,
   Role,
   WalletEsimPurchaseStatus,
 } from "@prisma/client";
@@ -291,11 +292,15 @@ export type WalletPurchaseSuccess = {
   amountChargedLabel: string;
   walletAppliedLabel: string | null;
   gatewayPaidLabel: string | null;
+  /** Display label for gateway line (Card payment vs Mobile payment). */
+  gatewayPaymentMethodLabel: string | null;
   balanceLabel: string | null;
   fundingSource:
     | typeof OrderFundingSource.CUSTOMER_WALLET
     | typeof OrderFundingSource.CUSTOMER_SPLIT
     | typeof OrderFundingSource.DIRECT_PAYMENT;
+  /** Display-only: latest attempt provider when gateway was used. */
+  paymentProvider: "SIMPAISA" | "SAFEPAY" | null;
   orderId: string;
 };
 
@@ -372,6 +377,35 @@ export async function getCompletedWalletPurchase(
     row.fundingSource === OrderFundingSource.CUSTOMER_WALLET ||
     row.fundingSource === OrderFundingSource.CUSTOMER_SPLIT;
 
+  let paymentProvider: "SIMPAISA" | "SAFEPAY" | null = null;
+  if (gatewayPaid > 0) {
+    const attempt = await prisma.esimPurchasePaymentAttempt.findFirst({
+      where: {
+        purchaseId: row.id,
+        gatewayProvider: {
+          in: [
+            PaymentGatewayProvider.SIMPAISA,
+            PaymentGatewayProvider.SAFEPAY,
+          ],
+        },
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { gatewayProvider: true },
+    });
+    if (attempt?.gatewayProvider === PaymentGatewayProvider.SIMPAISA) {
+      paymentProvider = "SIMPAISA";
+    } else if (attempt?.gatewayProvider === PaymentGatewayProvider.SAFEPAY) {
+      paymentProvider = "SAFEPAY";
+    } else {
+      // Fallback to active env provider for display only when attempt lacks provider.
+      paymentProvider = resolveActivePaymentProviderLabel();
+    }
+  }
+
+  const mobilePayment = paymentProvider === "SIMPAISA";
+  const gatewayPaidLabel =
+    gatewayPaid > 0 ? formatWalletPurchasePriceLabel(gatewayPaid) : null;
+
   return {
     purchaseId: row.id,
     customerId: row.customer.id,
@@ -388,12 +422,17 @@ export async function getCompletedWalletPurchase(
         : row.fundingSource === OrderFundingSource.CUSTOMER_WALLET
           ? formatWalletPurchasePriceLabel(payableCents)
           : null,
-    gatewayPaidLabel:
-      gatewayPaid > 0 ? formatWalletPurchasePriceLabel(gatewayPaid) : null,
+    gatewayPaidLabel,
+    gatewayPaymentMethodLabel: gatewayPaidLabel
+      ? mobilePayment
+        ? "Mobile payment"
+        : "Card payment"
+      : null,
     balanceLabel: showWallet
       ? `${formatUsdCents(row.customer.walletAccount?.balanceCents ?? 0)} USD`
       : null,
     fundingSource: row.fundingSource,
+    paymentProvider,
     orderId: row.orderId,
   };
 }

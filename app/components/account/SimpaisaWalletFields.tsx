@@ -43,7 +43,9 @@ export default function SimpaisaWalletFields({
         </legend>
         <p className="text-sm leading-relaxed text-[var(--text-muted)]">
           Select Easypaisa or JazzCash. Enter the 10-digit mobile number
-          (without country code) that will receive the payment request.
+          (without country code) that will receive the payment request. After
+          you continue, approve the request in your JazzCash or Easypaisa app,
+          then return here and refresh status.
         </p>
 
         <div

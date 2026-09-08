@@ -74,6 +74,12 @@ export default async function EsimPurchasePaymentReturnPage({
           ? esimPurchasePaymentCancelPath(attempt.attemptId)
           : null
       }
+      paymentProvider={
+        attempt.gatewayProvider === "SIMPAISA" ||
+        attempt.gatewayProvider === "SAFEPAY"
+          ? attempt.gatewayProvider
+          : null
+      }
     />
   );
 }

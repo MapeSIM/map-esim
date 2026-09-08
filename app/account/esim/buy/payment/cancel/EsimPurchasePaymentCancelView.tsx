@@ -23,7 +23,8 @@ export function EsimPurchasePaymentCancelView({
         role="status"
       >
         <p className="text-sm text-[var(--heading)]">
-          You can return to checkout and try again when ready.
+          Any wallet amount reserved for this checkout has been restored to your
+          available balance. You can return to checkout and try again when ready.
         </p>
       </div>
 
