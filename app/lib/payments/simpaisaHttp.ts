@@ -1,3 +1,4 @@
+import { HttpsProxyAgent } from "https-proxy-agent";
 import "server-only";
 
 import type { SimpaisaValidatedConfig } from "@/app/lib/payments/simpaisaConfig";
