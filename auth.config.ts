@@ -10,6 +10,9 @@ import { safeCallbackPath } from "@/app/lib/auth/redirects";
  * and Google legal-consent gating flags already stored on the JWT.
  */
 export const authConfig = {
+  // Required for self-hosted / reverse-proxy production (DigitalOcean, nginx).
+  // Auth.js only auto-trusts Vercel/Cloudflare Pages otherwise.
+  trustHost: true,
   pages: {
     signIn: "/signin",
     error: "/signin",
