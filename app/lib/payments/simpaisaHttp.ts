@@ -68,6 +68,139 @@ type SimpaisaJson = Record<string, unknown>;
 const HTTP_RETRY_DELAYS_MS = [250, 750, 1500] as const;
 const HTTP_MAX_ATTEMPTS = HTTP_RETRY_DELAYS_MS.length + 1;
 
+/** Optional fixed-egress proxy for Simpaisa Verify / Inquire / Refund only. */
+const SIMPAISA_OUTBOUND_PROXY_ENV = "SIMPAISA_OUTBOUND_PROXY_URL";
+
+type SimpaisaOutboundProxyMode =
+  | { mode: "direct" }
+  | { mode: "proxy"; proxyUrl: string }
+  | { mode: "invalid" };
+
+type UndiciProxyAgent = object;
+
+type UndiciFetch = (
+  input: string | URL | Request,
+  init?: FetchInitWithDispatcher
+) => Promise<Response>;
+
+type UndiciModule = {
+  ProxyAgent: new (proxyUrl: string) => UndiciProxyAgent;
+  fetch: UndiciFetch;
+};
+
+type FetchInitWithDispatcher = RequestInit & {
+  dispatcher?: UndiciProxyAgent;
+};
+
+let cachedOutboundProxyAgent: {
+  proxyUrl: string;
+  agent: UndiciProxyAgent;
+} | null = null;
+
+let cachedUndiciModule: UndiciModule | null = null;
+
+/**
+ * Resolve outbound proxy for Simpaisa API calls.
+ * Missing/blank env → direct fetch (legacy behavior).
+ * Invalid URL/scheme → fail closed (caller must not fall back to direct).
+ * Never logs the URL or credentials.
+ */
+function resolveSimpaisaOutboundProxy(
+  env: NodeJS.ProcessEnv = process.env
+): SimpaisaOutboundProxyMode {
+  const raw = env[SIMPAISA_OUTBOUND_PROXY_ENV];
+  if (raw == null) return { mode: "direct" };
+  const trimmed = raw.trim();
+  if (!trimmed) return { mode: "direct" };
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return { mode: "invalid" };
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return { mode: "invalid" };
+  }
+  return { mode: "proxy", proxyUrl: trimmed };
+}
+
+async function loadUndiciModule(): Promise<UndiciModule> {
+  if (cachedUndiciModule) return cachedUndiciModule;
+  try {
+    // Node embeds undici; keep this server-only path out of the browser bundle.
+    const undici = (await import("undici")) as unknown as UndiciModule;
+    if (typeof undici.ProxyAgent !== "function" || typeof undici.fetch !== "function") {
+      throw new Error("UNDICI_API_MISSING");
+    }
+    cachedUndiciModule = undici;
+    return undici;
+  } catch {
+    console.error("simpaisa_http", "PROXY_UNAVAILABLE");
+    throw new SimpaisaHttpError(
+      "UNAVAILABLE",
+      "Payment provider unavailable."
+    );
+  }
+}
+
+async function loadUndiciProxyAgent(
+  proxyUrl: string
+): Promise<UndiciProxyAgent> {
+  if (
+    cachedOutboundProxyAgent &&
+    cachedOutboundProxyAgent.proxyUrl === proxyUrl
+  ) {
+    return cachedOutboundProxyAgent.agent;
+  }
+  try {
+    const undici = await loadUndiciModule();
+    const agent = new undici.ProxyAgent(proxyUrl);
+    cachedOutboundProxyAgent = { proxyUrl, agent };
+    return agent;
+  } catch (error) {
+    if (error instanceof SimpaisaHttpError) throw error;
+    console.error("simpaisa_http", "PROXY_UNAVAILABLE");
+    throw new SimpaisaHttpError(
+      "UNAVAILABLE",
+      "Payment provider unavailable."
+    );
+  }
+}
+
+type SimpaisaFetchPlan =
+  | { mode: "direct"; init: RequestInit }
+  | { mode: "proxy"; init: FetchInitWithDispatcher; fetchImpl: UndiciFetch };
+
+/**
+ * Build fetch plan for Simpaisa outbound calls.
+ * Proxy mode uses undici.fetch + ProxyAgent dispatcher so Next.js patched
+ * fetch cannot strip `dispatcher` and silently egress directly.
+ * Throws SimpaisaHttpError UNAVAILABLE when proxy env is set but invalid.
+ */
+async function buildSimpaisaFetchPlan(
+  init: RequestInit
+): Promise<SimpaisaFetchPlan> {
+  const proxy = resolveSimpaisaOutboundProxy();
+  if (proxy.mode === "direct") {
+    return { mode: "direct", init };
+  }
+  if (proxy.mode === "invalid") {
+    console.error("simpaisa_http", "PROXY_MISCONFIGURED");
+    throw new SimpaisaHttpError(
+      "UNAVAILABLE",
+      "Payment provider unavailable."
+    );
+  }
+  const undici = await loadUndiciModule();
+  const dispatcher = await loadUndiciProxyAgent(proxy.proxyUrl);
+  return {
+    mode: "proxy",
+    fetchImpl: undici.fetch,
+    init: { ...init, dispatcher },
+  };
+}
+
 function asRecord(value: unknown): SimpaisaJson | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value as SimpaisaJson;
@@ -577,7 +710,7 @@ export class SimpaisaHttpClient {
     for (let attempt = 0; attempt < HTTP_MAX_ATTEMPTS; attempt++) {
       let response: Response;
       try {
-        response = await fetch(url, {
+        const fetchPlan = await buildSimpaisaFetchPlan({
           method,
           headers: {
             Accept: "application/json",
@@ -587,7 +720,14 @@ export class SimpaisaHttpClient {
           body: JSON.stringify(body),
           cache: "no-store",
         });
-      } catch {
+        response =
+          fetchPlan.mode === "proxy"
+            ? await fetchPlan.fetchImpl(url, fetchPlan.init)
+            : await fetch(url, fetchPlan.init);
+      } catch (error) {
+        if (error instanceof SimpaisaHttpError) {
+          throw error;
+        }
         if (attempt < HTTP_MAX_ATTEMPTS - 1) {
           await sleep(HTTP_RETRY_DELAYS_MS[attempt] ?? 1500);
           continue;
