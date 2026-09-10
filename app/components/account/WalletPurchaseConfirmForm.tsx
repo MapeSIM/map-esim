@@ -170,6 +170,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
   const zeroCashConfirm = !gatewayRequired;
   const rewardsDisabled = !review.rewardEligible;
   const walletDisabled = review.balanceCents <= 0;
+  const hasWalletBalance = !walletDisabled;
   const paymentGatewayConfigured = review.paymentGatewayConfigured === true;
   const simpaisaCheckout = review.activePaymentProvider === "SIMPAISA";
   const gatewayReady = gatewayRequired && paymentGatewayConfigured;
@@ -183,20 +184,29 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
     afterPromoCents - preview.rewardPointsRedeemed
   );
   const canFullWallet =
-    !walletDisabled &&
+    hasWalletBalance &&
     review.balanceCents >= cashPayablePreview &&
     cashPayablePreview > 0;
   const canWalletAndMobile =
-    !walletDisabled &&
+    hasWalletBalance &&
     review.balanceCents > 0 &&
     review.balanceCents < cashPayablePreview;
-  // Vesim-style visibility: hide unavailable options (no greyed-out cards).
-  // Enough balance → Full wallet + Wallet + online + Online.
-  // Partial balance → Wallet + online + Online (hybrid remains available).
-  // No balance → Online only.
-  const showFullWalletOption = canFullWallet;
-  const showWalletAndOnlineOption = canWalletAndMobile || canFullWallet;
+  // UI visibility only (funding math unchanged):
+  // - Wallet balance available → show Full wallet (when enough), Wallet + online,
+  //   and Online payment (JazzCash / Easypaisa).
+  // - No wallet balance → hide wallet options; Online payment only.
+  const showFullWalletOption = hasWalletBalance && canFullWallet;
+  const showWalletAndOnlineOption =
+    hasWalletBalance && (canWalletAndMobile || canFullWallet);
   const showOnlinePaymentOption = cashPayablePreview > 0;
+  const showRewardsSection =
+    Math.max(0, Math.trunc(Number(review.rewardPointsBalance))) >= 100;
+  const onlinePaymentLabel = simpaisaCheckout
+    ? "Online payment (JazzCash / Easypaisa)"
+    : "Online payment";
+  const walletAndOnlineLabel = simpaisaCheckout
+    ? "Wallet + online payment (JazzCash / Easypaisa)"
+    : "Wallet + online payment";
   const balanceAfterPreview = Math.max(
     0,
     review.balanceCents - preview.walletAppliedCents
@@ -429,7 +439,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
             disabled={busy}
           />
 
-          {review.rewardEligible ? (
+          {showRewardsSection ? (
             <section className={cardClass} aria-labelledby={rewardsHeadingId}>
               <h2
                 id={rewardsHeadingId}
@@ -472,13 +482,15 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
             >
               Payment
             </h2>
-            <p className="mt-2 text-sm text-[var(--text-muted)]">
-              Wallet:{" "}
-              <CheckoutMoney
-                cents={review.balanceCents}
-                variant="wallet-balance"
-              />
-            </p>
+            {hasWalletBalance ? (
+              <p className="mt-2 text-sm text-[var(--text-muted)]">
+                Wallet:{" "}
+                <CheckoutMoney
+                  cents={review.balanceCents}
+                  variant="wallet-balance"
+                />
+              </p>
+            ) : null}
 
             {cashPayablePreview <= 0 ? (
               <p className="mt-3 text-sm text-[var(--text-muted)]">
@@ -527,7 +539,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                       className="shrink-0"
                     />
                     <span className="font-semibold text-[var(--heading)]">
-                      Wallet + online payment
+                      {walletAndOnlineLabel}
                     </span>
                   </label>
                 ) : null}
@@ -548,7 +560,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                       className="shrink-0"
                     />
                     <span className="font-semibold text-[var(--heading)]">
-                      Online payment
+                      {onlinePaymentLabel}
                     </span>
                   </label>
                 ) : null}

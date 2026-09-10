@@ -105,7 +105,11 @@ function offlineChecks(): void {
   assert.doesNotMatch(fundingChoice, /claimRewardRedemptionInTx/);
   assert.match(confirmForm, /Use rewards/);
   assert.match(confirmForm, /CheckoutMoney cents=\{preview\.rewardPointsRedeemed\} signed/);
-  assert.match(confirmForm, /review\.rewardEligible \?/);
+  assert.match(confirmForm, /showRewardsSection/);
+  assert.match(
+    confirmForm,
+    /rewardPointsBalance\)\) >= 100|showRewardsSection/
+  );
   assert.doesNotMatch(
     confirmForm,
     /Earn \{review\.rewardPointsToUnlock\} more points to unlock rewards/

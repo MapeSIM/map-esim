@@ -268,8 +268,9 @@ function main() {
   // Simpaisa checkout intentionally names JazzCash / Easypaisa in helper copy.
   assert.match(confirmForm, /JazzCash|Easypaisa/);
   assert.match(confirmForm, /showFullWalletOption|showOnlinePaymentOption/);
+  assert.match(confirmForm, /hasWalletBalance/);
   assert.doesNotMatch(confirmForm, /How do you want to pay\?/);
-  assert.doesNotMatch(confirmForm, /Mobile payment only|Wallet \+ mobile payment/);
+  assert.doesNotMatch(confirmForm, /Mobile payment only/);
   const promoSection = read(
     "app/components/account/CheckoutPromoCodeSection.tsx"
   );
