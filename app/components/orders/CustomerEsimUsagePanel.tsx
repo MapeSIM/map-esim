@@ -44,15 +44,17 @@ function formatWhen(iso: string | null): string {
   if (!iso) return "Not reported";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "Not reported";
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "UTC",
-  }).format(d) + " UTC";
+  return (
+    new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "UTC",
+    }).format(d) + " UTC"
+  );
 }
 
 function statusBadgeClass(usage: UsagePayload): string {
@@ -60,9 +62,54 @@ function statusBadgeClass(usage: UsagePayload): string {
     return "border-[var(--danger-border)] bg-[var(--danger-bg)] text-[var(--danger-text)]";
   }
   if (usage.isActivated || /active/i.test(usage.statusLabel + usage.status)) {
-    return "border-[var(--accent-strong)]/40 bg-[var(--accent-strong)]/10 text-[var(--heading)]";
+    return "border-[var(--accent-strong)]/45 bg-[var(--accent-strong)]/14 text-[var(--heading)]";
   }
   return "border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--heading)]";
+}
+
+/** Display-only low/empty data cues from existing usage fields. */
+function dataLevelHint(usage: UsagePayload): {
+  level: "ok" | "low" | "empty" | "unknown";
+  message: string | null;
+} {
+  if (usage.isUnlimited) {
+    return { level: "ok", message: null };
+  }
+  if (!usage.reportsDataAllowance) {
+    return {
+      level: "unknown",
+      message: "Detailed data totals were not reported for this plan.",
+    };
+  }
+  const remaining = usage.remainingDataGB;
+  const pct = usage.usagePercent;
+  if (remaining !== null && Number.isFinite(remaining) && remaining <= 0) {
+    return {
+      level: "empty",
+      message: "No data remaining on this eSIM.",
+    };
+  }
+  if (
+    (remaining !== null && Number.isFinite(remaining) && remaining <= 0.25) ||
+    (pct !== null && Number.isFinite(pct) && pct >= 90)
+  ) {
+    return {
+      level: "low",
+      message: "Data is running low on this eSIM.",
+    };
+  }
+  return { level: "ok", message: null };
+}
+
+function remainingToneClass(level: "ok" | "low" | "empty" | "unknown"): string {
+  switch (level) {
+    case "empty":
+      return "border-[var(--danger-border)] bg-[var(--danger-bg)] text-[var(--danger-text)]";
+    case "low":
+      return "border-[var(--warning-border)] bg-[var(--warning-bg)] text-[var(--warning-text)]";
+    default:
+      return "border-[var(--accent-strong)]/30 bg-[var(--accent-strong)]/10 text-[var(--heading)]";
+  }
 }
 
 export default function CustomerEsimUsagePanel({
@@ -111,7 +158,9 @@ export default function CustomerEsimUsagePanel({
       }
       setUsage({
         status: String(json.usage.status || "Unknown"),
-        statusLabel: String(json.usage.statusLabel || json.usage.status || "Unknown"),
+        statusLabel: String(
+          json.usage.statusLabel || json.usage.status || "Unknown"
+        ),
         initialDataGB:
           typeof json.usage.initialDataGB === "number"
             ? json.usage.initialDataGB
@@ -182,6 +231,7 @@ export default function CustomerEsimUsagePanel({
       : usage?.isUnlimited
         ? 0
         : null;
+  const dataHint = usage ? dataLevelHint(usage) : null;
 
   return (
     <section
@@ -190,14 +240,14 @@ export default function CustomerEsimUsagePanel({
       className={
         compact
           ? "min-w-0"
-          : "rounded-2xl border border-[var(--border-hover)] bg-[var(--surface-2)] p-4 sm:p-5"
+          : "overflow-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_10px_28px_rgba(0,0,0,0.14)]"
       }
     >
       <div
         className={
           compact
             ? "flex flex-col gap-2"
-            : "flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+            : "border-b border-[var(--border)] bg-[var(--surface-2)]/45 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6"
         }
       >
         {compact ? (
@@ -205,26 +255,32 @@ export default function CustomerEsimUsagePanel({
             eSIM Status &amp; Usage
           </h2>
         ) : (
-        <div className="min-w-0">
-          <h2
-            id={headingId}
-            className="text-base font-bold tracking-tight text-[var(--heading)]"
-          >
-            eSIM Status &amp; Usage
-          </h2>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Check activation and data usage when you need it. No automatic
-            refresh.
-          </p>
-        </div>
+          <div className="min-w-0">
+            <h2
+              id={headingId}
+              className="text-base font-bold tracking-tight text-[var(--heading)]"
+            >
+              eSIM Status &amp; Usage
+            </h2>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Check activation and data usage when you need it. No automatic
+              refresh.
+            </p>
+          </div>
         )}
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+        <div
+          className={
+            compact
+              ? "flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center"
+              : "mt-3 flex w-full flex-col gap-2 sm:mt-0 sm:w-auto sm:flex-row sm:items-center"
+          }
+        >
           {!open ? (
             <button
               type="button"
               onClick={() => void openAndLoad()}
               disabled={loading}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 disabled:opacity-60 sm:w-auto"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_16px_rgba(0,0,0,0.14)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 disabled:opacity-60 sm:w-auto"
             >
               <Signal className="h-4 w-4" aria-hidden="true" />
               {loading ? "Loading…" : compact ? "Check Usage" : "View usage"}
@@ -247,10 +303,13 @@ export default function CustomerEsimUsagePanel({
       </div>
 
       {open ? (
-        <div className="mt-5 space-y-4" aria-live="polite">
+        <div
+          className={compact ? "mt-5 space-y-4" : "space-y-5 px-5 py-5 sm:px-6"}
+          aria-live="polite"
+        >
           {error ? (
             <p
-              className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--text-muted)]"
+              className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--text-muted)]"
               role="status"
             >
               {error}
@@ -306,112 +365,156 @@ export default function CustomerEsimUsagePanel({
                 ) : null}
               </div>
             ) : (
-            <>
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass(usage)}`}
-                >
-                  {usage.statusLabel}
-                </span>
-              </div>
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold tracking-wide ${statusBadgeClass(usage)}`}
+                  >
+                    {usage.statusLabel}
+                  </span>
+                  {dataHint && dataHint.level === "low" ? (
+                    <span className="inline-flex rounded-full border border-[var(--warning-border)] bg-[var(--warning-bg)] px-2.5 py-1 text-xs font-bold text-[var(--warning-text)]">
+                      Low data
+                    </span>
+                  ) : null}
+                  {dataHint && dataHint.level === "empty" ? (
+                    <span className="inline-flex rounded-full border border-[var(--danger-border)] bg-[var(--danger-bg)] px-2.5 py-1 text-xs font-bold text-[var(--danger-text)]">
+                      No data left
+                    </span>
+                  ) : null}
+                </div>
 
-              <dl className="grid gap-3 text-sm sm:grid-cols-3">
-                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3">
-                  <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-                    Activated
-                  </dt>
-                  <dd className="mt-1 font-medium text-[var(--heading)]">
-                    {formatWhen(usage.activatedAt)}
-                  </dd>
-                </div>
-                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3">
-                  <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-                    Expires
-                  </dt>
-                  <dd className="mt-1 font-medium text-[var(--heading)]">
-                    {formatWhen(usage.expiresAt)}
-                  </dd>
-                </div>
-                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3">
-                  <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-                    Days remaining
-                  </dt>
-                  <dd className="mt-1 font-medium text-[var(--heading)]">
-                    {usage.daysRemaining !== null
-                      ? `${usage.daysRemaining}`
-                      : "—"}
-                  </dd>
-                </div>
-              </dl>
-
-              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-4 sm:px-4">
-                {usage.isUnlimited ? (
-                  <p className="text-sm font-semibold text-[var(--heading)]">
-                    Data: Unlimited
+                {dataHint?.message ? (
+                  <p
+                    className={`rounded-2xl border px-4 py-3 text-sm font-medium ${
+                      dataHint.level === "empty"
+                        ? "border-[var(--danger-border)] bg-[var(--danger-bg)] text-[var(--danger-text)]"
+                        : dataHint.level === "low"
+                          ? "border-[var(--warning-border)] bg-[var(--warning-bg)] text-[var(--warning-text)]"
+                          : "border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-muted)]"
+                    }`}
+                    role="status"
+                  >
+                    {dataHint.message}
                   </p>
-                ) : (
-                  <>
-                    <dl className="grid grid-cols-3 gap-2 text-center text-sm">
-                      <div>
-                        <dt className="text-xs text-[var(--text-soft)]">Used</dt>
-                        <dd className="mt-0.5 font-semibold tabular-nums text-[var(--heading)]">
-                          {formatGb(usage.usedDataGB)}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs text-[var(--text-soft)]">
-                          Remaining
-                        </dt>
-                        <dd className="mt-0.5 font-semibold tabular-nums text-[var(--heading)]">
-                          {formatGb(usage.remainingDataGB)}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs text-[var(--text-soft)]">Total</dt>
-                        <dd className="mt-0.5 font-semibold tabular-nums text-[var(--heading)]">
-                          {formatGb(usage.initialDataGB)}
-                        </dd>
-                      </div>
-                    </dl>
-                    {barPct !== null ? (
-                      <div className="mt-4">
-                        <div className="mb-1.5 flex items-center justify-between text-xs text-[var(--text-soft)]">
-                          <span>Usage</span>
-                          <span className="tabular-nums font-semibold text-[var(--heading)]">
-                            {usage.usagePercent !== null
-                              ? `${Math.round(usage.usagePercent)}%`
-                              : `${Math.round(barPct)}%`}
-                          </span>
+                ) : null}
+
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--page-bg)]/35 p-4 sm:p-5">
+                  {usage.isUnlimited ? (
+                    <p className="text-base font-bold text-[var(--heading)]">
+                      Unlimited data
+                    </p>
+                  ) : (
+                    <>
+                      <dl className="grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3.5">
+                          <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                            Used
+                          </dt>
+                          <dd className="mt-1.5 text-lg font-bold tabular-nums text-[var(--heading)]">
+                            {formatGb(usage.usedDataGB)}
+                          </dd>
                         </div>
                         <div
-                          className="h-2.5 overflow-hidden rounded-full bg-[var(--page-bg-soft)]"
-                          role="progressbar"
-                          aria-valuemin={0}
-                          aria-valuemax={100}
-                          aria-valuenow={Math.round(barPct)}
-                          aria-label="Data usage"
+                          className={`rounded-2xl border px-3.5 py-3.5 ${remainingToneClass(dataHint?.level ?? "ok")}`}
                         >
-                          <div
-                            className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent)_0%,var(--accent-strong)_100%)] transition-[width] duration-300"
-                            style={{ width: `${barPct}%` }}
-                          />
+                          <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] opacity-80">
+                            Remaining
+                          </dt>
+                          <dd className="mt-1.5 text-lg font-bold tabular-nums">
+                            {formatGb(usage.remainingDataGB)}
+                          </dd>
                         </div>
-                      </div>
-                    ) : null}
-                  </>
-                )}
+                        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3.5">
+                          <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                            Total
+                          </dt>
+                          <dd className="mt-1.5 text-lg font-bold tabular-nums text-[var(--heading)]">
+                            {formatGb(usage.initialDataGB)}
+                          </dd>
+                        </div>
+                      </dl>
+                      {barPct !== null ? (
+                        <div className="mt-4">
+                          <div className="mb-1.5 flex items-center justify-between text-xs text-[var(--text-soft)]">
+                            <span>Usage</span>
+                            <span className="tabular-nums font-semibold text-[var(--heading)]">
+                              {usage.usagePercent !== null
+                                ? `${Math.round(usage.usagePercent)}%`
+                                : `${Math.round(barPct)}%`}
+                            </span>
+                          </div>
+                          <div
+                            className="h-2.5 overflow-hidden rounded-full bg-[var(--page-bg-soft)]"
+                            role="progressbar"
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={Math.round(barPct)}
+                            aria-label="Data usage"
+                          >
+                            <div
+                              className={`h-full rounded-full transition-[width] duration-300 ${
+                                dataHint?.level === "empty"
+                                  ? "bg-[var(--danger-text)]"
+                                  : dataHint?.level === "low"
+                                    ? "bg-[var(--warning-text)]"
+                                    : "bg-[linear-gradient(90deg,var(--accent)_0%,var(--accent-strong)_100%)]"
+                              }`}
+                              style={{ width: `${barPct}%` }}
+                            />
+                          </div>
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+
+                <dl className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/50 px-3.5 py-3.5">
+                    <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                      Activated
+                    </dt>
+                    <dd className="mt-1.5 text-sm font-semibold text-[var(--heading)]">
+                      {formatWhen(usage.activatedAt)}
+                    </dd>
+                  </div>
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/50 px-3.5 py-3.5">
+                    <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                      Expires
+                    </dt>
+                    <dd className="mt-1.5 text-sm font-semibold text-[var(--heading)]">
+                      {formatWhen(usage.expiresAt)}
+                    </dd>
+                  </div>
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/50 px-3.5 py-3.5">
+                    <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                      Days remaining
+                    </dt>
+                    <dd className="mt-1.5 text-sm font-semibold text-[var(--heading)]">
+                      {usage.daysRemaining !== null
+                        ? `${usage.daysRemaining}`
+                        : "—"}
+                    </dd>
+                  </div>
+                </dl>
+
                 {addDataHref ? (
-                  <div className="mt-4">
+                  <div className="rounded-2xl border border-[var(--accent-strong)]/40 bg-[var(--accent-strong)]/10 px-4 py-4">
+                    <p className="text-sm font-semibold text-[var(--heading)]">
+                      Need more data on this eSIM?
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--text-muted)]">
+                      Top up the same eSIM — a new eSIM is not created.
+                    </p>
                     <Link
                       href={addDataHref}
-                      className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-[var(--accent-strong)]/50 bg-[var(--accent-strong)]/10 px-3 text-sm font-bold text-[var(--heading)] transition hover:bg-[var(--accent-strong)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
+                      className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_16px_rgba(0,0,0,0.14)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
                     >
                       Add More Data
                     </Link>
                   </div>
                 ) : null}
-              </div>
-            </>
+              </>
             )
           ) : null}
 
@@ -420,9 +523,9 @@ export default function CustomerEsimUsagePanel({
           ) : null}
 
           {compact ? null : (
-          <p className="text-xs leading-relaxed text-[var(--text-soft)]">
-            Usage data may be delayed by up to 1 hour.
-          </p>
+            <p className="text-xs leading-relaxed text-[var(--text-soft)]">
+              Usage data may be delayed by up to 1 hour.
+            </p>
           )}
         </div>
       ) : null}

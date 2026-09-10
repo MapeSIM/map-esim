@@ -9,10 +9,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import AccountActionRow from "@/app/components/account/AccountActionRow";
-import CustomerPendingPurchases from "@/app/components/account/CustomerPendingPurchases";
 import { requireSession } from "@/app/lib/auth/session";
 import { prisma } from "@/app/lib/db";
-import { listCustomerPendingWalletPurchases } from "@/app/lib/esim/walletPurchaseRead";
 import { getCustomerWalletSummary } from "@/app/lib/wallet/read";
 import { getCustomerRewardSummary } from "@/app/lib/rewards/rewardRead";
 
@@ -26,9 +24,6 @@ export default async function AccountOverviewPage() {
 
   let walletBalanceLabel: string | null = null;
   let rewardsPointsLabel: string | null = null;
-  let pendingPurchases: Awaited<
-    ReturnType<typeof listCustomerPendingWalletPurchases>
-  > = [];
   if (user.role === "CUSTOMER") {
     try {
       const summary = await getCustomerWalletSummary(user.id);
@@ -41,11 +36,6 @@ export default async function AccountOverviewPage() {
       rewardsPointsLabel = rewards ? `${rewards.pointsBalanceLabel} points` : "0 points";
     } catch {
       rewardsPointsLabel = null;
-    }
-    try {
-      pendingPurchases = await listCustomerPendingWalletPurchases(user.id);
-    } catch {
-      pendingPurchases = [];
     }
   }
 
@@ -93,8 +83,6 @@ export default async function AccountOverviewPage() {
           </div>
         )}
       </div>
-
-      <CustomerPendingPurchases purchases={pendingPurchases} />
 
       <div className="grid gap-3">
         <AccountActionRow

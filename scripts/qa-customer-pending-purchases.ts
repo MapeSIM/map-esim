@@ -197,8 +197,10 @@ function main() {
   const ordersPage = read("app/account/orders/page.tsx");
   const buyPage = read("app/account/esim/buy/page.tsx");
   const listUi = read("app/components/account/CustomerPendingPurchases.tsx");
-  assert.match(accountPage, /listCustomerPendingWalletPurchases/);
-  assert.match(accountPage, /CustomerPendingPurchases/);
+  // Account overview no longer surfaces unfinished purchases (checkout recovery unchanged).
+  assert.doesNotMatch(accountPage, /listCustomerPendingWalletPurchases/);
+  assert.doesNotMatch(accountPage, /CustomerPendingPurchases/);
+  assert.doesNotMatch(accountPage, /Unfinished purchases/);
   assert.doesNotMatch(ordersPage, /listCustomerPendingWalletPurchases/);
   assert.doesNotMatch(ordersPage, /CustomerPendingPurchases/);
   assert.doesNotMatch(buyPage, /listCustomerPendingWalletPurchases/);

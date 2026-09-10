@@ -25,11 +25,11 @@ export const dynamic = "force-dynamic";
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[160px_1fr] sm:gap-4">
-      <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+    <div className="grid gap-1 border-b border-[var(--border)] py-3.5 last:border-b-0 sm:grid-cols-[168px_1fr] sm:gap-4">
+      <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
         {label}
       </dt>
-      <dd className="text-sm font-medium text-[var(--heading)] break-words">
+      <dd className="text-sm font-semibold text-[var(--heading)] break-words">
         {value}
       </dd>
     </div>
@@ -39,7 +39,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 function statusBadgeClass(status: CustomerEsimStatusBadge): string {
   switch (status) {
     case "Completed":
-      return "bg-[var(--accent)]/15 text-[var(--heading)] border-[var(--accent-strong)]/40";
+      return "bg-[var(--accent-strong)]/18 text-[var(--heading)] border-[var(--accent-strong)]/45";
     case "Processing":
       return "bg-[var(--surface)] text-[var(--text)] border-[var(--border-hover)]";
     case "Review needed":
@@ -112,6 +112,8 @@ export default async function AccountOrderDetailPage({
     isOpenRefundStatus(row.status)
   );
   const canRequestRefund = !detail.isRefunded && !openRefund;
+  const showDataChip = detail.dataAllowance !== "Not available";
+  const showValidityChip = detail.validity !== "Not available";
 
   return (
     <div className="space-y-8">
@@ -122,36 +124,67 @@ export default async function AccountOrderDetailPage({
         >
           ← Back to My eSIMs
         </Link>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          {detail.flagUrl ? (
-            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-2)]">
-              <Image
-                src={detail.flagUrl}
-                alt=""
-                width={48}
-                height={36}
-                className="h-8 w-auto object-cover"
-                unoptimized
-              />
+
+        <section className="mt-4 overflow-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_14px_36px_rgba(0,0,0,0.18)]">
+          <div className="border-b border-[var(--border)] bg-[var(--surface-2)]/55 px-5 py-5 sm:px-6">
+            <div className="flex flex-wrap items-start gap-4">
+              {detail.flagUrl ? (
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] shadow-sm">
+                  <Image
+                    src={detail.flagUrl}
+                    alt=""
+                    width={56}
+                    height={42}
+                    className="h-9 w-auto object-cover"
+                    unoptimized
+                  />
+                </div>
+              ) : null}
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+                  <h1 className="text-2xl font-bold tracking-tight text-[var(--heading)] sm:text-3xl">
+                    {detail.destination}
+                  </h1>
+                  <span
+                    className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold tracking-wide ${statusBadgeClass(detail.statusBadge)}`}
+                  >
+                    {customerEsimStatusLabel(detail.statusBadge)}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-sm text-[var(--text-muted)]">
+                  Order {detail.shortReference}
+                </p>
+                <p className="mt-2 text-sm font-medium text-[var(--text)]">
+                  {detail.planName}
+                </p>
+              </div>
+              <p className="shrink-0 text-right text-lg font-bold tabular-nums text-[var(--heading)]">
+                {detail.amountLabel}
+              </p>
             </div>
-          ) : null}
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              {detail.destination}
-            </h1>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Order {detail.shortReference}
+
+            {(showDataChip || showValidityChip) && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {showDataChip ? (
+                  <span className="inline-flex items-center rounded-xl border border-[var(--accent-strong)]/30 bg-[var(--accent-strong)]/10 px-3 py-1.5 text-sm font-bold text-[var(--heading)]">
+                    {detail.dataAllowance}
+                  </span>
+                ) : null}
+                {showValidityChip ? (
+                  <span className="inline-flex items-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1.5 text-sm font-semibold text-[var(--heading)]">
+                    {detail.validity}
+                  </span>
+                ) : null}
+              </div>
+            )}
+          </div>
+
+          <div className="px-5 py-4 sm:px-6">
+            <p className="max-w-2xl text-sm leading-relaxed text-[var(--text-muted)]">
+              {customerEsimStatusHelp(detail.statusBadge)}
             </p>
           </div>
-          <span
-            className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass(detail.statusBadge)}`}
-          >
-            {customerEsimStatusLabel(detail.statusBadge)}
-          </span>
-        </div>
-        <p className="mt-3 max-w-2xl text-sm text-[var(--text-muted)]">
-          {customerEsimStatusHelp(detail.statusBadge)}
-        </p>
+        </section>
       </div>
 
       {detail.isRefunded ? (
@@ -204,100 +237,171 @@ export default async function AccountOrderDetailPage({
         </section>
       ) : null}
 
-      <dl className="rounded-2xl border border-[var(--border-hover)] bg-[var(--surface-2)] px-4 sm:px-5">
-        <DetailRow label="Destination" value={detail.destination} />
-        <DetailRow label="Package / offer" value={detail.planName} />
-        <DetailRow label="Data allowance" value={detail.dataAllowance} />
-        <DetailRow label="Validity" value={detail.validity} />
-        <DetailRow
-          label="Status"
-          value={customerEsimStatusLabel(detail.statusBadge)}
-        />
-        <DetailRow label="Amount" value={detail.amountLabel} />
-        {detail.promoCode ? (
-          <DetailRow label="Promo code" value={detail.promoCode} />
-        ) : null}
-        {detail.originalAmountLabel ? (
-          <DetailRow label="Original" value={detail.originalAmountLabel} />
-        ) : null}
-        {detail.discountAmountLabel ? (
-          <DetailRow label="Discount" value={`−${detail.discountAmountLabel}`} />
-        ) : null}
-        {detail.finalAmountLabel ? (
-          <DetailRow label="Package total" value={detail.finalAmountLabel} />
-        ) : null}
-        {detail.rewardsAppliedPoints != null && detail.rewardsAppliedPoints > 0 ? (
+      <section
+        className="overflow-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_10px_28px_rgba(0,0,0,0.14)]"
+        aria-labelledby="plan-details-heading"
+      >
+        <div className="border-b border-[var(--border)] bg-[var(--surface-2)]/40 px-5 py-3.5 sm:px-6">
+          <h2
+            id="plan-details-heading"
+            className="text-base font-bold text-[var(--heading)]"
+          >
+            Plan details
+          </h2>
+        </div>
+        <dl className="px-5 sm:px-6">
+          <DetailRow label="Destination" value={detail.destination} />
+          <DetailRow label="Package / offer" value={detail.planName} />
+          <DetailRow label="Data allowance" value={detail.dataAllowance} />
+          <DetailRow label="Validity" value={detail.validity} />
           <DetailRow
-            label="Rewards applied"
-            value={`−${detail.rewardsAppliedPoints} points`}
+            label="Status"
+            value={customerEsimStatusLabel(detail.statusBadge)}
           />
-        ) : null}
-        {detail.rewardsEarnedPoints != null && detail.rewardsEarnedPoints > 0 ? (
+          <DetailRow label="Amount" value={detail.amountLabel} />
+          {detail.promoCode ? (
+            <DetailRow label="Promo code" value={detail.promoCode} />
+          ) : null}
+          {detail.originalAmountLabel ? (
+            <DetailRow label="Original" value={detail.originalAmountLabel} />
+          ) : null}
+          {detail.discountAmountLabel ? (
+            <DetailRow
+              label="Discount"
+              value={`−${detail.discountAmountLabel}`}
+            />
+          ) : null}
+          {detail.finalAmountLabel ? (
+            <DetailRow label="Package total" value={detail.finalAmountLabel} />
+          ) : null}
+          {detail.rewardsAppliedPoints != null &&
+          detail.rewardsAppliedPoints > 0 ? (
+            <DetailRow
+              label="Rewards applied"
+              value={`−${detail.rewardsAppliedPoints} points`}
+            />
+          ) : null}
+          {detail.rewardsEarnedPoints != null &&
+          detail.rewardsEarnedPoints > 0 ? (
+            <DetailRow
+              label="Rewards earned"
+              value={`+${detail.rewardsEarnedPoints} points`}
+            />
+          ) : null}
+          <DetailRow label="Currency" value={detail.currencyLabel} />
+          <DetailRow label="Purchased" value={detail.createdAtLabel} />
+          <DetailRow label="Order reference" value={detail.shortReference} />
           <DetailRow
-            label="Rewards earned"
-            value={`+${detail.rewardsEarnedPoints} points`}
+            label="Installation"
+            value={
+              detail.installEligible
+                ? "Available after you open installation options"
+                : detail.isRefunded
+                  ? "Disabled (refunded)"
+                  : "Not available yet"
+            }
           />
-        ) : null}
-        <DetailRow label="Currency" value={detail.currencyLabel} />
-        <DetailRow label="Purchased" value={detail.createdAtLabel} />
-        <DetailRow label="Order reference" value={detail.shortReference} />
-        <DetailRow
-          label="Installation"
-          value={
-            detail.installEligible
-              ? "Available after you open installation options"
-              : detail.isRefunded
-                ? "Disabled (refunded)"
-                : "Not available yet"
-          }
-        />
-        {detail.emailDeliveryLabel ? (
-          <DetailRow label="Email" value={detail.emailDeliveryLabel} />
-        ) : null}
-        <IccidRevealPanel
-          orderId={detail.id}
-          maskedLabel={detail.iccidMasked}
-          revealable={detail.iccidRevealable}
-          revealPath={`/api/account/orders/${encodeURIComponent(detail.id)}/iccid`}
-        />
-      </dl>
+          {detail.emailDeliveryLabel ? (
+            <DetailRow label="Email" value={detail.emailDeliveryLabel} />
+          ) : null}
+        </dl>
+      </section>
+
+      <section
+        className="overflow-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_10px_28px_rgba(0,0,0,0.14)]"
+        aria-labelledby="iccid-heading"
+      >
+        <div className="border-b border-[var(--border)] bg-[var(--surface-2)]/40 px-5 py-3.5 sm:px-6">
+          <h2
+            id="iccid-heading"
+            className="text-base font-bold text-[var(--heading)]"
+          >
+            ICCID
+          </h2>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Secure reveal stays on this order only.
+          </p>
+        </div>
+        <div className="px-5 py-2 sm:px-6">
+          <IccidRevealPanel
+            orderId={detail.id}
+            maskedLabel={detail.iccidMasked}
+            revealable={detail.iccidRevealable}
+            revealPath={`/api/account/orders/${encodeURIComponent(detail.id)}/iccid`}
+          />
+        </div>
+      </section>
 
       {detail.addDataEligible ? (
         <section
-          className="rounded-2xl border border-[var(--accent-strong)]/35 bg-[var(--accent-strong)]/10 px-4 py-4 sm:px-5"
+          className="rounded-[24px] border border-[var(--accent-strong)]/45 bg-[var(--accent-strong)]/12 px-5 py-5 shadow-[0_10px_28px_rgba(0,0,0,0.14)] sm:px-6"
           aria-labelledby="add-more-data-heading"
         >
           <h2
             id="add-more-data-heading"
-            className="text-base font-bold text-[var(--heading)]"
+            className="text-lg font-bold text-[var(--heading)]"
           >
             Need more data?
           </h2>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Add more data to this eSIM when top-up packages are available.
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--text)]">
+            Add More Data tops up this existing eSIM. A new eSIM is not created
+            — extra data is applied to the same package and ICCID you already
+            have.
           </p>
           <Link
             href={`/account/orders/${encodeURIComponent(detail.id)}/add-data`}
-            className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
+            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_18px_rgba(0,0,0,0.16)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
           >
             Add More Data
           </Link>
         </section>
       ) : null}
 
-      <CustomerEsimUsagePanel
-        orderId={detail.id}
-        usageEligible={detail.installEligible && !detail.isRefunded}
-        autoOpen={autoOpenUsage}
-        addDataEligible={detail.addDataEligible}
-      />
+      <section
+        className="space-y-3"
+        aria-labelledby="usage-section-heading"
+      >
+        <div>
+          <h2
+            id="usage-section-heading"
+            className="text-base font-bold text-[var(--heading)]"
+          >
+            Usage
+          </h2>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Check remaining data for this eSIM when available.
+          </p>
+        </div>
+        <CustomerEsimUsagePanel
+          orderId={detail.id}
+          usageEligible={detail.installEligible && !detail.isRefunded}
+          autoOpen={autoOpenUsage}
+          addDataEligible={detail.addDataEligible}
+        />
+      </section>
 
-      <CustomerEsimInstallPanel
-        orderId={detail.id}
-        installEligible={detail.installEligible}
-        isRefunded={detail.isRefunded}
-      />
-      <CustomerEsimInstallHelpLinks />
+      <section
+        className="space-y-3"
+        aria-labelledby="install-section-heading"
+      >
+        <div>
+          <h2
+            id="install-section-heading"
+            className="text-base font-bold text-[var(--heading)]"
+          >
+            Installation
+          </h2>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Open QR and install options when this eSIM is ready.
+          </p>
+        </div>
+        <CustomerEsimInstallPanel
+          orderId={detail.id}
+          installEligible={detail.installEligible}
+          isRefunded={detail.isRefunded}
+        />
+        <CustomerEsimInstallHelpLinks />
+      </section>
 
       {refundJustRequested ? (
         <div
