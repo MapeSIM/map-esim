@@ -45,10 +45,17 @@ function main() {
   assert.match(confirm, /safe-area-inset-bottom/);
   // Conversion polish: sticky disabled reason + zero-due Covered/Wallet labels.
   assert.match(confirm, /stickyDisabledReason/);
-  assert.match(confirm, /Confirm the purchase above to continue/);
   assert.match(confirm, /dueLabel/);
   assert.match(confirm, /"Covered"/);
   assert.match(confirm, /Continue with JazzCash \/ Easypaisa/);
+  // Mobile P0: early amount-due summary + sticky confirm (no vague "confirm above").
+  assert.match(confirm, /checkout-mobile-due-summary/);
+  assert.match(confirm, /Amount due/);
+  assert.match(confirm, /Jump to confirm|Jump to pay/);
+  assert.match(confirm, /checkout-confirm/);
+  assert.match(confirm, /stickyShowConfirm/);
+  assert.match(confirm, /confirmStickyId/);
+  assert.doesNotMatch(confirm, /Confirm the purchase above to continue/);
   console.log("PASS logged_in_checkout_two_column");
 
   assert.match(review, />Checkout</);

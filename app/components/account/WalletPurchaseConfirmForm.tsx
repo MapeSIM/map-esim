@@ -153,13 +153,17 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
   const [fundingPending, startFundingTransition] = useTransition();
   const fundingChoiceGen = useRef(0);
   const confirmId = useId();
+  const confirmStickyId = useId();
   const useRewardsId = useId();
   const planHeadingId = useId();
   const customerHeadingId = useId();
   const paymentModeHeadingId = useId();
   const rewardsHeadingId = useId();
   const orderHeadingId = useId();
+  const mobileDueHeadingId = useId();
   const paymentHeadingId = useId();
+  const confirmSectionId = "checkout-confirm";
+  const mobileDueSummaryId = "checkout-mobile-due-summary";
   const errorState = state as WalletPurchaseActionState;
 
   const useWallet = useWalletFromPaymentMode(paymentMode);
@@ -225,13 +229,15 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
       : gatewayReady
         ? purchaseBlocked
         : true;
+  const stickyShowConfirm = zeroCashConfirm && !pending;
   const stickyDisabledReason = (() => {
     if (pending) return null;
     if (deliveryBlocksPurchase) {
       return "Save or cancel the delivery email to continue.";
     }
+    // Zero-cash confirm is shown in the sticky bar itself on mobile.
     if (zeroCashConfirm && !confirmed) {
-      return "Confirm the purchase above to continue.";
+      return null;
     }
     if (!zeroCashConfirm && !gatewayReady) {
       return "Online payment is unavailable right now.";
@@ -353,7 +359,11 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
 
     <form
       action={formAction}
-      className="space-y-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0"
+      className={`space-y-6 lg:pb-0 ${
+        stickyShowConfirm
+          ? "pb-[calc(8.5rem+env(safe-area-inset-bottom))]"
+          : "pb-[calc(5.5rem+env(safe-area-inset-bottom))]"
+      }`}
       noValidate
     >
       <input type="hidden" name="purchaseId" value={review.purchaseId} />
@@ -400,6 +410,74 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 </dt>
                 <dd className="font-semibold text-[var(--heading)]">
                   {review.deliveryLabel}
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          {/* Mobile-only: surface amount due early after plan (desktop uses sticky aside). */}
+          <section
+            id={mobileDueSummaryId}
+            className={`${cardClass} lg:hidden`}
+            aria-labelledby={mobileDueHeadingId}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] pb-3">
+              <h2
+                id={mobileDueHeadingId}
+                className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+              >
+                Amount due
+              </h2>
+              <a
+                href={`#${confirmSectionId}`}
+                className="shrink-0 text-xs font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+              >
+                {zeroCashConfirm ? "Jump to confirm" : "Jump to pay"}
+              </a>
+            </div>
+            <dl className="text-sm">
+              <div className="flex items-baseline justify-between gap-3 border-b border-[var(--border)] py-2.5">
+                <dt className="text-[var(--text-muted)]">Package total</dt>
+                <dd className="font-semibold text-[var(--heading)]">
+                  <CheckoutMoney cents={review.priceCents} />
+                </dd>
+              </div>
+              {review.promoDiscountCents > 0 ? (
+                <div className="flex items-baseline justify-between gap-3 border-b border-[var(--border)] py-2.5">
+                  <dt className="text-[var(--text-muted)]">Promo</dt>
+                  <dd className="font-semibold text-[var(--heading)]">
+                    <CheckoutMoney cents={review.promoDiscountCents} signed />
+                  </dd>
+                </div>
+              ) : null}
+              {preview.rewardPointsRedeemed > 0 ? (
+                <div className="flex items-baseline justify-between gap-3 border-b border-[var(--border)] py-2.5">
+                  <dt className="text-[var(--text-muted)]">Rewards</dt>
+                  <dd className="font-semibold text-[var(--heading)]">
+                    <CheckoutMoney cents={preview.rewardPointsRedeemed} signed />
+                  </dd>
+                </div>
+              ) : null}
+              {preview.walletAppliedCents > 0 ? (
+                <div className="flex items-baseline justify-between gap-3 border-b border-[var(--border)] py-2.5">
+                  <dt className="text-[var(--text-muted)]">Wallet</dt>
+                  <dd className="font-semibold text-[var(--heading)]">
+                    <CheckoutMoney
+                      cents={preview.walletAppliedCents}
+                      signed
+                      variant="wallet-deduction"
+                    />
+                  </dd>
+                </div>
+              ) : null}
+              <div className="flex items-baseline justify-between gap-3 pt-2.5">
+                <dt className="font-semibold text-[var(--heading)]">{dueLabel}</dt>
+                <dd className="text-base font-semibold text-[var(--heading)]">
+                  {dueOnline ? (
+                    <CheckoutMoney cents={preview.gatewayAmountCents} />
+                  ) : (
+                    "Covered"
+                  )}
                 </dd>
               </div>
             </dl>
@@ -755,7 +833,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
 
           {zeroCashConfirm ? (
             <>
-              <div className="space-y-2">
+              <div id={confirmSectionId} className="scroll-mt-24 space-y-2">
                 <label
                   htmlFor={confirmId}
                   className="flex items-start gap-3 text-sm text-[var(--heading)]"
@@ -797,27 +875,31 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               </button>
             </>
           ) : gatewayReady ? (
-            <button
-              type="submit"
-              disabled={purchaseBlocked}
-              className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
-            >
-              {pending
-                ? simpaisaCheckout
-                  ? "Sending payment request…"
-                  : "Starting payment…"
-                : simpaisaCheckout
-                  ? "Continue with JazzCash / Easypaisa"
-                  : "Continue to payment"}
-            </button>
+            <div id={confirmSectionId} className="scroll-mt-24">
+              <button
+                type="submit"
+                disabled={purchaseBlocked}
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
+              >
+                {pending
+                  ? simpaisaCheckout
+                    ? "Sending payment request…"
+                    : "Starting payment…"
+                  : simpaisaCheckout
+                    ? "Continue with JazzCash / Easypaisa"
+                    : "Continue to payment"}
+              </button>
+            </div>
           ) : (
-            <button
-              type="button"
-              disabled
-              className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--heading)] opacity-60"
-            >
-              Continue to Payment
-            </button>
+            <div id={confirmSectionId} className="scroll-mt-24">
+              <button
+                type="button"
+                disabled
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--heading)] opacity-60"
+              >
+                Continue to Payment
+              </button>
+            </div>
           )}
 
           {/* Trust sits below Pay CTA so mobile users see action first. */}
@@ -833,6 +915,34 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         aria-label="Checkout payment action"
       >
         <div className="mx-auto flex max-w-5xl flex-col gap-2">
+          {stickyShowConfirm ? (
+            <label
+              htmlFor={confirmStickyId}
+              className="flex items-start gap-2.5 text-xs leading-snug text-[var(--heading)]"
+            >
+              <input
+                id={confirmStickyId}
+                type="checkbox"
+                checked={confirmed}
+                onChange={(event) => setConfirmed(event.target.checked)}
+                disabled={purchaseBlocked}
+                className="mt-0.5"
+                aria-controls={confirmSectionId}
+              />
+              <span>
+                {fullWallet
+                  ? "I confirm this wallet purchase."
+                  : "I confirm this purchase. No online payment is required."}{" "}
+                <a
+                  href={`#${confirmSectionId}`}
+                  className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  Details
+                </a>
+              </span>
+            </label>
+          ) : null}
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
