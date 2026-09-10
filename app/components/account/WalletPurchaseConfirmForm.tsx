@@ -377,10 +377,10 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
             >
               Customer
             </h2>
-            <p className="mt-2 text-sm font-semibold text-[var(--heading)]">
+            <p className="mt-2 text-sm font-semibold text-[var(--heading)] break-words">
               {review.customerEmail}
             </p>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
+            <p className="mt-0.5 text-xs text-[var(--text-muted)]">
               Signed-in account email
             </p>
             <CheckoutDeliveryEmailSection
@@ -404,65 +404,38 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
             disabled={busy}
           />
 
-          <section className={cardClass} aria-labelledby={rewardsHeadingId}>
-            <h2
-              id={rewardsHeadingId}
-              className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
-            >
-              Rewards
-            </h2>
-            {review.rewardEligible ? (
-              <>
-                <p className="mt-2 text-sm text-[var(--text-muted)]">
-                  {review.rewardPointsBalanceLabel} points available (
-                  <CheckoutMoney cents={review.rewardPointsBalance} />)
-                </p>
-                <label
-                  htmlFor={useRewardsId}
-                  className="mt-4 flex items-start gap-3 text-sm text-[var(--heading)]"
-                >
-                  <input
-                    id={useRewardsId}
-                    name="useRewards"
-                    type="checkbox"
-                    value="on"
-                    checked={useRewards}
-                    onChange={(event) =>
-                      onUseRewardsChange(event.target.checked)
-                    }
-                    disabled={busy}
-                    className="mt-1"
-                  />
-                  <span>Use rewards</span>
-                </label>
-              </>
-            ) : (
-              <>
-                <p className="mt-2 text-sm text-[var(--heading)]">
-                  {review.rewardPointsBalanceLabel} points available
-                </p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  Earn {review.rewardPointsToUnlock} more points to unlock
-                  rewards.
-                </p>
-                <label
-                  htmlFor={useRewardsId}
-                  className="mt-4 flex items-start gap-3 text-sm text-[var(--text-muted)]"
-                >
-                  <input
-                    id={useRewardsId}
-                    name="useRewards"
-                    type="checkbox"
-                    value="on"
-                    checked={false}
-                    disabled
-                    className="mt-1"
-                  />
-                  <span>Use rewards</span>
-                </label>
-              </>
-            )}
-          </section>
+          {review.rewardEligible ? (
+            <section className={cardClass} aria-labelledby={rewardsHeadingId}>
+              <h2
+                id={rewardsHeadingId}
+                className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+              >
+                Rewards
+              </h2>
+              <p className="mt-2 text-sm text-[var(--text-muted)]">
+                {review.rewardPointsBalanceLabel} points available (
+                <CheckoutMoney cents={review.rewardPointsBalance} />)
+              </p>
+              <label
+                htmlFor={useRewardsId}
+                className="mt-3 flex items-center gap-2.5 text-sm text-[var(--heading)]"
+              >
+                <input
+                  id={useRewardsId}
+                  name="useRewards"
+                  type="checkbox"
+                  value="on"
+                  checked={useRewards}
+                  onChange={(event) =>
+                    onUseRewardsChange(event.target.checked)
+                  }
+                  disabled={busy}
+                  className="shrink-0"
+                />
+                <span>Use rewards</span>
+              </label>
+            </section>
+          ) : null}
 
           <section
             className={cardClass}

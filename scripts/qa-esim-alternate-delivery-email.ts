@@ -144,6 +144,8 @@ function offlineChecks() {
   assert.match(deliveryUi, /ALTERNATE_DELIVERY_EMAIL_COPY\.confirmDeliveryEmail/);
   assert.match(deliveryUi, /ALTERNATE_DELIVERY_EMAIL_COPY\.attestation/);
   assert.match(deliveryUi, /ALTERNATE_DELIVERY_EMAIL_COPY\.unverified/);
+  assert.doesNotMatch(deliveryUi, /useAlternateDeliveryEmail/);
+  assert.doesNotMatch(deliveryUi, /type="checkbox"[\s\S]*useAlternate|name="useAlternateDeliveryEmail"/);
   assert.doesNotMatch(deliveryUi, /OTP|one-time|verification code|ownership/i);
   assert.match(deliveryUi, /min-w-0/);
   assert.match(actions, /saveWalletPurchaseAlternateDeliveryEmailAction/);
