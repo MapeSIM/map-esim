@@ -160,8 +160,8 @@ function main() {
     navbar,
     /HOME_DISCOVERY_CTA_HREF[\s\S]{0,200}href="\/account\/esim\/buy"|Get eSIM[\s\S]{0,120}href="\/account\/esim\/buy"/
   );
-  assert.match(accountLayout, /label: "Buy eSIM"/);
   assert.match(accountLayout, /AccountMenu/);
+  assert.doesNotMatch(accountLayout, /label: "Buy eSIM"/);
   assert.doesNotMatch(accountLayout, /Buy with wallet/);
   assert.doesNotMatch(accountLayout, /lg:grid-cols-\[220px/);
   assert.doesNotMatch(accountLayout, /<aside/);

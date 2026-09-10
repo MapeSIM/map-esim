@@ -66,8 +66,9 @@ function main() {
 
   assert.match(adminList, /requireRole\("ADMIN"\)/);
   assert.match(adminDetail, /requireRole\("ADMIN"\)/);
-  assert.match(accountLayout, /Buy eSIM/);
-  assert.match(walletPage, /\/account\/esim\/buy/);
+  assert.doesNotMatch(accountLayout, /label: "Buy eSIM"|\/account\/esim\/buy/);
+  assert.doesNotMatch(walletPage, /Buy eSIM|\/account\/esim\/buy/);
+  assert.doesNotMatch(topupPage, /Buy eSIM|\/account\/esim\/buy/);
   // Soft-launch: Add funds nav/CTA only when gateway is configured.
   assert.match(accountLayout, /isPaymentGatewayConfigured/);
   assert.match(walletPage, /isPaymentGatewayConfigured/);

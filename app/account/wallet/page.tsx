@@ -70,22 +70,14 @@ export default async function AccountWalletPage({
             Your MAP eSIM wallet balance and history.
           </p>
         </div>
-        {data.hasWallet ? (
+        {data.hasWallet && gatewayReady ? (
           <div className="flex flex-wrap gap-2">
             <Link
-              href="/account/esim/buy"
-              className="inline-flex h-10 items-center justify-center rounded-[14px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+              href="/account/wallet/top-up"
+              className="inline-flex h-10 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
             >
-              Buy eSIM
+              Add funds
             </Link>
-            {gatewayReady ? (
-              <Link
-                href="/account/wallet/top-up"
-                className="inline-flex h-10 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
-              >
-                Add funds
-              </Link>
-            ) : null}
           </div>
         ) : null}
       </header>

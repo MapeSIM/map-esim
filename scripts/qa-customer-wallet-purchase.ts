@@ -280,7 +280,8 @@ function main() {
 
   assert.ok(!/executeCreditCheckout\(/.test(read("scripts/qa-customer-wallet-purchase.ts")));
   assert.ok(!/getBrokerToken\(/.test(read("scripts/qa-customer-wallet-purchase.ts")));
-  assert.match(walletPage, /Buy eSIM/);
+  assert.doesNotMatch(walletPage, /Buy eSIM/);
+  assert.doesNotMatch(walletPage, /href="\/account\/esim\/buy"/);
   assert.match(reviewPage, /getWalletPurchaseReview/);
   assert.equal(
     resolveCustomerPurchaseStatusMessaging("FUNDED"),

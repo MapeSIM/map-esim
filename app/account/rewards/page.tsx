@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Gift } from "lucide-react";
 import { requireRole } from "@/app/lib/auth/session";
 import { getCustomerRewardSummary } from "@/app/lib/rewards/rewardRead";
@@ -53,20 +52,7 @@ export default async function AccountRewardsPage() {
               {summary.rateCopy}
             </p>
             <p className="mt-1 text-sm text-[var(--heading)]">{summary.statusCopy}</p>
-            <Link
-              href="/account/esim/buy"
-              className="
-                mt-4 inline-flex h-11 w-full items-center justify-center
-                rounded-[14px] bg-[var(--accent-strong)] px-4 text-sm font-semibold
-                text-[var(--accent-ink)] transition hover:opacity-95
-                focus-visible:outline-none focus-visible:ring-2
-                focus-visible:ring-[var(--accent-strong)]/60
-                sm:w-auto
-              "
-            >
-              Buy eSIM
-            </Link>
-            <p className="mt-2 text-xs text-[var(--text-muted)]">
+            <p className="mt-4 text-xs text-[var(--text-muted)]">
               Eligible points can be used at checkout when you buy.
             </p>
           </div>

@@ -886,7 +886,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               <button
                 type="submit"
                 disabled={purchaseBlocked || !confirmed}
-                className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
+                className="hidden min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60 lg:inline-flex"
               >
                 {pending ? primaryCtaPendingLabel : primaryCtaLabel}
               </button>
@@ -896,7 +896,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               <button
                 type="submit"
                 disabled={purchaseBlocked}
-                className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
+                className="hidden min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60 lg:inline-flex"
               >
                 {pending ? primaryCtaPendingLabel : primaryCtaLabel}
               </button>
@@ -906,7 +906,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               <button
                 type="button"
                 disabled
-                className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--heading)] opacity-60"
+                className="hidden min-h-12 w-full items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--heading)] opacity-60 lg:inline-flex"
               >
                 Continue to Payment
               </button>
@@ -918,7 +918,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         </aside>
       </div>
 
-      {/* Mobile sticky pay action — mirrors aside CTA without changing funding logic. */}
+      {/* Mobile sticky pay action — sole mobile CTA; aside buttons stay desktop-only. */}
       {!awaitingGatewayPayment ? (
       <div
         className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden"

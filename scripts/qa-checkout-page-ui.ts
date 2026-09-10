@@ -38,13 +38,16 @@ function main() {
   assert.match(confirm, /confirmWalletEsimPurchaseAction/);
   assert.match(confirm, /setWalletPurchaseFundingChoiceAction/);
   // Sprint A: Pay CTA above trust; mobile sticky pay bar (lg:hidden).
+  // Inline aside pay buttons are desktop-only (hidden lg:inline-flex).
   assert.match(
     confirm,
     /Continue to Payment[\s\S]*?CheckoutTrustPanel|Buy eSIM with Wallet[\s\S]*?CheckoutTrustPanel/
   );
+  assert.match(confirm, /hidden[\s\S]*?lg:inline-flex/);
   assert.match(confirm, /aria-label="Checkout payment action"/);
   assert.match(confirm, /fixed inset-x-0 bottom-0[\s\S]*?lg:hidden/);
   assert.match(confirm, /safe-area-inset-bottom/);
+  assert.match(confirm, /sole mobile CTA|Mobile sticky pay action/);
   // Conversion polish: sticky disabled reason + zero-due Covered/Wallet labels.
   assert.match(confirm, /stickyDisabledReason/);
   assert.match(confirm, /dueLabel/);
