@@ -693,13 +693,13 @@ export default function PlansListing({
                           <article
                             key={offer.id}
                             className="
-                              group flex h-full min-h-[220px] min-w-0 flex-col rounded-[22px]
+                              group flex h-full min-w-0 flex-col rounded-[22px]
                               border border-[var(--border)] bg-[var(--surface)] p-4
                               shadow-[0_10px_28px_rgba(0,0,0,0.2)]
                               transition duration-200
                               hover:-translate-y-1 hover:border-[var(--border-hover)]
                               hover:shadow-[0_18px_40px_rgba(0,0,0,0.32)]
-                              sm:p-5
+                              sm:p-5 md:min-h-[220px]
                             "
                           >
                             <div className="flex min-w-0 items-start justify-between gap-3">
@@ -718,7 +718,7 @@ export default function PlansListing({
                               planCardSecondaryLines — never packageInfo,
                               description, notes, or raw network.
                             */}
-                            <div className="mt-4 flex flex-1 flex-col gap-1.5 text-sm">
+                            <div className="mt-4 flex flex-col gap-1.5 text-sm md:flex-1">
                               {secondaryLines.map((line) => (
                                 <p
                                   key={`${offer.id}-${line.kind}`}
@@ -760,7 +760,7 @@ export default function PlansListing({
                               ))}
                             </div>
 
-                            <div className="mt-auto space-y-2.5 pt-5">
+                            <div className="mt-auto space-y-2.5 pt-3 md:pt-5">
                               {/*
                                 Mobile (1-col): Buy Now first, Plan Details second.
                                 Wider (≥400px 2-col): Details left, Buy Now right.

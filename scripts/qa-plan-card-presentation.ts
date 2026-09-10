@@ -129,8 +129,13 @@ function main() {
     listing,
     /destination\.kind === "country"\s*&&\s*\n\s*\(offer\.packageInfo \|\| offer\.network\)/
   );
-  assert.match(listing, /min-h-\[220px\]/);
+  assert.match(listing, /md:min-h-\[220px\]/);
   assert.match(listing, /mt-auto/);
+  // Mobile P0: no forced min-height / secondary stretch on small screens.
+  assert.doesNotMatch(listing, /group flex h-full min-h-\[220px\]/);
+  assert.match(cardSource, /md:min-h-\[220px\]/);
+  assert.match(cardSource, /flex flex-col gap-1\.5 text-sm md:flex-1/);
+  assert.match(cardSource, /pt-3 md:pt-5/);
   assert.doesNotMatch(listing, /PLAN_CARD_BENEFITS/);
   assert.doesNotMatch(cardSource, /Plan benefits|aria-label="Plan benefits"/);
   assert.doesNotMatch(cardSource, /Digital eSIM|Keep your SIM|QR after purchase/);
