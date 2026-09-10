@@ -60,6 +60,7 @@ export default function PlanDetailsModal({
   destination,
   countryNames = {},
   onClose,
+  coverageFocused = false,
   checkoutHref = buildCheckoutHref,
   purchaseTrustLine = PLAN_PURCHASE_TRUST_LINE_GUEST,
 }: PlanDetailsModalProps) {
@@ -93,10 +94,51 @@ export default function PlanDetailsModal({
   const description = planDetailDescription(offer);
   const notes = planDetailNotes(offer);
   const isCoverageDestination =
-    destination.kind === "regional" || destination.kind === "global";
+    coverageFocused ||
+    destination.kind === "regional" ||
+    destination.kind === "global";
+  const showCoverageFirst = coverageFocused && covered.length > 0;
   const displayDestinationName = destinationDisplayName(destination);
   const planTitle = `${offer.dataFormatted} · ${formatValidityPhrase(offer.durationDays)}`;
   const extraPlanName = planDetailsExtraName(offer, planTitle);
+
+  const countriesCoveredSection =
+    covered.length > 0 ? (
+      <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-3)] p-4">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--heading)]">
+          <MapPinned className="h-4 w-4 text-[var(--accent-strong)]" />
+          Countries covered ({covered.length})
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {covered.map((code) => {
+            const roamingEntry = (offer.roaming || []).find(
+              (entry) =>
+                entry.country === code ||
+                entry.country.toLowerCase() === code.toLowerCase()
+            );
+            const speeds =
+              roamingEntry?.dataSpeeds?.filter(Boolean).slice(0, 4) || [];
+            const label =
+              countryNames[code] ||
+              countryNames[code.toUpperCase()] ||
+              code;
+            return (
+              <span
+                key={code}
+                className="rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1 text-xs text-[var(--text)]"
+                title={
+                  speeds.length > 0
+                    ? `${label}: ${speeds.join(", ")}`
+                    : undefined
+                }
+              >
+                {label}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+    ) : null;
 
   return (
     <div
@@ -169,6 +211,8 @@ export default function PlanDetailsModal({
         </div>
 
         <div className="max-h-[calc(92vh-180px)] overflow-y-auto px-5 py-2 sm:px-6">
+          {showCoverageFirst ? countriesCoveredSection : null}
+
           <div className="grid grid-cols-2 gap-3 py-4">
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
               <p className="text-xs uppercase tracking-wider text-[var(--text-soft)]">
@@ -253,42 +297,7 @@ export default function PlanDetailsModal({
             ) : null}
           </div>
 
-          {covered.length > 0 ? (
-            <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-3)] p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--heading)]">
-                <MapPinned className="h-4 w-4 text-[var(--accent-strong)]" />
-                Countries covered ({covered.length})
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {covered.map((code) => {
-                  const roamingEntry = (offer.roaming || []).find(
-                    (entry) =>
-                      entry.country === code ||
-                      entry.country.toLowerCase() === code.toLowerCase()
-                  );
-                  const speeds =
-                    roamingEntry?.dataSpeeds?.filter(Boolean).slice(0, 4) || [];
-                  const label =
-                    countryNames[code] ||
-                    countryNames[code.toUpperCase()] ||
-                    code;
-                  return (
-                    <span
-                      key={code}
-                      className="rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1 text-xs text-[var(--text)]"
-                      title={
-                        speeds.length > 0
-                          ? `${label}: ${speeds.join(", ")}`
-                          : undefined
-                      }
-                    >
-                      {label}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
+          {!showCoverageFirst ? countriesCoveredSection : null}
 
           {networks.length > 0 ? (
             <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-3)] p-4">

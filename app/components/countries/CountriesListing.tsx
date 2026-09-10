@@ -33,6 +33,7 @@ import {
   resolveDestinationFlagVisual,
 } from "@/app/lib/vesim/destinationPresentation";
 import { popularDestinationDisplayRank } from "@/app/lib/home/homeConversionSections";
+import { buildDestinationPlansHref } from "@/app/lib/vesim/countriesListingReturn";
 
 const filters = [
   { id: "Country", label: "Country", icon: Flag },
@@ -262,9 +263,11 @@ function DestinationCardSkeleton() {
 function CompactDestinationCard({
   destination,
   formatPrice,
+  href,
 }: {
   destination: DestinationCard;
   formatPrice: (amountUsd: number | null | undefined) => string;
+  href: string;
 }) {
   const Icon =
     destination.kind === "global"
@@ -275,7 +278,7 @@ function CompactDestinationCard({
 
   return (
     <Link
-      href={`/countries/${destination.id}`}
+      href={href}
       className="
         group flex h-full min-h-[84px] items-center justify-between gap-3
         rounded-2xl border border-[var(--border)] bg-[var(--surface)]
@@ -333,7 +336,7 @@ function CountriesListingContent({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const filter = parseFilter(searchParams.get("filter"));
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const { formatPrice } = useCurrency();
   const [source, setSource] = useState<DestinationCatalogSource>(initialSource);
   const [destinations, setDestinations] = useState<DestinationCard[]>(() =>
@@ -345,6 +348,32 @@ function CountriesListingContent({
   const sourceRef = useRef(source);
   destinationsRef.current = destinations;
   sourceRef.current = source;
+
+  // Restore search when returning from plans with ?q= (do not clear local typing when q absent).
+  useEffect(() => {
+    if (!searchParams.has("q")) return;
+    setSearch(searchParams.get("q") ?? "");
+  }, [searchParams]);
+
+  function destinationHref(destinationId: string) {
+    return buildDestinationPlansHref(destinationId, {
+      filter,
+      q: search,
+    });
+  }
+
+  // Restore search when returning from a plan page with ?q= (do not wipe local typing when q absent).
+  useEffect(() => {
+    if (!searchParams.has("q")) return;
+    setSearch(searchParams.get("q") ?? "");
+  }, [searchParams]);
+
+  function destinationHref(destinationId: string) {
+    return buildDestinationPlansHref(destinationId, {
+      filter,
+      q: search,
+    });
+  }
 
   function setFilter(next: FilterId) {
     const params = new URLSearchParams(searchParams.toString());
@@ -689,6 +718,7 @@ function CountriesListingContent({
                       key={destinationReactKey(destination)}
                       destination={destination}
                       formatPrice={formatPrice}
+                      href={destinationHref(destination.id)}
                     />
                   ))}
                 </div>
@@ -702,6 +732,7 @@ function CountriesListingContent({
                 key={destinationReactKey(destination)}
                 destination={destination}
                 formatPrice={formatPrice}
+                href={destinationHref(destination.id)}
               />
             ))}
           </div>

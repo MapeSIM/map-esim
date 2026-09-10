@@ -470,6 +470,11 @@ function main() {
   assert.match(modal, /planTitle/);
   assert.doesNotMatch(modal, /coverageFocused \? "Coverage details"/);
   assert.doesNotMatch(modal, /: offer\.name\}/);
+  assert.match(modal, /showCoverageFirst/);
+  assert.match(
+    modal,
+    /showCoverageFirst\s*\?\s*countriesCoveredSection\s*:\s*null/
+  );
   console.log("   ok");
 
   console.log("PASS plan_card_presentation_qa");

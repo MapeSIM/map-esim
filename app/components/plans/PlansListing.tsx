@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
@@ -19,6 +20,7 @@ import {
   destinationDisplayName,
   resolveDestinationFlagVisual,
 } from "@/app/lib/vesim/destinationPresentation";
+import { countriesListingHrefFromPlanParams } from "@/app/lib/vesim/countriesListingReturn";
 import { PAKISTAN_FLAG_PUBLIC_PATH } from "@/app/lib/seo/siteGraph";
 import PlanDetailsModal from "@/app/components/plans/PlanDetailsModal";
 import SortSelect from "@/app/components/plans/SortSelect";
@@ -205,7 +207,15 @@ function FilterChip({
   );
 }
 
-export default function PlansListing({
+export default function PlansListing(props: PlansListingProps) {
+  return (
+    <Suspense fallback={<PlansListingContent {...props} />}>
+      <PlansListingContent {...props} />
+    </Suspense>
+  );
+}
+
+function PlansListingContent({
   destination,
   offers,
   loading = false,
@@ -230,6 +240,11 @@ export default function PlansListing({
   const [partnerCheckout, setPartnerCheckout] = useState(false);
   const { formatPrice } = useCurrency();
   const purchaseTrustLine = planPurchaseTrustLine(signedIn);
+  const searchParams = useSearchParams();
+  const destinationsBackHref = useMemo(
+    () => countriesListingHrefFromPlanParams((key) => searchParams.get(key)),
+    [searchParams]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -257,13 +272,8 @@ export default function PlansListing({
   const showPlanTypeToggle =
     planTypeSummary.dataOnly > 0 && planTypeSummary.withVoice > 0;
 
-  // Regional/global: always expose package tabs when offers exist.
-  // Country pages: only when real unlimited offers exist.
-  const showPackageTabs =
-    offers.length > 0 &&
-    (isRegionalOrGlobal || categorySummary.unlimited > 0);
-  const showUnlimitedTab =
-    categorySummary.unlimited > 0 || isRegionalOrGlobal;
+  // Show package tabs only when unlimited plans exist (avoid empty/disabled Unlimited).
+  const showPackageTabs = offers.length > 0 && categorySummary.unlimited > 0;
   const unlimitedTabEnabled = categorySummary.unlimited > 0;
 
   // Clamp via derived state so disabled Unlimited never filters/shows as active.
@@ -413,7 +423,7 @@ export default function PlansListing({
         {/* Extra mobile top padding keeps hero clear of the sticky navbar. */}
         <div className="mx-auto max-w-[1200px] px-4 pb-3 pt-6 sm:px-6 sm:py-8">
           <Link
-            href="/countries"
+            href={destinationsBackHref}
             className="
               mb-3 inline-flex max-w-full items-center gap-2 text-sm font-medium
               text-[var(--text-muted)] transition hover:text-[var(--accent-strong)]
@@ -525,17 +535,15 @@ export default function PlansListing({
                           categorySummary.standard === 1 ? "" : "s"
                         }`}
                       </PillButton>
-                      {showUnlimitedTab && (
-                        <PillButton
-                          active={activeCategory === "unlimited"}
-                          onClick={() => selectCategory("unlimited")}
-                          disabled={!unlimitedTabEnabled}
-                        >
-                          {`Unlimited · ${categorySummary.unlimited} plan${
-                            categorySummary.unlimited === 1 ? "" : "s"
-                          }`}
-                        </PillButton>
-                      )}
+                      <PillButton
+                        active={activeCategory === "unlimited"}
+                        onClick={() => selectCategory("unlimited")}
+                        disabled={!unlimitedTabEnabled}
+                      >
+                        {`Unlimited · ${categorySummary.unlimited} plan${
+                          categorySummary.unlimited === 1 ? "" : "s"
+                        }`}
+                      </PillButton>
                     </div>
                   </div>
                 )}

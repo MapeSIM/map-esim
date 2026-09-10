@@ -108,6 +108,19 @@ function main() {
   assert.doesNotMatch(listing, /Need more options\?/);
   assert.match(listing, /href="\/device-compatibility"/);
   assert.match(listing, /Check compatibility/);
+  // P0/P1: hide Unlimited tab when count is 0 (no disabled empty tab).
+  assert.match(
+    listing,
+    /showPackageTabs\s*=\s*offers\.length\s*>\s*0\s*&&\s*categorySummary\.unlimited\s*>\s*0/
+  );
+  assert.doesNotMatch(
+    listing,
+    /showUnlimitedTab\s*=\s*categorySummary\.unlimited\s*>\s*0\s*\|\|\s*isRegionalOrGlobal/
+  );
+  // P1: preserve destination listing filter/search on All Destinations when available.
+  assert.match(listing, /countriesListingHrefFromPlanParams/);
+  assert.match(listing, /destinationsBackHref/);
+  assert.doesNotMatch(listing, /href="\/countries"/);
   // Mobile P0: tighter chrome so first Buy Now sits closer to the fold.
   assert.match(listing, /pb-3 pt-6 sm:px-6 sm:py-8/);
   assert.match(listing, /pt-4 pb-6 sm:px-6 sm:py-10/);
@@ -155,6 +168,19 @@ function main() {
   );
   assert.doesNotMatch(modal, /coverageFocused \? "Coverage details"/);
   assert.doesNotMatch(modal, /coverageFocused\s*\?\s*`\$\{offer\.dataFormatted\}/);
+  // P0: coverageFocused shows Countries covered first; sticky Buy Now footer retained.
+  assert.match(modal, /coverageFocused\s*=\s*false/);
+  assert.match(modal, /showCoverageFirst/);
+  assert.match(
+    modal,
+    /showCoverageFirst\s*\?\s*countriesCoveredSection\s*:\s*null/
+  );
+  assert.match(
+    modal,
+    /!showCoverageFirst\s*\?\s*countriesCoveredSection\s*:\s*null/
+  );
+  assert.match(modal, /Buy Now/);
+  assert.match(modal, /border-t border-\[var\(--border\)\][\s\S]*?Buy Now/);
   console.log("PASS modal_simple_layout");
 
   const offer = { id: "ESIM-QA-CONV-1" } as VesimOffer;

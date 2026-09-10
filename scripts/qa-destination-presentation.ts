@@ -179,6 +179,19 @@ function main() {
   assert.match(listing, /sticky top-16/);
   console.log("   ok");
 
+  console.log("6) Preserve listing filter/search into plan pages");
+  assert.match(listing, /buildDestinationPlansHref/);
+  assert.match(listing, /destinationHref\(/);
+  assert.doesNotMatch(
+    listing,
+    /href=\{`\/countries\/\$\{destination\.id\}`\}/
+  );
+  const returnHelper = read("app/lib/vesim/countriesListingReturn.ts");
+  assert.match(returnHelper, /fromFilter/);
+  assert.match(returnHelper, /fromQ/);
+  assert.match(returnHelper, /buildCountriesListingHref/);
+  console.log("   ok");
+
   console.log("PASS destination_presentation_qa");
 }
 
