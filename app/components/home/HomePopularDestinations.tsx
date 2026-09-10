@@ -24,7 +24,7 @@ export function HomePopularDestinations() {
           <div className="max-w-2xl">
             <h2
               id="home-popular-heading"
-              className="text-2xl font-bold tracking-tight text-[var(--heading)] sm:text-4xl"
+              className="scroll-mt-24 text-2xl font-bold tracking-tight text-[var(--heading)] sm:text-4xl"
             >
               {HOME_POPULAR_SECTION_TITLE}
             </h2>

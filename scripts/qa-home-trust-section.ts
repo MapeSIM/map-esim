@@ -56,7 +56,7 @@ function main() {
 
   const heroIdx = home.indexOf("{/* Hero */}");
   const trustIdx = home.indexOf("<HomeTrustSection");
-  const categoriesIdx = home.indexOf("{/* Categories */}");
+  const categoriesIdx = home.indexOf("{/* Categories");
   assert.ok(heroIdx >= 0 && trustIdx > heroIdx);
   assert.ok(categoriesIdx > trustIdx);
   assert.match(home, /Stay connected wherever you travel/);

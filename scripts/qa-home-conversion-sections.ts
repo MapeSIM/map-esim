@@ -86,7 +86,7 @@ function main() {
   const trustIdx = home.indexOf("<HomeTrustSection");
   const popularIdx = home.indexOf("<HomePopularDestinations");
   const comparisonIdx = home.indexOf("<HomeComparisonSection");
-  const categoriesIdx = home.indexOf("{/* Categories */}");
+  const categoriesIdx = home.indexOf("{/* Categories");
   const ctaIdx = home.indexOf("<HomeFinalCta");
   assert.ok(heroIdx >= 0 && trustIdx > heroIdx);
   assert.ok(popularIdx > trustIdx);
@@ -119,6 +119,17 @@ function main() {
   assert.match(home, /HOME_DISCOVERY_CTA_LABEL/);
   assert.match(home, /HOME_DISCOVERY_CTA_HREF/);
   assert.doesNotMatch(home, /Browse eSIM destinations/);
+  // Mobile P1: secondary hero CTA differs from primary Get eSIM → /countries.
+  assert.match(home, /href="#home-popular-heading"/);
+  assert.match(home, /Browse popular/);
+  assert.doesNotMatch(
+    home,
+    /href="\/countries"\s*\n\s*className="[\s\S]*?Explore destinations/
+  );
+  // Mobile P1: Explore is compact; Popular stays in HomePopularDestinations.
+  assert.match(home, /aria-label="Browse plan types"/);
+  assert.match(home, /filter\(\(category\) => category\.title !== "Popular"\)/);
+  assert.match(home, /hidden gap-5 sm:grid md:grid-cols-3/);
   assert.match(cta, /HOME_DISCOVERY_CTA_LABEL/);
   assert.match(cta, /href=\{HOME_DISCOVERY_CTA_HREF\}/);
   assert.match(cta, /href=\{HOME_FINAL_CTA_SECONDARY_HREF\}/);
