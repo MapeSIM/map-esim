@@ -122,7 +122,7 @@ function main() {
   );
   console.log("PASS actions_gateway_only_branch_and_browser_money_rejected");
 
-  assert.match(confirmForm, /Continue to Secure Payment/);
+  assert.match(confirmForm, /Continue to payment|Continue with JazzCash/);
   assert.match(confirmForm, /paymentGatewayConfigured/);
   assert.match(confirmForm, /gatewayReady/);
   assert.match(confirmForm, /showGatewayUnavailable/);

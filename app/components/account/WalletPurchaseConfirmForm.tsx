@@ -2,6 +2,7 @@
 
 import {
   useActionState,
+  useEffect,
   useId,
   useRef,
   useState,
@@ -189,6 +190,13 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
     !walletDisabled &&
     review.balanceCents > 0 &&
     review.balanceCents < cashPayablePreview;
+  // Vesim-style visibility: hide unavailable options (no greyed-out cards).
+  // Enough balance → Full wallet + Wallet + online + Online.
+  // Partial balance → Wallet + online + Online (hybrid remains available).
+  // No balance → Online only.
+  const showFullWalletOption = canFullWallet;
+  const showWalletAndOnlineOption = canWalletAndMobile || canFullWallet;
+  const showOnlinePaymentOption = cashPayablePreview > 0;
   const balanceAfterPreview = Math.max(
     0,
     review.balanceCents - preview.walletAppliedCents
@@ -237,18 +245,39 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
     persistFundingChoice(paymentMode, checked);
   }
 
+  // Keep selection on a visible option when rewards/balance change.
+  useEffect(() => {
+    let next: CustomerEsimPaymentMode = paymentMode;
+    if (cashPayablePreview <= 0) {
+      next = "full_wallet";
+    } else if (paymentMode === "full_wallet" && !showFullWalletOption) {
+      next = showWalletAndOnlineOption ? "wallet_and_mobile" : "mobile_only";
+    } else if (
+      paymentMode === "wallet_and_mobile" &&
+      !showWalletAndOnlineOption
+    ) {
+      next = showFullWalletOption ? "full_wallet" : "mobile_only";
+    }
+    if (next !== paymentMode) {
+      setPaymentMode(next);
+      persistFundingChoice(next, useRewards && !rewardsDisabled);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only when option visibility changes
+  }, [
+    cashPayablePreview,
+    showFullWalletOption,
+    showWalletAndOnlineOption,
+  ]);
+
   const cardClass =
     "rounded-[24px] border border-[var(--border)] bg-[var(--surface)] px-5 py-5 sm:px-6";
 
-  const paymentOptionClass = (selected: boolean, disabled: boolean) =>
+  const paymentOptionClass = (selected: boolean) =>
     [
-      "flex min-w-0 cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3 text-sm transition",
+      "flex min-w-0 cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-2.5 text-sm transition",
       selected
         ? "border-[var(--accent-strong)] bg-[color-mix(in_srgb,var(--accent-strong)_8%,var(--surface))]"
-        : "border-[var(--border)] bg-[var(--surface)]",
-      disabled
-        ? "cursor-not-allowed opacity-55"
-        : "hover:border-[var(--border-strong)]",
+        : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)]",
     ].join(" ");
 
   const awaitingGatewayPayment =
@@ -443,105 +472,90 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               id={paymentModeHeadingId}
               className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
             >
-              How do you want to pay?
+              Payment
             </h2>
             <p className="mt-2 text-sm text-[var(--text-muted)]">
-              Current wallet balance:{" "}
+              Wallet:{" "}
               <CheckoutMoney
                 cents={review.balanceCents}
                 variant="wallet-balance"
               />
-              {walletDisabled ? " (no funds available)" : null}
             </p>
 
-            <div
-              role="radiogroup"
-              aria-labelledby={paymentModeHeadingId}
-              className="mt-4 space-y-3"
-            >
-              <label
-                className={paymentOptionClass(
-                  paymentMode === "full_wallet",
-                  !canFullWallet && cashPayablePreview > 0
-                )}
+            {cashPayablePreview <= 0 ? (
+              <p className="mt-3 text-sm text-[var(--text-muted)]">
+                No online payment needed.
+              </p>
+            ) : (
+              <div
+                role="radiogroup"
+                aria-labelledby={paymentModeHeadingId}
+                className="mt-3 space-y-2"
               >
-                <input
-                  type="radio"
-                  name="paymentModeChoice"
-                  value="full_wallet"
-                  checked={paymentMode === "full_wallet"}
-                  disabled={busy || (!canFullWallet && cashPayablePreview > 0)}
-                  onChange={() => onPaymentModeChange("full_wallet")}
-                  className="mt-1"
-                />
-                <span>
-                  <span className="block font-semibold text-[var(--heading)]">
-                    Full wallet
-                  </span>
-                  <span className="mt-1 block text-[var(--text-muted)]">
-                    Pay the full amount from your wallet balance.
-                  </span>
-                </span>
-              </label>
+                {showFullWalletOption ? (
+                  <label
+                    className={paymentOptionClass(
+                      paymentMode === "full_wallet"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentModeChoice"
+                      value="full_wallet"
+                      checked={paymentMode === "full_wallet"}
+                      disabled={busy}
+                      onChange={() => onPaymentModeChange("full_wallet")}
+                      className="shrink-0"
+                    />
+                    <span className="font-semibold text-[var(--heading)]">
+                      Full wallet
+                    </span>
+                  </label>
+                ) : null}
 
-              <label
-                className={paymentOptionClass(
-                  paymentMode === "wallet_and_mobile",
-                  !canWalletAndMobile
-                )}
-              >
-                <input
-                  type="radio"
-                  name="paymentModeChoice"
-                  value="wallet_and_mobile"
-                  checked={paymentMode === "wallet_and_mobile"}
-                  disabled={busy || !canWalletAndMobile}
-                  onChange={() => onPaymentModeChange("wallet_and_mobile")}
-                  className="mt-1"
-                />
-                <span>
-                  <span className="block font-semibold text-[var(--heading)]">
-                    {simpaisaCheckout
-                      ? "Wallet + mobile payment"
-                      : "Wallet + online payment"}
-                  </span>
-                  <span className="mt-1 block text-[var(--text-muted)]">
-                    {simpaisaCheckout
-                      ? "Use available wallet funds, then pay the remainder with Easypaisa or JazzCash."
-                      : "Use available wallet funds, then pay the remainder on our secure payment page."}
-                  </span>
-                </span>
-              </label>
+                {showWalletAndOnlineOption ? (
+                  <label
+                    className={paymentOptionClass(
+                      paymentMode === "wallet_and_mobile"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentModeChoice"
+                      value="wallet_and_mobile"
+                      checked={paymentMode === "wallet_and_mobile"}
+                      disabled={busy}
+                      onChange={() => onPaymentModeChange("wallet_and_mobile")}
+                      className="shrink-0"
+                    />
+                    <span className="font-semibold text-[var(--heading)]">
+                      Wallet + online payment
+                    </span>
+                  </label>
+                ) : null}
 
-              <label
-                className={paymentOptionClass(
-                  paymentMode === "mobile_only",
-                  false
-                )}
-              >
-                <input
-                  type="radio"
-                  name="paymentModeChoice"
-                  value="mobile_only"
-                  checked={paymentMode === "mobile_only"}
-                  disabled={busy}
-                  onChange={() => onPaymentModeChange("mobile_only")}
-                  className="mt-1"
-                />
-                <span>
-                  <span className="block font-semibold text-[var(--heading)]">
-                    {simpaisaCheckout
-                      ? "Mobile payment only"
-                      : "Online payment only"}
-                  </span>
-                  <span className="mt-1 block text-[var(--text-muted)]">
-                    {simpaisaCheckout
-                      ? "Pay the full amount with Easypaisa or JazzCash. Your wallet balance will not be used for this purchase."
-                      : "Pay the full amount on our secure payment page. Your wallet balance will not be used for this purchase."}
-                  </span>
-                </span>
-              </label>
-            </div>
+                {showOnlinePaymentOption ? (
+                  <label
+                    className={paymentOptionClass(
+                      paymentMode === "mobile_only"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentModeChoice"
+                      value="mobile_only"
+                      checked={paymentMode === "mobile_only"}
+                      disabled={busy}
+                      onChange={() => onPaymentModeChange("mobile_only")}
+                      className="shrink-0"
+                    />
+                    <span className="font-semibold text-[var(--heading)]">
+                      Online payment
+                    </span>
+                  </label>
+                ) : null}
+              </div>
+            )}
 
             {errorState.ok === false && errorState.fieldErrors?.paymentMode ? (
               <p className="mt-3 text-sm text-[var(--heading)]" role="alert">
@@ -556,25 +570,24 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 id={paymentHeadingId}
                 className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
               >
-                {simpaisaCheckout ? "Mobile payment" : "Payment method"}
+                Online payment
               </h2>
               {gatewayReady ? (
                 <>
                   <p className="mt-2 text-sm text-[var(--text-muted)]">
-                    Amount due online:{" "}
+                    Due online:{" "}
                     <CheckoutMoney cents={preview.gatewayAmountCents} />
                     {preview.walletAppliedCents > 0 ? (
                       <>
                         {" "}
-                        after applying{" "}
+                        (wallet{" "}
                         <CheckoutMoney
                           cents={preview.walletAppliedCents}
                           variant="wallet-deduction"
-                        />{" "}
-                        from your wallet
+                        />
+                        )
                       </>
                     ) : null}
-                    . Your eSIM is created only after payment is verified.
                   </p>
                   {simpaisaCheckout ? (
                     <SimpaisaWalletFields
@@ -593,7 +606,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                     />
                   ) : (
                     <p className="mt-3 text-sm font-semibold text-[var(--heading)]">
-                      Continue to our secure payment page.
+                      Continue to JazzCash or Easypaisa.
                     </p>
                   )}
                 </>
@@ -706,8 +719,8 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               role="note"
             >
               {fullWallet
-                ? "Confirm below to complete this purchase with your wallet. If the provider confirms failure, the amount will be restored automatically. An uncertain provider result may require support review."
-                : "Confirm below to complete this purchase. No card payment is required. If the provider confirms failure, reserved rewards are restored automatically."}
+                ? "Confirm below to complete this purchase with your wallet."
+                : "Confirm below to complete this purchase. No online payment is required."}
             </div>
           ) : null}
 
@@ -744,8 +757,8 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                   />
                   <span>
                     {fullWallet
-                      ? "I confirm this wallet purchase and understand funds are reserved before provider checkout."
-                      : "I confirm this purchase. No card payment is required."}
+                      ? "I confirm this wallet purchase."
+                      : "I confirm this purchase. No online payment is required."}
                   </span>
                 </label>
                 {errorState.ok === false && errorState.fieldErrors?.confirm ? (
@@ -778,10 +791,10 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               {pending
                 ? simpaisaCheckout
                   ? "Sending payment request…"
-                  : "Starting secure payment…"
+                  : "Starting payment…"
                 : simpaisaCheckout
-                  ? "Continue with mobile payment"
-                  : "Continue to Secure Payment"}
+                  ? "Continue with JazzCash / Easypaisa"
+                  : "Continue to payment"}
             </button>
           ) : (
             <button
@@ -836,7 +849,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 ? "Working…"
                 : simpaisaCheckout
                   ? "Continue"
-                  : "Pay securely"}
+                  : "Pay now"}
             </button>
           ) : (
             <button

@@ -220,7 +220,7 @@ function main() {
   assert.doesNotMatch(actions, /SPLIT_PAYMENT_UNAVAILABLE_MESSAGE/);
   assert.match(confirmForm, /gatewayReady/);
   assert.doesNotMatch(confirmForm, /partialWalletSplit/);
-  assert.match(confirmForm, /Continue to Secure Payment/);
+  assert.match(confirmForm, /Continue to payment|Continue with JazzCash/);
   assert.match(confirmForm, /Buy eSIM with Wallet/);
   console.log("PASS split_unblocked_full_wallet_unchanged_ui");
 

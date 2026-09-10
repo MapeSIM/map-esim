@@ -237,7 +237,7 @@ function main() {
   assert.match(confirmForm, /Plan summary/);
   assert.match(confirmForm, /Customer/);
   assert.match(confirmForm, /customerEmail/);
-  assert.match(confirmForm, /Full wallet|Wallet \+ mobile payment|How do you want to pay/);
+  assert.match(confirmForm, /Full wallet|Wallet \+ online payment|Payment/);
   assert.match(confirmForm, /Order summary/);
   assert.match(confirmForm, /Wallet applied/);
   assert.match(confirmForm, /Pay now/);
@@ -250,10 +250,10 @@ function main() {
   assert.match(confirmForm, /gatewayRequired/);
   assert.match(confirmForm, /walletFundsApplied/);
   assert.match(confirmForm, /fullWallet = !gatewayRequired && walletFundsApplied/);
-  assert.match(confirmForm, /Payment method|How do you want to pay/);
+  assert.match(confirmForm, /Online payment|Payment/);
   assert.match(confirmForm, /CARD_PAYMENT_UNAVAILABLE_MESSAGE/);
   assert.match(confirmForm, /Continue to Payment/);
-  assert.match(confirmForm, /Continue to Secure Payment/);
+  assert.match(confirmForm, /Continue to payment|Continue with JazzCash/);
   assert.match(confirmForm, /paymentGatewayConfigured/);
   assert.match(confirmForm, /gatewayReady/);
   assert.doesNotMatch(confirmForm, /partialWalletSplit/);
@@ -264,9 +264,12 @@ function main() {
     confirmForm,
     /walletAppliedCents:\s*0,\s*gatewayAmountCents:\s*review\.priceCents/
   );
-  assert.ok(!/fake payment|Apple Pay|Google Pay|VReward/i.test(confirmForm));
+  assert.ok(!/fake payment|Apple Pay|Google Pay|VReward|Visa|Mastercard|Credit\/debit/i.test(confirmForm));
   // Simpaisa checkout intentionally names JazzCash / Easypaisa in helper copy.
   assert.match(confirmForm, /JazzCash|Easypaisa/);
+  assert.match(confirmForm, /showFullWalletOption|showOnlinePaymentOption/);
+  assert.doesNotMatch(confirmForm, /How do you want to pay\?/);
+  assert.doesNotMatch(confirmForm, /Mobile payment only|Wallet \+ mobile payment/);
   const promoSection = read(
     "app/components/account/CheckoutPromoCodeSection.tsx"
   );

@@ -1,6 +1,7 @@
 /**
  * Shared Simpaisa wallet checkout fields (operator + MSISDN).
  * Amounts are display-only; the server recomputes the PKR charge.
+ * UI only shows JazzCash and Easypaisa (no card option).
  */
 "use client";
 
@@ -33,20 +34,14 @@ export default function SimpaisaWalletFields({
   const quote = quoteSimpaisaPkrChargeFromUsdCents(usdCents);
 
   return (
-    <div className="mt-4 min-w-0 space-y-5">
-      <fieldset disabled={disabled} className="min-w-0 space-y-3">
+    <div className="mt-3 min-w-0 space-y-4">
+      <fieldset disabled={disabled} className="min-w-0 space-y-2.5">
         <legend
           id={legendId}
           className="text-sm font-semibold text-[var(--heading)]"
         >
-          Choose Payment Method
+          Pay with
         </legend>
-        <p className="text-sm leading-relaxed text-[var(--text-muted)]">
-          Select Easypaisa or JazzCash. Enter the 10-digit mobile number
-          (without country code) that will receive the payment request. After
-          you continue, approve the request in your JazzCash or Easypaisa app,
-          then return here and refresh status.
-        </p>
 
         <div
           id={operatorGroupId}
@@ -56,13 +51,13 @@ export default function SimpaisaWalletFields({
           aria-describedby={
             operatorError ? `${operatorGroupId}-error` : undefined
           }
-          className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2"
+          className="grid min-w-0 grid-cols-2 gap-2.5"
         >
           {SIMPAISA_MOBILE_WALLET_METHODS.map((method) => (
             <label
               key={method.id}
               className={[
-                "group relative flex min-h-[9.5rem] min-w-0 cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border bg-[#071e2e] px-4 py-5 text-center transition",
+                "group relative flex min-h-[7.5rem] min-w-0 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border bg-[#071e2e] px-3 py-3.5 text-center transition",
                 "border-[#1a4a63] hover:border-[#2f6f90]",
                 "has-[:checked]:border-[var(--accent-strong)] has-[:checked]:bg-[color-mix(in_srgb,var(--accent-strong)_10%,#071e2e)]",
                 "has-[:checked]:shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent-strong)_35%,transparent)]",
@@ -81,12 +76,12 @@ export default function SimpaisaWalletFields({
 
               <span
                 aria-hidden="true"
-                className="absolute top-3 right-3 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#1e5470] bg-[#082433] text-transparent transition group-has-[:checked]:border-[var(--accent-strong)] group-has-[:checked]:bg-[var(--accent-strong)] group-has-[:checked]:text-[var(--accent-ink)]"
+                className="absolute top-2.5 right-2.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[#1e5470] bg-[#082433] text-transparent transition group-has-[:checked]:border-[var(--accent-strong)] group-has-[:checked]:bg-[var(--accent-strong)] group-has-[:checked]:text-[var(--accent-ink)]"
               >
-                <Check className="h-3 w-3" strokeWidth={3} />
+                <Check className="h-2.5 w-2.5" strokeWidth={3} />
               </span>
 
-              <span className="flex h-[4.5rem] w-full items-center justify-center">
+              <span className="flex h-12 w-full items-center justify-center sm:h-14">
                 <img
                   src={method.logoSrc}
                   alt=""
@@ -95,18 +90,13 @@ export default function SimpaisaWalletFields({
                 />
               </span>
 
-              <span className="block text-sm font-semibold text-white">
+              <span className="block text-xs font-semibold text-white sm:text-sm">
                 {method.label}
               </span>
 
               <span className="sr-only">{method.logoAlt}</span>
             </label>
           ))}
-
-          {/*
-            Future card payment option (disabled placeholder — not wired):
-            <div className="rounded-2xl border border-dashed ...">{FUTURE_CARD_PAYMENT_METHOD_LABEL}</div>
-          */}
         </div>
 
         {operatorError ? (
@@ -120,7 +110,7 @@ export default function SimpaisaWalletFields({
         ) : null}
       </fieldset>
 
-      <div className="min-w-0 space-y-2">
+      <div className="min-w-0 space-y-1.5">
         <label
           htmlFor={msisdnId}
           className="block text-sm font-semibold text-[var(--heading)]"
@@ -136,11 +126,10 @@ export default function SimpaisaWalletFields({
           required
           disabled={disabled}
           placeholder="3XXXXXXXXX"
-          className="w-full min-w-0 rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-3 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+          className="w-full min-w-0 rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
         />
-        <p className="text-xs leading-relaxed text-[var(--text-muted)]">
-          10-digit Pakistani mobile number without country code, for example
-          3001234567.
+        <p className="text-xs text-[var(--text-muted)]">
+          10 digits, no country code (e.g. 3001234567).
         </p>
         {msisdnError ? (
           <p className="text-sm text-[var(--heading)]" role="alert">
@@ -151,17 +140,14 @@ export default function SimpaisaWalletFields({
 
       {quote ? (
         <div
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3"
+          className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3.5 py-2.5"
           role="note"
         >
           <p className="text-sm text-[var(--heading)]">
-            Amount to pay:{" "}
+            Amount:{" "}
             <span className="font-semibold">
               {formatSimpaisaPkrChargeLabel(quote.pkrRupees)}
             </span>
-          </p>
-          <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">
-            Charged in PKR. Wallet and order values stay in USD.
           </p>
         </div>
       ) : null}

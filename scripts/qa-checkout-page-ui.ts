@@ -29,16 +29,16 @@ function main() {
   assert.match(confirm, /CheckoutTrustPanel/);
   assert.match(confirm, /Plan summary/);
   assert.match(confirm, /Customer/);
-  assert.match(confirm, /Payment method/);
+  assert.match(confirm, /Online payment/);
   assert.match(confirm, /Order summary/);
   assert.match(confirm, /Buy eSIM with Wallet/);
-  assert.match(confirm, /Continue to Secure Payment/);
+  assert.match(confirm, /Continue to payment|Continue with JazzCash/);
   assert.match(confirm, /confirmWalletEsimPurchaseAction/);
   assert.match(confirm, /setWalletPurchaseFundingChoiceAction/);
   // Sprint A: Pay CTA above trust; mobile sticky pay bar (lg:hidden).
   assert.match(
     confirm,
-    /Continue to Secure Payment[\s\S]*?CheckoutTrustPanel|Buy eSIM with Wallet[\s\S]*?CheckoutTrustPanel/
+    /Continue to payment[\s\S]*?CheckoutTrustPanel|Continue with JazzCash[\s\S]*?CheckoutTrustPanel|Buy eSIM with Wallet[\s\S]*?CheckoutTrustPanel/
   );
   assert.match(confirm, /aria-label="Checkout payment action"/);
   assert.match(confirm, /fixed inset-x-0 bottom-0[\s\S]*?lg:hidden/);
