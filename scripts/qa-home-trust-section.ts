@@ -72,6 +72,11 @@ function main() {
   assert.match(section, /aria-hidden="true"/);
   assert.match(section, /HOME_TRUST_SECTION_TITLE/);
   assert.match(section, /HOME_TRUST_ITEMS/);
+  // Mobile P1: compact chips on small screens; full cards from sm up.
+  assert.match(section, /sm:hidden/);
+  assert.match(section, /hidden[\s\S]*?sm:grid/);
+  assert.match(section, /rounded-full/);
+  assert.match(section, /aria-label="Trust highlights"/);
   // Sprint B0: Support / Destinations trust cards link to existing routes (no fake proof).
   assert.match(section, /return "\/support"/);
   assert.match(section, /return "\/countries"/);

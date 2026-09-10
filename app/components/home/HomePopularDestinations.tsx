@@ -16,19 +16,19 @@ export function HomePopularDestinations() {
       className="border-b border-[var(--border)]"
       aria-labelledby="home-popular-heading"
     >
-      <div className="mx-auto max-w-[1200px] px-4 py-12 sm:px-6 sm:py-16">
+      <div className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6 sm:py-16">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)]">
           {HOME_POPULAR_SECTION_EYEBROW}
         </p>
-        <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mt-2 flex flex-col gap-3 sm:mt-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
           <div className="max-w-2xl">
             <h2
               id="home-popular-heading"
-              className="text-3xl font-bold tracking-tight text-[var(--heading)] sm:text-4xl"
+              className="text-2xl font-bold tracking-tight text-[var(--heading)] sm:text-4xl"
             >
               {HOME_POPULAR_SECTION_TITLE}
             </h2>
-            <p className="mt-3 text-[var(--text-muted)]">
+            <p className="mt-2 text-sm text-[var(--text-muted)] sm:mt-3 sm:text-base">
               {HOME_POPULAR_SECTION_INTRO}
             </p>
           </div>
@@ -41,7 +41,7 @@ export function HomePopularDestinations() {
           </Link>
         </div>
 
-        <ul className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <ul className="mt-5 grid grid-cols-1 gap-3 sm:mt-8 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
           {HOME_POPULAR_DESTINATIONS.map((destination) => {
             const flagSrc =
               destination.code === "PK"

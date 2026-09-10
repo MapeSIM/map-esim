@@ -33,20 +33,52 @@ export function HomeTrustSection() {
       className="border-b border-[var(--border)] bg-[var(--page-bg-soft)]/70"
       aria-labelledby="home-trust-heading"
     >
-      <div className="mx-auto max-w-[1200px] px-4 py-12 sm:px-6 sm:py-16">
+      <div className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6 sm:py-16">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)]">
           Why travelers choose MAP eSIM
         </p>
         <h2
           id="home-trust-heading"
-          className="mt-3 text-3xl font-bold tracking-tight text-[var(--heading)] sm:text-4xl"
+          className="mt-2 text-2xl font-bold tracking-tight text-[var(--heading)] sm:mt-3 sm:text-4xl"
         >
           {HOME_TRUST_SECTION_TITLE}
         </h2>
-        <p className="mt-3 max-w-2xl text-[var(--text-muted)]">
+        <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)] sm:mt-3 sm:text-base">
           {HOME_TRUST_SECTION_INTRO}
         </p>
-        <ul className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-5">
+
+        {/* Mobile: compact title chips (less scroll before Popular). */}
+        <ul className="mt-5 flex flex-wrap gap-2 sm:hidden" aria-label="Trust highlights">
+          {HOME_TRUST_ITEMS.map((item, index) => {
+            const Icon = TRUST_ICONS[index] ?? QrCode;
+            const href = trustItemHref(item.title);
+            const chipClass =
+              "inline-flex max-w-full items-center gap-1.5 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--heading)]";
+            const body = (
+              <>
+                <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--accent-strong)]" aria-hidden="true" />
+                <span className="truncate">{item.title}</span>
+              </>
+            );
+            return (
+              <li key={item.title}>
+                {href ? (
+                  <Link
+                    href={href}
+                    className={`${chipClass} transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60`}
+                  >
+                    {body}
+                  </Link>
+                ) : (
+                  <span className={chipClass}>{body}</span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+
+        {/* Tablet/desktop: existing tall trust cards (layout unchanged from sm up). */}
+        <ul className="mt-8 hidden grid-cols-1 gap-4 sm:grid sm:grid-cols-2 sm:gap-5 lg:grid-cols-5">
           {HOME_TRUST_ITEMS.map((item, index) => {
             const Icon = TRUST_ICONS[index] ?? QrCode;
             const href = trustItemHref(item.title);

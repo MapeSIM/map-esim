@@ -101,6 +101,15 @@ function main() {
   assert.match(popular, /href=\{`\/countries\/\$\{destination\.id\}`\}/);
   assert.match(popular, /href="\/countries\?filter=Popular"/);
   assert.doesNotMatch(popular, /startingPrice|providerPriceUSD|priceUSD/);
+  // Mobile P1: tighter spacing toward Popular without removing the section.
+  assert.match(popular, /py-8 sm:px-6 sm:py-16/);
+  assert.match(popular, /mt-5 grid[\s\S]*?sm:mt-8/);
+
+  // Mobile P1: hero secondary card content compacted (primary CTA remains).
+  assert.match(home, /Stay connected wherever you travel/);
+  assert.match(home, /HOME_DISCOVERY_CTA_LABEL/);
+  assert.match(home, /hidden space-y-2\.5[\s\S]*?sm:block/);
+  assert.match(home, /hidden grid-cols-2[\s\S]*?sm:grid/);
 
   const listing = read("app/components/countries/CountriesListing.tsx");
   assert.match(listing, /sortPopularDestinations|popularDestinationDisplayRank/);

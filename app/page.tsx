@@ -161,17 +161,18 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-[28px] border border-[var(--border-strong)] bg-[var(--surface)] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.35)] sm:p-7">
+          {/* Mobile: compact secondary card; full content from sm up. Primary CTA stays in left column. */}
+          <div className="relative overflow-hidden rounded-[28px] border border-[var(--border-strong)] bg-[var(--surface)] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.35)] sm:p-7">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(124,255,0,0.12),_transparent_45%)]" />
-            <div className="relative space-y-4">
+            <div className="relative space-y-3 sm:space-y-4">
               <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-soft)]">
                 <Smartphone className="h-3.5 w-3.5" />
                 Designed for travelers
               </div>
-              <h2 className="text-2xl font-bold text-[var(--heading)] sm:text-3xl">
+              <h2 className="text-xl font-bold text-[var(--heading)] sm:text-3xl">
                 Your travel internet, ready before takeoff
               </h2>
-              <ul className="space-y-2.5 text-sm text-[var(--text)]">
+              <ul className="hidden space-y-2.5 text-sm text-[var(--text)] sm:block">
                 {[
                   "Instant QR delivery",
                   "No physical SIM swap",
@@ -183,7 +184,7 @@ export default function Home() {
                   </li>
                 ))}
               </ul>
-              <div className="grid grid-cols-2 gap-3 pt-1">
+              <div className="hidden grid-cols-2 gap-3 pt-1 sm:grid">
                 <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-3.5">
                   <Wifi className="h-5 w-5 text-[var(--accent-strong)]" />
                   <p className="mt-2.5 text-sm font-semibold text-[var(--heading)]">
