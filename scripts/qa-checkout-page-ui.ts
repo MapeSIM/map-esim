@@ -43,6 +43,12 @@ function main() {
   assert.match(confirm, /aria-label="Checkout payment action"/);
   assert.match(confirm, /fixed inset-x-0 bottom-0[\s\S]*?lg:hidden/);
   assert.match(confirm, /safe-area-inset-bottom/);
+  // Conversion polish: sticky disabled reason + zero-due Covered/Wallet labels.
+  assert.match(confirm, /stickyDisabledReason/);
+  assert.match(confirm, /Confirm the purchase above to continue/);
+  assert.match(confirm, /dueLabel/);
+  assert.match(confirm, /"Covered"/);
+  assert.match(confirm, /Continue with JazzCash \/ Easypaisa/);
   console.log("PASS logged_in_checkout_two_column");
 
   assert.match(review, />Checkout</);
@@ -64,6 +70,9 @@ function main() {
   assert.match(trust, /aria-labelledby="checkout-trust-heading"/);
   assert.match(trust, /Verified Payments|Support Available/);
   assert.match(trust, /return "\/support"/);
+  // Compact trust: titles only (no description paragraphs under each item).
+  assert.doesNotMatch(trust, /item\.description/);
+  assert.match(trust, /grid-cols-1 gap-2 sm:grid-cols-2/);
   assert.doesNotMatch(trust, /applyVerifiedPaymentEvent|PAYMENT_GATEWAY_ENABLED/);
   console.log("PASS trust_panel_display_only");
 

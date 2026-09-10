@@ -203,6 +203,31 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
   );
   const busy = pending || fundingPending;
   const purchaseBlocked = busy || deliveryBlocksPurchase;
+  const dueOnline = preview.gatewayAmountCents > 0;
+  const dueLabel = dueOnline
+    ? "Pay now"
+    : fullWallet || walletFundsApplied
+      ? "Wallet"
+      : "Covered";
+  const stickyCtaDisabled =
+    zeroCashConfirm
+      ? purchaseBlocked || !confirmed
+      : gatewayReady
+        ? purchaseBlocked
+        : true;
+  const stickyDisabledReason = (() => {
+    if (pending) return null;
+    if (deliveryBlocksPurchase) {
+      return "Save or cancel the delivery email to continue.";
+    }
+    if (zeroCashConfirm && !confirmed) {
+      return "Confirm the purchase above to continue.";
+    }
+    if (!zeroCashConfirm && !gatewayReady) {
+      return "Online payment is unavailable right now.";
+    }
+    return null;
+  })();
   const alertError =
     errorState.ok === false && errorState.error
       ? errorState.error === CARD_PAYMENT_UNAVAILABLE_MESSAGE ||
@@ -662,10 +687,14 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 }`}
               >
                 <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-                  Pay now
+                  {dueLabel}
                 </dt>
                 <dd className="font-semibold text-[var(--heading)]">
-                  <CheckoutMoney cents={preview.gatewayAmountCents} />
+                  {dueOnline ? (
+                    <CheckoutMoney cents={preview.gatewayAmountCents} />
+                  ) : (
+                    "Covered"
+                  )}
                 </dd>
               </div>
               {fullWallet || walletFundsApplied ? (
@@ -791,48 +820,63 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         role="region"
         aria-label="Checkout payment action"
       >
-        <div className="mx-auto flex max-w-5xl items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              Pay now
-            </p>
-            <p className="truncate text-sm font-semibold text-[var(--heading)]">
-              <CheckoutMoney cents={preview.gatewayAmountCents} />
-            </p>
+        <div className="mx-auto flex max-w-5xl flex-col gap-2">
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                {dueLabel}
+              </p>
+              <p className="truncate text-sm font-semibold text-[var(--heading)]">
+                {dueOnline ? (
+                  <CheckoutMoney cents={preview.gatewayAmountCents} />
+                ) : (
+                  "Covered"
+                )}
+              </p>
+            </div>
+            {zeroCashConfirm ? (
+              <button
+                type="submit"
+                disabled={stickyCtaDisabled}
+                className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
+              >
+                {pending
+                  ? fullWallet
+                    ? "Buying…"
+                    : "Completing…"
+                  : fullWallet
+                    ? "Buy eSIM with Wallet"
+                    : "Complete purchase"}
+              </button>
+            ) : gatewayReady ? (
+              <button
+                type="submit"
+                disabled={stickyCtaDisabled}
+                className="inline-flex h-11 max-w-[58%] shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-3 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
+              >
+                {pending
+                  ? simpaisaCheckout
+                    ? "Sending…"
+                    : "Starting…"
+                  : simpaisaCheckout
+                    ? "Continue with JazzCash / Easypaisa"
+                    : "Continue to payment"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled
+                className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 text-sm font-semibold text-[var(--heading)] opacity-60"
+              >
+                Continue to Payment
+              </button>
+            )}
           </div>
-          {zeroCashConfirm ? (
-            <button
-              type="submit"
-              disabled={purchaseBlocked || !confirmed}
-              className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
-            >
-              {pending
-                ? "Working…"
-                : fullWallet
-                  ? "Buy with Wallet"
-                  : "Complete"}
-            </button>
-          ) : gatewayReady ? (
-            <button
-              type="submit"
-              disabled={purchaseBlocked}
-              className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
-            >
-              {pending
-                ? "Working…"
-                : simpaisaCheckout
-                  ? "Continue"
-                  : "Pay now"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled
-              className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 text-sm font-semibold text-[var(--heading)] opacity-60"
-            >
-              Unavailable
-            </button>
-          )}
+          {stickyDisabledReason ? (
+            <p className="text-xs leading-snug text-[var(--text-muted)]" role="status">
+              {stickyDisabledReason}
+            </p>
+          ) : null}
         </div>
       </div>
       ) : null}

@@ -18,10 +18,11 @@ function trustItemHref(title: string): string | null {
   return null;
 }
 
+/** Compact checkout trust strip — titles only to reduce scroll under the Pay CTA. */
 export function CheckoutTrustPanel() {
   return (
     <section
-      className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6"
+      className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3.5 sm:px-5"
       aria-labelledby="checkout-trust-heading"
     >
       <h2
@@ -30,32 +31,27 @@ export function CheckoutTrustPanel() {
       >
         Why travelers choose MAP eSIM
       </h2>
-      <ul className="mt-4 space-y-3">
+      <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
         {CHECKOUT_TRUST_ITEMS.map((item) => {
           const href = trustItemHref(item.title);
           return (
-            <li key={item.title} className="flex items-start gap-3">
+            <li key={item.title} className="flex items-center gap-2">
               <CheckCircle2
-                className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-strong)]"
+                className="h-3.5 w-3.5 shrink-0 text-[var(--accent-strong)]"
                 aria-hidden="true"
               />
-              <div>
-                {href ? (
-                  <Link
-                    href={href}
-                    className="text-sm font-semibold text-[var(--heading)] underline-offset-2 hover:underline"
-                  >
-                    {item.title}
-                  </Link>
-                ) : (
-                  <p className="text-sm font-semibold text-[var(--heading)]">
-                    {item.title}
-                  </p>
-                )}
-                <p className="mt-0.5 text-sm leading-relaxed text-[var(--text-muted)]">
-                  {item.description}
+              {href ? (
+                <Link
+                  href={href}
+                  className="text-xs font-semibold leading-snug text-[var(--heading)] underline-offset-2 hover:underline sm:text-sm"
+                >
+                  {item.title}
+                </Link>
+              ) : (
+                <p className="text-xs font-semibold leading-snug text-[var(--heading)] sm:text-sm">
+                  {item.title}
                 </p>
-              </div>
+              )}
             </li>
           );
         })}

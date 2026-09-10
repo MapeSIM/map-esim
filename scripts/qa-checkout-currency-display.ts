@@ -145,7 +145,7 @@ function main() {
   for (const [name, pattern] of moneyRows) {
     assert.match(confirmForm, pattern, `missing ${name} CheckoutMoney row`);
   }
-  assert.match(confirmForm, /Current wallet balance:/);
+  assert.match(confirmForm, /Wallet:/);
   assert.match(confirmForm, /Package total/);
   assert.match(confirmForm, /Pay now/);
   assert.match(confirmForm, /Remaining due:/);
