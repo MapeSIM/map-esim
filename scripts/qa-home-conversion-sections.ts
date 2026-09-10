@@ -14,6 +14,7 @@ import {
   HOME_FINAL_CTA_PRIMARY_LABEL,
   HOME_FINAL_CTA_SECONDARY_HREF,
   HOME_POPULAR_DESTINATIONS,
+  POPULAR_DESTINATION_DISPLAY_ORDER,
 } from "../app/lib/home/homeConversionSections";
 
 const root = join(__dirname, "..");
@@ -26,6 +27,31 @@ function main() {
   assert.ok(HOME_POPULAR_DESTINATIONS.length >= 6);
   assert.ok(HOME_POPULAR_DESTINATIONS.some((item) => item.id === "pakistan"));
   assert.ok(HOME_POPULAR_DESTINATIONS.some((item) => item.id === "france"));
+  assert.deepEqual(
+    HOME_POPULAR_DESTINATIONS.map((item) => item.name),
+    [
+      "Pakistan",
+      "Saudi Arabia",
+      "United Arab Emirates",
+      "Turkey",
+      "United Kingdom",
+      "United States",
+      "France",
+      "Germany",
+    ]
+  );
+  assert.deepEqual([...POPULAR_DESTINATION_DISPLAY_ORDER], [
+    "PK",
+    "SA",
+    "AE",
+    "MY",
+    "TH",
+    "TR",
+    "GB",
+    "US",
+    "JP",
+    "FR",
+  ]);
   assert.deepEqual([...HOME_COMPARISON_COLUMNS], [
     "MAP eSIM",
     "Typical roaming",
@@ -75,6 +101,10 @@ function main() {
   assert.match(popular, /href=\{`\/countries\/\$\{destination\.id\}`\}/);
   assert.match(popular, /href="\/countries\?filter=Popular"/);
   assert.doesNotMatch(popular, /startingPrice|providerPriceUSD|priceUSD/);
+
+  const listing = read("app/components/countries/CountriesListing.tsx");
+  assert.match(listing, /sortPopularDestinations|popularDestinationDisplayRank/);
+  assert.match(listing, /filter === "Popular"/);
 
   // B1.1 discovery CTA wired on hero + final + navbar + comparison
   assert.match(home, /HOME_DISCOVERY_CTA_LABEL/);

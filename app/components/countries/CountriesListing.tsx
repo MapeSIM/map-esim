@@ -32,6 +32,7 @@ import {
   destinationDisplayName,
   resolveDestinationFlagVisual,
 } from "@/app/lib/vesim/destinationPresentation";
+import { popularDestinationDisplayRank } from "@/app/lib/home/homeConversionSections";
 
 const filters = [
   { id: "Country", label: "Country", icon: Flag },
@@ -193,6 +194,20 @@ function sortByName(items: DestinationCard[]) {
       numeric: true,
     })
   );
+}
+
+/** Popular tab: pin preferred codes first, then keep remaining A–Z. */
+function sortPopularDestinations(items: DestinationCard[]) {
+  return [...items].sort((a, b) => {
+    const rankDelta =
+      popularDestinationDisplayRank(a.code) -
+      popularDestinationDisplayRank(b.code);
+    if (rankDelta !== 0) return rankDelta;
+    return a.name.localeCompare(b.name, undefined, {
+      sensitivity: "base",
+      numeric: true,
+    });
+  });
 }
 
 function groupAlphabetically(items: DestinationCard[]): LetterGroup[] {
@@ -397,6 +412,7 @@ function CountriesListingContent({
 
   const gridItems = useMemo(() => {
     if (filter === "Country") return [];
+    if (filter === "Popular") return sortPopularDestinations(filteredDestinations);
     return sortByName(filteredDestinations);
   }, [filter, filteredDestinations]);
 

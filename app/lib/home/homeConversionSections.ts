@@ -13,14 +13,39 @@ export const HOME_POPULAR_SECTION_INTRO =
 
 export const HOME_POPULAR_DESTINATIONS = [
   { id: "pakistan", name: "Pakistan", code: "PK" },
-  { id: "uae", name: "United Arab Emirates", code: "AE" },
   { id: "saudi-arabia", name: "Saudi Arabia", code: "SA" },
-  { id: "united-states", name: "United States", code: "US" },
-  { id: "united-kingdom", name: "United Kingdom", code: "GB" },
+  { id: "uae", name: "United Arab Emirates", code: "AE" },
   { id: "turkey", name: "Turkey", code: "TR" },
+  { id: "united-kingdom", name: "United Kingdom", code: "GB" },
+  { id: "united-states", name: "United States", code: "US" },
   { id: "france", name: "France", code: "FR" },
   { id: "germany", name: "Germany", code: "DE" },
 ] as const;
+
+/**
+ * Display-only pin order for Popular destination UIs.
+ * Codes missing from a given list are skipped; remaining stay after these.
+ */
+export const POPULAR_DESTINATION_DISPLAY_ORDER = [
+  "PK",
+  "SA",
+  "AE",
+  "MY",
+  "TH",
+  "TR",
+  "GB",
+  "US",
+  "JP",
+  "FR",
+] as const;
+
+export function popularDestinationDisplayRank(code: string): number {
+  const normalized = code.trim().toUpperCase();
+  const index = (POPULAR_DESTINATION_DISPLAY_ORDER as readonly string[]).indexOf(
+    normalized
+  );
+  return index >= 0 ? index : Number.POSITIVE_INFINITY;
+}
 
 export const HOME_COMPARISON_EYEBROW = "Compare";
 export const HOME_COMPARISON_TITLE = "Travel eSIM vs typical alternatives";

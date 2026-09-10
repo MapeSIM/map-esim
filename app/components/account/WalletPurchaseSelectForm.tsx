@@ -6,6 +6,7 @@ import { useId, useMemo, useState } from "react";
 import { Earth, MapPinned, Search } from "lucide-react";
 import type { AdminDestinationOption } from "@/app/lib/esim/adminPackageAssignmentRead";
 import { filterPlansDiscoveryDestinations } from "@/app/lib/plans/plansDiscovery";
+import { popularDestinationDisplayRank } from "@/app/lib/home/homeConversionSections";
 import {
   resolveDestinationFlagVisual,
   type DestinationPresentationInput,
@@ -184,9 +185,15 @@ export default function WalletPurchaseSelectForm({ destinations }: Props) {
       visibleDestinations
         .filter((d) => d.isPopular === true)
         .slice()
-        .sort((a, b) =>
-          a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
-        ),
+        .sort((a, b) => {
+          const rankDelta =
+            popularDestinationDisplayRank(a.code) -
+            popularDestinationDisplayRank(b.code);
+          if (rankDelta !== 0) return rankDelta;
+          return a.name.localeCompare(b.name, undefined, {
+            sensitivity: "base",
+          });
+        }),
     [visibleDestinations]
   );
 
