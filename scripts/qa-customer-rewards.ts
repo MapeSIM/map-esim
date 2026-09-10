@@ -103,6 +103,9 @@ function offlineChecks(): void {
   assert.match(accountPage, /\/account\/rewards/);
   assert.match(rewardsPage, /REWARDS_COPY|100 points = \$1 reward|requireRole\("CUSTOMER"\)/);
   assert.doesNotMatch(rewardsPage, /Redeem|Use points|Apply points/i);
+  // P1: primary Buy eSIM CTA into existing buy flow (no standalone redeem UI).
+  assert.match(rewardsPage, /href="\/account\/esim\/buy"/);
+  assert.match(rewardsPage, /Buy eSIM/);
   assert.match(orderDetail, /Rewards earned/);
   assert.doesNotMatch(safepay, /CustomerReward|rewardPoints/);
   assert.doesNotMatch(earn, /executeCreditCheckout|createCheckoutSession|PURCHASE_DEBIT/);

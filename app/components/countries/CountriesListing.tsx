@@ -349,19 +349,6 @@ function CountriesListingContent({
   destinationsRef.current = destinations;
   sourceRef.current = source;
 
-  // Restore search when returning from plans with ?q= (do not clear local typing when q absent).
-  useEffect(() => {
-    if (!searchParams.has("q")) return;
-    setSearch(searchParams.get("q") ?? "");
-  }, [searchParams]);
-
-  function destinationHref(destinationId: string) {
-    return buildDestinationPlansHref(destinationId, {
-      filter,
-      q: search,
-    });
-  }
-
   // Restore search when returning from a plan page with ?q= (do not wipe local typing when q absent).
   useEffect(() => {
     if (!searchParams.has("q")) return;

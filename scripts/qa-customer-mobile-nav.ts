@@ -97,6 +97,9 @@ function main() {
   // No duplicate Account hamburger on mobile account pages
   assert.match(accountMenu, /hidden lg:|lg:inline-flex|max-lg:hidden/);
   assert.match(accountLayout, /AccountMenu/);
+  // P1: desktop AccountMenu includes Support (mobile Navbar drawer unchanged).
+  assert.match(accountLayout, /href:\s*["']\/support["']/);
+  assert.match(accountLayout, /label:\s*["']Support["']/);
   console.log("PASS no_duplicate_mobile_account_menu");
 
   // C) My eSIMs journey + #install preserved (order card → install panel)
@@ -119,6 +122,14 @@ function main() {
   assert.doesNotMatch(accountPage, /\{user\.name\}/);
   assert.doesNotMatch(accountPage, /\{user\.email\}/);
   console.log("PASS compact_account_page");
+
+  // P1: Profile trust — verify path + support guidance for non-editable details.
+  const profilePage = read("app/account/profile/page.tsx");
+  assert.match(profilePage, /Verify \/ resend code|verify-email/);
+  assert.match(profilePage, /Contact support|\/support/);
+  assert.match(profilePage, /BRAND_SUPPORT_EMAIL|support@mapesim\.com/);
+  assert.match(profilePage, /can&apos;t be edited|cannot be edited|not editable|Name and email/i);
+  console.log("PASS profile_trust_guidance");
 
   // E) Layout wires customer summary without inventing APIs
   assert.match(layout, /Navbar/);

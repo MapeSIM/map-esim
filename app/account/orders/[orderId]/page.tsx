@@ -209,7 +209,10 @@ export default async function AccountOrderDetailPage({
         <DetailRow label="Package / offer" value={detail.planName} />
         <DetailRow label="Data allowance" value={detail.dataAllowance} />
         <DetailRow label="Validity" value={detail.validity} />
-        <DetailRow label="Status" value={detail.statusLabel} />
+        <DetailRow
+          label="Status"
+          value={customerEsimStatusLabel(detail.statusBadge)}
+        />
         <DetailRow label="Amount" value={detail.amountLabel} />
         {detail.promoCode ? (
           <DetailRow label="Promo code" value={detail.promoCode} />

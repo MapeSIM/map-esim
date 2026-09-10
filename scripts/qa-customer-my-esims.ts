@@ -144,6 +144,13 @@ function main() {
   assert.match(orderCard, /customerEsimStatusLabel/);
   assert.match(detailPage, /customerEsimStatusLabel/);
   assert.match(detailPage, /CustomerEsimInstallHelpLinks/);
+  // P1: detail Status row uses friendly label (not raw badge like "Completed").
+  assert.match(
+    detailPage,
+    /label="Status"[\s\S]*?customerEsimStatusLabel\(detail\.statusBadge\)/
+  );
+  assert.match(ordersLib, /statusLabel:\s*customerEsimStatusLabel\(statusBadge\)/);
+  assert.doesNotMatch(ordersLib, /statusLabel:\s*statusBadge,/);
   assert.doesNotMatch(listPage, /Show full ICCID|decryptIccid|IccidRevealPanel/);
   assert.doesNotMatch(
     listPage,

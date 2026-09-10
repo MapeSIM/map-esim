@@ -32,7 +32,8 @@ export default async function AccountLayout({
   links.push(
     { href: "/account/esim/buy", label: "Buy eSIM" },
     { href: "/account/profile", label: "Profile" },
-    { href: "/account/security", label: "Security" }
+    { href: "/account/security", label: "Security" },
+    { href: "/support", label: "Support" }
   );
 
   return (

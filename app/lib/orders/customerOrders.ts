@@ -15,6 +15,7 @@ import {
   parseCustomerEsimStatusFilter,
   parseCustomerOrderDateFilter,
   resolveCustomerEsimStatusBadge,
+  customerEsimStatusLabel,
   shortCustomerOrderReference,
   type CustomerEsimStatusBadge,
   type CustomerEsimStatusFilter,
@@ -473,7 +474,7 @@ export async function getCustomerOwnedOrderDetail(
     dataAllowance: displayOrUnavailable(order.dataAllowance),
     validity: displayOrUnavailable(order.validity),
     statusBadge,
-    statusLabel: statusBadge,
+    statusLabel: customerEsimStatusLabel(statusBadge),
     amountLabel: formatCustomerOrderAmount(amount, currency),
     promoCode: order.walletEsimPurchase?.promoCodeNormalized || null,
     originalAmountLabel:
