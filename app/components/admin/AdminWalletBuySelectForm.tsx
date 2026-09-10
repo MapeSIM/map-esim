@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useId, useState, useTransition } from "react";
+import AdminPackageShareControls from "@/app/components/admin/AdminPackageShareControls";
 import {
   loadAdminWalletBuyOffersAction,
   prepareAdminWalletPurchaseAction,
@@ -170,26 +171,38 @@ export default function AdminWalletBuySelectForm({
               const selected = selectedOfferId === offer.offerId;
               return (
                 <li key={offer.offerId}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedOfferId(offer.offerId)}
-                    disabled={pending}
-                    className={`w-full rounded-2xl border px-4 py-3 text-left text-sm transition ${
+                  <div
+                    className={`rounded-2xl border px-4 py-3 text-sm transition ${
                       selected
                         ? "border-[var(--accent-strong)] bg-[var(--surface)]"
-                        : "border-[var(--border)] bg-[var(--surface-2)] hover:bg-[var(--surface)]"
+                        : "border-[var(--border)] bg-[var(--surface-2)]"
                     }`}
                   >
-                    <p className="font-semibold text-[var(--heading)]">
-                      {offer.name}
-                    </p>
-                    <p className="mt-1 text-[var(--text-muted)]">
-                      {offer.dataLabel} · {offer.validityLabel}
-                    </p>
-                    <p className="mt-1 text-[var(--text-muted)]">
-                      {offer.destinationLabel} · Price {offer.costLabel}
-                    </p>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedOfferId(offer.offerId)}
+                      disabled={pending}
+                      className="w-full text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                    >
+                      <p className="font-semibold text-[var(--heading)]">
+                        {offer.name}
+                      </p>
+                      <p className="mt-1 text-[var(--text-muted)]">
+                        {offer.dataLabel} · {offer.validityLabel}
+                      </p>
+                      <p className="mt-1 text-[var(--text-muted)]">
+                        {offer.destinationLabel} · Price {offer.costLabel}
+                      </p>
+                    </button>
+                    <AdminPackageShareControls
+                      offerId={offer.offerId}
+                      country={destinationCode}
+                      destination={offer.destinationLabel}
+                      planName={offer.name}
+                      dataAllowance={offer.dataLabel}
+                      validity={offer.validityLabel}
+                    />
+                  </div>
                 </li>
               );
             })}
