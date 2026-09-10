@@ -131,20 +131,20 @@ export default function Home() {
 
       {/* Hero */}
       <section className="border-b border-[var(--border)] bg-[radial-gradient(ellipse_at_top_left,var(--hero-glow)_0%,_transparent_45%),linear-gradient(180deg,var(--page-bg-soft)_0%,var(--page-bg)_100%)]">
-        <div className="mx-auto grid max-w-[1200px] items-center gap-8 px-4 py-10 sm:gap-10 sm:px-6 sm:py-14 lg:grid-cols-2 lg:gap-14 lg:py-20">
+        <div className="mx-auto grid max-w-[1200px] items-center gap-6 px-4 py-8 sm:gap-8 sm:px-6 sm:py-10 lg:grid-cols-2 lg:gap-12 lg:py-14">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
               MAP eSIM travel connectivity
             </p>
-            <h1 className="mt-3 text-[2rem] font-bold leading-tight tracking-tight text-[var(--heading)] sm:mt-4 sm:text-5xl lg:text-[3.4rem] lg:leading-[1.08]">
-              Stay connected abroad with travel eSIM plans
+            <h1 className="mt-2.5 text-[2rem] font-bold leading-tight tracking-tight text-[var(--heading)] sm:mt-3 sm:text-5xl lg:text-[3.4rem] lg:leading-[1.08]">
+              Stay connected wherever you travel
             </h1>
-            <p className="mt-4 max-w-xl text-base leading-relaxed text-[var(--text-muted)] sm:mt-5 sm:text-lg">
-              Browse destination plans, compare data options, and checkout with
-              verified offer pricing — built for clear travel connectivity.
+            <p className="mt-3 max-w-xl text-base leading-relaxed text-[var(--text-muted)] sm:mt-4 sm:text-lg">
+              Browse eSIM plans by destination, compare data options, and get
+              connected before your trip.
             </p>
 
-            <div className="mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row">
+            <div className="mt-5 flex flex-col gap-3 sm:mt-6 sm:flex-row">
               <Link
                 href={HOME_DISCOVERY_CTA_HREF}
                 className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-6 text-sm font-bold text-[var(--accent-ink)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 sm:w-auto"
@@ -153,29 +153,29 @@ export default function Home() {
                 <ArrowRight className="h-4 w-4 shrink-0" />
               </Link>
               <Link
-                href="/countries?filter=Regional"
+                href="/countries"
                 className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-6 text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--border-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 sm:w-auto"
               >
-                View regional plans
+                Explore destinations
               </Link>
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-[28px] border border-[var(--border-strong)] bg-[var(--surface)] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.35)] sm:p-8">
+          <div className="relative overflow-hidden rounded-[28px] border border-[var(--border-strong)] bg-[var(--surface)] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.35)] sm:p-7">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(124,255,0,0.12),_transparent_45%)]" />
-            <div className="relative space-y-5">
+            <div className="relative space-y-4">
               <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-soft)]">
                 <Smartphone className="h-3.5 w-3.5" />
                 Designed for travelers
               </div>
               <h2 className="text-2xl font-bold text-[var(--heading)] sm:text-3xl">
-                Find the right plan before you land
+                Your travel internet, ready before takeoff
               </h2>
-              <ul className="space-y-3 text-sm text-[var(--text)]">
+              <ul className="space-y-2.5 text-sm text-[var(--text)]">
                 {[
-                  "Live destination and offer catalog",
-                  "Clear data, validity and coverage details",
-                  "Currency display for USD, PKR and more",
+                  "Instant QR delivery",
+                  "No physical SIM swap",
+                  "Flexible country and regional plans",
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-strong)]" />
@@ -183,16 +183,16 @@ export default function Home() {
                   </li>
                 ))}
               </ul>
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-3.5">
                   <Wifi className="h-5 w-5 text-[var(--accent-strong)]" />
-                  <p className="mt-3 text-sm font-semibold text-[var(--heading)]">
-                    Data-focused plans
+                  <p className="mt-2.5 text-sm font-semibold text-[var(--heading)]">
+                    Data plans for every trip
                   </p>
                 </div>
-                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-3.5">
                   <Settings2 className="h-5 w-5 text-[var(--accent-strong)]" />
-                  <p className="mt-3 text-sm font-semibold text-[var(--heading)]">
+                  <p className="mt-2.5 text-sm font-semibold text-[var(--heading)]">
                     Easy plan comparison
                   </p>
                 </div>

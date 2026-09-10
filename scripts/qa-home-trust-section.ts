@@ -59,7 +59,7 @@ function main() {
   const categoriesIdx = home.indexOf("{/* Categories */}");
   assert.ok(heroIdx >= 0 && trustIdx > heroIdx);
   assert.ok(categoriesIdx > trustIdx);
-  assert.match(home, /Stay connected abroad with travel eSIM plans/);
+  assert.match(home, /Stay connected wherever you travel/);
   console.log("PASS homepage_renders_trust_below_hero");
 
   assert.match(section, /aria-labelledby="home-trust-heading"/);
