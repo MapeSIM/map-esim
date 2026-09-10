@@ -31,6 +31,10 @@ import { schedulePaymentReceivedPendingNotification } from "@/app/lib/esim/payme
 import type { NormalizedPaymentEvent } from "@/app/lib/payments/types";
 import { executeCreditCheckout } from "@/app/lib/vesim/creditCheckout";
 import {
+  parseAddDataSourceOrderId,
+  resolveOwnedRechargeOrderId,
+} from "@/app/lib/esim/addDataCheckout";
+import {
   sanitizeCountryHint,
   verifyOfferAuthoritative,
   type VerifiedCheckoutOffer,
@@ -800,6 +804,7 @@ async function fulfillFundedEsimPurchaseAfterPayment(
       walletAppliedCents: true,
       gatewayAmountCents: true,
       adminUserId: true,
+      idempotencyKey: true,
       customer: {
         select: { id: true, email: true, role: true, deletedAt: true },
       },
@@ -882,9 +887,33 @@ async function fulfillFundedEsimPurchaseAfterPayment(
     return { ok: false };
   }
 
+  const addDataSourceOrderId = parseAddDataSourceOrderId(
+    purchase.idempotencyKey
+  );
+  let rechargeOrderId: string | null = null;
+  if (addDataSourceOrderId) {
+    rechargeOrderId = await resolveOwnedRechargeOrderId({
+      customerUserId: purchase.customerUserId,
+      localOrderId: addDataSourceOrderId,
+    });
+    if (!rechargeOrderId) {
+      await prisma.walletEsimPurchase.update({
+        where: { id: purchase.id },
+        data: {
+          status: WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED,
+          failureCategory: "add_data_source_unavailable",
+          failureCode: "missing_provider_order",
+          reconciliationState: "awaiting_manual_review",
+        },
+      });
+      return { ok: false };
+    }
+  }
+
   const checkout = await executeCreditCheckout({
     offerId: verifiedOffer.offerId,
     customerEmail: purchase.customer.email,
+    rechargeOrderId,
   });
 
   if (checkout.kind !== "success") {

@@ -262,10 +262,34 @@ export default async function AccountOrderDetailPage({
         />
       </dl>
 
+      {detail.addDataEligible ? (
+        <section
+          className="rounded-2xl border border-[var(--accent-strong)]/35 bg-[var(--accent-strong)]/10 px-4 py-4 sm:px-5"
+          aria-labelledby="add-more-data-heading"
+        >
+          <h2
+            id="add-more-data-heading"
+            className="text-base font-bold text-[var(--heading)]"
+          >
+            Need more data?
+          </h2>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Add more data to this eSIM when top-up packages are available.
+          </p>
+          <Link
+            href={`/account/orders/${encodeURIComponent(detail.id)}/add-data`}
+            className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
+          >
+            Add More Data
+          </Link>
+        </section>
+      ) : null}
+
       <CustomerEsimUsagePanel
         orderId={detail.id}
         usageEligible={detail.installEligible && !detail.isRefunded}
         autoOpen={autoOpenUsage}
+        addDataEligible={detail.addDataEligible}
       />
 
       <CustomerEsimInstallPanel

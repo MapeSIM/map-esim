@@ -41,13 +41,22 @@ function main() {
   );
   assert.match(bodySlice, /VESIM_PROVIDER_CUSTOMER_EMAIL/);
   assert.doesNotMatch(bodySlice, /options\.customerEmail|customerEmail,\s*$/m);
+  assert.match(bodySlice, /platform:\s*"api"/);
+  assert.match(
+    bodySlice,
+    /\.\.\.\(rechargeOrderId \? \{ rechargeOrderId \} : \{\}\)/
+  );
   console.log("PASS vesim_credit_checkout_uses_orders_inbox");
 
   // Wallet + gateway apply: one provider call; MAP install email uses frozen Order.customerEmail
   assert.match(wallet, /executeCreditCheckout\(/);
   assert.equal((wallet.match(/executeCreditCheckout\(/g) || []).length, 1);
+  assert.match(wallet, /rechargeOrderId/);
+  assert.match(wallet, /parseAddDataSourceOrderId/);
   assert.match(wallet, /deliverCompletedWalletPurchaseInstallEmail/);
   assert.match(apply, /executeCreditCheckout\(/);
+  assert.match(apply, /rechargeOrderId/);
+  assert.match(apply, /parseAddDataSourceOrderId/);
   assert.match(apply, /deliverCompletedWalletPurchaseInstallEmail/);
   assert.match(
     apply,

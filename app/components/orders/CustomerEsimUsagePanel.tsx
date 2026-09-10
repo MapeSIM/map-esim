@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useState } from "react";
+import Link from "next/link";
 import { RefreshCw, Signal } from "lucide-react";
 
 type UsagePayload = {
@@ -29,6 +30,8 @@ type Props = {
   usagePath?: string;
   /** Compact Partner/share result card. Default remains the customer panel. */
   compact?: boolean;
+  /** Show Add More Data near remaining usage when eligible (customer UI only). */
+  addDataEligible?: boolean;
 };
 
 function formatGb(value: number | null): string {
@@ -68,12 +71,17 @@ export default function CustomerEsimUsagePanel({
   autoOpen = false,
   usagePath,
   compact = false,
+  addDataEligible = false,
 }: Props) {
   const headingId = useId();
   const [open, setOpen] = useState(Boolean(autoOpen && usageEligible));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usage, setUsage] = useState<UsagePayload | null>(null);
+  /** Route uses MAP local order id; VeSIM provider bind id is checkout-only. */
+  const addDataHref = addDataEligible
+    ? `/account/orders/${encodeURIComponent(orderId)}/add-data`
+    : null;
 
   const loadUsage = useCallback(async () => {
     setLoading(true);
@@ -392,6 +400,16 @@ export default function CustomerEsimUsagePanel({
                     ) : null}
                   </>
                 )}
+                {addDataHref ? (
+                  <div className="mt-4">
+                    <Link
+                      href={addDataHref}
+                      className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-[var(--accent-strong)]/50 bg-[var(--accent-strong)]/10 px-3 text-sm font-bold text-[var(--heading)] transition hover:bg-[var(--accent-strong)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
+                    >
+                      Add More Data
+                    </Link>
+                  </div>
+                ) : null}
               </div>
             </>
             )

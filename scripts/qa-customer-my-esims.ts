@@ -220,6 +220,68 @@ function main() {
   const usageApi = read("app/api/account/orders/[orderId]/usage/route.ts");
   const usagePanel = read("app/components/orders/CustomerEsimUsagePanel.tsx");
   assert.match(orderCard, /View usage/);
+  assert.match(orderCard, /addDataEligible/);
+  assert.match(orderCard, /Add More Data/);
+  assert.match(
+    orderCard,
+    /addDataEligible[\s\S]*?Add More Data|Add More Data[\s\S]*?addDataEligible/
+  );
+  assert.match(orderCard, /\$\{encodeURIComponent\(order\.id\)\}/);
+  assert.doesNotMatch(orderCard, /rechargeOrderId/);
+  assert.match(detailPage, /addDataEligible/);
+  assert.match(detailPage, /Add More Data/);
+  assert.match(
+    detailPage,
+    /\$\{encodeURIComponent\(detail\.id\)\}\/add-data/
+  );
+  assert.doesNotMatch(
+    detailPage,
+    /encodeURIComponent\(detail\.rechargeOrderId\)/
+  );
+  assert.match(usagePanel, /addDataEligible/);
+  assert.match(usagePanel, /Add More Data/);
+  assert.match(usagePanel, /\/add-data/);
+  assert.match(usagePanel, /encodeURIComponent\(orderId\)/);
+  assert.doesNotMatch(usagePanel, /rechargeOrderId/);
+  const customerOrders = read("app/lib/orders/customerOrders.ts");
+  assert.match(customerOrders, /providerOrderId/);
+  assert.match(customerOrders, /missing_provider_order/);
+  assert.match(customerOrders, /const rechargeOrderId = providerOrderId/);
+  assert.match(
+    customerOrders,
+    /buildAddDataEligibility\(\{\s*providerOrderId,/
+  );
+  assert.doesNotMatch(customerOrders, /rechargeOrderId:\s*(order|row)\.id\b/);
+  assert.doesNotMatch(
+    customerOrders,
+    /buildAddDataEligibility\(\{\s*orderId:/
+  );
+  const addDataPage = read("app/account/orders/[orderId]/add-data/page.tsx");
+  assert.match(addDataPage, /startCustomerAddDataCheckoutAction/);
+  assert.match(addDataPage, /Continue to checkout/);
+  assert.match(addDataPage, /getCustomerOwnedOrderDetail/);
+  assert.match(addDataPage, /name="orderId"/);
+  assert.doesNotMatch(addDataPage, /name="rechargeOrderId"|name="providerOrderId"/);
+  const addDataLib = read("app/lib/esim/addDataCheckout.ts");
+  assert.match(addDataLib, /buildAddDataIdempotencyKey/);
+  assert.match(addDataLib, /parseAddDataSourceOrderId/);
+  assert.match(addDataLib, /resolveOwnedRechargeOrderId/);
+  const creditCheckout = read("app/lib/vesim/creditCheckout.ts");
+  assert.match(creditCheckout, /rechargeOrderId/);
+  assert.match(
+    creditCheckout,
+    /\.\.\.\(rechargeOrderId \? \{ rechargeOrderId \} : \{\}\)/
+  );
+  const walletPurchase = read("app/lib/esim/walletPurchase.ts");
+  assert.match(walletPurchase, /rechargeOrderId/);
+  assert.match(walletPurchase, /parseAddDataSourceOrderId/);
+  const paymentApply = read("app/lib/esim/esimPurchasePaymentApply.ts");
+  assert.match(paymentApply, /rechargeOrderId/);
+  assert.match(paymentApply, /parseAddDataSourceOrderId/);
+  const walletActions = read("app/lib/esim/walletPurchaseActions.ts");
+  assert.match(walletActions, /startCustomerAddDataCheckoutAction/);
+  assert.match(walletActions, /buildAddDataIdempotencyKey/);
+  assert.doesNotMatch(addDataPage, /Coming soon/);
   assert.match(detailPage, /CustomerEsimUsagePanel/);
   assert.match(usageLib, /import "server-only"/);
   assert.match(usageLib, /authorizeCustomerOwnedOrderInstall/);

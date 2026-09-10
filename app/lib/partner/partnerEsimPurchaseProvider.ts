@@ -46,6 +46,7 @@ export const PARTNER_ESIM_PURCHASE_RECONCILIATION_AUDIT =
 export type PartnerProviderCheckoutExecutor = (options: {
   offerId: string;
   customerEmail?: string;
+  rechargeOrderId?: string | null;
 }) => Promise<CreditCheckoutResult>;
 
 export type ExecutePartnerEsimProviderPurchaseInput = {

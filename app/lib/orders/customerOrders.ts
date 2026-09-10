@@ -20,6 +20,14 @@ import {
   type CustomerEsimStatusBadge,
   type CustomerEsimStatusFilter,
 } from "@/app/lib/orders/customerOrderDisplay";
+import type { VesimOffer } from "@/app/lib/vesim/offers";
+import {
+  extractCountryHintFromOfferId,
+  fetchPublicOffersForCountry,
+  findOfferById,
+  normalizeOfferId,
+  sanitizeCountryHint,
+} from "@/app/lib/vesim/server";
 
 function displayOrUnavailable(value: string | null | undefined): string {
   const trimmed = (value ?? "").trim();
@@ -58,6 +66,185 @@ function customerIccidDisplay(
   return "Pending from provider";
 }
 
+/** Why Add More Data is blocked — null when eligible. */
+export type CustomerAddDataBlockedReason =
+  | "refunded"
+  | "not_ready"
+  | "missing_offer"
+  | "missing_provider_order"
+  | "catalog_unavailable"
+  | "offer_unavailable"
+  | "not_supported";
+
+export type CustomerAddDataEligibility = {
+  offerId: string | null;
+  supportTopUp: boolean;
+  supportTopUpType: string | null;
+  /** VeSIM provider order id — use as checkout rechargeOrderId (never MAP local id). */
+  providerOrderId: string | null;
+  /** Same as providerOrderId when present; null if provider ref missing. */
+  rechargeOrderId: string | null;
+  addDataEligible: boolean;
+  addDataBlockedReason: CustomerAddDataBlockedReason | null;
+};
+
+type CatalogTopUpLookup =
+  | {
+      state: "ok";
+      supportTopUp: boolean;
+      supportTopUpType: string | null;
+    }
+  | { state: "catalog_unavailable" }
+  | { state: "offer_unavailable" }
+  | { state: "no_offer_id" };
+
+function resolveCatalogCountryHint(
+  destinationCode: string | null | undefined,
+  offerId: string | null
+): string | null {
+  return (
+    sanitizeCountryHint(destinationCode) ||
+    (offerId ? extractCountryHintFromOfferId(offerId) : null)
+  );
+}
+
+/**
+ * Public browse catalog only (snapshot / cached lists). Soft-fails — never throws to callers.
+ * Not used for purchase validation or pricing.
+ */
+async function lookupOfferTopUpFromCatalog(
+  offerIdRaw: string | null | undefined,
+  destinationCode: string | null | undefined,
+  catalogCache: Map<string, VesimOffer[] | null>
+): Promise<CatalogTopUpLookup> {
+  const offerId = normalizeOfferId(offerIdRaw);
+  if (!offerId) {
+    return { state: "no_offer_id" };
+  }
+
+  const country = resolveCatalogCountryHint(destinationCode, offerId);
+  if (!country) {
+    return { state: "catalog_unavailable" };
+  }
+
+  let offers = catalogCache.get(country);
+  if (offers === undefined) {
+    try {
+      offers = await fetchPublicOffersForCountry(country);
+      catalogCache.set(country, offers);
+    } catch {
+      catalogCache.set(country, null);
+      return { state: "catalog_unavailable" };
+    }
+  }
+  if (offers == null) {
+    return { state: "catalog_unavailable" };
+  }
+
+  const match = findOfferById(offers, offerId);
+  if (!match) {
+    return { state: "offer_unavailable" };
+  }
+
+  const supportTopUpType =
+    typeof match.supportTopUpType === "string" && match.supportTopUpType.trim()
+      ? match.supportTopUpType.trim()
+      : null;
+
+  return {
+    state: "ok",
+    supportTopUp: match.supportTopUp === true,
+    supportTopUpType,
+  };
+}
+
+function buildAddDataEligibility(input: {
+  providerOrderId: string | null;
+  offerId: string | null;
+  isRefunded: boolean;
+  installEligible: boolean;
+  catalog: CatalogTopUpLookup;
+}): CustomerAddDataEligibility {
+  const offerId = input.offerId;
+  const providerOrderId = (input.providerOrderId ?? "").trim() || null;
+  /** VeSIM bind key only — never MAP local order id. */
+  const rechargeOrderId = providerOrderId;
+  const base = {
+    offerId,
+    providerOrderId,
+    rechargeOrderId,
+    supportTopUp: false,
+    supportTopUpType: null as string | null,
+  };
+
+  if (input.isRefunded) {
+    return {
+      ...base,
+      addDataEligible: false,
+      addDataBlockedReason: "refunded",
+    };
+  }
+  if (!input.installEligible) {
+    return {
+      ...base,
+      addDataEligible: false,
+      addDataBlockedReason: "not_ready",
+    };
+  }
+  if (!providerOrderId) {
+    return {
+      ...base,
+      addDataEligible: false,
+      addDataBlockedReason: "missing_provider_order",
+    };
+  }
+  if (input.catalog.state === "no_offer_id") {
+    return {
+      ...base,
+      addDataEligible: false,
+      addDataBlockedReason: "missing_offer",
+    };
+  }
+  if (input.catalog.state === "catalog_unavailable") {
+    return {
+      ...base,
+      addDataEligible: false,
+      addDataBlockedReason: "catalog_unavailable",
+    };
+  }
+  if (input.catalog.state === "offer_unavailable") {
+    return {
+      ...base,
+      addDataEligible: false,
+      addDataBlockedReason: "offer_unavailable",
+    };
+  }
+
+  const supportTopUp = input.catalog.supportTopUp;
+  const supportTopUpType = input.catalog.supportTopUpType;
+  if (!supportTopUp) {
+    return {
+      offerId,
+      providerOrderId,
+      rechargeOrderId,
+      supportTopUp: false,
+      supportTopUpType,
+      addDataEligible: false,
+      addDataBlockedReason: "not_supported",
+    };
+  }
+
+  return {
+    offerId,
+    providerOrderId,
+    rechargeOrderId,
+    supportTopUp: true,
+    supportTopUpType,
+    addDataEligible: true,
+    addDataBlockedReason: null,
+  };
+}
+
 export type CustomerOrderListRow = {
   id: string;
   shortReference: string;
@@ -76,6 +263,15 @@ export type CustomerOrderListRow = {
   emailDeliveryLabel: string | null;
   installEligible: boolean;
   isRefunded: boolean;
+  offerId: string | null;
+  /** VeSIM provider order id (same value as rechargeOrderId when set). */
+  providerOrderId: string | null;
+  supportTopUp: boolean;
+  supportTopUpType: string | null;
+  /** VeSIM provider order id for Add Data checkout — never MAP local id. */
+  rechargeOrderId: string | null;
+  addDataEligible: boolean;
+  addDataBlockedReason: CustomerAddDataBlockedReason | null;
 };
 
 export type CustomerOrdersListResult = {
@@ -96,7 +292,8 @@ export type CustomerOrdersQueryInput = {
 
 /**
  * Orders linked to this CUSTOMER userId only — never by email or browser id.
- * Local DB only — never calls the provider. Never returns full ICCID.
+ * Local DB for order rows. Add More Data flags may soft-read the public offer
+ * catalog (snapshot/cache) by offerId — never install secrets or broker order payloads.
  */
 export async function listCustomerOrders(
   userId: string,
@@ -118,6 +315,8 @@ export async function listCustomerOrders(
     take: CUSTOMER_ORDERS_PAGE_LIMIT,
     select: {
       id: true,
+      offerId: true,
+      providerOrderId: true,
       destination: true,
       planName: true,
       dataAllowance: true,
@@ -134,6 +333,7 @@ export async function listCustomerOrders(
       walletEsimPurchase: {
         select: {
           status: true,
+          offerId: true,
           destinationCode: true,
           emailDeliveryStatus: true,
           priceCents: true,
@@ -142,6 +342,7 @@ export async function listCustomerOrders(
       adminPackageAssignment: {
         select: {
           status: true,
+          offerId: true,
           destinationCode: true,
           emailDeliveryStatus: true,
         },
@@ -154,6 +355,7 @@ export async function listCustomerOrders(
   const fromMs = from ? Date.parse(`${from}T00:00:00.000Z`) : null;
   const toMs = to ? Date.parse(`${to}T23:59:59.999Z`) : null;
 
+  const catalogCache = new Map<string, VesimOffer[] | null>();
   const mapped: CustomerOrderListRow[] = [];
 
   for (const row of rows) {
@@ -211,6 +413,25 @@ export async function listCustomerOrders(
     const installEligible =
       row.status === OrderStatus.COMPLETED && statusBadge === "Completed";
 
+    const offerId =
+      normalizeOfferId(row.offerId) ||
+      normalizeOfferId(row.walletEsimPurchase?.offerId) ||
+      normalizeOfferId(row.adminPackageAssignment?.offerId) ||
+      null;
+    const providerOrderId = (row.providerOrderId ?? "").trim() || null;
+    const catalog = await lookupOfferTopUpFromCatalog(
+      offerId,
+      flagCode,
+      catalogCache
+    );
+    const addData = buildAddDataEligibility({
+      providerOrderId,
+      offerId,
+      isRefunded,
+      installEligible,
+      catalog,
+    });
+
     mapped.push({
       id: row.id,
       shortReference: shortCustomerOrderReference(row.id),
@@ -228,6 +449,13 @@ export async function listCustomerOrders(
       emailDeliveryLabel,
       installEligible,
       isRefunded,
+      offerId: addData.offerId,
+      providerOrderId: addData.providerOrderId,
+      supportTopUp: addData.supportTopUp,
+      supportTopUpType: addData.supportTopUpType,
+      rechargeOrderId: addData.rechargeOrderId,
+      addDataEligible: addData.addDataEligible,
+      addDataBlockedReason: addData.addDataBlockedReason,
     });
   }
 
@@ -274,12 +502,23 @@ export type CustomerOrderDetail = {
   gatewayRefundLabel: string | null;
   rewardsEarnedPoints: number | null;
   rewardsAppliedPoints: number | null;
+  offerId: string | null;
+  /** Destination catalog hint for Add Data → prepare (never for pricing). */
+  destinationCode: string | null;
+  /** VeSIM provider order id (same value as rechargeOrderId when set). */
+  providerOrderId: string | null;
+  supportTopUp: boolean;
+  supportTopUpType: string | null;
+  /** VeSIM provider order id for Add Data checkout — never MAP local id. */
+  rechargeOrderId: string | null;
+  addDataEligible: boolean;
+  addDataBlockedReason: CustomerAddDataBlockedReason | null;
 };
 
 /**
  * Load one order only when it belongs to the signed-in CUSTOMER.
- * Local DB only — never fetches broker/provider payloads on page render.
- * Install secrets are loaded only via explicit authorized API actions.
+ * Local DB for order fields. Add More Data eligibility soft-reads the public
+ * offer catalog by offerId. Install secrets stay on authorized API actions only.
  */
 export async function getCustomerOwnedOrderDetail(
   userId: string,
@@ -312,6 +551,8 @@ export async function getCustomerOwnedOrderDetail(
     },
     select: {
       id: true,
+      offerId: true,
+      providerOrderId: true,
       destination: true,
       planName: true,
       dataAllowance: true,
@@ -328,6 +569,7 @@ export async function getCustomerOwnedOrderDetail(
       walletEsimPurchase: {
         select: {
           status: true,
+          offerId: true,
           destinationCode: true,
           emailDeliveryStatus: true,
           priceCents: true,
@@ -348,6 +590,7 @@ export async function getCustomerOwnedOrderDetail(
       adminPackageAssignment: {
         select: {
           status: true,
+          offerId: true,
           destinationCode: true,
           emailDeliveryStatus: true,
         },
@@ -389,6 +632,25 @@ export async function getCustomerOwnedOrderDetail(
   const isRefunded = statusBadge === "Refunded";
   const installEligible =
     order.status === OrderStatus.COMPLETED && statusBadge === "Completed";
+
+  const offerId =
+    normalizeOfferId(order.offerId) ||
+    normalizeOfferId(order.walletEsimPurchase?.offerId) ||
+    normalizeOfferId(order.adminPackageAssignment?.offerId) ||
+    null;
+  const providerOrderId = (order.providerOrderId ?? "").trim() || null;
+  const catalog = await lookupOfferTopUpFromCatalog(
+    offerId,
+    flagCode,
+    new Map()
+  );
+  const addData = buildAddDataEligibility({
+    providerOrderId,
+    offerId,
+    isRefunded,
+    installEligible,
+    catalog,
+  });
 
   let rewardsAppliedPoints: number | null = null;
   let rewardsEarnedPoints: number | null = null;
@@ -513,5 +775,13 @@ export async function getCustomerOwnedOrderDetail(
     gatewayRefundLabel,
     rewardsEarnedPoints,
     rewardsAppliedPoints,
+    offerId: addData.offerId,
+    destinationCode: flagCode ? sanitizeCountryHint(flagCode) : null,
+    providerOrderId: addData.providerOrderId,
+    supportTopUp: addData.supportTopUp,
+    supportTopUpType: addData.supportTopUpType,
+    rechargeOrderId: addData.rechargeOrderId,
+    addDataEligible: addData.addDataEligible,
+    addDataBlockedReason: addData.addDataBlockedReason,
   };
 }

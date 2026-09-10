@@ -47,8 +47,14 @@ export async function executeCreditCheckout(options: {
    * Callers must pass the real customer email to MAP branded delivery separately.
    */
   customerEmail?: string;
+  /**
+   * VeSIM provider order id for Add More Data / top-up checkout.
+   * Never pass a MAP local Order.id here.
+   */
+  rechargeOrderId?: string | null;
 }): Promise<CreditCheckoutResult> {
   const offerId = options.offerId.trim();
+  const rechargeOrderId = (options.rechargeOrderId ?? "").trim() || null;
   // Intentionally unused — never forward the end-customer address to VeSIM.
   void options.customerEmail;
   if (!offerId) {
@@ -75,6 +81,7 @@ export async function executeCreditCheckout(options: {
         offerId,
         customerEmail: VESIM_PROVIDER_CUSTOMER_EMAIL,
         platform: "api",
+        ...(rechargeOrderId ? { rechargeOrderId } : {}),
       }),
       cache: "no-store",
     });

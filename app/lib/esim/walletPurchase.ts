@@ -19,6 +19,10 @@ import {
 } from "@/app/lib/esim/esimDeliveryEmail";
 import { deliverCompletedWalletPurchaseInstallEmail } from "@/app/lib/esim/esimPurchaseInstallEmail";
 import { executeCreditCheckout } from "@/app/lib/vesim/creditCheckout";
+import {
+  parseAddDataSourceOrderId,
+  resolveOwnedRechargeOrderId,
+} from "@/app/lib/esim/addDataCheckout";
 import { scheduleReconciliationRequiredNotification } from "@/app/lib/esim/reconciliationRequiredNotification";
 import {
   persistWalletPurchaseProviderObservation,
@@ -311,6 +315,20 @@ export async function prepareWalletEsimPurchase(
       "OFFER_UNAVAILABLE",
       "The selected package is unavailable."
     );
+  }
+
+  const addDataSourceOrderId = parseAddDataSourceOrderId(idempotencyKey);
+  if (addDataSourceOrderId) {
+    const rechargeOrderId = await resolveOwnedRechargeOrderId({
+      customerUserId,
+      localOrderId: addDataSourceOrderId,
+    });
+    if (!rechargeOrderId) {
+      throw new WalletEsimPurchaseError(
+        "INVALID_STATE",
+        "Add More Data is not available for this eSIM."
+      );
+    }
   }
 
   if (isAssisted && assistedAdminUserId) {
@@ -1583,9 +1601,25 @@ export async function confirmWalletEsimPurchase(
   }
 
   // External provider write — outside Prisma transaction.
+  const addDataSourceOrderId = parseAddDataSourceOrderId(purchase.idempotencyKey);
+  let rechargeOrderId: string | null = null;
+  if (addDataSourceOrderId) {
+    rechargeOrderId = await resolveOwnedRechargeOrderId({
+      customerUserId,
+      localOrderId: addDataSourceOrderId,
+    });
+    if (!rechargeOrderId) {
+      throw new WalletEsimPurchaseError(
+        "INVALID_STATE",
+        "Add More Data is not available for this eSIM."
+      );
+    }
+  }
+
   const checkout = await executeCreditCheckout({
     offerId: snapshot.offerId,
     customerEmail: customer.email,
+    rechargeOrderId,
   });
 
   if (checkout.kind === "declined") {

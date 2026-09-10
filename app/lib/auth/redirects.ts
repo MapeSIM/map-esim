@@ -148,19 +148,28 @@ export function navAuthLink(options: {
   return { href: "/account", label: "Account" };
 }
 
-/** Build the wallet-buy return path that preserves offer/country hints. */
+/** Build the wallet-buy return path that preserves offer/country/fromOrder hints. */
 export function buildWalletBuyReturnPath(input: {
   offerId?: string | null;
   country?: string | null;
+  fromOrder?: string | null;
 }): string {
   const params = new URLSearchParams();
   const offerId = (input.offerId ?? "").trim();
   const country = (input.country ?? "").trim();
+  const fromOrder = (input.fromOrder ?? "").trim();
   if (offerId && offerId.length <= 120 && /^[A-Za-z0-9._:-]+$/.test(offerId)) {
     params.set("offerId", offerId);
   }
   if (country && country.length <= 64 && /^[A-Za-z0-9._-]+$/.test(country)) {
     params.set("country", country);
+  }
+  if (
+    fromOrder &&
+    fromOrder.length <= 64 &&
+    /^[A-Za-z0-9_-]+$/.test(fromOrder)
+  ) {
+    params.set("fromOrder", fromOrder);
   }
   const qs = params.toString();
   return qs ? `/account/esim/buy?${qs}` : "/account/esim/buy";

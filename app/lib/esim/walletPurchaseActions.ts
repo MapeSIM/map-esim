@@ -13,6 +13,7 @@ import {
   prepareWalletEsimPurchase,
   setWalletPurchaseFundingChoice,
 } from "@/app/lib/esim/walletPurchase";
+import { getCustomerOwnedOrderDetail } from "@/app/lib/orders/customerOrders";
 import { esimPurchasePaymentCancelPath } from "@/app/lib/payments/safepayCheckoutPaths";
 import {
   CARD_PAYMENT_UNAVAILABLE_MESSAGE,
@@ -47,6 +48,11 @@ import {
   normalizeOfferId,
   sanitizeCountryHint,
 } from "@/app/lib/vesim/server";
+import {
+  buildAddDataIdempotencyKey,
+  normalizeAddDataFromOrderId,
+  resolveOwnedRechargeOrderId,
+} from "@/app/lib/esim/addDataCheckout";
 
 export async function loadCustomerWalletPurchaseOffersAction(
   destinationCode: string
@@ -83,6 +89,7 @@ export async function prepareWalletEsimPurchaseAction(
 
   const offerId = normalizeOfferId(formData.get("offerId"));
   const countryHint = sanitizeCountryHint(formData.get("destinationCode"));
+  const fromOrderId = normalizeAddDataFromOrderId(formData.get("fromOrder"));
   const idempotencyParsed = parseWalletPurchaseIdempotencyKey(
     formData.get("idempotencyKey")
   );
@@ -93,6 +100,7 @@ export async function prepareWalletEsimPurchaseAction(
   void formData.get("planName");
   void formData.get("dataAllowance");
   void formData.get("validity");
+  void formData.get("rechargeOrderId");
 
   if (!offerId) {
     return {
@@ -108,7 +116,23 @@ export async function prepareWalletEsimPurchaseAction(
       error: "Select a destination.",
     };
   }
-  if (!idempotencyParsed.ok) {
+
+  let idempotencyKey: string;
+  if (fromOrderId) {
+    const rechargeOrderId = await resolveOwnedRechargeOrderId({
+      customerUserId: customer.id,
+      localOrderId: fromOrderId,
+    });
+    if (!rechargeOrderId) {
+      return {
+        ok: false,
+        error: "Add More Data is not available for this eSIM.",
+      };
+    }
+    idempotencyKey = buildAddDataIdempotencyKey(fromOrderId);
+  } else if (idempotencyParsed.ok) {
+    idempotencyKey = idempotencyParsed.value;
+  } else {
     return { ok: false, error: idempotencyParsed.error };
   }
 
@@ -118,7 +142,7 @@ export async function prepareWalletEsimPurchaseAction(
       customerUserId: customer.id,
       offerId,
       countryHint,
-      idempotencyKey: idempotencyParsed.value,
+      idempotencyKey,
     });
   } catch (error) {
     if (error instanceof WalletEsimPurchaseError) {
@@ -139,6 +163,54 @@ export async function prepareWalletEsimPurchaseAction(
 
   redirect(reviewPath(result.purchaseId));
 }
+
+export async function startCustomerAddDataCheckoutAction(
+  formData: FormData
+): Promise<void> {
+  const customer = await requireRole("CUSTOMER");
+  const localOrderId = normalizeAddDataFromOrderId(formData.get("orderId"));
+  // Never trust browser-supplied VeSIM ids.
+  void formData.get("rechargeOrderId");
+  void formData.get("providerOrderId");
+  void formData.get("offerId");
+  void formData.get("price");
+
+  if (!localOrderId) {
+    redirect("/account/orders");
+  }
+
+  const detail = await getCustomerOwnedOrderDetail(customer.id, localOrderId);
+  if (!detail || !detail.addDataEligible) {
+    redirect(
+      `/account/orders/${encodeURIComponent(localOrderId)}/add-data`
+    );
+  }
+  if (!detail.offerId || !detail.rechargeOrderId) {
+    redirect(
+      `/account/orders/${encodeURIComponent(localOrderId)}/add-data`
+    );
+  }
+
+  const countryHint = sanitizeCountryHint(detail.destinationCode);
+
+  try {
+    const prepared = await prepareWalletEsimPurchase({
+      customerUserId: customer.id,
+      offerId: detail.offerId,
+      countryHint,
+      idempotencyKey: buildAddDataIdempotencyKey(localOrderId),
+    });
+    redirect(reviewPath(prepared.purchaseId));
+  } catch (error) {
+    if (error instanceof WalletEsimPurchaseError) {
+      redirect(
+        `/account/orders/${encodeURIComponent(localOrderId)}/add-data?error=1`
+      );
+    }
+    throw error;
+  }
+}
+
 
 /**
  * Persist READY purchase funding choice. Accepts useWallet only — never client money.

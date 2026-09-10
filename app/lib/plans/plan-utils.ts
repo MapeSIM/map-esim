@@ -51,7 +51,8 @@ export function dataAmountKey(offer: VesimOffer): string {
  */
 export function buildCheckoutHref(
   offer: VesimOffer,
-  destinationCode: string
+  destinationCode: string,
+  options?: { fromOrder?: string | null }
 ): string {
   const params = new URLSearchParams({
     offerId: offer.id,
@@ -59,6 +60,14 @@ export function buildCheckoutHref(
 
   if (destinationCode.trim()) {
     params.set("country", destinationCode.trim());
+  }
+  const fromOrder = (options?.fromOrder ?? "").trim();
+  if (
+    fromOrder &&
+    fromOrder.length <= 64 &&
+    /^[A-Za-z0-9_-]+$/.test(fromOrder)
+  ) {
+    params.set("fromOrder", fromOrder);
   }
 
   return `/account/esim/buy?${params.toString()}`;

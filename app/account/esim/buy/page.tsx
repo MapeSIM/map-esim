@@ -13,6 +13,11 @@ import {
   prepareWalletEsimPurchase,
   WalletEsimPurchaseError,
 } from "@/app/lib/esim/walletPurchase";
+import {
+  buildAddDataIdempotencyKey,
+  normalizeAddDataFromOrderId,
+  resolveOwnedRechargeOrderId,
+} from "@/app/lib/esim/addDataCheckout";
 import { prisma } from "@/app/lib/db";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
 import { resolveCheckoutBackHref } from "@/app/lib/plans/checkoutBackHref";
@@ -88,7 +93,11 @@ function BuyRecoveryActions({
 export default async function AccountWalletBuyPage({
   searchParams,
 }: {
-  searchParams: Promise<{ offerId?: string; country?: string }>;
+  searchParams: Promise<{
+    offerId?: string;
+    country?: string;
+    fromOrder?: string;
+  }>;
 }) {
   const query = await searchParams;
   // Preserve package hints across sign-in when page-level auth runs.
@@ -97,10 +106,12 @@ export default async function AccountWalletBuyPage({
     buildWalletBuyReturnPath({
       offerId: query.offerId,
       country: query.country,
+      fromOrder: query.fromOrder,
     })
   );
   const offerIdHint = normalizeOfferId(query.offerId);
   const countryHint = sanitizeCountryHint(query.country);
+  const fromOrderId = normalizeAddDataFromOrderId(query.fromOrder);
   const gatewayReady = isPaymentGatewayConfigured();
 
   let destinations: Awaited<
@@ -167,13 +178,28 @@ export default async function AccountWalletBuyPage({
       );
     }
     try {
-      const prepared = await prepareWalletEsimPurchase({
-        customerUserId: user.id,
-        offerId: offerIdHint,
-        countryHint,
-        idempotencyKey: newIdempotencyKey(),
-      });
-      directPurchaseId = prepared.purchaseId;
+      let idempotencyKey = newIdempotencyKey();
+      if (fromOrderId) {
+        const rechargeOrderId = await resolveOwnedRechargeOrderId({
+          customerUserId: user.id,
+          localOrderId: fromOrderId,
+        });
+        if (!rechargeOrderId) {
+          directOfferError =
+            "Add More Data is not available for this eSIM.";
+        } else {
+          idempotencyKey = buildAddDataIdempotencyKey(fromOrderId);
+        }
+      }
+      if (!directOfferError) {
+        const prepared = await prepareWalletEsimPurchase({
+          customerUserId: user.id,
+          offerId: offerIdHint,
+          countryHint,
+          idempotencyKey,
+        });
+        directPurchaseId = prepared.purchaseId;
+      }
     } catch (error) {
       if (error instanceof WalletEsimPurchaseError) {
         directOfferError =

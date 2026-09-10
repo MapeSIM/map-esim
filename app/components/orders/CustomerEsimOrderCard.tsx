@@ -20,6 +20,8 @@ export type CustomerEsimOrderCardOrder = {
   createdAtLabel: string;
   iccidMasked: string;
   emailDeliveryLabel: string | null;
+  /** Read-model gate — show Add More Data only when true. */
+  addDataEligible?: boolean;
 };
 
 function statusBadgeClass(status: CustomerEsimStatusBadge): string {
@@ -45,6 +47,9 @@ export function CustomerEsimOrderCard({
 }) {
   const ready = order.statusBadge === "Completed";
   const href = `/account/orders/${encodeURIComponent(order.id)}`;
+  const addDataHref = order.addDataEligible
+    ? `/account/orders/${encodeURIComponent(order.id)}/add-data`
+    : null;
 
   return (
     <article className="min-w-0 rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.2)] sm:p-6">
@@ -143,6 +148,14 @@ export function CustomerEsimOrderCard({
               View usage
             </Link>
           </>
+        ) : null}
+        {addDataHref ? (
+          <Link
+            href={addDataHref}
+            className="inline-flex h-11 w-full items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--border-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
+          >
+            Add More Data
+          </Link>
         ) : null}
         {order.statusBadge === "Review needed" ||
         order.statusBadge === "Failed" ? (
