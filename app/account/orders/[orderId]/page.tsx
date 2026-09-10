@@ -25,7 +25,7 @@ export const dynamic = "force-dynamic";
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid gap-1 border-b border-[var(--border)] py-3.5 last:border-b-0 sm:grid-cols-[168px_1fr] sm:gap-4">
+    <div className="grid gap-1 border-b border-[var(--border)] py-3 last:border-b-0 sm:grid-cols-[168px_1fr] sm:gap-4">
       <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
         {label}
       </dt>
@@ -116,7 +116,7 @@ export default async function AccountOrderDetailPage({
   const showValidityChip = detail.validity !== "Not available";
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
         <Link
           href="/account/orders"
@@ -125,23 +125,23 @@ export default async function AccountOrderDetailPage({
           ← Back to My eSIMs
         </Link>
 
-        <section className="mt-4 overflow-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_14px_36px_rgba(0,0,0,0.18)]">
-          <div className="border-b border-[var(--border)] bg-[var(--surface-2)]/55 px-5 py-5 sm:px-6">
-            <div className="flex flex-wrap items-start gap-4">
+        <section className="mt-3 overflow-hidden rounded-[22px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_12px_30px_rgba(0,0,0,0.16)]">
+          <div className="border-b border-[var(--border)] bg-[var(--surface-2)]/55 px-4 py-4 sm:px-5">
+            <div className="flex flex-wrap items-start gap-3 sm:gap-4">
               {detail.flagUrl ? (
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] shadow-sm">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] shadow-sm sm:h-14 sm:w-14 sm:rounded-2xl">
                   <Image
                     src={detail.flagUrl}
                     alt=""
                     width={56}
                     height={42}
-                    className="h-9 w-auto object-cover"
+                    className="h-8 w-auto object-cover sm:h-9"
                     unoptimized
                   />
                 </div>
               ) : null}
               <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+                <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-2.5">
                   <h1 className="text-2xl font-bold tracking-tight text-[var(--heading)] sm:text-3xl">
                     {detail.destination}
                   </h1>
@@ -151,20 +151,20 @@ export default async function AccountOrderDetailPage({
                     {customerEsimStatusLabel(detail.statusBadge)}
                   </span>
                 </div>
-                <p className="mt-1.5 text-sm text-[var(--text-muted)]">
+                <p className="mt-1 text-sm text-[var(--text-muted)]">
                   Order {detail.shortReference}
                 </p>
-                <p className="mt-2 text-sm font-medium text-[var(--text)]">
+                <p className="mt-1.5 text-sm font-medium text-[var(--text)]">
                   {detail.planName}
                 </p>
               </div>
-              <p className="shrink-0 text-right text-lg font-bold tabular-nums text-[var(--heading)]">
+              <p className="shrink-0 text-right text-base font-bold tabular-nums text-[var(--heading)] sm:text-lg">
                 {detail.amountLabel}
               </p>
             </div>
 
             {(showDataChip || showValidityChip) && (
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 {showDataChip ? (
                   <span className="inline-flex items-center rounded-xl border border-[var(--accent-strong)]/30 bg-[var(--accent-strong)]/10 px-3 py-1.5 text-sm font-bold text-[var(--heading)]">
                     {detail.dataAllowance}
@@ -179,7 +179,7 @@ export default async function AccountOrderDetailPage({
             )}
           </div>
 
-          <div className="px-5 py-4 sm:px-6">
+          <div className="px-4 py-3 sm:px-5">
             <p className="max-w-2xl text-sm leading-relaxed text-[var(--text-muted)]">
               {customerEsimStatusHelp(detail.statusBadge)}
             </p>
@@ -238,10 +238,10 @@ export default async function AccountOrderDetailPage({
       ) : null}
 
       <section
-        className="overflow-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_10px_28px_rgba(0,0,0,0.14)]"
+        className="overflow-hidden rounded-[22px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_10px_28px_rgba(0,0,0,0.14)]"
         aria-labelledby="plan-details-heading"
       >
-        <div className="border-b border-[var(--border)] bg-[var(--surface-2)]/40 px-5 py-3.5 sm:px-6">
+        <div className="border-b border-[var(--border)] bg-[var(--surface-2)]/40 px-4 py-3 sm:px-5">
           <h2
             id="plan-details-heading"
             className="text-base font-bold text-[var(--heading)]"
@@ -249,7 +249,7 @@ export default async function AccountOrderDetailPage({
             Plan details
           </h2>
         </div>
-        <dl className="px-5 sm:px-6">
+        <dl className="px-4 sm:px-5">
           <DetailRow label="Destination" value={detail.destination} />
           <DetailRow label="Package / offer" value={detail.planName} />
           <DetailRow label="Data allowance" value={detail.dataAllowance} />
@@ -308,21 +308,21 @@ export default async function AccountOrderDetailPage({
       </section>
 
       <section
-        className="overflow-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_10px_28px_rgba(0,0,0,0.14)]"
+        className="overflow-hidden rounded-[22px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_8px_22px_rgba(0,0,0,0.12)]"
         aria-labelledby="iccid-heading"
       >
-        <div className="border-b border-[var(--border)] bg-[var(--surface-2)]/40 px-5 py-3.5 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface-2)]/40 px-4 py-2.5 sm:px-5">
           <h2
             id="iccid-heading"
-            className="text-base font-bold text-[var(--heading)]"
+            className="text-sm font-bold text-[var(--heading)]"
           >
             ICCID
           </h2>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Secure reveal stays on this order only.
+          <p className="text-xs text-[var(--text-soft)]">
+            Secure reveal for this order only
           </p>
         </div>
-        <div className="px-5 py-2 sm:px-6">
+        <div className="px-4 py-1.5 sm:px-5">
           <IccidRevealPanel
             orderId={detail.id}
             maskedLabel={detail.iccidMasked}
@@ -332,33 +332,8 @@ export default async function AccountOrderDetailPage({
         </div>
       </section>
 
-      {detail.addDataEligible ? (
-        <section
-          className="rounded-[24px] border border-[var(--accent-strong)]/45 bg-[var(--accent-strong)]/12 px-5 py-5 shadow-[0_10px_28px_rgba(0,0,0,0.14)] sm:px-6"
-          aria-labelledby="add-more-data-heading"
-        >
-          <h2
-            id="add-more-data-heading"
-            className="text-lg font-bold text-[var(--heading)]"
-          >
-            Need more data?
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--text)]">
-            Add More Data tops up this existing eSIM. A new eSIM is not created
-            — extra data is applied to the same package and ICCID you already
-            have.
-          </p>
-          <Link
-            href={`/account/orders/${encodeURIComponent(detail.id)}/add-data`}
-            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_18px_rgba(0,0,0,0.16)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
-          >
-            Add More Data
-          </Link>
-        </section>
-      ) : null}
-
       <section
-        className="space-y-3"
+        className="space-y-2.5"
         aria-labelledby="usage-section-heading"
       >
         <div>
@@ -368,7 +343,7 @@ export default async function AccountOrderDetailPage({
           >
             Usage
           </h2>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
+          <p className="mt-0.5 text-sm text-[var(--text-muted)]">
             Check remaining data for this eSIM when available.
           </p>
         </div>
@@ -381,7 +356,7 @@ export default async function AccountOrderDetailPage({
       </section>
 
       <section
-        className="space-y-3"
+        className="space-y-2.5 border-t border-[var(--border)] pt-6"
         aria-labelledby="install-section-heading"
       >
         <div>
@@ -391,7 +366,7 @@ export default async function AccountOrderDetailPage({
           >
             Installation
           </h2>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
+          <p className="mt-0.5 text-sm text-[var(--text-muted)]">
             Open QR and install options when this eSIM is ready.
           </p>
         </div>

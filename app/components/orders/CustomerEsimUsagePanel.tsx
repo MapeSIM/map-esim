@@ -240,14 +240,14 @@ export default function CustomerEsimUsagePanel({
       className={
         compact
           ? "min-w-0"
-          : "overflow-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_10px_28px_rgba(0,0,0,0.14)]"
+          : "overflow-hidden rounded-[22px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_10px_28px_rgba(0,0,0,0.14)]"
       }
     >
       <div
         className={
           compact
             ? "flex flex-col gap-2"
-            : "border-b border-[var(--border)] bg-[var(--surface-2)]/45 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6"
+            : "border-b border-[var(--border)] bg-[var(--surface-2)]/45 px-4 py-3.5 sm:flex-row sm:items-start sm:justify-between sm:px-5"
         }
       >
         {compact ? (
@@ -262,7 +262,7 @@ export default function CustomerEsimUsagePanel({
             >
               eSIM Status &amp; Usage
             </h2>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
+            <p className="mt-0.5 text-sm text-[var(--text-muted)]">
               Check activation and data usage when you need it. No automatic
               refresh.
             </p>
@@ -304,7 +304,7 @@ export default function CustomerEsimUsagePanel({
 
       {open ? (
         <div
-          className={compact ? "mt-5 space-y-4" : "space-y-5 px-5 py-5 sm:px-6"}
+          className={compact ? "mt-5 space-y-4" : "space-y-4 px-4 py-4 sm:px-5"}
           aria-live="polite"
         >
           {error ? (
@@ -399,43 +399,43 @@ export default function CustomerEsimUsagePanel({
                   </p>
                 ) : null}
 
-                <div className="rounded-2xl border border-[var(--border)] bg-[var(--page-bg)]/35 p-4 sm:p-5">
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--page-bg)]/35 p-3.5 sm:p-4">
                   {usage.isUnlimited ? (
                     <p className="text-base font-bold text-[var(--heading)]">
                       Unlimited data
                     </p>
                   ) : (
                     <>
-                      <dl className="grid gap-3 sm:grid-cols-3">
-                        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3.5">
-                          <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-                            Used
-                          </dt>
-                          <dd className="mt-1.5 text-lg font-bold tabular-nums text-[var(--heading)]">
-                            {formatGb(usage.usedDataGB)}
-                          </dd>
-                        </div>
+                      <dl className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3">
                         <div
-                          className={`rounded-2xl border px-3.5 py-3.5 ${remainingToneClass(dataHint?.level ?? "ok")}`}
+                          className={`order-1 rounded-2xl border px-3.5 py-3.5 sm:order-2 sm:col-span-1 ${remainingToneClass(dataHint?.level ?? "ok")}`}
                         >
                           <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] opacity-80">
                             Remaining
                           </dt>
-                          <dd className="mt-1.5 text-lg font-bold tabular-nums">
+                          <dd className="mt-1.5 text-2xl font-bold tabular-nums tracking-tight sm:text-[1.65rem]">
                             {formatGb(usage.remainingDataGB)}
                           </dd>
                         </div>
-                        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3.5">
+                        <div className="order-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 sm:order-1">
+                          <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                            Used
+                          </dt>
+                          <dd className="mt-1.5 text-base font-bold tabular-nums text-[var(--heading)] sm:text-lg">
+                            {formatGb(usage.usedDataGB)}
+                          </dd>
+                        </div>
+                        <div className="order-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 sm:order-3">
                           <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
                             Total
                           </dt>
-                          <dd className="mt-1.5 text-lg font-bold tabular-nums text-[var(--heading)]">
+                          <dd className="mt-1.5 text-base font-bold tabular-nums text-[var(--heading)] sm:text-lg">
                             {formatGb(usage.initialDataGB)}
                           </dd>
                         </div>
                       </dl>
                       {barPct !== null ? (
-                        <div className="mt-4">
+                        <div className="mt-3.5">
                           <div className="mb-1.5 flex items-center justify-between text-xs text-[var(--text-soft)]">
                             <span>Usage</span>
                             <span className="tabular-nums font-semibold text-[var(--heading)]">
@@ -467,53 +467,51 @@ export default function CustomerEsimUsagePanel({
                       ) : null}
                     </>
                   )}
+
+                  {addDataHref ? (
+                    <div className="mt-3.5 border-t border-[var(--border)] pt-3.5">
+                      <p className="text-sm text-[var(--text-muted)]">
+                        Need more data on this eSIM? Top up the same package —
+                        a new eSIM is not created.
+                      </p>
+                      <Link
+                        href={addDataHref}
+                        className="mt-2.5 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_16px_rgba(0,0,0,0.14)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
+                      >
+                        Add More Data
+                      </Link>
+                    </div>
+                  ) : null}
                 </div>
 
-                <dl className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/50 px-3.5 py-3.5">
+                <dl className="grid gap-2.5 sm:grid-cols-3 sm:gap-3">
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/50 px-3.5 py-3">
                     <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
                       Activated
                     </dt>
-                    <dd className="mt-1.5 text-sm font-semibold text-[var(--heading)]">
+                    <dd className="mt-1 text-sm font-semibold text-[var(--heading)]">
                       {formatWhen(usage.activatedAt)}
                     </dd>
                   </div>
-                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/50 px-3.5 py-3.5">
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/50 px-3.5 py-3">
                     <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
                       Expires
                     </dt>
-                    <dd className="mt-1.5 text-sm font-semibold text-[var(--heading)]">
+                    <dd className="mt-1 text-sm font-semibold text-[var(--heading)]">
                       {formatWhen(usage.expiresAt)}
                     </dd>
                   </div>
-                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/50 px-3.5 py-3.5">
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/50 px-3.5 py-3">
                     <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
                       Days remaining
                     </dt>
-                    <dd className="mt-1.5 text-sm font-semibold text-[var(--heading)]">
+                    <dd className="mt-1 text-sm font-semibold text-[var(--heading)]">
                       {usage.daysRemaining !== null
                         ? `${usage.daysRemaining}`
                         : "—"}
                     </dd>
                   </div>
                 </dl>
-
-                {addDataHref ? (
-                  <div className="rounded-2xl border border-[var(--accent-strong)]/40 bg-[var(--accent-strong)]/10 px-4 py-4">
-                    <p className="text-sm font-semibold text-[var(--heading)]">
-                      Need more data on this eSIM?
-                    </p>
-                    <p className="mt-1 text-sm text-[var(--text-muted)]">
-                      Top up the same eSIM — a new eSIM is not created.
-                    </p>
-                    <Link
-                      href={addDataHref}
-                      className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_16px_rgba(0,0,0,0.14)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
-                    >
-                      Add More Data
-                    </Link>
-                  </div>
-                ) : null}
               </>
             )
           ) : null}

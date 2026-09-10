@@ -229,8 +229,10 @@ function main() {
   assert.match(orderCard, /\$\{encodeURIComponent\(order\.id\)\}/);
   assert.doesNotMatch(orderCard, /rechargeOrderId/);
   assert.match(detailPage, /addDataEligible/);
-  assert.match(detailPage, /Add More Data/);
-  assert.match(
+  // Add More Data lives in Usage panel only (no duplicate detail-page CTA).
+  assert.doesNotMatch(detailPage, /Need more data\?/);
+  assert.doesNotMatch(detailPage, /add-more-data-heading/);
+  assert.doesNotMatch(
     detailPage,
     /\$\{encodeURIComponent\(detail\.id\)\}\/add-data/
   );
