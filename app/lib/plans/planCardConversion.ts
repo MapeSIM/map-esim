@@ -3,12 +3,6 @@
  * Does not change retail prices, offer IDs, or checkout targets.
  */
 
-export const PLAN_CARD_BENEFITS = [
-  "Digital eSIM",
-  "Keep your SIM",
-  "QR after purchase",
-] as const;
-
 export const PLAN_CARD_RECOMMENDED_LABEL = "Recommended";
 
 /** Guest / signed-out Buy Now helper. */

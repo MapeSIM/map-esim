@@ -42,7 +42,7 @@ import {
   type PlanTypeFilter,
   type SortOption,
 } from "@/app/lib/plans/plan-utils";
-import { PLAN_CARD_BENEFITS, planPurchaseTrustLine } from "@/app/lib/plans/planCardConversion";
+import { planPurchaseTrustLine } from "@/app/lib/plans/planCardConversion";
 import {
   planCardLineLabel,
   planCardSecondaryLines,
@@ -767,21 +767,6 @@ export default function PlansListing({
                             </div>
 
                             <div className="mt-auto space-y-2.5 pt-5">
-                              <ul className="flex flex-wrap gap-1.5" aria-label="Plan benefits">
-                                {PLAN_CARD_BENEFITS.map((benefit) => (
-                                  <li
-                                    key={benefit}
-                                    className="
-                                      rounded-full border border-[var(--border)]
-                                      bg-[var(--surface-2)] px-2.5 py-1
-                                      text-[11px] font-medium leading-none
-                                      text-[var(--text-muted)] sm:text-xs
-                                    "
-                                  >
-                                    {benefit}
-                                  </li>
-                                ))}
-                              </ul>
                               {/*
                                 Mobile (1-col): Buy Now first, Plan Details second.
                                 Wider (≥400px 2-col): Details left, Buy Now right.

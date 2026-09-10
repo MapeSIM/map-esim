@@ -6,7 +6,6 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  PLAN_CARD_BENEFITS,
   PLAN_CARD_RECOMMENDED_LABEL,
   PLAN_PURCHASE_TRUST_LINE,
   PLAN_PURCHASE_TRUST_LINE_AUTHENTICATED,
@@ -26,11 +25,6 @@ function read(rel: string): string {
 
 function main() {
   assert.equal(PLAN_CARD_RECOMMENDED_LABEL, "Recommended");
-  assert.deepEqual([...PLAN_CARD_BENEFITS], [
-    "Digital eSIM",
-    "Keep your SIM",
-    "QR after purchase",
-  ]);
   assert.equal(
     PLAN_PURCHASE_TRUST_LINE_GUEST,
     "Sign in to buy. QR and install details arrive after purchase."
@@ -71,9 +65,12 @@ function main() {
   assert.match(listing, /planPurchaseTrustLine/);
   assert.match(listing, /purchaseTrustLine/);
   assert.match(listing, /setSignedIn/);
-  // Sprint B1.4 Phase 2: controlled benefits micro-row (existing constant only).
-  assert.match(listing, /PLAN_CARD_BENEFITS/);
-  assert.match(listing, /aria-label="Plan benefits"/);
+  // Plan benefit chips removed (Digital eSIM / Keep your SIM / QR after purchase).
+  assert.doesNotMatch(conversion, /PLAN_CARD_BENEFITS/);
+  assert.doesNotMatch(listing, /PLAN_CARD_BENEFITS/);
+  assert.doesNotMatch(listing, /aria-label="Plan benefits"/);
+  assert.doesNotMatch(listing, /Digital eSIM|Keep your SIM|QR after purchase/);
+  assert.doesNotMatch(conversion, /Digital eSIM|Keep your SIM|QR after purchase/);
   assert.match(listing, /formatValidityCardValue/);
   assert.match(listing, /text-xs leading-snug text-\[var\(--text-muted\)\]/);
   // Sprint B1.4: mobile Buy Now first via order utilities.

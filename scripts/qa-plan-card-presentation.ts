@@ -28,7 +28,6 @@ import {
   planDetailPackageInfo,
 } from "../app/lib/plans/planOfferPresentation";
 import type { VesimOffer } from "../app/lib/vesim/offers";
-import { PLAN_CARD_BENEFITS } from "../app/lib/plans/planCardConversion";
 
 const root = join(__dirname, "..");
 
@@ -132,13 +131,13 @@ function main() {
   );
   assert.match(listing, /min-h-\[220px\]/);
   assert.match(listing, /mt-auto/);
-  assert.match(listing, /PLAN_CARD_BENEFITS/);
-  assert.match(cardSource, /Plan benefits|aria-label="Plan benefits"/);
-  assert.deepEqual([...PLAN_CARD_BENEFITS], [
-    "Digital eSIM",
-    "Keep your SIM",
-    "QR after purchase",
-  ]);
+  assert.doesNotMatch(listing, /PLAN_CARD_BENEFITS/);
+  assert.doesNotMatch(cardSource, /Plan benefits|aria-label="Plan benefits"/);
+  assert.doesNotMatch(cardSource, /Digital eSIM|Keep your SIM|QR after purchase/);
+  assert.doesNotMatch(
+    read("app/lib/plans/planCardConversion.ts"),
+    /PLAN_CARD_BENEFITS|Digital eSIM|Keep your SIM|QR after purchase/
+  );
   assert.doesNotMatch(cardSource, /PLAN_CARD_RECOMMENDED_LABEL|Recommended/);
   assert.match(listing, /formatValidityCardValue/);
   assert.match(cardSource, /break-words/);
