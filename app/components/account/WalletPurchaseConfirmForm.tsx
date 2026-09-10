@@ -22,6 +22,7 @@ import {
   initialWalletPurchaseState,
   type WalletPurchaseActionState,
 } from "@/app/lib/esim/walletPurchaseFormState";
+import { CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE } from "@/app/lib/payments/customerPaymentCheckoutPolicy";
 import type { CustomerEsimPaymentMode } from "@/app/lib/esim/walletPurchaseValidation";
 import { useWalletFromPaymentMode } from "@/app/lib/esim/walletPurchaseValidation";
 import type { WalletPurchaseReview } from "@/app/lib/esim/walletPurchaseRead";
@@ -196,7 +197,8 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
   const purchaseBlocked = busy || deliveryBlocksPurchase;
   const alertError =
     errorState.ok === false && errorState.error
-      ? errorState.error === CARD_PAYMENT_UNAVAILABLE_MESSAGE
+      ? errorState.error === CARD_PAYMENT_UNAVAILABLE_MESSAGE ||
+        errorState.error === CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE
         ? null
         : errorState.fieldErrors?.walletOperatorId ||
             errorState.fieldErrors?.customerMsisdn ||
@@ -598,10 +600,12 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               ) : showGatewayUnavailable ? (
                 <>
                   <p
-                    className="mt-1 text-sm text-[var(--text-muted)]"
+                    className="mt-1 text-sm font-medium text-[var(--heading)]"
                     role="status"
                   >
-                    {CARD_PAYMENT_UNAVAILABLE_MESSAGE}
+                    {review.customerPaymentsTemporarilyUnavailable
+                      ? CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE
+                      : CARD_PAYMENT_UNAVAILABLE_MESSAGE}
                   </p>
                   <p className="mt-3 text-sm text-[var(--text-muted)]">
                     Remaining due:{" "}

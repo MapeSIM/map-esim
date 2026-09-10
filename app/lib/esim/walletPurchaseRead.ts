@@ -25,6 +25,7 @@ import {
 } from "@/app/lib/esim/esimDeliveryEmail";
 import { isPurchaseDeliveryEmailLocked } from "@/app/lib/esim/esimDeliveryEmailState";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
+import { isCustomerPaymentCheckoutDisabled } from "@/app/lib/payments/customerPaymentCheckoutPolicy";
 import { parsePaymentGatewayProvider } from "@/app/lib/payments/gatewaySelect";
 import { formatUsdCents } from "@/app/lib/wallet/display";
 import { pointsNeededToUnlockRewards } from "@/app/lib/rewards/rewardConstants";
@@ -37,6 +38,7 @@ function displayOrUnavailable(value: string | null | undefined): string {
 
 function resolveActivePaymentProviderLabel(): "SAFEPAY" | "SIMPAISA" | null {
   if (!isPaymentGatewayConfigured()) return null;
+  if (isCustomerPaymentCheckoutDisabled()) return null;
   const selected = parsePaymentGatewayProvider(
     process.env.PAYMENT_GATEWAY_PROVIDER
   );
@@ -82,6 +84,8 @@ export type WalletPurchaseReview = {
   gatewayAmountLabel: string;
   fundingLabel: "Wallet" | "Wallet + mobile payment" | "Mobile payment" | "Wallet + card" | "Card";
   paymentGatewayConfigured: boolean;
+  /** True when customer gateway initiation is temporarily kill-switched. */
+  customerPaymentsTemporarilyUnavailable: boolean;
   /** Active hosted-checkout provider when configured; drives Simpaisa wallet fields. */
   activePaymentProvider: "SAFEPAY" | "SIMPAISA" | null;
   idempotencyKey: string;
@@ -261,7 +265,9 @@ export async function getWalletPurchaseReview(
     gatewayAmountCents: displayFunding.gatewayAmountCents,
     gatewayAmountLabel: formatUsdCents(displayFunding.gatewayAmountCents),
     fundingLabel,
-    paymentGatewayConfigured: isPaymentGatewayConfigured(),
+    paymentGatewayConfigured:
+      isPaymentGatewayConfigured() && !isCustomerPaymentCheckoutDisabled(),
+    customerPaymentsTemporarilyUnavailable: isCustomerPaymentCheckoutDisabled(),
     activePaymentProvider,
     idempotencyKey: row.idempotencyKey,
     status: row.status,

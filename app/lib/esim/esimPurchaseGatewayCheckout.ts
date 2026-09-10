@@ -33,6 +33,10 @@ import {
   isPaymentGatewayConfigured,
 } from "@/app/lib/payments/disabledAdapter";
 import {
+  CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE,
+  isCustomerPaymentCheckoutDisabled,
+} from "@/app/lib/payments/customerPaymentCheckoutPolicy";
+import {
   esimPurchasePaymentCancelPath,
   esimPurchasePaymentReturnPath,
 } from "@/app/lib/payments/safepayCheckoutPaths";
@@ -180,6 +184,12 @@ export async function startEsimPurchaseHostedCheckout(
     throw new EsimPurchaseGatewayCheckoutError(
       "GATEWAY_UNAVAILABLE",
       CARD_PAYMENT_UNAVAILABLE_MESSAGE
+    );
+  }
+  if (isCustomerPaymentCheckoutDisabled()) {
+    throw new EsimPurchaseGatewayCheckoutError(
+      "GATEWAY_UNAVAILABLE",
+      CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE
     );
   }
 

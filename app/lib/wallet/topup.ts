@@ -15,6 +15,10 @@ import type {
   PaymentGatewayProviderName,
 } from "@/app/lib/payments/adapter";
 import { getActivePaymentAdapter } from "@/app/lib/payments/disabledAdapter";
+import {
+  CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE,
+  isCustomerPaymentCheckoutDisabled,
+} from "@/app/lib/payments/customerPaymentCheckoutPolicy";
 import { resumeSafepayHostedCheckout } from "@/app/lib/payments/safepayAdapter";
 import {
   WALLET_TOPUP_MAX_CENTS,
@@ -167,6 +171,13 @@ async function assertCustomerMayStartTopup(customerUserId: string) {
 export async function createWalletTopupDraft(
   input: CreateWalletTopupDraftInput
 ): Promise<CreateWalletTopupDraftResult> {
+  if (isCustomerPaymentCheckoutDisabled()) {
+    throw new WalletTopupError(
+      "GATEWAY_UNAVAILABLE",
+      CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE
+    );
+  }
+
   const customerUserId = input.customerUserId.trim();
   const idempotencyKey = input.checkoutIdempotencyKey.trim();
   const creditAmountCents = input.creditAmountCents;
@@ -364,6 +375,13 @@ export async function startWalletTopupCheckout(options: {
   customerUserId: string;
   topupId: string;
 }): Promise<StartWalletTopupCheckoutResult> {
+  if (isCustomerPaymentCheckoutDisabled()) {
+    throw new WalletTopupError(
+      "GATEWAY_UNAVAILABLE",
+      CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE
+    );
+  }
+
   const customerUserId = options.customerUserId.trim();
   const topupId = options.topupId.trim();
   await assertActiveCustomer(customerUserId);

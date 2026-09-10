@@ -2,6 +2,10 @@ import Link from "next/link";
 import { requireRole } from "@/app/lib/auth/session";
 import { getCustomerWalletSummary } from "@/app/lib/wallet/read";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
+import {
+  CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE,
+  isCustomerPaymentCheckoutDisabled,
+} from "@/app/lib/payments/customerPaymentCheckoutPolicy";
 import WalletTopupForm from "@/app/components/account/WalletTopupForm";
 
 export const dynamic = "force-dynamic";
@@ -58,7 +62,12 @@ export default async function AccountWalletTopUpPage() {
     );
   }
 
-  const gatewayReady = isPaymentGatewayConfigured();
+  const paymentsTemporarilyUnavailable = isCustomerPaymentCheckoutDisabled();
+  const gatewayReady =
+    isPaymentGatewayConfigured() && !paymentsTemporarilyUnavailable;
+  const unavailableMessage = paymentsTemporarilyUnavailable
+    ? CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE
+    : GATEWAY_UNAVAILABLE;
 
   return (
     <div className="space-y-8">
@@ -73,7 +82,9 @@ export default async function AccountWalletTopUpPage() {
         <p className="mt-2 text-sm text-[var(--text-muted)]">
           {gatewayReady
             ? "Choose how much USD credit to add to your MAP eSIM wallet."
-            : "Self-serve wallet funding is paused until the payment provider is ready."}
+            : paymentsTemporarilyUnavailable
+              ? CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE
+              : "Self-serve wallet funding is paused until the payment provider is ready."}
         </p>
       </header>
 
@@ -88,7 +99,7 @@ export default async function AccountWalletTopUpPage() {
           role="status"
         >
           <p className="text-sm font-medium text-[var(--heading)]">
-            {GATEWAY_UNAVAILABLE}
+            {unavailableMessage}
           </p>
           <p className="text-sm text-[var(--text-muted)]">
             Current balance:{" "}

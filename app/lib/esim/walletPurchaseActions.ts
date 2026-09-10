@@ -37,6 +37,10 @@ import {
   type AdminOfferOption,
 } from "@/app/lib/esim/adminPackageAssignmentRead";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
+import {
+  CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE,
+  isCustomerPaymentCheckoutDisabled,
+} from "@/app/lib/payments/customerPaymentCheckoutPolicy";
 import { parsePaymentGatewayProvider } from "@/app/lib/payments/gatewaySelect";
 import { parseSimpaisaWalletCheckoutFields } from "@/app/lib/payments/simpaisaPkrQuote";
 import {
@@ -346,6 +350,12 @@ export async function confirmWalletEsimPurchaseAction(
 
   if (funding) {
     if (funding.gatewayAmountCents > 0) {
+      if (isCustomerPaymentCheckoutDisabled()) {
+        return {
+          ok: false,
+          error: CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE,
+        };
+      }
       if (!isPaymentGatewayConfigured()) {
         return { ok: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE };
       }
@@ -365,31 +375,34 @@ export async function confirmWalletEsimPurchaseAction(
   } else {
     // READY funding persist failed (likely AWAITING_GATEWAY_PAYMENT).
     // Attempt gateway resume when gateway payment is still required.
-    let resumeInvalidState = false;
-    let checkout: Awaited<
-      ReturnType<typeof startEsimPurchaseHostedCheckout>
-    > | null = null;
-    if (!isPaymentGatewayConfigured()) {
-      return { ok: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE };
-    }
-    const started = await startHostedCheckout();
-    if (!started.ok) {
-      if (started.code === "INVALID_STATE" && !started.fieldErrors) {
-        // May be full-wallet after funding change while awaiting — fall through.
-        resumeInvalidState = true;
-      } else {
-        return {
-          ok: false,
-          error: started.error,
-          fieldErrors: started.fieldErrors,
-        };
+    // Kill switch: skip resume only — still allow full-wallet fallthrough below.
+    if (!isCustomerPaymentCheckoutDisabled()) {
+      let resumeInvalidState = false;
+      let checkout: Awaited<
+        ReturnType<typeof startEsimPurchaseHostedCheckout>
+      > | null = null;
+      if (!isPaymentGatewayConfigured()) {
+        return { ok: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE };
       }
-    } else {
-      checkout = started.checkout;
-    }
-    if (!resumeInvalidState && checkout) {
-      // Must stay outside try/catch — redirect() throws NEXT_REDIRECT.
-      redirect(checkout.checkoutUrl);
+      const started = await startHostedCheckout();
+      if (!started.ok) {
+        if (started.code === "INVALID_STATE" && !started.fieldErrors) {
+          // May be full-wallet after funding change while awaiting — fall through.
+          resumeInvalidState = true;
+        } else {
+          return {
+            ok: false,
+            error: started.error,
+            fieldErrors: started.fieldErrors,
+          };
+        }
+      } else {
+        checkout = started.checkout;
+      }
+      if (!resumeInvalidState && checkout) {
+        // Must stay outside try/catch — redirect() throws NEXT_REDIRECT.
+        redirect(checkout.checkoutUrl);
+      }
     }
   }
   // Full wallet coverage only — existing secure confirm path.

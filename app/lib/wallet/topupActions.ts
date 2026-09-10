@@ -14,9 +14,30 @@ import {
 } from "@/app/lib/wallet/topup";
 import { browserReturnMustNotCreditWallet } from "@/app/lib/wallet/topupConstants";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
+import {
+  CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE,
+  isCustomerPaymentCheckoutDisabled,
+} from "@/app/lib/payments/customerPaymentCheckoutPolicy";
 
 function detailPath(topupId: string): string {
   return `/account/wallet/top-up/${encodeURIComponent(topupId)}`;
+}
+
+function customerPaymentBlockedState(): WalletTopupActionState {
+  if (isCustomerPaymentCheckoutDisabled()) {
+    return {
+      ok: false,
+      error: CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE,
+    };
+  }
+  if (!isPaymentGatewayConfigured()) {
+    return {
+      ok: false,
+      error:
+        "Adding funds online is not available yet. Payment provider setup is still in progress.",
+    };
+  }
+  return { ok: true };
 }
 
 export async function createWalletTopupDraftAction(
@@ -34,13 +55,8 @@ export async function createWalletTopupDraftAction(
   void formData.get("fxRate");
   browserReturnMustNotCreditWallet();
 
-  if (!isPaymentGatewayConfigured()) {
-    return {
-      ok: false,
-      error:
-        "Adding funds online is not available yet. Payment provider setup is still in progress.",
-    };
-  }
+  const blocked = customerPaymentBlockedState();
+  if (!blocked.ok) return blocked;
 
   const amountParsed = parseTopupUsdAmountToCents(formData.get("amount"));
   const idempotencyParsed = parseTopupCheckoutIdempotencyKey(
@@ -97,13 +113,8 @@ export async function startWalletTopupCheckoutAction(
   void formData.get("gatewayStatus");
   browserReturnMustNotCreditWallet();
 
-  if (!isPaymentGatewayConfigured()) {
-    return {
-      ok: false,
-      error:
-        "Adding funds online is not available yet. Payment provider setup is still in progress.",
-    };
-  }
+  const blocked = customerPaymentBlockedState();
+  if (!blocked.ok) return blocked;
 
   if (!topupId || topupId.length > 64) {
     return { ok: false, error: "This top-up is unavailable." };
