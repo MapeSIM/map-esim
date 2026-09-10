@@ -11,11 +11,18 @@ import {
 } from "@/app/lib/esim/adminWalletPurchaseValidation";
 import { listAdminWalletBuyOffers } from "@/app/lib/esim/adminWalletPurchaseRead";
 import {
+  buildAddDataIdempotencyKey,
+  normalizeAddDataFromOrderId,
+  resolveOwnedRechargeOrderId,
+} from "@/app/lib/esim/addDataCheckout";
+import {
   WalletEsimPurchaseError,
   confirmWalletEsimPurchase,
   prepareWalletEsimPurchase,
 } from "@/app/lib/esim/walletPurchase";
+import { getAdminOrderDetail } from "@/app/lib/admin/orders";
 import {
+  extractCountryHintFromOfferId,
   normalizeOfferId,
   sanitizeCountryHint,
 } from "@/app/lib/vesim/server";
@@ -241,4 +248,126 @@ export async function confirmAdminWalletPurchaseAction(
   }
 
   redirect(successPath(customerUserId, result.purchaseId));
+}
+
+/**
+ * Admin-assisted Add More Data: local order id only from the browser.
+ * Resolves customer + VeSIM providerOrderId server-side, then prepares an
+ * assisted wallet purchase with an adddata_ idempotency key and redirects to
+ * the existing wallet-buy review/confirm flow.
+ */
+export async function startAdminAddDataCheckoutAction(
+  _prev: AdminWalletPurchaseActionState,
+  formData: FormData
+): Promise<AdminWalletPurchaseActionState> {
+  const admin = await requireRole("ADMIN");
+
+  const localOrderId = normalizeAddDataFromOrderId(formData.get("orderId"));
+  const reasonParsed = parseAssistedWalletPurchaseReason(formData.get("reason"));
+
+  // Never trust browser-supplied ownership or VeSIM bind fields.
+  void formData.get("rechargeOrderId");
+  void formData.get("providerOrderId");
+  void formData.get("customerUserId");
+  void formData.get("offerId");
+  void formData.get("price");
+  void formData.get("priceUSD");
+
+  if (!localOrderId) {
+    return { ok: false, error: "Order is unavailable." };
+  }
+  if (!reasonParsed.ok) {
+    return {
+      ok: false,
+      fieldErrors: { reason: reasonParsed.error },
+      error: reasonParsed.error,
+    };
+  }
+
+  let detail: Awaited<ReturnType<typeof getAdminOrderDetail>>;
+  try {
+    detail = await getAdminOrderDetail(localOrderId);
+  } catch {
+    return {
+      ok: false,
+      error: "Add More Data is temporarily unavailable. Please try again.",
+    };
+  }
+
+  if (!detail || !detail.addDataEligible) {
+    return {
+      ok: false,
+      error: "Add More Data is not available for this eSIM.",
+    };
+  }
+
+  const customerUserId = (detail.customerUserId ?? "").trim();
+  if (!customerUserId || customerUserId.length > 64) {
+    return {
+      ok: false,
+      error: "A linked customer account is required for Add More Data.",
+    };
+  }
+
+  const rateBlocked = enforceAssistedRateLimits(admin.id, customerUserId);
+  if (rateBlocked) return rateBlocked;
+
+  const rechargeOrderId = await resolveOwnedRechargeOrderId({
+    customerUserId,
+    localOrderId,
+  });
+  if (!rechargeOrderId) {
+    return {
+      ok: false,
+      error: "Add More Data is not available for this eSIM.",
+    };
+  }
+
+  const offerId = normalizeOfferId(detail.addDataOfferId);
+  const countryHint =
+    sanitizeCountryHint(detail.destinationCode) ||
+    (offerId ? extractCountryHintFromOfferId(offerId) : null);
+  if (!offerId) {
+    return {
+      ok: false,
+      error: "Add More Data is not available for this eSIM.",
+    };
+  }
+  if (!countryHint) {
+    return {
+      ok: false,
+      error: "Destination is unavailable for this eSIM top-up.",
+    };
+  }
+
+  let result;
+  try {
+    result = await prepareWalletEsimPurchase({
+      customerUserId,
+      offerId,
+      countryHint,
+      idempotencyKey: buildAddDataIdempotencyKey(localOrderId),
+      assistedBy: {
+        adminUserId: admin.id,
+        reason: reasonParsed.value,
+      },
+    });
+  } catch (error) {
+    if (error instanceof WalletEsimPurchaseError) {
+      if (error.code === "OFFER_UNAVAILABLE") {
+        return {
+          ok: false,
+          fieldErrors: { offerId: error.message },
+          error: error.message,
+        };
+      }
+      return { ok: false, error: error.message };
+    }
+    return {
+      ok: false,
+      error: "Assisted Add More Data is temporarily unavailable.",
+    };
+  }
+
+  redirect(reviewPath(customerUserId, result.purchaseId));
 }

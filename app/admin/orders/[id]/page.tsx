@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import AdminAddDataForm from "@/app/components/admin/AdminAddDataForm";
 import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
 import AdminEsimUsagePanel from "@/app/components/orders/AdminEsimUsagePanel";
 import { getAdminOrderDetail } from "@/app/lib/admin/orders";
@@ -101,7 +102,27 @@ export default async function AdminOrderDetailPage({
         />
       </dl>
 
-      <AdminEsimUsagePanel orderId={detail.id} />
+      <section className="space-y-3" aria-labelledby="admin-usage-heading">
+        <div className="sr-only">
+          <h2 id="admin-usage-heading">Usage</h2>
+        </div>
+        <AdminEsimUsagePanel orderId={detail.id} />
+        {detail.addDataEligible ? (
+          <div className="rounded-2xl border border-[var(--accent-strong)]/40 bg-[var(--accent-strong)]/10 px-4 py-4 sm:px-5">
+            <p className="text-sm font-semibold text-[var(--heading)]">
+              Add More Data
+            </p>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Tops up this existing eSIM with the same package using the
+              customer wallet. A new eSIM is not created. Continues to the
+              assisted wallet purchase review.
+            </p>
+            <div className="mt-3">
+              <AdminAddDataForm orderId={detail.id} />
+            </div>
+          </div>
+        ) : null}
+      </section>
     </div>
   );
 }

@@ -16,6 +16,13 @@ import {
   type AdminOrderStatusFilter,
 } from "@/app/lib/admin/display";
 import { prisma } from "@/app/lib/db";
+import { resolveCustomerEsimStatusBadge } from "@/app/lib/orders/customerOrderDisplay";
+import {
+  buildAddDataEligibility,
+  lookupOfferTopUpFromCatalog,
+  type CustomerAddDataBlockedReason,
+} from "@/app/lib/orders/customerOrders";
+import { normalizeOfferId } from "@/app/lib/vesim/server";
 
 export type AdminOrderListRow = {
   id: string;
@@ -66,6 +73,23 @@ export type AdminOrderDetail = {
   iccidHint: string;
   /** True only when encrypted ICCID is stored (never includes ciphertext). */
   iccidRevealable: boolean;
+  /** Linked customer user id when present; null for guest orders. */
+  customerUserId: string | null;
+  /**
+   * VeSIM provider order id for Add More Data bind (never MAP local id).
+   * Required internally for eligibility / future admin recharge — not for UI display.
+   */
+  providerOrderId: string | null;
+  /** Same gates as customer Add More Data eligibility. */
+  addDataEligible: boolean;
+  addDataBlockedReason: CustomerAddDataBlockedReason | null;
+  /**
+   * Normalized offer id for Add More Data prepare (server-side only).
+   * Null when missing — never trust browser offerId.
+   */
+  addDataOfferId: string | null;
+  /** Destination code for catalog/checkout country hint (server-side only). */
+  destinationCode: string | null;
 };
 
 function adminIccidDisplay(
@@ -318,6 +342,20 @@ export async function getAdminOrderDetail(
           role: true,
         },
       },
+      walletEsimPurchase: {
+        select: {
+          status: true,
+          offerId: true,
+          destinationCode: true,
+        },
+      },
+      adminPackageAssignment: {
+        select: {
+          status: true,
+          offerId: true,
+          destinationCode: true,
+        },
+      },
     },
   });
 
@@ -337,6 +375,37 @@ export async function getAdminOrderDetail(
   // Never decrypt or emit ICCID ciphertext/plaintext on this page.
   const iccidHint = adminIccidDisplay(row.iccidLast4, row.status);
   const iccidRevealable = Boolean(row.iccidEncrypted?.trim());
+
+  const statusBadge = resolveCustomerEsimStatusBadge({
+    orderStatus: row.status,
+    walletPurchaseStatus: row.walletEsimPurchase?.status,
+    assignmentStatus: row.adminPackageAssignment?.status,
+  });
+  const isRefunded = statusBadge === "Refunded";
+  const installEligible =
+    row.status === OrderStatus.COMPLETED && statusBadge === "Completed";
+  const offerIdForEligibility =
+    normalizeOfferId(row.offerId) ||
+    normalizeOfferId(row.walletEsimPurchase?.offerId) ||
+    normalizeOfferId(row.adminPackageAssignment?.offerId) ||
+    null;
+  const providerOrderId = (row.providerOrderId ?? "").trim() || null;
+  const destinationCode =
+    row.walletEsimPurchase?.destinationCode ||
+    row.adminPackageAssignment?.destinationCode ||
+    null;
+  const catalog = await lookupOfferTopUpFromCatalog(
+    offerIdForEligibility,
+    destinationCode,
+    new Map()
+  );
+  const addData = buildAddDataEligibility({
+    providerOrderId,
+    offerId: offerIdForEligibility,
+    isRefunded,
+    installEligible,
+    catalog,
+  });
 
   return {
     id: row.id,
@@ -359,6 +428,12 @@ export async function getAdminOrderDetail(
       : "Not available",
     iccidHint,
     iccidRevealable,
+    customerUserId: row.userId ?? null,
+    providerOrderId,
+    addDataEligible: addData.addDataEligible,
+    addDataBlockedReason: addData.addDataBlockedReason,
+    addDataOfferId: offerIdForEligibility,
+    destinationCode: (destinationCode ?? "").trim() || null,
   };
 }
 

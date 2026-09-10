@@ -112,7 +112,7 @@ function resolveCatalogCountryHint(
  * Public browse catalog only (snapshot / cached lists). Soft-fails — never throws to callers.
  * Not used for purchase validation or pricing.
  */
-async function lookupOfferTopUpFromCatalog(
+export async function lookupOfferTopUpFromCatalog(
   offerIdRaw: string | null | undefined,
   destinationCode: string | null | undefined,
   catalogCache: Map<string, VesimOffer[] | null>
@@ -158,7 +158,7 @@ async function lookupOfferTopUpFromCatalog(
   };
 }
 
-function buildAddDataEligibility(input: {
+export function buildAddDataEligibility(input: {
   providerOrderId: string | null;
   offerId: string | null;
   isRefunded: boolean;
