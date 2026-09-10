@@ -32,13 +32,15 @@ function main() {
   assert.match(confirm, /Online payment/);
   assert.match(confirm, /Order summary/);
   assert.match(confirm, /Buy eSIM with Wallet/);
-  assert.match(confirm, /Continue to payment|Continue with JazzCash/);
+  assert.match(confirm, /Continue to Payment/);
+  assert.match(confirm, /isFullWalletMode|primaryCtaLabel/);
+  assert.match(confirm, /confirmCheckboxText|confirmNoteText/);
   assert.match(confirm, /confirmWalletEsimPurchaseAction/);
   assert.match(confirm, /setWalletPurchaseFundingChoiceAction/);
   // Sprint A: Pay CTA above trust; mobile sticky pay bar (lg:hidden).
   assert.match(
     confirm,
-    /Continue to payment[\s\S]*?CheckoutTrustPanel|Continue with JazzCash[\s\S]*?CheckoutTrustPanel|Buy eSIM with Wallet[\s\S]*?CheckoutTrustPanel/
+    /Continue to Payment[\s\S]*?CheckoutTrustPanel|Buy eSIM with Wallet[\s\S]*?CheckoutTrustPanel/
   );
   assert.match(confirm, /aria-label="Checkout payment action"/);
   assert.match(confirm, /fixed inset-x-0 bottom-0[\s\S]*?lg:hidden/);
@@ -47,7 +49,9 @@ function main() {
   assert.match(confirm, /stickyDisabledReason/);
   assert.match(confirm, /dueLabel/);
   assert.match(confirm, /"Covered"/);
-  assert.match(confirm, /Continue with JazzCash \/ Easypaisa/);
+  // Mode option labels may mention JazzCash/Easypaisa; CTA is mode-based "Continue to Payment".
+  assert.match(confirm, /JazzCash \/ Easypaisa/);
+  assert.doesNotMatch(confirm, /Continue with JazzCash \/ Easypaisa/);
   // Mobile P0: early amount-due summary + sticky confirm (no vague "confirm above").
   assert.match(confirm, /checkout-mobile-due-summary/);
   assert.match(confirm, /Amount due/);

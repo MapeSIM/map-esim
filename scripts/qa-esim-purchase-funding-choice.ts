@@ -253,7 +253,8 @@ function main() {
   assert.match(confirmForm, /Online payment|Payment/);
   assert.match(confirmForm, /CARD_PAYMENT_UNAVAILABLE_MESSAGE/);
   assert.match(confirmForm, /Continue to Payment/);
-  assert.match(confirmForm, /Continue to payment|Continue with JazzCash/);
+  assert.match(confirmForm, /primaryCtaLabel|isFullWalletMode/);
+  assert.doesNotMatch(confirmForm, /Continue with JazzCash \/ Easypaisa/);
   assert.match(confirmForm, /paymentGatewayConfigured/);
   assert.match(confirmForm, /gatewayReady/);
   assert.doesNotMatch(confirmForm, /partialWalletSplit/);
@@ -268,6 +269,11 @@ function main() {
   // Simpaisa checkout intentionally names JazzCash / Easypaisa in helper copy.
   assert.match(confirmForm, /JazzCash|Easypaisa/);
   assert.match(confirmForm, /showFullWalletOption|showOnlinePaymentOption/);
+  assert.match(confirmForm, /showWalletAndOnlineOption = canWalletAndMobile/);
+  assert.doesNotMatch(
+    confirmForm,
+    /showWalletAndOnlineOption =\s*hasWalletBalance && \(canWalletAndMobile \|\| canFullWallet\)/
+  );
   assert.match(confirmForm, /hasWalletBalance/);
   assert.doesNotMatch(confirmForm, /How do you want to pay\?/);
   assert.doesNotMatch(confirmForm, /Mobile payment only/);

@@ -172,6 +172,21 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
   const walletFundsApplied = preview.walletAppliedCents > 0;
   const fullWallet = !gatewayRequired && walletFundsApplied;
   const zeroCashConfirm = !gatewayRequired;
+  // Display-only: confirmation + CTA copy follows selected payment mode.
+  const isFullWalletMode = paymentMode === "full_wallet";
+  const confirmNoteText = isFullWalletMode
+    ? "Confirm below to complete this purchase with your wallet."
+    : "Confirm below to continue to online payment.";
+  const confirmCheckboxText = isFullWalletMode
+    ? "I confirm this wallet purchase."
+    : "I confirm this purchase and will continue to payment.";
+  const primaryCtaLabel = isFullWalletMode
+    ? "Buy eSIM with Wallet"
+    : "Continue to Payment";
+  const primaryCtaPendingLabel = isFullWalletMode
+    ? "Buying with wallet…"
+    : "Starting payment…";
+  const stickyCtaPendingLabel = isFullWalletMode ? "Buying…" : "Starting…";
   const rewardsDisabled = !review.rewardEligible;
   const walletDisabled = review.balanceCents <= 0;
   const hasWalletBalance = !walletDisabled;
@@ -196,12 +211,11 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
     review.balanceCents > 0 &&
     review.balanceCents < cashPayablePreview;
   // UI visibility only (funding math unchanged):
-  // - Wallet balance available → show Full wallet (when enough), Wallet + online,
-  //   and Online payment (JazzCash / Easypaisa).
-  // - No wallet balance → hide wallet options; Online payment only.
+  // - Balance >= payable → Full wallet + Online (no Wallet + online).
+  // - 0 < balance < payable → Wallet + online + Online (Full wallet only if canFullWallet).
+  // - Balance = 0 → Online payment only.
   const showFullWalletOption = hasWalletBalance && canFullWallet;
-  const showWalletAndOnlineOption =
-    hasWalletBalance && (canWalletAndMobile || canFullWallet);
+  const showWalletAndOnlineOption = canWalletAndMobile;
   const showOnlinePaymentOption = cashPayablePreview > 0;
   const showRewardsSection =
     Math.max(0, Math.trunc(Number(review.rewardPointsBalance))) >= 100;
@@ -694,7 +708,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                     />
                   ) : (
                     <p className="mt-3 text-sm font-semibold text-[var(--heading)]">
-                      Continue to JazzCash or Easypaisa.
+                      Continue to online payment.
                     </p>
                   )}
                 </>
@@ -814,9 +828,16 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-4 text-sm text-[var(--text-muted)]"
               role="note"
             >
-              {fullWallet
-                ? "Confirm below to complete this purchase with your wallet."
-                : "Confirm below to complete this purchase. No online payment is required."}
+              {confirmNoteText}
+            </div>
+          ) : gatewayReady ? (
+            <div
+              className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-4 text-sm text-[var(--text-muted)]"
+              role="note"
+            >
+              {paymentMode === "wallet_and_mobile"
+                ? "Continue below to complete the remaining amount with online payment."
+                : "Continue below to complete this purchase with online payment."}
             </div>
           ) : null}
 
@@ -852,9 +873,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                     className="mt-1"
                   />
                   <span>
-                    {fullWallet
-                      ? "I confirm this wallet purchase."
-                      : "I confirm this purchase. No online payment is required."}
+                    {confirmCheckboxText}
                   </span>
                 </label>
                 {errorState.ok === false && errorState.fieldErrors?.confirm ? (
@@ -869,13 +888,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 disabled={purchaseBlocked || !confirmed}
                 className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
               >
-                {pending
-                  ? fullWallet
-                    ? "Buying with wallet…"
-                    : "Completing purchase…"
-                  : fullWallet
-                    ? "Buy eSIM with Wallet"
-                    : "Complete purchase"}
+                {pending ? primaryCtaPendingLabel : primaryCtaLabel}
               </button>
             </>
           ) : gatewayReady ? (
@@ -885,13 +898,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 disabled={purchaseBlocked}
                 className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
               >
-                {pending
-                  ? simpaisaCheckout
-                    ? "Sending payment request…"
-                    : "Starting payment…"
-                  : simpaisaCheckout
-                    ? "Continue with JazzCash / Easypaisa"
-                    : "Continue to payment"}
+                {pending ? primaryCtaPendingLabel : primaryCtaLabel}
               </button>
             </div>
           ) : (
@@ -934,9 +941,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 aria-controls={confirmSectionId}
               />
               <span>
-                {fullWallet
-                  ? "I confirm this wallet purchase."
-                  : "I confirm this purchase. No online payment is required."}{" "}
+                {confirmCheckboxText}{" "}
                 <a
                   href={`#${confirmSectionId}`}
                   className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
@@ -966,13 +971,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 disabled={stickyCtaDisabled}
                 className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
               >
-                {pending
-                  ? fullWallet
-                    ? "Buying…"
-                    : "Completing…"
-                  : fullWallet
-                    ? "Buy eSIM with Wallet"
-                    : "Complete purchase"}
+                {pending ? stickyCtaPendingLabel : primaryCtaLabel}
               </button>
             ) : gatewayReady ? (
               <button
@@ -980,13 +979,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 disabled={stickyCtaDisabled}
                 className="inline-flex h-11 max-w-[58%] shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-3 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
               >
-                {pending
-                  ? simpaisaCheckout
-                    ? "Sending…"
-                    : "Starting…"
-                  : simpaisaCheckout
-                    ? "Continue with JazzCash / Easypaisa"
-                    : "Continue to payment"}
+                {pending ? stickyCtaPendingLabel : primaryCtaLabel}
               </button>
             ) : (
               <button
