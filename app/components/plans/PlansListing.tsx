@@ -797,9 +797,12 @@ export default function PlansListing({
                                     : "Plan Details"}
                                 </button>
                               </div>
-                              <p className="text-center text-xs leading-snug text-[var(--text-muted)]">
-                                {purchaseTrustLine}
-                              </p>
+                              {/* Guest "Sign in to buy…" trust line removed from cards (modal still shows). */}
+                              {signedIn ? (
+                                <p className="text-center text-xs leading-snug text-[var(--text-muted)]">
+                                  {purchaseTrustLine}
+                                </p>
+                              ) : null}
                             </div>
                           </article>
                         );

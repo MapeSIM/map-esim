@@ -65,6 +65,12 @@ function main() {
   assert.match(listing, /planPurchaseTrustLine/);
   assert.match(listing, /purchaseTrustLine/);
   assert.match(listing, /setSignedIn/);
+  // Plan cards: do not show guest "Sign in to buy…" under Buy Now (modal may still).
+  assert.match(listing, /signedIn \? \([\s\S]*?purchaseTrustLine[\s\S]*?\) : null/);
+  assert.doesNotMatch(
+    listing,
+    /<\/div>\s*<p className="text-center text-xs leading-snug text-\[var\(--text-muted\)\]">\s*\{purchaseTrustLine\}/
+  );
   // Plan benefit chips removed (Digital eSIM / Keep your SIM / QR after purchase).
   assert.doesNotMatch(conversion, /PLAN_CARD_BENEFITS/);
   assert.doesNotMatch(listing, /PLAN_CARD_BENEFITS/);
