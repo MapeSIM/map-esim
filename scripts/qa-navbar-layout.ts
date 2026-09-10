@@ -35,9 +35,9 @@ function main() {
   assert.match(navbar, /variant="mobile"/);
   // Destinations nav link and/or shared discovery CTA target /countries
   assert.match(navbar, /href:\s*["']\/countries["']|HOME_DISCOVERY_CTA_HREF/);
-  // B1.1: public discovery CTA uses shared Get eSIM constants → /countries
+  // B1.1: public discovery CTA uses shared Get eSIM → Popular destinations.
   assert.equal(HOME_DISCOVERY_CTA_LABEL, "Get eSIM");
-  assert.equal(HOME_DISCOVERY_CTA_HREF, "/countries");
+  assert.equal(HOME_DISCOVERY_CTA_HREF, "/countries?filter=Popular");
   assert.match(navbar, /HOME_DISCOVERY_CTA_LABEL/);
   assert.match(navbar, /href=\{HOME_DISCOVERY_CTA_HREF\}/);
   assert.match(navbar, /\{HOME_DISCOVERY_CTA_LABEL\}/);

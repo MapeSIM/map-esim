@@ -170,6 +170,15 @@ function main() {
   assert.match(listing, /code:\s*destination\.code/);
   console.log("   ok");
 
+  console.log("5) Mobile P1 listing conversion chrome");
+  assert.doesNotMatch(listing, /min-h-\[240px\]/);
+  assert.match(listing, /py-5 sm:min-h-\[340px\]/);
+  assert.match(listing, /id="destination-search"/);
+  assert.match(listing, /id="destination-search-sticky"/);
+  assert.match(listing, /destination-search-sticky[\s\S]*?sm:hidden|sm:hidden[\s\S]*?destination-search-sticky/);
+  assert.match(listing, /sticky top-16/);
+  console.log("   ok");
+
   console.log("PASS destination_presentation_qa");
 }
 

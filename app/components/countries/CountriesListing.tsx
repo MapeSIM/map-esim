@@ -442,10 +442,10 @@ function CountriesListingContent({
     <main className="min-h-screen overflow-x-hidden bg-[var(--page-bg)] text-[var(--heading)]">
       <section
         className="
-          relative flex min-h-[240px] items-center justify-center
+          relative flex items-center justify-center
           border-b border-[var(--border)]
           theme-hero
-          px-4 py-8 sm:min-h-[340px] sm:px-6 sm:py-12
+          px-4 py-5 sm:min-h-[340px] sm:px-6 sm:py-12
         "
       >
         <div
@@ -465,10 +465,10 @@ function CountriesListingContent({
 
           <h1
             className="
-              mx-auto mt-3 max-w-3xl
-              text-[1.75rem] font-semibold leading-tight tracking-tight
+              mx-auto mt-2 max-w-3xl
+              text-[1.5rem] font-semibold leading-tight tracking-tight
               text-[var(--heading)]
-              sm:text-4xl md:text-[2.5rem]
+              sm:mt-3 sm:text-4xl md:text-[2.5rem]
             "
           >
             Explore destinations worldwide
@@ -476,15 +476,15 @@ function CountriesListingContent({
 
           <p
             className="
-              mx-auto mt-3 max-w-xl
+              mx-auto mt-2 hidden max-w-xl
               text-sm leading-relaxed text-[var(--text-muted)]
-              sm:text-base
+              sm:mt-3 sm:block sm:text-base
             "
           >
             Browse country, popular, regional, and global eSIM destinations.
           </p>
 
-          <div className="relative mx-auto mt-7 w-full max-w-[620px]">
+          <div className="relative mx-auto mt-4 w-full max-w-[620px] sm:mt-7">
             <label htmlFor="destination-search" className="sr-only">
               Search by country or region
             </label>
@@ -505,14 +505,14 @@ function CountriesListingContent({
                 w-full rounded-[16px]
                 border border-[var(--border-strong)]
                 bg-[var(--surface-2)]
-                py-3.5 pl-11 pr-4
+                py-3 pl-11 pr-4
                 text-sm text-[var(--heading)] placeholder:text-[var(--text-soft)]
                 shadow-[0_8px_30px_rgba(0,0,0,0.25)]
                 transition-all
                 hover:border-[var(--border-hover)]
                 focus:border-[var(--accent-strong)]/50 focus:outline-none
                 focus:ring-2 focus:ring-[var(--accent-strong)]/25
-                sm:text-[15px]
+                sm:py-3.5 sm:text-[15px]
               "
             />
           </div>
@@ -527,10 +527,41 @@ function CountriesListingContent({
         "
       >
         <div className="mx-auto max-w-[1200px] px-4 sm:px-6">
+          {/* Mobile: compact sticky search (same state as hero search). */}
+          <div className="pt-2.5 sm:hidden">
+            <div className="relative">
+              <label htmlFor="destination-search-sticky" className="sr-only">
+                Search by country or region
+              </label>
+              <Search
+                className="
+                  pointer-events-none absolute left-3 top-1/2 h-4 w-4
+                  -translate-y-1/2 text-[var(--text-soft)]
+                "
+                aria-hidden="true"
+              />
+              <input
+                id="destination-search-sticky"
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search destinations"
+                className="
+                  w-full rounded-full
+                  border border-[var(--border-strong)]
+                  bg-[var(--surface)]
+                  py-2 pl-9 pr-3
+                  text-sm text-[var(--heading)] placeholder:text-[var(--text-soft)]
+                  focus:border-[var(--accent-strong)]/50 focus:outline-none
+                  focus:ring-2 focus:ring-[var(--accent-strong)]/25
+                "
+              />
+            </div>
+          </div>
           <div
             className="
               flex flex-wrap items-center justify-center gap-2
-              py-3 sm:gap-2.5 sm:py-4
+              py-2.5 sm:gap-2.5 sm:py-4
             "
             role="group"
             aria-label="Destination filters"
@@ -566,8 +597,8 @@ function CountriesListingContent({
         </div>
       </div>
 
-      <section className="mx-auto max-w-[1200px] px-4 pb-16 pt-8 sm:px-6 sm:pb-20">
-        <div className="mb-7 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <section className="mx-auto max-w-[1200px] px-4 pb-16 pt-4 sm:px-6 sm:pb-20 sm:pt-8">
+        <div className="mb-4 flex flex-col gap-2 sm:mb-7 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-2xl font-semibold tracking-tight text-[var(--heading)] sm:text-[1.75rem]">
               {filter === "Country"

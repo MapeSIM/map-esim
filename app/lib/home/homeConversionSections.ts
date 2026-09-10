@@ -4,7 +4,8 @@
 
 /** Shared public discovery CTA (Navbar, hero, final CTA, comparison follow-up). */
 export const HOME_DISCOVERY_CTA_LABEL = "Get eSIM";
-export const HOME_DISCOVERY_CTA_HREF = "/countries";
+/** Soft-launch: land on Popular destinations; Country tab remains available. */
+export const HOME_DISCOVERY_CTA_HREF = "/countries?filter=Popular";
 
 export const HOME_POPULAR_SECTION_EYEBROW = "Destinations";
 export const HOME_POPULAR_SECTION_TITLE = "Popular destinations";

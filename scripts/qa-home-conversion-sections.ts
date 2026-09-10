@@ -60,7 +60,7 @@ function main() {
   assert.ok(HOME_COMPARISON_ROWS.length >= 4);
   // B1.1: shared discovery CTA
   assert.equal(HOME_DISCOVERY_CTA_LABEL, "Get eSIM");
-  assert.equal(HOME_DISCOVERY_CTA_HREF, "/countries");
+  assert.equal(HOME_DISCOVERY_CTA_HREF, "/countries?filter=Popular");
   assert.equal(HOME_FINAL_CTA_PRIMARY_HREF, HOME_DISCOVERY_CTA_HREF);
   assert.equal(HOME_FINAL_CTA_PRIMARY_LABEL, HOME_DISCOVERY_CTA_LABEL);
   assert.equal(HOME_FINAL_CTA_SECONDARY_HREF, "/how-it-works");
