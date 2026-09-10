@@ -56,6 +56,9 @@ function main() {
   assert.match(confirm, /stickyShowConfirm/);
   assert.match(confirm, /confirmStickyId/);
   assert.doesNotMatch(confirm, /Confirm the purchase above to continue/);
+  // Mobile: hide duplicate Order summary; keep early Amount due + sticky due.
+  assert.match(confirm, /hidden lg:block/);
+  assert.match(confirm, /Desktop\/tablet: full order summary|Mobile uses early Amount due/);
   console.log("PASS logged_in_checkout_two_column");
 
   assert.match(review, />Checkout</);

@@ -719,7 +719,11 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         </div>
 
         <aside className="space-y-5 lg:sticky lg:top-6">
-          <section className={cardClass} aria-labelledby={orderHeadingId}>
+          {/* Desktop/tablet: full order summary. Mobile uses early Amount due + sticky due. */}
+          <section
+            className={`${cardClass} hidden lg:block`}
+            aria-labelledby={orderHeadingId}
+          >
             <h2
               id={orderHeadingId}
               className="border-b border-[var(--border)] py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
