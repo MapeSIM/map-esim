@@ -13,6 +13,11 @@ import {
 import { formatStoredIccidLast4 } from "@/app/lib/admin/display";
 import { prisma } from "@/app/lib/db";
 import { customerFlagImageUrl } from "@/app/lib/orders/customerOrderDisplay";
+import {
+  buildAddDataEligibility,
+  lookupOfferTopUpFromCatalog,
+  type CustomerAddDataBlockedReason,
+} from "@/app/lib/orders/customerOrders";
 import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
 import {
   PARTNER_ORDERS_PAGE_LIMIT,
@@ -28,6 +33,8 @@ import {
   type PartnerOrderStatusBadge,
 } from "@/app/lib/partner/partnerOrdersDisplay";
 import { formatUsdCents } from "@/app/lib/wallet/display";
+import type { VesimOffer } from "@/app/lib/vesim/offers";
+import { normalizeOfferId } from "@/app/lib/vesim/server";
 
 function partnerIccidMasked(
   last4: string | null | undefined,
@@ -62,6 +69,8 @@ export type PartnerOrderListRow = {
   iccidRevealable: boolean;
   /** Boolean-only; never a raw share token. */
   hasActiveShareToken: boolean;
+  /** Add More Data CTA gate — never includes providerOrderId. */
+  addDataEligible: boolean;
 };
 
 export type PartnerAttentionRow = {
@@ -100,6 +109,16 @@ export type PartnerOrderDetail = {
   /** True only when encrypted ICCID is stored. */
   iccidRevealable: boolean;
   purchaseId: string;
+  /** Same gates as customer/admin Add More Data (no provider ids exposed). */
+  addDataEligible: boolean;
+  addDataBlockedReason: CustomerAddDataBlockedReason | null;
+  /**
+   * Normalized offer id for Add More Data prepare (server-side only).
+   * Never render as a Partner UI secret field.
+   */
+  addDataOfferId: string | null;
+  /** Destination code for catalog/checkout country hint (server-side only). */
+  destinationCode: string | null;
 };
 
 /**
@@ -129,6 +148,7 @@ export async function listPartnerOrdersPage(
     select: {
       id: true,
       status: true,
+      offerId: true,
       destinationCode: true,
       destinationName: true,
       planName: true,
@@ -139,6 +159,7 @@ export async function listPartnerOrdersPage(
       createdAt: true,
       completedAt: true,
       orderId: true,
+      providerOrderId: true,
       order: {
         select: {
           id: true,
@@ -150,6 +171,8 @@ export async function listPartnerOrdersPage(
           createdAt: true,
           iccidLast4: true,
           iccidEncrypted: true,
+          offerId: true,
+          providerOrderId: true,
         },
       },
     },
@@ -157,6 +180,7 @@ export async function listPartnerOrdersPage(
 
   const orders: PartnerOrderListRow[] = [];
   const attention: PartnerAttentionRow[] = [];
+  const catalogCache = new Map<string, VesimOffer[] | null>();
 
   for (const row of purchases) {
     const destination = displayOrUnavailable(
@@ -179,6 +203,31 @@ export async function listPartnerOrdersPage(
       row.orderId &&
       row.order
     ) {
+      const isRefunded = statusBadge === "Failed — balance returned";
+      const installEligible =
+        row.order.status === OrderStatus.COMPLETED &&
+        statusBadge === "Completed";
+      const offerIdForEligibility =
+        normalizeOfferId(row.offerId) ||
+        normalizeOfferId(row.order.offerId) ||
+        null;
+      const providerOrderId =
+        (row.order.providerOrderId ?? "").trim() ||
+        (row.providerOrderId ?? "").trim() ||
+        null;
+      const catalog = await lookupOfferTopUpFromCatalog(
+        offerIdForEligibility,
+        row.destinationCode,
+        catalogCache
+      );
+      const addData = buildAddDataEligibility({
+        providerOrderId,
+        offerId: offerIdForEligibility,
+        isRefunded,
+        installEligible,
+        catalog,
+      });
+
       orders.push({
         purchaseId: row.id,
         orderId: row.order.id,
@@ -199,6 +248,7 @@ export async function listPartnerOrdersPage(
         ),
         iccidRevealable: Boolean(row.order.iccidEncrypted?.trim()),
         hasActiveShareToken: false,
+        addDataEligible: addData.addDataEligible,
       });
       continue;
     }
@@ -277,6 +327,7 @@ export async function getPartnerOwnedOrderDetail(
     select: {
       id: true,
       status: true,
+      offerId: true,
       destinationCode: true,
       destinationName: true,
       planName: true,
@@ -286,6 +337,7 @@ export async function getPartnerOwnedOrderDetail(
       partnerChargeCents: true,
       createdAt: true,
       completedAt: true,
+      providerOrderId: true,
       order: {
         select: {
           id: true,
@@ -297,6 +349,8 @@ export async function getPartnerOwnedOrderDetail(
           createdAt: true,
           iccidLast4: true,
           iccidEncrypted: true,
+          offerId: true,
+          providerOrderId: true,
         },
       },
     },
@@ -306,6 +360,35 @@ export async function getPartnerOwnedOrderDetail(
 
   const order = purchase.order;
   const encrypted = Boolean(order.iccidEncrypted?.trim());
+
+  // Eligibility only — providerOrderId / offerId stay off the Partner DTO.
+  const statusBadge = partnerOrderStatusFromPurchase(purchase.status);
+  const isRefunded = statusBadge === "Failed — balance returned";
+  const installEligible =
+    order.status === OrderStatus.COMPLETED &&
+    purchase.status === PartnerEsimPurchaseStatus.COMPLETED &&
+    statusBadge === "Completed";
+  const offerIdForEligibility =
+    normalizeOfferId(purchase.offerId) ||
+    normalizeOfferId(order.offerId) ||
+    null;
+  const providerOrderId =
+    (order.providerOrderId ?? "").trim() ||
+    (purchase.providerOrderId ?? "").trim() ||
+    null;
+  const destinationCode = (purchase.destinationCode ?? "").trim() || null;
+  const catalog = await lookupOfferTopUpFromCatalog(
+    offerIdForEligibility,
+    destinationCode,
+    new Map()
+  );
+  const addData = buildAddDataEligibility({
+    providerOrderId,
+    offerId: offerIdForEligibility,
+    isRefunded,
+    installEligible,
+    catalog,
+  });
 
   return {
     orderId: order.id,
@@ -319,7 +402,7 @@ export async function getPartnerOwnedOrderDetail(
       order.dataAllowance || purchase.dataAllowance
     ),
     validity: displayOrUnavailable(order.validity || purchase.validity),
-    statusBadge: partnerOrderStatusFromPurchase(purchase.status),
+    statusBadge,
     purchasedAtLabel: formatPartnerOrderDate(
       purchase.completedAt ?? order.createdAt
     ),
@@ -332,5 +415,9 @@ export async function getPartnerOwnedOrderDetail(
     ),
     iccidRevealable: encrypted,
     purchaseId: purchase.id,
+    addDataEligible: addData.addDataEligible,
+    addDataBlockedReason: addData.addDataBlockedReason,
+    addDataOfferId: offerIdForEligibility,
+    destinationCode,
   };
 }

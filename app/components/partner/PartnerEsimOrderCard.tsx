@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { Signal } from "lucide-react";
 import CustomerEsimUsagePanel from "@/app/components/orders/CustomerEsimUsagePanel";
 import PartnerEsimInstallPanel from "@/app/components/partner/PartnerEsimInstallPanel";
@@ -37,6 +38,9 @@ type Props = {
 export default function PartnerEsimOrderCard({ row, refundRequest }: Props) {
   const [showUsage, setShowUsage] = useState(false);
   const completed = row.statusBadge === "Completed";
+  const addDataHref = row.addDataEligible
+    ? `/partner/orders/${encodeURIComponent(row.orderId)}/add-data`
+    : null;
 
   return (
     <article className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
@@ -118,6 +122,15 @@ export default function PartnerEsimOrderCard({ row, refundRequest }: Props) {
               usagePath={`/api/partner/orders/${encodeURIComponent(row.orderId)}/usage`}
             />
           )}
+
+          {addDataHref ? (
+            <Link
+              href={addDataHref}
+              className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            >
+              Add More Data
+            </Link>
+          ) : null}
 
           <PartnerEsimInstallPanel
             orderId={row.orderId}

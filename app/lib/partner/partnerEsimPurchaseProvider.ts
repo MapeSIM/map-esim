@@ -24,7 +24,9 @@ import {
 } from "@/app/lib/esim/providerResultPersist";
 import { persistAssignedOrder } from "@/app/lib/orders/persistAssignedOrder";
 import { classifyOrderPersistError } from "@/app/lib/orders/orderPersistError";
+import { parseAddDataSourceOrderId } from "@/app/lib/esim/addDataCheckout";
 import { PartnerEsimPurchaseError } from "@/app/lib/partner/partnerEsimPurchase";
+import { resolvePartnerOwnedRechargeOrderId } from "@/app/lib/partner/partnerAddDataCheckout";
 import {
   PartnerPurchaseWalletError,
   refundPartnerPurchaseFundsInTx,
@@ -462,6 +464,7 @@ export async function executePartnerEsimProviderPurchase(
       destinationName: true,
       dataAllowance: true,
       validity: true,
+      idempotencyKey: true,
     },
   });
 
@@ -558,9 +561,29 @@ export async function executePartnerEsimProviderPurchase(
   }
 
   // External provider write — outside Prisma transaction. Never blind-retry.
+  // Add More Data only: bind VeSIM recharge from adddata_ idempotency key.
+  // Normal Partner Buy eSIM never sets that prefix → no rechargeOrderId.
+  let rechargeOrderId: string | null = null;
+  const addDataSourceOrderId = parseAddDataSourceOrderId(
+    purchase.idempotencyKey
+  );
+  if (addDataSourceOrderId) {
+    rechargeOrderId = await resolvePartnerOwnedRechargeOrderId({
+      partnerUserId: partner.partnerUserId,
+      localOrderId: addDataSourceOrderId,
+    });
+    if (!rechargeOrderId) {
+      throw new PartnerEsimPurchaseError(
+        "INVALID_STATE",
+        "Add More Data is not available for this eSIM."
+      );
+    }
+  }
+
   const checkout = await checkoutFn({
     offerId: purchase.offerId,
     customerEmail: partner.partnerEmail,
+    ...(rechargeOrderId ? { rechargeOrderId } : {}),
   });
 
   if (checkout.kind === "declined") {

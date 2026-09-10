@@ -92,6 +92,7 @@ export default async function PartnerOrderDetailPage({
           iccidMasked: detail.iccidMasked,
           iccidRevealable: detail.iccidRevealable,
           hasActiveShareToken: hasActiveToken,
+          addDataEligible: detail.addDataEligible,
         }}
         refundRequest={refundRequest}
       />
