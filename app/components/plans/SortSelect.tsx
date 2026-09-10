@@ -216,7 +216,7 @@ export default function SortSelect({
   }
 
   return (
-    <div ref={rootRef} className="relative inline-flex w-full sm:w-auto">
+    <div ref={rootRef} className="relative inline-flex min-w-0 flex-1 sm:w-auto sm:flex-none">
       <button
         ref={buttonRef}
         id={buttonId}
@@ -234,14 +234,14 @@ export default function SortSelect({
         }}
         onKeyDown={handleButtonKeyDown}
         className={`
-          inline-flex h-11 w-full items-center justify-between gap-2
+          inline-flex h-10 w-full items-center justify-between gap-2
           rounded-full border border-[var(--border-strong)] bg-[var(--surface)]
-          py-2 pl-4 pr-3 text-sm font-semibold text-[var(--heading)]
+          py-2 pl-3 pr-2.5 text-sm font-semibold text-[var(--heading)]
           outline-none transition
           hover:border-[var(--border-hover)] hover:bg-[var(--surface-2)]
           focus-visible:border-[var(--accent-strong)]/60 focus-visible:ring-2
           focus-visible:ring-[var(--accent-strong)]/25
-          sm:min-w-[240px]
+          sm:h-11 sm:min-w-[240px] sm:pl-4 sm:pr-3
           ${open ? "border-[var(--accent-strong)]/45" : ""}
         `}
       >

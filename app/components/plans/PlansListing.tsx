@@ -147,13 +147,11 @@ function PillButton({
   onClick,
   children,
   disabled = false,
-  fullWidthOnMobile = false,
 }: {
   active: boolean;
   onClick: () => void;
   children: ReactNode;
   disabled?: boolean;
-  fullWidthOnMobile?: boolean;
 }) {
   return (
     <button
@@ -168,7 +166,6 @@ function PillButton({
         focus-visible:ring-offset-[var(--page-bg)]
         disabled:cursor-not-allowed disabled:opacity-45
         sm:px-4 sm:text-sm
-        ${fullWidthOnMobile ? "w-full min-[400px]:w-auto" : ""}
         ${
           active
             ? "border-[var(--accent-strong)] bg-[var(--accent-strong)] text-[var(--accent-ink)] shadow-[0_0_0_1px_rgba(124,255,0,0.25)]"
@@ -414,11 +411,11 @@ export default function PlansListing({
     <main className="min-h-screen overflow-x-clip bg-[var(--page-bg)] text-[var(--heading)]">
       <section className="theme-hero border-b border-[var(--border)]">
         {/* Extra mobile top padding keeps hero clear of the sticky navbar. */}
-        <div className="mx-auto max-w-[1200px] px-4 pb-5 pt-8 sm:px-6 sm:py-8">
+        <div className="mx-auto max-w-[1200px] px-4 pb-3 pt-6 sm:px-6 sm:py-8">
           <Link
             href="/countries"
             className="
-              mb-4 inline-flex max-w-full items-center gap-2 text-sm font-medium
+              mb-3 inline-flex max-w-full items-center gap-2 text-sm font-medium
               text-[var(--text-muted)] transition hover:text-[var(--accent-strong)]
               sm:mb-5
             "
@@ -430,7 +427,7 @@ export default function PlansListing({
           <div className="flex items-start gap-3 sm:gap-4">
             <div
               className="
-                flex h-12 w-12 shrink-0 items-center justify-center
+                flex h-11 w-11 shrink-0 items-center justify-center
                 rounded-2xl border border-[var(--border-strong)]
                 bg-[var(--surface)] shadow-[0_10px_30px_rgba(0,0,0,0.25)]
                 sm:h-16 sm:w-16
@@ -447,10 +444,10 @@ export default function PlansListing({
                     ? "Regional plans"
                     : "Global plans"}
               </p>
-              <h1 className="mt-1 break-words text-[1.65rem] font-bold leading-tight tracking-tight text-[var(--heading)] sm:text-4xl sm:leading-none">
+              <h1 className="mt-1 break-words text-[1.5rem] font-bold leading-tight tracking-tight text-[var(--heading)] sm:text-4xl sm:leading-none">
                 {heading}
               </h1>
-              <p className="mt-1.5 text-sm text-[var(--text-muted)] sm:text-base">
+              <p className="mt-1 text-sm text-[var(--text-muted)] sm:mt-1.5 sm:text-base">
                 {heroSummary}
               </p>
             </div>
@@ -458,10 +455,9 @@ export default function PlansListing({
         </div>
       </section>
 
-      <section className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6 sm:py-10">
-        <p className="mb-6 text-sm leading-relaxed text-[var(--text-muted)]">
-          Before buying: confirm your device supports eSIM and is
-          carrier-unlocked.{" "}
+      <section className="mx-auto max-w-[1200px] px-4 pt-4 pb-6 sm:px-6 sm:py-10">
+        <p className="mb-3 text-xs leading-snug text-[var(--text-muted)] sm:mb-6 sm:text-sm sm:leading-relaxed">
+          Confirm your phone supports eSIM and is unlocked.{" "}
           <Link
             href="/device-compatibility"
             className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
@@ -495,8 +491,8 @@ export default function PlansListing({
 
         {!loading && !error && offers.length > 0 && (
           <>
-            <div className="rounded-3xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-4 shadow-[0_12px_40px_rgba(0,0,0,0.22)] sm:p-5">
-              <div className="flex flex-col gap-4">
+            <div className="rounded-3xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-3 shadow-[0_12px_40px_rgba(0,0,0,0.22)] sm:p-5">
+              <div className="flex flex-col gap-2.5 sm:gap-4">
                 {showPlanTypeToggle && (
                   <div className="flex flex-wrap gap-2">
                     <PillButton
@@ -515,16 +511,15 @@ export default function PlansListing({
                 )}
 
                 {showPackageTabs && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <p className="hidden text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] sm:block">
                       Package type
                     </p>
-                    <div className="flex w-full flex-col gap-2 min-[400px]:flex-row min-[400px]:flex-wrap">
+                    <div className="flex w-full flex-row flex-wrap gap-2">
                       <PillButton
                         active={activeCategory === "standard"}
                         onClick={() => selectCategory("standard")}
                         disabled={categorySummary.standard === 0}
-                        fullWidthOnMobile
                       >
                         {`Standard · ${categorySummary.standard} plan${
                           categorySummary.standard === 1 ? "" : "s"
@@ -535,7 +530,6 @@ export default function PlansListing({
                           active={activeCategory === "unlimited"}
                           onClick={() => selectCategory("unlimited")}
                           disabled={!unlimitedTabEnabled}
-                          fullWidthOnMobile
                         >
                           {`Unlimited · ${categorySummary.unlimited} plan${
                             categorySummary.unlimited === 1 ? "" : "s"
@@ -546,14 +540,14 @@ export default function PlansListing({
                   </div>
                 )}
 
-                <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex w-full flex-row items-center gap-2 sm:justify-between">
                   <button
                     type="button"
                     onClick={() => setFiltersOpen((open) => !open)}
                     className={`
-                      inline-flex h-11 w-full items-center justify-center gap-2
-                      rounded-full border px-5 text-sm font-semibold transition
-                      sm:w-auto
+                      inline-flex h-10 min-w-0 flex-1 items-center justify-center gap-2
+                      rounded-full border px-4 text-sm font-semibold transition
+                      sm:h-11 sm:w-auto sm:flex-none sm:px-5
                       ${
                         filtersOpen || activeFilterCount > 0
                           ? "border-[var(--accent-strong)] bg-[var(--accent-strong)]/12 text-[var(--heading)]"
@@ -653,7 +647,7 @@ export default function PlansListing({
               )}
             </div>
 
-            <div className="mt-8 flex items-center justify-between gap-3">
+            <div className="mt-4 flex items-center justify-between gap-3 sm:mt-8">
               <p className="text-sm font-medium text-[var(--text-muted)]">
                 Showing {filtered.length} of {categoryOffers.length}{" "}
                 {activeCategory === "unlimited" ? "unlimited" : "standard"}{" "}
@@ -665,7 +659,7 @@ export default function PlansListing({
             </div>
 
             {filtered.length === 0 ? (
-              <div className="mt-6 rounded-3xl border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center">
+              <div className="mt-4 rounded-3xl border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center sm:mt-6">
                 <h3 className="text-lg font-semibold">No matching plans</h3>
                 <p className="mt-2 text-sm text-[var(--text-muted)]">
                   {activeCategory === "unlimited" &&
@@ -675,11 +669,11 @@ export default function PlansListing({
                 </p>
               </div>
             ) : (
-              <div className="mt-6 space-y-10">
+              <div className="mt-4 space-y-6 sm:mt-6 sm:space-y-10">
                 {groups.map((group) => (
                   <section key={group.label}>
-                    <div className="mb-4 flex items-end justify-between gap-3 border-b border-[var(--border)] pb-3">
-                      <h2 className="text-xl font-bold text-[var(--heading)] sm:text-2xl">
+                    <div className="mb-3 flex items-end justify-between gap-3 border-b border-[var(--border)] pb-2 sm:mb-4 sm:pb-3">
+                      <h2 className="text-lg font-bold text-[var(--heading)] sm:text-2xl">
                         {group.label}
                       </h2>
                       <p className="text-sm text-[var(--text-soft)]">

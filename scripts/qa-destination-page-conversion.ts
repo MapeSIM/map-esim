@@ -102,6 +102,14 @@ function main() {
   assert.doesNotMatch(listing, /Need more options\?/);
   assert.match(listing, /href="\/device-compatibility"/);
   assert.match(listing, /Check compatibility/);
+  // Mobile P0: tighter chrome so first Buy Now sits closer to the fold.
+  assert.match(listing, /pb-3 pt-6 sm:px-6 sm:py-8/);
+  assert.match(listing, /pt-4 pb-6 sm:px-6 sm:py-10/);
+  assert.match(listing, /mb-3 text-xs leading-snug/);
+  assert.match(listing, /flex w-full flex-row flex-wrap gap-2/);
+  assert.match(listing, /flex w-full flex-row items-center gap-2/);
+  assert.match(listing, /mt-4 space-y-6 sm:mt-6 sm:space-y-10/);
+  assert.doesNotMatch(listing, /fullWidthOnMobile/);
   assert.doesNotMatch(listing, /href="\/install\/iphone"/);
   assert.doesNotMatch(listing, /href="\/install\/android"/);
   assert.doesNotMatch(listing, /How MAP eSIM works/);
