@@ -389,6 +389,8 @@ function main() {
   assert.doesNotMatch(buyPage, /blockedReason/);
   assert.match(buyPage, /prepareWalletEsimPurchase/);
   assert.match(buyPage, /offerIdHint/);
+  assert.match(buyPage, /if\s*\(\s*!offerIdHint\s*\)/);
+  assert.match(buyPage, /listAdminAssignmentDestinations/);
   assert.match(selectForm, /filterPlansDiscoveryDestinations/);
   assert.match(selectForm, /Popular Destinations/);
   assert.match(selectForm, /All Destinations/);

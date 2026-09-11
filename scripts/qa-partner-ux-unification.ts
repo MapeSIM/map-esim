@@ -78,7 +78,9 @@ function main() {
   assert.match(navbar, /\/partner\/wallet/);
   assert.match(navbar, /\/partner\/orders/);
   assert.match(rootLayout, /coerceAppRole/);
-  assert.match(rootLayout, /getPartnerPortalSummary/);
+  assert.doesNotMatch(rootLayout, /getPartnerPortalSummary/);
+  assert.doesNotMatch(rootLayout, /getCustomerWalletSummary/);
+  assert.match(rootLayout, /partnerNav|customerNav/);
   assert.match(accountPage, /AccountActionRow/);
   assert.match(catalogRead, /partnerCatalogOfferForbiddenKeys|discountBps|providerCost/);
   assert.match(buyPage, /buyPartnerEsim|listPartnerCatalogOffers|requireRole\(["']PARTNER["']\)/);
@@ -86,6 +88,12 @@ function main() {
   assert.match(authConfig, /\/partner\/buy/);
   assert.match(authConfig, /\/account\/esim\/buy/);
   assert.equal(isTawkEnabledRoute("/partner"), false);
+
+  assert.match(access, /\$queryRaw|aggregate/);
+  assert.doesNotMatch(
+    access,
+    /partnerEsimPurchase\.findMany\([\s\S]*retailPriceCents[\s\S]*partnerChargeCents/
+  );
 
   const offer = { id: "ESIM-QA-1" } as VesimOffer;
   assert.equal(

@@ -137,7 +137,11 @@ export default async function AccountWalletBuyPage({
         blockedAt: account?.blockedAt ?? null,
       }) === "BLOCKED";
     hasWallet = Boolean(account?.walletAccount);
-    destinations = await listAdminAssignmentDestinations();
+    // Buy Now with offerId prepares/redirects without needing the destination
+    // catalog. Load live destinations only for the select/browse UI path.
+    if (!offerIdHint) {
+      destinations = await listAdminAssignmentDestinations();
+    }
   } catch {
     loadError = true;
   }
@@ -218,6 +222,15 @@ export default async function AccountWalletBuyPage({
   }
   if (directPurchaseId) {
     redirect(reviewPath(directPurchaseId));
+  }
+
+  // Direct Buy Now failed or skipped — load catalog for the select UI path.
+  if (!loadError && destinations.length === 0) {
+    try {
+      destinations = await listAdminAssignmentDestinations();
+    } catch {
+      loadError = true;
+    }
   }
 
   if (loadError) {

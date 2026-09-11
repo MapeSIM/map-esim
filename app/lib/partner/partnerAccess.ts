@@ -162,7 +162,7 @@ export async function getPartnerPortalSummary(
     topupCreditAgg,
     adminDebitAgg,
     purchaseDebitAgg,
-    completedPurchases,
+    completedPurchaseAgg,
   ] = await Promise.all([
     prisma.partnerWalletTransaction.aggregate({
       where: {
@@ -192,17 +192,30 @@ export async function getPartnerPortalSummary(
       },
       _sum: { amountCents: true },
     }),
-    prisma.partnerEsimPurchase.findMany({
-      where: {
-        partnerId: actor.partnerId,
-        status: PartnerEsimPurchaseStatus.COMPLETED,
-        orderId: { not: null },
-      },
-      select: {
-        retailPriceCents: true,
-        partnerChargeCents: true,
-      },
-    }),
+    // DB aggregation (no unbounded findMany). Count all completed linked
+    // purchases; savings = SUM(retail − charge) only when retail >= charge.
+    prisma.$queryRaw<
+      Array<{ orderCount: bigint; savingsCents: bigint }>
+    >`
+      SELECT
+        COUNT(*)::bigint AS "orderCount",
+        COALESCE(
+          SUM(
+            CASE
+              WHEN "retailPriceCents" >= 0
+                AND "partnerChargeCents" >= 0
+                AND "retailPriceCents" >= "partnerChargeCents"
+              THEN "retailPriceCents" - "partnerChargeCents"
+              ELSE 0
+            END
+          ),
+          0
+        )::bigint AS "savingsCents"
+      FROM "PartnerEsimPurchase"
+      WHERE "partnerId" = ${actor.partnerId}
+        AND "status" = CAST(${PartnerEsimPurchaseStatus.COMPLETED} AS "PartnerEsimPurchaseStatus")
+        AND "orderId" IS NOT NULL
+    `,
   ]);
 
   const totalAddedCents =
@@ -210,21 +223,9 @@ export async function getPartnerPortalSummary(
     (topupCreditAgg._sum.amountCents ?? 0);
   const totalDeductedCents = adminDebitAgg._sum.amountCents ?? 0;
   const totalSpentCents = purchaseDebitAgg._sum.amountCents ?? 0;
-  const totalEsimOrders = completedPurchases.length;
-  let totalSavingsCents = 0;
-  for (const row of completedPurchases) {
-    const retail = row.retailPriceCents;
-    const charge = row.partnerChargeCents;
-    if (
-      Number.isInteger(retail) &&
-      Number.isInteger(charge) &&
-      retail >= 0 &&
-      charge >= 0 &&
-      retail >= charge
-    ) {
-      totalSavingsCents += retail - charge;
-    }
-  }
+  const completedRow = completedPurchaseAgg[0];
+  const totalEsimOrders = Number(completedRow?.orderCount ?? 0);
+  const totalSavingsCents = Number(completedRow?.savingsCents ?? 0);
 
   return {
     balanceCents,

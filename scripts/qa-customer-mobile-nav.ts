@@ -131,11 +131,13 @@ function main() {
   assert.match(profilePage, /can&apos;t be edited|cannot be edited|not editable|Name and email/i);
   console.log("PASS profile_trust_guidance");
 
-  // E) Layout wires customer summary without inventing APIs
+  // E) Layout wires lightweight customer identity for the drawer (no wallet aggregates).
   assert.match(layout, /Navbar/);
-  assert.match(layout, /getCustomerWalletSummary/);
+  assert.doesNotMatch(layout, /getCustomerWalletSummary/);
+  assert.doesNotMatch(layout, /getPartnerPortalSummary/);
   assert.match(layout, /customer=\{customerNav\}|customer=\{customerNav\}/);
   assert.match(layout, /customerNav/);
+  assert.match(layout, /walletBalanceLabel:\s*null/);
   assert.doesNotMatch(layout, /decryptIccid|fetchBrokerOrderPayload/);
   console.log("PASS layout_customer_props_safe");
 
