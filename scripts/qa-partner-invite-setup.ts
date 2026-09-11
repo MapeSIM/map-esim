@@ -141,6 +141,15 @@ async function main() {
   assert.doesNotMatch(actions, /^export const\s+/m);
   console.log("PASS setup_action_server_boundary");
 
+  const signinPage = read("app/signin/page.tsx");
+  assert.match(signinPage, /partnerSetup/);
+  assert.match(signinPage, /params\.partnerSetup\s*===\s*["']1["']/);
+  assert.match(
+    signinPage,
+    /Password created\. Sign in to open your Partner portal\./
+  );
+  console.log("PASS signin_partner_setup_notice");
+
   const authConfig = read("auth.config.ts");
   assert.match(authConfig, /\/partner\/setup-password/);
   assert.match(

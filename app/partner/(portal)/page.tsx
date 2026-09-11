@@ -57,7 +57,7 @@ export default async function PartnerDashboardPage() {
         </p>
       </header>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
             Partner Balance
@@ -76,6 +76,39 @@ export default async function PartnerDashboardPage() {
           </p>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
             Applied automatically at purchase
+          </p>
+        </div>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
+            Total eSIM orders
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
+            {summary.totalEsimOrdersLabel}
+          </p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Completed Partner purchases
+          </p>
+        </div>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
+            Total spent
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
+            {summary.totalSpentLabel}
+          </p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            eSIM purchase debits from wallet
+          </p>
+        </div>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
+            Total savings
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
+            {summary.totalSavingsLabel}
+          </p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Retail minus Partner charge on completed buys
           </p>
         </div>
       </div>

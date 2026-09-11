@@ -22,6 +22,7 @@ export default async function SigninPage({
     verified?: string;
     reset?: string;
     deleted?: string;
+    partnerSetup?: string;
     error?: string;
   }>;
 }) {
@@ -34,6 +35,7 @@ export default async function SigninPage({
   const verified = params.verified === "1";
   const reset = params.reset === "1";
   const deleted = params.deleted === "1";
+  const partnerSetup = params.partnerSetup === "1";
   const adminSessionEnded = await consumeAdminSessionEndedNotice();
   const oauthError = publicOAuthErrorMessage(
     mapOAuthErrorParam(params.error)
@@ -58,6 +60,14 @@ export default async function SigninPage({
           role="status"
         >
           {ADMIN_SESSION_ENDED_MESSAGE}
+        </p>
+      ) : null}
+      {partnerSetup ? (
+        <p
+          className="mb-4 rounded-xl border border-[var(--accent-strong)]/35 bg-[var(--accent-strong)]/10 px-3 py-2 text-sm text-[var(--heading)]"
+          role="status"
+        >
+          Password created. Sign in to open your Partner portal.
         </p>
       ) : null}
       {verified ? (

@@ -33,15 +33,19 @@ function main() {
 
   assert.match(partnerLayout, /AccountMenu/);
   assert.match(partnerLayout, /["']\/countries["']/);
-  assert.match(partnerLayout, /["']\/partner\/catalog["']/);
+  assert.match(partnerLayout, /label:\s*["']Catalog["']/);
   assert.match(partnerLayout, /["']\/partner\/orders["']/);
   assert.match(partnerHome, /Partner Balance|Available Partner Balance|balanceLabel/);
   assert.match(partnerHome, /Current Partner Discount|discountPercentLabel/);
+  assert.match(partnerHome, /Total eSIM orders|totalEsimOrdersLabel/);
+  assert.match(partnerHome, /Total spent|totalSpentLabel/);
+  assert.match(partnerHome, /Total savings|totalSavingsLabel/);
   assert.match(partnerHome, /Share Branding/);
   assert.match(partnerHome, /Quick Actions/);
   assert.doesNotMatch(partnerHome, /Reward Points|rewardPoints/i);
-  assert.doesNotMatch(partnerWallet, /Reward Points|rewardPoints|Add funds/i);
+  assert.doesNotMatch(partnerWallet, /Reward Points|rewardPoints/i);
   assert.doesNotMatch(partnerWallet, /href=["']\/account\/wallet\/top-up["']/);
+  assert.match(partnerWallet, /PartnerWalletAddFundsForm|Available Partner Balance/);
   assert.match(partnerWallet, /Available Partner Balance/);
   assert.match(partnerOrders, /My eSIMs/);
   assert.match(partnerOrders, /PartnerEsimOrderCard/);
@@ -63,6 +67,13 @@ function main() {
   assert.match(partnerWallet, /Partner/);
   assert.match(access, /Purchase debit/);
   assert.match(access, /Purchase refund/);
+  assert.match(access, /ESIM_PURCHASE_DEBIT/);
+  assert.match(access, /TOPUP_CREDIT/);
+  assert.match(access, /totalSpentLabel:\s*formatUsdCents\(totalSpentCents\)/);
+  assert.doesNotMatch(access, /totalSpentLabel:\s*formatUsdCents\(0\)/);
+  assert.match(access, /totalEsimOrders/);
+  assert.match(access, /totalSavingsLabel/);
+  assert.match(access, /retailPriceCents[\s\S]*partnerChargeCents/);
   assert.match(navbar, /partner\?/);
   assert.match(navbar, /\/partner\/wallet/);
   assert.match(navbar, /\/partner\/orders/);

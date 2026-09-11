@@ -4,6 +4,7 @@
 import "server-only";
 
 import {
+  PartnerEsimPurchaseStatus,
   PartnerWalletTransactionType,
   Role,
 } from "@prisma/client";
@@ -33,7 +34,14 @@ export type PartnerPortalSummary = {
   discountPercentLabel: string;
   totalAddedLabel: string;
   totalDeductedLabel: string;
+  /** Sum of ESIM_PURCHASE_DEBIT wallet transactions (purchase spend). */
   totalSpentLabel: string;
+  /** Completed Partner eSIM purchases linked to an order. */
+  totalEsimOrders: number;
+  totalEsimOrdersLabel: string;
+  /** Retail − partner charge on completed purchases (Partner discount savings). */
+  totalSavingsCents: number;
+  totalSavingsLabel: string;
   recentTransactions: PartnerPortalTxRow[];
 };
 
@@ -149,10 +157,23 @@ export async function getPartnerPortalSummary(
   const wallet = profile.walletAccount;
   const balanceCents = wallet?.balanceCents ?? 0;
 
-  const [creditAgg, debitAgg] = await Promise.all([
+  const [
+    adminCreditAgg,
+    topupCreditAgg,
+    adminDebitAgg,
+    purchaseDebitAgg,
+    completedPurchases,
+  ] = await Promise.all([
     prisma.partnerWalletTransaction.aggregate({
       where: {
         type: PartnerWalletTransactionType.ADMIN_CREDIT,
+        wallet: { partnerId: actor.partnerId },
+      },
+      _sum: { amountCents: true },
+    }),
+    prisma.partnerWalletTransaction.aggregate({
+      where: {
+        type: PartnerWalletTransactionType.TOPUP_CREDIT,
         wallet: { partnerId: actor.partnerId },
       },
       _sum: { amountCents: true },
@@ -164,10 +185,46 @@ export async function getPartnerPortalSummary(
       },
       _sum: { amountCents: true },
     }),
+    prisma.partnerWalletTransaction.aggregate({
+      where: {
+        type: PartnerWalletTransactionType.ESIM_PURCHASE_DEBIT,
+        wallet: { partnerId: actor.partnerId },
+      },
+      _sum: { amountCents: true },
+    }),
+    prisma.partnerEsimPurchase.findMany({
+      where: {
+        partnerId: actor.partnerId,
+        status: PartnerEsimPurchaseStatus.COMPLETED,
+        orderId: { not: null },
+      },
+      select: {
+        retailPriceCents: true,
+        partnerChargeCents: true,
+      },
+    }),
   ]);
 
-  const totalAddedCents = creditAgg._sum.amountCents ?? 0;
-  const totalDeductedCents = debitAgg._sum.amountCents ?? 0;
+  const totalAddedCents =
+    (adminCreditAgg._sum.amountCents ?? 0) +
+    (topupCreditAgg._sum.amountCents ?? 0);
+  const totalDeductedCents = adminDebitAgg._sum.amountCents ?? 0;
+  const totalSpentCents = purchaseDebitAgg._sum.amountCents ?? 0;
+  const totalEsimOrders = completedPurchases.length;
+  let totalSavingsCents = 0;
+  for (const row of completedPurchases) {
+    const retail = row.retailPriceCents;
+    const charge = row.partnerChargeCents;
+    if (
+      Number.isInteger(retail) &&
+      Number.isInteger(charge) &&
+      retail >= 0 &&
+      charge >= 0 &&
+      retail >= charge
+    ) {
+      totalSavingsCents += retail - charge;
+    }
+  }
 
   return {
     balanceCents,
@@ -175,7 +232,11 @@ export async function getPartnerPortalSummary(
     discountPercentLabel: `${formatDiscountBpsAsPercent(profile.discountBps)}%`,
     totalAddedLabel: formatUsdCents(totalAddedCents),
     totalDeductedLabel: formatUsdCents(totalDeductedCents),
-    totalSpentLabel: formatUsdCents(0),
+    totalSpentLabel: formatUsdCents(totalSpentCents),
+    totalEsimOrders,
+    totalEsimOrdersLabel: String(totalEsimOrders),
+    totalSavingsCents,
+    totalSavingsLabel: formatUsdCents(totalSavingsCents),
     recentTransactions: (wallet?.transactions ?? []).map((tx) => ({
       id: tx.id,
       typeLabel: partnerTxTypeLabel(tx.type),
