@@ -3,7 +3,18 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { OrderStatus, Role } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
+import { isProviderUsageExpired } from "@/app/lib/esim/esimLifecycleNotificationShared";
 import { resolveCustomerEsimStatusBadge } from "@/app/lib/orders/customerOrderDisplay";
+import {
+  fetchProviderUsage,
+  normalizeProviderUsagePayload,
+} from "@/app/lib/orders/customerEsimUsage";
+import {
+  decryptIccid,
+  isIccidEncryptionConfigured,
+  normalizeIccid,
+  validateIccid,
+} from "@/app/lib/orders/iccidCrypto";
 
 /** Idempotency prefix — encodes MAP local source order without a schema change. */
 export const ADD_DATA_IDEMPOTENCY_PREFIX = "adddata_";
@@ -52,8 +63,40 @@ export function normalizeAddDataFromOrderId(
 }
 
 /**
+ * Live VeSIM usage expiry for Add More Data checkout.
+ * Returns true only when usage proves expired (isExpired or expiresAt <= now).
+ * Unknown / unavailable usage → false (does not invent expiry from validity).
+ */
+export async function isEncryptedOrderIccidExpiredForAddData(
+  iccidEncrypted: string | null | undefined
+): Promise<boolean> {
+  const encrypted = (iccidEncrypted ?? "").trim();
+  if (!encrypted || !isIccidEncryptionConfigured()) return false;
+
+  let iccid: string;
+  try {
+    const plain = decryptIccid(encrypted);
+    const normalized = normalizeIccid(plain);
+    if (!validateIccid(normalized)) return false;
+    iccid = normalized;
+  } catch {
+    return false;
+  }
+
+  const usageRes = await fetchProviderUsage(iccid);
+  if (!usageRes.ok) return false;
+  const snapshot = normalizeProviderUsagePayload(usageRes.payload);
+  if (!snapshot) return false;
+
+  return isProviderUsageExpired({
+    expiresAt: snapshot.expiresAt,
+    isExpired: snapshot.isExpired,
+  });
+}
+
+/**
  * Resolve VeSIM rechargeOrderId for an owned MAP order.
- * Returns null when missing/unauthorized — callers must fail closed for Add Data.
+ * Returns null when missing/unauthorized/expired — callers must fail closed for Add Data.
  */
 export async function resolveOwnedRechargeOrderId(options: {
   customerUserId: string;
@@ -79,6 +122,7 @@ export async function resolveOwnedRechargeOrderId(options: {
       id: true,
       status: true,
       providerOrderId: true,
+      iccidEncrypted: true,
       walletEsimPurchase: { select: { status: true } },
       adminPackageAssignment: { select: { status: true } },
     },
@@ -92,6 +136,10 @@ export async function resolveOwnedRechargeOrderId(options: {
   });
   if (statusBadge === "Refunded") return null;
   if (order.status !== OrderStatus.COMPLETED || statusBadge !== "Completed") {
+    return null;
+  }
+
+  if (await isEncryptedOrderIccidExpiredForAddData(order.iccidEncrypted)) {
     return null;
   }
 

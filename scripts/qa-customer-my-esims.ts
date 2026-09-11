@@ -268,6 +268,21 @@ function main() {
   assert.match(addDataLib, /buildAddDataIdempotencyKey/);
   assert.match(addDataLib, /parseAddDataSourceOrderId/);
   assert.match(addDataLib, /resolveOwnedRechargeOrderId/);
+  assert.match(addDataLib, /isEncryptedOrderIccidExpiredForAddData/);
+  assert.match(addDataLib, /isProviderUsageExpired/);
+  assert.match(addDataLib, /fetchProviderUsage/);
+  assert.doesNotMatch(addDataLib, /daysRemaining/);
+  assert.doesNotMatch(
+    addDataLib,
+    /validity.*expir|expir.*Order\.validity/i
+  );
+  const partnerAddData = read("app/lib/partner/partnerAddDataCheckout.ts");
+  assert.match(partnerAddData, /isEncryptedOrderIccidExpiredForAddData/);
+  assert.match(partnerAddData, /resolvePartnerOwnedRechargeOrderId/);
+  const lifecycleShared = read(
+    "app/lib/esim/esimLifecycleNotificationShared.ts"
+  );
+  assert.match(lifecycleShared, /export function isProviderUsageExpired/);
   const creditCheckout = read("app/lib/vesim/creditCheckout.ts");
   assert.match(creditCheckout, /rechargeOrderId/);
   assert.match(

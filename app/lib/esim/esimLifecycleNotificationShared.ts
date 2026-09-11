@@ -83,6 +83,21 @@ export function parseProviderInstantMs(
 }
 
 /**
+ * Authoritative expired check for Add More Data / lifecycle.
+ * True when provider says isExpired, or expiresAt/endAt is parseable and <= now.
+ * Never uses Order.validity text or daysRemaining alone.
+ */
+export function isProviderUsageExpired(
+  usage: Pick<EsimLifecycleUsageInput, "expiresAt" | "isExpired">,
+  nowMs: number = Date.now()
+): boolean {
+  if (!Number.isFinite(nowMs)) return false;
+  if (usage.isExpired === true) return true;
+  const expiresMs = parseProviderInstantMs(usage.expiresAt);
+  return expiresMs != null && expiresMs <= nowMs;
+}
+
+/**
  * Expiry candidates from authoritative provider timestamps / flags only.
  * - Prefer expiresAt/endAt (passed as usage.expiresAt after normalize).
  * - EXPIRY_SOON only when expiresAt is > now and <= 24h away.
@@ -96,14 +111,11 @@ export function evaluateEsimLifecycleExpiryEvents(
 ): EsimLifecycleKind[] {
   if (!Number.isFinite(nowMs)) return [];
 
-  const expiresMs = parseProviderInstantMs(usage.expiresAt);
-  const expiredByFlag = usage.isExpired === true;
-  const expiredByTimestamp = expiresMs != null && expiresMs <= nowMs;
-  const isExpired = expiredByFlag || expiredByTimestamp;
-
-  if (isExpired) {
+  if (isProviderUsageExpired(usage, nowMs)) {
     return ["EXPIRED"];
   }
+
+  const expiresMs = parseProviderInstantMs(usage.expiresAt);
 
   if (expiresMs == null) {
     return [];

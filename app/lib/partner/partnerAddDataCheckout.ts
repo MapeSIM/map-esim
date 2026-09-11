@@ -10,7 +10,10 @@ import {
   Role,
 } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
-import { normalizeAddDataFromOrderId } from "@/app/lib/esim/addDataCheckout";
+import {
+  isEncryptedOrderIccidExpiredForAddData,
+  normalizeAddDataFromOrderId,
+} from "@/app/lib/esim/addDataCheckout";
 import {
   buildAddDataEligibility,
   lookupOfferTopUpFromCatalog,
@@ -67,6 +70,7 @@ export async function resolvePartnerOwnedRechargeOrderId(options: {
           status: true,
           offerId: true,
           providerOrderId: true,
+          iccidEncrypted: true,
         },
       },
     },
@@ -107,6 +111,10 @@ export async function resolvePartnerOwnedRechargeOrderId(options: {
   });
 
   if (!addData.addDataEligible) return null;
+
+  if (await isEncryptedOrderIccidExpiredForAddData(order.iccidEncrypted)) {
+    return null;
+  }
 
   const rechargeOrderId = (addData.rechargeOrderId ?? "").trim();
   return rechargeOrderId || null;
