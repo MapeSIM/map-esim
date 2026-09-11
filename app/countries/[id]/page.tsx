@@ -14,6 +14,7 @@ import {
   fetchPublicDestinationCatalog,
   fetchPublicOffersForCountry,
 } from "@/app/lib/vesim/server";
+import { notFound } from "next/navigation";
 
 /** Align with public destination catalog cache; keep crawlers on fresh plan HTML. */
 export const revalidate = 300;
@@ -85,16 +86,7 @@ export default async function CountryDetailPage({
   const fallbackDestination = id ? staticToDestination(id) : undefined;
 
   if (!id) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-[var(--page-bg)] text-[var(--heading)]">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold">Destination not found</h1>
-          <p className="mt-3 text-[var(--text-muted)]">
-            We couldn&apos;t find plans for this destination.
-          </p>
-        </div>
-      </main>
-    );
+    notFound();
   }
 
   const destinations = await loadPublicDestinations();
@@ -109,16 +101,7 @@ export default async function CountryDetailPage({
     findDestinationBySlug(destinations, id) || fallbackDestination || null;
 
   if (!matched) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-[var(--page-bg)] text-[var(--heading)]">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold">Destination not found</h1>
-          <p className="mt-3 text-[var(--text-muted)]">
-            We couldn&apos;t find plans for this destination.
-          </p>
-        </div>
-      </main>
-    );
+    notFound();
   }
 
   const relatedRegional =
@@ -141,7 +124,7 @@ export default async function CountryDetailPage({
       countryNames={countryNames}
       relatedRegional={relatedRegional}
     >
-      <CountrySeoContent destination={destination} />
+      <CountrySeoContent destination={destination} offers={offers} />
     </PlansListing>
   );
 }

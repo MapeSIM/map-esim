@@ -19,25 +19,35 @@ import { HomePopularDestinations } from "@/app/components/home/HomePopularDestin
 import { HomeComparisonSection } from "@/app/components/home/HomeComparisonSection";
 import { HomeFinalCta } from "@/app/components/home/HomeFinalCta";
 import { FaqAccordion } from "@/app/components/faq/FaqAccordion";
-import { BRAND_NAME, BRAND_TAGLINE } from "@/app/lib/brand";
+import { BRAND_NAME } from "@/app/lib/brand";
 import {
   HOME_DISCOVERY_CTA_HREF,
   HOME_DISCOVERY_CTA_LABEL,
 } from "@/app/lib/home/homeConversionSections";
 import { absoluteCanonical } from "@/app/lib/seo/canonical";
+import { DEFAULT_SOCIAL_SHARE_IMAGE } from "@/app/lib/seo/socialShareMeta";
 
 const homeCanonical = absoluteCanonical("/");
+const homeTitle = `Buy Travel eSIM Online | ${BRAND_NAME}`;
+const homeDescription = `Get travel data eSIM plans for destinations worldwide. Compare coverage, buy online, and install instantly with QR — stay connected abroad with ${BRAND_NAME}.`;
 
 export const metadata: Metadata = {
-  title: BRAND_NAME,
-  description: BRAND_TAGLINE,
+  title: homeTitle,
+  description: homeDescription,
   alternates: { canonical: homeCanonical },
   openGraph: {
-    title: BRAND_NAME,
-    description: BRAND_TAGLINE,
+    title: homeTitle,
+    description: homeDescription,
     url: homeCanonical,
     siteName: BRAND_NAME,
     type: "website",
+    images: [DEFAULT_SOCIAL_SHARE_IMAGE],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: homeTitle,
+    description: homeDescription,
+    images: [DEFAULT_SOCIAL_SHARE_IMAGE.url],
   },
 };
 

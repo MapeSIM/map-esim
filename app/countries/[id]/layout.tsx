@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { BRAND_NAME } from "@/app/lib/brand";
 import { absoluteCanonical } from "@/app/lib/seo/canonical";
 import { resolveDestinationForSeo } from "@/app/lib/seo/destinationCatalog";
+import { DEFAULT_SOCIAL_SHARE_IMAGE } from "@/app/lib/seo/socialShareMeta";
 import { destinationPath } from "@/app/lib/vesim/destinations";
 import { destinationDisplayName } from "@/app/lib/vesim/destinationPresentation";
 
@@ -47,6 +48,13 @@ export async function generateMetadata({
       url: canonical,
       siteName: BRAND_NAME,
       type: "website",
+      images: [DEFAULT_SOCIAL_SHARE_IMAGE],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [DEFAULT_SOCIAL_SHARE_IMAGE.url],
     },
     robots: { index: true, follow: true },
   };

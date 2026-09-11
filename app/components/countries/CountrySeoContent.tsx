@@ -6,17 +6,22 @@ import { absoluteCanonical } from "@/app/lib/seo/canonical";
 import { buildCountrySeoContent } from "@/app/lib/seo/countryPageContent";
 import {
   breadcrumbList,
+  destinationPlanProductNode,
   faqPage,
   SITE_ORG_ID,
   SITE_WEBSITE_ID,
 } from "@/app/lib/seo/siteGraph";
 import { destinationPath, type VesimDestination } from "@/app/lib/vesim/destinations";
 import { destinationDisplayName } from "@/app/lib/vesim/destinationPresentation";
+import type { VesimOffer } from "@/app/lib/vesim/offers";
 
 export function CountrySeoContent({
   destination,
+  offers = [],
 }: {
   destination: VesimDestination;
+  /** SSR public offers — Product/Offer JSON-LD uses real retail prices only. */
+  offers?: VesimOffer[];
 }) {
   const label = destinationDisplayName(destination);
   const path = destinationPath(destination);
@@ -26,6 +31,14 @@ export function CountrySeoContent({
     path,
   });
   const canonical = absoluteCanonical(path);
+  const productName = `${label} eSIM`;
+  const productDescription = `Travel data eSIM plans for ${label} from ${BRAND_NAME}.`;
+  const productNode = destinationPlanProductNode({
+    name: productName,
+    description: productDescription,
+    url: canonical,
+    offers,
+  });
   const structuredData = {
     "@context": "https://schema.org",
     "@graph": [
@@ -39,6 +52,7 @@ export function CountrySeoContent({
         isPartOf: { "@id": SITE_WEBSITE_ID },
         publisher: { "@id": SITE_ORG_ID },
       },
+      ...(productNode ? [productNode] : []),
     ],
   };
 

@@ -23,7 +23,11 @@ import {
   THEME_PREFERENCE_COOKIE,
   themePreferenceToHtmlClass,
 } from "@/app/lib/cookies/preferenceCookies";
-import { organizationNode, websiteNode } from "@/app/lib/seo/siteGraph";
+import {
+  organizationNode,
+  websiteNode,
+} from "@/app/lib/seo/siteGraph";
+import { DEFAULT_SOCIAL_SHARE_IMAGE } from "@/app/lib/seo/socialShareMeta";
 
 export const metadata: Metadata = {
   metadataBase: new URL(BRAND_SITE_URL),
@@ -37,11 +41,13 @@ export const metadata: Metadata = {
     // child routes that omit their own og:url and confused crawler canonicals.
     siteName: BRAND_NAME,
     type: "website",
+    images: [DEFAULT_SOCIAL_SHARE_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
     title: BRAND_NAME,
     description: BRAND_TAGLINE,
+    images: [DEFAULT_SOCIAL_SHARE_IMAGE.url],
   },
 };
 

@@ -67,3 +67,65 @@ export function faqPage(
     })),
   };
 }
+
+/**
+ * Destination plan commerce node from real SSR offer retail prices only.
+ * Returns null when no valid positive USD prices exist (never invents prices).
+ */
+export function destinationPlanProductNode(options: {
+  name: string;
+  description: string;
+  url: string;
+  offers: Array<{
+    id?: string;
+    name?: string;
+    priceUSD?: number | null;
+    currency?: string;
+  }>;
+}) {
+  const priced = options.offers
+    .map((offer) => {
+      const price = offer.priceUSD;
+      if (typeof price !== "number" || !Number.isFinite(price) || price <= 0) {
+        return null;
+      }
+      return {
+        id: (offer.id ?? "").trim(),
+        name: (offer.name ?? "").trim() || options.name,
+        priceUSD: price,
+        currency:
+          typeof offer.currency === "string" && offer.currency.trim()
+            ? offer.currency.trim().toUpperCase()
+            : "USD",
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null);
+
+  if (priced.length === 0) {
+    return null;
+  }
+
+  const prices = priced.map((row) => row.priceUSD);
+  const lowPrice = Math.min(...prices);
+  const highPrice = Math.max(...prices);
+  const currency = priced.every((row) => row.currency === priced[0].currency)
+    ? priced[0].currency
+    : "USD";
+
+  return {
+    "@type": "Product",
+    name: options.name,
+    description: options.description,
+    url: options.url,
+    brand: { "@id": SITE_ORG_ID },
+    offers: {
+      "@type": "AggregateOffer",
+      url: options.url,
+      priceCurrency: currency,
+      lowPrice: Number(lowPrice.toFixed(2)),
+      highPrice: Number(highPrice.toFixed(2)),
+      offerCount: priced.length,
+      availability: "https://schema.org/InStock",
+    },
+  };
+}

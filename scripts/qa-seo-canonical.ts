@@ -27,13 +27,22 @@ function main() {
     "https://mapesim.com/countries/saudi-arabia"
   );
 
-  const rootLayout = read("app/layout.tsx");
-  assert.doesNotMatch(rootLayout, /openGraph:\s*\{[^}]*url:\s*BRAND_SITE_URL/);
-  assert.match(rootLayout, /Do not set openGraph\.url here/);
-
   const home = read("app/page.tsx");
   assert.match(home, /absoluteCanonical\("\/"\)/);
   assert.doesNotMatch(home, /canonical:\s*"\/"/);
+  assert.match(home, /Buy Travel eSIM Online/);
+  assert.match(home, /DEFAULT_SOCIAL_SHARE_IMAGE|opengraph-image/);
+  assert.match(home, /summary_large_image/);
+
+  const rootLayout = read("app/layout.tsx");
+  assert.doesNotMatch(rootLayout, /openGraph:\s*\{[^}]*url:\s*BRAND_SITE_URL/);
+  assert.match(rootLayout, /Do not set openGraph\.url here/);
+  assert.match(rootLayout, /DEFAULT_SOCIAL_SHARE_IMAGE/);
+  assert.match(rootLayout, /summary_large_image/);
+  assert.match(
+    read("app/lib/seo/socialShareMeta.ts"),
+    /DEFAULT_SOCIAL_SHARE_IMAGE/
+  );
 
   const countries = read("app/countries/layout.tsx");
   assert.match(countries, /absoluteCanonical\("\/countries"\)/);

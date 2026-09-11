@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildCountrySeoContent } from "../app/lib/seo/countryPageContent";
+import { destinationPlanProductNode } from "../app/lib/seo/siteGraph";
 
 const root = join(__dirname, "..");
 
@@ -63,7 +64,12 @@ function main() {
 
   assert.doesNotMatch(page, /^["']use client["']/m);
   assert.match(page, /CountrySeoContent/);
-  assert.match(page, /<CountrySeoContent destination=\{destination\} \/>/);
+  assert.match(page, /notFound\(\)/);
+  assert.doesNotMatch(page, /Destination not found/);
+  assert.match(
+    page,
+    /<CountrySeoContent destination=\{destination\} offers=\{offers\} \/>/
+  );
   assert.match(page, /loading=\{false\}/);
   console.log("PASS country_page_wires_seo_slot");
 
@@ -84,6 +90,7 @@ function main() {
   assert.match(section, /items=\{content\.faqs\}/);
   assert.match(section, /faqPage\(/);
   assert.match(section, /breadcrumbList\(/);
+  assert.match(section, /destinationPlanProductNode\(/);
   assert.match(section, /buildCountrySeoContent/);
   assert.doesNotMatch(section, /href="\/install\/iphone"/);
   assert.doesNotMatch(section, /href="\/install\/android"/);
@@ -99,7 +106,48 @@ function main() {
   assert.match(graph, /export function faqPage/);
   assert.match(graph, /"@type": "FAQPage"/);
   assert.match(graph, /export function breadcrumbList/);
+  assert.match(graph, /export function destinationPlanProductNode/);
+  assert.match(graph, /"@type": "AggregateOffer"/);
+  const socialMeta = read("app/lib/seo/socialShareMeta.ts");
+  assert.match(socialMeta, /DEFAULT_SOCIAL_SHARE_IMAGE/);
+  assert.match(socialMeta, /opengraph-image/);
   console.log("PASS schema_helpers");
+
+  assert.equal(
+    destinationPlanProductNode({
+      name: "Japan eSIM",
+      description: "test",
+      url: "https://mapesim.com/countries/japan",
+      offers: [{ priceUSD: null }, { priceUSD: 0 }, { priceUSD: -1 }],
+    }),
+    null
+  );
+  const product = destinationPlanProductNode({
+    name: "Japan eSIM",
+    description: "test",
+    url: "https://mapesim.com/countries/japan",
+    offers: [
+      { id: "a", name: "1GB", priceUSD: 4.5 },
+      { id: "b", name: "3GB", priceUSD: 9 },
+    ],
+  });
+  assert.ok(product);
+  assert.equal(
+    (product as { offers: { lowPrice: number; highPrice: number; offerCount: number } })
+      .offers.lowPrice,
+    4.5
+  );
+  assert.equal(
+    (product as { offers: { lowPrice: number; highPrice: number; offerCount: number } })
+      .offers.highPrice,
+    9
+  );
+  assert.equal(
+    (product as { offers: { lowPrice: number; highPrice: number; offerCount: number } })
+      .offers.offerCount,
+    2
+  );
+  console.log("PASS product_offer_uses_real_prices_only");
 
   assert.match(pkg, /qa:country-page-seo/);
   assert.match(prelaunch, /qa:country-page-seo/);
