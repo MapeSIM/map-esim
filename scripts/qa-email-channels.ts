@@ -87,10 +87,21 @@ function assertUnifiedEmailFooter(html: string, label: string): void {
     `${label}: copyright`
   );
   assert.equal(
-    html.includes("cid:mapesim-brand-logo@mapesim.com"),
+    html.includes("https://mapesim.com/brand/map-esim-logo.png"),
     true,
-    `${label}: logo cid`
+    `${label}: absolute logo url`
   );
+  assert.equal(
+    html.includes('width="200"'),
+    true,
+    `${label}: logo width`
+  );
+  assert.equal(
+    html.includes('height="62"'),
+    true,
+    `${label}: logo height`
+  );
+  assert.equal(html.includes("cid:mapesim-brand-logo@mapesim.com"), false);
   assert.equal(html.includes("MAP eSIM Security"), false, `${label}: no channel footer`);
   assert.equal(html.includes("MAP eSIM Orders"), false, `${label}: no channel footer`);
   assert.equal(html.includes("MAP eSIM Billing"), false, `${label}: no channel footer`);

@@ -2,10 +2,17 @@ import { BRAND_NAME, BRAND_SITE_URL, BRAND_SUPPORT_EMAIL } from "@/app/lib/brand
 import {
   escapeHtml,
   renderEmailFooterText,
-  TEXT_PRIMARY,
-  TEXT_SECONDARY,
 } from "@/app/lib/email/brand";
 import { renderTransactionalEmailLayoutHtml } from "@/app/lib/email/emailLayout";
+import {
+  renderEmailCtaButton,
+  renderEmailDetailRow,
+  renderEmailHeading,
+  renderEmailLead,
+  renderEmailNotice,
+  renderEmailSummaryPanel,
+  renderEmailSupportBlock,
+} from "@/app/lib/email/emailUi";
 
 export type RefundStatusEmailKind =
   | "received"
@@ -25,13 +32,6 @@ export type RefundStatusEmailPayload = {
   /** Exact MAP Wallet credit for completed emails. */
   walletCreditedLabel?: string;
 };
-
-function detailRow(label: string, value: string): string {
-  return `<tr>
-    <td style="padding:6px 0;font-size:13px;color:${TEXT_SECONDARY};width:42%;vertical-align:top;">${escapeHtml(label)}</td>
-    <td style="padding:6px 0;font-size:14px;color:${TEXT_PRIMARY};font-weight:600;vertical-align:top;">${escapeHtml(value)}</td>
-  </tr>`;
-}
 
 function headlineFor(kind: RefundStatusEmailKind): string {
   switch (kind) {
@@ -89,9 +89,6 @@ export function refundStatusEmailSubject(kind: RefundStatusEmailKind): string {
 export function renderRefundStatusEmailHtml(
   payload: RefundStatusEmailPayload
 ): string {
-  const name = escapeHtml(payload.customerName || "Customer");
-  const support = escapeHtml(BRAND_SUPPORT_EMAIL);
-  const headline = escapeHtml(headlineFor(payload.kind));
   const intro = escapeHtml(
     introFor(
       payload.kind,
@@ -102,19 +99,19 @@ export function renderRefundStatusEmailHtml(
 
   const caution =
     payload.kind === "completed"
-      ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.55;color:${TEXT_PRIMARY};font-weight:600;">
-          MAP Wallet credited: ${escapeHtml(payload.walletCreditedLabel || payload.amountLabel)} ${escapeHtml(payload.currencyLabel)}.
-          No Simpaisa / original-payment refund was issued by this notice.
-        </p>`
+      ? renderEmailNotice(
+          `MAP Wallet credited: ${escapeHtml(payload.walletCreditedLabel || payload.amountLabel)} ${escapeHtml(payload.currencyLabel)}. No Simpaisa / original-payment refund was issued by this notice.`,
+          { title: "Refund completed" }
+        )
       : payload.kind === "approved_pending_execution"
-      ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.55;color:${TEXT_PRIMARY};font-weight:600;">
-          This is not a refund-completed notice. Actual funds have not yet been returned.
-        </p>`
-      : payload.kind === "received" || payload.kind === "under_review"
-        ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.55;color:${TEXT_PRIMARY};font-weight:600;">
-            No refund has been completed yet. No funds have been moved.
-          </p>`
-        : "";
+        ? renderEmailNotice(
+            "This is not a refund-completed notice. Actual funds have not yet been returned."
+          )
+        : payload.kind === "received" || payload.kind === "under_review"
+          ? renderEmailNotice(
+              "No refund has been completed yet. No funds have been moved."
+            )
+          : "";
 
   const amountRowLabel =
     payload.kind === "completed" ? "MAP Wallet credited" : "Requested amount";
@@ -123,30 +120,22 @@ export function renderRefundStatusEmailHtml(
       ? `${payload.walletCreditedLabel || payload.amountLabel} ${payload.currencyLabel}`
       : `${payload.amountLabel} ${payload.currencyLabel}`;
 
+  const rows = [
+    renderEmailDetailRow("Order reference", payload.orderReference),
+    renderEmailDetailRow(amountRowLabel, amountRowValue),
+    renderEmailDetailRow("Date", payload.requestedAtLabel),
+  ].join("");
+
   return renderTransactionalEmailLayoutHtml({
     title: `${BRAND_NAME} ${headlineFor(payload.kind)}`,
+    preheader: subjectFor(payload.kind),
     contentHtml: `
-              <h1 style="margin:0 0 12px;font-size:22px;color:${TEXT_PRIMARY};font-weight:700;">
-                ${headline}
-              </h1>
-              <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:${TEXT_SECONDARY};">
-                ${intro}
-              </p>
+              ${renderEmailHeading(headlineFor(payload.kind))}
+              ${renderEmailLead(intro)}
               ${caution}
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 8px;">
-                ${detailRow("Order reference", payload.orderReference)}
-                ${detailRow(amountRowLabel, amountRowValue)}
-                ${detailRow("Date", payload.requestedAtLabel)}
-              </table>
-              <p style="margin:16px 0 0;font-size:14px;line-height:1.55;">
-                <a href="${escapeHtml(payload.orderUrl)}" style="color:#2f6b00;font-weight:700;text-decoration:underline;">View your order</a>
-              </p>
-              <p style="margin:18px 0 0;font-size:13px;line-height:1.55;color:${TEXT_SECONDARY};">
-                Questions? Contact
-                <a href="mailto:${support}" style="color:#2f6b00;text-decoration:underline;">${support}</a>
-                or visit
-                <a href="${escapeHtml(BRAND_SITE_URL)}/contact" style="color:#2f6b00;text-decoration:underline;">${escapeHtml(BRAND_SITE_URL.replace(/^https?:\/\//, ""))}/contact</a>.
-              </p>`,
+              ${renderEmailSummaryPanel("Refund details", rows)}
+              ${renderEmailCtaButton(payload.orderUrl, "View your order")}
+              ${renderEmailSupportBlock()}`,
   });
 }
 

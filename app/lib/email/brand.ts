@@ -1,13 +1,17 @@
 import {
   BRAND_EMAIL_COPYRIGHT,
   BRAND_EMAIL_TAGLINE,
+  BRAND_LOGO_ALT,
   BRAND_NAME,
   BRAND_SITE_HOST,
   BRAND_SITE_URL,
   BRAND_SUPPORT_EMAIL,
 } from "@/app/lib/brand";
 import type { EmailChannel } from "@/app/lib/email/channels";
-import { EMAIL_LOGO_CID, getEmailLogoCidSrc } from "@/app/lib/email/logo";
+import {
+  EMAIL_LOGO_CID,
+  resolveEmailLogoSrc,
+} from "@/app/lib/email/logo";
 
 export const BRAND_LIME = "#7CFF00";
 export const BRAND_NAVY = "#020817";
@@ -19,6 +23,13 @@ export const PAGE_BG = "#eef2f7";
 export const CARD_BG = "#ffffff";
 /** Display width for brand logo images in HTML emails (190–220px). */
 export const EMAIL_LOGO_DISPLAY_WIDTH = 200;
+/**
+ * Intrinsic logo is 928×288 — keep height explicit for Outlook.
+ * round(200 * 288 / 928) = 62
+ */
+export const EMAIL_LOGO_DISPLAY_HEIGHT = 62;
+const EMAIL_LINK = "#2f6b00";
+const EMAIL_FONT = "Segoe UI,Helvetica,Arial,sans-serif";
 
 export { EMAIL_LOGO_CID };
 
@@ -33,51 +44,61 @@ export function escapeHtml(value: string): string {
 
 /**
  * Central reusable MAP eSIM email footer for every outgoing template.
- * Logo is CID-backed for Gmail/Outlook; text remains when images are blocked.
+ * Logo uses an absolute HTTPS URL (Gmail/Outlook compatible). CID attachment
+ * may still be included by the transport as a fallback asset.
  *
  * Channel is accepted for call-site compatibility but does not change footer
  * content — From / Reply-To routing stays on sendChannelMail.
  */
 export function renderEmailFooterHtml(
   _channel?: EmailChannel,
-  logoSrc: string = getEmailLogoCidSrc()
+  logoSrc?: string
 ): string {
   const site = escapeHtml(BRAND_SITE_HOST);
   const siteUrl = escapeHtml(BRAND_SITE_URL);
   const support = escapeHtml(BRAND_SUPPORT_EMAIL);
-  const logo = escapeHtml(logoSrc);
+  const logo = escapeHtml(resolveEmailLogoSrc(logoSrc));
+  const contactUrl = escapeHtml(`${BRAND_SITE_URL}/contact`);
 
   return `
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0;border-top:1px solid ${BORDER};">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:32px 0 0;border-top:1px solid ${BORDER};">
       <tr>
-        <td style="padding:20px 0 0;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 14px;">
+        <td style="padding:28px 0 0;font-family:${EMAIL_FONT};">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 18px;">
             <tr>
               <td>
                 <a href="${siteUrl}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;border:0;outline:none;">
                   <img
                     src="${logo}"
                     width="${EMAIL_LOGO_DISPLAY_WIDTH}"
-                    alt="${escapeHtml(BRAND_NAME)}"
+                    height="${EMAIL_LOGO_DISPLAY_HEIGHT}"
+                    alt="${escapeHtml(BRAND_LOGO_ALT)}"
                     style="display:block;width:${EMAIL_LOGO_DISPLAY_WIDTH}px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;"
                   />
                 </a>
               </td>
             </tr>
           </table>
-          <p style="margin:0 0 2px;font-size:15px;line-height:1.4;color:${TEXT_PRIMARY};font-weight:800;">
+          <p style="margin:0 0 4px;font-size:16px;line-height:1.35;color:${TEXT_PRIMARY};font-weight:800;">
             ${escapeHtml(BRAND_NAME)}
           </p>
-          <p style="margin:0 0 14px;font-size:13px;line-height:1.45;color:${TEXT_SECONDARY};font-weight:600;">
+          <p style="margin:0 0 20px;font-size:13px;line-height:1.55;color:${TEXT_SECONDARY};font-weight:600;">
             ${escapeHtml(BRAND_EMAIL_TAGLINE)}
           </p>
-          <p style="margin:0 0 4px;font-size:12px;line-height:1.5;color:${TEXT_SECONDARY};">
-            <a href="${siteUrl}" target="_blank" rel="noopener noreferrer" style="color:#2f6b00;text-decoration:underline;">${siteUrl}</a>
+          <p style="margin:0 0 8px;font-size:11px;line-height:1.4;letter-spacing:0.08em;text-transform:uppercase;color:${TEXT_SECONDARY};font-weight:800;">
+            Support
           </p>
-          <p style="margin:0 0 14px;font-size:12px;line-height:1.5;color:${TEXT_SECONDARY};">
-            <a href="mailto:${support}" style="color:#2f6b00;text-decoration:underline;">${support}</a>
+          <p style="margin:0 0 6px;font-size:13px;line-height:1.55;color:${TEXT_SECONDARY};">
+            <a href="mailto:${support}" style="color:${EMAIL_LINK};font-weight:700;text-decoration:underline;">${support}</a>
           </p>
-          <p style="margin:0;font-size:11px;line-height:1.5;color:${TEXT_SECONDARY};">
+          <p style="margin:0 0 6px;font-size:13px;line-height:1.55;color:${TEXT_SECONDARY};">
+            Website:
+            <a href="${siteUrl}" target="_blank" rel="noopener noreferrer" style="color:${EMAIL_LINK};font-weight:700;text-decoration:underline;">${site}</a>
+          </p>
+          <p style="margin:0 0 20px;font-size:13px;line-height:1.55;color:${TEXT_SECONDARY};">
+            <a href="${contactUrl}" target="_blank" rel="noopener noreferrer" style="color:${EMAIL_LINK};font-weight:700;text-decoration:underline;">${site}/contact</a>
+          </p>
+          <p style="margin:0;font-size:11px;line-height:1.55;color:${TEXT_SECONDARY};">
             ${escapeHtml(BRAND_EMAIL_COPYRIGHT)}
           </p>
         </td>
@@ -91,8 +112,10 @@ export function renderEmailFooterText(_channel?: EmailChannel): string {
     BRAND_NAME,
     BRAND_EMAIL_TAGLINE,
     "",
-    BRAND_SITE_URL,
+    "Support",
     BRAND_SUPPORT_EMAIL,
+    `Website: ${BRAND_SITE_URL}`,
+    `${BRAND_SITE_URL}/contact`,
     "",
     BRAND_EMAIL_COPYRIGHT,
   ].join("\n");

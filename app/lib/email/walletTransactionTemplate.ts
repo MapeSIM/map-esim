@@ -2,10 +2,17 @@ import { BRAND_NAME, BRAND_SITE_URL, BRAND_SUPPORT_EMAIL } from "@/app/lib/brand
 import {
   escapeHtml,
   renderEmailFooterText,
-  TEXT_PRIMARY,
-  TEXT_SECONDARY,
 } from "@/app/lib/email/brand";
 import { renderTransactionalEmailLayoutHtml } from "@/app/lib/email/emailLayout";
+import {
+  renderEmailCtaButton,
+  renderEmailDetailRow,
+  renderEmailHeading,
+  renderEmailLead,
+  renderEmailSummaryPanel,
+  renderEmailSupportBlock,
+  renderEmailTextLink,
+} from "@/app/lib/email/emailUi";
 
 export type WalletTransactionEmailPayload = {
   customerName: string;
@@ -22,57 +29,48 @@ export type WalletTransactionEmailPayload = {
   walletUrl: string;
 };
 
-function detailRow(label: string, value: string): string {
-  return `<tr>
-    <td style="padding:6px 0;font-size:13px;color:${TEXT_SECONDARY};width:42%;vertical-align:top;">${escapeHtml(label)}</td>
-    <td style="padding:6px 0;font-size:14px;color:${TEXT_PRIMARY};font-weight:600;vertical-align:top;">${escapeHtml(value)}</td>
-  </tr>`;
-}
-
 export function renderWalletTransactionEmailHtml(
   payload: WalletTransactionEmailPayload
 ): string {
   const name = escapeHtml(payload.customerName || "Customer");
-  const support = escapeHtml(BRAND_SUPPORT_EMAIL);
-  const orderBlock = payload.orderReference
-    ? detailRow("Related order", payload.orderReference)
-    : "";
+  const rows = [
+    renderEmailDetailRow("Transaction type", payload.transactionTypeLabel),
+    renderEmailDetailRow(
+      "Amount",
+      `${payload.amountLabel} ${payload.currencyLabel}`
+    ),
+    renderEmailDetailRow("Description", payload.description),
+    payload.orderReference
+      ? renderEmailDetailRow("Related order", payload.orderReference)
+      : "",
+    renderEmailDetailRow(
+      "Transaction reference",
+      payload.transactionReference
+    ),
+    renderEmailDetailRow("Previous balance", payload.previousBalanceLabel),
+    renderEmailDetailRow("New balance", payload.newBalanceLabel),
+    renderEmailDetailRow("Date", payload.occurredAtLabel),
+  ].join("");
+
   const orderLink =
     payload.orderUrl != null
-      ? `<p style="margin:16px 0 0;font-size:14px;line-height:1.55;">
-          <a href="${escapeHtml(payload.orderUrl)}" style="color:#2f6b00;font-weight:700;text-decoration:underline;">View related order</a>
+      ? `<p style="margin:8px 0 0;font-size:14px;line-height:1.55;">
+          ${renderEmailTextLink(payload.orderUrl, "View related order")}
         </p>`
       : "";
 
   return renderTransactionalEmailLayoutHtml({
     title: `${BRAND_NAME} wallet update`,
+    preheader: `${payload.transactionTypeLabel} · ${payload.amountLabel} ${payload.currencyLabel}`,
     contentHtml: `
-              <h1 style="margin:0 0 12px;font-size:22px;color:${TEXT_PRIMARY};font-weight:700;">
-                ${escapeHtml(payload.transactionTypeLabel)}
-              </h1>
-              <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:${TEXT_SECONDARY};">
-                Hello ${name}, here is a summary of your ${escapeHtml(BRAND_NAME)} wallet activity.
-              </p>
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 8px;">
-                ${detailRow("Transaction type", payload.transactionTypeLabel)}
-                ${detailRow("Amount", `${payload.amountLabel} ${payload.currencyLabel}`)}
-                ${detailRow("Description", payload.description)}
-                ${orderBlock}
-                ${detailRow("Transaction reference", payload.transactionReference)}
-                ${detailRow("Previous balance", payload.previousBalanceLabel)}
-                ${detailRow("New balance", payload.newBalanceLabel)}
-                ${detailRow("Date", payload.occurredAtLabel)}
-              </table>
-              <p style="margin:16px 0 0;font-size:14px;line-height:1.55;">
-                <a href="${escapeHtml(payload.walletUrl)}" style="color:#2f6b00;font-weight:700;text-decoration:underline;">View your wallet</a>
-              </p>
+              ${renderEmailHeading(payload.transactionTypeLabel)}
+              ${renderEmailLead(
+                `Hello ${name}, here is a summary of your ${escapeHtml(BRAND_NAME)} wallet activity.`
+              )}
+              ${renderEmailSummaryPanel("Transaction summary", rows)}
+              ${renderEmailCtaButton(payload.walletUrl, "View your wallet")}
               ${orderLink}
-              <p style="margin:18px 0 0;font-size:13px;line-height:1.55;color:${TEXT_SECONDARY};">
-                Questions? Contact
-                <a href="mailto:${support}" style="color:#2f6b00;text-decoration:underline;">${support}</a>
-                or visit
-                <a href="${escapeHtml(BRAND_SITE_URL)}/contact" style="color:#2f6b00;text-decoration:underline;">${escapeHtml(BRAND_SITE_URL.replace(/^https?:\/\//, ""))}/contact</a>.
-              </p>`,
+              ${renderEmailSupportBlock()}`,
   });
 }
 

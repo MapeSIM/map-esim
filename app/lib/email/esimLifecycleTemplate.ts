@@ -2,10 +2,17 @@ import { BRAND_NAME, BRAND_SITE_URL, BRAND_SUPPORT_EMAIL } from "@/app/lib/brand
 import {
   escapeHtml,
   renderEmailFooterText,
-  TEXT_PRIMARY,
-  TEXT_SECONDARY,
 } from "@/app/lib/email/brand";
 import { renderTransactionalEmailLayoutHtml } from "@/app/lib/email/emailLayout";
+import {
+  renderEmailCtaButton,
+  renderEmailDetailRow,
+  renderEmailHeading,
+  renderEmailLead,
+  renderEmailSummaryPanel,
+  renderEmailSupportBlock,
+  renderEmailTextLink,
+} from "@/app/lib/email/emailUi";
 import {
   lifecycleSubject,
   type EsimLifecycleKind,
@@ -23,13 +30,6 @@ export type EsimLifecycleEmailPayload = {
   buyAnotherUrl: string;
 };
 
-function detailRow(label: string, value: string): string {
-  return `<tr>
-    <td style="padding:6px 0;font-size:13px;color:${TEXT_SECONDARY};width:42%;vertical-align:top;">${escapeHtml(label)}</td>
-    <td style="padding:6px 0;font-size:14px;color:${TEXT_PRIMARY};font-weight:600;vertical-align:top;">${escapeHtml(value)}</td>
-  </tr>`;
-}
-
 function headlineFor(kind: EsimLifecycleKind): string {
   switch (kind) {
     case "EXPIRY_SOON_24H":
@@ -39,7 +39,7 @@ function headlineFor(kind: EsimLifecycleKind): string {
     case "LOW_DATA":
       return "Your data is running low";
     case "DATA_EXHAUSTED":
-      return "Your data is used up";
+      return "You’ve used all your data";
     default:
       return "Plan update";
   }
@@ -64,48 +64,32 @@ export function renderEsimLifecycleEmailHtml(
   payload: EsimLifecycleEmailPayload
 ): string {
   const name = escapeHtml(payload.customerName || "Customer");
-  const support = escapeHtml(BRAND_SUPPORT_EMAIL);
-  const destinationRow = payload.destinationLabel
-    ? detailRow("Destination", payload.destinationLabel)
-    : "";
-  const planRow = payload.planLabel
-    ? detailRow("Plan", payload.planLabel)
-    : "";
-  const expiryDateRow = payload.expiryDateLabel
-    ? detailRow("Expiry", payload.expiryDateLabel)
-    : "";
-  const remainingRow = payload.remainingDataLabel
-    ? detailRow("Data remaining", payload.remainingDataLabel)
-    : "";
+  const rows = [
+    payload.destinationLabel
+      ? renderEmailDetailRow("Destination", payload.destinationLabel)
+      : "",
+    payload.planLabel ? renderEmailDetailRow("Plan", payload.planLabel) : "",
+    renderEmailDetailRow("Status", payload.expiryStatusLabel),
+    payload.expiryDateLabel
+      ? renderEmailDetailRow("Expiry", payload.expiryDateLabel)
+      : "",
+    payload.remainingDataLabel
+      ? renderEmailDetailRow("Data remaining", payload.remainingDataLabel)
+      : "",
+  ].join("");
 
   return renderTransactionalEmailLayoutHtml({
     title: lifecycleSubject(payload.kind),
     preheader: lifecycleSubject(payload.kind),
     contentHtml: `
-              <h1 style="margin:0 0 12px;font-size:22px;color:${TEXT_PRIMARY};font-weight:700;">
-                ${escapeHtml(headlineFor(payload.kind))}
-              </h1>
-              <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:${TEXT_SECONDARY};">
-                ${bodyIntro(payload.kind, name)}
+              ${renderEmailHeading(headlineFor(payload.kind))}
+              ${renderEmailLead(bodyIntro(payload.kind, name))}
+              ${renderEmailSummaryPanel("Plan status", rows)}
+              ${renderEmailCtaButton(payload.myEsimUrl, "View My eSIM")}
+              <p style="margin:4px 0 0;font-size:14px;line-height:1.55;">
+                ${renderEmailTextLink(payload.buyAnotherUrl, "Buy another plan")}
               </p>
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 8px;">
-                ${destinationRow}
-                ${planRow}
-                ${detailRow("Status", payload.expiryStatusLabel)}
-                ${expiryDateRow}
-                ${remainingRow}
-              </table>
-              <p style="margin:18px 0 0;font-size:14px;line-height:1.55;">
-                <a href="${escapeHtml(payload.myEsimUrl)}" style="color:#2f6b00;font-weight:700;text-decoration:underline;">View My eSIM</a>
-                &nbsp;&nbsp;·&nbsp;&nbsp;
-                <a href="${escapeHtml(payload.buyAnotherUrl)}" style="color:#2f6b00;font-weight:700;text-decoration:underline;">Buy another plan</a>
-              </p>
-              <p style="margin:18px 0 0;font-size:13px;line-height:1.55;color:${TEXT_SECONDARY};">
-                Questions? Contact
-                <a href="mailto:${support}" style="color:#2f6b00;text-decoration:underline;">${support}</a>
-                or visit
-                <a href="${escapeHtml(BRAND_SITE_URL)}/contact" style="color:#2f6b00;text-decoration:underline;">${escapeHtml(BRAND_SITE_URL.replace(/^https?:\/\//, ""))}/contact</a>.
-              </p>`,
+              ${renderEmailSupportBlock()}`,
   });
 }
 

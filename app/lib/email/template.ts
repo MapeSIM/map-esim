@@ -1,10 +1,29 @@
 import type { OrderEmailPayload } from "@/app/lib/email/types";
 import { BRAND_NAME } from "@/app/lib/brand";
 import {
-  renderEmailFooterHtml,
+  BORDER,
+  BRAND_INK,
+  CARD_BG,
+  escapeHtml,
   renderEmailFooterText,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
 } from "@/app/lib/email/brand";
-import { getEmailLogoCidSrc } from "@/app/lib/email/logo";
+import { renderTransactionalEmailLayoutHtml } from "@/app/lib/email/emailLayout";
+import {
+  EMAIL_FONT_STACK,
+  EMAIL_SURFACE_MUTED,
+  renderEmailCtaButton,
+  renderEmailDetailRow,
+  renderEmailHeroBand,
+  renderEmailLead,
+  renderEmailNotice,
+  renderEmailParagraph,
+  renderEmailSummaryPanel,
+  renderEmailSupportBlock,
+  renderEmailTextLink,
+} from "@/app/lib/email/emailUi";
+import { resolveEmailLogoSrc } from "@/app/lib/email/logo";
 import {
   formatDestinationHeadline,
   maskOrderReference,
@@ -25,40 +44,9 @@ export type OrderEmailHtmlOptions = {
   logoImageSrc?: string;
 };
 
-const BRAND_LIME = "#7CFF00";
-const BRAND_NAVY = "#020817";
-const BRAND_INK = "#06120a";
-const TEXT_PRIMARY = "#0d1524";
-const TEXT_SECONDARY = "#4b5d78";
-const TEXT_ON_NAVY = "#C5D5E4";
-const BORDER = "#e2e8f0";
-const NOTICE_BG = "#f4ffe6";
-const NOTICE_BORDER = "#b8e66b";
-const PAGE_BG = "#eef2f7";
-/** Display width for the horizontal brand logo in HTML emails (190–220px). */
-const EMAIL_LOGO_WIDTH = 200;
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function detailRow(label: string, value?: string): string {
+function optionalDetailRow(label: string, value?: string): string {
   if (!value) return "";
-  return `
-    <tr>
-      <td style="padding:10px 0;border-bottom:1px solid ${BORDER};color:${TEXT_SECONDARY};font-size:13px;width:38%;vertical-align:top;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-        ${escapeHtml(label)}
-      </td>
-      <td style="padding:10px 0;border-bottom:1px solid ${BORDER};color:${TEXT_PRIMARY};font-size:14px;font-weight:600;word-break:break-word;overflow-wrap:anywhere;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-        ${escapeHtml(value)}
-      </td>
-    </tr>
-  `;
+  return renderEmailDetailRow(label, value);
 }
 
 function installQrSection(
@@ -79,10 +67,10 @@ function installQrSection(
 
   const qrImageBlock = hasQrImage
     ? `
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 20px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px;">
         <tr>
-          <td align="center" style="padding:20px 16px;border:1px solid ${BORDER};background:#ffffff;">
-            <p style="margin:0 0 14px;color:${TEXT_PRIMARY};font-size:16px;font-weight:700;line-height:1.3;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+          <td align="center" style="padding:20px 16px;border:1px solid ${BORDER};border-radius:12px;background:${CARD_BG};">
+            <p style="margin:0 0 14px;font-family:${EMAIL_FONT_STACK};color:${TEXT_PRIMARY};font-size:16px;font-weight:800;line-height:1.3;">
               Scan to install your eSIM
             </p>
             <img
@@ -92,91 +80,43 @@ function installQrSection(
               alt="eSIM installation QR code"
               style="display:block;margin:0 auto;width:280px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;"
             />
-            <p style="margin:14px 0 0;color:${TEXT_SECONDARY};font-size:13px;line-height:1.5;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+            <p style="margin:14px 0 0;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:13px;line-height:1.5;">
               Open your phone camera or eSIM installer and scan this code.
             </p>
           </td>
         </tr>
       </table>
     `
-    : `
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 20px;">
-        <tr>
-          <td style="padding:14px 16px;border:1px solid ${BORDER};background:#f8fafc;">
-            <p style="margin:0;color:${TEXT_PRIMARY};font-size:13px;line-height:1.55;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-              A scannable QR code was not available for this order. Use the manual installation details below.
-            </p>
-          </td>
-        </tr>
-      </table>
-    `;
+    : renderEmailNotice(
+        "A scannable QR code was not available for this order. Use the manual installation details below."
+      );
 
   const downloadNotice = hasQrImage
-    ? `
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 20px;">
-        <tr>
-          <td style="padding:14px 16px;border:1px solid ${NOTICE_BORDER};background:${NOTICE_BG};">
-            <p style="margin:0 0 6px;color:${BRAND_INK};font-size:14px;font-weight:700;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-              QR Code Download Available
-            </p>
-            <p style="margin:0;color:${TEXT_PRIMARY};font-size:13px;line-height:1.55;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-              Download the attached QR image and save it securely to your photos before installation.
-            </p>
-          </td>
-        </tr>
-      </table>
-    `
+    ? renderEmailNotice(
+        "Download the attached QR image and save it securely to your photos before installation.",
+        { title: "QR Code Download Available" }
+      )
     : "";
 
   const deviceActions = deviceActionsSection(payload, hasQrImage);
 
   const fallbackRows = [
-    detailRow("SM-DP+ address", payload.smdpAddress),
-    detailRow("Activation code", payload.activationCode),
-    detailRow("Complete LPA installation value", payload.qrValue),
-    detailRow("ICCID", payload.iccid),
-  ]
-    .filter(Boolean)
-    .join("");
+    optionalDetailRow("SM-DP+ address", payload.smdpAddress),
+    optionalDetailRow("Activation code", payload.activationCode),
+    optionalDetailRow("Complete LPA installation value", payload.qrValue),
+    optionalDetailRow("ICCID", payload.iccid),
+  ].join("");
 
-  const fallbackBlock = fallbackRows
-    ? `
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 20px;">
-        <tr>
-          <td style="padding:16px;border:1px solid ${BORDER};background:#f8fafc;">
-            <p style="margin:0 0 8px;color:${TEXT_PRIMARY};font-size:14px;font-weight:700;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-              Manual installation details
-            </p>
-            <p style="margin:0 0 12px;color:${TEXT_SECONDARY};font-size:12px;line-height:1.5;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-              If scanning is unavailable, enter these verified details manually on your device.
-            </p>
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-              ${fallbackRows}
-            </table>
-          </td>
-        </tr>
-      </table>
-    `
-    : "";
+  const fallbackBlock = renderEmailSummaryPanel(
+    "Manual installation details",
+    fallbackRows,
+    {
+      intro:
+        "If scanning is unavailable, enter these verified details manually on your device.",
+    }
+  );
 
   return `${qrImageBlock}${deviceActions}${downloadNotice}${fallbackBlock}`;
-}
-
-function ctaButton(href: string, label: string, primary = true): string {
-  const bg = primary ? BRAND_LIME : "#0d1524";
-  const color = primary ? BRAND_INK : "#ffffff";
-  const border = primary ? BRAND_LIME : "#0d1524";
-  return `
-    <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto 10px;">
-      <tr>
-        <td align="center" bgcolor="${bg}" style="border-radius:10px;background-color:${bg};border:1px solid ${border};">
-          <a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 22px;color:${color};font-size:14px;font-weight:700;text-decoration:none;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-            ${escapeHtml(label)}
-          </a>
-        </td>
-      </tr>
-    </table>
-  `;
 }
 
 function deviceActionsSection(
@@ -203,14 +143,14 @@ function deviceActionsSection(
 
   const iphoneBlock = hasIphoneButton
     ? `
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 16px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 16px;">
         <tr>
           <td align="center">
-            ${ctaButton(iphoneUrl!, "Install on iPhone", true)}
-            <p style="margin:0 0 8px;color:${TEXT_SECONDARY};font-size:12px;line-height:1.5;text-align:center;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+            ${renderEmailCtaButton(iphoneUrl!, "Install on iPhone")}
+            <p style="margin:0 0 8px;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:12px;line-height:1.5;text-align:center;">
               On iOS 17.4 or later, tap the button and follow Apple’s confirmation steps.
             </p>
-            <p style="margin:0;color:${TEXT_SECONDARY};font-size:12px;line-height:1.5;text-align:center;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+            <p style="margin:0;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:12px;line-height:1.5;text-align:center;">
               Installation still requires the normal Apple Allow/Continue confirmation.
             </p>
           </td>
@@ -219,16 +159,18 @@ function deviceActionsSection(
     `
     : iphoneGuideUrl
       ? `
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 16px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 16px;">
         <tr>
-          <td align="center" style="padding:14px 12px;border:1px solid ${BORDER};background:#f8fafc;">
-            <p style="margin:0 0 10px;color:${TEXT_PRIMARY};font-size:14px;font-weight:700;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+          <td align="center" style="padding:16px 14px;border:1px solid ${BORDER};border-radius:12px;background:${EMAIL_SURFACE_MUTED};">
+            <p style="margin:0 0 10px;font-family:${EMAIL_FONT_STACK};color:${TEXT_PRIMARY};font-size:14px;font-weight:800;">
               iPhone installation
             </p>
-            <p style="margin:0 0 12px;color:${TEXT_SECONDARY};font-size:12px;line-height:1.55;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+            <p style="margin:0 0 12px;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:12px;line-height:1.55;">
               No official one-tap activation link was supplied for this order. Use the QR code below or the iPhone guide.
             </p>
-            ${ctaButton(iphoneGuideUrl, "View iPhone Installation Guide", false)}
+            ${renderEmailCtaButton(iphoneGuideUrl, "View iPhone Installation Guide", {
+              primary: false,
+            })}
           </td>
         </tr>
       </table>
@@ -237,7 +179,7 @@ function deviceActionsSection(
 
   const iphoneQrFallback = hasQrImage
     ? `
-      <p style="margin:0 0 16px;color:${TEXT_SECONDARY};font-size:12px;line-height:1.55;text-align:center;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+      <p style="margin:0 0 16px;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:12px;line-height:1.55;text-align:center;">
         On iOS 17.4 or later, you can also press and hold the QR code in Mail or Safari and select Add eSIM.
       </p>
     `
@@ -246,11 +188,13 @@ function deviceActionsSection(
   let androidBlock = "";
   if (hasAndroidDirect) {
     androidBlock = `
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 8px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 8px;">
         <tr>
           <td align="center">
-            ${ctaButton(androidUrl!, "Install on Android", false)}
-            <p style="margin:0;color:${TEXT_SECONDARY};font-size:12px;line-height:1.5;text-align:center;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+            ${renderEmailCtaButton(androidUrl!, "Install on Android", {
+              primary: false,
+            })}
+            <p style="margin:0;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:12px;line-height:1.5;text-align:center;">
               Uses the official activation link supplied for this order. Android support varies by device and carrier app.
             </p>
           </td>
@@ -259,24 +203,28 @@ function deviceActionsSection(
     `;
   } else if (hasQrImage || androidGuideUrl) {
     androidBlock = `
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 8px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 8px;">
         <tr>
-          <td align="center" style="padding:14px 12px;border:1px solid ${BORDER};background:#f8fafc;">
-            <p style="margin:0 0 10px;color:${TEXT_PRIMARY};font-size:14px;font-weight:700;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+          <td align="center" style="padding:16px 14px;border:1px solid ${BORDER};border-radius:12px;background:${EMAIL_SURFACE_MUTED};">
+            <p style="margin:0 0 10px;font-family:${EMAIL_FONT_STACK};color:${TEXT_PRIMARY};font-size:14px;font-weight:800;">
               Android installation
             </p>
-            <p style="margin:0 0 12px;color:${TEXT_SECONDARY};font-size:12px;line-height:1.55;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+            <p style="margin:0 0 12px;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:12px;line-height:1.55;">
               One-click Android installation is not universally available. Download the attached QR image, then follow the Android guide.
             </p>
             ${
               hasQrImage
-                ? `<p style="margin:0 0 10px;color:${TEXT_PRIMARY};font-size:13px;font-weight:700;font-family:Segoe UI,Helvetica,Arial,sans-serif;">Download QR for Android</p>
-                   <p style="margin:0 0 12px;color:${TEXT_SECONDARY};font-size:12px;line-height:1.5;font-family:Segoe UI,Helvetica,Arial,sans-serif;">Use the downloadable PNG attached to this email.</p>`
+                ? `<p style="margin:0 0 10px;font-family:${EMAIL_FONT_STACK};color:${TEXT_PRIMARY};font-size:13px;font-weight:800;">Download QR for Android</p>
+                   <p style="margin:0 0 12px;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:12px;line-height:1.5;">Use the downloadable PNG attached to this email.</p>`
                 : ""
             }
             ${
               androidGuideUrl
-                ? ctaButton(androidGuideUrl, "View Android Installation Guide", false)
+                ? renderEmailCtaButton(
+                    androidGuideUrl,
+                    "View Android Installation Guide",
+                    { primary: false }
+                  )
                 : ""
             }
           </td>
@@ -286,10 +234,10 @@ function deviceActionsSection(
   }
 
   return `
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 20px;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px;">
       <tr>
-        <td style="padding:16px;border:1px solid ${BORDER};background:#ffffff;">
-          <p style="margin:0 0 14px;color:${TEXT_PRIMARY};font-size:14px;font-weight:700;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+        <td style="padding:18px 16px;border:1px solid ${BORDER};border-radius:12px;background:${CARD_BG};">
+          <p style="margin:0 0 14px;font-family:${EMAIL_FONT_STACK};color:${TEXT_PRIMARY};font-size:13px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;">
             Device installation actions
           </p>
           ${iphoneBlock}
@@ -303,29 +251,14 @@ function deviceActionsSection(
 
 function planDetailsSection(payload: OrderEmailPayload): string {
   const rows = [
-    detailRow("Destination", payload.destination),
-    detailRow("Plan name", payload.planName),
-    detailRow("Data allowance", payload.dataAllowance),
-    detailRow("Validity", payload.validity),
-    detailRow("Order ID", maskOrderReference(payload.orderId)),
-  ]
-    .filter(Boolean)
-    .join("");
+    optionalDetailRow("Destination", payload.destination),
+    optionalDetailRow("Plan name", payload.planName),
+    optionalDetailRow("Data allowance", payload.dataAllowance),
+    optionalDetailRow("Validity", payload.validity),
+    optionalDetailRow("Order ID", maskOrderReference(payload.orderId)),
+  ].join("");
 
-  return `
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 20px;">
-      <tr>
-        <td style="padding:16px;border:1px solid ${BORDER};background:#ffffff;">
-          <p style="margin:0 0 10px;color:${TEXT_PRIMARY};font-size:14px;font-weight:700;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-            Plan details
-          </p>
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-            ${rows}
-          </table>
-        </td>
-      </tr>
-    </table>
-  `;
+  return renderEmailSummaryPanel("Plan details", rows);
 }
 
 function howToInstallSection(hasQrImage: boolean): string {
@@ -349,10 +282,10 @@ function howToInstallSection(hasQrImage: boolean): string {
     .map(
       (step, index) => `
       <tr>
-        <td valign="top" width="28" style="padding:0 0 10px;color:${BRAND_INK};font-size:14px;font-weight:700;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+        <td valign="top" width="28" style="padding:0 0 10px;font-family:${EMAIL_FONT_STACK};color:${BRAND_INK};font-size:14px;font-weight:800;">
           ${index + 1}.
         </td>
-        <td style="padding:0 0 10px;color:${TEXT_PRIMARY};font-size:13px;line-height:1.55;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+        <td style="padding:0 0 10px;font-family:${EMAIL_FONT_STACK};color:${TEXT_PRIMARY};font-size:13px;line-height:1.55;">
           ${escapeHtml(step)}
         </td>
       </tr>
@@ -361,13 +294,13 @@ function howToInstallSection(hasQrImage: boolean): string {
     .join("");
 
   return `
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 20px;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px;">
       <tr>
-        <td style="padding:16px;border:1px solid ${BORDER};background:#ffffff;">
-          <p style="margin:0 0 12px;color:${TEXT_PRIMARY};font-size:14px;font-weight:700;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+        <td style="padding:18px 16px;border:1px solid ${BORDER};border-radius:12px;background:${CARD_BG};">
+          <p style="margin:0 0 12px;font-family:${EMAIL_FONT_STACK};color:${TEXT_PRIMARY};font-size:13px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;">
             How to Install
           </p>
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
             ${items}
           </table>
         </td>
@@ -386,17 +319,7 @@ function introCopy(hasQrImage: boolean): string {
 function supportPurchaseNoticeSection(payload: OrderEmailPayload): string {
   const notice = payload.supportPurchaseNotice?.trim();
   if (!notice) return "";
-  return `
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 20px;">
-      <tr>
-        <td style="padding:14px 16px;border:1px solid ${NOTICE_BORDER};background:${NOTICE_BG};">
-          <p style="margin:0;color:${TEXT_PRIMARY};font-size:13px;line-height:1.55;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-            ${escapeHtml(notice)}
-          </p>
-        </td>
-      </tr>
-    </table>
-  `;
+  return renderEmailNotice(escapeHtml(notice));
 }
 
 export function renderOrderEmailHtml(
@@ -406,89 +329,36 @@ export function renderOrderEmailHtml(
   const hasQrImage = Boolean(options.qrImageSrc);
   const installSection = installQrSection(payload, options.qrImageSrc);
   const destinationHeadline = formatDestinationHeadline(payload.destination);
-  /** Preview: public `/brand/...` URL. Real mail: CID (default). */
-  const logoSrc = escapeHtml(options.logoImageSrc || getEmailLogoCidSrc());
-  const logoImg = `
-                  <img
-                    src="${logoSrc}"
-                    width="${EMAIL_LOGO_WIDTH}"
-                    alt="MAP eSIM"
-                    style="display:block;margin:0 auto;width:${EMAIL_LOGO_WIDTH}px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;"
-                  />`;
+  const logoSrc = resolveEmailLogoSrc(options.logoImageSrc);
 
-  return `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <title>Your eSIM is Ready! — ${BRAND_NAME}</title>
-    <!--[if mso]>
-    <noscript>
-      <xml>
-        <o:OfficeDocumentSettings>
-          <o:PixelsPerInch>96</o:PixelsPerInch>
-        </o:OfficeDocumentSettings>
-      </xml>
-    </noscript>
-    <![endif]-->
-  </head>
-  <body style="margin:0;padding:0;background:${PAGE_BG};color:${TEXT_PRIMARY};font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="${PAGE_BG}" style="background:${PAGE_BG};padding:24px 12px;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid ${BORDER};">
-            <tr>
-              <td align="center" bgcolor="#ffffff" style="padding:28px 24px 22px;background-color:#ffffff;">
-                ${logoImg}
-              </td>
-            </tr>
-            <tr>
-              <td height="3" bgcolor="${BRAND_LIME}" style="height:3px;line-height:3px;font-size:0;background-color:${BRAND_LIME};">&nbsp;</td>
-            </tr>
-            <tr>
-              <td align="center" bgcolor="${BRAND_NAVY}" style="padding:28px 24px;background-color:${BRAND_NAVY};">
-                <p style="margin:0 0 10px;color:${BRAND_LIME};font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-                  ${BRAND_NAME}
-                </p>
-                <h1 style="margin:0;color:#ffffff;font-size:28px;line-height:1.2;font-weight:800;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-                  Your eSIM is Ready!
-                </h1>
-                <p style="margin:12px 0 0;color:${TEXT_ON_NAVY};font-size:16px;line-height:1.4;font-weight:600;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-                  ${escapeHtml(destinationHeadline)}
-                </p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:24px 24px 8px;background:#ffffff;">
-                <p style="margin:0 0 20px;color:${TEXT_PRIMARY};font-size:14px;line-height:1.6;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-                  ${escapeHtml(introCopy(hasQrImage))}
-                </p>
-                ${supportPurchaseNoticeSection(payload)}
-                ${installSection}
-                ${planDetailsSection(payload)}
-                ${howToInstallSection(hasQrImage)}
-                ${
-                  payload.orderAccessUrl
-                    ? `
-                <p style="margin:0 0 14px;color:${TEXT_PRIMARY};font-size:13px;line-height:1.55;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-                  Prefer the website?
-                  <a href="${escapeHtml(payload.orderAccessUrl)}" style="color:#2f6b00;text-decoration:underline;">Open your secure order page</a>
-                </p>`
-                    : ""
-                }
-                ${renderEmailFooterHtml("orders", options.logoImageSrc || getEmailLogoCidSrc())}
-                <p style="margin:16px 0 8px;color:${TEXT_SECONDARY};font-size:12px;line-height:1.5;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-                  © 2026 ${BRAND_NAME}. All rights reserved.
-                </p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
+  const orderPageLink = payload.orderAccessUrl
+    ? renderEmailParagraph(
+        `Prefer the website? ${renderEmailTextLink(
+          payload.orderAccessUrl,
+          "Open your secure order page"
+        )}`
+      )
+    : "";
+
+  return renderTransactionalEmailLayoutHtml({
+    title: `Your eSIM is Ready! — ${BRAND_NAME}`,
+    preheader: `${destinationHeadline} · Install your eSIM`,
+    footerLogoSrc: logoSrc,
+    maxWidth: 600,
+    contentHtml: `
+              ${renderEmailHeroBand({
+                eyebrow: BRAND_NAME,
+                title: "Your eSIM is Ready!",
+                subtitle: destinationHeadline,
+              })}
+              ${renderEmailLead(escapeHtml(introCopy(hasQrImage)))}
+              ${supportPurchaseNoticeSection(payload)}
+              ${installSection}
+              ${planDetailsSection(payload)}
+              ${howToInstallSection(hasQrImage)}
+              ${orderPageLink}
+              ${renderEmailSupportBlock()}`,
+  });
 }
 
 export function renderOrderEmailText(
@@ -574,11 +444,7 @@ export function renderOrderEmailText(
     lines.push("", `Secure order page: ${payload.orderAccessUrl}`);
   }
 
-  lines.push(
-    "",
-    renderEmailFooterText(),
-    `© 2026 ${BRAND_NAME}. All rights reserved.`
-  );
+  lines.push("", renderEmailFooterText());
 
   return lines.join("\n");
 }
