@@ -103,7 +103,17 @@ function main() {
     quote,
     /customerEmail:\s*VESIM_PROVIDER_CUSTOMER_EMAIL/
   );
+  assert.match(quote, /consumeRateLimit/);
+  assert.match(quote, /vesim-quote-ip:/);
+  assert.match(quote, /status:\s*429/);
+  assert.match(quote, /Retry-After/);
+  assert.match(quote, /getRequestIpKey|getBrokerToken/);
+  // Rate limit must run before broker token / live quote fetch.
+  const rateIdx = quote.indexOf("consumeRateLimit");
+  const brokerIdx = quote.indexOf("getBrokerToken");
+  assert.ok(rateIdx >= 0 && brokerIdx > rateIdx, "rate limit before broker");
   console.log("PASS quote_uses_relay_when_email_present");
+  console.log("PASS quote_rate_limited_before_broker");
 
   // Do not surface internal relay in customer checkout UI
   assert.doesNotMatch(confirmForm, /orders@mapesim\.com/);

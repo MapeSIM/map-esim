@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
+import { getRequestIpKey } from "@/app/lib/auth/requestMeta";
 import { VESIM_PROVIDER_CUSTOMER_EMAIL } from "@/app/lib/vesim/creditCheckout";
 import {
   getBrokerToken,
@@ -12,8 +14,31 @@ import {
   verifyOfferAuthoritative,
 } from "@/app/lib/vesim/server";
 
+/** Per-IP limit for the public quote proxy (protects broker quota / CPU). */
+const QUOTE_RATE_LIMIT = 30;
+const QUOTE_RATE_WINDOW_MS = 60_000;
+
 export async function POST(req: NextRequest) {
   try {
+    const ip = await getRequestIpKey();
+    const rate = consumeRateLimit({
+      key: `vesim-quote-ip:${ip}`,
+      limit: QUOTE_RATE_LIMIT,
+      windowMs: QUOTE_RATE_WINDOW_MS,
+    });
+    if (!rate.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Too many requests. Please try again shortly.",
+        },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rate.retryAfterSec) },
+        }
+      );
+    }
+
     let requestBody: {
       offerId?: unknown;
       customerEmail?: unknown;

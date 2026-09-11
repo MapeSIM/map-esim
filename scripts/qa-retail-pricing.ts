@@ -138,6 +138,9 @@ function main() {
   assert.match(offersRoute, /toPublicVesimOffers/);
   assert.match(offerRoute, /toPublicVerifiedCheckoutOffer/);
   assert.match(quoteRoute, /toPublicVerifiedCheckoutOffer/);
+  assert.match(quoteRoute, /consumeRateLimit/);
+  assert.match(quoteRoute, /status:\s*429/);
+  assert.doesNotMatch(quoteRoute, /void requestBody\.price|requestBody\.priceUSD/);
   assert.match(
     persist,
     /providerAmount:\s*options\.verifiedOffer\.providerPriceUSD/
