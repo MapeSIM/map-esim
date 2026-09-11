@@ -13,6 +13,7 @@ export const metadata: Metadata = {
 const partnerLinks: AccountNavLink[] = [
   { href: "/partner", label: "Overview", exact: true },
   { href: "/partner/orders", label: "My eSIMs" },
+  { href: "/partner/sales", label: "Sales" },
   { href: "/partner/wallet", label: "Wallet" },
   { href: "/countries", label: "Buy eSIM" },
   { href: "/countries", label: "Catalog" },

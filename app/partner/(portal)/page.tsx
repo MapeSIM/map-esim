@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   CreditCard,
   Palette,
   Shield,
@@ -142,6 +143,12 @@ export default async function PartnerDashboardPage() {
             title="My eSIMs"
             subtitle="Install, usage, and ICCID for Partner purchases"
             icon={<Smartphone className="h-5 w-5" aria-hidden="true" />}
+          />
+          <AccountActionRow
+            href="/partner/sales"
+            title="Sales report"
+            subtitle="Period totals, destinations, packages, and CSV export"
+            icon={<BarChart3 className="h-5 w-5" aria-hidden="true" />}
           />
           <AccountActionRow
             href="/partner/profile"

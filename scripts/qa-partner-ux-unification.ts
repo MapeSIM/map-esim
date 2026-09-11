@@ -35,7 +35,9 @@ function main() {
   assert.match(partnerLayout, /["']\/countries["']/);
   assert.match(partnerLayout, /label:\s*["']Catalog["']/);
   assert.match(partnerLayout, /["']\/partner\/orders["']/);
+  assert.match(partnerLayout, /["']\/partner\/sales["']/);
   assert.match(partnerHome, /Partner Balance|Available Partner Balance|balanceLabel/);
+  assert.match(partnerHome, /\/partner\/sales|Sales report/);
   assert.match(partnerHome, /Current Partner Discount|discountPercentLabel/);
   assert.match(partnerHome, /Total eSIM orders|totalEsimOrdersLabel/);
   assert.match(partnerHome, /Total spent|totalSpentLabel/);
