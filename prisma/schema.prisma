@@ -251,6 +251,12 @@ enum CustomerReferralStatus {
   INELIGIBLE
 }
 
+/// Admin-configured referral reward mode.
+enum ReferralRewardType {
+  FIXED_AMOUNT
+  PERCENTAGE
+}
+
 /// Customer eSIM package lifecycle emails (expiry / data). One row per (order, kind).
 enum EsimLifecycleNotificationKind {
   EXPIRY_SOON_24H
@@ -1616,4 +1622,27 @@ model CustomerReferral {
   @@index([status])
   @@index([createdAt])
   @@index([rewardedPurchaseId])
+}
+
+/// Singleton admin config for the customer referral program (id = "default").
+/// Never stores secrets. Reward math uses integer cents / basis points only.
+model CustomerReferralProgramConfig {
+  /// Fixed singleton id — always "default".
+  id                 String             @id
+  /// When false, no new referral wallet rewards are issued.
+  enabled            Boolean            @default(true)
+  rewardType         ReferralRewardType @default(FIXED_AMOUNT)
+  /**
+   * FIXED_AMOUNT: USD cents to credit (e.g. 500 = $5.00).
+   * PERCENTAGE: basis points of qualifying purchase priceCents (500 = 5.00%).
+   */
+  rewardValue        Int                @default(500)
+  /// Minimum qualifying purchase catalog priceCents (0 = no minimum).
+  minPurchaseCents   Int                @default(0)
+  /// Optional cap for PERCENTAGE rewards in USD cents. Null = no cap.
+  maxRewardCents     Int?
+  version            Int                @default(1)
+  updatedByAdminId   String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 }

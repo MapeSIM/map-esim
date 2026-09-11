@@ -17,7 +17,6 @@ import {
 } from "@/app/lib/referrals/referralCode";
 import {
   REFERRAL_AUDIT,
-  REFERRAL_REWARD_CENTS,
   REFERRAL_REWARD_REFERENCE_TYPE,
   referralRewardIdempotencyKey,
 } from "@/app/lib/referrals/referralConstants";
@@ -235,6 +234,7 @@ export async function awardReferralRewardInTx(
       id: true,
       customerUserId: true,
       status: true,
+      priceCents: true,
     },
   });
   if (
@@ -329,7 +329,60 @@ export async function awardReferralRewardInTx(
     };
   }
 
-  const amountCents = REFERRAL_REWARD_CENTS;
+  const { getReferralProgramSettings } = await import(
+    "@/app/lib/referrals/referralProgramConfig"
+  );
+  const { calculateReferralRewardCents } = await import(
+    "@/app/lib/referrals/referralProgramShared"
+  );
+  const settings = await getReferralProgramSettings(tx);
+  const calc = calculateReferralRewardCents({
+    settings,
+    purchasePriceCents: purchase.priceCents,
+  });
+  if (!calc.ok) {
+    if (
+      calc.reason === "disabled" ||
+      calc.reason === "below_min_purchase" ||
+      calc.reason === "zero_reward"
+    ) {
+      await tx.customerReferral.updateMany({
+        where: {
+          id: referral.id,
+          status: CustomerReferralStatus.PENDING,
+        },
+        data: { status: CustomerReferralStatus.INELIGIBLE },
+      });
+      try {
+        await tx.auditLog.create({
+          data: {
+            actorUserId: options.actorUserId ?? null,
+            action: REFERRAL_AUDIT.markedIneligible,
+            targetType: "CustomerReferral",
+            targetId: referral.id,
+            metadata: {
+              purchaseId,
+              reason: calc.reason,
+              purchasePriceCents: purchase.priceCents,
+              rewardType: settings.rewardType,
+              rewardValue: settings.rewardValue,
+              minPurchaseCents: settings.minPurchaseCents,
+            },
+          },
+        });
+      } catch {
+        // ignore
+      }
+    }
+    return {
+      credited: false,
+      duplicate: false,
+      skipped: true,
+      walletTransactionId: null,
+    };
+  }
+
+  const amountCents = calc.amountCents;
   const idempotencyKey = referralRewardIdempotencyKey(referral.id);
 
   const existingTx = await tx.walletTransaction.findUnique({
@@ -480,6 +533,9 @@ export async function awardReferralRewardInTx(
         purchaseId,
         orderId: options.orderId,
         amountCents,
+        purchasePriceCents: purchase.priceCents,
+        rewardType: settings.rewardType,
+        rewardValue: settings.rewardValue,
         walletTransactionId: transactionId,
       },
     },
