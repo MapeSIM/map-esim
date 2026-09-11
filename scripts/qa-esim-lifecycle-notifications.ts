@@ -259,6 +259,7 @@ function main() {
 
   console.log("5) Daily Hobby-compatible cron (not hourly)");
   assert.match(cron, /CRON_SECRET/);
+  assert.match(cron, /raw\.length >= 16/);
   assert.match(cron, /runEsimLifecycleNotifications/);
   assert.match(cron, /unauthorized/);
   assert.match(cron, /Hobby|daily UTC/i);
@@ -270,6 +271,15 @@ function main() {
     1,
     "Hobby: keep a single daily cron job"
   );
+  const abandonedCron = read(
+    "app/api/cron/abandoned-checkout-recovery/route.ts"
+  );
+  assert.match(abandonedCron, /CRON_SECRET/);
+  assert.match(abandonedCron, /raw\.length >= 16/);
+  assert.match(abandonedCron, /Not registered in vercel\.json/);
+  const envExample = read(".env.example");
+  assert.match(envExample, /CRON_SECRET=/);
+  assert.match(envExample, /at least 16 characters/i);
   console.log("   ok");
 
   console.log("6) Email template branding + CTAs");
