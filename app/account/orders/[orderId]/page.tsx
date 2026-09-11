@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBadge";
 import CustomerEsimInstallPanel from "@/app/components/orders/CustomerEsimInstallPanel";
 import { CustomerEsimInstallHelpLinks } from "@/app/components/orders/CustomerEsimInstallHelpLinks";
 import CustomerEsimUsagePanel from "@/app/components/orders/CustomerEsimUsagePanel";
@@ -150,6 +151,9 @@ export default async function AccountOrderDetailPage({
                   >
                     {customerEsimStatusLabel(detail.statusBadge)}
                   </span>
+                  <AddDataPurchaseBadge
+                    isAddDataPurchase={detail.isAddDataPurchase}
+                  />
                 </div>
                 <p className="mt-1 text-sm text-[var(--text-muted)]">
                   Order {detail.shortReference}

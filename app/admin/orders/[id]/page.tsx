@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import AdminAddDataForm from "@/app/components/admin/AdminAddDataForm";
+import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBadge";
 import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
 import AdminEsimUsagePanel from "@/app/components/orders/AdminEsimUsagePanel";
 import { getAdminOrderDetail } from "@/app/lib/admin/orders";
@@ -72,6 +73,11 @@ export default async function AdminOrderDetailPage({
           Local order snapshots only. Provider fulfilment status is not
           refreshed from this page.
         </p>
+        {detail.isAddDataPurchase ? (
+          <div className="mt-3">
+            <AddDataPurchaseBadge isAddDataPurchase />
+          </div>
+        ) : null}
       </div>
 
       <dl className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 sm:px-5">
@@ -82,6 +88,12 @@ export default async function AdminOrderDetailPage({
         <DetailRow label="Plan / data" value={detail.planPackage} />
         <DetailRow label="Validity" value={detail.validity} />
         <DetailRow label="Local status" value={detail.localStatus} />
+        {detail.isAddDataPurchase && detail.addDataSourceOrderId ? (
+          <DetailRow
+            label="Add More Data source"
+            value={detail.addDataSourceOrderId}
+          />
+        ) : null}
         <DetailRow label="Funding" value={detail.fundingLabel} />
         <DetailRow label="Provider amount" value={detail.amountLabel} />
         <DetailRow

@@ -12,6 +12,7 @@ import {
 } from "@prisma/client";
 import { formatStoredIccidLast4 } from "@/app/lib/admin/display";
 import { prisma } from "@/app/lib/db";
+import { resolveAddDataPurchaseLabel } from "@/app/lib/esim/addDataCheckout";
 import { customerFlagImageUrl } from "@/app/lib/orders/customerOrderDisplay";
 import {
   buildAddDataEligibility,
@@ -71,6 +72,9 @@ export type PartnerOrderListRow = {
   hasActiveShareToken: boolean;
   /** Add More Data CTA gate — never includes providerOrderId. */
   addDataEligible: boolean;
+  /** True when this order itself was created by an Add More Data top-up. */
+  isAddDataPurchase: boolean;
+  addDataSourceOrderId: string | null;
 };
 
 export type PartnerAttentionRow = {
@@ -119,6 +123,10 @@ export type PartnerOrderDetail = {
   addDataOfferId: string | null;
   /** Destination code for catalog/checkout country hint (server-side only). */
   destinationCode: string | null;
+  /** True when this order itself was created by an Add More Data top-up. */
+  isAddDataPurchase: boolean;
+  /** Source MAP order id when isAddDataPurchase; never confuse with addDataEligible. */
+  addDataSourceOrderId: string | null;
 };
 
 /**
@@ -160,6 +168,7 @@ export async function listPartnerOrdersPage(
       completedAt: true,
       orderId: true,
       providerOrderId: true,
+      idempotencyKey: true,
       order: {
         select: {
           id: true,
@@ -227,6 +236,7 @@ export async function listPartnerOrdersPage(
         installEligible,
         catalog,
       });
+      const addDataPurchase = resolveAddDataPurchaseLabel(row.idempotencyKey);
 
       orders.push({
         purchaseId: row.id,
@@ -249,6 +259,8 @@ export async function listPartnerOrdersPage(
         iccidRevealable: Boolean(row.order.iccidEncrypted?.trim()),
         hasActiveShareToken: false,
         addDataEligible: addData.addDataEligible,
+        isAddDataPurchase: addDataPurchase.isAddDataPurchase,
+        addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
       });
       continue;
     }
@@ -338,6 +350,7 @@ export async function getPartnerOwnedOrderDetail(
       createdAt: true,
       completedAt: true,
       providerOrderId: true,
+      idempotencyKey: true,
       order: {
         select: {
           id: true,
@@ -389,6 +402,7 @@ export async function getPartnerOwnedOrderDetail(
     installEligible,
     catalog,
   });
+  const addDataPurchase = resolveAddDataPurchaseLabel(purchase.idempotencyKey);
 
   return {
     orderId: order.id,
@@ -419,5 +433,7 @@ export async function getPartnerOwnedOrderDetail(
     addDataBlockedReason: addData.addDataBlockedReason,
     addDataOfferId: offerIdForEligibility,
     destinationCode,
+    isAddDataPurchase: addDataPurchase.isAddDataPurchase,
+    addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
   };
 }

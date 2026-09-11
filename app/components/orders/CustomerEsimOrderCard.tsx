@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBadge";
 import { CustomerEsimInstallHelpLinks } from "@/app/components/orders/CustomerEsimInstallHelpLinks";
 import {
   customerEsimStatusHelp,
@@ -20,8 +21,10 @@ export type CustomerEsimOrderCardOrder = {
   createdAtLabel: string;
   iccidMasked: string;
   emailDeliveryLabel: string | null;
-  /** Read-model gate — show Add More Data only when true. */
+  /** Read-model gate — show Add More Data CTA only when true. */
   addDataEligible?: boolean;
+  /** True when this order itself was created by an Add More Data top-up. */
+  isAddDataPurchase?: boolean;
 };
 
 function statusBadgeClass(status: CustomerEsimStatusBadge): string {
@@ -84,6 +87,9 @@ export function CustomerEsimOrderCard({
               >
                 {customerEsimStatusLabel(order.statusBadge)}
               </span>
+              <AddDataPurchaseBadge
+                isAddDataPurchase={Boolean(order.isAddDataPurchase)}
+              />
             </div>
             <p className="mt-1.5 text-xs font-medium text-[var(--text-soft)]">
               Ref {order.shortReference}

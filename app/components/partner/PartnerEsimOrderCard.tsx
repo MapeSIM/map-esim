@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Signal } from "lucide-react";
+import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBadge";
 import CustomerEsimUsagePanel from "@/app/components/orders/CustomerEsimUsagePanel";
 import PartnerEsimInstallPanel from "@/app/components/partner/PartnerEsimInstallPanel";
 import PartnerRefundRequestControls, {
@@ -67,6 +68,7 @@ export default function PartnerEsimOrderCard({ row, refundRequest }: Props) {
             >
               {row.statusBadge}
             </span>
+            <AddDataPurchaseBadge isAddDataPurchase={row.isAddDataPurchase} />
             {completed ? (
               <span className="inline-flex rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-2 py-0.5 text-xs font-semibold text-[var(--heading)]">
                 {PARTNER_ESIM_READY_LABEL}

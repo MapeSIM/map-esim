@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBadge";
 import { getAdminOrdersPage } from "@/app/lib/admin/orders";
 
 export const dynamic = "force-dynamic";
@@ -202,7 +203,14 @@ export default async function AdminOrdersPage({
                     {order.createdAtLabel}
                   </td>
                   <td className="px-3 py-3">{order.destination}</td>
-                  <td className="px-3 py-3">{order.planPackage}</td>
+                  <td className="px-3 py-3">
+                    <div className="flex min-w-0 flex-col gap-1.5">
+                      <span>{order.planPackage}</span>
+                      <AddDataPurchaseBadge
+                        isAddDataPurchase={order.isAddDataPurchase}
+                      />
+                    </div>
+                  </td>
                   <td className="px-3 py-3">{order.localStatus}</td>
                   <td className="px-3 py-3">{order.fundingLabel}</td>
                   <td className="whitespace-nowrap px-3 py-3">

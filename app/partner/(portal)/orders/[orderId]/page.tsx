@@ -93,6 +93,8 @@ export default async function PartnerOrderDetailPage({
           iccidRevealable: detail.iccidRevealable,
           hasActiveShareToken: hasActiveToken,
           addDataEligible: detail.addDataEligible,
+          isAddDataPurchase: detail.isAddDataPurchase,
+          addDataSourceOrderId: detail.addDataSourceOrderId,
         }}
         refundRequest={refundRequest}
       />

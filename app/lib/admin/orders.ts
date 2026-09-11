@@ -16,6 +16,7 @@ import {
   type AdminOrderStatusFilter,
 } from "@/app/lib/admin/display";
 import { prisma } from "@/app/lib/db";
+import { resolveAddDataPurchaseLabel } from "@/app/lib/esim/addDataCheckout";
 import { resolveCustomerEsimStatusBadge } from "@/app/lib/orders/customerOrderDisplay";
 import {
   buildAddDataEligibility,
@@ -36,6 +37,9 @@ export type AdminOrderListRow = {
   iccidMasked: string;
   associationLabel: "Linked customer" | "Guest order";
   fundingLabel: string;
+  /** True when this order itself was created by an Add More Data top-up. */
+  isAddDataPurchase: boolean;
+  addDataSourceOrderId: string | null;
 };
 
 export type AdminOrdersPageResult = {
@@ -90,6 +94,10 @@ export type AdminOrderDetail = {
   addDataOfferId: string | null;
   /** Destination code for catalog/checkout country hint (server-side only). */
   destinationCode: string | null;
+  /** True when this order itself was created by an Add More Data top-up. */
+  isAddDataPurchase: boolean;
+  /** Source MAP order id when isAddDataPurchase; never confuse with addDataEligible. */
+  addDataSourceOrderId: string | null;
 };
 
 function adminIccidDisplay(
@@ -274,21 +282,35 @@ export async function getAdminOrdersPage(
       userId: true,
       fundingSource: true,
       iccidLast4: true,
+      walletEsimPurchase: {
+        select: { idempotencyKey: true },
+      },
+      partnerEsimPurchase: {
+        select: { idempotencyKey: true },
+      },
     },
   });
 
-  const rows: AdminOrderListRow[] = pageRows.map((row) => ({
-    id: row.id,
-    createdAtLabel: formatCreatedAt(row.createdAt),
-    destination: displayOrUnavailable(row.destination),
-    planPackage: planPackageLabel(row.planName, row.dataAllowance),
-    localStatus: displayOrUnavailable(row.status),
-    amountLabel: formatOrderAmount(row.providerAmount, row.providerCurrency),
-    providerRefMasked: maskProviderOrderRef(row.providerOrderId),
-    iccidMasked: adminIccidDisplay(row.iccidLast4, row.status),
-    associationLabel: row.userId ? "Linked customer" : "Guest order",
-    fundingLabel: fundingSourceLabel(row.fundingSource),
-  }));
+  const rows: AdminOrderListRow[] = pageRows.map((row) => {
+    const addDataPurchase = resolveAddDataPurchaseLabel([
+      row.walletEsimPurchase?.idempotencyKey,
+      row.partnerEsimPurchase?.idempotencyKey,
+    ]);
+    return {
+      id: row.id,
+      createdAtLabel: formatCreatedAt(row.createdAt),
+      destination: displayOrUnavailable(row.destination),
+      planPackage: planPackageLabel(row.planName, row.dataAllowance),
+      localStatus: displayOrUnavailable(row.status),
+      amountLabel: formatOrderAmount(row.providerAmount, row.providerCurrency),
+      providerRefMasked: maskProviderOrderRef(row.providerOrderId),
+      iccidMasked: adminIccidDisplay(row.iccidLast4, row.status),
+      associationLabel: row.userId ? "Linked customer" : "Guest order",
+      fundingLabel: fundingSourceLabel(row.fundingSource),
+      isAddDataPurchase: addDataPurchase.isAddDataPurchase,
+      addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
+    };
+  });
 
   return {
     rows,
@@ -347,6 +369,12 @@ export async function getAdminOrderDetail(
           status: true,
           offerId: true,
           destinationCode: true,
+          idempotencyKey: true,
+        },
+      },
+      partnerEsimPurchase: {
+        select: {
+          idempotencyKey: true,
         },
       },
       adminPackageAssignment: {
@@ -406,6 +434,10 @@ export async function getAdminOrderDetail(
     installEligible,
     catalog,
   });
+  const addDataPurchase = resolveAddDataPurchaseLabel([
+    row.walletEsimPurchase?.idempotencyKey,
+    row.partnerEsimPurchase?.idempotencyKey,
+  ]);
 
   return {
     id: row.id,
@@ -434,6 +466,8 @@ export async function getAdminOrderDetail(
     addDataBlockedReason: addData.addDataBlockedReason,
     addDataOfferId: offerIdForEligibility,
     destinationCode: (destinationCode ?? "").trim() || null,
+    isAddDataPurchase: addDataPurchase.isAddDataPurchase,
+    addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
   };
 }
 

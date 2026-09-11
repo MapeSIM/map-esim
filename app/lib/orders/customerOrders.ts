@@ -3,6 +3,7 @@ import "server-only";
 import { CustomerRewardTransactionType, OrderStatus, Prisma, Role } from "@prisma/client";
 import { formatStoredIccidLast4 } from "@/app/lib/admin/display";
 import { prisma } from "@/app/lib/db";
+import { resolveAddDataPurchaseLabel } from "@/app/lib/esim/addDataCheckout";
 import {
   CUSTOMER_ORDERS_PAGE_LIMIT,
   customerEmailDeliveryLabel,
@@ -272,6 +273,10 @@ export type CustomerOrderListRow = {
   rechargeOrderId: string | null;
   addDataEligible: boolean;
   addDataBlockedReason: CustomerAddDataBlockedReason | null;
+  /** True when this order itself was created by an Add More Data top-up. */
+  isAddDataPurchase: boolean;
+  /** Source MAP order id when isAddDataPurchase; never confuse with addDataEligible. */
+  addDataSourceOrderId: string | null;
 };
 
 export type CustomerOrdersListResult = {
@@ -337,6 +342,7 @@ export async function listCustomerOrders(
           destinationCode: true,
           emailDeliveryStatus: true,
           priceCents: true,
+          idempotencyKey: true,
         },
       },
       adminPackageAssignment: {
@@ -431,6 +437,9 @@ export async function listCustomerOrders(
       installEligible,
       catalog,
     });
+    const addDataPurchase = resolveAddDataPurchaseLabel(
+      row.walletEsimPurchase?.idempotencyKey
+    );
 
     mapped.push({
       id: row.id,
@@ -456,6 +465,8 @@ export async function listCustomerOrders(
       rechargeOrderId: addData.rechargeOrderId,
       addDataEligible: addData.addDataEligible,
       addDataBlockedReason: addData.addDataBlockedReason,
+      isAddDataPurchase: addDataPurchase.isAddDataPurchase,
+      addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
     });
   }
 
@@ -513,6 +524,10 @@ export type CustomerOrderDetail = {
   rechargeOrderId: string | null;
   addDataEligible: boolean;
   addDataBlockedReason: CustomerAddDataBlockedReason | null;
+  /** True when this order itself was created by an Add More Data top-up. */
+  isAddDataPurchase: boolean;
+  /** Source MAP order id when isAddDataPurchase; never confuse with addDataEligible. */
+  addDataSourceOrderId: string | null;
 };
 
 /**
@@ -576,6 +591,7 @@ export async function getCustomerOwnedOrderDetail(
           promoCodeNormalized: true,
           promoDiscountCents: true,
           rewardPointsRedeemed: true,
+          idempotencyKey: true,
           updatedAt: true,
           completedAt: true,
           refundTransaction: {
@@ -651,6 +667,9 @@ export async function getCustomerOwnedOrderDetail(
     installEligible,
     catalog,
   });
+  const addDataPurchase = resolveAddDataPurchaseLabel(
+    order.walletEsimPurchase?.idempotencyKey
+  );
 
   let rewardsAppliedPoints: number | null = null;
   let rewardsEarnedPoints: number | null = null;
@@ -783,5 +802,7 @@ export async function getCustomerOwnedOrderDetail(
     rechargeOrderId: addData.rechargeOrderId,
     addDataEligible: addData.addDataEligible,
     addDataBlockedReason: addData.addDataBlockedReason,
+    isAddDataPurchase: addDataPurchase.isAddDataPurchase,
+    addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
   };
 }

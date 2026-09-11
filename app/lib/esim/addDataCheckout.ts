@@ -54,6 +54,36 @@ export function parseAddDataSourceOrderId(
   return orderId;
 }
 
+export type AddDataPurchaseLabel = {
+  /** True only when this purchase/order was created via Add More Data top-up. */
+  isAddDataPurchase: boolean;
+  /** MAP local source order id embedded in adddata_ idempotency key. */
+  addDataSourceOrderId: string | null;
+};
+
+/**
+ * Detect Add More Data purchases from purchase idempotencyKey (adddata_ convention).
+ * Not the same as addDataEligible (CTA on a source eSIM that can receive top-up).
+ */
+export function resolveAddDataPurchaseLabel(
+  idempotencyKeyOrKeys:
+    | string
+    | null
+    | undefined
+    | Array<string | null | undefined>
+): AddDataPurchaseLabel {
+  const keys = Array.isArray(idempotencyKeyOrKeys)
+    ? idempotencyKeyOrKeys
+    : [idempotencyKeyOrKeys];
+  for (const key of keys) {
+    const addDataSourceOrderId = parseAddDataSourceOrderId(key);
+    if (addDataSourceOrderId) {
+      return { isAddDataPurchase: true, addDataSourceOrderId };
+    }
+  }
+  return { isAddDataPurchase: false, addDataSourceOrderId: null };
+}
+
 export function normalizeAddDataFromOrderId(
   raw: unknown
 ): string | null {
