@@ -178,6 +178,14 @@ export async function signupAction(
     },
   });
 
+  const { attachReferralOnSignupBestEffort } = await import(
+    "@/app/lib/referrals/referralService"
+  );
+  await attachReferralOnSignupBestEffort({
+    referredUserId: user.id,
+    code: formData.get("referralCode"),
+  });
+
   const issued = await issueEmailOtp({
     userId: user.id,
     purpose: OtpPurpose.EMAIL_VERIFICATION,

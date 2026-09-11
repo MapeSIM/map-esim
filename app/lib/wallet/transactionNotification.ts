@@ -40,8 +40,9 @@ function customerFacingTypeLabel(
       return "Wallet funds returned";
     case WalletTransactionType.TOPUP_CREDIT:
     case WalletTransactionType.ADMIN_CREDIT:
-    case WalletTransactionType.ADJUSTMENT_CREDIT:
       return "Credit";
+    case WalletTransactionType.ADJUSTMENT_CREDIT:
+      return "Referral reward";
     case WalletTransactionType.PURCHASE_DEBIT:
     case WalletTransactionType.ADJUSTMENT_DEBIT:
       return "Debit";
@@ -100,7 +101,9 @@ function safeDescription(options: {
     case WalletTransactionType.ADJUSTMENT_DEBIT:
       return "Account adjustment debit by MAP eSIM";
     case WalletTransactionType.ADJUSTMENT_CREDIT:
-      return "Account adjustment credit by MAP eSIM";
+      return options.referenceType === "REFERRAL_REWARD"
+        ? "Referral reward for a friend's first purchase"
+        : "Account adjustment credit by MAP eSIM";
     default:
       return "Wallet balance update";
   }

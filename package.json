@@ -58,6 +58,7 @@
     "qa:customer-rewards": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-customer-rewards.ts",
     "qa:customer-rewards-redemption": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-customer-rewards-redemption.ts",
     "qa:customer-rewards-refund": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-customer-rewards-refund.ts",
+    "qa:customer-referrals": "tsx scripts/qa-customer-referrals.ts",
     "qa:login-return-to-checkout": "tsx scripts/qa-login-return-to-checkout.ts",
     "qa:safepay-foundation": "tsx scripts/qa-safepay-foundation.ts",
     "qa:safepay-webhook-observability": "tsx scripts/qa-safepay-webhook-observability.ts",

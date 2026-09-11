@@ -44,6 +44,29 @@ export function MapEsimPrismaAdapter(prisma: PrismaClient): Adapter {
         },
       });
 
+      try {
+        const { cookies } = await import("next/headers");
+        const { REFERRAL_COOKIE_NAME } = await import(
+          "@/app/lib/referrals/referralConstants"
+        );
+        const { attachReferralOnSignupBestEffort } = await import(
+          "@/app/lib/referrals/referralService"
+        );
+        const jar = await cookies();
+        const raw = jar.get(REFERRAL_COOKIE_NAME)?.value ?? null;
+        await attachReferralOnSignupBestEffort({
+          referredUserId: created.id,
+          code: raw ? decodeURIComponent(raw) : null,
+        });
+        try {
+          jar.delete(REFERRAL_COOKIE_NAME);
+        } catch {
+          // Cookie delete is best-effort in adapter context.
+        }
+      } catch {
+        // Referral attribution must never fail OAuth user create.
+      }
+
       // Standard AdapterUser shape (includes emailVerified for Auth.js).
       return toAdapterUser(created);
     },

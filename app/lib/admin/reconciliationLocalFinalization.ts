@@ -44,6 +44,7 @@ import { deliverCompletedWalletPurchaseInstallEmail } from "@/app/lib/esim/esimP
 import { snapshotOrderAlternateDeliveryEmail } from "@/app/lib/esim/esimDeliveryEmail";
 import { awardCustomerPurchaseEarnInTx } from "@/app/lib/rewards/rewardEarn";
 import { completeRewardRedemptionInTx } from "@/app/lib/rewards/rewardRedeem";
+import { awardReferralRewardBestEffort } from "@/app/lib/referrals/referralService";
 import { VesimEnvironmentError } from "@/app/lib/vesim/environment";
 import {
   classifyProviderOrderResponse,
@@ -1042,6 +1043,22 @@ export async function finalizeReconciliationLocalRecord(options: {
         });
       } catch {
         // Email must never fail local finalization, provider, or wallet state.
+      }
+      try {
+        const purchase = await prisma.walletEsimPurchase.findUnique({
+          where: { id: ids.recordId },
+          select: { customerUserId: true },
+        });
+        if (purchase?.customerUserId) {
+          await awardReferralRewardBestEffort({
+            customerUserId: purchase.customerUserId,
+            purchaseId: ids.recordId,
+            orderId: result.orderId,
+            actorUserId: admin.id,
+          });
+        }
+      } catch {
+        // Referral reward must never fail local finalization.
       }
     }
 

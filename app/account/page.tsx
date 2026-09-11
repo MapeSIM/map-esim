@@ -9,8 +9,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import AccountActionRow from "@/app/components/account/AccountActionRow";
+import ReferralShareCard from "@/app/components/account/ReferralShareCard";
 import { requireSession } from "@/app/lib/auth/session";
 import { prisma } from "@/app/lib/db";
+import { getCustomerReferralSummary } from "@/app/lib/referrals/referralRead";
 import { getCustomerWalletSummary } from "@/app/lib/wallet/read";
 import { getCustomerRewardSummary } from "@/app/lib/rewards/rewardRead";
 
@@ -24,6 +26,9 @@ export default async function AccountOverviewPage() {
 
   let walletBalanceLabel: string | null = null;
   let rewardsPointsLabel: string | null = null;
+  let referralSummary: Awaited<
+    ReturnType<typeof getCustomerReferralSummary>
+  > = null;
   if (user.role === "CUSTOMER") {
     try {
       const summary = await getCustomerWalletSummary(user.id);
@@ -36,6 +41,11 @@ export default async function AccountOverviewPage() {
       rewardsPointsLabel = rewards ? `${rewards.pointsBalanceLabel} points` : "0 points";
     } catch {
       rewardsPointsLabel = null;
+    }
+    try {
+      referralSummary = await getCustomerReferralSummary(user.id);
+    } catch {
+      referralSummary = null;
     }
   }
 
@@ -83,6 +93,16 @@ export default async function AccountOverviewPage() {
           </div>
         )}
       </div>
+
+      {user.role === "CUSTOMER" && referralSummary ? (
+        <ReferralShareCard
+          shareUrl={referralSummary.shareUrl}
+          code={referralSummary.code}
+          title={referralSummary.cardTitle}
+          subtitle={referralSummary.cardSubtitle}
+          rewardCopy={referralSummary.rewardCopy}
+        />
+      ) : null}
 
       <div className="grid gap-3">
         <AccountActionRow

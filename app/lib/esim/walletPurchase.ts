@@ -52,6 +52,7 @@ import {
   releasePromoRedemptionInTx,
 } from "@/app/lib/promo/promoRedemption";
 import { awardCustomerPurchaseEarnBestEffort } from "@/app/lib/rewards/rewardEarn";
+import { awardReferralRewardBestEffort } from "@/app/lib/referrals/referralService";
 import { applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx } from "@/app/lib/rewards/rewardRefund";
 import {
   claimRewardRedemptionInTx,
@@ -1207,6 +1208,12 @@ export async function runWalletPurchasePostCommitSideEffects(options: {
     actorUserId: options.actorUserId,
   });
   await awardCustomerPurchaseEarnBestEffort({
+    customerUserId: options.customerUserId,
+    purchaseId: options.purchaseId,
+    orderId: options.orderId,
+    actorUserId: options.actorUserId,
+  });
+  await awardReferralRewardBestEffort({
     customerUserId: options.customerUserId,
     purchaseId: options.purchaseId,
     orderId: options.orderId,

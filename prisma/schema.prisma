@@ -241,6 +241,16 @@ enum AlertNotificationDeliveryStatus {
   FAILED
 }
 
+/// Customer referral relationship lifecycle (MVP).
+enum CustomerReferralStatus {
+  /// Referred user signed up with a valid code; awaiting first completed purchase.
+  PENDING
+  /// Referrer wallet credited after referred user's first completed purchase.
+  REWARDED
+  /// Invalid for reward (e.g. first-purchase window missed).
+  INELIGIBLE
+}
+
 /// Customer eSIM package lifecycle emails (expiry / data). One row per (order, kind).
 enum EsimLifecycleNotificationKind {
   EXPIRY_SOON_24H
@@ -322,6 +332,10 @@ model User {
   customerRewardAccount        CustomerRewardAccount?     @relation("CustomerRewardAccount")
   customerRewardTransactions   CustomerRewardTransaction[] @relation("CustomerRewardTransaction")
   customerRewardRedemptions    CustomerRewardRedemption[] @relation("CustomerRewardRedemption")
+  /// Public customer referral code (shareable). Minted lazily for CUSTOMER users.
+  referralCode                 String?                    @unique
+  referralsAsReferrer          CustomerReferral[]         @relation("CustomerReferralReferrer")
+  referralAsReferred           CustomerReferral?          @relation("CustomerReferralReferred")
 
   @@index([deletedAt])
   @@index([blockedAt])
@@ -1579,4 +1593,27 @@ model EsimLifecycleNotificationRunnerLock {
   claimedAt      DateTime?
   claimExpiresAt DateTime?
   updatedAt      DateTime  @updatedAt
+}
+
+/// Customer-to-customer referral: one row per referred user (first attributed referrer wins).
+model CustomerReferral {
+  id                   String                 @id @default(cuid())
+  referrerUserId       String
+  referredUserId       String                 @unique
+  codeUsed             String
+  status               CustomerReferralStatus @default(PENDING)
+  /// WalletEsimPurchase that triggered the referrer reward (first COMPLETED).
+  rewardedPurchaseId   String?
+  /// Referrer WalletTransaction id for the referral credit.
+  rewardWalletTxId     String?
+  rewardedAt           DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  referrer             User                   @relation("CustomerReferralReferrer", fields: [referrerUserId], references: [id], onDelete: Cascade)
+  referred             User                   @relation("CustomerReferralReferred", fields: [referredUserId], references: [id], onDelete: Cascade)
+
+  @@index([referrerUserId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([rewardedPurchaseId])
 }

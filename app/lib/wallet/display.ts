@@ -10,6 +10,7 @@ export type WalletTransactionTypeLabel =
   | "Top-up"
   | "eSIM purchase"
   | "Refund"
+  | "Referral reward"
   | "Adjustment credit"
   | "Admin adjustment"
   | "Reversal"
@@ -72,7 +73,7 @@ export function walletTransactionTypeLabel(type: string): WalletTransactionTypeL
     case "REFUND_CREDIT":
       return "Refund";
     case "ADJUSTMENT_CREDIT":
-      return "Adjustment credit";
+      return "Referral reward";
     case "ADJUSTMENT_DEBIT":
       return "Admin adjustment";
     case "REVERSAL":
