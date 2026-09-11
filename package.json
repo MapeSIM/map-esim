@@ -18,6 +18,7 @@
     "qa:google-oauth": "tsx scripts/qa-google-oauth.ts",
     "qa:password-policy": "tsx scripts/qa-password-policy.ts",
     "qa:admin-overview": "tsx scripts/qa-admin-overview.ts",
+    "qa:admin-revenue": "tsx scripts/qa-admin-revenue.ts",
     "qa:admin-orders": "tsx scripts/qa-admin-orders.ts",
     "qa:admin-customers": "tsx scripts/qa-admin-customers.ts",
     "qa:admin-single-session": "tsx scripts/qa-admin-single-session.ts",

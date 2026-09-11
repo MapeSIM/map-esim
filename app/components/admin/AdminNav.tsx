@@ -6,6 +6,7 @@ import { signOutAction } from "@/app/lib/auth/actions";
 
 const links = [
   { href: "/admin", label: "Overview", exact: true },
+  { href: "/admin/revenue", label: "Revenue", exact: false },
   { href: "/admin/orders", label: "Orders", exact: false },
   { href: "/admin/customers", label: "Customers", exact: false },
   { href: "/admin/partners", label: "Partners", exact: false },
