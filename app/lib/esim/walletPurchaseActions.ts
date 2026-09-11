@@ -49,9 +49,9 @@ import {
   sanitizeCountryHint,
 } from "@/app/lib/vesim/server";
 import {
-  buildAddDataIdempotencyKey,
   normalizeAddDataFromOrderId,
   resolveOwnedRechargeOrderId,
+  resolveWalletAddDataIdempotencyKey,
 } from "@/app/lib/esim/addDataCheckout";
 
 export async function loadCustomerWalletPurchaseOffersAction(
@@ -129,7 +129,12 @@ export async function prepareWalletEsimPurchaseAction(
         error: "Add More Data is not available for this eSIM.",
       };
     }
-    idempotencyKey = buildAddDataIdempotencyKey(fromOrderId);
+    idempotencyKey = await resolveWalletAddDataIdempotencyKey({
+      localOrderId: fromOrderId,
+      ownerKind: "customer",
+      ownerId: customer.id,
+      offerId,
+    });
   } else if (idempotencyParsed.ok) {
     idempotencyKey = idempotencyParsed.value;
   } else {
@@ -165,6 +170,7 @@ export async function prepareWalletEsimPurchaseAction(
 }
 
 export async function startCustomerAddDataCheckoutAction(
+  _prev: unknown,
   formData: FormData
 ): Promise<void> {
   const customer = await requireRole("CUSTOMER");
@@ -174,6 +180,7 @@ export async function startCustomerAddDataCheckoutAction(
   void formData.get("providerOrderId");
   void formData.get("offerId");
   void formData.get("price");
+  void _prev;
 
   if (!localOrderId) {
     redirect("/account/orders");
@@ -194,11 +201,17 @@ export async function startCustomerAddDataCheckoutAction(
   const countryHint = sanitizeCountryHint(detail.destinationCode);
 
   try {
+    const idempotencyKey = await resolveWalletAddDataIdempotencyKey({
+      localOrderId,
+      ownerKind: "customer",
+      ownerId: customer.id,
+      offerId: detail.offerId,
+    });
     const prepared = await prepareWalletEsimPurchase({
       customerUserId: customer.id,
       offerId: detail.offerId,
       countryHint,
-      idempotencyKey: buildAddDataIdempotencyKey(localOrderId),
+      idempotencyKey,
     });
     redirect(reviewPath(prepared.purchaseId));
   } catch (error) {

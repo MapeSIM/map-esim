@@ -2,8 +2,8 @@
 
 import { requireRole } from "@/app/lib/auth/session";
 import {
-  buildAddDataIdempotencyKey,
   normalizeAddDataFromOrderId,
+  resolvePartnerAddDataIdempotencyKey,
 } from "@/app/lib/esim/addDataCheckout";
 import { parseWalletPurchaseIdempotencyKey } from "@/app/lib/esim/walletPurchaseValidation";
 import {
@@ -192,10 +192,15 @@ export async function startPartnerAddDataCheckoutAction(
   }
 
   // Existing Partner wallet + discount buy; provider bind via adddata_ key.
+  const idempotencyKey = await resolvePartnerAddDataIdempotencyKey({
+    localOrderId,
+    ownerId: actor.partnerId,
+    offerId,
+  });
   return buyPartnerEsimPurchase({
     partnerUserId: actor.userId,
     offerId,
     countryHint,
-    idempotencyKey: buildAddDataIdempotencyKey(localOrderId),
+    idempotencyKey,
   });
 }

@@ -259,13 +259,27 @@ function main() {
     /buildAddDataEligibility\(\{\s*orderId:/
   );
   const addDataPage = read("app/account/orders/[orderId]/add-data/page.tsx");
-  assert.match(addDataPage, /startCustomerAddDataCheckoutAction/);
+  assert.match(addDataPage, /CustomerAddDataForm/);
   assert.match(addDataPage, /Continue to checkout/);
   assert.match(addDataPage, /getCustomerOwnedOrderDetail/);
-  assert.match(addDataPage, /name="orderId"/);
   assert.doesNotMatch(addDataPage, /name="rechargeOrderId"|name="providerOrderId"/);
+  const customerAddDataForm = read(
+    "app/components/orders/CustomerAddDataForm.tsx"
+  );
+  assert.match(customerAddDataForm, /startCustomerAddDataCheckoutAction/);
+  assert.match(customerAddDataForm, /useActionState/);
+  assert.match(customerAddDataForm, /disabled=\{pending\}/);
+  assert.match(customerAddDataForm, /name="orderId"/);
+  assert.doesNotMatch(
+    customerAddDataForm,
+    /name="rechargeOrderId"|name="providerOrderId"/
+  );
   const addDataLib = read("app/lib/esim/addDataCheckout.ts");
   assert.match(addDataLib, /buildAddDataIdempotencyKey/);
+  assert.match(addDataLib, /resolveWalletAddDataIdempotencyKey/);
+  assert.match(addDataLib, /resolvePartnerAddDataIdempotencyKey/);
+  assert.match(addDataLib, /createHash/);
+  assert.doesNotMatch(addDataLib, /randomBytes/);
   assert.match(addDataLib, /parseAddDataSourceOrderId/);
   assert.match(addDataLib, /resolveOwnedRechargeOrderId/);
   assert.match(addDataLib, /isEncryptedOrderIccidExpiredForAddData/);
@@ -297,7 +311,15 @@ function main() {
   assert.match(paymentApply, /parseAddDataSourceOrderId/);
   const walletActions = read("app/lib/esim/walletPurchaseActions.ts");
   assert.match(walletActions, /startCustomerAddDataCheckoutAction/);
-  assert.match(walletActions, /buildAddDataIdempotencyKey/);
+  assert.match(walletActions, /resolveWalletAddDataIdempotencyKey/);
+  const adminAddDataActions = read(
+    "app/lib/esim/adminWalletPurchaseActions.ts"
+  );
+  assert.match(adminAddDataActions, /resolveWalletAddDataIdempotencyKey/);
+  const partnerAddDataActions = read(
+    "app/lib/partner/partnerPurchaseActions.ts"
+  );
+  assert.match(partnerAddDataActions, /resolvePartnerAddDataIdempotencyKey/);
   assert.doesNotMatch(addDataPage, /Coming soon/);
   assert.match(detailPage, /CustomerEsimUsagePanel/);
   assert.match(usageLib, /import "server-only"/);

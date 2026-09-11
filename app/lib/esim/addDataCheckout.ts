@@ -1,7 +1,12 @@
 import "server-only";
 
-import { randomBytes } from "node:crypto";
-import { OrderStatus, Role } from "@prisma/client";
+import { createHash } from "node:crypto";
+import {
+  OrderStatus,
+  PartnerEsimPurchaseStatus,
+  Role,
+  WalletEsimPurchaseStatus,
+} from "@prisma/client";
 import { prisma } from "@/app/lib/db";
 import { isProviderUsageExpired } from "@/app/lib/esim/esimLifecycleNotificationShared";
 import { resolveCustomerEsimStatusBadge } from "@/app/lib/orders/customerOrderDisplay";
@@ -15,21 +20,148 @@ import {
   normalizeIccid,
   validateIccid,
 } from "@/app/lib/orders/iccidCrypto";
+import { normalizeOfferId } from "@/app/lib/vesim/server";
 
 /** Idempotency prefix — encodes MAP local source order without a schema change. */
 export const ADD_DATA_IDEMPOTENCY_PREFIX = "adddata_";
 
 const LOCAL_ORDER_ID_RE = /^[A-Za-z0-9_-]+$/;
+const ADD_DATA_KEY_MAX_GENERATION = 64;
+
+export type AddDataIdempotencyOwnerKind = "customer" | "admin" | "partner";
+
+export type BuildAddDataIdempotencyKeyInput = {
+  localOrderId: string;
+  ownerKind: AddDataIdempotencyOwnerKind;
+  /** Customer user id, or Partner profile id. */
+  ownerId: string;
+  offerId: string;
+  /** Bumped after COMPLETED / FAILED_REFUNDED so a new top-up can start. */
+  generation?: number;
+  /** Admin-assisted only — separates assisted keys from self-service. */
+  adminUserId?: string | null;
+};
 
 /**
- * Build a wallet-purchase idempotency key that binds Add Data checkout to a
- * MAP local order id. VeSIM rechargeOrderId is resolved from that order's
- * providerOrderId at credit-checkout time (never store MAP id as recharge id).
+ * Stable Add More Data idempotency key.
+ * Format preserved for parseAddDataSourceOrderId:
+ *   adddata_<16-hex-fingerprint>_<localOrderId>
+ * Fingerprint covers owner + offer + generation (not a random nonce).
  */
-export function buildAddDataIdempotencyKey(localOrderId: string): string {
-  const orderId = (localOrderId ?? "").trim();
-  const nonce = randomBytes(8).toString("hex");
+export function buildAddDataIdempotencyKey(
+  input: BuildAddDataIdempotencyKeyInput
+): string {
+  const orderId = (input.localOrderId ?? "").trim();
+  const ownerId = (input.ownerId ?? "").trim();
+  const offerId =
+    normalizeOfferId(input.offerId) || (input.offerId ?? "").trim();
+  const generation =
+    Number.isInteger(input.generation) && (input.generation as number) >= 0
+      ? (input.generation as number)
+      : 0;
+  const adminUserId =
+    input.ownerKind === "admin" ? (input.adminUserId ?? "").trim() : "";
+
+  const material = [
+    "adddata-v1",
+    input.ownerKind,
+    ownerId,
+    adminUserId,
+    offerId,
+    String(generation),
+    orderId,
+  ].join("|");
+  const nonce = createHash("sha256")
+    .update(material, "utf8")
+    .digest("hex")
+    .slice(0, 16);
   return `${ADD_DATA_IDEMPOTENCY_PREFIX}${nonce}_${orderId}`;
+}
+
+function isWalletAddDataTerminalStatus(
+  status: WalletEsimPurchaseStatus
+): boolean {
+  return (
+    status === WalletEsimPurchaseStatus.COMPLETED ||
+    status === WalletEsimPurchaseStatus.FAILED_REFUNDED
+  );
+}
+
+function isPartnerAddDataTerminalStatus(
+  status: PartnerEsimPurchaseStatus
+): boolean {
+  return (
+    status === PartnerEsimPurchaseStatus.COMPLETED ||
+    status === PartnerEsimPurchaseStatus.FAILED_REFUNDED
+  );
+}
+
+/**
+ * Pick a stable Add Data key for customer/admin wallet prepare:
+ * - READY / in-flight → reuse same key (double-submit safe)
+ * - COMPLETED → next generation (new top-up allowed)
+ * - FAILED_REFUNDED → next generation (retry allowed)
+ */
+export async function resolveWalletAddDataIdempotencyKey(
+  input: Omit<BuildAddDataIdempotencyKeyInput, "generation">
+): Promise<string> {
+  for (let generation = 0; generation < ADD_DATA_KEY_MAX_GENERATION; generation++) {
+    const key = buildAddDataIdempotencyKey({ ...input, generation });
+    const existing = await prisma.walletEsimPurchase.findUnique({
+      where: { idempotencyKey: key },
+      select: { status: true, customerUserId: true },
+    });
+    if (!existing) return key;
+    if (existing.customerUserId !== input.ownerId.trim()) {
+      continue;
+    }
+    if (isWalletAddDataTerminalStatus(existing.status)) {
+      continue;
+    }
+    // READY / DRAFT / funded / provider-pending / recon → reuse.
+    return key;
+  }
+  // Exhausted generations — last key still binds source order for parse/recharge.
+  return buildAddDataIdempotencyKey({
+    ...input,
+    generation: ADD_DATA_KEY_MAX_GENERATION - 1,
+  });
+}
+
+/**
+ * Pick a stable Add Data key for Partner prepare/buy (same reuse rules).
+ */
+export async function resolvePartnerAddDataIdempotencyKey(input: {
+  localOrderId: string;
+  /** Partner profile id. */
+  ownerId: string;
+  offerId: string;
+}): Promise<string> {
+  const base: BuildAddDataIdempotencyKeyInput = {
+    localOrderId: input.localOrderId,
+    ownerKind: "partner",
+    ownerId: input.ownerId,
+    offerId: input.offerId,
+  };
+  for (let generation = 0; generation < ADD_DATA_KEY_MAX_GENERATION; generation++) {
+    const key = buildAddDataIdempotencyKey({ ...base, generation });
+    const existing = await prisma.partnerEsimPurchase.findUnique({
+      where: { idempotencyKey: key },
+      select: { status: true, partnerId: true },
+    });
+    if (!existing) return key;
+    if (existing.partnerId !== input.ownerId.trim()) {
+      continue;
+    }
+    if (isPartnerAddDataTerminalStatus(existing.status)) {
+      continue;
+    }
+    return key;
+  }
+  return buildAddDataIdempotencyKey({
+    ...base,
+    generation: ADD_DATA_KEY_MAX_GENERATION - 1,
+  });
 }
 
 /** Extract MAP local source order id from an Add Data idempotency key. */

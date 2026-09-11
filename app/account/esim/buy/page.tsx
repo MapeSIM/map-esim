@@ -14,9 +14,9 @@ import {
   WalletEsimPurchaseError,
 } from "@/app/lib/esim/walletPurchase";
 import {
-  buildAddDataIdempotencyKey,
   normalizeAddDataFromOrderId,
   resolveOwnedRechargeOrderId,
+  resolveWalletAddDataIdempotencyKey,
 } from "@/app/lib/esim/addDataCheckout";
 import { prisma } from "@/app/lib/db";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
@@ -188,7 +188,12 @@ export default async function AccountWalletBuyPage({
           directOfferError =
             "Add More Data is not available for this eSIM.";
         } else {
-          idempotencyKey = buildAddDataIdempotencyKey(fromOrderId);
+          idempotencyKey = await resolveWalletAddDataIdempotencyKey({
+            localOrderId: fromOrderId,
+            ownerKind: "customer",
+            ownerId: user.id,
+            offerId: offerIdHint,
+          });
         }
       }
       if (!directOfferError) {

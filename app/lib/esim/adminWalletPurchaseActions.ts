@@ -11,9 +11,9 @@ import {
 } from "@/app/lib/esim/adminWalletPurchaseValidation";
 import { listAdminWalletBuyOffers } from "@/app/lib/esim/adminWalletPurchaseRead";
 import {
-  buildAddDataIdempotencyKey,
   normalizeAddDataFromOrderId,
   resolveOwnedRechargeOrderId,
+  resolveWalletAddDataIdempotencyKey,
 } from "@/app/lib/esim/addDataCheckout";
 import {
   WalletEsimPurchaseError,
@@ -342,11 +342,18 @@ export async function startAdminAddDataCheckoutAction(
 
   let result;
   try {
+    const idempotencyKey = await resolveWalletAddDataIdempotencyKey({
+      localOrderId,
+      ownerKind: "admin",
+      ownerId: customerUserId,
+      offerId,
+      adminUserId: admin.id,
+    });
     result = await prepareWalletEsimPurchase({
       customerUserId,
       offerId,
       countryHint,
-      idempotencyKey: buildAddDataIdempotencyKey(localOrderId),
+      idempotencyKey,
       assistedBy: {
         adminUserId: admin.id,
         reason: reasonParsed.value,

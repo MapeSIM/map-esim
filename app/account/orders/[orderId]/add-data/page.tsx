@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import CustomerAddDataForm from "@/app/components/orders/CustomerAddDataForm";
 import { requireSession } from "@/app/lib/auth/session";
-import { startCustomerAddDataCheckoutAction } from "@/app/lib/esim/walletPurchaseActions";
 import { getCustomerOwnedOrderDetail } from "@/app/lib/orders/customerOrders";
 
 export const dynamic = "force-dynamic";
@@ -75,15 +75,7 @@ export default async function AccountOrderAddDataPage({
                 contact support.
               </p>
             ) : null}
-            <form action={startCustomerAddDataCheckoutAction} className="mt-4">
-              <input type="hidden" name="orderId" value={detail.id} />
-              <button
-                type="submit"
-                className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
-              >
-                Continue to checkout
-              </button>
-            </form>
+            <CustomerAddDataForm orderId={detail.id} />
           </>
         ) : (
           <>
