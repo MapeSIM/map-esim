@@ -1,4 +1,5 @@
 import PartnerShareBrandingForm from "@/app/components/partner/PartnerShareBrandingForm";
+import { partnerCardClass, partnerSectionLabelClass } from "@/app/components/partner/partnerPortalUi";
 import { requireRole } from "@/app/lib/auth/session";
 import { getPartnerPortalSummary } from "@/app/lib/partner/partnerAccess";
 import { getPartnerShareBranding } from "@/app/lib/partner/partnerShareBranding";
@@ -32,26 +33,35 @@ export default async function PartnerProfilePage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Profile</h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Profile editing arrives in a later phase. Your signed-in details are
-          shown below.
+          Profile editing arrives in a later phase. Manage share-page branding
+          below.
         </p>
       </div>
 
-      <section className="space-y-3 text-sm">
+      <section className="space-y-3">
         <h2 className="text-lg font-semibold tracking-tight">Account Info</h2>
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5">
-          <p>
-            <span className="text-[var(--text-soft)]">Name:</span>{" "}
-            <b>{user.name}</b>
-          </p>
-          <p className="mt-2">
-            <span className="text-[var(--text-soft)]">Email:</span>{" "}
-            <b>{user.email}</b>
-          </p>
-          <p className="mt-2">
-            <span className="text-[var(--text-soft)]">Partner discount:</span>{" "}
-            <b>{discountLabel}</b>
-          </p>
+        <div className={partnerCardClass}>
+          <p className={partnerSectionLabelClass}>Signed-in partner</p>
+          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3">
+              <dt className="text-xs text-[var(--text-soft)]">Name</dt>
+              <dd className="mt-1 font-semibold text-[var(--heading)]">
+                {user.name}
+              </dd>
+            </div>
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3">
+              <dt className="text-xs text-[var(--text-soft)]">Email</dt>
+              <dd className="mt-1 font-semibold text-[var(--heading)]">
+                {user.email}
+              </dd>
+            </div>
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 sm:col-span-2">
+              <dt className="text-xs text-[var(--text-soft)]">Partner discount</dt>
+              <dd className="mt-1 font-semibold text-[var(--heading)]">
+                {discountLabel}
+              </dd>
+            </div>
+          </dl>
         </div>
       </section>
 
@@ -61,9 +71,7 @@ export default async function PartnerProfilePage() {
           Shown only on secure share pages for your eSIM orders. Public MAP
           storefront branding is unchanged.
         </p>
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5">
-          <PartnerShareBrandingForm initial={branding} />
-        </div>
+        <PartnerShareBrandingForm initial={branding} />
       </section>
     </div>
   );

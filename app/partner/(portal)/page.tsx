@@ -59,8 +59,8 @@ export default async function PartnerDashboardPage() {
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
             Partner Balance
           </p>
           <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
@@ -68,8 +68,8 @@ export default async function PartnerDashboardPage() {
           </p>
           <p className="mt-1 text-sm text-[var(--text-muted)]">USD</p>
         </div>
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
             Current Partner Discount
           </p>
           <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
@@ -79,8 +79,8 @@ export default async function PartnerDashboardPage() {
             Applied automatically at purchase
           </p>
         </div>
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
             Total eSIM orders
           </p>
           <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
@@ -90,8 +90,8 @@ export default async function PartnerDashboardPage() {
             Completed Partner purchases
           </p>
         </div>
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
             Total spent
           </p>
           <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
@@ -101,8 +101,8 @@ export default async function PartnerDashboardPage() {
             eSIM purchase debits from wallet
           </p>
         </div>
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
             Total savings
           </p>
           <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">

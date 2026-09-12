@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { QrCode } from "lucide-react";
 import Link from "next/link";
 import EsimActionSheet from "@/app/components/install/EsimActionSheet";
@@ -8,6 +8,12 @@ import InstallEsimSheet from "@/app/components/install/InstallEsimSheet";
 import ManualInstallSheet from "@/app/components/install/ManualInstallSheet";
 import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
 import PartnerEsimShareControls from "@/app/components/partner/PartnerEsimShareControls";
+import {
+  partnerCardClass,
+  partnerPrimaryCtaClass,
+  partnerSecondaryCtaClass,
+  partnerSectionLabelClass,
+} from "@/app/components/partner/partnerPortalUi";
 import { PARTNER_INSTALL_UNAVAILABLE_MESSAGE } from "@/app/lib/partner/partnerOrderInstallClient";
 
 type InstallPayload = {
@@ -36,6 +42,8 @@ type Props = {
   planName: string | null;
   dataAllowance: string | null;
   validity: string | null;
+  addDataHref?: string | null;
+  defaultExpanded?: boolean;
 };
 
 export default function PartnerEsimInstallPanel({
@@ -48,8 +56,10 @@ export default function PartnerEsimInstallPanel({
   planName,
   dataAllowance,
   validity,
+  addDataHref = null,
+  defaultExpanded = false,
 }: Props) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const [guideOpen, setGuideOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +112,11 @@ export default function PartnerEsimInstallPanel({
     }
   }, [orderId]);
 
+  useEffect(() => {
+    if (!defaultExpanded || !installEligible) return;
+    void loadInstall();
+  }, [defaultExpanded, installEligible, loadInstall]);
+
   async function expand() {
     setExpanded(true);
     if (!data && !loading) {
@@ -122,7 +137,7 @@ export default function PartnerEsimInstallPanel({
       <button
         type="button"
         onClick={() => void expand()}
-        className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--accent-ink)] outline-none transition hover:bg-[var(--accent-strong)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+        className={partnerPrimaryCtaClass}
       >
         <QrCode className="h-4 w-4" aria-hidden="true" />
         View QR Code & Install
@@ -133,60 +148,82 @@ export default function PartnerEsimInstallPanel({
   const showQr = Boolean(data?.hasVerifiedLpa && data.qrViewHref);
 
   return (
-    <div className="min-w-0 space-y-3">
+    <div className="min-w-0 space-y-5">
       <h2 className="sr-only">Install your eSIM</h2>
-      {loading && !data ? (
-        <p className="text-sm text-[var(--text-muted)]" role="status">
-          Loading installation details…
-        </p>
-      ) : null}
-      {error && !data ? (
-        <p className="text-sm text-[var(--danger-text)]" role="alert">
-          {error}
-        </p>
-      ) : null}
 
-      {data && !data.hasInstallDetails ? (
-        <p className="text-sm text-[var(--text-muted)]" role="status">
-          {PARTNER_INSTALL_UNAVAILABLE_MESSAGE}
+      <section className={partnerCardClass}>
+        <p className={partnerSectionLabelClass}>QR Installation</p>
+        <h3 className="mt-2 text-base font-semibold tracking-tight text-[var(--heading)]">
+          Install this eSIM
+        </h3>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">
+          Use the green button on this device, or scan the QR code with another
+          phone.
         </p>
-      ) : null}
 
-      <div
-        className={
-          showQr
-            ? "min-w-0 space-y-3 sm:grid sm:grid-cols-[minmax(0,240px)_minmax(0,1fr)] sm:items-start sm:gap-4 sm:space-y-0"
-            : "min-w-0 space-y-3"
-        }
-      >
-        {showQr ? (
-          <div className="rounded-2xl border border-[var(--border)] bg-white p-4">
-            {/* authorized partner QR route */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={data!.qrViewHref!}
-              alt="eSIM installation QR code"
-              width={240}
-              height={240}
-              className="mx-auto h-auto w-full max-w-[220px] sm:max-w-[240px]"
-            />
-          </div>
+        {loading && !data ? (
+          <p className="mt-4 text-sm text-[var(--text-muted)]" role="status">
+            Loading installation details…
+          </p>
+        ) : null}
+        {error && !data ? (
+          <p className="mt-4 text-sm text-[var(--danger-text)]" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {data && !data.hasInstallDetails ? (
+          <p className="mt-4 text-sm text-[var(--text-muted)]" role="status">
+            {PARTNER_INSTALL_UNAVAILABLE_MESSAGE}
+          </p>
         ) : null}
 
-        <div className="min-w-0 space-y-3">
-          {data ? (
-            <InstallEsimSheet
-              qrViewHref={data.qrViewHref}
-              smdpAddress={data.smdpAddress}
-              activationCode={data.activationCode}
-              lpa={data.lpa}
-              iphoneOfficialHref={data.iphoneInstallHref}
-              androidOfficialHref={data.androidActivationUrl}
-              iphoneGuideHref={data.iphoneGuideHref}
-              androidGuideHref={data.androidGuideHref}
-            />
+        <div
+          className={
+            showQr
+              ? "mt-5 grid gap-5 lg:grid-cols-[minmax(0,200px)_minmax(0,1fr)] lg:items-start"
+              : "mt-5 space-y-4"
+          }
+        >
+          {showQr ? (
+            <div className="rounded-2xl border border-[var(--border)] bg-white p-4">
+              {/* authorized partner QR route */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={data!.qrViewHref!}
+                alt="eSIM installation QR code"
+                width={180}
+                height={180}
+                className="mx-auto h-auto w-full max-w-[180px]"
+              />
+            </div>
           ) : null}
 
+          <div className="min-w-0 space-y-3">
+            {data ? (
+              <InstallEsimSheet
+                qrViewHref={data.qrViewHref}
+                smdpAddress={data.smdpAddress}
+                activationCode={data.activationCode}
+                lpa={data.lpa}
+                iphoneOfficialHref={data.iphoneInstallHref}
+                androidOfficialHref={data.androidActivationUrl}
+                iphoneGuideHref={data.iphoneGuideHref}
+                androidGuideHref={data.androidGuideHref}
+              />
+            ) : null}
+            <p className="text-sm leading-relaxed text-[var(--text-muted)]">
+              If automatic install does not open, use Manual Installation or the
+              Installation Guide below.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-2 sm:grid-cols-2">
+          {addDataHref ? (
+            <Link href={addDataHref} className={partnerSecondaryCtaClass}>
+              Add More Data
+            </Link>
+          ) : null}
           <PartnerEsimShareControls
             orderId={orderId}
             hasActiveToken={hasActiveShareToken}
@@ -196,52 +233,50 @@ export default function PartnerEsimInstallPanel({
             validity={validity}
             compact
           />
-
-          <IccidRevealPanel
-            orderId={orderId}
-            maskedLabel={iccidMasked}
-            revealable={iccidRevealable}
-            revealPath={`/api/partner/orders/${encodeURIComponent(orderId)}/iccid`}
-            compact
+          <ManualInstallSheet
+            label="Manual Installation"
+            smdpAddress={data?.smdpAddress}
+            activationCode={data?.activationCode}
+            lpa={data?.lpa}
+            buttonClassName={partnerSecondaryCtaClass}
           />
-
-          <div className="grid gap-2 sm:grid-cols-2">
-            <ManualInstallSheet
-              label="Manual installation details"
-              smdpAddress={data?.smdpAddress}
-              activationCode={data?.activationCode}
-              lpa={data?.lpa}
-            />
-            <button
-              type="button"
-              onClick={() => setGuideOpen(true)}
-              className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--page-bg-soft)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-            >
-              Installation Guide
-            </button>
-          </div>
-          <EsimActionSheet
-            open={guideOpen}
-            title="Installation Guide"
-            onClose={() => setGuideOpen(false)}
+          <button
+            type="button"
+            onClick={() => setGuideOpen(true)}
+            className={partnerSecondaryCtaClass}
           >
-            <div className="flex flex-col gap-2">
-              <Link
-                href={data?.iphoneGuideHref || "/install/iphone"}
-                className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--surface-2)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-              >
-                iPhone Guide
-              </Link>
-              <Link
-                href={data?.androidGuideHref || "/install/android"}
-                className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--page-bg-soft)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-              >
-                Android Guide
-              </Link>
-            </div>
-          </EsimActionSheet>
+            Installation Guide
+          </button>
         </div>
-      </div>
+        <EsimActionSheet
+          open={guideOpen}
+          title="Installation Guide"
+          onClose={() => setGuideOpen(false)}
+        >
+          <div className="flex flex-col gap-2">
+            <Link
+              href={data?.iphoneGuideHref || "/install/iphone"}
+              className={partnerSecondaryCtaClass}
+            >
+              iPhone Guide
+            </Link>
+            <Link
+              href={data?.androidGuideHref || "/install/android"}
+              className={partnerSecondaryCtaClass}
+            >
+              Android Guide
+            </Link>
+          </div>
+        </EsimActionSheet>
+      </section>
+
+      <IccidRevealPanel
+        orderId={orderId}
+        maskedLabel={iccidMasked}
+        revealable={iccidRevealable}
+        revealPath={`/api/partner/orders/${encodeURIComponent(orderId)}/iccid`}
+        compact
+      />
     </div>
   );
 }

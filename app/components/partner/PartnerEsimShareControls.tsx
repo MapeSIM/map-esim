@@ -3,6 +3,11 @@
 import { useState } from "react";
 import EsimActionSheet from "@/app/components/install/EsimActionSheet";
 import {
+  partnerDangerCtaClass,
+  partnerPrimaryCtaClass,
+  partnerSecondaryCtaClass,
+} from "@/app/components/partner/partnerPortalUi";
+import {
   createOrRegeneratePartnerShareLinkAction,
   revokePartnerShareLinkAction,
 } from "@/app/lib/partner/partnerShareLinkActions";
@@ -173,7 +178,7 @@ export default function PartnerEsimShareControls({
           type="button"
           onClick={() => void createOrRegenerate()}
           disabled={busy}
-          className="inline-flex h-11 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] outline-none hover:bg-[var(--accent)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+          className={`${partnerPrimaryCtaClass} sm:w-auto`}
         >
           {active ? "Regenerate Share Link" : "Create Share Link"}
         </button>
@@ -183,7 +188,7 @@ export default function PartnerEsimShareControls({
               type="button"
               onClick={() => void copyLink()}
               disabled={busy}
-              className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--surface)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+              className={`${partnerSecondaryCtaClass} sm:w-auto`}
             >
               {copied ? "Copied" : "Copy Link"}
             </button>
@@ -193,7 +198,7 @@ export default function PartnerEsimShareControls({
                 target="_blank"
                 rel="noopener noreferrer"
                 referrerPolicy="no-referrer"
-                className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--surface)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                className={`${partnerSecondaryCtaClass} sm:w-auto`}
               >
                 WhatsApp Share
               </a>
@@ -202,7 +207,7 @@ export default function PartnerEsimShareControls({
               type="button"
               onClick={() => void webShare()}
               disabled={busy}
-              className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--surface)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+              className={`${partnerSecondaryCtaClass} sm:w-auto`}
             >
               Web Share
             </button>
@@ -213,7 +218,7 @@ export default function PartnerEsimShareControls({
             type="button"
             onClick={() => void revoke()}
             disabled={busy}
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--danger-border)] px-4 text-sm font-semibold text-[var(--danger-text)] outline-none hover:bg-[var(--danger-bg)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className={`${partnerDangerCtaClass} sm:w-auto`}
           >
             Revoke Share Link
           </button>
@@ -239,7 +244,7 @@ export default function PartnerEsimShareControls({
         <button
           type="button"
           onClick={() => setSheetOpen(true)}
-          className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--page-bg-soft)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+          className={partnerSecondaryCtaClass}
         >
           Share eSIM
         </button>

@@ -7,6 +7,11 @@ import {
   type PartnerRefundRequestFormState,
 } from "@/app/lib/partner/partnerRefundRequestActions";
 import {
+  partnerCardClass,
+  partnerQuietCtaClass,
+  partnerSectionLabelClass,
+} from "@/app/components/partner/partnerPortalUi";
+import {
   PARTNER_REFUND_NOTE_MAX,
   PARTNER_REFUND_REQUEST_REASONS,
   partnerRefundReasonLabel,
@@ -29,6 +34,7 @@ type Props = {
   partnerDebitLabel: string;
   alreadyRefunded: boolean;
   existingRequest: PartnerRefundRequestCardState;
+  embedded?: boolean;
 };
 
 export default function PartnerRefundRequestControls({
@@ -36,6 +42,7 @@ export default function PartnerRefundRequestControls({
   partnerDebitLabel,
   alreadyRefunded,
   existingRequest,
+  embedded = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -48,13 +55,15 @@ export default function PartnerRefundRequestControls({
     if (state?.ok) setOpen(false);
   }, [state]);
 
+  const shellClass = embedded
+    ? "min-w-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
+    : partnerCardClass;
+
   if (existingRequest?.isCompleted) {
     return (
-      <section
-        className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
-        aria-label="Refund completed"
-      >
-        <p className="text-sm font-semibold text-[var(--heading)]">
+      <section className={shellClass} aria-label="Refund completed">
+        <p className={partnerSectionLabelClass}>Refund</p>
+        <p className="mt-3 text-sm font-semibold text-[var(--heading)]">
           {existingRequest.statusLabel}
         </p>
         {existingRequest.refundedAmountLabel ? (
@@ -69,21 +78,27 @@ export default function PartnerRefundRequestControls({
 
   if (alreadyRefunded) {
     return (
-      <p className="text-sm text-[var(--text-muted)]" role="status">
-        Balance returned
-      </p>
+      <section className={shellClass} role="status">
+        <p className={partnerSectionLabelClass}>Refund</p>
+        <p className="mt-3 text-sm text-[var(--text-muted)]">Balance returned</p>
+      </section>
     );
   }
 
   const showButton = !existingRequest?.isOpen;
 
   return (
-    <div className="min-w-0 space-y-3">
+    <section className={shellClass} aria-label="Refund request status">
+      <p className={partnerSectionLabelClass}>Refund</p>
+      <h3 className="mt-2 text-base font-semibold tracking-tight text-[var(--heading)]">
+        Refund request
+      </h3>
+      <p className="mt-1 text-sm text-[var(--text-muted)]">
+        Requests are reviewed before any balance is returned.
+      </p>
+
       {existingRequest ? (
-        <section
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
-          aria-label="Refund request status"
-        >
+        <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
           <p className="text-sm font-semibold text-[var(--heading)]">
             {existingRequest.statusLabel}
           </p>
@@ -95,14 +110,14 @@ export default function PartnerRefundRequestControls({
               {existingRequest.decisionNote}
             </p>
           ) : null}
-          <p className="mt-1 text-xs text-[var(--text-soft)]">
+          <p className="mt-2 text-xs text-[var(--text-soft)]">
             Submitted {existingRequest.createdAtLabel}
           </p>
-        </section>
+        </div>
       ) : null}
 
       {showButton ? (
-        <>
+        <div className="mt-4">
           {state?.ok ? (
             <p className="text-sm font-semibold text-[var(--heading)]" role="status">
               {state.message}
@@ -111,12 +126,12 @@ export default function PartnerRefundRequestControls({
             <button
               type="button"
               onClick={() => setOpen(true)}
-              className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--page-bg-soft)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
+              className={`${partnerQuietCtaClass} sm:w-auto`}
             >
               Request Refund
             </button>
           )}
-        </>
+        </div>
       ) : null}
 
       <EsimActionSheet
@@ -214,6 +229,6 @@ export default function PartnerRefundRequestControls({
           </button>
         </form>
       </EsimActionSheet>
-    </div>
+    </section>
   );
 }

@@ -3,12 +3,16 @@ import PartnerEsimOrderCard from "@/app/components/partner/PartnerEsimOrderCard"
 import PartnerRefundRequestControls, {
   type PartnerRefundRequestCardState,
 } from "@/app/components/partner/PartnerRefundRequestControls";
+import {
+  partnerCardClass,
+  partnerSectionLabelClass,
+  partnerStatusBadgeClass,
+} from "@/app/components/partner/partnerPortalUi";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   listPartnerOrdersPage,
   type PartnerAttentionRow,
 } from "@/app/lib/partner/partnerOrders";
-import type { PartnerOrderStatusBadge } from "@/app/lib/partner/partnerOrdersDisplay";
 import {
   latestPartnerRefundSummary,
   listPartnerRefundRequestSummaries,
@@ -20,21 +24,6 @@ export const dynamic = "force-dynamic";
 const PORTAL_UNAVAILABLE =
   "Orders are temporarily unavailable. Please refresh shortly.";
 
-function statusBadgeClass(status: PartnerOrderStatusBadge): string {
-  switch (status) {
-    case "Completed":
-      return "bg-[var(--accent)]/15 text-[var(--heading)] border-[var(--accent-strong)]/40";
-    case "Processing":
-      return "bg-[var(--surface)] text-[var(--text)] border-[var(--border-hover)]";
-    case "Under review":
-      return "bg-[var(--warning-bg)] text-[var(--warning-text)] border-[var(--warning-border)]";
-    case "Failed — balance returned":
-      return "bg-[var(--danger-bg)] text-[var(--danger-text)] border-[var(--danger-border)]";
-    default:
-      return "bg-[var(--surface)] text-[var(--text-muted)] border-[var(--border)]";
-  }
-}
-
 function AttentionCard({
   row,
   refundRequest,
@@ -43,11 +32,11 @@ function AttentionCard({
   refundRequest: PartnerRefundRequestCardState;
 }) {
   return (
-    <li className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
+    <li className={partnerCardClass}>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <p className="text-sm font-semibold text-[var(--heading)]">{row.title}</p>
         <span
-          className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${statusBadgeClass(row.statusBadge)}`}
+          className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${partnerStatusBadgeClass(row.statusBadge)}`}
         >
           {row.statusBadge}
         </span>
@@ -85,6 +74,7 @@ function AttentionCard({
           partnerDebitLabel={row.partnerDebitLabel}
           alreadyRefunded={row.statusBadge === "Failed — balance returned"}
           existingRequest={refundRequest}
+          embedded
         />
       </div>
     </li>
@@ -99,10 +89,7 @@ export default async function PartnerOrdersPage() {
     data = await listPartnerOrdersPage(user.id);
   } catch {
     return (
-      <div
-        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-        role="status"
-      >
+        <div className={`${partnerCardClass} px-5 py-8`} role="status">
         <p className="text-sm font-medium text-[var(--heading)]">
           {PORTAL_UNAVAILABLE}
         </p>
@@ -136,10 +123,7 @@ export default async function PartnerOrdersPage() {
 
   if (!data) {
     return (
-      <div
-        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-        role="status"
-      >
+      <div className={`${partnerCardClass} px-5 py-8`} role="status">
         <p className="text-sm font-medium text-[var(--heading)]">
           Partner access is unavailable.
         </p>
@@ -152,8 +136,8 @@ export default async function PartnerOrdersPage() {
       <header>
         <h1 className="text-2xl font-bold tracking-tight">My eSIMs</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Your purchased Partner eSIMs. Open QR and usage only when you need
-          them.
+          Your purchased Partner eSIMs. Open an eSIM to install, share, or check
+          usage.
         </p>
       </header>
 
@@ -161,7 +145,7 @@ export default async function PartnerOrdersPage() {
         <section className="min-w-0 space-y-3" aria-labelledby="attention-heading">
           <h2
             id="attention-heading"
-            className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+            className={partnerSectionLabelClass}
           >
             Purchases requiring attention
           </h2>
@@ -180,7 +164,7 @@ export default async function PartnerOrdersPage() {
       <section className="min-w-0 space-y-3" aria-labelledby="orders-heading">
         <h2
           id="orders-heading"
-          className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+          className={partnerSectionLabelClass}
         >
           Completed orders
         </h2>
@@ -202,6 +186,7 @@ export default async function PartnerOrdersPage() {
                 <PartnerEsimOrderCard
                   row={row}
                   refundRequest={refundByPurchase.get(row.purchaseId) ?? null}
+                  variant="list"
                 />
               </li>
             ))}

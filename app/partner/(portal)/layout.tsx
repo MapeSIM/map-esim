@@ -30,15 +30,15 @@ export default async function PartnerLayout({
 
   return (
     <main className="min-h-screen w-full max-w-full bg-[var(--page-bg)] px-3 py-8 text-[var(--heading)] sm:px-6 sm:py-10">
-      <div className="mx-auto w-full min-w-0 max-w-5xl space-y-4">
-        <header className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 sm:px-5">
+      <div className="mx-auto w-full min-w-0 max-w-5xl space-y-5">
+        <header className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 sm:px-5">
           <AccountMenu
             userName={user.name}
             userEmail={user.email}
             links={partnerLinks}
           />
         </header>
-        <section className="min-w-0 w-full max-w-full rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-8">
+        <section className="min-w-0 w-full max-w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-8">
           {children}
         </section>
       </div>

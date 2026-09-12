@@ -28,7 +28,7 @@ export default function ShareLayout({
 }) {
   return (
     <main className="min-h-screen w-full max-w-full bg-[var(--page-bg)] px-3 py-8 text-[var(--heading)] sm:px-6 sm:py-10">
-      <div className="mx-auto w-full min-w-0 max-w-lg">{children}</div>
+      <div className="mx-auto w-full min-w-0 max-w-xl">{children}</div>
     </main>
   );
 }

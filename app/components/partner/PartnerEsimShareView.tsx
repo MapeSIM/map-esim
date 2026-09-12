@@ -6,6 +6,13 @@ import CopyInstallField from "@/app/components/install/CopyInstallField";
 import EsimActionSheet from "@/app/components/install/EsimActionSheet";
 import ManualInstallSheet from "@/app/components/install/ManualInstallSheet";
 import SmartInstallEsimButton from "@/app/components/install/SmartInstallEsimButton";
+import {
+  partnerCardClass,
+  partnerPrimaryCtaClass,
+  partnerQuietCtaClass,
+  partnerSecondaryCtaClass,
+  partnerSectionLabelClass,
+} from "@/app/components/partner/partnerPortalUi";
 import type { PartnerEsimSharePageData } from "@/app/lib/partner/partnerEsimShareRead";
 import { ONE_TAP_FALLBACK } from "@/app/lib/install/progressiveInstallCopy";
 import Link from "next/link";
@@ -134,22 +141,29 @@ export default function PartnerEsimShareView({ token, data }: Props) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {data.installDetailsAvailable && data.qrDataUrl ? (
-        <div className="rounded-2xl border border-[var(--border)] bg-white p-4">
-          {/* data URL — never a /share/<token> image path */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={data.qrDataUrl}
-            alt="eSIM installation QR code"
-            width={240}
-            height={240}
-            className="mx-auto h-auto w-full max-w-[220px] sm:max-w-[240px]"
-          />
-        </div>
+        <section className={partnerCardClass}>
+          <p className={partnerSectionLabelClass}>QR code</p>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">
+            Scan this code with another phone if you are not installing on this
+            device.
+          </p>
+          <div className="mt-4 rounded-2xl border border-[var(--border)] bg-white p-4">
+            {/* data URL — never a /share/<token> image path */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={data.qrDataUrl}
+              alt="eSIM installation QR code"
+              width={200}
+              height={200}
+              className="mx-auto h-auto w-full max-w-[180px] sm:max-w-[200px]"
+            />
+          </div>
+        </section>
       ) : (
         <p
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 text-sm text-[var(--text-muted)]"
+          className={`${partnerCardClass} text-sm text-[var(--text-muted)]`}
           role="status"
         >
           Installation details are not available yet.
@@ -157,18 +171,30 @@ export default function PartnerEsimShareView({ token, data }: Props) {
       )}
 
       {data.installDetailsAvailable ? (
-        <SmartInstallEsimButton
-          activationLpa={data.lpa}
-          qrViewHref={data.qrDataUrl}
-          smdpAddress={data.smdpAddress}
-          activationCode={data.activationCode}
-        />
-      ) : null}
-
-      {data.installDetailsAvailable ? (
-        <p className="text-sm leading-relaxed text-[var(--text-muted)]">
-          {ONE_TAP_FALLBACK}
-        </p>
+        <section className={partnerCardClass}>
+          <p className={partnerSectionLabelClass}>Install</p>
+          <h2 className="mt-2 text-base font-semibold tracking-tight text-[var(--heading)]">
+            Start installation
+          </h2>
+          <div className="mt-4">
+            <SmartInstallEsimButton
+              activationLpa={data.lpa}
+              qrViewHref={data.qrDataUrl}
+              smdpAddress={data.smdpAddress}
+              activationCode={data.activationCode}
+              className={partnerPrimaryCtaClass}
+              style={ctaStyle}
+            />
+          </div>
+          <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
+            {ONE_TAP_FALLBACK}
+          </p>
+          <ol className="mt-3 space-y-1.5 text-sm leading-relaxed text-[var(--text)]">
+            <li>1. Tap Install eSIM on this phone.</li>
+            <li>2. If nothing opens, scan the QR code with another device.</li>
+            <li>3. Still stuck? Use Manual Install or the Installation Guide.</li>
+          </ol>
+        </section>
       ) : null}
 
       {data.fullIccid ? (
@@ -177,71 +203,24 @@ export default function PartnerEsimShareView({ token, data }: Props) {
         </div>
       ) : null}
 
-      <button
-        type="button"
-        onClick={() => void loadUsage()}
-        disabled={usageLoading}
-        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] outline-none hover:bg-[var(--accent)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
-        style={ctaStyle}
-      >
-        <RefreshCw
-          className={`h-4 w-4 ${usageLoading ? "animate-spin" : ""}`}
-          aria-hidden="true"
-        />
-        {usageLoading ? "Checking…" : "Check Usage"}
-      </button>
-      {usageError ? (
-        <p className="text-sm text-[var(--text-muted)]" role="status">
-          {usageError}
-        </p>
-      ) : null}
-      {usage ? (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-3">
-          <p className="text-sm font-semibold text-[var(--heading)]">
-            {usage.statusLabel}
-          </p>
-          <dl className="mt-2 grid grid-cols-3 gap-2 text-center text-sm">
-            <div>
-              <dt className="text-xs text-[var(--text-soft)]">Used</dt>
-              <dd className="mt-0.5 font-semibold tabular-nums">
-                {usage.isUnlimited ? "—" : formatGb(usage.usedDataGB)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-[var(--text-soft)]">Remaining</dt>
-              <dd className="mt-0.5 font-semibold tabular-nums">
-                {usage.isUnlimited ? "Unlimited" : formatGb(usage.remainingDataGB)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-[var(--text-soft)]">Total</dt>
-              <dd className="mt-0.5 font-semibold tabular-nums">
-                {usage.isUnlimited ? "Unlimited" : formatGb(usage.initialDataGB)}
-              </dd>
-            </div>
-          </dl>
-          {usage.daysRemaining !== null ? (
-            <p className="mt-2 text-xs text-[var(--text-muted)]">
-              {usage.daysRemaining} days remaining
-            </p>
-          ) : null}
+      <section className={partnerCardClass}>
+        <p className={partnerSectionLabelClass}>Need another option?</p>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <ManualInstallSheet
+            smdpAddress={data.smdpAddress}
+            activationCode={data.activationCode}
+            lpa={data.lpa}
+            buttonClassName={partnerSecondaryCtaClass}
+          />
+          <button
+            type="button"
+            onClick={() => setGuideOpen(true)}
+            className={partnerSecondaryCtaClass}
+          >
+            Installation Guide
+          </button>
         </div>
-      ) : null}
-
-      <div className="grid gap-2 sm:grid-cols-2">
-        <ManualInstallSheet
-          smdpAddress={data.smdpAddress}
-          activationCode={data.activationCode}
-          lpa={data.lpa}
-        />
-        <button
-          type="button"
-          onClick={() => setGuideOpen(true)}
-          className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--page-bg-soft)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-        >
-          Installation Guide
-        </button>
-      </div>
+      </section>
 
       <EsimActionSheet
         open={guideOpen}
@@ -253,7 +232,7 @@ export default function PartnerEsimShareView({ token, data }: Props) {
             href="/install/iphone"
             rel="noreferrer"
             referrerPolicy="no-referrer"
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--surface-2)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className={partnerSecondaryCtaClass}
           >
             iPhone guide
           </Link>
@@ -261,53 +240,104 @@ export default function PartnerEsimShareView({ token, data }: Props) {
             href="/install/android"
             rel="noreferrer"
             referrerPolicy="no-referrer"
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--surface-2)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className={partnerSecondaryCtaClass}
           >
             Android guide
           </Link>
         </div>
       </EsimActionSheet>
 
-      <button
-        type="button"
-        onClick={() => void sharePage()}
-        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--page-bg-soft)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-      >
-        <Share2 className="h-4 w-4" aria-hidden="true" />
-        {shareCopied ? "Copied" : "Share eSIM"}
-      </button>
+      <section className={partnerCardClass}>
+        <p className={partnerSectionLabelClass}>Usage</p>
+        <button
+          type="button"
+          onClick={() => void loadUsage()}
+          disabled={usageLoading}
+          className={`mt-4 ${partnerSecondaryCtaClass}`}
+        >
+          <RefreshCw
+            className={`h-4 w-4 ${usageLoading ? "animate-spin" : ""}`}
+            aria-hidden="true"
+          />
+          {usageLoading ? "Checking…" : "Check Usage"}
+        </button>
+        {usageError ? (
+          <p className="mt-3 text-sm text-[var(--text-muted)]" role="status">
+            {usageError}
+          </p>
+        ) : null}
+        {usage ? (
+          <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3">
+            <p className="text-sm font-semibold text-[var(--heading)]">
+              {usage.statusLabel}
+            </p>
+            <dl className="mt-3 grid grid-cols-3 gap-2 text-center text-sm">
+              <div className="rounded-xl bg-[var(--surface-2)] px-2 py-2">
+                <dt className="text-xs text-[var(--text-soft)]">Used</dt>
+                <dd className="mt-0.5 font-semibold tabular-nums">
+                  {usage.isUnlimited ? "—" : formatGb(usage.usedDataGB)}
+                </dd>
+              </div>
+              <div className="rounded-xl bg-[var(--accent-strong)]/10 px-2 py-2">
+                <dt className="text-xs text-[var(--text-soft)]">Remaining</dt>
+                <dd className="mt-0.5 font-semibold tabular-nums">
+                  {usage.isUnlimited ? "Unlimited" : formatGb(usage.remainingDataGB)}
+                </dd>
+              </div>
+              <div className="rounded-xl bg-[var(--surface-2)] px-2 py-2">
+                <dt className="text-xs text-[var(--text-soft)]">Total</dt>
+                <dd className="mt-0.5 font-semibold tabular-nums">
+                  {usage.isUnlimited ? "Unlimited" : formatGb(usage.initialDataGB)}
+                </dd>
+              </div>
+            </dl>
+            {usage.daysRemaining !== null ? (
+              <p className="mt-3 text-xs text-[var(--text-muted)]">
+                {usage.daysRemaining} days remaining
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
 
-      {data.branding.supportEmail || data.branding.websiteUrl ? (
-        <div className="flex flex-col gap-2 sm:flex-row">
-          {data.branding.supportEmail ? (
-            <a
-              href={`mailto:${data.branding.supportEmail}`}
-              rel="noopener noreferrer"
-              referrerPolicy="no-referrer"
-              className="inline-flex h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-              style={
-                ctaStyle ?? {
-                  backgroundColor: "var(--accent-strong)",
-                  color: "var(--accent-ink)",
-                }
-              }
-            >
-              Support
-            </a>
-          ) : null}
-          {data.branding.websiteUrl ? (
-            <a
-              href={data.branding.websiteUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              referrerPolicy="no-referrer"
-              className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--page-bg-soft)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-            >
-              Visit website
-            </a>
+      <section className={partnerCardClass}>
+        <p className={partnerSectionLabelClass}>Share & support</p>
+        <div className="mt-4 grid gap-2">
+          <button
+            type="button"
+            onClick={() => void sharePage()}
+            className={partnerSecondaryCtaClass}
+          >
+            <Share2 className="h-4 w-4" aria-hidden="true" />
+            {shareCopied ? "Copied" : "Share eSIM"}
+          </button>
+          {data.branding.supportEmail || data.branding.websiteUrl ? (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {data.branding.supportEmail ? (
+                <a
+                  href={`mailto:${data.branding.supportEmail}`}
+                  rel="noopener noreferrer"
+                  referrerPolicy="no-referrer"
+                  className={partnerQuietCtaClass}
+                >
+                  Support
+                </a>
+              ) : null}
+              {data.branding.websiteUrl ? (
+                <a
+                  href={data.branding.websiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  referrerPolicy="no-referrer"
+                  className={partnerQuietCtaClass}
+                >
+                  Visit website
+                </a>
+              ) : null}
+            </div>
           ) : null}
         </div>
-      ) : null}
+      </section>
     </div>
   );
 }

@@ -97,6 +97,7 @@ export default async function PartnerOrderDetailPage({
           addDataSourceOrderId: detail.addDataSourceOrderId,
         }}
         refundRequest={refundRequest}
+        variant="detail"
       />
     </div>
   );

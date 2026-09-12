@@ -159,12 +159,18 @@ export default function IccidRevealPanel({
 
   if (compact) {
     return (
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+      <section className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
           ICCID
         </p>
-        <div className="min-w-0 space-y-2 text-sm font-medium text-[var(--heading)]">
-          <p className="break-all font-mono" aria-label={`ICCID for order ${orderId}`}>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">
+          Reveal only when you need the full number. It hides automatically.
+        </p>
+        <div className="mt-4 min-w-0 space-y-3 text-sm font-medium text-[var(--heading)]">
+          <p
+            className="break-all rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 font-mono tracking-wide"
+            aria-label={`ICCID for order ${orderId}`}
+          >
             {revealed ?? maskedLabel}
           </p>
           <div className="flex flex-wrap gap-2">
@@ -173,7 +179,7 @@ export default function IccidRevealPanel({
                 type="button"
                 onClick={() => void reveal()}
                 disabled={!revealable || pending}
-                className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--border-strong)] px-3 text-xs font-semibold text-[var(--heading)] transition hover:bg-[var(--surface)] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 text-xs font-semibold text-[var(--heading)] transition hover:bg-[var(--page-bg-soft)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {pending ? "Revealing…" : "Show"}
               </button>
@@ -182,14 +188,14 @@ export default function IccidRevealPanel({
                 <button
                   type="button"
                   onClick={() => void copy()}
-                  className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--border-strong)] px-3 text-xs font-semibold text-[var(--heading)] transition hover:bg-[var(--surface)]"
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 text-xs font-semibold text-[var(--heading)] transition hover:bg-[var(--page-bg-soft)]"
                 >
                   {copied ? "Copied" : "Copy"}
                 </button>
                 <button
                   type="button"
                   onClick={hide}
-                  className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--border-strong)] px-3 text-xs font-semibold text-[var(--heading)] transition hover:bg-[var(--surface)]"
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-[var(--border)] px-3.5 text-xs font-semibold text-[var(--text)] transition hover:bg-[var(--surface)]"
                 >
                   Hide
                 </button>
@@ -202,7 +208,7 @@ export default function IccidRevealPanel({
             </p>
           ) : null}
         </div>
-      </div>
+      </section>
     );
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import SmartInstallFallbackSheet from "@/app/components/install/SmartInstallFallbackSheet";
 import {
   launchSmartEsimInstallPath,
@@ -22,6 +22,7 @@ type Props = SmartInstallPayload & {
   iphoneGuideHref?: string;
   androidGuideHref?: string;
   className?: string;
+  style?: CSSProperties;
   /** Load authorized install data before resolving the path. */
   ensureInstallData?: () => Promise<SmartInstallPayload | false | null>;
 };
@@ -36,6 +37,7 @@ export default function SmartInstallEsimButton({
   iphoneGuideHref = "/install/iphone",
   androidGuideHref = "/install/android",
   className = "inline-flex h-12 w-full items-center justify-center rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--accent-ink)] outline-none transition hover:bg-[var(--accent-strong)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60",
+  style,
   ensureInstallData,
 }: Props) {
   const [fallbackOpen, setFallbackOpen] = useState(false);
@@ -106,6 +108,7 @@ export default function SmartInstallEsimButton({
         onClick={() => void onInstall()}
         disabled={pending}
         className={className}
+        style={style}
       >
         {pending ? "Preparing…" : SMART_INSTALL_BUTTON_LABEL}
       </button>

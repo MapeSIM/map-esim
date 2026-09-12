@@ -318,7 +318,7 @@ export default function CustomerEsimUsagePanel({
 
           {usage ? (
             compact ? (
-              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3">
+              <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span
                     className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass(usage)}`}
@@ -327,42 +327,40 @@ export default function CustomerEsimUsagePanel({
                   </span>
                 </div>
                 {usage.isUnlimited ? (
-                  <p className="mt-3 text-sm font-semibold text-[var(--heading)]">
+                  <p className="text-sm font-semibold text-[var(--heading)]">
                     Unlimited data
                   </p>
                 ) : (
-                  <dl className="mt-3 grid grid-cols-3 gap-2 text-center text-sm">
-                    <div>
+                  <dl className="grid grid-cols-3 gap-2 text-center text-sm">
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2 py-3">
                       <dt className="text-xs text-[var(--text-soft)]">Used</dt>
-                      <dd className="mt-0.5 font-semibold tabular-nums text-[var(--heading)]">
+                      <dd className="mt-1 font-semibold tabular-nums text-[var(--heading)]">
                         {formatGb(usage.usedDataGB)}
                       </dd>
                     </div>
-                    <div>
+                    <div className="rounded-xl border border-[var(--accent-strong)]/30 bg-[var(--accent-strong)]/10 px-2 py-3">
                       <dt className="text-xs text-[var(--text-soft)]">
                         Remaining
                       </dt>
-                      <dd className="mt-0.5 font-semibold tabular-nums text-[var(--heading)]">
+                      <dd className="mt-1 font-semibold tabular-nums text-[var(--heading)]">
                         {formatGb(usage.remainingDataGB)}
                       </dd>
                     </div>
-                    <div>
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2 py-3">
                       <dt className="text-xs text-[var(--text-soft)]">Total</dt>
-                      <dd className="mt-0.5 font-semibold tabular-nums text-[var(--heading)]">
+                      <dd className="mt-1 font-semibold tabular-nums text-[var(--heading)]">
                         {formatGb(usage.initialDataGB)}
                       </dd>
                     </div>
                   </dl>
                 )}
-                {usage.expiresAt ? (
-                  <p className="mt-3 text-xs text-[var(--text-muted)]">
-                    Expires {formatWhen(usage.expiresAt)}
-                  </p>
-                ) : usage.activatedAt ? (
-                  <p className="mt-3 text-xs text-[var(--text-muted)]">
-                    Activated {formatWhen(usage.activatedAt)}
-                  </p>
-                ) : null}
+                <p className="text-xs text-[var(--text-muted)]">
+                  {usage.expiresAt
+                    ? `Expiry date ${formatWhen(usage.expiresAt)}`
+                    : usage.activatedAt
+                      ? `Activated ${formatWhen(usage.activatedAt)}`
+                      : "Expiry date not reported"}
+                </p>
               </div>
             ) : (
               <>
