@@ -18,6 +18,7 @@ const links = [
   { href: "/admin/payments/webhooks", label: "Webhook receipts", exact: false },
   { href: "/admin/refund-requests", label: "Refund requests", exact: false },
   { href: "/admin/emails", label: "Email Center", exact: false },
+  { href: "/admin/email-campaigns", label: "Email Campaigns", exact: false },
   { href: "/admin/promo-codes", label: "Promo Codes", exact: false },
   { href: "/admin/reconciliation", label: "Reconciliation", exact: false },
   { href: "/admin/operations", label: "Operations", exact: false },

@@ -13,6 +13,28 @@ enum Role {
   PARTNER
 }
 
+/// Admin customer email campaign audience (broadcast only — never transactional).
+enum EmailCampaignAudience {
+  ALL_CUSTOMERS
+  PURCHASED_CUSTOMERS
+  ACTIVE_CUSTOMERS
+}
+
+enum EmailCampaignStatus {
+  DRAFT
+  TEST_SENT
+  SENDING
+  SENT
+  FAILED
+}
+
+enum EmailCampaignRecipientStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
 enum PartnerWalletTransactionType {
   ADMIN_CREDIT
   ADMIN_DEBIT
@@ -342,6 +364,8 @@ model User {
   referralCode                 String?                    @unique
   referralsAsReferrer          CustomerReferral[]         @relation("CustomerReferralReferrer")
   referralAsReferred           CustomerReferral?          @relation("CustomerReferralReferred")
+  emailCampaignsCreated        EmailCampaign[]            @relation("EmailCampaignCreatedByAdmin")
+  emailCampaignRecipients      EmailCampaignRecipient[]   @relation("EmailCampaignRecipientCustomer")
 
   @@index([deletedAt])
   @@index([blockedAt])
@@ -1622,6 +1646,55 @@ model CustomerReferral {
   @@index([status])
   @@index([createdAt])
   @@index([rewardedPurchaseId])
+}
+
+/// Admin-only customer email broadcast. Never used by order/wallet/payment mail.
+model EmailCampaign {
+  id               String               @id @default(cuid())
+  createdByAdminId String
+  subject          String
+  bodyText         String
+  audience         EmailCampaignAudience
+  status           EmailCampaignStatus  @default(DRAFT)
+  /// Audience size snapshotted when bulk send starts (0 until then).
+  recipientCount   Int                  @default(0)
+  sentCount        Int                  @default(0)
+  failedCount      Int                  @default(0)
+  skippedCount     Int                  @default(0)
+  testSentTo       String?
+  testSentAt       DateTime?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  lastError        String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  createdByAdmin   User                 @relation("EmailCampaignCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: Restrict)
+  recipients       EmailCampaignRecipient[]
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([createdByAdminId])
+}
+
+/// Per-recipient send log for one campaign. Unique per campaign+customer.
+model EmailCampaignRecipient {
+  id             String                       @id @default(cuid())
+  campaignId     String
+  customerUserId String
+  /// Email snapshot at send time (admin ops). Never used as a payment identifier.
+  email          String
+  status         EmailCampaignRecipientStatus @default(PENDING)
+  sentAt         DateTime?
+  /// Safe token only: not_configured | send_failed | invalid_recipient | skipped
+  errorCode      String?
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+  campaign       EmailCampaign                @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customer       User                         @relation("EmailCampaignRecipientCustomer", fields: [customerUserId], references: [id], onDelete: Restrict)
+
+  @@unique([campaignId, customerUserId])
+  @@index([campaignId, status])
+  @@index([customerUserId])
 }
 
 /// Singleton admin config for the customer referral program (id = "default").
