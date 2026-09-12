@@ -109,7 +109,7 @@ export function buildCountrySeoContent(
       {
         question: "How do I get the QR code?",
         answer:
-          "Open My eSIMs after purchase and choose View QR Code & Details, or use the installation email when delivery succeeds.",
+          "Open My eSIMs after purchase and choose Install eSIM, or use the installation email when delivery succeeds.",
       },
       {
         question: `What if I need help with my ${label} eSIM?`,

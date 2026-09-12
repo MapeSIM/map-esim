@@ -2,7 +2,6 @@
 
 import { Smartphone } from "lucide-react";
 import EsimInstallExperience from "@/app/components/install/EsimInstallExperience";
-import { useAppleOneTapInstallState } from "@/app/components/install/AppleOneTapInstallButton";
 
 export type OrderInstallActionsProps = {
   hasInstallDetails?: boolean;
@@ -37,8 +36,6 @@ export default function OrderInstallActions({
   qrValue,
   iccid,
 }: OrderInstallActionsProps) {
-  const appleOneTap = useAppleOneTapInstallState(qrValue);
-
   if (!hasInstallDetails) {
     return null;
   }
@@ -61,8 +58,6 @@ export default function OrderInstallActions({
 
         <div className="mt-5">
           <EsimInstallExperience
-            appleOneTapHref={appleOneTap.href}
-            showSafariOneTapGuidance={appleOneTap.showSafariGuidance}
             hasOfficialIphoneActivationUrl={hasOfficialIphoneActivationUrl}
             iphoneInstallHref={iphoneInstallHref}
             iphoneGuideHref={iphoneGuideHref}

@@ -2,13 +2,10 @@
 
 import { useCallback, useState } from "react";
 import { RefreshCw, Share2 } from "lucide-react";
-import AppleOneTapInstallButton, {
-  AppleOneTapSafariGuidance,
-  useAppleOneTapInstallState,
-} from "@/app/components/install/AppleOneTapInstallButton";
 import CopyInstallField from "@/app/components/install/CopyInstallField";
 import EsimActionSheet from "@/app/components/install/EsimActionSheet";
 import ManualInstallSheet from "@/app/components/install/ManualInstallSheet";
+import SmartInstallEsimButton from "@/app/components/install/SmartInstallEsimButton";
 import type { PartnerEsimSharePageData } from "@/app/lib/partner/partnerEsimShareRead";
 import { ONE_TAP_FALLBACK } from "@/app/lib/install/progressiveInstallCopy";
 import Link from "next/link";
@@ -54,8 +51,6 @@ export default function PartnerEsimShareView({ token, data }: Props) {
   const [guideOpen, setGuideOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const ctaStyle = brandButtonStyle(data);
-  const appleOneTap = useAppleOneTapInstallState(data.lpa);
-  const eligibleIphone = Boolean(appleOneTap.href);
 
   const loadUsage = useCallback(async () => {
     setUsageLoading(true);
@@ -161,22 +156,20 @@ export default function PartnerEsimShareView({ token, data }: Props) {
         </p>
       )}
 
-      {eligibleIphone ? (
-        <AppleOneTapInstallButton
-          href={appleOneTap.href!}
-          label="One-Tap Install eSIM"
+      {data.installDetailsAvailable ? (
+        <SmartInstallEsimButton
+          activationLpa={data.lpa}
+          qrViewHref={data.qrDataUrl}
+          smdpAddress={data.smdpAddress}
+          activationCode={data.activationCode}
         />
       ) : null}
 
-      {appleOneTap.showSafariGuidance && !eligibleIphone ? (
-        <AppleOneTapSafariGuidance />
+      {data.installDetailsAvailable ? (
+        <p className="text-sm leading-relaxed text-[var(--text-muted)]">
+          {ONE_TAP_FALLBACK}
+        </p>
       ) : null}
-
-      <p className="text-sm leading-relaxed text-[var(--text-muted)]">
-        {eligibleIphone
-          ? ONE_TAP_FALLBACK
-          : "Scan the QR code or open Manual Install to add this eSIM."}
-      </p>
 
       {data.fullIccid ? (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-3">

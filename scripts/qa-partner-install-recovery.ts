@@ -189,7 +189,7 @@ async function main() {
     partnerPage,
     /Use the full ICCID above|Secure QR and one-tap install for Partners will follow/
   );
-  assert.match(partnerPanel, /useAppleOneTapInstallState/);
+  assert.match(partnerPanel, /InstallEsimSheet/);
   assert.match(partnerPanel, /Install your eSIM/);
   assert.match(partnerPanel, /View QR Code & Install/);
   assert.match(partnerPanel, /PARTNER_INSTALL_UNAVAILABLE_MESSAGE/);
@@ -199,15 +199,19 @@ async function main() {
   assert.match(partnerPanel, /Android Guide/);
   assert.match(partnerPanel, /\/install\/iphone/);
   assert.match(partnerPanel, /\/install\/android/);
-  assert.match(partnerPanel, /eligibleIphone \? \(\s*<AppleOneTapInstallButton/);
+  assert.doesNotMatch(partnerPanel, /AppleOneTapInstallButton|useAppleOneTapInstallState/);
   assert.doesNotMatch(partnerPanel, /EsimInstallExperience/);
   assert.doesNotMatch(partnerPanel, /Confirmation PIN|confirmationPin/);
   assert.match(installSheet, />\s*iPhone Guide\s*</);
   assert.match(installSheet, />\s*Android Guide\s*</);
   assert.match(installSheet, /href=\{iphoneGuideHref\}/);
   assert.match(installSheet, /href=\{androidGuideHref\}/);
-  assert.match(installSheet, /label="One-Tap Install eSIM"/);
-  assert.match(installSheet, /eligibleIphone \? \(\s*<AppleOneTapInstallButton/);
+  assert.match(installSheet, /SMART_INSTALL_BUTTON_LABEL|Install eSIM/);
+  assert.match(installSheet, /resolveSmartEsimInstallFromLpa/);
+  assert.match(installSheet, /View QR Code/);
+  assert.match(installSheet, /Manual Installation/);
+  assert.match(installSheet, /Check Device Compatibility/);
+  assert.doesNotMatch(installSheet, /One-Tap Install eSIM/);
   assert.doesNotMatch(installSheet, /Confirmation PIN|confirmationPin/);
   assert.match(customerPanel, /\/api\/account\/orders\/\$\{encodeURIComponent\(orderId\)\}\/install/);
   assert.match(customerInstall, /\/api\/account\/orders\//);

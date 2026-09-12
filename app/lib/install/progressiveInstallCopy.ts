@@ -3,10 +3,10 @@
 export const ESIM_READY_TO_INSTALL = "Ready to install";
 
 export const ONE_TAP_FALLBACK =
-  "If one-tap does not open the installer, use Manual Install or the Installation Guide.";
+  "If automatic install does not open, use Manual Install or the Installation Guide.";
 
 export const INSTALL_SHEET_STEPS_IPHONE = [
-  "Tap One-Tap Install",
+  "Tap Install eSIM",
   "Review & Confirm",
   "Wait for installation",
   "Select eSIM for mobile data",

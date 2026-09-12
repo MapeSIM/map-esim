@@ -1,10 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { QrCode, Smartphone } from "lucide-react";
+import { Smartphone } from "lucide-react";
 import EsimInstallExperience from "@/app/components/install/EsimInstallExperience";
+import SmartInstallEsimButton, {
+  type SmartInstallPayload,
+} from "@/app/components/install/SmartInstallEsimButton";
 import { CustomerEsimInstallHelpLinks } from "@/app/components/orders/CustomerEsimInstallHelpLinks";
-import { useAppleOneTapInstallState } from "@/app/components/install/AppleOneTapInstallButton";
+import { SMART_INSTALL_BUTTON_LABEL } from "@/app/lib/install/smartEsimInstall";
 
 /** Hash-only install intent from My eSIMs — never carries secrets. */
 function hasInstallHashIntent(): boolean {
@@ -34,6 +37,17 @@ type Props = {
   isRefunded: boolean;
 };
 
+function toSmartPayload(data: InstallPayload): SmartInstallPayload {
+  return {
+    activationLpa: data.lpa,
+    iphoneOfficialHref: data.iphoneInstallHref,
+    androidOfficialHref: data.androidActivationUrl,
+    qrViewHref: data.qrViewHref,
+    smdpAddress: data.smdpAddress,
+    activationCode: data.activationCode,
+  };
+}
+
 export default function CustomerEsimInstallPanel({
   orderId,
   installEligible,
@@ -42,9 +56,8 @@ export default function CustomerEsimInstallPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<InstallPayload | null>(null);
-  const appleOneTap = useAppleOneTapInstallState(data?.lpa);
 
-  const loadInstall = useCallback(async () => {
+  const loadInstall = useCallback(async (): Promise<InstallPayload | null> => {
     setLoading(true);
     setError(null);
     try {
@@ -65,9 +78,9 @@ export default function CustomerEsimInstallPanel({
           json?.error ||
             "Installation details are not available for this order."
         );
-        return;
+        return null;
       }
-      setData({
+      const mapped: InstallPayload = {
         hasInstallDetails: Boolean(json.hasInstallDetails),
         hasVerifiedLpa: Boolean(json.hasVerifiedLpa),
         hasOfficialIphoneActivationUrl: Boolean(
@@ -85,17 +98,26 @@ export default function CustomerEsimInstallPanel({
         smdpAddress: json.smdpAddress,
         activationCode: json.activationCode,
         lpa: json.lpa,
-      });
+      };
+      setData(mapped);
+      return mapped;
     } catch {
       setData(null);
       setError("Installation details are temporarily unavailable.");
+      return null;
     } finally {
       setLoading(false);
     }
   }, [orderId]);
 
-  // My eSIMs "View QR Code & Details" lands on #install — auto-open once via the
-  // same secure on-demand fetch. Normal detail visits (no hash) stay lazy.
+  const ensureInstallData = useCallback(async () => {
+    const payload = data ?? (await loadInstall());
+    if (!payload) return false;
+    return toSmartPayload(payload);
+  }, [data, loadInstall]);
+
+  // My eSIMs "Install eSIM" lands on #install — auto-open details once via the
+  // same secure on-demand fetch. Does not auto-launch native install.
   const autoOpenStarted = useRef(false);
   useEffect(() => {
     if (autoOpenStarted.current) return;
@@ -155,34 +177,40 @@ export default function CustomerEsimInstallPanel({
             </h2>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
               Install the eSIM only when you are ready to use it. Sensitive
-              details load only after you open QR code and details below.
+              details load only after you tap {SMART_INSTALL_BUTTON_LABEL}.
             </p>
             <CustomerEsimInstallHelpLinks className="mt-3 text-sm text-[var(--text-muted)]" />
           </div>
         </div>
 
-        {!data ? (
-          <div className="mt-5 space-y-3">
-            <button
-              type="button"
-              onClick={() => void loadInstall()}
-              disabled={loading}
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
-            >
-              <QrCode className="h-4 w-4" />
-              {loading ? "Loading…" : "View QR Code & Details"}
-            </button>
-            {error ? (
-              <p className="text-sm text-[var(--danger-text)]" role="alert">
-                {error}
-              </p>
-            ) : null}
-          </div>
-        ) : (
+        <div className="mt-5 space-y-3">
+          <SmartInstallEsimButton
+            activationLpa={data?.lpa}
+            iphoneOfficialHref={data?.iphoneInstallHref}
+            androidOfficialHref={data?.androidActivationUrl}
+            qrViewHref={data?.qrViewHref}
+            smdpAddress={data?.smdpAddress}
+            activationCode={data?.activationCode}
+            iphoneGuideHref={data?.iphoneGuideHref}
+            androidGuideHref={data?.androidGuideHref}
+            ensureInstallData={ensureInstallData}
+          />
+          {loading && !data ? (
+            <p className="text-sm text-[var(--text-muted)]" role="status">
+              Loading installation details…
+            </p>
+          ) : null}
+          {error ? (
+            <p className="text-sm text-[var(--danger-text)]" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </div>
+
+        {data ? (
           <div className="mt-5">
             <EsimInstallExperience
-              appleOneTapHref={appleOneTap.href}
-              showSafariOneTapGuidance={appleOneTap.showSafariGuidance}
+              showPrimaryInstallButton={false}
               hasOfficialIphoneActivationUrl={
                 data.hasOfficialIphoneActivationUrl
               }
@@ -215,7 +243,7 @@ export default function CustomerEsimInstallPanel({
               }
             />
           </div>
-        )}
+        ) : null}
       </div>
     </section>
   );

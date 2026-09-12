@@ -3,10 +3,6 @@
 import { useCallback, useState } from "react";
 import { QrCode } from "lucide-react";
 import Link from "next/link";
-import AppleOneTapInstallButton, {
-  AppleOneTapSafariGuidance,
-  useAppleOneTapInstallState,
-} from "@/app/components/install/AppleOneTapInstallButton";
 import EsimActionSheet from "@/app/components/install/EsimActionSheet";
 import InstallEsimSheet from "@/app/components/install/InstallEsimSheet";
 import ManualInstallSheet from "@/app/components/install/ManualInstallSheet";
@@ -58,7 +54,6 @@ export default function PartnerEsimInstallPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<InstallPayload | null>(null);
-  const appleOneTap = useAppleOneTapInstallState(data?.lpa);
 
   const loadInstall = useCallback(async () => {
     setLoading(true);
@@ -136,7 +131,6 @@ export default function PartnerEsimInstallPanel({
   }
 
   const showQr = Boolean(data?.hasVerifiedLpa && data.qrViewHref);
-  const eligibleIphone = Boolean(appleOneTap.href);
 
   return (
     <div className="min-w-0 space-y-3">
@@ -180,25 +174,14 @@ export default function PartnerEsimInstallPanel({
         ) : null}
 
         <div className="min-w-0 space-y-3">
-          {eligibleIphone ? (
-            <AppleOneTapInstallButton
-              href={appleOneTap.href!}
-              label="One-Tap Install eSIM"
-            />
-          ) : null}
-
-          {appleOneTap.showSafariGuidance && !eligibleIphone ? (
-            <AppleOneTapSafariGuidance />
-          ) : null}
-
           {data ? (
             <InstallEsimSheet
-              appleOneTapHref={appleOneTap.href}
-              showSafariOneTapGuidance={appleOneTap.showSafariGuidance}
               qrViewHref={data.qrViewHref}
               smdpAddress={data.smdpAddress}
               activationCode={data.activationCode}
               lpa={data.lpa}
+              iphoneOfficialHref={data.iphoneInstallHref}
+              androidOfficialHref={data.androidActivationUrl}
               iphoneGuideHref={data.iphoneGuideHref}
               androidGuideHref={data.androidGuideHref}
             />

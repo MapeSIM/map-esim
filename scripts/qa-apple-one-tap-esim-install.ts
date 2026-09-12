@@ -140,18 +140,20 @@ function main() {
   const panel = read("app/components/orders/CustomerEsimInstallPanel.tsx");
   const successActions = read("app/components/install/OrderInstallActions.tsx");
   assert.match(oneTapUi, /buildAppleEsimInstallUrl/);
-  assert.match(oneTapUi, /supportsAppleOneTapEsimInstall/);
+  assert.match(oneTapUi, /canAttemptAppleNativeEsimInstall/);
   assert.match(oneTapUi, /shouldShowAppleOneTapSafariGuidance/);
   assert.match(oneTapUi, /Install eSIM/);
   assert.match(oneTapUi, /Available on iPhone with iOS 17\.4 or later/);
-  assert.match(oneTapUi, /Open this page in Safari for One-Tap Install/);
+  assert.match(oneTapUi, /Safari is usually the most reliable iPhone browser/);
   assert.doesNotMatch(oneTapUi, /console\.(log|info|warn|debug)/);
   assert.doesNotMatch(oneTapUi, /gtag|analytics|trackEvent|dataLayer/i);
 
-  assert.match(experience, /One-Tap Install eSIM|AppleOneTapInstallButton/);
-  assert.match(experience, /AppleOneTapSafariGuidance|showSafariOneTapGuidance/);
+  assert.match(experience, /SmartInstallEsimButton/);
   assert.match(experience, /Or install using QR code \/ manual details/);
-  assert.match(experience, /If one-tap does not work, use manual install or the QR code/);
+  assert.match(
+    experience,
+    /If automatic install does not open, use manual install or the QR/
+  );
   assert.match(experience, /Download QR Code/);
   assert.match(experience, /Manual installation details/);
   assert.match(experience, /Installation guide/);
@@ -160,14 +162,11 @@ function main() {
   assert.doesNotMatch(experience, /console\.(log|info|warn|debug)/);
   assert.doesNotMatch(experience, /mapesim\.com.*carddata|carddata=.*mapesim/i);
 
-  assert.match(panel, /useAppleOneTapInstallState|EsimInstallExperience/);
-  assert.match(panel, /showSafariOneTapGuidance/);
-  assert.match(panel, /View QR Code & Details/);
+  assert.match(panel, /SmartInstallEsimButton|EsimInstallExperience/);
+  assert.match(panel, /Install eSIM|SMART_INSTALL_BUTTON_LABEL/);
   assert.doesNotMatch(panel, /console\.(log|info|warn|debug)/);
   assert.doesNotMatch(panel, /mapesim\.com.*carddata|carddata=.*mapesim/i);
 
-  assert.match(successActions, /useAppleOneTapInstallState\(qrValue\)/);
-  assert.match(successActions, /showSafariOneTapGuidance/);
   assert.match(successActions, /EsimInstallExperience/);
   assert.doesNotMatch(successActions, /console\.(log|info|warn|debug)/);
   console.log("PASS ui_surfaces_one_tap_safari_and_fallback");

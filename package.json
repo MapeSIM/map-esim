@@ -126,6 +126,7 @@
     "qa:customer-pending-purchases": "tsx scripts/qa-customer-pending-purchases.ts",
     "qa:customer-block": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-customer-block.ts",
     "qa:apple-one-tap-esim-install": "tsx scripts/qa-apple-one-tap-esim-install.ts",
+    "qa:smart-install-esim": "tsx scripts/qa-smart-install-esim.ts",
     "qa:wallet-transaction-email": "tsx scripts/qa-wallet-transaction-email.ts",
     "qa:payment-failure-email": "tsx scripts/qa-payment-failure-email.ts",
     "qa:esim-lifecycle-notifications": "tsx scripts/qa-esim-lifecycle-notifications.ts",

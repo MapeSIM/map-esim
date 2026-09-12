@@ -160,7 +160,7 @@ export function CustomerEsimOrderCard({
               href={`${href}#install`}
               className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_18px_rgba(0,0,0,0.18)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
             >
-              View QR Code & Details
+              Install eSIM
             </Link>
           ) : (
             <Link

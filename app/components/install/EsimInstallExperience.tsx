@@ -11,12 +11,10 @@ import {
   Smartphone,
   Wifi,
 } from "lucide-react";
-import AppleOneTapInstallButton, {
-  AppleOneTapSafariGuidance,
-} from "@/app/components/install/AppleOneTapInstallButton";
+import SmartInstallEsimButton from "@/app/components/install/SmartInstallEsimButton";
 
 const INSTALL_STEPS = [
-  "Tap Install eSIM / One-Tap Install",
+  "Tap Install eSIM",
   "Review and confirm on your device",
   "Wait for activation to finish",
   "Enable or select this eSIM for mobile data",
@@ -31,8 +29,8 @@ const INSTALL_TIPS = [
 ] as const;
 
 export type EsimInstallExperienceProps = {
-  appleOneTapHref: string | null;
-  /** Supported iPhone OS in non-Safari — show open-in-Safari guidance, no Apple href. */
+  appleOneTapHref?: string | null;
+  /** @deprecated Optional Safari hint only — never hides Install eSIM. */
   showSafariOneTapGuidance?: boolean;
   hasOfficialIphoneActivationUrl?: boolean;
   iphoneInstallHref?: string | null;
@@ -48,12 +46,11 @@ export type EsimInstallExperienceProps = {
   /** Only pass when already authorized for this surface (e.g. masked on /success). */
   iccid?: string | null;
   manualInstallText?: string | null;
+  /** Parent may own the primary Install eSIM button (customer lazy-load). */
+  showPrimaryInstallButton?: boolean;
 };
 
 export default function EsimInstallExperience({
-  appleOneTapHref,
-  showSafariOneTapGuidance = false,
-  hasOfficialIphoneActivationUrl,
   iphoneInstallHref,
   iphoneGuideHref = "/install/iphone",
   androidGuideHref = "/install/android",
@@ -66,6 +63,7 @@ export default function EsimInstallExperience({
   lpa,
   iccid,
   manualInstallText,
+  showPrimaryInstallButton = true,
 }: EsimInstallExperienceProps) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
@@ -79,13 +77,6 @@ export default function EsimInstallExperience({
     }
   }
 
-  // Never launch Apple activation URLs outside supported iPhone Safari.
-  const showOfficialIphone = Boolean(
-    !appleOneTapHref &&
-      !showSafariOneTapGuidance &&
-      hasOfficialIphoneActivationUrl &&
-      iphoneInstallHref
-  );
   const showQr = Boolean(hasVerifiedLpa && qrViewHref);
   const hasManual = Boolean(smdpAddress || activationCode || lpa || iccid);
 
@@ -105,45 +96,22 @@ export default function EsimInstallExperience({
       ) : null}
 
       <div className="space-y-3">
-        {appleOneTapHref ? (
-          <AppleOneTapInstallButton
-            href={appleOneTapHref}
-            label="One-Tap Install eSIM"
-            className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[var(--accent)] text-sm font-bold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+        {showPrimaryInstallButton ? (
+          <SmartInstallEsimButton
+            activationLpa={lpa}
+            iphoneOfficialHref={iphoneInstallHref}
+            androidOfficialHref={androidActivationUrl}
+            qrViewHref={qrViewHref}
+            smdpAddress={smdpAddress}
+            activationCode={activationCode}
+            iphoneGuideHref={iphoneGuideHref}
+            androidGuideHref={androidGuideHref}
           />
         ) : null}
 
-        {showSafariOneTapGuidance && !appleOneTapHref ? (
-          <AppleOneTapSafariGuidance />
-        ) : null}
-
-        {showOfficialIphone ? (
-          <div className="space-y-2">
-            <a
-              href={iphoneInstallHref!}
-              className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[var(--accent)] text-sm font-bold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-            >
-              Install eSIM
-            </a>
-            <p className="text-xs leading-relaxed text-[var(--text-muted)]">
-              Follow Apple’s confirmation steps to finish installation.
-            </p>
-          </div>
-        ) : null}
-
-        {!appleOneTapHref &&
-        !showOfficialIphone &&
-        !showSafariOneTapGuidance ? (
-          <Link
-            href={iphoneGuideHref}
-            className="inline-flex h-12 w-full items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-          >
-            View iPhone installation guide
-          </Link>
-        ) : null}
-
         <p className="text-sm leading-relaxed text-[var(--text-muted)]">
-          If one-tap does not work, use manual install or the QR code.
+          If automatic install does not open, use manual install or the QR
+          code.
         </p>
       </div>
 
@@ -224,8 +192,14 @@ export default function EsimInstallExperience({
           </a>
         ) : null}
         <Link
+          href={iphoneGuideHref}
+          className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+        >
+          View iPhone installation guide
+        </Link>
+        <Link
           href={androidGuideHref}
-          className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:col-span-2"
+          className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
         >
           View Android installation guide
         </Link>

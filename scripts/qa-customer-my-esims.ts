@@ -126,7 +126,7 @@ function main() {
   assert.match(listPage, /CustomerEsimOrderCard/);
   assert.match(orderCard, /iccidMasked/);
   assert.match(orderCard, /View details/);
-  assert.match(orderCard, /View QR Code & Details/);
+  assert.match(orderCard, /Install eSIM/);
   assert.match(
     orderCard,
     /\/account\/orders\/\$\{encodeURIComponent\(order\.id\)\}|href=\{\`\$\{href\}#install\`\}|#install/
@@ -195,7 +195,7 @@ function main() {
   );
   assert.match(installLib, /FAILED_REFUNDED/);
   assert.match(installLib, /RECONCILIATION_REQUIRED/);
-  assert.match(installPanel, /View QR Code & Details/);
+  assert.match(installPanel, /Install eSIM|SMART_INSTALL_BUTTON_LABEL/);
   assert.match(installPanel, /Install the eSIM only when you are ready to use it/);
   assert.match(installPanel, /CustomerEsimInstallHelpLinks/);
   assert.match(installPanel, /Order refunded/);
