@@ -47,7 +47,7 @@ export default async function SigninPage({
   return (
     <AuthCard
       title="Sign in"
-      subtitle="Access your MAP eSIM account. Installation details still require your secure order link."
+      subtitle="Access your MAP eSIM account."
     >
       {deleted ? (
         <p className="mb-4 rounded-xl border border-[var(--accent-strong)]/35 bg-[var(--accent-strong)]/10 px-3 py-2 text-sm text-[var(--heading)]">

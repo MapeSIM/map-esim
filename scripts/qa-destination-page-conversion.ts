@@ -25,21 +25,19 @@ function read(rel: string): string {
 
 function main() {
   assert.equal(PLAN_CARD_RECOMMENDED_LABEL, "Recommended");
-  assert.equal(
-    PLAN_PURCHASE_TRUST_LINE_GUEST,
-    "Sign in to buy. QR and install details arrive after purchase."
-  );
-  assert.equal(
-    PLAN_PURCHASE_TRUST_LINE_AUTHENTICATED,
-    "QR and install details arrive after purchase."
-  );
+  assert.equal(PLAN_PURCHASE_TRUST_LINE_GUEST, "");
+  assert.equal(PLAN_PURCHASE_TRUST_LINE_AUTHENTICATED, "");
   assert.equal(PLAN_PURCHASE_TRUST_LINE, PLAN_PURCHASE_TRUST_LINE_GUEST);
-  assert.equal(planPurchaseTrustLine(false), PLAN_PURCHASE_TRUST_LINE_GUEST);
-  assert.equal(
-    planPurchaseTrustLine(true),
-    PLAN_PURCHASE_TRUST_LINE_AUTHENTICATED
+  assert.equal(planPurchaseTrustLine(false), "");
+  assert.equal(planPurchaseTrustLine(true), "");
+  assert.doesNotMatch(
+    PLAN_PURCHASE_TRUST_LINE_GUEST,
+    /QR and install details|Sign in to (buy|view QR)/
   );
-  assert.doesNotMatch(PLAN_PURCHASE_TRUST_LINE_AUTHENTICATED, /Sign in to buy/);
+  assert.doesNotMatch(
+    PLAN_PURCHASE_TRUST_LINE_AUTHENTICATED,
+    /QR and install details|Sign in to (buy|view QR)/
+  );
   assert.match(PLAN_STICKY_TRUST_LINE, /Digital delivery/);
   assert.equal(planCardLineLabel("validity"), "Validity");
   assert.equal(planCardLineLabel("coverage"), "Coverage");
@@ -65,12 +63,11 @@ function main() {
   assert.match(listing, /planPurchaseTrustLine/);
   assert.match(listing, /purchaseTrustLine/);
   assert.match(listing, /setSignedIn/);
-  // Plan cards: do not show guest "Sign in to buy…" under Buy Now (modal may still).
-  assert.match(listing, /signedIn \? \([\s\S]*?purchaseTrustLine[\s\S]*?\) : null/);
-  assert.doesNotMatch(
-    listing,
-    /<\/div>\s*<p className="text-center text-xs leading-snug text-\[var\(--text-muted\)\]">\s*\{purchaseTrustLine\}/
-  );
+  // Public QR/install access lines are not rendered unless a trust line exists.
+  assert.match(listing, /purchaseTrustLine \? \([\s\S]*?purchaseTrustLine[\s\S]*?\) : null/);
+  assert.doesNotMatch(listing, /QR and install details arrive after purchase/);
+  assert.doesNotMatch(listing, /Sign in to buy\. QR and install/);
+  assert.doesNotMatch(listing, /Sign in to view QR/);
   // Plan benefit chips removed (Digital eSIM / Keep your SIM / QR after purchase).
   assert.doesNotMatch(conversion, /PLAN_CARD_BENEFITS/);
   assert.doesNotMatch(listing, /PLAN_CARD_BENEFITS/);
@@ -154,6 +151,9 @@ function main() {
 
   assert.match(modal, /purchaseTrustLine/);
   assert.match(modal, /PLAN_PURCHASE_TRUST_LINE_GUEST/);
+  assert.doesNotMatch(modal, /QR and install details arrive after purchase/);
+  assert.doesNotMatch(modal, /Sign in to buy\. QR and install/);
+  assert.doesNotMatch(modal, /Sign in to view QR/);
   assert.match(modal, /Buy Now/);
   assert.match(modal, /Available networks/);
   assert.match(modal, /label="Coverage"/);

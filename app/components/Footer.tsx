@@ -133,18 +133,6 @@ export default function Footer() {
             </p>
           ) : null}
         </div>
-        <div className="mx-auto max-w-[1200px] px-4 pb-5 text-xs text-[var(--text-soft)] sm:px-6">
-          Display currency conversion powered in part by{" "}
-          <a
-            href="https://www.exchangerate-api.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--text-muted)] focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
-          >
-            ExchangeRate-API
-          </a>
-          .
-        </div>
       </div>
     </footer>
   );

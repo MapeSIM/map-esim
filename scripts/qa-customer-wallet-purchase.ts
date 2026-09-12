@@ -98,6 +98,26 @@ function main() {
   assert.match(confirmForm, /disabled=\{purchaseBlocked \|\| !confirmed\}/);
   assert.match(confirmForm, /Buy eSIM with Wallet/);
   assert.ok(!/confirmPhrase|WALLET_PURCHASE_CONFIRM_PHRASE/.test(confirmForm));
+  assert.match(formState, /INSUFFICIENT_WALLET_CHECKOUT_MESSAGE/);
+  assert.match(
+    formState,
+    /Insufficient wallet balance\. Please add funds or contact support\./
+  );
+  assert.match(confirmForm, /INSUFFICIENT_WALLET_CHECKOUT_MESSAGE/);
+  assert.match(confirmForm, /onlinePaymentsAllowed/);
+  assert.match(confirmForm, /walletOnlyInsufficient/);
+  assert.match(
+    confirmForm,
+    /showOnlinePaymentOption = cashPayablePreview > 0 && onlinePaymentsAllowed/
+  );
+  assert.match(
+    confirmForm,
+    /onlinePaymentsAllowed && showWalletAndOnlineOption/
+  );
+  assert.match(confirmForm, /onlinePaymentsAllowed \? \(/);
+  assert.match(confirmForm, /href="\/account\/wallet"/);
+  assert.match(confirmForm, /href="\/support"/);
+  console.log("PASS wallet_only_soft_launch_checkout_ui");
   assert.ok(!/parseWalletPurchaseConfirmPhrase|confirmPhrase/.test(actions));
   assert.ok(!/WALLET_PURCHASE_CONFIRM_PHRASE|parseWalletPurchaseConfirmPhrase/.test(
     read("app/lib/esim/walletPurchaseValidation.ts")
@@ -420,7 +440,7 @@ function main() {
   assert.match(service, /assertCustomerFinancialActivityAllowed/);
   console.log("PASS buy_esim_destination_launcher");
 
-  console.log("ALL_QA_PASSED=33");
+  console.log("ALL_QA_PASSED=34");
 }
 
 main();

@@ -8,6 +8,7 @@ import {
   useState,
   useTransition,
 } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   confirmWalletEsimPurchaseAction,
@@ -20,6 +21,7 @@ import {
 } from "@/app/lib/esim/purchaseFunding";
 import {
   CARD_PAYMENT_UNAVAILABLE_MESSAGE,
+  INSUFFICIENT_WALLET_CHECKOUT_MESSAGE,
   initialWalletPurchaseState,
   type WalletPurchaseActionState,
 } from "@/app/lib/esim/walletPurchaseFormState";
@@ -58,10 +60,35 @@ function defaultPaymentMode(
   const cashPayable = Math.max(0, afterPromo - rewards);
   const balance = Math.max(0, Math.trunc(Number(review.balanceCents)));
   if (cashPayable <= 0) return "full_wallet";
+  if (review.paymentGatewayConfigured !== true) return "full_wallet";
   if (balance <= 0) return "mobile_only";
   if (balance >= cashPayable) return "full_wallet";
   if (review.useWallet) return "wallet_and_mobile";
   return "mobile_only";
+}
+
+function InsufficientWalletCheckoutNotice() {
+  return (
+    <div className="space-y-3" role="status">
+      <p className="text-sm font-medium text-[var(--heading)]">
+        {INSUFFICIENT_WALLET_CHECKOUT_MESSAGE}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href="/account/wallet"
+          className="inline-flex h-10 items-center justify-center rounded-[14px] bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95"
+        >
+          Go to wallet
+        </Link>
+        <Link
+          href="/support"
+          className="inline-flex h-10 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface-2)]"
+        >
+          Contact support
+        </Link>
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -191,9 +218,11 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
   const walletDisabled = review.balanceCents <= 0;
   const hasWalletBalance = !walletDisabled;
   const paymentGatewayConfigured = review.paymentGatewayConfigured === true;
+  const onlinePaymentsAllowed = paymentGatewayConfigured;
   const simpaisaCheckout = review.activePaymentProvider === "SIMPAISA";
   const gatewayReady = gatewayRequired && paymentGatewayConfigured;
-  const showGatewayUnavailable = gatewayRequired && !paymentGatewayConfigured;
+  const showGatewayUnavailable =
+    onlinePaymentsAllowed && gatewayRequired && !paymentGatewayConfigured;
   const afterPromoCents = Math.max(
     0,
     Math.trunc(Number(review.payableCents ?? review.priceCents))
@@ -216,7 +245,9 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
   // - Balance = 0 → Online payment only.
   const showFullWalletOption = hasWalletBalance && canFullWallet;
   const showWalletAndOnlineOption = canWalletAndMobile;
-  const showOnlinePaymentOption = cashPayablePreview > 0;
+  const showOnlinePaymentOption = cashPayablePreview > 0 && onlinePaymentsAllowed;
+  const walletOnlyInsufficient =
+    !onlinePaymentsAllowed && cashPayablePreview > 0 && !canFullWallet;
   const showRewardsSection =
     Math.max(0, Math.trunc(Number(review.rewardPointsBalance))) >= 100;
   const onlinePaymentLabel = simpaisaCheckout
@@ -233,7 +264,9 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
   const purchaseBlocked = busy || deliveryBlocksPurchase;
   const dueOnline = preview.gatewayAmountCents > 0;
   const dueLabel = dueOnline
-    ? "Pay now"
+    ? onlinePaymentsAllowed
+      ? "Pay now"
+      : "Remaining"
     : fullWallet || walletFundsApplied
       ? "Wallet"
       : "Covered";
@@ -252,6 +285,9 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
     // Zero-cash confirm is shown in the sticky bar itself on mobile.
     if (zeroCashConfirm && !confirmed) {
       return null;
+    }
+    if (walletOnlyInsufficient) {
+      return INSUFFICIENT_WALLET_CHECKOUT_MESSAGE;
     }
     if (!zeroCashConfirm && !gatewayReady) {
       return "Online payment is unavailable right now.";
@@ -303,7 +339,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
   // Keep selection on a visible option when rewards/balance change.
   useEffect(() => {
     let next: CustomerEsimPaymentMode = paymentMode;
-    if (cashPayablePreview <= 0) {
+    if (!onlinePaymentsAllowed || cashPayablePreview <= 0) {
       next = "full_wallet";
     } else if (paymentMode === "full_wallet" && !showFullWalletOption) {
       next = showWalletAndOnlineOption ? "wallet_and_mobile" : "mobile_only";
@@ -320,6 +356,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only when option visibility changes
   }, [
     cashPayablePreview,
+    onlinePaymentsAllowed,
     showFullWalletOption,
     showWalletAndOnlineOption,
   ]);
@@ -446,7 +483,9 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 href={`#${confirmSectionId}`}
                 className="shrink-0 text-xs font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
               >
-                {zeroCashConfirm ? "Jump to confirm" : "Jump to pay"}
+                {zeroCashConfirm || walletOnlyInsufficient
+                  ? "Jump to confirm"
+                  : "Jump to pay"}
               </a>
             </div>
             <dl className="text-sm">
@@ -574,20 +613,22 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
             >
               Payment
             </h2>
-            {hasWalletBalance ? (
-              <p className="mt-2 text-sm text-[var(--text-muted)]">
-                Wallet:{" "}
-                <CheckoutMoney
-                  cents={review.balanceCents}
-                  variant="wallet-balance"
-                />
-              </p>
-            ) : null}
+            <p className="mt-2 text-sm text-[var(--text-muted)]">
+              Wallet:{" "}
+              <CheckoutMoney
+                cents={review.balanceCents}
+                variant="wallet-balance"
+              />
+            </p>
 
             {cashPayablePreview <= 0 ? (
               <p className="mt-3 text-sm text-[var(--text-muted)]">
                 No online payment needed.
               </p>
+            ) : walletOnlyInsufficient ? (
+              <div className="mt-3">
+                <InsufficientWalletCheckoutNotice />
+              </div>
             ) : (
               <div
                 role="radiogroup"
@@ -615,7 +656,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                   </label>
                 ) : null}
 
-                {showWalletAndOnlineOption ? (
+                {onlinePaymentsAllowed && showWalletAndOnlineOption ? (
                   <label
                     className={paymentOptionClass(
                       paymentMode === "wallet_and_mobile"
@@ -667,6 +708,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
           </section>
 
           {gatewayRequired ? (
+            onlinePaymentsAllowed ? (
             <section className={cardClass} aria-labelledby={paymentHeadingId}>
               <h2
                 id={paymentHeadingId}
@@ -729,6 +771,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 </>
               ) : null}
             </section>
+            ) : null
           ) : null}
         </div>
 
@@ -839,6 +882,13 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 ? "Continue below to complete the remaining amount with online payment."
                 : "Continue below to complete this purchase with online payment."}
             </div>
+          ) : walletOnlyInsufficient ? (
+            <div
+              className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-4"
+              role="status"
+            >
+              <InsufficientWalletCheckoutNotice />
+            </div>
           ) : null}
 
           {alertError ? (
@@ -901,6 +951,8 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 {pending ? primaryCtaPendingLabel : primaryCtaLabel}
               </button>
             </div>
+          ) : walletOnlyInsufficient ? (
+            <div id={confirmSectionId} className="scroll-mt-24 lg:hidden" />
           ) : (
             <div id={confirmSectionId} className="scroll-mt-24">
               <button
@@ -981,7 +1033,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               >
                 {pending ? stickyCtaPendingLabel : primaryCtaLabel}
               </button>
-            ) : (
+            ) : walletOnlyInsufficient ? null : (
               <button
                 type="button"
                 disabled

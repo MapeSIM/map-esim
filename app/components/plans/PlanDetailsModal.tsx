@@ -364,9 +364,11 @@ export default function PlanDetailsModal({
           >
             Buy Now
           </Link>
-          <p className="text-center text-[11px] leading-snug text-[var(--text-soft)]">
-            {purchaseTrustLine}
-          </p>
+          {purchaseTrustLine ? (
+            <p className="text-center text-[11px] leading-snug text-[var(--text-soft)]">
+              {purchaseTrustLine}
+            </p>
+          ) : null}
         </div>
       </div>
     </div>
