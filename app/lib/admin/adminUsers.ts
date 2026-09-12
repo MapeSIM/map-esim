@@ -32,9 +32,10 @@ import { assertSameOriginAdminRequest } from "@/app/lib/admin/reconciliationCase
 import type { AdminUserListRow } from "@/app/lib/admin/adminUsersShared";
 import {
   acquireAdminStatusXactLock,
-  countActiveSuperAdminsTx,
+  assignAdminTeamRoleAtomic,
   disableActiveAdminUnderLock,
 } from "@/app/lib/admin/adminUsersLock";
+import { randomUUID } from "node:crypto";
 
 export type { AdminUserListRow } from "@/app/lib/admin/adminUsersShared";
 
@@ -61,6 +62,33 @@ class AdminUsersLastActiveError extends Error {
     super("admin_users_last_active");
     this.name = "AdminUsersLastActiveError";
   }
+}
+
+/** Prisma Accelerate/interactive tx default is 5s; production P2028 exceeded that. */
+const ADMIN_USERS_TX = { maxWait: 10_000, timeout: 20_000 } as const;
+
+const ADMIN_USERS_TEMPORARY =
+  "This update could not be completed. Please reload and try again.";
+
+function isAdminUsersTxExpired(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2028"
+  );
+}
+
+function unexpectedAdminUsersMutationResult(
+  error: unknown
+): AdminUsersMutationResult {
+  console.error(
+    "Admin users mutation failed:",
+    isAdminUsersTxExpired(error)
+      ? "P2028"
+      : error instanceof Error
+        ? error.name
+        : "unknown"
+  );
+  return { ok: false, error: ADMIN_USERS_TEMPORARY };
 }
 
 export type AdminUsersMutationResult =
@@ -375,7 +403,7 @@ export async function inviteAdminUser(options: {
           },
         },
       });
-    });
+    }, ADMIN_USERS_TX);
   } catch (err) {
     if (
       err instanceof Prisma.PrismaClientKnownRequestError &&
@@ -390,7 +418,7 @@ export async function inviteAdminUser(options: {
         error: "This email cannot be invited right now. Please reload and try again.",
       };
     }
-    throw err;
+    return unexpectedAdminUsersMutationResult(err);
   }
 
   // Mint/send outside the create transaction (email I/O). Never log the raw token.
@@ -705,7 +733,7 @@ export async function deactivateAdminUser(options: {
           },
         },
       });
-    });
+    }, ADMIN_USERS_TX);
   } catch (err) {
     if (err instanceof AdminUsersLastActiveError) {
       await auditBlocked({
@@ -734,7 +762,7 @@ export async function deactivateAdminUser(options: {
         },
       };
     }
-    throw err;
+    return unexpectedAdminUsersMutationResult(err);
   }
 
   return {
@@ -861,7 +889,7 @@ export async function reactivateAdminUser(options: {
           },
         },
       });
-    });
+    }, ADMIN_USERS_TX);
   } catch (err) {
     if (err instanceof AdminUsersCasConflictError) {
       await auditBlocked({
@@ -878,7 +906,7 @@ export async function reactivateAdminUser(options: {
         },
       };
     }
-    throw err;
+    return unexpectedAdminUsersMutationResult(err);
   }
 
   const restored = resolveAdminAccountStatus({
@@ -986,53 +1014,31 @@ export async function assignAdminTeamRole(options: {
   const nextVersion = expectedVersion + 1;
 
   try {
-    await prisma.$transaction(async (tx) => {
-      await acquireAdminStatusXactLock(tx);
+    const saved = await assignAdminTeamRoleAtomic(prisma, {
+      targetId: target.id,
+      expectedVersion,
+      teamRole: teamRole as AdminTeamRole,
+      actorId: actor.id,
+      auditId: randomUUID(),
+      action: ADMIN_TEAM_ROLE_CHANGED_AUDIT,
+      previousRole: previousRole as AdminTeamRole,
+      previousStatus,
+      nextVersion,
+    });
 
-      if (
+    if (saved.updatedCount !== 1) {
+      const lastSuperBlocked =
         previousRole === "SUPER_ADMIN" &&
         teamRole !== "SUPER_ADMIN" &&
-        isActiveAdminForProtection(target)
-      ) {
-        const activeSuper = await countActiveSuperAdminsTx(tx);
-        if (activeSuper <= 1) {
-          throw new AdminUsersLastActiveError();
-        }
+        isActiveAdminForProtection(target) &&
+        saved.activeSuperCount <= 1 &&
+        saved.currentVersion === expectedVersion;
+
+      if (lastSuperBlocked) {
+        throw new AdminUsersLastActiveError();
       }
-
-      const updated = await tx.user.updateMany({
-        where: {
-          id: target.id,
-          role: Role.ADMIN,
-          deletedAt: null,
-          adminStatusVersion: expectedVersion,
-        },
-        data: {
-          adminTeamRole: teamRole,
-          adminStatusVersion: { increment: 1 },
-        },
-      });
-      if (updated.count !== 1) {
-        throw new AdminUsersCasConflictError();
-      }
-
-      await tx.adminPermissionGrant.deleteMany({ where: { userId: target.id } });
-
-      await tx.auditLog.create({
-        data: {
-          actorUserId: actor.id,
-          action: ADMIN_TEAM_ROLE_CHANGED_AUDIT,
-          targetType: "user",
-          targetId: target.id,
-          metadata: {
-            previousRole,
-            teamRole,
-            previousStatus,
-            adminStatusVersion: nextVersion,
-          },
-        },
-      });
-    });
+      throw new AdminUsersCasConflictError();
+    }
   } catch (err) {
     if (err instanceof AdminUsersLastActiveError) {
       await auditBlocked({
@@ -1061,7 +1067,7 @@ export async function assignAdminTeamRole(options: {
         },
       };
     }
-    throw err;
+    return unexpectedAdminUsersMutationResult(err);
   }
 
   return {
@@ -1203,7 +1209,7 @@ export async function updateAdminPermissions(options: {
           },
         },
       });
-    });
+    }, ADMIN_USERS_TX);
   } catch (err) {
     if (err instanceof AdminUsersCasConflictError) {
       await auditBlocked({
@@ -1220,7 +1226,7 @@ export async function updateAdminPermissions(options: {
         },
       };
     }
-    throw err;
+    return unexpectedAdminUsersMutationResult(err);
   }
 
   return {

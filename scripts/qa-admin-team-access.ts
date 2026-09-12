@@ -144,12 +144,27 @@ function main() {
   assert.match(users, /last Super Admin/);
   assert.match(users, /self_role_change/);
   assert.match(users, /adminTeamRole: teamRole/);
+  assert.match(users, /assignAdminTeamRoleAtomic/);
+  const assignFn = users.slice(
+    users.indexOf("export async function assignAdminTeamRole"),
+    users.indexOf("export async function updateAdminPermissions")
+  );
+  assert.match(assignFn, /assignAdminTeamRoleAtomic/);
+  assert.doesNotMatch(assignFn, /\$transaction\(async/);
+  assert.match(users, /ADMIN_USERS_TX/);
+  assert.match(users, /timeout:\s*20_000/);
+  assert.match(users, /P2028/);
+  assert.match(users, /unexpectedAdminUsersMutationResult/);
   assert.doesNotMatch(users, /walletAccount|vesim|simpaisa|safepay/i);
   console.log("PASS admin_users_super_admin_only_management");
 
   const lock = read("app/lib/admin/adminUsersLock.ts");
   assert.match(lock, /countActiveSuperAdminsTx|activeSuperAdminWhere/);
   assert.match(lock, /AdminTeamRole\.SUPER_ADMIN/);
+  assert.match(lock, /assignAdminTeamRoleAtomic/);
+  assert.match(lock, /\$queryRaw/);
+  assert.match(lock, /AdminPermissionGrant/);
+  assert.match(lock, /AuditLog/);
   console.log("PASS last_super_admin_protection");
 
   const authSrc = read("auth.ts");
