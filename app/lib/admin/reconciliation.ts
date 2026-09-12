@@ -41,6 +41,7 @@ import {
 import { ORDER_EMAIL_NOT_CONFIGURED_LABEL } from "@/app/lib/admin/reconciliationCaseShared";
 import { redirect } from "next/navigation";
 import { formatUsdCents } from "@/app/lib/wallet/display";
+import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 
 export const RECONCILIATION_LIST_LIMIT = 100;
@@ -229,6 +230,7 @@ function resolutionLabel(options: {
  */
 export async function requireActiveAdminForReconciliation() {
   const sessionUser = await requireRole("ADMIN");
+  await assertAdminPermission(sessionUser.id, "RECONCILIATION");
   const admin = await prisma.user.findUnique({
     where: { id: sessionUser.id },
     select: {

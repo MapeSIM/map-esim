@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 import { parseProviderRefreshReason } from "@/app/lib/admin/providerRefreshShared";
 import {
@@ -19,6 +20,7 @@ export async function refreshProviderStatusAction(
   formData: FormData
 ): Promise<ProviderRefreshFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, ["INSTALL_ISSUES", "ESIM_FULFILLMENT"]);
 
   const sourceType = String(formData.get("sourceType") ?? "").trim();
   const attemptId = String(formData.get("attemptId") ?? "").trim();

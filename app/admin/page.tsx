@@ -75,7 +75,14 @@ function DashboardUnavailable() {
   );
 }
 
-export default async function AdminDashboardPage() {
+export default async function AdminDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ forbidden?: string }>;
+}) {
+  const params = await searchParams;
+  const forbidden = params.forbidden === "1";
+
   let data: Awaited<ReturnType<typeof getAdminOverview>>;
   try {
     data = await getAdminOverview();
@@ -86,6 +93,14 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="space-y-10">
+      {forbidden ? (
+        <p
+          className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200"
+          role="alert"
+        >
+          You do not have permission to open that admin page.
+        </p>
+      ) : null}
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Overview</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">

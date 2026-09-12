@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   applyAdminRefundRequestDecision,
@@ -35,6 +36,7 @@ export async function adminRefundRequestDecisionAction(
   formData: FormData
 ): Promise<AdminRefundRequestFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "REFUNDS_MANAGE");
 
   // Never accept money-movement or completion flags from the browser.
   void formData.get("creditWallet");
@@ -98,6 +100,7 @@ export async function adminSendVesimRefundReviewAction(
   formData: FormData
 ): Promise<AdminVesimReviewFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "REFUNDS_MANAGE");
 
   // Never accept money-movement or status flags from the browser.
   void formData.get("creditWallet");

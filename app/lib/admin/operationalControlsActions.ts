@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   setOperationalControlPaused,
@@ -18,6 +19,7 @@ export async function pauseOperationalControlAction(
   formData: FormData
 ): Promise<OperationalControlFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "OPERATIONS_CONTROLS");
   const result = await setOperationalControlPaused({
     adminUserId: admin.id,
     controlKey: String(formData.get("controlKey") ?? ""),
@@ -40,6 +42,7 @@ export async function resumeOperationalControlAction(
   formData: FormData
 ): Promise<OperationalControlFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "OPERATIONS_CONTROLS");
   const result = await setOperationalControlPaused({
     adminUserId: admin.id,
     controlKey: String(formData.get("controlKey") ?? ""),

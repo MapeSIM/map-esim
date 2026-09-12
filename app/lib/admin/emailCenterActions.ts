@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   retryAdminEmailCenterSend,
@@ -14,6 +15,7 @@ export async function retryEmailCenterSendAction(
   formData: FormData
 ): Promise<EmailCenterRetryFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "SUPPORT_EMAILS");
 
   const result = await retryAdminEmailCenterSend({
     adminUserId: admin.id,

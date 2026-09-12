@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   createAdminPromoCode,
@@ -15,6 +16,7 @@ export async function createPromoCodeAction(
   formData: FormData
 ): Promise<PromoAdminActionState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "PROMO_CODES");
   try {
     const created = await createAdminPromoCode({
       adminUserId: admin.id,
@@ -39,6 +41,7 @@ export async function updatePromoCodeAction(
   formData: FormData
 ): Promise<PromoAdminActionState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "PROMO_CODES");
   const promoId = String(formData.get("promoId") ?? "").trim();
   try {
     await updateAdminPromoCode({
@@ -63,6 +66,7 @@ export async function setPromoCodeActiveAction(
   formData: FormData
 ): Promise<void> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "PROMO_CODES");
   const promoId = String(formData.get("promoId") ?? "").trim();
   const isActive = String(formData.get("isActive") ?? "") === "true";
   await setAdminPromoActive({

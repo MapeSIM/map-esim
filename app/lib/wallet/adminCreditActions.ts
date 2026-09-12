@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   AdminWalletCreditError,
@@ -29,6 +30,7 @@ export async function creditCustomerWalletAction(
   formData: FormData
 ): Promise<AdminWalletCreditActionState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "WALLET_ADJUST");
 
   const customerUserId = String(formData.get("customerUserId") ?? "").trim();
   const amountRaw = formData.get("amount");

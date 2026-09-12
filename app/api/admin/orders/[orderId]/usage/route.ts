@@ -6,6 +6,7 @@ import {
   adminUsagePublicError,
   getAdminOrderUsage,
 } from "@/app/lib/orders/adminEsimUsage";
+import { apiActorHasAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 
 const NO_STORE = {
   "Cache-Control": "private, no-store, max-age=0",
@@ -59,6 +60,15 @@ export async function GET(
       select: { id: true, role: true, deletedAt: true, adminDisabledAt: true },
     });
     if (!admin || admin.deletedAt || admin.role !== Role.ADMIN || admin.adminDisabledAt) {
+      return json({ success: false, error: "Not found" }, 404);
+    }
+    if (
+      !(await apiActorHasAdminPermission(admin.id, [
+        "ORDERS_VIEW",
+        "ORDERS_MANAGE",
+        "ESIM_FULFILLMENT",
+      ]))
+    ) {
       return json({ success: false, error: "Not found" }, 404);
     }
 

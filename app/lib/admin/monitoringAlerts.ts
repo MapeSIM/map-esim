@@ -14,6 +14,7 @@ import {
 } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { prisma } from "@/app/lib/db";
+import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 import { getEmailChannelsReadiness } from "@/app/lib/email/config";
 import { isIccidEncryptionConfigured } from "@/app/lib/orders/iccidCrypto";
@@ -100,6 +101,7 @@ export type MonitoringAlertsDashboard = {
 
 export async function requireActiveAdminForAlerts() {
   const sessionUser = await requireRole("ADMIN");
+  await assertAdminPermission(sessionUser.id, "ALERTS_VIEW");
   const admin = await prisma.user.findUnique({
     where: { id: sessionUser.id },
     select: { id: true, role: true, deletedAt: true, adminDisabledAt: true, name: true },

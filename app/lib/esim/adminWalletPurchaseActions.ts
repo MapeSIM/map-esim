@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
+import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 import type { AdminWalletPurchaseActionState } from "@/app/lib/esim/adminWalletPurchaseFormState";
 import {
@@ -80,7 +81,8 @@ function enforceAssistedRateLimits(
 export async function loadAdminWalletBuyOffersAction(
   destinationCode: string
 ): Promise<Awaited<ReturnType<typeof listAdminWalletBuyOffers>>> {
-  await requireRole("ADMIN");
+  const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "ESIM_FULFILLMENT");
   return listAdminWalletBuyOffers(destinationCode);
 }
 
@@ -89,6 +91,7 @@ export async function prepareAdminWalletPurchaseAction(
   formData: FormData
 ): Promise<AdminWalletPurchaseActionState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "ESIM_FULFILLMENT");
 
   const customerUserId = String(formData.get("customerUserId") ?? "").trim();
   const offerId = normalizeOfferId(formData.get("offerId"));
@@ -174,6 +177,7 @@ export async function confirmAdminWalletPurchaseAction(
   formData: FormData
 ): Promise<AdminWalletPurchaseActionState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "ESIM_FULFILLMENT");
 
   const customerUserId = String(formData.get("customerUserId") ?? "").trim();
   const purchaseId = String(formData.get("purchaseId") ?? "").trim();
@@ -261,6 +265,7 @@ export async function startAdminAddDataCheckoutAction(
   formData: FormData
 ): Promise<AdminWalletPurchaseActionState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "ESIM_FULFILLMENT");
 
   const localOrderId = normalizeAddDataFromOrderId(formData.get("orderId"));
   const reasonParsed = parseAssistedWalletPurchaseReason(formData.get("reason"));

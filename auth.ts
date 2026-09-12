@@ -343,6 +343,23 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         // Fresh login: stamp ADMIN session generation from DB (after authorize rotation).
         if (dbUser.role === "ADMIN") {
           token.adminSessionVersion = dbUser.adminSessionVersion;
+          try {
+            await prisma.user.update({
+              where: { id: userId },
+              data: { lastAdminLoginAt: new Date() },
+            });
+            await writeAuditLog({
+              actorUserId: userId,
+              action: "admin.signed_in",
+              targetType: "User",
+              targetId: userId,
+              metadata: {
+                method: account?.provider === "google" ? "google" : "credentials",
+              },
+            });
+          } catch {
+            // Last-login stamp must never block a valid admin sign-in.
+          }
         } else {
           token.adminSessionVersion = undefined;
         }

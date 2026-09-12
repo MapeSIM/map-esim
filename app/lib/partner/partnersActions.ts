@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 import { prisma } from "@/app/lib/db";
 import {
@@ -41,6 +42,7 @@ export async function createPartnerAction(
   formData: FormData
 ): Promise<PartnersFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "PARTNERS_MANAGE");
   const result = await createPartner({
     adminUserId: admin.id,
     name: formData.get("name"),
@@ -61,6 +63,7 @@ export async function changePartnerDiscountAction(
   formData: FormData
 ): Promise<PartnersFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "PARTNERS_MANAGE");
   const partnerId = String(formData.get("partnerId") ?? "").trim();
   const result = await changePartnerDiscount({
     adminUserId: admin.id,
@@ -79,6 +82,7 @@ export async function disablePartnerAction(
   formData: FormData
 ): Promise<PartnersFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "PARTNERS_MANAGE");
   const partnerId = String(formData.get("partnerId") ?? "").trim();
   const result = await disablePartner({
     adminUserId: admin.id,
@@ -97,6 +101,7 @@ export async function reactivatePartnerAction(
   formData: FormData
 ): Promise<PartnersFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "PARTNERS_MANAGE");
   const partnerId = String(formData.get("partnerId") ?? "").trim();
   const result = await reactivatePartner({
     adminUserId: admin.id,
@@ -115,6 +120,7 @@ export async function resendPartnerInvitationAction(
   formData: FormData
 ): Promise<PartnersFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "PARTNERS_MANAGE");
   const partnerId = String(formData.get("partnerId") ?? "").trim();
   const result = await resendPartnerInvitation({
     adminUserId: admin.id,
@@ -131,6 +137,7 @@ export async function creditPartnerWalletAction(
   formData: FormData
 ): Promise<PartnerWalletActionState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "PARTNERS_MANAGE");
 
   const partnerId = String(formData.get("partnerId") ?? "").trim();
   const amountRaw = formData.get("amount");
@@ -222,6 +229,7 @@ export async function debitPartnerWalletAction(
   formData: FormData
 ): Promise<PartnerWalletActionState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "PARTNERS_MANAGE");
 
   const partnerId = String(formData.get("partnerId") ?? "").trim();
   const amountRaw = formData.get("amount");

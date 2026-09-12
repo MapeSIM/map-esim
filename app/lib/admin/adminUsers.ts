@@ -1,10 +1,11 @@
 /**
- * Admin Users management: invite / deactivate / reactivate.
- * One ADMIN role only. History via AuditLog. No temp passwords.
+ * Admin Users management: invite / deactivate / reactivate / team access.
+ * Portal login stays Role.ADMIN. Team access is permission-based.
+ * History via AuditLog. No temp passwords.
  */
 import "server-only";
 
-import { Prisma, Role } from "@prisma/client";
+import { AdminPermissionEffect, AdminTeamRole, Prisma, Role } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
 import { writeAuditLog } from "@/app/lib/auth/audit";
 import {
@@ -13,6 +14,14 @@ import {
   resolveAdminAccountStatus,
   type AdminAccountStatusLabel,
 } from "@/app/lib/auth/adminAccess";
+import { actorHasAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
+import {
+  ADMIN_TEAM_ROLE_LABELS,
+  grantsFromPermissionSelection,
+  parseAdminTeamRole,
+  resolveAdminPermissions,
+  type AdminTeamRoleName,
+} from "@/app/lib/admin/adminPermissions";
 import { isValidEmailFormat, normalizeEmail } from "@/app/lib/auth/email";
 import {
   buildAdminInviteSetupUrl,
@@ -23,6 +32,7 @@ import { assertSameOriginAdminRequest } from "@/app/lib/admin/reconciliationCase
 import type { AdminUserListRow } from "@/app/lib/admin/adminUsersShared";
 import {
   acquireAdminStatusXactLock,
+  countActiveSuperAdminsTx,
   disableActiveAdminUnderLock,
 } from "@/app/lib/admin/adminUsersLock";
 
@@ -32,6 +42,8 @@ export const ADMIN_INVITED_AUDIT = "admin.invited";
 export const ADMIN_INVITATION_RESENT_AUDIT = "admin.invitation_resent";
 export const ADMIN_DEACTIVATED_AUDIT = "admin.deactivated";
 export const ADMIN_REACTIVATED_AUDIT = "admin.reactivated";
+export const ADMIN_TEAM_ROLE_CHANGED_AUDIT = "admin.team_role_changed";
+export const ADMIN_PERMISSIONS_CHANGED_AUDIT = "admin.permissions_changed";
 export const ADMIN_MANAGEMENT_BLOCKED_AUDIT = "admin.management_action_blocked";
 
 const NAME_MIN = 1;
@@ -61,8 +73,32 @@ export type AdminUsersMutationResult =
   | {
       ok: false;
       error: string;
-      fieldErrors?: Partial<Record<"name" | "email" | "expectedVersion", string>>;
+      fieldErrors?: Partial<
+        Record<"name" | "email" | "expectedVersion" | "teamRole", string>
+      >;
     };
+
+async function requireAdminManager(
+  actorUserId: string
+): Promise<{ id: string } | null> {
+  const actor = await findActiveAdminActor(actorUserId);
+  if (!actor) return null;
+  if (!(await actorHasAdminPermission(actor.id, "MANAGE_ADMINS"))) {
+    return null;
+  }
+  return actor;
+}
+
+function formatLastAdminLogin(value: Date | null): string {
+  if (!value) return "Never";
+  return (
+    new Intl.DateTimeFormat("en-GB", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "UTC",
+    }).format(value) + " UTC"
+  );
+}
 
 function parseExpectedVersion(
   raw: FormDataEntryValue | string | number | null | undefined
@@ -115,6 +151,9 @@ async function auditBlocked(options: {
 }
 
 export async function listAdminUsers(actorUserId: string): Promise<AdminUserListRow[]> {
+  const actor = await requireAdminManager(actorUserId);
+  if (!actor) return [];
+
   const rows = await prisma.user.findMany({
     where: { role: Role.ADMIN },
     orderBy: [{ createdAt: "asc" }, { email: "asc" }],
@@ -129,6 +168,11 @@ export async function listAdminUsers(actorUserId: string): Promise<AdminUserList
       emailVerifiedAt: true,
       createdAt: true,
       adminStatusVersion: true,
+      adminTeamRole: true,
+      lastAdminLoginAt: true,
+      adminPermissionGrants: {
+        select: { permission: true, effect: true },
+      },
     },
   });
 
@@ -136,6 +180,12 @@ export async function listAdminUsers(actorUserId: string): Promise<AdminUserList
     const resolved = resolveAdminAccountStatus(row);
     const status: AdminUserListRow["status"] =
       resolved === "OTHER" ? "DISABLED" : resolved;
+    const permissions = [
+      ...resolveAdminPermissions({
+        teamRole: row.adminTeamRole,
+        grants: row.adminPermissionGrants,
+      }),
+    ];
     return {
       id: row.id,
       name: row.name,
@@ -144,6 +194,10 @@ export async function listAdminUsers(actorUserId: string): Promise<AdminUserList
       createdAt: row.createdAt,
       adminStatusVersion: row.adminStatusVersion,
       isSelf: row.id === actorUserId,
+      teamRole: row.adminTeamRole,
+      teamRoleLabel: ADMIN_TEAM_ROLE_LABELS[row.adminTeamRole],
+      lastAdminLoginLabel: formatLastAdminLogin(row.lastAdminLoginAt),
+      permissions,
     };
   });
 }
@@ -157,6 +211,7 @@ export async function inviteAdminUser(options: {
   adminUserId: string;
   name: FormDataEntryValue | string | null;
   email: FormDataEntryValue | string | null;
+  teamRole?: FormDataEntryValue | string | null;
 }): Promise<AdminUsersMutationResult> {
   const sameOrigin = await assertSameOriginAdminRequest();
   if (!sameOrigin) {
@@ -167,9 +222,18 @@ export async function inviteAdminUser(options: {
     return { ok: false, error: "Request could not be verified. Please try again." };
   }
 
-  const actor = await findActiveAdminActor(options.adminUserId);
+  const actor = await requireAdminManager(options.adminUserId);
   if (!actor) {
     return { ok: false, error: "Not authorized." };
+  }
+
+  const teamRole = parseAdminTeamRole(options.teamRole) ?? "SUPPORT";
+  if (options.teamRole != null && String(options.teamRole).trim() && !parseAdminTeamRole(options.teamRole)) {
+    return {
+      ok: false,
+      error: "Select a valid team role.",
+      fieldErrors: { teamRole: "Select a valid team role." },
+    };
   }
 
   const nameParsed = parseName(options.name);
@@ -284,6 +348,7 @@ export async function inviteAdminUser(options: {
           name: nameParsed.name,
           email,
           role: Role.ADMIN,
+          adminTeamRole: teamRole,
           passwordHash: null,
           // Credentials login + ACTIVE status require verification.
           // Invitee establishes password via the one-time setup link (no temp password).
@@ -306,6 +371,7 @@ export async function inviteAdminUser(options: {
             inviteMethod: "opaque_setup_link",
             previousStatus: null,
             adminStatusVersion: 0,
+            teamRole,
           },
         },
       });
@@ -377,7 +443,7 @@ export async function resendAdminInviteSetup(options: {
     return { ok: false, error: "Request could not be verified. Please try again." };
   }
 
-  const actor = await findActiveAdminActor(options.adminUserId);
+  const actor = await requireAdminManager(options.adminUserId);
   if (!actor) {
     return { ok: false, error: "Not authorized." };
   }
@@ -508,7 +574,7 @@ export async function deactivateAdminUser(options: {
     return { ok: false, error: "Request could not be verified. Please try again." };
   }
 
-  const actor = await findActiveAdminActor(options.adminUserId);
+  const actor = await requireAdminManager(options.adminUserId);
   if (!actor) {
     return { ok: false, error: "Not authorized." };
   }
@@ -650,7 +716,7 @@ export async function deactivateAdminUser(options: {
       });
       return {
         ok: false,
-        error: "Cannot disable the last active admin account.",
+        error: "Cannot disable the last Super Admin account.",
       };
     }
     if (err instanceof AdminUsersCasConflictError) {
@@ -694,7 +760,7 @@ export async function reactivateAdminUser(options: {
     return { ok: false, error: "Request could not be verified. Please try again." };
   }
 
-  const actor = await findActiveAdminActor(options.adminUserId);
+  const actor = await requireAdminManager(options.adminUserId);
   if (!actor) {
     return { ok: false, error: "Not authorized." };
   }
@@ -831,5 +897,335 @@ export async function reactivateAdminUser(options: {
         : "Admin reactivated.",
     adminStatusVersion: nextVersion,
     status: restored,
+  };
+}
+
+export async function assignAdminTeamRole(options: {
+  adminUserId: string;
+  targetUserId: string;
+  teamRole: FormDataEntryValue | string | null;
+  expectedVersion: FormDataEntryValue | string | number | null;
+}): Promise<AdminUsersMutationResult> {
+  const sameOrigin = await assertSameOriginAdminRequest();
+  if (!sameOrigin) {
+    await auditBlocked({
+      actorUserId: options.adminUserId,
+      targetId: options.targetUserId,
+      failureCode: "same_origin",
+    });
+    return { ok: false, error: "Request could not be verified. Please try again." };
+  }
+
+  const actor = await requireAdminManager(options.adminUserId);
+  if (!actor) {
+    return { ok: false, error: "Not authorized." };
+  }
+
+  const targetId = (options.targetUserId ?? "").trim();
+  if (!targetId || targetId.length > 64) {
+    return { ok: false, error: "Admin not found." };
+  }
+  if (targetId === actor.id) {
+    await auditBlocked({
+      actorUserId: actor.id,
+      targetId,
+      failureCode: "self_role_change",
+    });
+    return { ok: false, error: "You cannot change your own team role." };
+  }
+
+  const teamRole = parseAdminTeamRole(options.teamRole);
+  if (!teamRole) {
+    return {
+      ok: false,
+      error: "Select a valid team role.",
+      fieldErrors: { teamRole: "Select a valid team role." },
+    };
+  }
+
+  const expectedVersion = parseExpectedVersion(options.expectedVersion);
+  if (expectedVersion === null) {
+    return {
+      ok: false,
+      error: "This page is out of date. Please reload and try again.",
+      fieldErrors: {
+        expectedVersion: "This page is out of date. Please reload and try again.",
+      },
+    };
+  }
+
+  const target = await prisma.user.findUnique({
+    where: { id: targetId },
+    select: {
+      id: true,
+      role: true,
+      deletedAt: true,
+      adminDisabledAt: true,
+      passwordHash: true,
+      emailVerifiedAt: true,
+      adminStatusVersion: true,
+      adminTeamRole: true,
+    },
+  });
+
+  if (!target || target.role !== Role.ADMIN) {
+    await auditBlocked({
+      actorUserId: actor.id,
+      targetId,
+      failureCode: "not_admin",
+    });
+    return { ok: false, error: "Admin not found." };
+  }
+
+  const previousStatus = resolveAdminAccountStatus(target);
+  if (previousStatus === "DELETED") {
+    return { ok: false, error: "Deleted accounts cannot be updated." };
+  }
+
+  const previousRole = target.adminTeamRole as AdminTeamRoleName;
+  const nextVersion = expectedVersion + 1;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await acquireAdminStatusXactLock(tx);
+
+      if (
+        previousRole === "SUPER_ADMIN" &&
+        teamRole !== "SUPER_ADMIN" &&
+        isActiveAdminForProtection(target)
+      ) {
+        const activeSuper = await countActiveSuperAdminsTx(tx);
+        if (activeSuper <= 1) {
+          throw new AdminUsersLastActiveError();
+        }
+      }
+
+      const updated = await tx.user.updateMany({
+        where: {
+          id: target.id,
+          role: Role.ADMIN,
+          deletedAt: null,
+          adminStatusVersion: expectedVersion,
+        },
+        data: {
+          adminTeamRole: teamRole,
+          adminStatusVersion: { increment: 1 },
+        },
+      });
+      if (updated.count !== 1) {
+        throw new AdminUsersCasConflictError();
+      }
+
+      await tx.adminPermissionGrant.deleteMany({ where: { userId: target.id } });
+
+      await tx.auditLog.create({
+        data: {
+          actorUserId: actor.id,
+          action: ADMIN_TEAM_ROLE_CHANGED_AUDIT,
+          targetType: "user",
+          targetId: target.id,
+          metadata: {
+            previousRole,
+            teamRole,
+            previousStatus,
+            adminStatusVersion: nextVersion,
+          },
+        },
+      });
+    });
+  } catch (err) {
+    if (err instanceof AdminUsersLastActiveError) {
+      await auditBlocked({
+        actorUserId: actor.id,
+        targetId: target.id,
+        failureCode: "last_active_admin",
+        metadata: { previousRole, teamRole },
+      });
+      return {
+        ok: false,
+        error: "Cannot change the last Super Admin account to another role.",
+      };
+    }
+    if (err instanceof AdminUsersCasConflictError) {
+      await auditBlocked({
+        actorUserId: actor.id,
+        targetId: target.id,
+        failureCode: "stale_version",
+        metadata: { expectedVersion },
+      });
+      return {
+        ok: false,
+        error: "This page is out of date. Please reload and try again.",
+        fieldErrors: {
+          expectedVersion: "This page is out of date. Please reload and try again.",
+        },
+      };
+    }
+    throw err;
+  }
+
+  return {
+    ok: true,
+    message: `Role updated to ${ADMIN_TEAM_ROLE_LABELS[teamRole]}. Custom permissions were reset to that role.`,
+    adminStatusVersion: nextVersion,
+    status: previousStatus === "OTHER" ? "DISABLED" : previousStatus,
+  };
+}
+
+export async function updateAdminPermissions(options: {
+  adminUserId: string;
+  targetUserId: string;
+  selectedPermissions: Iterable<FormDataEntryValue | string | null>;
+  expectedVersion: FormDataEntryValue | string | number | null;
+}): Promise<AdminUsersMutationResult> {
+  const sameOrigin = await assertSameOriginAdminRequest();
+  if (!sameOrigin) {
+    await auditBlocked({
+      actorUserId: options.adminUserId,
+      targetId: options.targetUserId,
+      failureCode: "same_origin",
+    });
+    return { ok: false, error: "Request could not be verified. Please try again." };
+  }
+
+  const actor = await requireAdminManager(options.adminUserId);
+  if (!actor) {
+    return { ok: false, error: "Not authorized." };
+  }
+
+  const targetId = (options.targetUserId ?? "").trim();
+  if (!targetId || targetId.length > 64) {
+    return { ok: false, error: "Admin not found." };
+  }
+
+  const expectedVersion = parseExpectedVersion(options.expectedVersion);
+  if (expectedVersion === null) {
+    return {
+      ok: false,
+      error: "This page is out of date. Please reload and try again.",
+      fieldErrors: {
+        expectedVersion: "This page is out of date. Please reload and try again.",
+      },
+    };
+  }
+
+  const target = await prisma.user.findUnique({
+    where: { id: targetId },
+    select: {
+      id: true,
+      role: true,
+      deletedAt: true,
+      adminDisabledAt: true,
+      adminTeamRole: true,
+      adminStatusVersion: true,
+    },
+  });
+
+  if (!target || target.role !== Role.ADMIN) {
+    await auditBlocked({
+      actorUserId: actor.id,
+      targetId,
+      failureCode: "not_admin",
+    });
+    return { ok: false, error: "Admin not found." };
+  }
+  if (target.deletedAt) {
+    return { ok: false, error: "Deleted accounts cannot be updated." };
+  }
+  if (target.adminTeamRole === AdminTeamRole.SUPER_ADMIN) {
+    await auditBlocked({
+      actorUserId: actor.id,
+      targetId,
+      failureCode: "super_admin_permissions_locked",
+    });
+    return {
+      ok: false,
+      error: "Super Admin always has full access. Change the role first to limit permissions.",
+    };
+  }
+
+  const selected = [...options.selectedPermissions]
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+  const grants = grantsFromPermissionSelection({
+    teamRole: target.adminTeamRole,
+    selected,
+  });
+  const nextVersion = expectedVersion + 1;
+  const effective = [
+    ...resolveAdminPermissions({
+      teamRole: target.adminTeamRole,
+      grants,
+    }),
+  ];
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await acquireAdminStatusXactLock(tx);
+
+      const updated = await tx.user.updateMany({
+        where: {
+          id: target.id,
+          role: Role.ADMIN,
+          deletedAt: null,
+          adminStatusVersion: expectedVersion,
+        },
+        data: { adminStatusVersion: { increment: 1 } },
+      });
+      if (updated.count !== 1) {
+        throw new AdminUsersCasConflictError();
+      }
+
+      await tx.adminPermissionGrant.deleteMany({ where: { userId: target.id } });
+      if (grants.length > 0) {
+        await tx.adminPermissionGrant.createMany({
+          data: grants.map((grant) => ({
+            userId: target.id,
+            permission: grant.permission,
+            effect:
+              grant.effect === "GRANT"
+                ? AdminPermissionEffect.GRANT
+                : AdminPermissionEffect.DENY,
+          })),
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          actorUserId: actor.id,
+          action: ADMIN_PERMISSIONS_CHANGED_AUDIT,
+          targetType: "user",
+          targetId: target.id,
+          metadata: {
+            teamRole: target.adminTeamRole,
+            permissions: effective,
+            adminStatusVersion: nextVersion,
+          },
+        },
+      });
+    });
+  } catch (err) {
+    if (err instanceof AdminUsersCasConflictError) {
+      await auditBlocked({
+        actorUserId: actor.id,
+        targetId: target.id,
+        failureCode: "stale_version",
+        metadata: { expectedVersion },
+      });
+      return {
+        ok: false,
+        error: "This page is out of date. Please reload and try again.",
+        fieldErrors: {
+          expectedVersion: "This page is out of date. Please reload and try again.",
+        },
+      };
+    }
+    throw err;
+  }
+
+  return {
+    ok: true,
+    message: "Permissions updated.",
+    adminStatusVersion: nextVersion,
   };
 }

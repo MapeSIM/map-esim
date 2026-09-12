@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { assertSameOriginAdminRequest } from "@/app/lib/admin/reconciliationCaseManagement";
+import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   executeAdminPartnerRefundRequest,
@@ -28,6 +29,7 @@ export async function adminPartnerRefundRequestExecuteAction(
   }
 
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "REFUNDS_MANAGE");
 
   void formData.get("amount");
   void formData.get("amountCents");

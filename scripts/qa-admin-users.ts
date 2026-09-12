@@ -272,10 +272,13 @@ async function main() {
   assert.match(nav, /Admin Users/);
   assert.match(page, /InviteAdminForm/);
   assert.match(page, /AdminUsersTable/);
-  assert.match(panel, /Invite Admin/);
+  assert.match(panel, /Create admin user|Invite Admin/);
   assert.match(panel, /ACTIVE|INVITED|DISABLED/);
-  assert.match(panel, /Deactivate/);
-  assert.match(panel, /Reactivate/);
+  assert.match(panel, /Disable|Deactivate/);
+  assert.match(panel, /Enable|Reactivate/);
+  assert.match(panel, /Assign role/);
+  assert.match(panel, /Save permissions|Full access/);
+  assert.match(panel, /Last login/);
   assert.match(panel, /Resend setup link/);
   assert.match(panel, /Invitation pending/);
   assert.match(panel, /isSelf/);

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   deescalateReconciliationCase,
@@ -31,6 +32,7 @@ export async function lockReconciliationCaseAction(
   formData: FormData
 ): Promise<CaseManagementFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "RECONCILIATION");
   const sourceType = String(formData.get("sourceType") ?? "").trim();
   const attemptId = String(formData.get("attemptId") ?? "").trim();
   // Never trust browser status fields.
@@ -53,6 +55,7 @@ export async function unlockReconciliationCaseAction(
   formData: FormData
 ): Promise<CaseManagementFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "RECONCILIATION");
   const sourceType = String(formData.get("sourceType") ?? "").trim();
   const attemptId = String(formData.get("attemptId") ?? "").trim();
   void formData.get("caseStatus");
@@ -74,6 +77,7 @@ export async function escalateReconciliationCaseAction(
   formData: FormData
 ): Promise<CaseManagementFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "RECONCILIATION");
   const sourceType = String(formData.get("sourceType") ?? "").trim();
   const attemptId = String(formData.get("attemptId") ?? "").trim();
   void formData.get("caseStatus");
@@ -94,6 +98,7 @@ export async function deescalateReconciliationCaseAction(
   formData: FormData
 ): Promise<CaseManagementFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "RECONCILIATION");
   const sourceType = String(formData.get("sourceType") ?? "").trim();
   const attemptId = String(formData.get("attemptId") ?? "").trim();
   void formData.get("caseStatus");
@@ -116,6 +121,7 @@ export async function resolveReconciliationCaseAction(
   formData: FormData
 ): Promise<CaseManagementFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "RECONCILIATION");
   const sourceType = String(formData.get("sourceType") ?? "").trim();
   const attemptId = String(formData.get("attemptId") ?? "").trim();
   void formData.get("caseStatus");
@@ -138,6 +144,7 @@ export async function resendReconciliationEmailAction(
   formData: FormData
 ): Promise<CaseManagementFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "RECONCILIATION");
   const sourceType = String(formData.get("sourceType") ?? "").trim();
   const attemptId = String(formData.get("attemptId") ?? "").trim();
   void formData.get("caseStatus");
@@ -159,6 +166,7 @@ export async function clearStuckReconciliationSendAction(
   formData: FormData
 ): Promise<CaseManagementFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "RECONCILIATION");
   const sourceType = String(formData.get("sourceType") ?? "").trim();
   const attemptId = String(formData.get("attemptId") ?? "").trim();
   void formData.get("caseStatus");
@@ -180,6 +188,7 @@ export async function backfillReconciliationIccidAction(
   formData: FormData
 ): Promise<CaseManagementFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "RECONCILIATION");
   const sourceType = String(formData.get("sourceType") ?? "").trim();
   const attemptId = String(formData.get("attemptId") ?? "").trim();
   void formData.get("caseStatus");
@@ -202,6 +211,7 @@ export async function finalizeReconciliationLocalRecordAction(
   formData: FormData
 ): Promise<CaseManagementFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "RECONCILIATION");
   const sourceType = String(formData.get("sourceType") ?? "").trim();
   const attemptId = String(formData.get("attemptId") ?? "").trim();
   void formData.get("caseStatus");
@@ -225,6 +235,7 @@ export async function refundReconciliationWalletPurchaseAction(
   formData: FormData
 ): Promise<CaseManagementFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "RECONCILIATION");
   const sourceType = String(formData.get("sourceType") ?? "").trim();
   const attemptId = String(formData.get("attemptId") ?? "").trim();
   void formData.get("caseStatus");
@@ -252,6 +263,7 @@ export async function refundReconciliationPartnerPurchaseAction(
   formData: FormData
 ): Promise<CaseManagementFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "RECONCILIATION");
   const sourceType = String(formData.get("sourceType") ?? "").trim();
   const attemptId = String(formData.get("attemptId") ?? "").trim();
   void formData.get("caseStatus");

@@ -8,6 +8,7 @@ import {
   type SimpaisaPendingReleaseActionResult,
 } from "@/app/lib/admin/pendingSimpaisaPaymentInvestigate";
 import { parsePendingPaymentVerifyReason } from "@/app/lib/admin/pendingSimpaisaPaymentInvestigateShared";
+import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 
 export type SimpaisaPendingInvestigateFormState =
@@ -38,6 +39,7 @@ export async function checkSimpaisaPendingPaymentStatusAction(
   formData: FormData
 ): Promise<SimpaisaPendingInvestigateFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "PAYMENTS_MANAGE");
 
   const paymentAttemptId = String(
     formData.get("paymentAttemptId") ?? ""
@@ -78,6 +80,7 @@ export async function releaseSimpaisaPendingReservationAction(
   formData: FormData
 ): Promise<SimpaisaPendingReleaseFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "PAYMENTS_MANAGE");
 
   const paymentAttemptId = String(
     formData.get("paymentAttemptId") ?? ""

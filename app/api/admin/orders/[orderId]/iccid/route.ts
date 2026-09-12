@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { Role } from "@prisma/client";
 import { revealIccidForAdmin } from "@/app/lib/orders/iccidReveal";
+import { apiActorHasAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 
 const NO_STORE = {
   "Cache-Control": "private, no-store, max-age=0",
@@ -37,6 +38,14 @@ export async function POST(
       select: { id: true, role: true, deletedAt: true, adminDisabledAt: true },
     });
     if (!admin || admin.deletedAt || admin.role !== Role.ADMIN || admin.adminDisabledAt) {
+      return json({ success: false, error: "Not found" }, 404);
+    }
+    if (
+      !(await apiActorHasAdminPermission(admin.id, [
+        "ESIM_FULFILLMENT",
+        "ORDERS_MANAGE",
+      ]))
+    ) {
       return json({ success: false, error: "Not found" }, 404);
     }
 

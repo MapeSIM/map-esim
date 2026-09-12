@@ -4,7 +4,10 @@ import AdminAddDataForm from "@/app/components/admin/AdminAddDataForm";
 import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBadge";
 import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
 import AdminEsimUsagePanel from "@/app/components/orders/AdminEsimUsagePanel";
+import { loadAdminAccess } from "@/app/lib/admin/adminPermissionAccess";
+import { hasAdminPermission } from "@/app/lib/admin/adminPermissions";
 import { getAdminOrderDetail } from "@/app/lib/admin/orders";
+import { requireRole } from "@/app/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +32,16 @@ export default async function AdminOrderDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const admin = await requireRole("ADMIN");
+  const access = await loadAdminAccess(admin.id);
+  const canRevealIccid = hasAdminPermission(
+    access?.permissions ?? [],
+    ["ESIM_FULFILLMENT", "ORDERS_MANAGE"]
+  );
+  const canFulfill = hasAdminPermission(
+    access?.permissions ?? [],
+    "ESIM_FULFILLMENT"
+  );
   const { id } = await params;
 
   let detail: Awaited<ReturnType<typeof getAdminOrderDetail>>;
@@ -106,12 +119,16 @@ export default async function AdminOrderDetailPage({
         <DetailRow label="Account status" value={detail.accountStatusLabel} />
         <DetailRow label="Claim status" value={detail.claimStatusLabel} />
         <DetailRow label="Claimed at" value={detail.claimedAtLabel} />
-        <IccidRevealPanel
-          orderId={detail.id}
-          maskedLabel={detail.iccidHint}
-          revealable={detail.iccidRevealable}
-          revealPath={`/api/admin/orders/${encodeURIComponent(detail.id)}/iccid`}
-        />
+        {canRevealIccid ? (
+          <IccidRevealPanel
+            orderId={detail.id}
+            maskedLabel={detail.iccidHint}
+            revealable={detail.iccidRevealable}
+            revealPath={`/api/admin/orders/${encodeURIComponent(detail.id)}/iccid`}
+          />
+        ) : (
+          <DetailRow label="ICCID" value={detail.iccidHint} />
+        )}
       </dl>
 
       <section className="space-y-3" aria-labelledby="admin-usage-heading">
@@ -119,7 +136,7 @@ export default async function AdminOrderDetailPage({
           <h2 id="admin-usage-heading">Usage</h2>
         </div>
         <AdminEsimUsagePanel orderId={detail.id} />
-        {detail.addDataEligible ? (
+        {canFulfill && detail.addDataEligible ? (
           <div className="rounded-2xl border border-[var(--accent-strong)]/40 bg-[var(--accent-strong)]/10 px-4 py-4 sm:px-5">
             <p className="text-sm font-semibold text-[var(--heading)]">
               Add More Data

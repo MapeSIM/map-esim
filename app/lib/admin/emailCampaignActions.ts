@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   createAdminEmailCampaign,
@@ -37,6 +38,7 @@ export async function createEmailCampaignAction(
   formData: FormData
 ): Promise<EmailCampaignActionState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, ["EMAIL_CAMPAIGNS", "CUSTOMER_ANNOUNCEMENTS"]);
   try {
     const created = await createAdminEmailCampaign({
       adminUserId: admin.id,
@@ -63,6 +65,7 @@ export async function sendEmailCampaignTestAction(
   formData: FormData
 ): Promise<EmailCampaignActionState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, ["EMAIL_CAMPAIGNS", "CUSTOMER_ANNOUNCEMENTS"]);
   try {
     const campaignId = String(formData.get("campaignId") ?? "");
     await sendAdminEmailCampaignTest({
@@ -89,6 +92,7 @@ export async function sendEmailCampaignBulkAction(
   formData: FormData
 ): Promise<EmailCampaignActionState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, ["EMAIL_CAMPAIGNS", "CUSTOMER_ANNOUNCEMENTS"]);
   try {
     const campaignId = String(formData.get("campaignId") ?? "");
     const result = await sendAdminEmailCampaignBulk({

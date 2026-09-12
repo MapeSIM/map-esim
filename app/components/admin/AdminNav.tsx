@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOutAction } from "@/app/lib/auth/actions";
+import { canAccessAdminPath } from "@/app/lib/admin/adminPageAccess";
 
 const links = [
   { href: "/admin", label: "Overview", exact: true },
@@ -47,8 +48,17 @@ function isActive(pathname: string, href: string, exact: boolean): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export default function AdminNav({ adminName }: { adminName: string }) {
+export default function AdminNav({
+  adminName,
+  permissions,
+}: {
+  adminName: string;
+  permissions: string[];
+}) {
   const pathname = usePathname() || "/admin";
+  const visibleLinks = links.filter((link) =>
+    canAccessAdminPath(permissions, link.href)
+  );
 
   return (
     <aside className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4">
@@ -59,7 +69,7 @@ export default function AdminNav({ adminName }: { adminName: string }) {
         {adminName}
       </p>
       <nav className="mt-4 flex flex-col gap-1" aria-label="Admin">
-        {links.map((link) => {
+        {visibleLinks.map((link) => {
           const active = isActive(pathname, link.href, link.exact);
           return (
             <Link

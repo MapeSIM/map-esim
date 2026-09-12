@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   updateReferralProgramConfig,
@@ -14,6 +15,7 @@ export async function saveReferralProgramConfigAction(
   formData: FormData
 ): Promise<ReferralProgramFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "SETTINGS_MANAGE");
   const result = await updateReferralProgramConfig({
     adminUserId: admin.id,
     enabled: formData.get("enabled"),

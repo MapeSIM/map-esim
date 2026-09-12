@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   AdminPackageAssignmentError,
@@ -26,7 +27,8 @@ import {
 export async function loadAdminAssignmentOffersAction(
   destinationCode: string
 ): Promise<AdminOfferOption[]> {
-  await requireRole("ADMIN");
+  const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "ESIM_FULFILLMENT");
   return listAdminAssignmentOffers(destinationCode);
 }
 
@@ -45,6 +47,7 @@ export async function prepareAdminPackageAssignmentAction(
   formData: FormData
 ): Promise<AdminPackageAssignmentActionState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "ESIM_FULFILLMENT");
 
   const customerUserId = String(formData.get("customerUserId") ?? "").trim();
   const offerId = normalizeOfferId(formData.get("offerId"));
@@ -141,6 +144,7 @@ export async function confirmAdminPackageAssignmentAction(
   formData: FormData
 ): Promise<AdminPackageAssignmentActionState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "ESIM_FULFILLMENT");
 
   const customerUserId = String(formData.get("customerUserId") ?? "").trim();
   const assignmentId = String(formData.get("assignmentId") ?? "").trim();

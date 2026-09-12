@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   blockCustomerAccount,
@@ -15,6 +16,7 @@ export async function blockCustomerAction(
   formData: FormData
 ): Promise<CustomerBlockFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "CUSTOMERS_VIEW");
   const customerUserId = String(formData.get("customerUserId") ?? "").trim();
   const result = await blockCustomerAccount({
     adminUserId: admin.id,
@@ -34,6 +36,7 @@ export async function reactivateCustomerAction(
   formData: FormData
 ): Promise<CustomerBlockFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "CUSTOMERS_VIEW");
   const customerUserId = String(formData.get("customerUserId") ?? "").trim();
   const result = await reactivateCustomerAccount({
     adminUserId: admin.id,

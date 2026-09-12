@@ -6,6 +6,7 @@ import {
   type PendingPaymentVerifyActionResult,
 } from "@/app/lib/admin/pendingPaymentVerify";
 import { parsePendingPaymentVerifyReason } from "@/app/lib/admin/pendingPaymentVerifyShared";
+import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 
 export type PendingPaymentVerifyFormState =
@@ -20,6 +21,7 @@ export async function verifyPendingGatewayPaymentAction(
   formData: FormData
 ): Promise<PendingPaymentVerifyFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "PAYMENTS_MANAGE");
 
   const paymentAttemptId = String(formData.get("paymentAttemptId") ?? "").trim();
   const reasonParsed = parsePendingPaymentVerifyReason(formData.get("reason"));

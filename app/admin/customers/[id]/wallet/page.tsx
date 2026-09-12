@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { loadAdminAccess } from "@/app/lib/admin/adminPermissionAccess";
+import { hasAdminPermission } from "@/app/lib/admin/adminPermissions";
 import { getAdminWalletLedgerPage } from "@/app/lib/admin/walletLedger";
 import { buildAdminWalletLedgerHref } from "@/app/lib/admin/walletLedgerShared";
 import { requireRole } from "@/app/lib/auth/session";
@@ -16,7 +18,24 @@ export default async function AdminCustomerWalletLedgerPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ page?: string }>;
 }) {
-  await requireRole("ADMIN");
+  const admin = await requireRole("ADMIN");
+  const access = await loadAdminAccess(admin.id);
+  const canAdjustWallet = hasAdminPermission(
+    access?.permissions ?? [],
+    "WALLET_ADJUST"
+  );
+  const canViewTransactions = hasAdminPermission(
+    access?.permissions ?? [],
+    "TRANSACTIONS_VIEW"
+  );
+  const canViewPayments = hasAdminPermission(access?.permissions ?? [], [
+    "TRANSACTIONS_VIEW",
+    "PAYMENTS_MANAGE",
+  ]);
+  const canViewOrders = hasAdminPermission(access?.permissions ?? [], [
+    "ORDERS_VIEW",
+    "ORDERS_MANAGE",
+  ]);
   const { id: rawId } = await params;
   const sp = await searchParams;
 
@@ -105,13 +124,15 @@ export default async function AdminCustomerWalletLedgerPage({
 
         {data.accountActive ? (
           <p className="mt-4 flex flex-wrap gap-3 text-sm">
-            <Link
-              href={`/admin/customers/${encodeURIComponent(data.customerId)}/wallet/credit`}
-              className="font-semibold text-[var(--accent-strong)]"
-            >
-              Add credit
-            </Link>
-            {data.hasWallet && data.balanceCents > 0 ? (
+            {canAdjustWallet ? (
+              <Link
+                href={`/admin/customers/${encodeURIComponent(data.customerId)}/wallet/credit`}
+                className="font-semibold text-[var(--accent-strong)]"
+              >
+                Add credit
+              </Link>
+            ) : null}
+            {canAdjustWallet && data.hasWallet && data.balanceCents > 0 ? (
               <Link
                 href={`/admin/customers/${encodeURIComponent(data.customerId)}/wallet/debit`}
                 className="font-semibold text-[var(--accent-strong)]"
@@ -119,18 +140,22 @@ export default async function AdminCustomerWalletLedgerPage({
                 Deduct funds
               </Link>
             ) : null}
-            <Link
-              href="/admin/wallet-topups"
-              className="font-semibold text-[var(--accent-strong)]"
-            >
-              Wallet top-ups
-            </Link>
-            <Link
-              href="/admin/payments"
-              className="font-semibold text-[var(--accent-strong)]"
-            >
-              Payments hub
-            </Link>
+            {canViewTransactions ? (
+              <Link
+                href="/admin/wallet-topups"
+                className="font-semibold text-[var(--accent-strong)]"
+              >
+                Wallet top-ups
+              </Link>
+            ) : null}
+            {canViewPayments ? (
+              <Link
+                href="/admin/payments"
+                className="font-semibold text-[var(--accent-strong)]"
+              >
+                Payments hub
+              </Link>
+            ) : null}
           </p>
         ) : null}
       </section>
@@ -223,20 +248,26 @@ export default async function AdminCustomerWalletLedgerPage({
                         <p className="text-[var(--text-soft)]">No purchase</p>
                       )}
                       {row.paymentAttemptHref && row.paymentAttemptId ? (
-                        <p className="mt-1">
-                          <Link
-                            href={row.paymentAttemptHref}
-                            className="font-semibold text-[var(--accent-strong)]"
-                          >
-                            Payment {row.paymentAttemptId}
-                          </Link>
-                        </p>
+                        canViewPayments ? (
+                          <p className="mt-1">
+                            <Link
+                              href={row.paymentAttemptHref}
+                              className="font-semibold text-[var(--accent-strong)]"
+                            >
+                              Payment {row.paymentAttemptId}
+                            </Link>
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-[var(--text-soft)]">
+                            Payment recorded
+                          </p>
+                        )
                       ) : (
                         <p className="mt-1 text-[var(--text-soft)]">
                           No payment attempt
                         </p>
                       )}
-                      {row.orderHref && row.orderId ? (
+                      {canViewOrders && row.orderHref && row.orderId ? (
                         <p className="mt-1">
                           <Link
                             href={row.orderHref}

@@ -6,6 +6,7 @@ import {
   fetchProviderWalletSnapshot,
   providerWalletPublicError,
 } from "@/app/lib/vesim/providerWallet";
+import { apiActorHasAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 
 const NO_STORE = {
   "Cache-Control": "private, no-store, max-age=0",
@@ -41,6 +42,14 @@ export async function GET() {
       select: { id: true, role: true, deletedAt: true, adminDisabledAt: true },
     });
     if (!admin || admin.deletedAt || admin.role !== Role.ADMIN || admin.adminDisabledAt) {
+      return json({ success: false, error: "Not found" }, 404);
+    }
+    if (
+      !(await apiActorHasAdminPermission(admin.id, [
+        "OPERATIONS_CONTROLS",
+        "REVENUE_VIEW",
+      ]))
+    ) {
       return json({ success: false, error: "Not found" }, 404);
     }
 

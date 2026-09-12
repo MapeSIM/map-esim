@@ -13,6 +13,45 @@ enum Role {
   PARTNER
 }
 
+/// Team role for Role.ADMIN users. Portal login stays Role.ADMIN.
+enum AdminTeamRole {
+  SUPER_ADMIN
+  SUPPORT
+  OPERATIONS
+  FINANCE
+  MARKETING
+}
+
+/// Fine-grained admin capabilities. Guards must check these, not team role names.
+enum AdminPermission {
+  MANAGE_ADMINS
+  CUSTOMERS_VIEW
+  ORDERS_VIEW
+  ORDERS_MANAGE
+  ESIM_FULFILLMENT
+  INSTALL_ISSUES
+  SUPPORT_EMAILS
+  REVENUE_VIEW
+  TRANSACTIONS_VIEW
+  REFUNDS_MANAGE
+  EMAIL_CAMPAIGNS
+  CUSTOMER_ANNOUNCEMENTS
+  PARTNERS_MANAGE
+  PAYMENTS_MANAGE
+  PROMO_CODES
+  RECONCILIATION
+  OPERATIONS_CONTROLS
+  ALERTS_VIEW
+  AUDIT_LOGS
+  SETTINGS_MANAGE
+  WALLET_ADJUST
+}
+
+enum AdminPermissionEffect {
+  GRANT
+  DENY
+}
+
 /// Admin customer email campaign audience (broadcast only — never transactional).
 enum EmailCampaignAudience {
   ALL_CUSTOMERS
@@ -322,6 +361,10 @@ model User {
   adminDisabledAt              DateTime?
   /// CAS version for admin deactivate/reactivate.
   adminStatusVersion           Int                      @default(0)
+  /// Team access role for ADMIN users. Existing admins default to SUPER_ADMIN.
+  adminTeamRole                AdminTeamRole            @default(SUPER_ADMIN)
+  /// Last successful ADMIN portal sign-in. Null until the first login after this field exists.
+  lastAdminLoginAt             DateTime?
   /// Signup (or future) consent to Terms & Conditions.
   termsAcceptedAt              DateTime?
   termsVersion                 String?
@@ -366,10 +409,26 @@ model User {
   referralAsReferred           CustomerReferral?          @relation("CustomerReferralReferred")
   emailCampaignsCreated        EmailCampaign[]            @relation("EmailCampaignCreatedByAdmin")
   emailCampaignRecipients      EmailCampaignRecipient[]   @relation("EmailCampaignRecipientCustomer")
+  adminPermissionGrants        AdminPermissionGrant[]
 
   @@index([deletedAt])
   @@index([blockedAt])
   @@index([adminDisabledAt])
+  @@index([adminTeamRole])
+}
+
+/// Super-admin overrides on top of AdminTeamRole defaults. Never used for CUSTOMER/PARTNER.
+model AdminPermissionGrant {
+  id         String                 @id @default(cuid())
+  userId     String
+  permission AdminPermission
+  effect     AdminPermissionEffect
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permission])
+  @@index([userId])
 }
 
 /// 1:1 Partner/reseller profile for Role.PARTNER users.

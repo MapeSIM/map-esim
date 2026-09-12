@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   updateWhatsAppSupportConfig,
@@ -14,6 +15,7 @@ export async function saveWhatsAppSupportConfigAction(
   formData: FormData
 ): Promise<WhatsAppSupportFormState> {
   const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "SETTINGS_MANAGE");
   const result = await updateWhatsAppSupportConfig({
     adminUserId: admin.id,
     enabled: formData.get("enabled"),

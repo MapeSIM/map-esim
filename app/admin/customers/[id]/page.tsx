@@ -4,8 +4,11 @@ import { getAdminCustomerDetail } from "@/app/lib/admin/customers";
 import { getAdminCustomerRecentOrders } from "@/app/lib/admin/orders";
 import { getAdminCustomerRecentTopups } from "@/app/lib/admin/topups";
 import { getAdminCustomerWalletSummary } from "@/app/lib/admin/wallet";
+import { loadAdminAccess } from "@/app/lib/admin/adminPermissionAccess";
+import { hasAdminPermission } from "@/app/lib/admin/adminPermissions";
 import { ADMIN_DEBIT_MIN_CENTS } from "@/app/lib/wallet/amount";
 import { CustomerBlockPanel } from "@/app/components/admin/CustomerBlockPanel";
+import { requireRole } from "@/app/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +33,24 @@ export default async function AdminCustomerDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const admin = await requireRole("ADMIN");
+  const access = await loadAdminAccess(admin.id);
+  const canFulfill = hasAdminPermission(
+    access?.permissions ?? [],
+    "ESIM_FULFILLMENT"
+  );
+  const canAdjustWallet = hasAdminPermission(
+    access?.permissions ?? [],
+    "WALLET_ADJUST"
+  );
+  const canViewOrders = hasAdminPermission(
+    access?.permissions ?? [],
+    ["ORDERS_VIEW", "ORDERS_MANAGE"]
+  );
+  const canViewTransactions = hasAdminPermission(
+    access?.permissions ?? [],
+    "TRANSACTIONS_VIEW"
+  );
   const { id } = await params;
 
   let detail: Awaited<ReturnType<typeof getAdminCustomerDetail>>;
@@ -203,7 +224,7 @@ export default async function AdminCustomerDetailPage({
         />
       ) : null}
 
-      {detail.localOrderCount > 0 ? (
+      {canViewOrders && detail.localOrderCount > 0 ? (
         <p>
           <Link
             href={`/admin/orders?userId=${encodeURIComponent(detail.id)}`}
@@ -223,7 +244,7 @@ export default async function AdminCustomerDetailPage({
               Assisted wallet purchase uses the customer&apos;s available balance.
             </p>
           </div>
-          {detail.accountStatusLabel === "Active" ? (
+          {canFulfill && detail.accountStatusLabel === "Active" ? (
             <div className="flex flex-wrap gap-2">
               <Link
                 href={`/admin/customers/${encodeURIComponent(detail.id)}/esim/assign`}
@@ -253,7 +274,7 @@ export default async function AdminCustomerDetailPage({
               open an order to use secure reveal when authorized.
             </p>
           </div>
-          {detail.localOrderCount > 0 ? (
+          {canViewOrders && detail.localOrderCount > 0 ? (
             <Link
               href={`/admin/orders?userId=${encodeURIComponent(detail.id)}`}
               className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
@@ -325,14 +346,16 @@ export default async function AdminCustomerDetailPage({
                     <dd className="inline">{order.iccidMasked}</dd>
                   </div>
                 </dl>
-                <p className="mt-3">
-                  <Link
-                    href={`/admin/orders/${encodeURIComponent(order.id)}`}
-                    className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-                  >
-                    View Order
-                  </Link>
-                </p>
+                {canViewOrders ? (
+                  <p className="mt-3">
+                    <Link
+                      href={`/admin/orders/${encodeURIComponent(order.id)}`}
+                      className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                    >
+                      View Order
+                    </Link>
+                  </p>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -348,7 +371,7 @@ export default async function AdminCustomerDetailPage({
               a wallet.
             </p>
           </div>
-          {wallet?.accountActive ? (
+          {canAdjustWallet && wallet?.accountActive ? (
             <div className="flex min-w-0 flex-col items-stretch gap-2 sm:items-end">
               <div className="flex flex-wrap gap-2">
                 <Link
@@ -456,7 +479,7 @@ export default async function AdminCustomerDetailPage({
                           {row.notificationLabel}
                         </p>
                       ) : null}
-                      {row.relatedOrderId ? (
+                      {canViewOrders && row.relatedOrderId ? (
                         <p className="mt-2">
                           <Link
                             href={`/admin/orders/${encodeURIComponent(row.relatedOrderId)}`}
@@ -493,12 +516,14 @@ export default async function AdminCustomerDetailPage({
               Read-only top-up attempts. No mark-paid or raw payload controls.
             </p>
           </div>
-          <Link
-            href="/admin/wallet-topups"
-            className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-          >
-            View all top-ups
-          </Link>
+          {canViewTransactions ? (
+            <Link
+              href="/admin/wallet-topups"
+              className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+            >
+              View all top-ups
+            </Link>
+          ) : null}
         </div>
 
         {topupsUnavailable ? (
@@ -534,14 +559,16 @@ export default async function AdminCustomerDetailPage({
                     {row.creditAmountLabel} USD
                   </p>
                 </div>
-                <p className="mt-3">
-                  <Link
-                    href={`/admin/wallet-topups/${encodeURIComponent(row.id)}`}
-                    className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-                  >
-                    View top-up
-                  </Link>
-                </p>
+                {canViewTransactions ? (
+                  <p className="mt-3">
+                    <Link
+                      href={`/admin/wallet-topups/${encodeURIComponent(row.id)}`}
+                      className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+                    >
+                      View top-up
+                    </Link>
+                  </p>
+                ) : null}
               </li>
             ))}
           </ul>
