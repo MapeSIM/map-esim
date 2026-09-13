@@ -1,8 +1,8 @@
 /**
  * Asia regional storefront overlay (pure, no I/O).
- * Temporary % markup and the 500 MB / 3 Days retail pin are disabled so
- * region-asia uses default MAP retail. Does not mutate provider cost,
- * base retail bands, orders, or snapshots at source.
+ * Temporary % markup and the 500 MB / 3 Days retail pin stay disabled.
+ * Only the Asialink 1 GB / 7 Days customer retail pin is applied.
+ * Does not mutate provider cost, base retail bands, orders, or snapshots at source.
  */
 
 import { roundUpToNextCent } from "@/app/lib/pricing/retailPrice";
@@ -21,6 +21,12 @@ export const ASIA_REGIONAL_DESTINATION_CODE = "region-asia";
  */
 export const ASIA_500MB_3DAY_RETAIL_CENTS = 341;
 export const ASIA_500MB_3DAY_RETAIL_USD = ASIA_500MB_3DAY_RETAIL_CENTS / 100;
+
+/**
+ * Customer MAP retail for Region Asia / Asialink / 1 GB / 7 Days.
+ * 849 PKR at the fixed 293 PKR/USD display rate. Provider cost is unchanged.
+ */
+export const ASIA_1GB_7DAY_RETAIL_USD = 849 / 293;
 
 function trimmed(value: string | null | undefined): string {
   return (value ?? "").trim();
@@ -79,6 +85,35 @@ export function isAsia500Mb3DayPackage(offer: VesimOffer): boolean {
   return isFiveHundredMbPackage(offer) && asiaOfferDurationDays(offer) === 3;
 }
 
+function isOneGbPackage(offer: VesimOffer): boolean {
+  if (offer.dataUnlimited === true) return false;
+  if (offer.dataGB === 1) return true;
+  if (typeof offer.dataGB === "number" && Number.isFinite(offer.dataGB)) {
+    return false;
+  }
+  if (offer.dataMB === 1024) return true;
+  return /^1(?:\.0+)?\s*GB$/i.test(trimmed(offer.dataFormatted));
+}
+
+function isAsialinkOffer(offer: VesimOffer): boolean {
+  const parts = [
+    offer.id,
+    offer.offerId,
+    offer.name,
+    offer.network,
+    ...(Array.isArray(offer.networks) ? offer.networks : []),
+  ];
+  return parts.some((value) => /asialink/i.test(trimmed(value)));
+}
+
+export function isAsia1Gb7DayAsialinkPackage(offer: VesimOffer): boolean {
+  return (
+    isAsialinkOffer(offer) &&
+    isOneGbPackage(offer) &&
+    asiaOfferDurationDays(offer) === 7
+  );
+}
+
 function resolveRetailUsd(offer: VesimOffer): number | null {
   if (typeof offer.priceUSD === "number" && Number.isFinite(offer.priceUSD)) {
     return offer.priceUSD;
@@ -123,20 +158,35 @@ export function applyAsiaTemporaryRetailMarkup(
 }
 
 /**
- * Former Asia 500 MB / 3 Days retail pin. Disabled — offer keeps default MAP retail.
+ * Pin customer retail for Region Asia / Asialink / 1 GB / 7 Days only.
+ * Other Asia SKUs and non-Asia destinations keep default MAP retail.
  * Provider cost (`providerPriceUSD`) is preserved unchanged.
  */
 export function applyAsiaRetailOverride(
   offer: VesimOffer,
-  _destination?: string | null
+  destination?: string | null
 ): VesimOffer {
-  void _destination;
-  return offer;
+  if (
+    !isAsiaRegionalDestinationCode(destination) &&
+    !isAsiaRegionalDestinationCode(offer.country)
+  ) {
+    return offer;
+  }
+  if (!isAsia1Gb7DayAsialinkPackage(offer)) return offer;
+
+  const currency = trimmed(offer.currency) || "USD";
+  return {
+    ...offer,
+    priceUSD: ASIA_1GB_7DAY_RETAIL_USD,
+    price: ASIA_1GB_7DAY_RETAIL_USD,
+    displayPrice: ASIA_1GB_7DAY_RETAIL_USD,
+    priceFormatted: formatOfferPrice(ASIA_1GB_7DAY_RETAIL_USD, currency),
+  };
 }
 
 /**
- * Customer storefront Asia retail. Markup and SKU pin are currently disabled,
- * so this returns default MAP retail. Same function is used for catalog and checkout.
+ * Customer storefront Asia retail. Same function is used for catalog and checkout.
+ * Applies only the Asialink 1 GB / 7 Days pin; % markup stays disabled.
  */
 export function applyAsiaCustomerRetailPrice(
   offer: VesimOffer,
@@ -150,7 +200,7 @@ export function applyAsiaCustomerRetailPrice(
 
 /**
  * Customer storefront Asia regional catalog overlay.
- * With markup and SKU pin disabled, region-asia offers keep default MAP retail.
+ * Only the Asialink 1 GB / 7 Days SKU is pinned; other plans keep default MAP retail.
  */
 export function applyAsiaPublicCatalog(
   destination: string,
