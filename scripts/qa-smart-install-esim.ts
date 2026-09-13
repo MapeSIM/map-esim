@@ -215,8 +215,15 @@ function main() {
   assert.match(installSheet, /SMART_INSTALL_BUTTON_LABEL/);
   assert.doesNotMatch(installSheet, /One-Tap Install eSIM/);
 
-  assert.match(partnerPanel, /InstallEsimSheet/);
+  assert.match(partnerPanel, /SmartInstallEsimButton/);
+  assert.match(
+    partnerPanel,
+    /\/api\/partner\/orders\/\$\{encodeURIComponent\(orderId\)\}\/install/
+  );
+  assert.doesNotMatch(partnerPanel, /InstallEsimSheet/);
+  assert.doesNotMatch(partnerPanel, /AppleOneTapInstallButton/);
   assert.doesNotMatch(partnerPanel, /useAppleOneTapInstallState/);
+  assert.doesNotMatch(partnerPanel, /isIphoneSafariBrowser/);
   assert.match(shareView, /SmartInstallEsimButton/);
   assert.doesNotMatch(shareView, /One-Tap Install eSIM/);
 

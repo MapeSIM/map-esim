@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { QrCode } from "lucide-react";
 import Link from "next/link";
 import EsimActionSheet from "@/app/components/install/EsimActionSheet";
-import InstallEsimSheet from "@/app/components/install/InstallEsimSheet";
 import ManualInstallSheet from "@/app/components/install/ManualInstallSheet";
+import SmartInstallEsimButton from "@/app/components/install/SmartInstallEsimButton";
 import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
 import PartnerEsimShareControls from "@/app/components/partner/PartnerEsimShareControls";
 import {
@@ -200,15 +200,16 @@ export default function PartnerEsimInstallPanel({
 
           <div className="min-w-0 space-y-3">
             {data ? (
-              <InstallEsimSheet
+              <SmartInstallEsimButton
+                activationLpa={data.lpa}
+                iphoneOfficialHref={data.iphoneInstallHref}
+                androidOfficialHref={data.androidActivationUrl}
                 qrViewHref={data.qrViewHref}
                 smdpAddress={data.smdpAddress}
                 activationCode={data.activationCode}
-                lpa={data.lpa}
-                iphoneOfficialHref={data.iphoneInstallHref}
-                androidOfficialHref={data.androidActivationUrl}
                 iphoneGuideHref={data.iphoneGuideHref}
                 androidGuideHref={data.androidGuideHref}
+                className={partnerPrimaryCtaClass}
               />
             ) : null}
             <p className="text-sm leading-relaxed text-[var(--text-muted)]">

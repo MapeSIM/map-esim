@@ -189,7 +189,11 @@ async function main() {
     partnerPage,
     /Use the full ICCID above|Secure QR and one-tap install for Partners will follow/
   );
-  assert.match(partnerPanel, /InstallEsimSheet/);
+  assert.match(partnerPanel, /SmartInstallEsimButton/);
+  assert.match(partnerPanel, /activationLpa=\{data\.lpa\}/);
+  assert.match(partnerPanel, /iphoneOfficialHref=\{data\.iphoneInstallHref\}/);
+  assert.match(partnerPanel, /androidOfficialHref=\{data\.androidActivationUrl\}/);
+  assert.doesNotMatch(partnerPanel, /InstallEsimSheet/);
   assert.match(partnerPanel, /Install your eSIM/);
   assert.match(partnerPanel, /View QR Code & Install/);
   assert.match(partnerPanel, /PARTNER_INSTALL_UNAVAILABLE_MESSAGE/);
