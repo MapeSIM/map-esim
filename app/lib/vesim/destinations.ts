@@ -534,3 +534,43 @@ export function destinationPath(
 ): string {
   return `/countries/${destinationRouteId(destination)}`;
 }
+
+/**
+ * Slim destination for public catalog/list client islands.
+ * Omits search aliases and SMS metadata unused by CountriesListing.
+ */
+export function toPublicCatalogDestination(
+  destination: VesimDestination
+): VesimDestination {
+  return {
+    code: destination.code,
+    name: destination.name,
+    flag: destination.flag,
+    offerCount: destination.offerCount,
+    minPrice: destination.minPrice,
+    minPriceFormatted: destination.minPriceFormatted,
+    isPopular: destination.isPopular === true,
+    slug: destination.slug,
+    kind: destination.kind,
+  };
+}
+
+/**
+ * Slim destination for plan listing / modal client islands.
+ */
+export function toPublicPlanDestination(
+  destination: VesimDestination
+): VesimDestination {
+  return {
+    code: destination.code,
+    name: destination.name,
+    flag: destination.flag,
+    regions: destination.regions,
+    offerCount: destination.offerCount,
+    minPrice: destination.minPrice,
+    minPriceFormatted: destination.minPriceFormatted,
+    isPopular: destination.isPopular,
+    slug: destination.slug,
+    kind: destination.kind,
+  };
+}

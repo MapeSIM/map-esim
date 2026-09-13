@@ -285,8 +285,46 @@ export function formatOfferPrice(
 
 /** Public JSON must never include supplier/provider cost fields. */
 export function toPublicVesimOffer(offer: VesimOffer): VesimOffer {
-  const { providerPriceUSD: _providerPriceUSD, ...publicOffer } = offer;
-  return publicOffer;
+  // Keep only fields needed by catalog cards + PlanDetailsModal.
+  // Strip provider cost and unused provider gating hints to shrink RSC/HTML.
+  return {
+    id: offer.id,
+    offerId: offer.offerId,
+    name: offer.name,
+    title: offer.title,
+    country: offer.country,
+    countryName: offer.countryName,
+    countryFlag: offer.countryFlag,
+    dataGB: offer.dataGB,
+    dataMB: offer.dataMB,
+    dataUnlimited: offer.dataUnlimited,
+    dataFormatted: offer.dataFormatted,
+    dataUnit: offer.dataUnit,
+    durationDays: offer.durationDays,
+    validity: offer.validity,
+    validityUnit: offer.validityUnit,
+    network: offer.network,
+    networks: offer.networks,
+    regions: offer.regions,
+    currency: offer.currency,
+    priceUSD: offer.priceUSD,
+    price: offer.price,
+    displayPrice: offer.displayPrice,
+    priceFormatted: offer.priceFormatted,
+    description: offer.description,
+    notes: offer.notes,
+    packageInfo: offer.packageInfo,
+    dataSpeeds: offer.dataSpeeds,
+    roaming: offer.roaming,
+    coveredCountries: offer.coveredCountries,
+    coveredCountriesCount: offer.coveredCountriesCount,
+    voiceMinutes: offer.voiceMinutes,
+    smsCount: offer.smsCount,
+    hasVoiceSms: offer.hasVoiceSms,
+    apn: offer.apn,
+    isRefundable: offer.isRefundable,
+    supportTopUp: offer.supportTopUp,
+  };
 }
 
 export function toPublicVesimOffers(offers: VesimOffer[]): VesimOffer[] {

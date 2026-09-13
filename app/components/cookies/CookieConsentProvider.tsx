@@ -11,12 +11,15 @@ import {
 } from "react";
 import {
   acceptAllConsent,
+  COOKIE_CONSENT_NAME,
   createConsentRecord,
+  parseCookieConsent,
   rejectNonEssentialConsent,
   type CookieConsentRecord,
   type OptionalCookieCategory,
 } from "@/app/lib/cookies/consent";
 import { saveCookieConsentAction } from "@/app/lib/cookies/consentActions";
+import { readBrowserCookie } from "@/app/lib/cookies/browserCookie";
 import {
   installPreferenceStorageGuard,
   setPreferencePersistenceAllowed,
@@ -70,6 +73,16 @@ export default function CookieConsentProvider({
   const [bannerVisible, setBannerVisible] = useState(!initialConsent);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [pending, setPending] = useState(false);
+
+  // Public layout is cacheable (no cookies() on the server). Rehydrate consent
+  // from the first-party cookie after mount so returning visitors keep choices.
+  useEffect(() => {
+    if (initialConsent) return;
+    const stored = parseCookieConsent(readBrowserCookie(COOKIE_CONSENT_NAME));
+    if (!stored) return;
+    setConsent(stored);
+    setBannerVisible(false);
+  }, [initialConsent]);
 
   // Keep the storage guard in sync after mount (never touch window during render).
   useEffect(() => {

@@ -42,6 +42,8 @@ function main() {
   assert.match(listing, /parsePublicDestinations/);
   assert.match(listing, /shouldAcceptPublicDestinationCatalog/);
   assert.match(listing, /fetch\(["'`]\/api\/vesim\/destinations/);
+  // Trusted SSR catalog skips the duplicate client refetch.
+  assert.match(listing, /initialSource === ["']catalog["']/);
   assert.doesNotMatch(listing, /normalizeDestinations\(/);
   assert.doesNotMatch(listing, /getBrokerToken|VESIM_PASSWORD|providerPriceUSD/);
   assert.match(listing, /Keep last good catalog/);

@@ -3,6 +3,7 @@ import { countries as staticCountries } from "@/app/data/countries";
 import {
   retailMinFromProviderStartingPrice,
   slugifyDestination,
+  toPublicCatalogDestination,
   type DestinationCatalogSource,
   type VesimDestination,
 } from "@/app/lib/vesim/destinations";
@@ -40,14 +41,20 @@ async function loadInitialCatalog(): Promise<{
   try {
     const destinations = await fetchPublicDestinationCatalog();
     if (destinations.length > 0) {
-      return { destinations, source: "catalog" };
+      return {
+        destinations: destinations.map(toPublicCatalogDestination),
+        source: "catalog",
+      };
     }
   } catch {
     // Provider/cache failures must not blank the listing.
   }
 
   // Static marketing list only when no trusted catalog exists at all.
-  return { destinations: staticFallbackDestinations(), source: "static" };
+  return {
+    destinations: staticFallbackDestinations().map(toPublicCatalogDestination),
+    source: "static",
+  };
 }
 
 export default async function CountriesPage() {

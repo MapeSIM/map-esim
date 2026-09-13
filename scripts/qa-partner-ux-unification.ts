@@ -79,10 +79,15 @@ function main() {
   assert.match(navbar, /partner\?/);
   assert.match(navbar, /\/partner\/wallet/);
   assert.match(navbar, /\/partner\/orders/);
-  assert.match(rootLayout, /coerceAppRole/);
+  const navbarShell = read("app/components/NavbarShell.tsx");
+  assert.match(navbarShell, /coerceAppRole/);
   assert.doesNotMatch(rootLayout, /getPartnerPortalSummary/);
   assert.doesNotMatch(rootLayout, /getCustomerWalletSummary/);
-  assert.match(rootLayout, /partnerNav|customerNav/);
+  assert.match(navbarShell, /partner|customer/);
+  assert.match(navbarShell, /walletBalanceLabel:\s*null/);
+  assert.match(rootLayout, /NavbarShell/);
+  assert.doesNotMatch(rootLayout, /await auth\(/);
+  assert.doesNotMatch(rootLayout, /from ["']next\/headers["']/);
   assert.match(accountPage, /AccountActionRow/);
   assert.match(catalogRead, /partnerCatalogOfferForbiddenKeys|discountBps|providerCost/);
   assert.match(buyPage, /buyPartnerEsim|listPartnerCatalogOffers|requireRole\(["']PARTNER["']\)/);

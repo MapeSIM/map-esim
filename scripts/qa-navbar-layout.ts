@@ -16,12 +16,21 @@ function read(rel: string): string {
 }
 
 function main() {
-  const navbar = read("app/components/Navbar.tsx");
   const layout = read("app/layout.tsx");
+  const navbar = read("app/components/Navbar.tsx");
+  const shell = read("app/components/NavbarShell.tsx");
   const pkg = read("package.json");
 
   console.log("1) Shared navbar only + order preserved");
-  assert.match(layout, /import Navbar from ["']\.\/components\/Navbar["']/);
+  assert.match(layout, /import NavbarShell from ["']\.\/components\/NavbarShell["']/);
+  assert.match(layout, /NavbarShell/);
+  assert.match(shell, /from ["']\.\/Navbar["']/);
+  assert.match(shell, /\/api\/auth\/session/);
+  assert.match(shell, /walletBalanceLabel:\s*null/);
+  assert.match(shell, /coerceAppRole|navAuthLink/);
+  assert.doesNotMatch(layout, /await auth\(/);
+  assert.doesNotMatch(layout, /getServerCookieConsent/);
+  assert.doesNotMatch(layout, /from ["']next\/headers["']/);
   assert.match(navbar, /label: "Home"/);
   assert.match(navbar, /label: "Pakistan"/);
   assert.match(navbar, /label: "Destinations"/);

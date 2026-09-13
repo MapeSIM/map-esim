@@ -3,7 +3,6 @@
  * Does not call VeSIM or mutate data.
  */
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -13,12 +12,8 @@ function read(rel: string): string {
   return readFileSync(join(root, rel), "utf8");
 }
 
-function readHead(rel: string): string {
-  return execSync(`git show "HEAD:${rel}"`, { encoding: "utf8", cwd: root });
-}
-
 function main() {
-  const page = readHead("app/countries/[id]/page.tsx");
+  const page = read("app/countries/[id]/page.tsx");
   const listing = read("app/components/plans/PlansListing.tsx");
   const layout = read("app/countries/[id]/layout.tsx");
   const offersApi = read("app/api/vesim/offers/route.ts");
@@ -28,6 +23,8 @@ function main() {
   assert.match(page, /fetchPublicDestinationCatalog/);
   assert.match(page, /fetchPublicOffersForCountry/);
   assert.match(page, /toPublicVesimOffers/);
+  assert.match(page, /toPublicPlanDestination/);
+  assert.match(page, /earlyOffersPromise|earlyOfferCodeHint/);
   assert.match(page, /loading=\{false\}/);
   assert.doesNotMatch(page, /fetch\(\s*["'`]\/api\/vesim\//);
   assert.doesNotMatch(page, /useEffect\s*\(/);
@@ -39,6 +36,7 @@ function main() {
   assert.doesNotMatch(offersApi, /fetchOffersForCountry\(/);
   assert.match(listing, /^["']use client["']/m);
   assert.match(listing, /useCurrency/);
+  assert.match(listing, /dynamic\(/);
 
   // Purchase validation must stay on the live no-store offer fetch.
   const server = read("app/lib/vesim/server.ts");

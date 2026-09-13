@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { useCookieConsent } from "@/app/components/cookies/CookieConsentProvider";
+import { readBrowserCookie } from "@/app/lib/cookies/browserCookie";
 import {
   DEFAULT_CURRENCY,
   FALLBACK_USD_RATES,
@@ -18,6 +19,10 @@ import {
 } from "@/app/lib/currency/currencies";
 import { formatMoney, type CurrencyRates } from "@/app/lib/currency/format";
 import { setCurrencyPreferenceAction } from "@/app/lib/cookies/preferenceActions";
+import {
+  CURRENCY_PREFERENCE_COOKIE,
+  parseCurrencyPreferenceCookie,
+} from "@/app/lib/cookies/preferenceCookies";
 import {
   CURRENCY_RESET_EVENT,
   PREFERENCES_GRANTED_EVENT,
@@ -49,10 +54,21 @@ export function CurrencyProvider({
     useState<CurrencyCode>(initialCurrency);
   const [rates, setRates] = useState<CurrencyRates>(FALLBACK_USD_RATES);
   const currencyRef = useRef(currency);
+  const hydratedPreference = useRef(false);
 
   useEffect(() => {
     currencyRef.current = currency;
   }, [currency]);
+
+  // Cacheable public shell cannot read preference cookies on the server.
+  useEffect(() => {
+    if (!persistPreferences || hydratedPreference.current) return;
+    hydratedPreference.current = true;
+    const stored = parseCurrencyPreferenceCookie(
+      readBrowserCookie(CURRENCY_PREFERENCE_COOKIE)
+    );
+    if (stored) setCurrencyState(stored);
+  }, [persistPreferences]);
 
   useEffect(() => {
     let cancelled = false;

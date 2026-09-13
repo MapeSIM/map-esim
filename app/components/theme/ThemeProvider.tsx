@@ -10,10 +10,13 @@ import {
   type ReactNode,
 } from "react";
 import { useCookieConsent } from "@/app/components/cookies/CookieConsentProvider";
+import { readBrowserCookie } from "@/app/lib/cookies/browserCookie";
 import { setThemePreferenceAction } from "@/app/lib/cookies/preferenceActions";
 import {
   DEFAULT_THEME,
   isThemePreference,
+  parseThemePreferenceCookie,
+  THEME_PREFERENCE_COOKIE,
   type ThemePreference,
 } from "@/app/lib/cookies/preferenceCookies";
 
@@ -62,9 +65,20 @@ export default function ThemeProvider({
 
   const [theme, setThemeState] = useState<ThemePreference>(initialTheme);
   const [systemTheme, setSystemTheme] = useState<"dark" | "light">("dark");
+  const [hydratedPreference, setHydratedPreference] = useState(false);
 
   const resolvedTheme: "dark" | "light" =
     theme === "system" ? systemTheme : theme;
+
+  // Cacheable public shell cannot read preference cookies on the server.
+  useLayoutEffect(() => {
+    if (!persistPreferences || hydratedPreference) return;
+    const stored = parseThemePreferenceCookie(
+      readBrowserCookie(THEME_PREFERENCE_COOKIE)
+    );
+    setHydratedPreference(true);
+    if (stored) setThemeState(stored);
+  }, [persistPreferences, hydratedPreference]);
 
   useLayoutEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");

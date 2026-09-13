@@ -8,6 +8,7 @@ import {
   findRelatedRegionalDestination,
   retailMinFromProviderStartingPrice,
   slugifyDestination,
+  toPublicPlanDestination,
   withLowestOfferRetailMinPrice,
 } from "@/app/lib/vesim/destinations";
 import {
@@ -78,6 +79,22 @@ async function loadPublicOffers(countryCode: string): Promise<{
   }
 }
 
+function sameDestinationCode(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+/** Best-effort offer code hint so catalog + offers can load in parallel. */
+function earlyOfferCodeHint(
+  id: string,
+  fallback: VesimDestination | undefined
+): string | null {
+  if (fallback?.code) return fallback.code.trim();
+  const key = id.trim().toLowerCase();
+  if (key === "global" || key.startsWith("region-")) return key;
+  if (/^[a-z]{2}$/i.test(key)) return key.toUpperCase();
+  return null;
+}
+
 export default async function CountryDetailPage({
   params,
 }: CountryDetailPageProps) {
@@ -89,7 +106,11 @@ export default async function CountryDetailPage({
     notFound();
   }
 
-  const destinations = await loadPublicDestinations();
+  const earlyCode = earlyOfferCodeHint(id, fallbackDestination);
+  const destinationsPromise = loadPublicDestinations();
+  const earlyOffersPromise = earlyCode ? loadPublicOffers(earlyCode) : null;
+
+  const destinations = await destinationsPromise;
   const countryNames: Record<string, string> = {};
   for (const item of destinations) {
     if (item.kind === "country") {
@@ -109,11 +130,20 @@ export default async function CountryDetailPage({
       ? findRelatedRegionalDestination(matched, destinations) || null
       : null;
 
-  const { offers, error } = await loadPublicOffers(matched.code.trim());
-  const destination = withLowestOfferRetailMinPrice(
-    { ...matched, offerCount: offers.length },
-    offers
+  const { offers, error } =
+    earlyOffersPromise && sameDestinationCode(matched.code, earlyCode || "")
+      ? await earlyOffersPromise
+      : await loadPublicOffers(matched.code.trim());
+
+  const destination = toPublicPlanDestination(
+    withLowestOfferRetailMinPrice(
+      { ...matched, offerCount: offers.length },
+      offers
+    )
   );
+  const publicRelatedRegional = relatedRegional
+    ? toPublicPlanDestination(relatedRegional)
+    : null;
 
   return (
     <PlansListing
@@ -122,7 +152,7 @@ export default async function CountryDetailPage({
       loading={false}
       error={error}
       countryNames={countryNames}
-      relatedRegional={relatedRegional}
+      relatedRegional={publicRelatedRegional}
     >
       <CountrySeoContent destination={destination} offers={offers} />
     </PlansListing>

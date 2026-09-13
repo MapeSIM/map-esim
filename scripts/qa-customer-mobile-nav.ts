@@ -132,13 +132,16 @@ function main() {
   console.log("PASS profile_trust_guidance");
 
   // E) Layout wires lightweight customer identity for the drawer (no wallet aggregates).
-  assert.match(layout, /Navbar/);
+  const shell = read("app/components/NavbarShell.tsx");
+  assert.match(layout, /NavbarShell/);
   assert.doesNotMatch(layout, /getCustomerWalletSummary/);
   assert.doesNotMatch(layout, /getPartnerPortalSummary/);
-  assert.match(layout, /customer=\{customerNav\}|customer=\{customerNav\}/);
-  assert.match(layout, /customerNav/);
-  assert.match(layout, /walletBalanceLabel:\s*null/);
+  assert.doesNotMatch(layout, /await auth\(/);
+  assert.doesNotMatch(layout, /from ["']next\/headers["']/);
+  assert.match(shell, /customer|partner/);
+  assert.match(shell, /walletBalanceLabel:\s*null/);
   assert.doesNotMatch(layout, /decryptIccid|fetchBrokerOrderPayload/);
+  assert.doesNotMatch(shell, /getCustomerWalletSummary|getPartnerPortalSummary/);
   console.log("PASS layout_customer_props_safe");
 
   assert.match(pkg, /"qa:customer-mobile-nav"/);

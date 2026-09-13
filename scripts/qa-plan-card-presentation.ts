@@ -386,6 +386,7 @@ function main() {
     "30 days\n12 countries covered\nOrange"
   );
   assert.match(listing, /PlanDetailsModal/);
+  assert.match(listing, /dynamic\(/);
   console.log("   ok");
 
   console.log("6) Voice/SMS metadata on cards when available (existing fields only)");

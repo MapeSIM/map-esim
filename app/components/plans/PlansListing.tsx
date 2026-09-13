@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
@@ -22,7 +23,6 @@ import {
 } from "@/app/lib/vesim/destinationPresentation";
 import { countriesListingHrefFromPlanParams } from "@/app/lib/vesim/countriesListingReturn";
 import { PAKISTAN_FLAG_PUBLIC_PATH } from "@/app/lib/seo/siteGraph";
-import PlanDetailsModal from "@/app/components/plans/PlanDetailsModal";
 import SortSelect from "@/app/components/plans/SortSelect";
 import { useCurrency } from "@/app/components/currency/CurrencyProvider";
 import {
@@ -49,6 +49,11 @@ import {
   planCardLineLabel,
   planCardSecondaryLines,
 } from "@/app/lib/plans/planOfferPresentation";
+
+const PlanDetailsModal = dynamic(
+  () => import("@/app/components/plans/PlanDetailsModal"),
+  { ssr: false }
+);
 
 type PlansListingProps = {
   destination: VesimDestination;
@@ -860,15 +865,17 @@ function PlansListingContent({
 
       {children}
 
-      <PlanDetailsModal
-        offer={selectedOffer}
-        destination={destination}
-        countryNames={countryNames}
-        onClose={() => setSelectedOffer(null)}
-        coverageFocused={isRegionalOrGlobal}
-        checkoutHref={resolveCheckoutHref}
-        purchaseTrustLine={purchaseTrustLine}
-      />
+      {selectedOffer ? (
+        <PlanDetailsModal
+          offer={selectedOffer}
+          destination={destination}
+          countryNames={countryNames}
+          onClose={() => setSelectedOffer(null)}
+          coverageFocused={isRegionalOrGlobal}
+          checkoutHref={resolveCheckoutHref}
+          purchaseTrustLine={purchaseTrustLine}
+        />
+      ) : null}
     </main>
   );
 }

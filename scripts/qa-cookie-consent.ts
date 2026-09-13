@@ -153,9 +153,19 @@ function main() {
   assert.equal(layoutSrc.includes("mapesim-clear-optional-prefs"), false);
   assert.equal(layoutSrc.includes("<script"), false);
   assert.equal(layoutSrc.includes("beforeInteractive"), false);
-  assert.match(layoutSrc, /resolveServerThemePreference/);
-  assert.match(layoutSrc, /resolveServerCurrencyPreference/);
   assert.match(layoutSrc, /themePreferenceToHtmlClass/);
+  assert.match(layoutSrc, /DEFAULT_THEME/);
+  assert.doesNotMatch(layoutSrc, /await auth\(/);
+  assert.doesNotMatch(layoutSrc, /getServerCookieConsent/);
+  assert.doesNotMatch(layoutSrc, /from ["']next\/headers["']/);
+  assert.match(layoutSrc, /NavbarShell/);
+  // Consent/theme/currency rehydrate client-side so public HTML stays cacheable.
+  const consentProviderSrc = readFileSync(
+    join(process.cwd(), "app/components/cookies/CookieConsentProvider.tsx"),
+    "utf8"
+  );
+  assert.match(consentProviderSrc, /readBrowserCookie|COOKIE_CONSENT_NAME/);
+  assert.match(consentProviderSrc, /parseCookieConsent/);
   console.log("PASS layout_no_preference_cleanup_script");
 
   const syncSrc = readFileSync(

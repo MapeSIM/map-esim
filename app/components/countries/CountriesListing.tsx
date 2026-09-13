@@ -369,6 +369,9 @@ function CountriesListingContent({
   }
 
   useEffect(() => {
+    // SSR already seeded a trusted provider catalog — skip duplicate API work.
+    if (initialSource === "catalog") return;
+
     let cancelled = false;
 
     async function refreshDestinations() {
@@ -406,7 +409,7 @@ function CountriesListingContent({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialSource]);
 
   const filteredDestinations = useMemo(() => {
     const query = search.trim().toLowerCase();

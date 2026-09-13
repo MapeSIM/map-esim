@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import "./globals.css";
-import Navbar from "./components/Navbar";
+import NavbarShell from "./components/NavbarShell";
 import Footer from "./components/Footer";
 import CookieConsentProvider from "./components/cookies/CookieConsentProvider";
 import PreferenceStorageSync from "./components/cookies/PreferenceStorageSync";
@@ -10,17 +9,9 @@ import JsonLd from "./components/seo/JsonLd";
 import ThemeProvider from "./components/theme/ThemeProvider";
 import WhatsAppSupportButton from "./components/support/WhatsAppSupportButton";
 import HideOnShare from "./components/share/HideOnShare";
-import { auth } from "@/auth";
-import { coerceAppRole } from "@/app/lib/auth/appRole";
-import { navAuthLink } from "@/app/lib/auth/redirects";
 import { BRAND_NAME, BRAND_SITE_URL, BRAND_TAGLINE } from "@/app/lib/brand";
-import type { NavbarCustomerSummary } from "./components/Navbar";
-import { getServerCookieConsent } from "@/app/lib/cookies/consentActions";
 import {
-  CURRENCY_PREFERENCE_COOKIE,
-  resolveServerCurrencyPreference,
-  resolveServerThemePreference,
-  THEME_PREFERENCE_COOKIE,
+  DEFAULT_THEME,
   themePreferenceToHtmlClass,
 } from "@/app/lib/cookies/preferenceCookies";
 import {
@@ -51,57 +42,18 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+/**
+ * Public shell intentionally avoids server session and request-cookie reads so
+ * marketing and catalog routes can use ISR/CDN caching. Session, consent, and
+ * preference values are rehydrated in client islands (NavbarShell,
+ * CookieConsentProvider, theme/currency providers).
+ */
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await auth();
-  const initialCookieConsent = await getServerCookieConsent();
-  const initialPreferencesAllowed = Boolean(
-    initialCookieConsent?.preferences
-  );
-
-  const jar = await cookies();
-  const initialTheme = resolveServerThemePreference(
-    initialPreferencesAllowed,
-    jar.get(THEME_PREFERENCE_COOKIE)?.value
-  );
-  const initialCurrency = resolveServerCurrencyPreference(
-    initialPreferencesAllowed,
-    jar.get(CURRENCY_PREFERENCE_COOKIE)?.value
-  );
-  const htmlThemeClass = themePreferenceToHtmlClass(initialTheme);
-
-  const sessionRole = session?.user?.id
-    ? coerceAppRole(session.user.role)
-    : null;
-  const { href: authHref, label: authLabel } = navAuthLink({
-    userId: session?.user?.id,
-    role: sessionRole,
-  });
-
-  // Lightweight nav identity only — avoid wallet/partner portal aggregates on
-  // every public page. Balances remain available on account/partner surfaces.
-  let customerNav: NavbarCustomerSummary | null = null;
-  let partnerNav: NavbarCustomerSummary | null = null;
-  if (sessionRole === "CUSTOMER" && session?.user?.id) {
-    customerNav = {
-      name: (session.user.name ?? "").trim() || "Customer",
-      email: (session.user.email ?? "").trim(),
-      walletBalanceLabel: null,
-      walletCurrency: "USD",
-    };
-  }
-
-  if (sessionRole === "PARTNER" && session?.user?.id) {
-    partnerNav = {
-      name: (session.user.name ?? "").trim() || "Partner",
-      email: (session.user.email ?? "").trim(),
-      walletBalanceLabel: null,
-      walletCurrency: "USD",
-    };
-  }
+  const htmlThemeClass = themePreferenceToHtmlClass(DEFAULT_THEME);
 
   const siteGraph = {
     "@context": "https://schema.org",
@@ -112,20 +64,15 @@ export default async function RootLayout({
     <html lang="en" className={htmlThemeClass} suppressHydrationWarning>
       <body>
         <CookieConsentProvider
-          initialConsent={initialCookieConsent}
-          initialPreferencesAllowed={initialPreferencesAllowed}
+          initialConsent={null}
+          initialPreferencesAllowed={false}
         >
-          <ThemeProvider initialTheme={initialTheme}>
+          <ThemeProvider>
             <PreferenceStorageSync />
-            <CurrencyProvider initialCurrency={initialCurrency}>
+            <CurrencyProvider>
               <HideOnShare>
                 <JsonLd data={siteGraph} />
-                <Navbar
-                  authHref={authHref}
-                  authLabel={authLabel}
-                  customer={customerNav}
-                  partner={partnerNav}
-                />
+                <NavbarShell />
               </HideOnShare>
               {children}
               <HideOnShare>
