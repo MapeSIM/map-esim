@@ -1,8 +1,8 @@
 /**
- * Temporary Asia regional storefront retail overlay (pure, no I/O).
- * Applies a reversible % markup on top of existing MAP retail for region-asia only,
- * plus an optional per-SKU customer retail pin.
- * Does not mutate provider cost, base retail bands, orders, or snapshots at source.
+ * Asia regional storefront overlay (pure, no I/O).
+ * Temporary % markup and the 500 MB / 3 Days retail pin are disabled so
+ * region-asia uses default MAP retail. Does not mutate provider cost,
+ * base retail bands, orders, or snapshots at source.
  */
 
 import { roundUpToNextCent } from "@/app/lib/pricing/retailPrice";
@@ -12,13 +12,12 @@ import {
 } from "@/app/lib/vesim/offers";
 
 /** Set to 0 to disable — restores exact base MAP retail automatically. */
-export const ASIA_TEMPORARY_RETAIL_MARKUP_PERCENT = 45;
+export const ASIA_TEMPORARY_RETAIL_MARKUP_PERCENT = 0;
 
 export const ASIA_REGIONAL_DESTINATION_CODE = "region-asia";
 
 /**
- * Customer MAP retail for Region Asia / 500 MB / 3 Days.
- * $3.41 × 293 PKR = 999.13 → displays as Rs 999. Provider cost is unchanged.
+ * Former Asia 500 MB / 3 Days pin. Not applied — that SKU uses default MAP retail.
  */
 export const ASIA_500MB_3DAY_RETAIL_CENTS = 341;
 export const ASIA_500MB_3DAY_RETAIL_USD = ASIA_500MB_3DAY_RETAIL_CENTS / 100;
@@ -124,34 +123,20 @@ export function applyAsiaTemporaryRetailMarkup(
 }
 
 /**
- * Pin customer retail for Asia 500 MB / 3 Days only.
+ * Former Asia 500 MB / 3 Days retail pin. Disabled — offer keeps default MAP retail.
  * Provider cost (`providerPriceUSD`) is preserved unchanged.
  */
 export function applyAsiaRetailOverride(
   offer: VesimOffer,
-  destination?: string | null
+  _destination?: string | null
 ): VesimOffer {
-  if (
-    !isAsiaRegionalDestinationCode(destination) &&
-    !isAsiaRegionalDestinationCode(offer.country)
-  ) {
-    return offer;
-  }
-  if (!isAsia500Mb3DayPackage(offer)) return offer;
-
-  const currency = trimmed(offer.currency) || "USD";
-  return {
-    ...offer,
-    priceUSD: ASIA_500MB_3DAY_RETAIL_USD,
-    price: ASIA_500MB_3DAY_RETAIL_USD,
-    displayPrice: ASIA_500MB_3DAY_RETAIL_USD,
-    priceFormatted: formatOfferPrice(ASIA_500MB_3DAY_RETAIL_USD, currency),
-  };
+  void _destination;
+  return offer;
 }
 
 /**
- * Customer storefront Asia retail: temporary regional markup, then SKU pin.
- * Same function is used for catalog cards and checkout verification.
+ * Customer storefront Asia retail. Markup and SKU pin are currently disabled,
+ * so this returns default MAP retail. Same function is used for catalog and checkout.
  */
 export function applyAsiaCustomerRetailPrice(
   offer: VesimOffer,
@@ -165,8 +150,7 @@ export function applyAsiaCustomerRetailPrice(
 
 /**
  * Customer storefront Asia regional catalog overlay.
- * Standard and Unlimited plans on region-asia receive the temporary markup.
- * Asia 500 MB / 3 Days is pinned to the customer retail override.
+ * With markup and SKU pin disabled, region-asia offers keep default MAP retail.
  */
 export function applyAsiaPublicCatalog(
   destination: string,
