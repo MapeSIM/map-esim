@@ -1,12 +1,12 @@
 /**
  * Simpaisa webhook signature placeholder (pure — no I/O).
  *
- * Official docs require postback signature verification, but the merchant-
- * specific signing algorithm and secret have NOT been provided yet.
+ * Official PK wallet Pay-In callback samples do not include a signature field.
  * Do NOT invent or claim HMAC-SHA256 (or any other algorithm) as Simpaisa's.
+ * Wallet postbacks are Inquire triggers only until an official wallet
+ * signature contract is documented and implemented here.
  *
- * isSimpaisaWebhookSignatureContractAvailable() remains false until the
- * official algorithm is implemented from merchant docs.
+ * isSimpaisaWebhookSignatureContractAvailable() remains false.
  */
 import { isSimpaisaWebhookSignatureContractAvailable } from "@/app/lib/payments/simpaisaPolicy";
 

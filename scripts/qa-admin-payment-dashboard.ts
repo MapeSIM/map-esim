@@ -100,8 +100,9 @@ function main() {
   assert.match(hub, /never marks a payment paid/i);
   assert.match(detail, /never fund or mark\s+paid/i);
   assert.doesNotMatch(service, /allowProduction:\s*true/);
-  assert.match(simpaisaConfig, /allowProduction:\s*false/);
-  console.log("PASS no_fund_mark_paid_or_production_simpaisa");
+  assert.match(simpaisaConfig, /allowProduction:\s*true/);
+  assert.doesNotMatch(simpaisaConfig, /allowProduction:\s*false/);
+  console.log("PASS no_fund_mark_paid_and_simpaisa_production_allowed");
 
   assert.match(
     webhooksLib,

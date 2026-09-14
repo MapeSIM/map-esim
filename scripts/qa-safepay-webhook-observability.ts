@@ -192,7 +192,10 @@ function main() {
   assert.doesNotMatch(alertShared, /PAYMENT_WEBHOOK_NOT_IMPLEMENTED/);
   assert.match(alerts, /PAYMENT_WEBHOOK_SECRET_NOT_CONFIGURED/);
   assert.match(alertShared, /PAYMENT_WEBHOOK_SECRET_NOT_CONFIGURED/);
-  assert.match(alerts, /signature verification is implemented/);
+  // Safepay HMAC is implemented; status is secret presence (health shared).
+  // Simpaisa wallet Pay-In callbacks do not invent HMAC — Inquire is authoritative.
+  assert.match(healthShared, /Webhook HMAC verification is implemented/);
+  assert.match(alerts, /Simpaisa payin webhook does not require HMAC/);
   assert.doesNotMatch(health, /return process\.env\.SAFEPAY_WEBHOOK_SECRET/);
   console.log("PASS admin_webhook_health_copy_corrected");
 

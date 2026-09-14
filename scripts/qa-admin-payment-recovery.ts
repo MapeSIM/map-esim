@@ -186,7 +186,8 @@ function main() {
   assert.doesNotMatch(page, /Mark paid|mark paid|Mark Paid/i);
   assert.doesNotMatch(service, /allowProduction:\s*true/);
   assert.doesNotMatch(shared, /allowProduction:\s*true/);
-  assert.match(simpaisaConfig, /allowProduction:\s*false/);
+  assert.match(simpaisaConfig, /allowProduction:\s*true/);
+  assert.doesNotMatch(simpaisaConfig, /allowProduction:\s*false/);
   assert.doesNotMatch(service, /requestRefund\(/);
   assert.doesNotMatch(page, /requestRefund\(/);
   assert.doesNotMatch(service, /replayWebhook|webhookReplay|replay.*webhook.*Action/i);

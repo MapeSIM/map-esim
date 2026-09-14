@@ -63,7 +63,8 @@ function envBag(): NodeJS.ProcessEnv {
 /**
  * Resolve Simpaisa adapter config from process.env.
  * Fail-closed when gateway flag is off or credentials/environment invalid.
- * Production remains blocked until explicitly allowed in code.
+ * Production is allowed in code; live traffic still requires Production env
+ * (SIMPAISA_ENVIRONMENT, API base URL, merchant ID, PAYMENT_GATEWAY_*).
  */
 export function resolveSimpaisaAdapterConfig(
   env: NodeJS.ProcessEnv = envBag()
@@ -75,11 +76,14 @@ export function resolveSimpaisaAdapterConfig(
     environmentRaw: env.SIMPAISA_ENVIRONMENT,
     apiBaseUrlRaw: env.SIMPAISA_API_BASE_URL,
     merchantIdRaw: env.SIMPAISA_MERCHANT_ID,
-    allowProduction: false,
+    allowProduction: true,
   });
 }
 
-/** Inquiry credentials after a signed payin postback — independent of checkout enable flag. */
+/**
+ * Inquiry credentials after a wallet payin postback — independent of checkout
+ * enable flag. Postback is a trigger only; Inquire remains authoritative.
+ */
 export function resolveSimpaisaInquiryConfig(
   env: NodeJS.ProcessEnv = envBag()
 ):
@@ -89,7 +93,7 @@ export function resolveSimpaisaInquiryConfig(
     environmentRaw: env.SIMPAISA_ENVIRONMENT,
     apiBaseUrlRaw: env.SIMPAISA_API_BASE_URL,
     merchantIdRaw: env.SIMPAISA_MERCHANT_ID,
-    allowProduction: false,
+    allowProduction: true,
   });
 }
 

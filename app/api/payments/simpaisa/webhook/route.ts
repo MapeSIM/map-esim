@@ -34,18 +34,17 @@ export const runtime = "nodejs";
 /**
  * Simpaisa PK wallet payin postback.
  *
- * Intended callback URL (share with Simpaisa only when ready):
+ * Intended callback URL:
  * https://mapesim.com/api/payments/simpaisa/webhook
  *
- * Sandbox (SIMPAISA_ENVIRONMENT=sandbox):
- * - Unsigned postbacks are accepted as Inquire triggers only.
+ * Wallet Pay-In (sandbox + production):
+ * - Unsigned postbacks are accepted as Inquire triggers only (no invented HMAC).
  * - Pending postbacks are ignored (no Inquire).
  * - Failed/uncertain/confirmed postbacks require authoritative Inquire before apply.
  * - Never fund or release on webhook payload alone.
  *
- * Production:
- * - Fail-closed until Simpaisa provides/approves signature contract.
- * - allowProduction remains false; PAYMENT_GATEWAY_ENABLED must stay off in Production.
+ * Live Production still requires env (SIMPAISA_ENVIRONMENT, API base URL,
+ * merchant ID) and PAYMENT_GATEWAY_* when enabling checkout.
  *
  * Browser return is never authoritative.
  * Never logs raw body, secrets, MSISDN, or card data.
@@ -104,7 +103,9 @@ export async function POST(request: Request) {
   }
 
   const { environment } = inquiryConfig.config;
-  const sandboxUnsigned = isSimpaisaSandboxUnsignedWebhookAllowed(environment);
+  // Wallet Pay-In: unsigned callback is an Inquire trigger only (sandbox + production).
+  const unsignedWalletTrigger =
+    isSimpaisaSandboxUnsignedWebhookAllowed(environment);
 
   if (!isSimpaisaWebhookPostbackAcceptable({ environment })) {
     await observeSimpaisaWebhookDelivery({
@@ -122,7 +123,9 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!sandboxUnsigned) {
+  // Reserved for a future official wallet signature contract only.
+  // Do not invent HMAC while unsignedWalletTrigger is the documented wallet path.
+  if (!unsignedWalletTrigger) {
     const webhookConfig = resolveSimpaisaWebhookConfig();
     if (!webhookConfig.ok) {
       await observeSimpaisaWebhookDelivery({

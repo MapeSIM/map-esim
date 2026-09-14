@@ -1,7 +1,7 @@
 /**
  * Pure Simpaisa PK wallet policy (no secrets, no I/O).
  * Card operators are intentionally omitted — wallet integration only.
- * Official v3 contract: verify + inquire + signed postback.
+ * Official wallet Pay-In: Verify + postback trigger + authoritative Inquire.
  */
 
 import { isPaymentGatewayEnabledFlag } from "./safepayPolicy";
@@ -171,39 +171,36 @@ export type SimpaisaWebhookValidatedConfig = {
 };
 
 /**
- * Production webhook signature algorithm/secret is not yet available from Simpaisa.
- * Production postbacks stay fail-closed (HTTP 503) until this returns true with
- * the official algorithm implemented.
+ * Official wallet Pay-In docs do not document a wallet callback HMAC/signature
+ * algorithm (wallet samples have no signature field). Do not invent one.
+ * Remains false so any future signed path stays explicit and opt-in.
  *
- * Sandbox: merchant confirmed unsigned postbacks are acceptable — see
- * isSimpaisaSandboxUnsignedWebhookAllowed(). Unsigned sandbox triggers still
- * never fund without authoritative Inquire 0000 + field validation.
+ * Unsigned wallet postbacks are accepted as Inquire triggers only — see
+ * isSimpaisaSandboxUnsignedWebhookAllowed(). Never fund without authoritative
+ * Inquire 0000 + field validation.
  */
 export function isSimpaisaWebhookSignatureContractAvailable(): boolean {
   return false;
 }
 
-/** Official sandbox policy: unsigned postbacks allowed as Inquire triggers only. */
+/**
+ * Wallet Pay-In policy (sandbox + production): unsigned postbacks allowed as
+ * Inquire triggers only. Never treat the callback body as payment success.
+ */
 export function isSimpaisaSandboxUnsignedWebhookAllowed(
   environment: SimpaisaEnvironment | null | undefined
 ): boolean {
-  return environment === "sandbox";
+  return environment === "sandbox" || environment === "production";
 }
 
 /**
  * Whether the webhook route may accept the postback body at all.
- * Sandbox → unsigned trigger OK. Production → signature contract required.
+ * Wallet Pay-In: unsigned trigger OK in sandbox and production when env is set.
  */
 export function isSimpaisaWebhookPostbackAcceptable(input: {
   environment: SimpaisaEnvironment | null | undefined;
 }): boolean {
-  if (isSimpaisaSandboxUnsignedWebhookAllowed(input.environment)) {
-    return true;
-  }
-  if (input.environment === "production") {
-    return isSimpaisaWebhookSignatureContractAvailable();
-  }
-  return false;
+  return isSimpaisaSandboxUnsignedWebhookAllowed(input.environment);
 }
 
 export function parseSimpaisaEnvironment(
@@ -369,8 +366,9 @@ function resolveApiBaseUrl(input: {
 }
 
 /**
- * Adapter credentials. Production stays fail-closed until allowProduction.
- * Does not require webhook secret (webhook is independently configured).
+ * Adapter credentials. Production is enabled when allowProduction is true
+ * (Simpaisa checkout/inquiry resolvers pass true). Does not require webhook
+ * secret (wallet postback is independently gated as an Inquire trigger).
  * userKey in API bodies is the MAP payment reference — not an env secret.
  */
 export function validateSimpaisaApiCredentials(input: {
