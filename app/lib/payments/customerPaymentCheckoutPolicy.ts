@@ -8,7 +8,7 @@
  */
 
 /** Flip to false to re-enable customer payment initiation in code. */
-export const CUSTOMER_PAYMENT_CHECKOUT_HARD_DISABLED = true;
+export const CUSTOMER_PAYMENT_CHECKOUT_HARD_DISABLED = false;
 
 export const CUSTOMER_PAYMENT_CHECKOUT_DISABLED_ENV =
   "CUSTOMER_PAYMENT_CHECKOUT_DISABLED";
