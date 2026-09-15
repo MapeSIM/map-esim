@@ -605,6 +605,11 @@ export async function startEsimPurchaseHostedCheckout(
 
   if (canResumeTracker && existingRef) {
     if (attempt.gatewayProvider === PaymentGatewayProvider.SIMPAISA) {
+      // Existing provider ref — do not re-call Verify (no outbound Simpaisa request).
+      console.info("simpaisa_checkout", "RESUME_SKIP_VERIFY", {
+        reusedAttempt,
+        attemptStatus: attempt.status,
+      });
       const resumed = resumeSimpaisaWalletCheckout({ returnPath });
       if (!resumed.ok) {
         throw new EsimPurchaseGatewayCheckoutError(
@@ -679,6 +684,10 @@ export async function startEsimPurchaseHostedCheckout(
 
   let session;
   try {
+    console.info("simpaisa_checkout", "CREATE_SESSION_START", {
+      provider: adapter.provider,
+      isSimpaisa,
+    });
     session = await adapter.createCheckoutSession({
       purpose: "ESIM_PURCHASE",
       customerUserId,

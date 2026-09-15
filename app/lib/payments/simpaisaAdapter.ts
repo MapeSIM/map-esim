@@ -41,24 +41,6 @@ const PUBLIC_UNAVAILABLE =
 const PUBLIC_MISCONFIGURED =
   "Payment gateway configuration is incomplete. Please try again later.";
 
-function absoluteAppUrl(relativePath: string): string {
-  const base = (
-    process.env.APP_BASE_URL ||
-    process.env.AUTH_URL ||
-    process.env.NEXTAUTH_URL ||
-    ""
-  )
-    .trim()
-    .replace(/\/$/, "");
-  if (!base.startsWith("https://") && !base.startsWith("http://")) {
-    throw new SimpaisaHttpError(
-      "INVALID_REQUEST",
-      "Application base URL is not configured."
-    );
-  }
-  return `${base}${relativePath}`;
-}
-
 function merchantUserKey(input: CreateCheckoutSessionInput): string {
   if (input.purpose === "WALLET_TOPUP") return input.localTopupId.trim();
   if (input.purpose === "PARTNER_WALLET_TOPUP") {
@@ -151,8 +133,28 @@ function createSimpaisaAdapter(
     ): Promise<CreateCheckoutSessionResult> {
       const invalid = validateCheckoutInput(input);
       if (invalid) {
+        console.error("simpaisa_adapter", "CREATE_CHECKOUT_REJECTED", {
+          reason: "INVALID_REQUEST",
+          purpose: input.purpose,
+        });
         return { ok: false, code: "INVALID_REQUEST", message: invalid };
       }
+
+      // Relative MAP waiting path — next/navigation redirect() + useActionState
+      // hang on absolute same-origin URLs ("Starting payment…" forever).
+      const waitingPath = assertSafePaymentReturnPath(input.returnPath);
+      let apiHost: string | null = null;
+      try {
+        apiHost = new URL(config.apiBaseUrl).hostname;
+      } catch {
+        apiHost = null;
+      }
+      console.info("simpaisa_adapter", "VERIFY_START", {
+        purpose: input.purpose,
+        environment: config.environment,
+        apiHost,
+        endpoint: "/v2/wallets/transaction/verify",
+      });
 
       try {
         // Non-OTP Verify is not final. Only 0037 is accepted-as-pending; never paid.
@@ -168,12 +170,19 @@ function createSimpaisaAdapter(
           customerMsisdn: input.customerMsisdn!,
         });
 
+        console.info("simpaisa_adapter", "VERIFY_OK", {
+          purpose: input.purpose,
+          environment: config.environment,
+          apiHost,
+          pending: verified.pending,
+          // response code only — never MSISDN, body, or secrets
+          responseCode: verified.responseCode,
+        });
+
         return {
           ok: true,
           provider: "SIMPAISA",
-          checkoutUrl: absoluteAppUrl(
-            assertSafePaymentReturnPath(input.returnPath)
-          ),
+          checkoutUrl: waitingPath,
           providerPaymentRef: verified.providerTransactionId,
           chargeCurrency: SIMPAISA_CHARGE_CURRENCY,
           chargeAmountMinor: input.chargeAmountMinor,
@@ -182,6 +191,12 @@ function createSimpaisaAdapter(
         };
       } catch (error) {
         if (error instanceof SimpaisaHttpError) {
+          console.error("simpaisa_adapter", "VERIFY_FAILED", {
+            purpose: input.purpose,
+            environment: config.environment,
+            apiHost,
+            code: error.code,
+          });
           return {
             ok: false,
             code:
@@ -191,7 +206,11 @@ function createSimpaisaAdapter(
             message: error.message,
           };
         }
-        console.error("simpaisa_adapter", "CREATE_CHECKOUT_FAILED");
+        console.error("simpaisa_adapter", "CREATE_CHECKOUT_FAILED", {
+          purpose: input.purpose,
+          environment: config.environment,
+          apiHost,
+        });
         return {
           ok: false,
           code: "UNAVAILABLE",
@@ -348,19 +367,9 @@ export function resumeSimpaisaWalletCheckout(input: {
     return { ok: false, code: "MISCONFIGURED", message: PUBLIC_MISCONFIGURED };
   }
 
-  try {
-    return { ok: true, checkoutUrl: absoluteAppUrl(returnPath) };
-  } catch (error) {
-    if (error instanceof SimpaisaHttpError) {
-      return {
-        ok: false,
-        code:
-          error.code === "INVALID_REQUEST"
-            ? "INVALID_REQUEST"
-            : "GATEWAY_UNAVAILABLE",
-        message: error.message,
-      };
-    }
-    return { ok: false, code: "GATEWAY_UNAVAILABLE", message: PUBLIC_UNAVAILABLE };
-  }
+  // Relative path — absolute same-origin URLs break useActionState redirect UX.
+  console.info("simpaisa_adapter", "RESUME_WAITING_PAGE", {
+    environment: resolved.config.environment,
+  });
+  return { ok: true, checkoutUrl: returnPath };
 }

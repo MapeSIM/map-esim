@@ -708,6 +708,23 @@ export class SimpaisaHttpClient {
     const url = `${this.config.apiBaseUrl}${path}`;
     let lastStatus: number | null = null;
 
+    // Temporary debug: hostname + path + egress mode only (never URL auth, body, MSISDN).
+    if (path === SIMPAISA_VERIFY_PATH) {
+      let hostname: string | null = null;
+      try {
+        hostname = new URL(this.config.apiBaseUrl).hostname;
+      } catch {
+        hostname = null;
+      }
+      const proxyMode = resolveSimpaisaOutboundProxy().mode;
+      console.info("simpaisa_http", "VERIFY_REQUEST", {
+        hostname,
+        path,
+        environment: this.config.environment,
+        egress: proxyMode === "proxy" ? "proxy" : proxyMode,
+      });
+    }
+
     for (let attempt = 0; attempt < HTTP_MAX_ATTEMPTS; attempt++) {
       let response: Response;
       try {
