@@ -68,6 +68,28 @@ type SimpaisaJson = Record<string, unknown>;
 
 const HTTP_RETRY_DELAYS_MS = [250, 750, 1500] as const;
 const HTTP_MAX_ATTEMPTS = HTTP_RETRY_DELAYS_MS.length + 1;
+/** Per-attempt AbortController timeout for Verify / Inquire / Refund. */
+const SIMPAISA_HTTP_TIMEOUT_MS = 15_000;
+
+function createSimpaisaHttpTimeout(timeoutMs: number): {
+  signal: AbortSignal;
+  clear: () => void;
+} {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+  return {
+    signal: controller.signal,
+    clear: () => clearTimeout(timer),
+  };
+}
+
+function isAbortError(error: unknown): boolean {
+  if (error == null || typeof error !== "object") return false;
+  const name = "name" in error ? String((error as { name: unknown }).name) : "";
+  return name === "AbortError" || name === "TimeoutError";
+}
 
 /** Optional fixed-egress proxy for Simpaisa Verify / Inquire / Refund only. */
 const SIMPAISA_OUTBOUND_PROXY_ENV = "SIMPAISA_OUTBOUND_PROXY_URL";
@@ -727,6 +749,7 @@ export class SimpaisaHttpClient {
 
     for (let attempt = 0; attempt < HTTP_MAX_ATTEMPTS; attempt++) {
       let response: Response;
+      const timeout = createSimpaisaHttpTimeout(SIMPAISA_HTTP_TIMEOUT_MS);
       try {
         const fetchPlan = await buildSimpaisaFetchPlan({
           method,
@@ -737,6 +760,7 @@ export class SimpaisaHttpClient {
           },
           body: JSON.stringify(body),
           cache: "no-store",
+          signal: timeout.signal,
         });
         response =
           fetchPlan.mode === "proxy"
@@ -745,6 +769,27 @@ export class SimpaisaHttpClient {
       } catch (error) {
         if (error instanceof SimpaisaHttpError) {
           throw error;
+        }
+        if (timeout.signal.aborted || isAbortError(error)) {
+          if (path === SIMPAISA_VERIFY_PATH) {
+            let hostname: string | null = null;
+            try {
+              hostname = new URL(this.config.apiBaseUrl).hostname;
+            } catch {
+              hostname = null;
+            }
+            console.error("simpaisa_http", "VERIFY_TIMEOUT", {
+              hostname,
+              path,
+              environment: this.config.environment,
+              timeoutMs: SIMPAISA_HTTP_TIMEOUT_MS,
+            });
+          }
+          this.sandboxTrace(path, body, extraHeaders, lastStatus, null);
+          throw new SimpaisaHttpError(
+            "SIMPAISA_TIMEOUT",
+            "Payment provider timed out. Please try again."
+          );
         }
         if (attempt < HTTP_MAX_ATTEMPTS - 1) {
           await sleep(HTTP_RETRY_DELAYS_MS[attempt] ?? 1500);
@@ -756,6 +801,8 @@ export class SimpaisaHttpClient {
           "UNAVAILABLE",
           "Payment provider unavailable."
         );
+      } finally {
+        timeout.clear();
       }
 
       lastStatus = response.status;
@@ -816,9 +863,12 @@ export class SimpaisaHttpClient {
 }
 
 export class SimpaisaHttpError extends Error {
-  readonly code: "INVALID_REQUEST" | "UNAVAILABLE";
+  readonly code: "INVALID_REQUEST" | "UNAVAILABLE" | "SIMPAISA_TIMEOUT";
 
-  constructor(code: "INVALID_REQUEST" | "UNAVAILABLE", message: string) {
+  constructor(
+    code: "INVALID_REQUEST" | "UNAVAILABLE" | "SIMPAISA_TIMEOUT",
+    message: string
+  ) {
     super(message);
     this.name = "SimpaisaHttpError";
     this.code = code;
