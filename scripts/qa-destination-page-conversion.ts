@@ -143,10 +143,12 @@ function main() {
   );
   assert.doesNotMatch(listing, /offer\.packageInfo/);
   assert.doesNotMatch(listing, /providerPriceUSD/);
-  // Country page still resolves + passes relatedRegional (display wired in listing).
+  // Country page still resolves relatedRegional, maps via toPublicPlanDestination,
+  // then passes publicRelatedRegional into PlansListing (display wired in listing).
   const countryPage = read("app/countries/[id]/page.tsx");
   assert.match(countryPage, /findRelatedRegionalDestination/);
-  assert.match(countryPage, /relatedRegional=\{relatedRegional\}/);
+  assert.match(countryPage, /toPublicPlanDestination\(relatedRegional\)/);
+  assert.match(countryPage, /relatedRegional=\{publicRelatedRegional\}/);
   console.log("PASS listing_conversion_ux");
 
   assert.match(modal, /purchaseTrustLine/);

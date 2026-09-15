@@ -53,12 +53,16 @@ function main() {
   );
   assert.match(navbar, /Affiliates & Partnerships/);
   assert.match(navbar, /HOME_DISCOVERY_CTA_LABEL|Get eSIM/);
-  assert.match(navbar, /href=["']\/countries["']/);
+  assert.match(navbar, /HOME_DISCOVERY_CTA_HREF/);
+  const homeCta = read("app/lib/home/homeConversionSections.ts");
+  assert.match(homeCta, /HOME_DISCOVERY_CTA_HREF\s*=\s*["']\/countries/);
   assert.match(navbar, /authHref|Sign in|Account/);
   assert.doesNotMatch(footer, /label:\s*["']Plans["']/);
   assert.match(footer, /Affiliates & Partnerships/);
   assert.match(plansPage, /fetchPublicDestinationCatalog|PlansDiscovery/);
-  assert.match(sitemap, /path:\s*["']\/plans["']/);
+  // Discovery canonical in sitemap is /countries; /plans page remains as redirect target.
+  assert.match(sitemap, /path:\s*["']\/countries["']/);
+  assert.doesNotMatch(sitemap, /path:\s*["']\/plans["']/);
   assert.match(sitemap, /path:\s*["']\/affiliates-and-partnerships["']/);
   assert.match(tawk, /\/affiliates-and-partnerships/);
   console.log("   ok");

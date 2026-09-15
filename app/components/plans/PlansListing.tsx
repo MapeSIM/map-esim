@@ -864,9 +864,7 @@ function PlansListingContent({
       ) : null}
 
       {children}
-
-      {selectedOffer ? (
-        <PlanDetailsModal
+      <PlanDetailsModal
           offer={selectedOffer}
           destination={destination}
           countryNames={countryNames}
@@ -875,7 +873,6 @@ function PlansListingContent({
           checkoutHref={resolveCheckoutHref}
           purchaseTrustLine={purchaseTrustLine}
         />
-      ) : null}
     </main>
   );
 }

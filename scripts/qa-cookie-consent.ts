@@ -197,7 +197,8 @@ function main() {
   assert.match(preferenceActionsSrc, /clearOptionalPreferenceCookiesAction/);
   console.log("PASS preference_cookie_writes_require_consent");
 
-  // Phase 3C1 order module still server-only / unchanged surface.
+  // Phase 3C1 order module stays server-only and must not couple to cookie prefs.
+  // VeSIM provider helpers/comments in admin orders are intentional — do not ban.
   const ordersSrc = readFileSync(
     join(process.cwd(), "app/lib/admin/orders.ts"),
     "utf8"
@@ -205,7 +206,10 @@ function main() {
   assert.match(ordersSrc, /import "server-only"/);
   assert.match(ordersSrc, /getAdminOrdersPage/);
   assert.match(ordersSrc, /getAdminOrderDetail/);
-  assert.equal(ordersSrc.includes("vesim"), false);
+  assert.doesNotMatch(
+    ordersSrc,
+    /CookieConsent|setThemePreferenceAction|setCurrencyPreferenceAction|clearOptionalPreferenceCookiesAction/
+  );
   console.log("PASS phase3c1_orders_untouched_surface");
 
   const themeProviderSrc = readFileSync(
