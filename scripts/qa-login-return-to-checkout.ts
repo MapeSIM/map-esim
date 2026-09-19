@@ -1,5 +1,6 @@
 /**
  * Offline QA: logged-out package selection → login → return to checkout.
+ * Also covers abandoned checkout review resume + verify-email callback chain.
  * Covers credentials + Google callbackUrl handling and open-redirect rejection.
  * Does not call providers, mutate the database, or touch .env files.
  */
@@ -7,7 +8,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  appendSafeCallbackUrlQuery,
   buildWalletBuyReturnPath,
+  buildWalletBuyReviewReturnPath,
   postSignInPath,
   resolvePostSignInPath,
   safeCallbackPath,
@@ -21,6 +24,7 @@ function read(rel: string): string {
 
 function main() {
   const buyHref = "/account/esim/buy?offerId=offer_abc&country=PK";
+  const reviewHref = "/account/esim/buy/review?purchase=purchase_abc";
   const sameOrigin = "http://localhost:3000";
   const opts = { requestOrigin: sameOrigin };
 
@@ -46,6 +50,59 @@ function main() {
     buyHref
   );
   console.log("PASS package_selection_login_returns_to_checkout");
+
+  // 1b) Abandoned checkout review resume URL preserved through post-login
+  assert.equal(
+    buildWalletBuyReviewReturnPath("purchase_abc"),
+    reviewHref
+  );
+  assert.equal(
+    resolvePostSignInPath("CUSTOMER", reviewHref, opts),
+    reviewHref
+  );
+  assert.equal(
+    resolvePostSignInPath(
+      "CUSTOMER",
+      `${sameOrigin}${reviewHref}`,
+      opts
+    ),
+    reviewHref
+  );
+  assert.equal(
+    safeCallbackPath(`${sameOrigin}${reviewHref}`, "/", opts),
+    reviewHref
+  );
+  assert.equal(
+    buildWalletBuyReviewReturnPath("bad id!!"),
+    "/account/esim/buy/review"
+  );
+  console.log("PASS abandoned_checkout_review_login_return");
+
+  // 1c) verify-email chain keeps callbackUrl (signin ↔ verify ↔ signin)
+  const verifyWithCallback = appendSafeCallbackUrlQuery(
+    "/verify-email?email=a%40b.co",
+    reviewHref,
+    opts
+  );
+  assert.match(
+    verifyWithCallback,
+    /callbackUrl=%2Faccount%2Fesim%2Fbuy%2Freview%3Fpurchase%3Dpurchase_abc/
+  );
+  const signInAfterVerify = appendSafeCallbackUrlQuery(
+    "/signin?verified=1",
+    reviewHref,
+    opts
+  );
+  assert.match(signInAfterVerify, /verified=1/);
+  assert.match(
+    signInAfterVerify,
+    /callbackUrl=%2Faccount%2Fesim%2Fbuy%2Freview%3Fpurchase%3Dpurchase_abc/
+  );
+  assert.equal(
+    appendSafeCallbackUrlQuery("/signin?verified=1", "https://evil.example/x", opts),
+    "/signin?verified=1"
+  );
+  console.log("PASS verify_email_callback_chain");
 
   // 2) Google OAuth path uses the same safe callback normalization
   const googleSignIn = read("app/lib/auth/googleSignInAction.ts");
@@ -91,19 +148,33 @@ function main() {
   assert.equal(safeCallbackPath("", "/", opts), "/");
   console.log("PASS normal_login_default_destination");
 
-  // Wiring: buy page preserves offer context; guest checkout untouched
+  // Wiring: buy + review preserve return; verify-email + layout/middleware
   const buyPage = read("app/account/esim/buy/page.tsx");
+  const reviewPage = read("app/account/esim/buy/review/page.tsx");
   const session = read("app/lib/auth/session.ts");
   const actions = read("app/lib/auth/actions.ts");
   const guestGate = read("app/lib/vesim/guestCheckoutGate.ts");
   const planUtils = read("app/lib/plans/plan-utils.ts");
+  const verifyPage = read("app/verify-email/page.tsx");
+  const otpForm = read("app/components/auth/OtpVerifyForm.tsx");
+  const accountLayout = read("app/account/layout.tsx");
+  const middleware = read("middleware.ts");
 
   assert.match(buyPage, /buildWalletBuyReturnPath/);
   assert.match(buyPage, /requireRole\(\s*"CUSTOMER"/);
+  assert.match(reviewPage, /buildWalletBuyReviewReturnPath/);
+  assert.match(reviewPage, /requireRole\(/);
   assert.match(session, /callbackPath\?:/);
   assert.match(actions, /resolvePostSignInPath\(role, rawCallbackUrl/);
   assert.match(actions, /readRequestOrigin/);
+  assert.match(actions, /appendSafeCallbackUrlQuery/);
+  assert.match(actions, /verifyParams\.set\("callbackUrl"/);
   assert.match(planUtils, /\/account\/esim\/buy\?/);
+  assert.match(verifyPage, /callbackUrl/);
+  assert.match(otpForm, /callbackUrl/);
+  assert.match(accountLayout, /x-map-pathname/);
+  assert.match(accountLayout, /x-map-search/);
+  assert.match(middleware, /x-map-search/);
   assert.match(
     guestGate,
     /process\.env\.ENABLE_GUEST_VESIM_CHECKOUT\s*===\s*"true"/

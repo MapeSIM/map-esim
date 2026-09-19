@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import AccountMenu, {
   type AccountNavLink,
 } from "@/app/components/account/AccountMenu";
+import { safeCallbackPath } from "@/app/lib/auth/redirects";
+import { readRequestOrigin } from "@/app/lib/auth/requestOrigin";
 import { requireSession } from "@/app/lib/auth/session";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
 import { Role } from "@prisma/client";
@@ -17,7 +20,15 @@ export default async function AccountLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await requireSession();
+  const headerStore = await headers();
+  const pathname = headerStore.get("x-map-pathname") || "/account";
+  const search = headerStore.get("x-map-search") || "";
+  const requestOrigin = await readRequestOrigin();
+  const deepLink = `${pathname}${search}`;
+  const callbackPath = safeCallbackPath(deepLink, "/account", {
+    requestOrigin,
+  });
+  const user = await requireSession(callbackPath);
   const links: AccountNavLink[] = [
     { href: "/account", label: "Overview", exact: true },
     { href: "/account/orders", label: "My eSIMs" },

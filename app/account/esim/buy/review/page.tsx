@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import WalletPurchaseConfirmForm from "@/app/components/account/WalletPurchaseConfirmForm";
+import { buildWalletBuyReviewReturnPath } from "@/app/lib/auth/redirects";
 import { requireRole } from "@/app/lib/auth/session";
 import { getWalletPurchaseReview } from "@/app/lib/esim/walletPurchaseRead";
 import { resolveCheckoutBackHref } from "@/app/lib/plans/checkoutBackHref";
@@ -20,9 +21,13 @@ export default async function AccountWalletBuyReviewPage({
 }: {
   searchParams: Promise<{ purchase?: string }>;
 }) {
-  const user = await requireRole("CUSTOMER");
   const query = await searchParams;
   const purchaseId = parsePurchaseId(query.purchase);
+  // Preserve review resume URL across sign-in (abandoned checkout email CTA).
+  const user = await requireRole(
+    "CUSTOMER",
+    buildWalletBuyReviewReturnPath(purchaseId)
+  );
   if (!purchaseId) notFound();
 
   let review: Awaited<ReturnType<typeof getWalletPurchaseReview>>;

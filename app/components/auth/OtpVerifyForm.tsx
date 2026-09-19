@@ -10,6 +10,7 @@ export default function OtpVerifyForm({
   verifyAction,
   resendAction,
   submitLabel = "Verify code",
+  callbackUrl = "",
 }: {
   email: string;
   verifyAction: (
@@ -21,6 +22,8 @@ export default function OtpVerifyForm({
     formData: FormData
   ) => Promise<AuthActionState>;
   submitLabel?: string;
+  /** Safe internal path preserved across verify → sign-in. */
+  callbackUrl?: string;
 }) {
   const [verifyState, verifyFormAction, verifyPending] = useActionState(
     verifyAction,
@@ -41,6 +44,9 @@ export default function OtpVerifyForm({
     <div className="space-y-4">
       <form action={verifyFormAction} className="space-y-4" noValidate>
         <input type="hidden" name="email" value={email} />
+        {callbackUrl ? (
+          <input type="hidden" name="callbackUrl" value={callbackUrl} />
+        ) : null}
         <div>
           <label
             htmlFor="email-display"

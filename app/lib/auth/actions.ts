@@ -22,7 +22,11 @@ import {
 } from "@/app/lib/auth/otp";
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
 import { coerceAppRole } from "@/app/lib/auth/appRole";
-import { resolvePostSignInPath } from "@/app/lib/auth/redirects";
+import {
+  appendSafeCallbackUrlQuery,
+  resolvePostSignInPath,
+  safeCallbackPath,
+} from "@/app/lib/auth/redirects";
 import { getRequestIpKey } from "@/app/lib/auth/requestMeta";
 import { readRequestOrigin } from "@/app/lib/auth/requestOrigin";
 import {
@@ -291,12 +295,19 @@ export async function signinAction(
     return { ok: false, error: "Invalid email or password." };
   }
 
+  const requestOrigin = await readRequestOrigin();
   if (!user.emailVerifiedAt) {
-    redirect(`/verify-email?email=${encodeURIComponent(email)}`);
+    const safeCallback = safeCallbackPath(rawCallbackUrl, "", {
+      requestOrigin,
+    });
+    const verifyParams = new URLSearchParams({ email });
+    if (safeCallback) {
+      verifyParams.set("callbackUrl", safeCallback);
+    }
+    redirect(`/verify-email?${verifyParams.toString()}`);
   }
 
   const role = coerceAppRole(user.role) ?? "CUSTOMER";
-  const requestOrigin = await readRequestOrigin();
   const redirectTo = resolvePostSignInPath(role, rawCallbackUrl, {
     requestOrigin,
   });
@@ -327,7 +338,14 @@ export async function verifyEmailOtpAction(
 ): Promise<AuthActionState> {
   const email = normalizeEmail(String(formData.get("email") || ""));
   const code = String(formData.get("otp") || "").trim();
+  const rawCallbackUrl = String(formData.get("callbackUrl") || "");
   const ip = await getRequestIpKey();
+  const requestOrigin = await readRequestOrigin();
+  const verifiedSignInPath = appendSafeCallbackUrlQuery(
+    "/signin?verified=1",
+    rawCallbackUrl,
+    { requestOrigin }
+  );
 
   const allowed = await rateLimitPair(
     `verify-email:${email}`,
@@ -353,7 +371,7 @@ export async function verifyEmailOtpAction(
   }
 
   if (user.emailVerifiedAt) {
-    redirect("/signin?verified=1");
+    redirect(verifiedSignInPath);
   }
 
   const verified = await verifyEmailOtp({
@@ -390,7 +408,7 @@ export async function verifyEmailOtpAction(
     targetId: user.id,
   });
 
-  redirect("/signin?verified=1");
+  redirect(verifiedSignInPath);
 }
 
 export async function resendSignupOtpAction(

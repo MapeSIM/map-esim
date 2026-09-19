@@ -6,15 +6,31 @@ import {
   verifyEmailOtpAction,
 } from "@/app/lib/auth/actions";
 import { normalizeEmail } from "@/app/lib/auth/email";
+import {
+  appendSafeCallbackUrlQuery,
+  safeCallbackPath,
+} from "@/app/lib/auth/redirects";
+import { readRequestOrigin } from "@/app/lib/auth/requestOrigin";
 
 export default async function VerifyEmailPage({
   searchParams,
 }: {
-  searchParams: Promise<{ email?: string; delivery?: string }>;
+  searchParams: Promise<{
+    email?: string;
+    delivery?: string;
+    callbackUrl?: string;
+  }>;
 }) {
   const params = await searchParams;
   const email = normalizeEmail(params.email || "");
   const deliveryFailed = params.delivery === "failed";
+  const requestOrigin = await readRequestOrigin();
+  const callbackUrl = safeCallbackPath(params.callbackUrl, "", {
+    requestOrigin,
+  });
+  const signInHref = appendSafeCallbackUrlQuery("/signin", callbackUrl, {
+    requestOrigin,
+  });
 
   return (
     <AuthCard
@@ -44,7 +60,7 @@ export default async function VerifyEmailPage({
             </Link>
             {" · "}
             <Link
-              href="/signin"
+              href={signInHref}
               className="font-medium text-[var(--accent-strong)] underline-offset-2 hover:underline"
             >
               Sign in
@@ -57,10 +73,11 @@ export default async function VerifyEmailPage({
             email={email}
             verifyAction={verifyEmailOtpAction}
             resendAction={resendSignupOtpAction}
+            callbackUrl={callbackUrl}
           />
           <p className="mt-4 text-center text-sm text-[var(--text-muted)]">
             <Link
-              href="/signin"
+              href={signInHref}
               className="font-medium text-[var(--accent-strong)] underline-offset-2 hover:underline"
             >
               Back to sign in

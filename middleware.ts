@@ -7,6 +7,8 @@ const { auth } = NextAuth(authConfig);
 export default auth((req) => {
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-map-pathname", req.nextUrl.pathname);
+  // Preserve query for auth return paths (e.g. abandoned checkout review).
+  requestHeaders.set("x-map-search", req.nextUrl.search);
   return NextResponse.next({
     request: { headers: requestHeaders },
   });

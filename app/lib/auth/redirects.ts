@@ -174,3 +174,39 @@ export function buildWalletBuyReturnPath(input: {
   const qs = params.toString();
   return qs ? `/account/esim/buy?${qs}` : "/account/esim/buy";
 }
+
+/**
+ * Resume path for an unfinished wallet purchase (abandoned checkout / review).
+ * purchaseId is validated; invalid ids fall back to the review entry without query.
+ */
+export function buildWalletBuyReviewReturnPath(
+  purchaseId: string | null | undefined
+): string {
+  const id = (purchaseId ?? "").trim();
+  if (!id || id.length > 64 || !/^[A-Za-z0-9_-]+$/.test(id)) {
+    return "/account/esim/buy/review";
+  }
+  return `/account/esim/buy/review?purchase=${encodeURIComponent(id)}`;
+}
+
+/**
+ * Append a safe internal callbackUrl query param without open-redirect risk.
+ * Leaves `pathWithQuery` unchanged when callback is missing or unsafe.
+ */
+export function appendSafeCallbackUrlQuery(
+  pathWithQuery: string,
+  callbackUrl: string | null | undefined,
+  options?: SafeCallbackOptions
+): string {
+  const base = safeCallbackPath(pathWithQuery, "", options);
+  if (!base) return pathWithQuery;
+  const safeCallback = safeCallbackPath(callbackUrl, "", options);
+  if (!safeCallback) return base;
+
+  const qIndex = base.indexOf("?");
+  const pathname = qIndex >= 0 ? base.slice(0, qIndex) : base;
+  const params = new URLSearchParams(qIndex >= 0 ? base.slice(qIndex + 1) : "");
+  params.set("callbackUrl", safeCallback);
+  const qs = params.toString();
+  return qs ? `${pathname}?${qs}` : pathname;
+}
