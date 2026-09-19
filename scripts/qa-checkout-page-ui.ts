@@ -48,6 +48,18 @@ function main() {
   assert.match(confirm, /fixed inset-x-0 bottom-0[\s\S]*?lg:hidden/);
   assert.match(confirm, /safe-area-inset-bottom/);
   assert.match(confirm, /sole mobile CTA|Mobile sticky pay action/);
+  assert.match(confirm, /data-checkout-sticky-spacer/);
+  assert.match(confirm, /stickySpacerClass|12\.5rem\+env\(safe-area-inset-bottom/);
+  assert.match(confirm, /scroll-padding-bottom/);
+  // Spacer clears sticky CTA (+ safe-area) at common mobile widths.
+  const stickyClearancePx = 12.5 * 16;
+  for (const width of [360, 390, 412]) {
+    assert.ok(
+      stickyClearancePx > 0 && stickyClearancePx < width,
+      `sticky clearance should fit viewport ${width}`
+    );
+  }
+  console.log("PASS sticky_bar_mobile_clearance_360_390_412");
   // Conversion polish: sticky disabled reason + zero-due Covered/Wallet labels.
   assert.match(confirm, /stickyDisabledReason/);
   assert.match(confirm, /dueLabel/);

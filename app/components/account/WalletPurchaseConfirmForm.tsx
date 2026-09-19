@@ -382,8 +382,16 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
   const awaitingGatewayPayment =
     review.status === WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT;
 
+  const stickyBarVisible = !awaitingGatewayPayment;
+  // Tallest sticky bar ≈ confirm checkbox + due row + helper + safe-area.
+  // Spacer (not form padding alone) keeps mobile number / amount above the CTA.
+  const stickySpacerClass =
+    stickyShowConfirm || Boolean(stickyDisabledReason)
+      ? "pointer-events-none h-[calc(12.5rem+env(safe-area-inset-bottom,0px))] lg:hidden"
+      : "pointer-events-none h-[calc(8.5rem+env(safe-area-inset-bottom,0px))] lg:hidden";
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-lg:[scroll-padding-bottom:calc(8.5rem+env(safe-area-inset-bottom,0px))]">
       {awaitingGatewayPayment ? (
         <div
           className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 py-4 sm:px-5"
@@ -417,11 +425,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
 
     <form
       action={formAction}
-      className={`space-y-6 lg:pb-0 ${
-        stickyShowConfirm
-          ? "pb-[calc(8.5rem+env(safe-area-inset-bottom))]"
-          : "pb-[calc(5.5rem+env(safe-area-inset-bottom))]"
-      }`}
+      className="space-y-6"
       noValidate
     >
       <input type="hidden" name="purchaseId" value={review.purchaseId} />
@@ -1006,10 +1010,19 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         </aside>
       </div>
 
+      {/* Mobile spacer: keeps final payment fields clear of the fixed sticky CTA. */}
+      {stickyBarVisible ? (
+        <div
+          className={stickySpacerClass}
+          aria-hidden="true"
+          data-checkout-sticky-spacer="true"
+        />
+      ) : null}
+
       {/* Mobile sticky pay action — sole mobile CTA; aside buttons stay desktop-only. */}
-      {!awaitingGatewayPayment ? (
+      {stickyBarVisible ? (
       <div
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] backdrop-blur supports-[padding:max(0px)]:pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden"
         role="region"
         aria-label="Checkout payment action"
       >
