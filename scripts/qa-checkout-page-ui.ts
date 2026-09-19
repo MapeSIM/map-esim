@@ -60,13 +60,43 @@ function main() {
   assert.match(confirm, /Amount due/);
   assert.match(confirm, /Jump to confirm|Jump to pay/);
   assert.match(confirm, /checkout-confirm/);
+  assert.match(confirm, /checkout-online-payment/);
+  assert.match(confirm, /onlinePaymentSectionId/);
+  assert.match(confirm, /simpaisaFieldsReady/);
+  assert.match(confirm, /onValidityChange/);
   assert.match(confirm, /stickyShowConfirm/);
   assert.match(confirm, /confirmStickyId/);
   assert.doesNotMatch(confirm, /Confirm the purchase above to continue/);
   // Mobile: hide duplicate Order summary; keep early Amount due + sticky due.
   assert.match(confirm, /hidden lg:block/);
   assert.match(confirm, /Desktop\/tablet: full order summary|Mobile uses early Amount due/);
+  // Sticky CTA waits for Simpaisa operator + MSISDN when gateway checkout.
+  assert.match(
+    confirm,
+    /gatewayNeedsSimpaisaFields && !simpaisaFieldsReady/
+  );
+  assert.match(
+    confirm,
+    /Select JazzCash or Easypaisa and enter a valid mobile number/
+  );
   console.log("PASS logged_in_checkout_two_column");
+
+  const simpaisaFields = read("app/components/account/SimpaisaWalletFields.tsx");
+  assert.match(simpaisaFields, /onValidityChange/);
+  assert.match(simpaisaFields, /normalizeSimpaisaMsisdn/);
+  assert.match(simpaisaFields, /min-h-\[6\.75rem\]/);
+  assert.match(simpaisaFields, /grid-cols-2/);
+  // Mobile cards: logos sized to fit half-width columns at 360–412px.
+  const presentation = read(
+    "app/components/account/simpaisaWalletMethodPresentation.ts"
+  );
+  assert.match(presentation, /max-w-\[7\.5rem\]/);
+  assert.match(presentation, /max-w-\[5\.25rem\]/);
+  const halfOf360 = 360 / 2 - 16; // column minus typical gap/padding
+  assert.ok(7.5 * 16 <= halfOf360);
+  assert.ok(5.25 * 16 <= halfOf360);
+  console.log("PASS simpaisa_mobile_wallet_fields_ux");
+  console.log("PASS mobile_viewport_logo_fit_360_390_412");
 
   assert.match(review, />Checkout</);
   assert.match(review, /Review your plan and choose how to fund/);

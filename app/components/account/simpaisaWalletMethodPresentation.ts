@@ -27,13 +27,13 @@ const MOBILE_WALLET_PRESENTATION: Record<
     logoSrc: "/payments/easypaisa-logo.svg",
     logoAlt: "Easypaisa",
     logoClassName:
-      "h-auto max-h-[3.125rem] w-auto max-w-[15.625rem] object-contain sm:max-h-[3.75rem]",
+      "h-auto max-h-8 w-auto max-w-[7.5rem] object-contain sm:max-h-[3.75rem] sm:max-w-[15.625rem]",
   },
   [SIMPAISA_WALLET_OPERATORS.JAZZCASH]: {
     logoSrc: "/payments/jazzcash-logo.png",
     logoAlt: "JazzCash",
     logoClassName:
-      "h-auto max-h-[4.05rem] w-auto max-w-[6.41rem] object-contain sm:max-h-[4.39rem]",
+      "h-auto max-h-10 w-auto max-w-[5.25rem] object-contain sm:max-h-[4.39rem] sm:max-w-[6.41rem]",
   },
 };
 

@@ -177,6 +177,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
   );
   const [useRewards, setUseRewards] = useState(review.useRewards);
   const [deliveryBlocksPurchase, setDeliveryBlocksPurchase] = useState(false);
+  const [simpaisaFieldsReady, setSimpaisaFieldsReady] = useState(false);
   const [fundingPending, startFundingTransition] = useTransition();
   const fundingChoiceGen = useRef(0);
   const confirmId = useId();
@@ -190,6 +191,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
   const mobileDueHeadingId = useId();
   const paymentHeadingId = useId();
   const confirmSectionId = "checkout-confirm";
+  const onlinePaymentSectionId = "checkout-online-payment";
   const mobileDueSummaryId = "checkout-mobile-due-summary";
   const errorState = state as WalletPurchaseActionState;
 
@@ -270,11 +272,13 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
     : fullWallet || walletFundsApplied
       ? "Wallet"
       : "Covered";
+  const gatewayNeedsSimpaisaFields = gatewayReady && simpaisaCheckout;
   const stickyCtaDisabled =
     zeroCashConfirm
       ? purchaseBlocked || !confirmed
       : gatewayReady
-        ? purchaseBlocked
+        ? purchaseBlocked ||
+          (gatewayNeedsSimpaisaFields && !simpaisaFieldsReady)
         : true;
   const stickyShowConfirm = zeroCashConfirm && !pending;
   const stickyDisabledReason = (() => {
@@ -291,6 +295,9 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
     }
     if (!zeroCashConfirm && !gatewayReady) {
       return "Online payment is unavailable right now.";
+    }
+    if (gatewayNeedsSimpaisaFields && !simpaisaFieldsReady) {
+      return "Select JazzCash or Easypaisa and enter a valid mobile number.";
     }
     return null;
   })();
@@ -480,8 +487,26 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 Amount due
               </h2>
               <a
-                href={`#${confirmSectionId}`}
+                href={
+                  zeroCashConfirm || walletOnlyInsufficient
+                    ? `#${confirmSectionId}`
+                    : `#${onlinePaymentSectionId}`
+                }
                 className="shrink-0 text-xs font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+                onClick={(event) => {
+                  const targetId =
+                    zeroCashConfirm || walletOnlyInsufficient
+                      ? confirmSectionId
+                      : onlinePaymentSectionId;
+                  const el = document.getElementById(targetId);
+                  if (!el) return;
+                  event.preventDefault();
+                  el.scrollIntoView({ behavior: "smooth", block: "start" });
+                  // Keep hash for accessibility / share without fighting scroll-mt.
+                  if (typeof history !== "undefined") {
+                    history.replaceState(null, "", `#${targetId}`);
+                  }
+                }}
               >
                 {zeroCashConfirm || walletOnlyInsufficient
                   ? "Jump to confirm"
@@ -709,7 +734,11 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
 
           {gatewayRequired ? (
             onlinePaymentsAllowed ? (
-            <section className={cardClass} aria-labelledby={paymentHeadingId}>
+            <section
+              id={onlinePaymentSectionId}
+              className={`${cardClass} scroll-mt-28 sm:scroll-mt-32`}
+              aria-labelledby={paymentHeadingId}
+            >
               <h2
                 id={paymentHeadingId}
                 className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
@@ -737,6 +766,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                     <SimpaisaWalletFields
                       usdCents={preview.gatewayAmountCents}
                       disabled={busy}
+                      onValidityChange={setSimpaisaFieldsReady}
                       operatorError={
                         errorState.ok === false
                           ? errorState.fieldErrors?.walletOperatorId
@@ -908,7 +938,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
 
           {zeroCashConfirm ? (
             <>
-              <div id={confirmSectionId} className="scroll-mt-24 space-y-2">
+              <div id={confirmSectionId} className="scroll-mt-28 sm:scroll-mt-32 space-y-2">
                 <label
                   htmlFor={confirmId}
                   className="flex items-start gap-3 text-sm text-[var(--heading)]"
@@ -942,19 +972,25 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               </button>
             </>
           ) : gatewayReady ? (
-            <div id={confirmSectionId} className="scroll-mt-24">
+            <div id={confirmSectionId} className="scroll-mt-28 sm:scroll-mt-32">
               <button
                 type="submit"
-                disabled={purchaseBlocked}
+                disabled={
+                  purchaseBlocked ||
+                  (gatewayNeedsSimpaisaFields && !simpaisaFieldsReady)
+                }
                 className="hidden min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60 lg:inline-flex"
               >
                 {pending ? primaryCtaPendingLabel : primaryCtaLabel}
               </button>
             </div>
           ) : walletOnlyInsufficient ? (
-            <div id={confirmSectionId} className="scroll-mt-24 lg:hidden" />
+            <div
+              id={confirmSectionId}
+              className="scroll-mt-28 sm:scroll-mt-32 lg:hidden"
+            />
           ) : (
-            <div id={confirmSectionId} className="scroll-mt-24">
+            <div id={confirmSectionId} className="scroll-mt-28 sm:scroll-mt-32">
               <button
                 type="button"
                 disabled
