@@ -109,31 +109,23 @@ export default async function AdminDashboardPage({
         </p>
       </header>
 
-      <section aria-labelledby="admin-kpi-heading">
-        <h2 id="admin-kpi-heading" className="sr-only">
+      <section aria-labelledby="admin-primary-kpi-heading">
+        <h2
+          id="admin-primary-kpi-heading"
+          className="text-lg font-semibold tracking-tight"
+        >
           Key metrics
         </h2>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <StatCard label="Active customers" value={data.activeCustomerCount} />
+        <p className="mt-1 text-sm text-[var(--text-muted)]">
+          Orders and active customers at a glance.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <StatCard label="Orders" value={data.totalLocalOrders} />
           <StatCard
-            label="Verified customers"
-            value={data.verifiedCustomerCount}
-          />
-          <StatCard label="Google customers" value={data.googleCustomerCount} />
-          <StatCard
-            label="Credentials customers"
-            value={data.credentialsCustomerCount}
-          />
-          <StatCard label="Local orders" value={data.totalLocalOrders} />
-          <StatCard
-            label="Completed local orders"
+            label="Completed orders"
             value={data.completedLocalOrders}
           />
-          <StatCard
-            label="VeSIM staging checkout total (USD)"
-            value={data.stagingProviderTotalUsd}
-            note="This is a staging provider-wallet total, not live customer revenue."
-          />
+          <StatCard label="Active customers" value={data.activeCustomerCount} />
         </div>
       </section>
 
@@ -190,6 +182,48 @@ export default async function AdminDashboardPage({
             </table>
           </div>
         )}
+      </section>
+
+      <section aria-labelledby="admin-customer-mix-heading">
+        <h2
+          id="admin-customer-mix-heading"
+          className="text-lg font-semibold tracking-tight"
+        >
+          Customer breakdown
+        </h2>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">
+          Sign-in mix among active customers. Secondary to order metrics.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <StatCard
+            label="Verified customers"
+            value={data.verifiedCustomerCount}
+          />
+          <StatCard label="Google customers" value={data.googleCustomerCount} />
+          <StatCard
+            label="Credentials customers"
+            value={data.credentialsCustomerCount}
+          />
+        </div>
+      </section>
+
+      <section aria-labelledby="admin-staging-heading">
+        <h2
+          id="admin-staging-heading"
+          className="text-lg font-semibold tracking-tight"
+        >
+          Staging provider
+        </h2>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">
+          Non-revenue staging totals only.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <StatCard
+            label="VeSIM staging checkout total (USD)"
+            value={data.stagingProviderTotalUsd}
+            note="This is a staging provider-wallet total, not live customer revenue."
+          />
+        </div>
       </section>
 
       <section aria-labelledby="admin-system-status-heading">
