@@ -76,7 +76,7 @@ function main() {
   console.log("PASS failed_reader_read_only");
 
   assert.match(nav, /href: "\/admin\/payments\/failed"/);
-  assert.match(nav, /label: "Failed payments"/);
+  assert.match(nav, /label: "Failed Payments"/);
   assert.match(pendingPage, /\/admin\/payments\/failed/);
   assert.match(pkg, /qa:admin-failed-payments/);
   const pendingVerify = read("app/lib/admin/pendingPaymentVerify.ts");

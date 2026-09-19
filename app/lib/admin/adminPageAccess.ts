@@ -111,26 +111,27 @@ export function canAccessAdminPath(
   return hasAdminPermission(owned, access.permissions);
 }
 
+/** Flat nav catalog (order matches AdminNav sections). Permission map unchanged. */
 export const ADMIN_NAV_LINKS = [
   { href: "/admin", label: "Overview", exact: true },
   { href: "/admin/revenue", label: "Revenue", exact: false },
   { href: "/admin/orders", label: "Orders", exact: false },
   { href: "/admin/customers", label: "Customers", exact: false },
   { href: "/admin/partners", label: "Partners", exact: false },
-  { href: "/admin/wallet-topups", label: "Wallet top-ups", exact: false },
-  { href: "/admin/payments", label: "Payments", exact: true },
-  { href: "/admin/payments/pending", label: "Pending payments", exact: false },
-  { href: "/admin/payments/failed", label: "Failed payments", exact: false },
-  { href: "/admin/payments/recovery", label: "Payment recovery", exact: false },
-  { href: "/admin/payments/webhooks", label: "Webhook receipts", exact: false },
-  { href: "/admin/refund-requests", label: "Refund requests", exact: false },
-  { href: "/admin/emails", label: "Email Center", exact: false },
-  { href: "/admin/email-campaigns", label: "Email Campaigns", exact: false },
   { href: "/admin/promo-codes", label: "Promo Codes", exact: false },
+  { href: "/admin/payments", label: "Payments", exact: true },
+  { href: "/admin/payments/pending", label: "Pending Payments", exact: false },
+  { href: "/admin/payments/failed", label: "Failed Payments", exact: false },
+  { href: "/admin/payments/recovery", label: "Payment Recovery", exact: false },
+  { href: "/admin/payments/webhooks", label: "Webhook Receipts", exact: false },
+  { href: "/admin/wallet-topups", label: "Wallet Top-ups", exact: false },
+  { href: "/admin/refund-requests", label: "Refund Requests", exact: false },
   { href: "/admin/reconciliation", label: "Reconciliation", exact: false },
   { href: "/admin/operations", label: "Operations", exact: false },
   { href: "/admin/alerts", label: "Alerts", exact: false },
-  { href: "/admin/audit-logs", label: "Audit logs", exact: false },
+  { href: "/admin/emails", label: "Email Center", exact: false },
+  { href: "/admin/email-campaigns", label: "Email Campaigns", exact: false },
+  { href: "/admin/audit-logs", label: "Audit Logs", exact: false },
   { href: "/admin/admin-users", label: "Admin Users", exact: false },
   { href: "/admin/settings", label: "Settings", exact: false },
 ] as const;

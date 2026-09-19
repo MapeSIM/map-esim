@@ -50,7 +50,7 @@ function main() {
 
   assert.match(page, /requireRole\("ADMIN"\)/);
   assert.match(nav, /href: "\/admin\/payments\/recovery"/);
-  assert.match(nav, /label: "Payment recovery"/);
+  assert.match(nav, /label: "Payment Recovery"/);
   assert.match(nav, /!pathname\.startsWith\("\/admin\/payments\/recovery"\)/);
   assert.match(pkg, /"qa:admin-payment-recovery"/);
   console.log("PASS route_nav_and_qa_script");
