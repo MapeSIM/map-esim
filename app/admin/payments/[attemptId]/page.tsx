@@ -9,8 +9,19 @@ import {
   PAYMENT_RECOVERY_POLICY_BLURB,
 } from "@/app/lib/admin/paymentRecoveryShared";
 import { requireRole } from "@/app/lib/auth/session";
+import {
+  AdminButton,
+  AdminKpiCard,
+  AdminStatusPill,
+} from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
+
+const CARD_CLASS =
+  "min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm sm:p-5";
+
+const EMPTY_CLASS =
+  "rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]";
 
 export default async function AdminPaymentDetailPage({
   params,
@@ -25,33 +36,50 @@ export default async function AdminPaymentDetailPage({
   const recovery = await getAdminPaymentRecoveryDetailExtras(detail.attemptId);
 
   return (
-    <div className="space-y-8">
-      <header className="space-y-2">
-        <p className="text-sm">
-          <Link
-            href="/admin/payments"
-            className="font-semibold text-[var(--accent-strong)]"
-          >
+    <div className="min-w-0 space-y-8">
+      <header className="min-w-0 space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <AdminButton href="/admin/payments" variant="ghost" size="sm">
             ← Payments
-          </Link>
+          </AdminButton>
           {recovery?.isRecoveryCandidate ? (
-            <>
-              <span className="text-[var(--text-soft)]"> · </span>
-              <Link
-                href="/admin/payments/recovery"
-                className="font-semibold text-[var(--accent-strong)]"
-              >
-                Payment recovery
-              </Link>
-            </>
+            <AdminButton
+              href="/admin/payments/recovery"
+              variant="ghost"
+              size="sm"
+            >
+              Payment recovery
+            </AdminButton>
           ) : null}
-        </p>
-        <h1 className="text-2xl font-bold tracking-tight">Payment detail</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          Canonical payment attempt view. Investigation tools never fund or mark
-          paid. Funding remains webhook-authoritative.
-        </p>
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Payment detail</h1>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">
+            Canonical payment attempt view. Investigation tools never fund or mark
+            paid. Funding remains webhook-authoritative.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <AdminStatusPill value={detail.attemptStatus}>
+            {detail.attemptStatus}
+          </AdminStatusPill>
+          <AdminStatusPill value={detail.purchaseStatus}>
+            {detail.purchaseStatus}
+          </AdminStatusPill>
+          <AdminStatusPill value={detail.webhookLabel}>
+            {detail.webhookLabel}
+          </AdminStatusPill>
+        </div>
       </header>
+
+      <section
+        aria-label="Payment summary"
+        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+      >
+        <AdminKpiCard label="Amount" value={detail.amountLabel} />
+        <AdminKpiCard label="Provider" value={detail.providerLabel} />
+        <AdminKpiCard label="Method" value={detail.methodLabel} />
+      </section>
 
       {recovery?.isRecoveryCandidate ? (
         <section
@@ -91,8 +119,11 @@ export default async function AdminPaymentDetailPage({
         </section>
       ) : null}
 
-      <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm sm:p-5">
-        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <section className={CARD_CLASS}>
+        <h2 className="text-base font-semibold tracking-tight text-[var(--heading)]">
+          Payment details
+        </h2>
+        <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
               Payment id
@@ -109,7 +140,7 @@ export default async function AdminPaymentDetailPage({
               {detail.customerHref ? (
                 <Link
                   href={detail.customerHref}
-                  className="font-semibold text-[var(--accent-strong)]"
+                  className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
                 >
                   {detail.customerLabel}
                 </Link>
@@ -134,7 +165,7 @@ export default async function AdminPaymentDetailPage({
               {detail.orderId ? (
                 <Link
                   href={`/admin/orders/${encodeURIComponent(detail.orderId)}`}
-                  className="font-semibold text-[var(--accent-strong)]"
+                  className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
                 >
                   {detail.orderId}
                 </Link>
@@ -164,8 +195,13 @@ export default async function AdminPaymentDetailPage({
             <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
               Status
             </dt>
-            <dd className="mt-1 text-[var(--heading)]">
-              attempt {detail.attemptStatus} · purchase {detail.purchaseStatus}
+            <dd className="mt-1 flex flex-wrap items-center gap-2">
+              <AdminStatusPill value={detail.attemptStatus}>
+                {detail.attemptStatus}
+              </AdminStatusPill>
+              <AdminStatusPill value={detail.purchaseStatus}>
+                {detail.purchaseStatus}
+              </AdminStatusPill>
             </dd>
           </div>
           <div>
@@ -180,15 +216,17 @@ export default async function AdminPaymentDetailPage({
             <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
               Webhook
             </dt>
-            <dd className="mt-1 text-[var(--heading)]">
-              {detail.webhookLabel}
-              <span className="text-[var(--text-soft)]"> · </span>
-              <Link
+            <dd className="mt-1 flex flex-wrap items-center gap-2">
+              <AdminStatusPill value={detail.webhookLabel}>
+                {detail.webhookLabel}
+              </AdminStatusPill>
+              <AdminButton
                 href="/admin/payments/webhooks"
-                className="font-semibold text-[var(--accent-strong)]"
+                variant="ghost"
+                size="sm"
               >
                 Receipts
-              </Link>
+              </AdminButton>
             </dd>
           </div>
           <div>
@@ -229,29 +267,28 @@ export default async function AdminPaymentDetailPage({
           ) : null}
         </dl>
 
-        <p className="mt-4 text-sm">
+        <div className="mt-4 flex flex-wrap gap-2">
           {detail.customerHref ? (
-            <>
-              <Link
-                href={`${detail.customerHref}/timeline`}
-                className="font-semibold text-[var(--accent-strong)]"
-              >
-                Customer timeline
-              </Link>
-              <span className="text-[var(--text-soft)]"> · </span>
-            </>
+            <AdminButton
+              href={`${detail.customerHref}/timeline`}
+              variant="secondary"
+              size="sm"
+            >
+              Customer timeline
+            </AdminButton>
           ) : null}
-          <Link
+          <AdminButton
             href={`/admin/payments/pending/${encodeURIComponent(detail.attemptId)}`}
-            className="font-semibold text-[var(--accent-strong)]"
+            variant="secondary"
+            size="sm"
           >
             Legacy pending page
-          </Link>
-        </p>
+          </AdminButton>
+        </div>
       </section>
 
-      <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm sm:p-5">
-        <h2 className="text-base font-semibold text-[var(--heading)]">
+      <section className={CARD_CLASS}>
+        <h2 className="text-base font-semibold tracking-tight text-[var(--heading)]">
           Webhook receipts for this attempt
         </h2>
         <p className="mt-1 text-xs text-[var(--text-soft)]">
@@ -259,20 +296,20 @@ export default async function AdminPaymentDetailPage({
           webhook replay.
         </p>
         {!recovery || recovery.receipts.length === 0 ? (
-          <p className="mt-3 text-[var(--text-muted)]">
+          <div className={`${EMPTY_CLASS} mt-3`}>
             No webhook receipts claimed for this attempt id.
-          </p>
+          </div>
         ) : (
           <ul className="mt-3 space-y-2">
             {recovery.receipts.map((receipt) => (
               <li
                 key={receipt.id}
-                className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
+                className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5"
               >
                 <p className="font-medium text-[var(--heading)]">
                   {receipt.receivedAtLabel} · {receipt.providerLabel}
                 </p>
-                <p className="text-xs text-[var(--text-soft)]">
+                <p className="mt-1 text-xs text-[var(--text-soft)]">
                   signature {receipt.signatureLabel} · parse {receipt.parseLabel}{" "}
                   · HTTP {receipt.httpStatusLabel} · {receipt.outcomeLabel}
                 </p>
@@ -280,14 +317,15 @@ export default async function AdminPaymentDetailPage({
             ))}
           </ul>
         )}
-        <p className="mt-3">
-          <Link
+        <div className="mt-3">
+          <AdminButton
             href="/admin/payments/webhooks"
-            className="font-semibold text-[var(--accent-strong)]"
+            variant="ghost"
+            size="sm"
           >
             All webhook receipts
-          </Link>
-        </p>
+          </AdminButton>
+        </div>
       </section>
 
       {detail.investigationAvailable ? (
@@ -304,7 +342,7 @@ export default async function AdminPaymentDetailPage({
           />
         )
       ) : (
-        <section className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-4 text-sm text-[var(--text-muted)]">
+        <section className={EMPTY_CLASS}>
           Investigation tools are available when the attempt is awaiting
           gateway payment, payment pending, or reconciliation required. This
           page never funds or marks paid.

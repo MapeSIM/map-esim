@@ -1,4 +1,4 @@
-import Link from "next/link";
+import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import CaseManagementPanel from "@/app/components/admin/CaseManagementPanel";
 import ProviderRefreshForm from "@/app/components/admin/ProviderRefreshForm";
@@ -10,6 +10,10 @@ import { isValidReconciliationSourceType } from "@/app/lib/admin/reconciliationC
 import { ORDER_EMAIL_NOT_CONFIGURED_LABEL } from "@/app/lib/admin/reconciliationCaseShared";
 import { getCaseManagementEligibility } from "@/app/lib/admin/reconciliationCaseManagement";
 import { getProviderRefreshUiState } from "@/app/lib/admin/providerRefresh";
+import {
+  AdminButton,
+  AdminStatusPill,
+} from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +23,15 @@ const UNAVAILABLE =
 const CASE_UNAVAILABLE_TITLE = "Reconciliation case unavailable";
 const CASE_UNAVAILABLE_MESSAGE =
   "This reconciliation case could not be opened. It may already be resolved, may no longer require reconciliation, or the reference may be incorrect.";
+
+const CARD_CLASS =
+  "min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 sm:px-5";
+
+const SECTION_CARD_CLASS =
+  "min-w-0 space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5";
+
+const UNAVAILABLE_CLASS =
+  "rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8";
 
 /** Structurally valid attempt ids (cuid / assignment:cuid). Not a DB existence check. */
 function isStructurallyValidAttemptId(raw: string): boolean {
@@ -31,9 +44,9 @@ function isStructurallyValidAttemptId(raw: string): boolean {
   return /^[A-Za-z0-9_-]+$/.test(id);
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[220px_1fr] sm:gap-4">
+    <div className="grid gap-1 border-b border-[var(--border)] py-3 last:border-b-0 sm:grid-cols-[220px_1fr] sm:gap-4">
       <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
         {label}
       </dt>
@@ -85,17 +98,11 @@ export default async function AdminReconciliationDetailPage({
     detail = await getReconciliationDetail(sourceType, attemptId);
   } catch {
     return (
-      <div className="space-y-6">
-        <Link
-          href="/admin/reconciliation"
-          className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-        >
+      <div className="min-w-0 space-y-6">
+        <AdminButton href="/admin/reconciliation" variant="ghost" size="sm">
           ← Back to reconciliation
-        </Link>
-        <div
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-          role="status"
-        >
+        </AdminButton>
+        <div className={UNAVAILABLE_CLASS} role="status">
           <p className="text-sm font-medium text-[var(--heading)]">
             {UNAVAILABLE}
           </p>
@@ -112,43 +119,33 @@ export default async function AdminReconciliationDetailPage({
       isStructurallyValidAttemptId(attemptId)
     ) {
       return (
-        <div className="space-y-6">
-          <div>
-            <Link
-              href="/admin/reconciliation"
-              className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-            >
+        <div className="min-w-0 space-y-6">
+          <header className="min-w-0 space-y-3">
+            <AdminButton href="/admin/reconciliation" variant="ghost" size="sm">
               ← Back to reconciliation
-            </Link>
-            <h1 className="mt-4 text-2xl font-bold tracking-tight">
-              {CASE_UNAVAILABLE_TITLE}
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-              {CASE_UNAVAILABLE_MESSAGE}
-            </p>
-          </div>
-          <div
-            className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-            role="status"
-          >
+            </AdminButton>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">
+                {CASE_UNAVAILABLE_TITLE}
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
+                {CASE_UNAVAILABLE_MESSAGE}
+              </p>
+            </div>
+          </header>
+          <div className={UNAVAILABLE_CLASS} role="status">
             <p className="text-sm font-medium text-[var(--heading)]">
               No recovery actions were started. Opening this page never moves
               funds, contacts the provider, or changes purchase status.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Link
-              href="/admin/reconciliation"
-              className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent-strong)] px-5 text-sm font-semibold text-white"
-            >
+            <AdminButton href="/admin/reconciliation" variant="primary">
               Back to Reconciliation
-            </Link>
-            <Link
-              href="/admin"
-              className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border-strong)] px-5 text-sm font-semibold text-[var(--heading)]"
-            >
+            </AdminButton>
+            <AdminButton href="/admin" variant="secondary">
               Back to Admin
-            </Link>
+            </AdminButton>
           </div>
         </div>
       );
@@ -175,24 +172,34 @@ export default async function AdminReconciliationDetailPage({
   const refreshReasonCode = refreshUi.eligibility.reasonCode;
 
   return (
-    <div className="space-y-8">
-      <div>
-        <Link
-          href="/admin/reconciliation"
-          className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-        >
+    <div className="min-w-0 space-y-8">
+      <header className="min-w-0 space-y-3">
+        <AdminButton href="/admin/reconciliation" variant="ghost" size="sm">
           ← Back to reconciliation
-        </Link>
-        <h1 className="mt-4 text-2xl font-bold tracking-tight">
-          Reconciliation case
-        </h1>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Sanitized timeline and controlled case management. Recovery actions
-          require a locked case, confirmation phrases where applicable, and
-          conclusive provider or local evidence. They never auto-unlock or
-          auto-resolve.
-        </p>
-      </div>
+        </AdminButton>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Reconciliation case
+          </h1>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">
+            Sanitized timeline and controlled case management. Recovery actions
+            require a locked case, confirmation phrases where applicable, and
+            conclusive provider or local evidence. They never auto-unlock or
+            auto-resolve.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <AdminStatusPill value={detail.categoryLabel}>
+            {detail.categoryLabel}
+          </AdminStatusPill>
+          <AdminStatusPill value={detail.providerResultKindLabel}>
+            {detail.providerResultKindLabel}
+          </AdminStatusPill>
+          <AdminStatusPill value={detail.resolutionLabel}>
+            {detail.resolutionLabel}
+          </AdminStatusPill>
+        </div>
+      </header>
 
       <div
         className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--heading)]"
@@ -204,11 +211,18 @@ export default async function AdminReconciliationDetailPage({
         review.
       </div>
 
-      <dl className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 sm:px-5">
+      <dl className={CARD_CLASS}>
         <DetailRow label="Attempt ID" value={detail.attemptId} />
         <DetailRow label="Source" value={detail.sourceType} />
         <DetailRow label="Purchase type" value={detail.purchaseType} />
-        <DetailRow label="Category" value={detail.categoryLabel} />
+        <DetailRow
+          label="Category"
+          value={
+            <AdminStatusPill value={detail.categoryLabel}>
+              {detail.categoryLabel}
+            </AdminStatusPill>
+          }
+        />
         <DetailRow label="Customer" value={detail.customerLabel} />
         <DetailRow label="Package" value={detail.destinationPackage} />
         <DetailRow label="Amount" value={detail.amountLabel} />
@@ -218,7 +232,11 @@ export default async function AdminReconciliationDetailPage({
         />
         <DetailRow
           label="Provider result"
-          value={detail.providerResultKindLabel}
+          value={
+            <AdminStatusPill value={detail.providerResultKindLabel}>
+              {detail.providerResultKindLabel}
+            </AdminStatusPill>
+          }
         />
         <DetailRow
           label="Provider reference"
@@ -228,7 +246,14 @@ export default async function AdminReconciliationDetailPage({
         <DetailRow label="Failure" value={detail.failureLabel} />
         <DetailRow label="Created" value={detail.createdAtLabel} />
         <DetailRow label="Updated" value={detail.updatedAtLabel} />
-        <DetailRow label="Resolution / lock" value={detail.resolutionLabel} />
+        <DetailRow
+          label="Resolution / lock"
+          value={
+            <AdminStatusPill value={detail.resolutionLabel}>
+              {detail.resolutionLabel}
+            </AdminStatusPill>
+          }
+        />
       </dl>
 
       {detail.sourceType === "order_email" &&
@@ -289,7 +314,7 @@ export default async function AdminReconciliationDetailPage({
         />
       ) : null}
 
-      <section className="space-y-3">
+      <section className="min-w-0 space-y-3">
         <h2 className="text-lg font-semibold tracking-tight">Timeline</h2>
         <ol className="space-y-2">
           {detail.timeline.map((event) => (
@@ -297,13 +322,13 @@ export default async function AdminReconciliationDetailPage({
               key={event.label}
               className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3"
             >
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-[var(--heading)]">
                   {event.label}
                 </p>
-                <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                <AdminStatusPill value={timelineStateLabel(event.state)}>
                   {timelineStateLabel(event.state)}
-                </p>
+                </AdminStatusPill>
               </div>
               <p className="mt-1 text-sm text-[var(--text-muted)] break-words">
                 {event.detail}
@@ -331,11 +356,11 @@ export default async function AdminReconciliationDetailPage({
           />
 
           {refreshUi.panel ? (
-            <section className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
+            <section className={SECTION_CARD_CLASS}>
               <h2 className="text-lg font-semibold tracking-tight">
                 Last provider observation
               </h2>
-              <dl className="space-y-0">
+              <dl>
                 <DetailRow
                   label="Last checked"
                   value={refreshUi.panel.lastCheckedLabel}
@@ -344,7 +369,14 @@ export default async function AdminReconciliationDetailPage({
                   label="Checked by"
                   value={refreshUi.panel.checkedByLabel}
                 />
-                <DetailRow label="Result" value={refreshUi.panel.resultLabel} />
+                <DetailRow
+                  label="Result"
+                  value={
+                    <AdminStatusPill value={refreshUi.panel.resultLabel}>
+                      {refreshUi.panel.resultLabel}
+                    </AdminStatusPill>
+                  }
+                />
                 <DetailRow
                   label="Provider state"
                   value={refreshUi.panel.safeProviderStateLabel}
@@ -371,17 +403,14 @@ export default async function AdminReconciliationDetailPage({
         </>
       ) : null}
 
-      <section className="space-y-3">
+      <section className="min-w-0 space-y-3">
         <h2 className="text-lg font-semibold tracking-tight">Related</h2>
-        <ul className="space-y-2">
+        <ul className="flex flex-wrap gap-2">
           {detail.relatedLinks.map((link) => (
             <li key={link.href}>
-              <Link
-                href={link.href}
-                className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-              >
+              <AdminButton href={link.href} variant="secondary" size="sm">
                 {link.label}
-              </Link>
+              </AdminButton>
             </li>
           ))}
         </ul>

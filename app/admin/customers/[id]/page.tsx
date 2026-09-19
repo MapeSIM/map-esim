@@ -1,4 +1,4 @@
-import Link from "next/link";
+import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { getAdminCustomerDetail } from "@/app/lib/admin/customers";
 import { getAdminCustomerRecentOrders } from "@/app/lib/admin/orders";
@@ -9,15 +9,32 @@ import { hasAdminPermission } from "@/app/lib/admin/adminPermissions";
 import { ADMIN_DEBIT_MIN_CENTS } from "@/app/lib/wallet/amount";
 import { CustomerBlockPanel } from "@/app/components/admin/CustomerBlockPanel";
 import { requireRole } from "@/app/lib/auth/session";
+import {
+  AdminButton,
+  AdminKpiCard,
+  AdminStatusPill,
+} from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
 const CUSTOMERS_UNAVAILABLE =
   "Customer data is temporarily unavailable. Please refresh shortly.";
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+const EMPTY_CLASS =
+  "rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]";
+
+const CARD_CLASS =
+  "min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 sm:px-5";
+
+const LIST_CARD_CLASS =
+  "min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm";
+
+const UNAVAILABLE_CLASS =
+  "rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8";
+
+function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[220px_1fr] sm:gap-4">
+    <div className="grid gap-1 border-b border-[var(--border)] py-3 last:border-b-0 sm:grid-cols-[220px_1fr] sm:gap-4">
       <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
         {label}
       </dt>
@@ -58,17 +75,11 @@ export default async function AdminCustomerDetailPage({
     detail = await getAdminCustomerDetail(id);
   } catch {
     return (
-      <div className="space-y-6">
-        <Link
-          href="/admin/customers"
-          className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-        >
+      <div className="min-w-0 space-y-6">
+        <AdminButton href="/admin/customers" variant="ghost" size="sm">
           ← Back to customers
-        </Link>
-        <div
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-          role="status"
-        >
+        </AdminButton>
+        <div className={UNAVAILABLE_CLASS} role="status">
           <p className="text-sm font-medium text-[var(--heading)]">
             {CUSTOMERS_UNAVAILABLE}
           </p>
@@ -109,51 +120,92 @@ export default async function AdminCustomerDetailPage({
 
   return (
     <div className="min-w-0 w-full max-w-full space-y-8">
-      <div>
-        <Link
-          href="/admin/customers"
-          className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-        >
+      <header className="min-w-0 space-y-3">
+        <AdminButton href="/admin/customers" variant="ghost" size="sm">
           ← Back to customers
-        </Link>
-        <h1 className="mt-4 text-2xl font-bold tracking-tight">
-          Customer detail
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Read-only CUSTOMER profile. Password hashes, OAuth tokens, and
-          installation secrets are never shown.
-        </p>
-        <p className="mt-4 text-sm">
-          <Link
+        </AdminButton>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Customer detail
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
+            Read-only CUSTOMER profile. Password hashes, OAuth tokens, and
+            installation secrets are never shown.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <AdminStatusPill value={detail.accountStatusLabel}>
+            {detail.accountStatusLabel}
+          </AdminStatusPill>
+          <AdminStatusPill value={detail.emailVerifiedLabel}>
+            {detail.emailVerifiedLabel}
+          </AdminStatusPill>
+          <AdminButton
             href={`/admin/customers/${encodeURIComponent(detail.id)}/timeline`}
-            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            variant="secondary"
+            size="sm"
           >
             Support timeline
-          </Link>
-          <span className="text-[var(--text-muted)]">
-            {" "}
-            — read-only purchases, payments, orders, wallet, refunds, emails, and
-            audits.
-          </span>
+          </AdminButton>
+        </div>
+        <p className="text-sm text-[var(--text-muted)]">
+          Support timeline is read-only: purchases, payments, orders, wallet,
+          refunds, emails, and audits.
         </p>
-      </div>
+      </header>
 
-      <dl className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 sm:px-5">
+      <section
+        aria-label="Customer summary"
+        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+      >
+        <AdminKpiCard
+          label="Local orders"
+          value={detail.localOrderCount}
+        />
+        <AdminKpiCard
+          label="Completed orders"
+          value={detail.completedOrderCount}
+        />
+        <AdminKpiCard
+          label="Claimed orders"
+          value={detail.claimedOrderCount}
+        />
+      </section>
+
+      <dl className={CARD_CLASS}>
         <DetailRow label="Local customer ID" value={detail.id} />
         <DetailRow label="Created" value={detail.createdAtLabel} />
         <DetailRow label="Updated" value={detail.updatedAtLabel} />
         <DetailRow label="Name" value={detail.name} />
         <DetailRow label="Email" value={detail.email} />
-        <DetailRow label="Role" value={detail.roleLabel} />
+        <DetailRow
+          label="Role"
+          value={
+            <AdminStatusPill value={detail.roleLabel}>
+              {detail.roleLabel}
+            </AdminStatusPill>
+          }
+        />
         <DetailRow
           label="Email verification"
-          value={detail.emailVerifiedLabel}
+          value={
+            <AdminStatusPill value={detail.emailVerifiedLabel}>
+              {detail.emailVerifiedLabel}
+            </AdminStatusPill>
+          }
         />
         <DetailRow
           label="Verified at"
           value={detail.emailVerifiedAtLabel}
         />
-        <DetailRow label="Account status" value={detail.accountStatusLabel} />
+        <DetailRow
+          label="Account status"
+          value={
+            <AdminStatusPill value={detail.accountStatusLabel}>
+              {detail.accountStatusLabel}
+            </AdminStatusPill>
+          }
+        />
         <DetailRow label="Deleted at" value={detail.deletedAtLabel} />
         <DetailRow label="Blocked at" value={detail.blockedAtLabel} />
         {detail.accountStatusLabel === "Blocked" ? (
@@ -168,15 +220,27 @@ export default async function AdminCustomerDetailPage({
         />
         <DetailRow
           label="Google account linked"
-          value={detail.googleLinkedLabel}
+          value={
+            <AdminStatusPill value={detail.googleLinkedLabel}>
+              {detail.googleLinkedLabel}
+            </AdminStatusPill>
+          }
         />
         <DetailRow
           label="Credentials available"
-          value={detail.credentialsAvailableLabel}
+          value={
+            <AdminStatusPill value={detail.credentialsAvailableLabel}>
+              {detail.credentialsAvailableLabel}
+            </AdminStatusPill>
+          }
         />
         <DetailRow
           label="Legal consent"
-          value={detail.legalConsentStatusLabel}
+          value={
+            <AdminStatusPill value={detail.legalConsentStatusLabel}>
+              {detail.legalConsentStatusLabel}
+            </AdminStatusPill>
+          }
         />
         <DetailRow
           label="Terms accepted at"
@@ -225,14 +289,15 @@ export default async function AdminCustomerDetailPage({
       ) : null}
 
       {canViewOrders && detail.localOrderCount > 0 ? (
-        <p>
-          <Link
+        <div>
+          <AdminButton
             href={`/admin/orders?userId=${encodeURIComponent(detail.id)}`}
-            className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            variant="secondary"
+            size="sm"
           >
             View linked local orders
-          </Link>
-        </p>
+          </AdminButton>
+        </div>
       ) : null}
 
       <section className="min-w-0 w-full max-w-full space-y-4">
@@ -246,18 +311,18 @@ export default async function AdminCustomerDetailPage({
           </div>
           {canFulfill && detail.accountStatusLabel === "Active" ? (
             <div className="flex flex-wrap gap-2">
-              <Link
+              <AdminButton
                 href={`/admin/customers/${encodeURIComponent(detail.id)}/esim/assign`}
-                className="inline-flex h-10 items-center justify-center rounded-[14px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+                variant="primary"
               >
                 Assign eSIM package
-              </Link>
-              <Link
+              </AdminButton>
+              <AdminButton
                 href={`/admin/customers/${encodeURIComponent(detail.id)}/esim/wallet-buy`}
-                className="inline-flex h-10 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+                variant="secondary"
               >
                 Buy eSIM with wallet
-              </Link>
+              </AdminButton>
             </div>
           ) : null}
         </div>
@@ -275,87 +340,82 @@ export default async function AdminCustomerDetailPage({
             </p>
           </div>
           {canViewOrders && detail.localOrderCount > 0 ? (
-            <Link
+            <AdminButton
               href={`/admin/orders?userId=${encodeURIComponent(detail.id)}`}
-              className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+              variant="ghost"
+              size="sm"
             >
               View all linked orders
-            </Link>
+            </AdminButton>
           ) : null}
         </div>
 
         {ordersUnavailable ? (
-          <div
-            className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-6"
-            role="status"
-          >
+          <div className={UNAVAILABLE_CLASS} role="status">
             <p className="text-sm font-medium text-[var(--heading)]">
               Order data is temporarily unavailable. Please refresh shortly.
             </p>
           </div>
         ) : recentOrders.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-5 text-sm text-[var(--text-muted)]">
+          <div className={EMPTY_CLASS}>
             No eSIM orders found for this customer.
           </div>
         ) : (
           <ul className="space-y-3">
             {recentOrders.map((order) => (
-              <li
-                key={order.id}
-                className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm"
-              >
-                <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-[var(--heading)] break-words">
-                      {order.destination}
-                    </p>
-                    <p className="mt-1 text-[var(--text-muted)] break-words">
+              <li key={order.id} className={LIST_CARD_CLASS}>
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 space-y-2">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <p className="font-semibold text-[var(--heading)] break-words">
+                        {order.destination}
+                      </p>
+                      <AdminStatusPill value={order.localStatus}>
+                        {order.localStatus}
+                      </AdminStatusPill>
+                    </div>
+                    <p className="text-[var(--text-muted)] break-words">
                       {order.planName}
                       {order.dataAllowance !== "Not available"
                         ? ` · ${order.dataAllowance}`
                         : ""}
                     </p>
+                    <p className="font-semibold tabular-nums text-[var(--heading)]">
+                      {order.amountLabel}
+                    </p>
+                    <dl className="grid gap-1 text-xs text-[var(--text-soft)] sm:grid-cols-2">
+                      <div>
+                        <dt className="inline font-semibold">Validity: </dt>
+                        <dd className="inline">{order.validity}</dd>
+                      </div>
+                      <div>
+                        <dt className="inline font-semibold">Currency: </dt>
+                        <dd className="inline">{order.currencyLabel}</dd>
+                      </div>
+                      <div>
+                        <dt className="inline font-semibold">Funding: </dt>
+                        <dd className="inline">{order.fundingLabel}</dd>
+                      </div>
+                      <div>
+                        <dt className="inline font-semibold">Purchased: </dt>
+                        <dd className="inline">{order.purchasedAtLabel}</dd>
+                      </div>
+                      <div>
+                        <dt className="inline font-semibold">ICCID: </dt>
+                        <dd className="inline">{order.iccidMasked}</dd>
+                      </div>
+                    </dl>
                   </div>
-                  <p className="shrink-0 font-semibold tabular-nums text-[var(--heading)]">
-                    {order.amountLabel}
-                  </p>
-                </div>
-                <dl className="mt-3 grid gap-1 text-xs text-[var(--text-soft)] sm:grid-cols-2">
-                  <div>
-                    <dt className="inline font-semibold">Validity: </dt>
-                    <dd className="inline">{order.validity}</dd>
-                  </div>
-                  <div>
-                    <dt className="inline font-semibold">Status: </dt>
-                    <dd className="inline">{order.localStatus}</dd>
-                  </div>
-                  <div>
-                    <dt className="inline font-semibold">Currency: </dt>
-                    <dd className="inline">{order.currencyLabel}</dd>
-                  </div>
-                  <div>
-                    <dt className="inline font-semibold">Funding: </dt>
-                    <dd className="inline">{order.fundingLabel}</dd>
-                  </div>
-                  <div>
-                    <dt className="inline font-semibold">Purchased: </dt>
-                    <dd className="inline">{order.purchasedAtLabel}</dd>
-                  </div>
-                  <div>
-                    <dt className="inline font-semibold">ICCID: </dt>
-                    <dd className="inline">{order.iccidMasked}</dd>
-                  </div>
-                </dl>
-                {canViewOrders ? (
-                  <p className="mt-3">
-                    <Link
+                  {canViewOrders ? (
+                    <AdminButton
                       href={`/admin/orders/${encodeURIComponent(order.id)}`}
-                      className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                      variant="primary"
+                      className="shrink-0"
                     >
                       View Order
-                    </Link>
-                  </p>
-                ) : null}
+                    </AdminButton>
+                  ) : null}
+                </div>
               </li>
             ))}
           </ul>
@@ -374,20 +434,20 @@ export default async function AdminCustomerDetailPage({
           {canAdjustWallet && wallet?.accountActive ? (
             <div className="flex min-w-0 flex-col items-stretch gap-2 sm:items-end">
               <div className="flex flex-wrap gap-2">
-                <Link
+                <AdminButton
                   href={`/admin/customers/${encodeURIComponent(detail.id)}/wallet/credit`}
-                  className="inline-flex h-10 items-center justify-center rounded-[14px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+                  variant="primary"
                 >
                   Add wallet credit
-                </Link>
+                </AdminButton>
                 {wallet.hasWallet &&
                 wallet.balanceCents >= ADMIN_DEBIT_MIN_CENTS ? (
-                  <Link
+                  <AdminButton
                     href={`/admin/customers/${encodeURIComponent(detail.id)}/wallet/debit`}
-                    className="inline-flex h-10 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+                    variant="secondary"
                   >
                     Deduct wallet funds
-                  </Link>
+                  </AdminButton>
                 ) : null}
               </div>
               {!(
@@ -402,17 +462,14 @@ export default async function AdminCustomerDetailPage({
         </div>
 
         {walletUnavailable ? (
-          <div
-            className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-6"
-            role="status"
-          >
+          <div className={UNAVAILABLE_CLASS} role="status">
             <p className="text-sm font-medium text-[var(--heading)]">
               Wallet data is temporarily unavailable. Please refresh shortly.
             </p>
           </div>
         ) : wallet ? (
           <>
-            <dl className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 sm:px-5">
+            <dl className={CARD_CLASS}>
               <DetailRow
                 label="Available balance"
                 value={`${wallet.balanceLabel} USD`}
@@ -421,9 +478,17 @@ export default async function AdminCustomerDetailPage({
               <DetailRow
                 label="Wallet status"
                 value={
-                  wallet.hasWallet
-                    ? wallet.walletStatusLabel
-                    : "Not created"
+                  <AdminStatusPill
+                    value={
+                      wallet.hasWallet
+                        ? wallet.walletStatusLabel
+                        : "Not created"
+                    }
+                  >
+                    {wallet.hasWallet
+                      ? wallet.walletStatusLabel
+                      : "Not created"}
+                  </AdminStatusPill>
                 }
               />
               {!wallet.hasWallet ? (
@@ -443,64 +508,67 @@ export default async function AdminCustomerDetailPage({
                 Recent wallet transactions
               </h3>
               {wallet.recentTransactions.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-5 text-sm text-[var(--text-muted)]">
+                <div className={EMPTY_CLASS}>
                   No wallet transactions yet.
                 </div>
               ) : (
                 <ul className="space-y-3">
                   {wallet.recentTransactions.map((row) => (
-                    <li
-                      key={row.id}
-                      className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm"
-                    >
-                      <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="font-semibold text-[var(--heading)] break-words">
-                            {row.typeLabel}
+                    <li key={row.id} className={LIST_CARD_CLASS}>
+                      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0 space-y-2">
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <p className="font-semibold text-[var(--heading)] break-words">
+                              {row.typeLabel}
+                            </p>
+                            <AdminStatusPill value={row.statusLabel}>
+                              {row.statusLabel}
+                            </AdminStatusPill>
+                          </div>
+                          <p className="text-[var(--text-muted)] break-words">
+                            {row.directionLabel}
                           </p>
-                          <p className="mt-1 text-[var(--text-muted)] break-words">
-                            {row.directionLabel} · {row.statusLabel}
+                          <p className="font-semibold tabular-nums text-[var(--heading)]">
+                            {row.amountLabel}
                           </p>
+                          <p className="text-xs text-[var(--text-soft)] break-words">
+                            {row.createdAtLabel}
+                          </p>
+                          {row.referenceLabel ? (
+                            <p className="text-xs text-[var(--text-soft)] break-words">
+                              Ref {row.referenceLabel}
+                            </p>
+                          ) : null}
+                          {row.notificationLabel ? (
+                            <p className="text-xs text-[var(--text-soft)] break-words">
+                              {row.notificationLabel}
+                            </p>
+                          ) : null}
                         </div>
-                        <p className="shrink-0 font-semibold tabular-nums text-[var(--heading)]">
-                          {row.amountLabel}
-                        </p>
-                      </div>
-                      <p className="mt-2 text-xs text-[var(--text-soft)] break-words">
-                        {row.createdAtLabel}
-                      </p>
-                      {row.referenceLabel ? (
-                        <p className="mt-1 text-xs text-[var(--text-soft)] break-words">
-                          Ref {row.referenceLabel}
-                        </p>
-                      ) : null}
-                      {row.notificationLabel ? (
-                        <p className="mt-1 text-xs text-[var(--text-soft)] break-words">
-                          {row.notificationLabel}
-                        </p>
-                      ) : null}
-                      {canViewOrders && row.relatedOrderId ? (
-                        <p className="mt-2">
-                          <Link
+                        {canViewOrders && row.relatedOrderId ? (
+                          <AdminButton
                             href={`/admin/orders/${encodeURIComponent(row.relatedOrderId)}`}
-                            className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                            variant="secondary"
+                            size="sm"
+                            className="shrink-0"
                           >
                             View related order
-                          </Link>
-                        </p>
-                      ) : null}
+                          </AdminButton>
+                        ) : null}
+                      </div>
                     </li>
                   ))}
                 </ul>
               )}
-              <p className="text-sm">
-                <Link
+              <div>
+                <AdminButton
                   href={`/admin/customers/${encodeURIComponent(detail.id)}/wallet`}
-                  className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                  variant="ghost"
+                  size="sm"
                 >
                   View full wallet ledger
-                </Link>
-              </p>
+                </AdminButton>
+              </div>
             </div>
           </>
         ) : null}
@@ -517,58 +585,54 @@ export default async function AdminCustomerDetailPage({
             </p>
           </div>
           {canViewTransactions ? (
-            <Link
+            <AdminButton
               href="/admin/wallet-topups"
-              className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+              variant="ghost"
+              size="sm"
             >
               View all top-ups
-            </Link>
+            </AdminButton>
           ) : null}
         </div>
 
         {topupsUnavailable ? (
-          <div
-            className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-6"
-            role="status"
-          >
+          <div className={UNAVAILABLE_CLASS} role="status">
             <p className="text-sm font-medium text-[var(--heading)]">
               Wallet top-up data is temporarily unavailable.
             </p>
           </div>
         ) : recentTopups.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-5 text-sm text-[var(--text-muted)]">
+          <div className={EMPTY_CLASS}>
             No wallet top-ups for this customer.
           </div>
         ) : (
           <ul className="space-y-3">
             {recentTopups.map((row) => (
-              <li
-                key={row.id}
-                className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="font-semibold text-[var(--heading)]">
-                      {row.statusLabel}
-                    </p>
-                    <p className="mt-1 text-[var(--text-muted)]">
+              <li key={row.id} className={LIST_CARD_CLASS}>
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 space-y-2">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <AdminStatusPill value={row.statusLabel}>
+                        {row.statusLabel}
+                      </AdminStatusPill>
+                      <p className="font-semibold tabular-nums text-[var(--heading)]">
+                        {row.creditAmountLabel} USD
+                      </p>
+                    </div>
+                    <p className="text-[var(--text-muted)]">
                       {row.gatewayLabel} · {row.createdAtLabel}
                     </p>
                   </div>
-                  <p className="font-semibold tabular-nums text-[var(--heading)]">
-                    {row.creditAmountLabel} USD
-                  </p>
-                </div>
-                {canViewTransactions ? (
-                  <p className="mt-3">
-                    <Link
+                  {canViewTransactions ? (
+                    <AdminButton
                       href={`/admin/wallet-topups/${encodeURIComponent(row.id)}`}
-                      className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+                      variant="primary"
+                      className="shrink-0"
                     >
                       View top-up
-                    </Link>
-                  </p>
-                ) : null}
+                    </AdminButton>
+                  ) : null}
+                </div>
               </li>
             ))}
           </ul>

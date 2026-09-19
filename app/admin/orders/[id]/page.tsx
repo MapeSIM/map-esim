@@ -1,4 +1,4 @@
-import Link from "next/link";
+import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import AdminAddDataForm from "@/app/components/admin/AdminAddDataForm";
 import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBadge";
@@ -8,15 +8,25 @@ import { loadAdminAccess } from "@/app/lib/admin/adminPermissionAccess";
 import { hasAdminPermission } from "@/app/lib/admin/adminPermissions";
 import { getAdminOrderDetail } from "@/app/lib/admin/orders";
 import { requireRole } from "@/app/lib/auth/session";
+import {
+  AdminButton,
+  AdminStatusPill,
+} from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
 const ORDERS_UNAVAILABLE =
   "Order data is temporarily unavailable. Please refresh shortly.";
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+const CARD_CLASS =
+  "min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 sm:px-5";
+
+const UNAVAILABLE_CLASS =
+  "rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8";
+
+function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[200px_1fr] sm:gap-4">
+    <div className="grid gap-1 border-b border-[var(--border)] py-3 last:border-b-0 sm:grid-cols-[200px_1fr] sm:gap-4">
       <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
         {label}
       </dt>
@@ -49,17 +59,11 @@ export default async function AdminOrderDetailPage({
     detail = await getAdminOrderDetail(id);
   } catch {
     return (
-      <div className="space-y-6">
-        <Link
-          href="/admin/orders"
-          className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-        >
+      <div className="min-w-0 space-y-6">
+        <AdminButton href="/admin/orders" variant="ghost" size="sm">
           ← Back to orders
-        </Link>
-        <div
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-          role="status"
-        >
+        </AdminButton>
+        <div className={UNAVAILABLE_CLASS} role="status">
           <p className="text-sm font-medium text-[var(--heading)]">
             {ORDERS_UNAVAILABLE}
           </p>
@@ -73,51 +77,92 @@ export default async function AdminOrderDetailPage({
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <Link
-          href="/admin/orders"
-          className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-        >
+    <div className="min-w-0 space-y-8">
+      <header className="min-w-0 space-y-3">
+        <AdminButton href="/admin/orders" variant="ghost" size="sm">
           ← Back to orders
-        </Link>
-        <h1 className="mt-4 text-2xl font-bold tracking-tight">Order detail</h1>
-        <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Local order snapshots only. Provider fulfilment status is not
-          refreshed from this page.
-        </p>
-        {detail.isAddDataPurchase ? (
-          <div className="mt-3">
-            <AddDataPurchaseBadge isAddDataPurchase />
-          </div>
-        ) : null}
-      </div>
+        </AdminButton>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Order detail</h1>
+          <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
+            Local order snapshots only. Provider fulfilment status is not
+            refreshed from this page.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <AdminStatusPill value={detail.localStatus}>
+            {detail.localStatus}
+          </AdminStatusPill>
+          <AdminStatusPill value={detail.fundingLabel}>
+            {detail.fundingLabel}
+          </AdminStatusPill>
+          <AdminStatusPill value={detail.associationLabel}>
+            {detail.associationLabel}
+          </AdminStatusPill>
+          {detail.isAddDataPurchase ? <AddDataPurchaseBadge isAddDataPurchase /> : null}
+        </div>
+      </header>
 
-      <dl className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 sm:px-5">
+      <dl className={CARD_CLASS}>
         <DetailRow label="Local order ID" value={detail.id} />
         <DetailRow label="Created" value={detail.createdAtLabel} />
         <DetailRow label="Updated" value={detail.updatedAtLabel} />
         <DetailRow label="Destination" value={detail.destination} />
         <DetailRow label="Plan / data" value={detail.planPackage} />
         <DetailRow label="Validity" value={detail.validity} />
-        <DetailRow label="Local status" value={detail.localStatus} />
+        <DetailRow
+          label="Local status"
+          value={
+            <AdminStatusPill value={detail.localStatus}>
+              {detail.localStatus}
+            </AdminStatusPill>
+          }
+        />
         {detail.isAddDataPurchase && detail.addDataSourceOrderId ? (
           <DetailRow
             label="Add More Data source"
             value={detail.addDataSourceOrderId}
           />
         ) : null}
-        <DetailRow label="Funding" value={detail.fundingLabel} />
+        <DetailRow
+          label="Funding"
+          value={
+            <AdminStatusPill value={detail.fundingLabel}>
+              {detail.fundingLabel}
+            </AdminStatusPill>
+          }
+        />
         <DetailRow label="Provider amount" value={detail.amountLabel} />
         <DetailRow
           label="Provider reference"
           value={detail.providerRefMasked}
         />
         <DetailRow label="Offer ID" value={detail.offerId} />
-        <DetailRow label="Association" value={detail.associationLabel} />
+        <DetailRow
+          label="Association"
+          value={
+            <AdminStatusPill value={detail.associationLabel}>
+              {detail.associationLabel}
+            </AdminStatusPill>
+          }
+        />
         <DetailRow label="Customer email" value={detail.customerEmail} />
-        <DetailRow label="Account status" value={detail.accountStatusLabel} />
-        <DetailRow label="Claim status" value={detail.claimStatusLabel} />
+        <DetailRow
+          label="Account status"
+          value={
+            <AdminStatusPill value={detail.accountStatusLabel}>
+              {detail.accountStatusLabel}
+            </AdminStatusPill>
+          }
+        />
+        <DetailRow
+          label="Claim status"
+          value={
+            <AdminStatusPill value={detail.claimStatusLabel}>
+              {detail.claimStatusLabel}
+            </AdminStatusPill>
+          }
+        />
         <DetailRow label="Claimed at" value={detail.claimedAtLabel} />
         {canRevealIccid ? (
           <IccidRevealPanel
@@ -131,7 +176,7 @@ export default async function AdminOrderDetailPage({
         )}
       </dl>
 
-      <section className="space-y-3" aria-labelledby="admin-usage-heading">
+      <section className="min-w-0 space-y-3" aria-labelledby="admin-usage-heading">
         <div className="sr-only">
           <h2 id="admin-usage-heading">Usage</h2>
         </div>
