@@ -1,11 +1,17 @@
-import Link from "next/link";
 import { requireRole } from "@/app/lib/auth/session";
 import { listFailedGatewayPaymentAttempts } from "@/app/lib/admin/failedPaymentAttempts";
+import { AdminButton, AdminStatusPill } from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
 const UNAVAILABLE =
   "Failed payment data is temporarily unavailable. Please refresh shortly.";
+
+const EMPTY_CLASS =
+  "rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]";
+
+const CARD_CLASS =
+  "rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm";
 
 export default async function AdminFailedPaymentsPage() {
   await requireRole("ADMIN");
@@ -35,46 +41,41 @@ export default async function AdminFailedPaymentsPage() {
           Failed and cancelled gateway payment attempts. This list is
           read-only and does not cancel, refund, or mark a purchase funded.
         </p>
-        <p className="mt-2 text-sm">
-          <Link
-            href="/admin/payments"
-            className="font-semibold text-[var(--accent-strong)]"
-          >
+        <p className="mt-2 flex flex-wrap gap-2 text-sm">
+          <AdminButton href="/admin/payments" variant="ghost" size="sm">
             Payments hub
-          </Link>
-          <span className="text-[var(--text-soft)]"> · </span>
-          <Link
-            href="/admin/payments/pending"
-            className="font-semibold text-[var(--accent-strong)]"
-          >
+          </AdminButton>
+          <AdminButton href="/admin/payments/pending" variant="ghost" size="sm">
             Pending payments
-          </Link>
-          <span className="text-[var(--text-soft)]"> · </span>
-          <Link
+          </AdminButton>
+          <AdminButton
             href="/admin/payments/webhooks"
-            className="font-semibold text-[var(--accent-strong)]"
+            variant="ghost"
+            size="sm"
           >
             Webhook receipts
-          </Link>
+          </AdminButton>
         </p>
       </header>
 
       {rows.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]">
+        <div className={EMPTY_CLASS}>
           No failed or cancelled gateway payment attempts right now.
         </div>
       ) : (
         <ul className="space-y-3">
           {rows.map((row) => (
-            <li
-              key={row.attemptId}
-              className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm"
-            >
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0 space-y-1">
-                  <p className="font-semibold text-[var(--heading)]">
-                    {row.statusLabel} · {row.amountLabel}
-                  </p>
+            <li key={row.attemptId} className={CARD_CLASS}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AdminStatusPill value={row.statusLabel}>
+                      {row.statusLabel}
+                    </AdminStatusPill>
+                    <span className="font-semibold text-[var(--heading)]">
+                      {row.amountLabel}
+                    </span>
+                  </div>
                   <p className="break-words text-[var(--text-muted)]">
                     {row.customerLabel}
                   </p>
@@ -90,19 +91,16 @@ export default async function AdminFailedPaymentsPage() {
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 sm:items-end">
-                  <Link
+                  <AdminButton
                     href={`/admin/payments/${encodeURIComponent(row.attemptId)}`}
-                    className="inline-flex h-10 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-white"
+                    variant="primary"
                   >
                     Open payment
-                  </Link>
+                  </AdminButton>
                   {row.customerHref ? (
-                    <Link
-                      href={row.customerHref}
-                      className="inline-flex h-10 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)]"
-                    >
+                    <AdminButton href={row.customerHref} variant="secondary">
                       View customer
-                    </Link>
+                    </AdminButton>
                   ) : null}
                 </div>
               </div>

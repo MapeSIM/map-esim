@@ -1,11 +1,14 @@
-import Link from "next/link";
 import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBadge";
 import { getAdminOrdersPage } from "@/app/lib/admin/orders";
+import { AdminButton, AdminStatusPill } from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
 const ORDERS_UNAVAILABLE =
   "Order data is temporarily unavailable. Please refresh shortly.";
+
+const EMPTY_CLASS =
+  "rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]";
 
 function buildOrdersHref(options: {
   q: string;
@@ -157,25 +160,19 @@ export default async function AdminOrdersPage({
         </label>
 
         <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
-          <button
-            type="submit"
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-          >
+          <AdminButton type="submit" variant="primary">
             Apply filters
-          </button>
-          <Link
-            href="/admin/orders"
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-          >
+          </AdminButton>
+          <AdminButton href="/admin/orders" variant="secondary">
             Clear
-          </Link>
+          </AdminButton>
         </div>
       </form>
 
       {data.rows.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-4 py-6 text-sm text-[var(--text-soft)]">
+        <div className={EMPTY_CLASS}>
           No local orders match the selected filters.
-        </p>
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-[var(--border)]">
           <table className="min-w-[900px] w-full border-collapse text-left text-sm">
@@ -211,7 +208,11 @@ export default async function AdminOrdersPage({
                       />
                     </div>
                   </td>
-                  <td className="px-3 py-3">{order.localStatus}</td>
+                  <td className="px-3 py-3">
+                    <AdminStatusPill value={order.localStatus}>
+                      {order.localStatus}
+                    </AdminStatusPill>
+                  </td>
                   <td className="px-3 py-3">{order.fundingLabel}</td>
                   <td className="whitespace-nowrap px-3 py-3">
                     {order.amountLabel}
@@ -222,14 +223,19 @@ export default async function AdminOrdersPage({
                   <td className="px-3 py-3 font-mono text-xs">
                     {order.iccidMasked}
                   </td>
-                  <td className="px-3 py-3">{order.associationLabel}</td>
                   <td className="px-3 py-3">
-                    <Link
+                    <AdminStatusPill value={order.associationLabel}>
+                      {order.associationLabel}
+                    </AdminStatusPill>
+                  </td>
+                  <td className="px-3 py-3">
+                    <AdminButton
                       href={`/admin/orders/${order.id}`}
-                      className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                      variant="ghost"
+                      size="sm"
                     >
                       View
-                    </Link>
+                    </AdminButton>
                   </td>
                 </tr>
               ))}
@@ -246,28 +252,28 @@ export default async function AdminOrdersPage({
         </p>
         <div className="flex gap-2">
           {data.page > 1 ? (
-            <Link
+            <AdminButton
               href={buildOrdersHref({ ...filterBase, page: data.page - 1 })}
-              className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-3 font-semibold text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+              variant="secondary"
             >
               Previous
-            </Link>
+            </AdminButton>
           ) : (
-            <span className="inline-flex h-10 items-center rounded-xl border border-[var(--border)] px-3 opacity-50">
+            <AdminButton variant="secondary" disabled>
               Previous
-            </span>
+            </AdminButton>
           )}
           {data.page < data.totalPages ? (
-            <Link
+            <AdminButton
               href={buildOrdersHref({ ...filterBase, page: data.page + 1 })}
-              className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-3 font-semibold text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+              variant="secondary"
             >
               Next
-            </Link>
+            </AdminButton>
           ) : (
-            <span className="inline-flex h-10 items-center rounded-xl border border-[var(--border)] px-3 opacity-50">
+            <AdminButton variant="secondary" disabled>
               Next
-            </span>
+            </AdminButton>
           )}
         </div>
       </div>

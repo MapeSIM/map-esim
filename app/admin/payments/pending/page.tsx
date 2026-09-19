@@ -1,11 +1,17 @@
-import Link from "next/link";
 import { requireRole } from "@/app/lib/auth/session";
 import { listPendingGatewayPaymentAttempts } from "@/app/lib/admin/pendingPaymentVerify";
+import { AdminButton, AdminStatusPill } from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
 const UNAVAILABLE =
   "Pending payment data is temporarily unavailable. Please refresh shortly.";
+
+const EMPTY_CLASS =
+  "rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]";
+
+const CARD_CLASS =
+  "rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm";
 
 export default async function AdminPendingPaymentsPage() {
   await requireRole("ADMIN");
@@ -36,43 +42,33 @@ export default async function AdminPendingPaymentsPage() {
           or Simpaisa Inquire checks. Successful evidence still requires an
           authoritative webhook before funding. Admin never funds or marks paid.
         </p>
-        <p className="mt-2 text-sm">
-          <Link
-            href="/admin/payments"
-            className="font-semibold text-[var(--accent-strong)]"
-          >
+        <p className="mt-2 flex flex-wrap gap-2 text-sm">
+          <AdminButton href="/admin/payments" variant="ghost" size="sm">
             Payments hub
-          </Link>
-          <span className="text-[var(--text-soft)]"> · </span>
-          <Link
-            href="/admin/payments/failed"
-            className="font-semibold text-[var(--accent-strong)]"
-          >
+          </AdminButton>
+          <AdminButton href="/admin/payments/failed" variant="ghost" size="sm">
             Failed payments
-          </Link>
-          <span className="text-[var(--text-soft)]"> · </span>
-          <Link
+          </AdminButton>
+          <AdminButton
             href="/admin/payments/webhooks"
-            className="font-semibold text-[var(--accent-strong)]"
+            variant="ghost"
+            size="sm"
           >
             Webhook receipts
-          </Link>
+          </AdminButton>
         </p>
       </header>
 
       {rows.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]">
+        <div className={EMPTY_CLASS}>
           No awaiting gateway payment attempts right now.
         </div>
       ) : (
         <ul className="space-y-3">
           {rows.map((row) => (
-            <li
-              key={row.attemptId}
-              className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm"
-            >
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-1">
+            <li key={row.attemptId} className={CARD_CLASS}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 space-y-2">
                   <p className="font-semibold text-[var(--heading)]">
                     Attempt {row.attemptId}
                   </p>
@@ -82,10 +78,17 @@ export default async function AdminPendingPaymentsPage() {
                       ? ` · ${row.gatewayProvider}`
                       : ""}
                   </p>
-                  <p className="text-[var(--text-muted)]">
-                    {row.gatewayAmountCents} {row.currency} · attempt{" "}
-                    {row.attemptStatus} · purchase {row.purchaseStatus}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AdminStatusPill value={row.attemptStatus}>
+                      {row.attemptStatus}
+                    </AdminStatusPill>
+                    <AdminStatusPill value={row.purchaseStatus}>
+                      {row.purchaseStatus}
+                    </AdminStatusPill>
+                    <span className="text-xs text-[var(--text-soft)]">
+                      {row.gatewayAmountCents} {row.currency}
+                    </span>
+                  </div>
                   <p className="text-xs text-[var(--text-soft)]">
                     Tracker {row.trackerRefMasked}
                     {row.walletAppliedCents > 0
@@ -93,12 +96,12 @@ export default async function AdminPendingPaymentsPage() {
                       : " · gateway-only"}
                   </p>
                 </div>
-                <Link
+                <AdminButton
                   href={`/admin/payments/${encodeURIComponent(row.attemptId)}`}
-                  className="inline-flex h-10 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-white"
+                  variant="primary"
                 >
                   Open
-                </Link>
+                </AdminButton>
               </div>
             </li>
           ))}

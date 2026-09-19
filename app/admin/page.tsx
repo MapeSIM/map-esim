@@ -1,33 +1,10 @@
 import { getAdminOverview } from "@/app/lib/admin/overview";
+import { AdminKpiCard, AdminStatusPill } from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
 const DASHBOARD_UNAVAILABLE =
   "Dashboard data is temporarily unavailable. Please refresh shortly.";
-
-function StatCard({
-  label,
-  value,
-  note,
-}: {
-  label: string;
-  value: string | number;
-  note?: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-bold tracking-tight text-[var(--heading)]">
-        {value}
-      </p>
-      {note ? (
-        <p className="mt-2 text-xs leading-snug text-[var(--text-muted)]">{note}</p>
-      ) : null}
-    </div>
-  );
-}
 
 function StatusRow({
   label,
@@ -36,19 +13,10 @@ function StatusRow({
   label: string;
   status: string;
 }) {
-  const ok = status === "Configured" || status === "Operational";
   return (
     <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] py-3 last:border-b-0">
       <span className="text-sm text-[var(--text)]">{label}</span>
-      <span
-        className={
-          ok
-            ? "rounded-full bg-[var(--accent-strong)]/12 px-2.5 py-1 text-xs font-semibold text-[var(--accent-strong)]"
-            : "rounded-full bg-[var(--surface)] px-2.5 py-1 text-xs font-semibold text-[var(--text-muted)]"
-        }
-      >
-        {status}
-      </span>
+      <AdminStatusPill value={status}>{status}</AdminStatusPill>
     </div>
   );
 }
@@ -120,12 +88,15 @@ export default async function AdminDashboardPage({
           Orders and active customers at a glance.
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <StatCard label="Orders" value={data.totalLocalOrders} />
-          <StatCard
+          <AdminKpiCard label="Orders" value={data.totalLocalOrders} />
+          <AdminKpiCard
             label="Completed orders"
             value={data.completedLocalOrders}
           />
-          <StatCard label="Active customers" value={data.activeCustomerCount} />
+          <AdminKpiCard
+            label="Active customers"
+            value={data.activeCustomerCount}
+          />
         </div>
       </section>
 
@@ -195,12 +166,15 @@ export default async function AdminDashboardPage({
           Sign-in mix among active customers. Secondary to order metrics.
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <StatCard
+          <AdminKpiCard
             label="Verified customers"
             value={data.verifiedCustomerCount}
           />
-          <StatCard label="Google customers" value={data.googleCustomerCount} />
-          <StatCard
+          <AdminKpiCard
+            label="Google customers"
+            value={data.googleCustomerCount}
+          />
+          <AdminKpiCard
             label="Credentials customers"
             value={data.credentialsCustomerCount}
           />
@@ -218,7 +192,7 @@ export default async function AdminDashboardPage({
           Non-revenue staging totals only.
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <StatCard
+          <AdminKpiCard
             label="VeSIM staging checkout total (USD)"
             value={data.stagingProviderTotalUsd}
             note="This is a staging provider-wallet total, not live customer revenue."

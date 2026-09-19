@@ -1,10 +1,13 @@
-import Link from "next/link";
 import { getAdminCustomersPage } from "@/app/lib/admin/customers";
+import { AdminButton, AdminStatusPill } from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
 const CUSTOMERS_UNAVAILABLE =
   "Customer data is temporarily unavailable. Please refresh shortly.";
+
+const EMPTY_CLASS =
+  "rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]";
 
 function buildCustomersHref(options: {
   q: string;
@@ -151,25 +154,19 @@ export default async function AdminCustomersPage({
         </label>
 
         <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
-          <button
-            type="submit"
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-          >
+          <AdminButton type="submit" variant="primary">
             Apply filters
-          </button>
-          <Link
-            href="/admin/customers"
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-          >
+          </AdminButton>
+          <AdminButton href="/admin/customers" variant="secondary">
             Clear
-          </Link>
+          </AdminButton>
         </div>
       </form>
 
       {data.rows.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-4 py-6 text-sm text-[var(--text-soft)]">
+        <div className={EMPTY_CLASS}>
           No customers match the selected filters.
-        </p>
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-[var(--border)]">
           <table className="min-w-[960px] w-full border-collapse text-left text-sm">
@@ -199,16 +196,25 @@ export default async function AdminCustomersPage({
                     {customer.emailMasked}
                   </td>
                   <td className="px-3 py-3">{customer.authMethodLabel}</td>
-                  <td className="px-3 py-3">{customer.emailVerifiedLabel}</td>
-                  <td className="px-3 py-3">{customer.accountStatusLabel}</td>
+                  <td className="px-3 py-3">
+                    <AdminStatusPill value={customer.emailVerifiedLabel}>
+                      {customer.emailVerifiedLabel}
+                    </AdminStatusPill>
+                  </td>
+                  <td className="px-3 py-3">
+                    <AdminStatusPill value={customer.accountStatusLabel}>
+                      {customer.accountStatusLabel}
+                    </AdminStatusPill>
+                  </td>
                   <td className="px-3 py-3">{customer.localOrderCount}</td>
                   <td className="px-3 py-3">
-                    <Link
+                    <AdminButton
                       href={`/admin/customers/${customer.id}`}
-                      className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                      variant="ghost"
+                      size="sm"
                     >
                       View
-                    </Link>
+                    </AdminButton>
                   </td>
                 </tr>
               ))}
@@ -225,34 +231,34 @@ export default async function AdminCustomersPage({
         </p>
         <div className="flex gap-2">
           {data.page > 1 ? (
-            <Link
+            <AdminButton
               href={buildCustomersHref({
                 ...filterBase,
                 page: data.page - 1,
               })}
-              className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-3 font-semibold text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+              variant="secondary"
             >
               Previous
-            </Link>
+            </AdminButton>
           ) : (
-            <span className="inline-flex h-10 items-center rounded-xl border border-[var(--border)] px-3 opacity-50">
+            <AdminButton variant="secondary" disabled>
               Previous
-            </span>
+            </AdminButton>
           )}
           {data.page < data.totalPages ? (
-            <Link
+            <AdminButton
               href={buildCustomersHref({
                 ...filterBase,
                 page: data.page + 1,
               })}
-              className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-3 font-semibold text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+              variant="secondary"
             >
               Next
-            </Link>
+            </AdminButton>
           ) : (
-            <span className="inline-flex h-10 items-center rounded-xl border border-[var(--border)] px-3 opacity-50">
+            <AdminButton variant="secondary" disabled>
               Next
-            </span>
+            </AdminButton>
           )}
         </div>
       </div>

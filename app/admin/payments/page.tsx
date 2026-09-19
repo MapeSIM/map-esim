@@ -2,24 +2,12 @@ import Link from "next/link";
 import { requireRole } from "@/app/lib/auth/session";
 import { listAdminPayments } from "@/app/lib/admin/paymentDashboard";
 import { buildAdminPaymentsHref } from "@/app/lib/admin/paymentDashboardShared";
+import { AdminButton, AdminKpiCard } from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
 const UNAVAILABLE =
   "Payment dashboard data is temporarily unavailable. Please refresh shortly.";
-
-function KpiCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-bold tracking-tight text-[var(--heading)]">
-        {value}
-      </p>
-    </div>
-  );
-}
 
 export default async function AdminPaymentsHubPage({
   searchParams,
@@ -109,16 +97,16 @@ export default async function AdminPaymentsHubPage({
         aria-label="Payment KPIs"
         className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
       >
-        <KpiCard label="Pending" value={data.kpis.pendingCount} />
-        <KpiCard
+        <AdminKpiCard label="Pending" value={data.kpis.pendingCount} />
+        <AdminKpiCard
           label="Failed / cancelled (24h)"
           value={data.kpis.failedLast24hCount}
         />
-        <KpiCard
+        <AdminKpiCard
           label="Webhook missing (pending)"
           value={data.kpis.webhookMissingAmongPendingCount}
         />
-        <KpiCard
+        <AdminKpiCard
           label="Recovery candidates"
           value={data.kpis.recoveryCandidateCount}
         />
@@ -192,18 +180,12 @@ export default async function AdminPaymentsHubPage({
         </label>
 
         <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
-          <button
-            type="submit"
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-white"
-          >
+          <AdminButton type="submit" variant="primary">
             Apply filters
-          </button>
-          <Link
-            href="/admin/payments"
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)]"
-          >
+          </AdminButton>
+          <AdminButton href="/admin/payments" variant="secondary">
             Reset
-          </Link>
+          </AdminButton>
         </div>
       </form>
 
@@ -289,12 +271,9 @@ export default async function AdminPaymentsHubPage({
                     <p>created {row.createdAtLabel}</p>
                   </td>
                   <td className="px-3 py-3 align-top">
-                    <Link
-                      href={row.href}
-                      className="inline-flex h-9 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-3 text-xs font-semibold text-white"
-                    >
+                    <AdminButton href={row.href} variant="primary" size="sm">
                       Open
-                    </Link>
+                    </AdminButton>
                   </td>
                 </tr>
               ))}
@@ -306,26 +285,26 @@ export default async function AdminPaymentsHubPage({
       {data.totalPages > 1 ? (
         <div className="flex flex-wrap gap-2">
           {data.page > 1 ? (
-            <Link
+            <AdminButton
               href={buildAdminPaymentsHref({
                 ...filterBase,
                 page: data.page - 1,
               })}
-              className="rounded-xl border border-[var(--border-strong)] px-3 py-2 text-sm font-semibold text-[var(--heading)]"
+              variant="secondary"
             >
               Previous
-            </Link>
+            </AdminButton>
           ) : null}
           {data.page < data.totalPages ? (
-            <Link
+            <AdminButton
               href={buildAdminPaymentsHref({
                 ...filterBase,
                 page: data.page + 1,
               })}
-              className="rounded-xl border border-[var(--border-strong)] px-3 py-2 text-sm font-semibold text-[var(--heading)]"
+              variant="secondary"
             >
               Next
-            </Link>
+            </AdminButton>
           ) : null}
         </div>
       ) : null}

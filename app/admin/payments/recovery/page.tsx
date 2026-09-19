@@ -5,11 +5,15 @@ import {
   PAYMENT_RECOVERY_POLICY_BLURB,
   buildAdminPaymentRecoveryHref,
 } from "@/app/lib/admin/paymentRecoveryShared";
+import { AdminButton, AdminStatusPill } from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
 const UNAVAILABLE =
   "Payment recovery data is temporarily unavailable. Please refresh shortly.";
+
+const EMPTY_CLASS =
+  "rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]";
 
 export default async function AdminPaymentRecoveryPage({
   searchParams,
@@ -40,12 +44,9 @@ export default async function AdminPaymentRecoveryPage({
     <div className="space-y-8">
       <header>
         <p className="text-sm">
-          <Link
-            href="/admin/payments"
-            className="font-semibold text-[var(--accent-strong)]"
-          >
+          <AdminButton href="/admin/payments" variant="ghost" size="sm">
             ← Payments
-          </Link>
+          </AdminButton>
         </p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight">
           Payment recovery
@@ -66,7 +67,7 @@ export default async function AdminPaymentRecoveryPage({
       </p>
 
       {data.rows.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]">
+        <div className={EMPTY_CLASS}>
           No recovery candidates match the stale threshold right now.
         </div>
       ) : (
@@ -84,18 +85,16 @@ export default async function AdminPaymentRecoveryPage({
                   Last investigation decision
                 </th>
                 <th className="px-3 py-3 font-semibold">Suggested safe action</th>
+                <th className="px-3 py-3 font-semibold"> </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)] bg-[var(--surface)]">
               {data.rows.map((row) => (
                 <tr key={row.attemptId}>
                   <td className="px-3 py-3 align-top">
-                    <Link
-                      href={row.href}
-                      className="font-semibold text-[var(--accent-strong)]"
-                    >
+                    <p className="font-medium text-[var(--heading)]">
                       {row.attemptId}
-                    </Link>
+                    </p>
                     <p className="mt-1 text-xs text-[var(--text-soft)]">
                       purchase {row.purchaseId}
                     </p>
@@ -104,7 +103,7 @@ export default async function AdminPaymentRecoveryPage({
                     {row.customerHref ? (
                       <Link
                         href={row.customerHref}
-                        className="font-medium text-[var(--accent-strong)]"
+                        className="font-medium text-[var(--accent-strong)] outline-none hover:underline focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
                       >
                         {row.customerLabel}
                       </Link>
@@ -121,8 +120,10 @@ export default async function AdminPaymentRecoveryPage({
                   <td className="px-3 py-3 align-top text-[var(--heading)]">
                     {row.ageLabel}
                   </td>
-                  <td className="px-3 py-3 align-top text-[var(--heading)]">
-                    {row.webhookStatusLabel}
+                  <td className="px-3 py-3 align-top">
+                    <AdminStatusPill value={row.webhookStatusLabel}>
+                      {row.webhookStatusLabel}
+                    </AdminStatusPill>
                   </td>
                   <td className="px-3 py-3 align-top text-[var(--heading)]">
                     <p className="font-medium">{row.lastDecisionLabel}</p>
@@ -135,6 +136,11 @@ export default async function AdminPaymentRecoveryPage({
                   <td className="px-3 py-3 align-top text-[var(--text-muted)]">
                     {row.suggestedSafeAction}
                   </td>
+                  <td className="px-3 py-3 align-top">
+                    <AdminButton href={row.href} variant="primary" size="sm">
+                      Open
+                    </AdminButton>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -143,26 +149,30 @@ export default async function AdminPaymentRecoveryPage({
       )}
 
       {data.totalPages > 1 ? (
-        <nav className="flex gap-3 text-sm" aria-label="Recovery pagination">
+        <nav className="flex flex-wrap gap-2" aria-label="Recovery pagination">
           {data.page > 1 ? (
-            <Link
+            <AdminButton
               href={buildAdminPaymentRecoveryHref({ page: data.page - 1 })}
-              className="font-semibold text-[var(--accent-strong)]"
+              variant="secondary"
             >
               Previous
-            </Link>
+            </AdminButton>
           ) : (
-            <span className="text-[var(--text-soft)]">Previous</span>
+            <AdminButton variant="secondary" disabled>
+              Previous
+            </AdminButton>
           )}
           {data.page < data.totalPages ? (
-            <Link
+            <AdminButton
               href={buildAdminPaymentRecoveryHref({ page: data.page + 1 })}
-              className="font-semibold text-[var(--accent-strong)]"
+              variant="secondary"
             >
               Next
-            </Link>
+            </AdminButton>
           ) : (
-            <span className="text-[var(--text-soft)]">Next</span>
+            <AdminButton variant="secondary" disabled>
+              Next
+            </AdminButton>
           )}
         </nav>
       ) : null}
