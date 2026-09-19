@@ -42,7 +42,11 @@ export function resolveAdminStatusPillTone(
     normalized === "PAYMENT_CONFIRMED" ||
     normalized === "VERIFIED" ||
     normalized === "PRESENT" ||
-    normalized === "LINKED"
+    normalized === "LINKED" ||
+    normalized === "VALID" ||
+    normalized === "CREDITED" ||
+    normalized === "RESOLVED" ||
+    normalized === "ESCALATED"
   ) {
     return "success";
   }
@@ -53,11 +57,18 @@ export function resolveAdminStatusPillTone(
     normalized === "CANCELED" ||
     normalized === "BLOCKED" ||
     normalized === "DELETED" ||
-    normalized === "EXPIRED"
+    normalized === "EXPIRED" ||
+    normalized === "PAUSED" ||
+    normalized === "UNAVAILABLE" ||
+    normalized === "INVALID"
   ) {
     return "critical";
   }
-  if (normalized === "HIGH" || normalized === "RECONCILIATION_REQUIRED") {
+  if (
+    normalized === "HIGH" ||
+    normalized === "RECONCILIATION_REQUIRED" ||
+    normalized === "PARTIALLY_PAUSED"
+  ) {
     return "high";
   }
   if (
@@ -69,21 +80,29 @@ export function resolveAdminStatusPillTone(
     normalized === "AWAITING_GATEWAY_PAYMENT" ||
     normalized === "UNVERIFIED" ||
     normalized === "MISSING" ||
-    normalized === "DRAFT"
+    normalized === "DRAFT" ||
+    normalized === "NOT_CONFIGURED" ||
+    normalized === "DISABLED" ||
+    normalized === "NO" ||
+    normalized === "NOT_EXPECTED" ||
+    normalized === "LOCKED"
   ) {
     return "warning";
   }
   if (normalized === "INFO") return "info";
   if (
-    normalized === "NOT_CONFIGURED" ||
-    normalized === "DISABLED" ||
     normalized === "UNKNOWN" ||
-    normalized === "UNAVAILABLE" ||
     normalized === "GUEST" ||
     normalized === "NONE" ||
     normalized === "N/A" ||
     normalized === "—" ||
-    normalized === "-"
+    normalized === "-" ||
+    normalized === "NOT_IMPLEMENTED" ||
+    normalized === "NOT_AVAILABLE" ||
+    normalized === "ON_DEMAND" ||
+    normalized === "NOT_CHECKED" ||
+    normalized === "NOT_IMPLEMENTED_/_DISABLED" ||
+    normalized.includes("NOT_IMPLEMENTED")
   ) {
     return "muted";
   }

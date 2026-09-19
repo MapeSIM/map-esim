@@ -8,11 +8,15 @@ import {
   filterLabel,
   type ReconciliationFilter,
 } from "@/app/lib/admin/reconciliationClassify";
+import { AdminButton, AdminStatusPill } from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
 const UNAVAILABLE =
   "Reconciliation data is temporarily unavailable. Please refresh shortly.";
+
+const EMPTY_CLASS =
+  "rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]";
 
 function buildHref(filter: ReconciliationFilter): string {
   if (filter === "needs_review") return "/admin/reconciliation";
@@ -30,8 +34,8 @@ export default async function AdminReconciliationPage({
   const data = await getReconciliationListPage({ filter: params.filter });
 
   return (
-    <div className="space-y-6">
-      <header>
+    <div className="min-w-0 space-y-8">
+      <header className="min-w-0">
         <h1 className="text-2xl font-bold tracking-tight">Reconciliation</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
           Review stuck purchases, uncertain provider results, and failed
@@ -50,24 +54,21 @@ export default async function AdminReconciliationPage({
       </div>
 
       <nav
-        className="flex flex-wrap gap-2"
+        className="flex min-w-0 flex-wrap gap-2"
         aria-label="Reconciliation filters"
       >
         {RECONCILIATION_FILTERS.map((f) => {
           const active = data.filter === f;
           return (
-            <Link
+            <AdminButton
               key={f}
               href={buildHref(f)}
-              aria-current={active ? "page" : undefined}
-              className={
-                active
-                  ? "rounded-lg bg-[var(--accent-strong)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--accent-strong)]"
-                  : "rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
-              }
+              variant={active ? "primary" : "secondary"}
+              size="sm"
+              className="!h-10 !px-4 !text-sm"
             >
               {filterLabel(f)}
-            </Link>
+            </AdminButton>
           );
         })}
       </nav>
@@ -82,16 +83,11 @@ export default async function AdminReconciliationPage({
           </p>
         </div>
       ) : data.rows.length === 0 ? (
-        <div
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-          role="status"
-        >
-          <p className="text-sm font-medium text-[var(--heading)]">
-            No reconciliation cases match “{data.filterLabel}”.
-          </p>
+        <div className={EMPTY_CLASS} role="status">
+          No reconciliation cases match “{data.filterLabel}”.
         </div>
       ) : (
-        <div className="-mx-1 overflow-x-auto px-1">
+        <div className="-mx-1 overflow-x-auto rounded-2xl border border-[var(--border)] px-1">
           <table className="w-full min-w-[1180px] table-fixed border-collapse text-left text-sm">
             <colgroup>
               <col className="w-[140px]" />
@@ -104,29 +100,29 @@ export default async function AdminReconciliationPage({
               <col className="w-[170px]" />
               <col className="w-[160px]" />
             </colgroup>
-            <thead>
+            <thead className="bg-[var(--surface-2)]">
               <tr className="border-b border-[var(--border)] text-xs uppercase tracking-[0.08em] text-[var(--text-soft)]">
-                <th className="py-2 pr-3 font-semibold whitespace-nowrap">
+                <th className="px-3 py-3 font-semibold whitespace-nowrap">
                   Reference
                 </th>
-                <th className="py-2 pr-3 font-semibold">Customer</th>
-                <th className="py-2 pr-3 font-semibold whitespace-nowrap">
+                <th className="px-3 py-3 font-semibold">Customer</th>
+                <th className="px-3 py-3 font-semibold whitespace-nowrap">
                   Type
                 </th>
-                <th className="py-2 pr-3 font-semibold">Package</th>
-                <th className="py-2 pr-3 font-semibold whitespace-nowrap">
+                <th className="px-3 py-3 font-semibold">Package</th>
+                <th className="px-3 py-3 font-semibold whitespace-nowrap">
                   Amount
                 </th>
-                <th className="py-2 pr-3 font-semibold whitespace-nowrap">
+                <th className="px-3 py-3 font-semibold whitespace-nowrap">
                   Wallet
                 </th>
-                <th className="py-2 pr-3 font-semibold whitespace-nowrap">
+                <th className="px-3 py-3 font-semibold whitespace-nowrap">
                   Provider
                 </th>
-                <th className="py-2 pr-3 font-semibold whitespace-nowrap">
+                <th className="px-3 py-3 font-semibold whitespace-nowrap">
                   Category
                 </th>
-                <th className="py-2 pr-3 font-semibold whitespace-nowrap">
+                <th className="px-3 py-3 font-semibold whitespace-nowrap">
                   Updated
                 </th>
               </tr>
@@ -135,9 +131,9 @@ export default async function AdminReconciliationPage({
               {data.rows.map((row) => (
                 <tr
                   key={`${row.sourceType}:${row.attemptId}`}
-                  className="border-b border-[var(--border)] align-top"
+                  className="border-b border-[var(--border)] align-top text-[var(--text)]"
                 >
-                  <td className="py-3 pr-3 whitespace-nowrap">
+                  <td className="px-3 py-3 whitespace-nowrap">
                     <Link
                       href={row.href}
                       className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
@@ -148,7 +144,7 @@ export default async function AdminReconciliationPage({
                       {row.providerRefMasked}
                     </p>
                   </td>
-                  <td className="py-3 pr-3">
+                  <td className="px-3 py-3">
                     <div className="max-w-[200px] whitespace-normal break-words [overflow-wrap:break-word] [word-break:normal]">
                       {row.customerHref ? (
                         <Link
@@ -162,21 +158,21 @@ export default async function AdminReconciliationPage({
                       )}
                     </div>
                   </td>
-                  <td className="py-3 pr-3 whitespace-nowrap">
+                  <td className="px-3 py-3 whitespace-nowrap">
                     {row.purchaseType}
                   </td>
-                  <td className="py-3 pr-3">
+                  <td className="px-3 py-3">
                     <div className="max-w-[220px] whitespace-normal break-words [overflow-wrap:break-word] [word-break:normal]">
                       {row.destinationPackage}
                     </div>
                   </td>
-                  <td className="py-3 pr-3 whitespace-nowrap">
+                  <td className="px-3 py-3 whitespace-nowrap">
                     {row.amountLabel}
                   </td>
-                  <td className="py-3 pr-3 whitespace-nowrap text-xs">
+                  <td className="px-3 py-3 whitespace-nowrap text-xs">
                     {row.walletDebitRefundLabel}
                   </td>
-                  <td className="py-3 pr-3 whitespace-nowrap">
+                  <td className="px-3 py-3 whitespace-nowrap">
                     <span className="block whitespace-nowrap">
                       {row.providerResultKindLabel}
                     </span>
@@ -184,7 +180,7 @@ export default async function AdminReconciliationPage({
                       {row.hasProviderRef ? "Ref stored" : "Ref missing"}
                     </span>
                   </td>
-                  <td className="py-3 pr-3 whitespace-nowrap">
+                  <td className="px-3 py-3 whitespace-nowrap">
                     <span className="block font-medium whitespace-nowrap">
                       {row.categoryLabel}
                     </span>
@@ -194,36 +190,36 @@ export default async function AdminReconciliationPage({
                     <span className="mt-1 block text-xs text-[var(--text-soft)] whitespace-nowrap">
                       {row.resolutionLabel}
                     </span>
-                    <span className="mt-1 flex flex-wrap gap-1">
+                    <span className="mt-2 flex flex-wrap gap-1.5">
                       {row.locked ? (
-                        <span className="inline-block rounded-md border border-[var(--border)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--heading)]">
-                          Locked
-                        </span>
+                        <AdminStatusPill value="Locked">Locked</AdminStatusPill>
                       ) : null}
                       {row.escalated ? (
-                        <span className="inline-block rounded-md bg-[var(--accent-strong)]/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--accent-strong)]">
+                        <AdminStatusPill value="Escalated">
                           Escalated
-                        </span>
+                        </AdminStatusPill>
                       ) : null}
                       {row.category === "RESOLVED" ? (
-                        <span className="inline-block rounded-md border border-[var(--border)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--text-soft)]">
+                        <AdminStatusPill value="Resolved">
                           Resolved
-                        </span>
+                        </AdminStatusPill>
                       ) : null}
                     </span>
                   </td>
-                  <td className="py-3 pr-3 whitespace-nowrap text-xs">
+                  <td className="px-3 py-3 whitespace-nowrap text-xs">
                     <div className="whitespace-nowrap">{row.updatedAtLabel}</div>
                     <div className="mt-1 text-[var(--text-soft)] whitespace-nowrap">
                       {row.createdAtLabel}
                     </div>
                     {row.localOrderHref ? (
-                      <Link
+                      <AdminButton
                         href={row.localOrderHref}
-                        className="mt-1 inline-block whitespace-nowrap text-[var(--accent-strong)] underline-offset-2 hover:underline"
+                        variant="ghost"
+                        size="sm"
+                        className="mt-1 !h-auto !px-0"
                       >
                         Order
-                      </Link>
+                      </AdminButton>
                     ) : null}
                   </td>
                 </tr>

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import {
   getMonitoringAlertsDashboard,
   requireActiveAdminForAlerts,
@@ -24,35 +23,22 @@ import {
   loadRecentNotificationActivity,
 } from "@/app/lib/admin/alertNotificationState";
 import { formatUtcTimestamp } from "@/app/lib/admin/operationsHealthShared";
+import {
+  AdminButton,
+  AdminKpiCard,
+  AdminStatusPill,
+} from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
 const UNAVAILABLE =
   "Alert monitoring is temporarily unavailable. Please refresh shortly.";
 
-function severityTone(severity: string): string {
-  switch (severity) {
-    case "CRITICAL":
-      return "bg-red-500/10 text-red-700 dark:text-red-300";
-    case "HIGH":
-      return "bg-amber-500/10 text-amber-800 dark:text-amber-200";
-    case "WARNING":
-      return "bg-[var(--surface)] text-[var(--heading)] border border-[var(--border)]";
-    case "INFO":
-    default:
-      return "bg-[var(--surface)] text-[var(--text-muted)] border border-[var(--border)]";
-  }
-}
+const EMPTY_CLASS =
+  "rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]";
 
-function StatusPill({ value }: { value: string }) {
-  return (
-    <span
-      className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] ${severityTone(value)}`}
-    >
-      {value}
-    </span>
-  );
-}
+const CARD_CLASS =
+  "min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5";
 
 function buildHref(options: {
   severity?: AlertSeverity | "ALL";
@@ -69,19 +55,6 @@ function buildHref(options: {
   return q ? `/admin/alerts?${q}` : "/admin/alerts";
 }
 
-function Metric({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="min-w-0">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-        {label}
-      </p>
-      <p className="mt-1 break-words text-sm font-semibold text-[var(--heading)]">
-        {value}
-      </p>
-    </div>
-  );
-}
-
 function AlertCard({
   alert,
   notificationStatus,
@@ -96,19 +69,20 @@ function AlertCard({
   const href =
     alert.href && isSafeAdminHref(alert.href) ? alert.href : undefined;
   return (
-    <article
-      className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5"
-      aria-labelledby={`alert-${alert.id}`}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <article className={CARD_CLASS} aria-labelledby={`alert-${alert.id}`}>
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <StatusPill value={alert.severity} />
-            <StatusPill value={categoryLabel(alert.category)} />
-            <StatusPill value={alert.state} />
-            <StatusPill
-              value={formatNotificationStatusLabel(notificationStatus)}
-            />
+            <AdminStatusPill value={alert.severity}>
+              {alert.severity}
+            </AdminStatusPill>
+            <AdminStatusPill value={categoryLabel(alert.category)}>
+              {categoryLabel(alert.category)}
+            </AdminStatusPill>
+            <AdminStatusPill value={alert.state}>{alert.state}</AdminStatusPill>
+            <AdminStatusPill value={formatNotificationStatusLabel(notificationStatus)}>
+              {formatNotificationStatusLabel(notificationStatus)}
+            </AdminStatusPill>
           </div>
           <h2
             id={`alert-${alert.id}`}
@@ -168,14 +142,11 @@ function AlertCard({
         {alert.recommendedAction}
       </p>
       {href ? (
-        <p className="mt-3">
-          <Link
-            href={href}
-            className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-          >
+        <div className="mt-3">
+          <AdminButton href={href} variant="primary" size="sm">
             Open related admin view
-          </Link>
-        </p>
+          </AdminButton>
+        </div>
       ) : null}
     </article>
   );
@@ -207,8 +178,8 @@ export default async function AdminAlertsPage({
     recentActivity = await loadRecentNotificationActivity(20);
   } catch {
     return (
-      <div className="space-y-6">
-        <header>
+      <div className="min-w-0 space-y-6">
+        <header className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight">Alerts</h1>
           <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
             Read-only internal monitoring for operational risk.
@@ -229,8 +200,8 @@ export default async function AdminAlertsPage({
   const summary = data.summary;
 
   return (
-    <div className="space-y-6">
-      <header>
+    <div className="min-w-0 space-y-8">
+      <header className="min-w-0">
         <h1 className="text-2xl font-bold tracking-tight">Alerts</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
           Read-only internal alert center. Alerts are derived from local database
@@ -262,96 +233,81 @@ export default async function AdminAlertsPage({
         </div>
       ) : null}
 
-      <section
-        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5"
-        aria-labelledby="alert-summary-heading"
-      >
+      <section aria-labelledby="alert-summary-heading" className="min-w-0 space-y-3">
         <h2
           id="alert-summary-heading"
           className="text-base font-semibold tracking-tight text-[var(--heading)]"
         >
           Active alert summary
         </h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <Metric label="Active" value={summary.totalActive} />
-          <Metric label="Critical" value={summary.criticalCount} />
-          <Metric label="High" value={summary.highCount} />
-          <Metric label="Warning" value={summary.warningCount} />
-          <Metric label="Oldest age" value={summary.oldestActiveAgeLabel} />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <AdminKpiCard label="Active" value={summary.totalActive} />
+          <AdminKpiCard label="Critical" value={summary.criticalCount} />
+          <AdminKpiCard label="High" value={summary.highCount} />
+          <AdminKpiCard label="Warning" value={summary.warningCount} />
+          <AdminKpiCard label="Oldest age" value={summary.oldestActiveAgeLabel} />
         </div>
       </section>
 
-      <nav className="flex flex-wrap gap-2" aria-label="Alert severity filters">
+      <nav className="flex min-w-0 flex-wrap gap-2" aria-label="Alert severity filters">
         {(["ALL", ...ALERT_SEVERITIES] as const).map((severity) => {
           const active = data.filterSeverity === severity;
           return (
-            <Link
+            <AdminButton
               key={severity}
               href={buildHref({
                 severity,
                 category: data.filterCategory,
               })}
-              aria-current={active ? "page" : undefined}
-              className={
-                active
-                  ? "rounded-lg bg-[var(--accent-strong)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--accent-strong)]"
-                  : "rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
-              }
+              variant={active ? "primary" : "secondary"}
+              size="sm"
+              className="!h-10 !px-4 !text-sm"
             >
               {severity}
-            </Link>
+            </AdminButton>
           );
         })}
       </nav>
 
-      <nav className="flex flex-wrap gap-2" aria-label="Alert category filters">
+      <nav className="flex min-w-0 flex-wrap gap-2" aria-label="Alert category filters">
         {(["ALL", ...ALERT_CATEGORIES] as const).map((category) => {
           const active = data.filterCategory === category;
           return (
-            <Link
+            <AdminButton
               key={category}
               href={buildHref({
                 severity: data.filterSeverity,
                 category,
               })}
-              aria-current={active ? "page" : undefined}
-              className={
-                active
-                  ? "rounded-lg bg-[var(--accent-strong)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--accent-strong)]"
-                  : "rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
-              }
+              variant={active ? "primary" : "secondary"}
+              size="sm"
+              className="!h-10 !px-4 !text-sm"
             >
               {category === "ALL" ? "ALL" : categoryLabel(category)}
-            </Link>
+            </AdminButton>
           );
         })}
       </nav>
 
       {data.alerts.length === 0 ? (
-        <div
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-          role="status"
-        >
-          <p className="text-sm font-medium text-[var(--heading)]">
+        <div className={EMPTY_CLASS} role="status">
+          <p className="font-medium text-[var(--heading)]">
             {data.unavailable
               ? UNAVAILABLE
               : "No active alerts match the current filters."}
           </p>
-          <p className="mt-2 text-sm text-[var(--text-muted)]">
+          <p className="mt-2">
             Informational payment and security readiness alerts appear when
             detection is healthy. Use Operations for configuration context.
           </p>
-          <p className="mt-3">
-            <Link
-              href="/admin/operations"
-              className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-            >
+          <div className="mt-4">
+            <AdminButton href="/admin/operations" variant="primary" size="sm">
               Open Operations
-            </Link>
-          </p>
+            </AdminButton>
+          </div>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-3">
           {data.alerts.map((alert) => {
             const view = notifyViews.get(alert.id);
             const checkedAt = new Date();
@@ -382,10 +338,7 @@ export default async function AdminAlertsPage({
         </div>
       )}
 
-      <section
-        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5"
-        aria-labelledby="recent-notification-activity-heading"
-      >
+      <section className={CARD_CLASS} aria-labelledby="recent-notification-activity-heading">
         <h2
           id="recent-notification-activity-heading"
           className="text-base font-semibold tracking-tight text-[var(--heading)]"
@@ -405,13 +358,20 @@ export default async function AdminAlertsPage({
             {recentActivity.map((row, idx) => (
               <li
                 key={`${row.alertCode}-${row.eventType}-${row.atLabel}-${idx}`}
-                className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+                className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm"
               >
-                <span className="font-semibold text-[var(--heading)]">
-                  {row.eventType}
-                </span>{" "}
-                · {row.status} · {row.severity} ·{" "}
-                <span className="font-mono text-xs">{row.alertCode}</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-[var(--heading)]">
+                    {row.eventType}
+                  </span>
+                  <AdminStatusPill value={row.status}>{row.status}</AdminStatusPill>
+                  <AdminStatusPill value={row.severity}>
+                    {row.severity}
+                  </AdminStatusPill>
+                  <span className="font-mono text-xs text-[var(--text-muted)]">
+                    {row.alertCode}
+                  </span>
+                </div>
                 <span className="mt-1 block text-[11px] text-[var(--text-soft)]">
                   {row.atLabel}
                   {row.sourceType ? ` · ${row.sourceType}` : ""}

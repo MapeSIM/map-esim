@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { requireRole } from "@/app/lib/auth/session";
 import { listAdminUnifiedRefundRequests } from "@/app/lib/refunds/unifiedRefundRequestAdmin";
 import {
@@ -6,11 +5,18 @@ import {
   unifiedRefundSourceLabel,
   type UnifiedRefundSourceFilter,
 } from "@/app/lib/refunds/unifiedRefundRequestDisplay";
+import { AdminButton, AdminStatusPill } from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
 const UNAVAILABLE =
   "Refund request data is temporarily unavailable. Please refresh shortly.";
+
+const EMPTY_CLASS =
+  "rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]";
+
+const CARD_CLASS =
+  "min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm";
 
 const FILTERS: { id: UnifiedRefundSourceFilter; label: string }[] = [
   { id: "all", label: "All" },
@@ -67,40 +73,36 @@ export default async function AdminRefundRequestsPage({
         {FILTERS.map((filter) => {
           const active = filter.id === source;
           return (
-            <Link
+            <AdminButton
               key={filter.id}
               href={sourceHref(filter.id)}
-              className={
-                active
-                  ? "inline-flex h-10 items-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-white"
-                  : "inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)]"
-              }
+              variant={active ? "primary" : "secondary"}
+              size="sm"
+              className="!h-10 !px-4 !text-sm"
             >
               {filter.label}
-            </Link>
+            </AdminButton>
           );
         })}
       </nav>
 
       {rows.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]">
-          No refund requests yet.
-        </div>
+        <div className={EMPTY_CLASS}>No refund requests yet.</div>
       ) : (
         <ul className="min-w-0 space-y-3">
           {rows.map((row) => (
-            <li
-              key={`${row.source}:${row.id}`}
-              className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm"
-            >
+            <li key={`${row.source}:${row.id}`} className={CARD_CLASS}>
               <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0 space-y-1">
+                <div className="min-w-0 space-y-2">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="inline-flex rounded-full border border-[var(--border-strong)] px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.06em] text-[var(--heading)]">
+                    <AdminStatusPill value={unifiedRefundSourceLabel(row.source)}>
                       {unifiedRefundSourceLabel(row.source)}
-                    </span>
+                    </AdminStatusPill>
+                    <AdminStatusPill value={row.statusLabel}>
+                      {row.statusLabel}
+                    </AdminStatusPill>
                     <p className="min-w-0 font-semibold text-[var(--heading)]">
-                      {row.statusLabel} · {row.reasonLabel}
+                      {row.reasonLabel}
                     </p>
                   </div>
                   <p className="break-words text-[var(--text-muted)]">
@@ -125,12 +127,9 @@ export default async function AdminRefundRequestsPage({
                     Requested {row.createdAtLabel}
                   </p>
                 </div>
-                <Link
-                  href={row.href}
-                  className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-white"
-                >
+                <AdminButton href={row.href} variant="primary" className="shrink-0">
                   Review
-                </Link>
+                </AdminButton>
               </div>
             </li>
           ))}

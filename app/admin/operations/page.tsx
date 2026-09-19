@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   getOperationsHealthDashboard,
@@ -15,52 +14,19 @@ import {
   type MonitoringAlertSummary,
 } from "@/app/lib/admin/monitoringAlerts";
 import { getAdminWhatsAppSupportView } from "@/app/lib/support/whatsappSupport";
+import {
+  AdminButton,
+  AdminKpiCard,
+  AdminStatusPill,
+} from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
 const UNAVAILABLE =
   "Operations health data is temporarily unavailable. Please refresh shortly.";
 
-function statusTone(status: string): string {
-  switch (status) {
-    case "HEALTHY":
-    case "yes":
-    case "expected":
-    case "ENABLED":
-    case "ACTIVE":
-      return "bg-[var(--accent-strong)]/12 text-[var(--accent-strong)]";
-    case "DEGRADED":
-    case "NOT_CONFIGURED":
-    case "DISABLED":
-    case "PARTIALLY_PAUSED":
-    case "no":
-    case "not_expected":
-      return "bg-[var(--surface)] text-[var(--heading)] border border-[var(--border)]";
-    case "UNAVAILABLE":
-    case "CRITICAL":
-    case "PAUSED":
-      return "bg-red-500/10 text-red-700 dark:text-red-300";
-    case "NOT_IMPLEMENTED":
-    case "NOT_AVAILABLE":
-    case "ON_DEMAND":
-    case "NOT_CHECKED":
-    case "UNKNOWN":
-    case "unknown":
-    case "NOT_IMPLEMENTED / DISABLED":
-    default:
-      return "bg-[var(--surface)] text-[var(--text-muted)] border border-[var(--border)]";
-  }
-}
-
-function StatusPill({ value }: { value: string }) {
-  return (
-    <span
-      className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] ${statusTone(value)}`}
-    >
-      {value}
-    </span>
-  );
-}
+const CARD_CLASS =
+  "min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5";
 
 function Metric({
   label,
@@ -95,12 +61,14 @@ function HealthCard({
   status?: HealthStatus | string;
 }) {
   return (
-    <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
+    <section className={CARD_CLASS}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h2 className="text-base font-semibold tracking-tight text-[var(--heading)]">
           {title}
         </h2>
-        {status ? <StatusPill value={status} /> : null}
+        {status ? (
+          <AdminStatusPill value={status}>{status}</AdminStatusPill>
+        ) : null}
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">{children}</div>
       <p className="mt-4 text-[11px] text-[var(--text-soft)]">
@@ -126,14 +94,18 @@ function WarningList({ warnings }: { warnings: OpsWarning[] }) {
           className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5"
         >
           <div className="flex flex-wrap items-center gap-2">
-            <StatusPill value={w.severity.toUpperCase()} />
+            <AdminStatusPill value={w.severity.toUpperCase()}>
+              {w.severity.toUpperCase()}
+            </AdminStatusPill>
             {w.href ? (
-              <Link
+              <AdminButton
                 href={w.href}
-                className="text-sm font-medium text-[var(--accent-strong)] underline-offset-2 hover:underline"
+                variant="ghost"
+                size="sm"
+                className="!h-auto !px-0"
               >
                 {w.message}
-              </Link>
+              </AdminButton>
             ) : (
               <span className="text-sm font-medium text-[var(--heading)]">
                 {w.message}
@@ -164,8 +136,8 @@ function DashboardBody({
   const controls = data.operationalControls;
 
   return (
-    <div className="space-y-6">
-      <header>
+    <div className="min-w-0 space-y-8">
+      <header className="min-w-0">
         <h1 className="text-2xl font-bold tracking-tight">Operations</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
           System health and safe runtime pause switches. Health cards are
@@ -178,10 +150,7 @@ function DashboardBody({
         </p>
       </header>
 
-      <section
-        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4"
-        aria-labelledby="ops-alerts-summary-heading"
-      >
+      <section className={CARD_CLASS} aria-labelledby="ops-alerts-summary-heading">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <h2
             id="ops-alerts-summary-heading"
@@ -189,7 +158,9 @@ function DashboardBody({
           >
             Active alerts summary
           </h2>
-          <StatusPill value={alertSummary.detectionStatus} />
+          <AdminStatusPill value={alertSummary.detectionStatus}>
+            {alertSummary.detectionStatus}
+          </AdminStatusPill>
         </div>
         {alertSummary.detectionStatus === "UNAVAILABLE" ? (
           <p className="mt-3 text-sm text-red-700 dark:text-red-300" role="status">
@@ -197,10 +168,10 @@ function DashboardBody({
           </p>
         ) : (
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Metric label="Active alerts" value={alertSummary.totalActive} />
-            <Metric label="Critical" value={alertSummary.criticalCount} />
-            <Metric label="High" value={alertSummary.highCount} />
-            <Metric
+            <AdminKpiCard label="Active alerts" value={alertSummary.totalActive} />
+            <AdminKpiCard label="Critical" value={alertSummary.criticalCount} />
+            <AdminKpiCard label="High" value={alertSummary.highCount} />
+            <AdminKpiCard
               label="Oldest active age"
               value={alertSummary.oldestActiveAgeLabel}
             />
@@ -210,20 +181,14 @@ function DashboardBody({
           Checked {alertSummary.checkedAtLabel} ·{" "}
           {alertSummary.freshness.replaceAll("_", " ")}
         </p>
-        <p className="mt-3">
-          <Link
-            href="/admin/alerts"
-            className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-          >
+        <div className="mt-3">
+          <AdminButton href="/admin/alerts" variant="primary" size="sm">
             Open alert center
-          </Link>
-        </p>
+          </AdminButton>
+        </div>
       </section>
 
-      <section
-        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4"
-        aria-labelledby="ops-warnings-heading"
-      >
+      <section className={CARD_CLASS} aria-labelledby="ops-warnings-heading">
         <h2
           id="ops-warnings-heading"
           className="text-base font-semibold tracking-tight text-[var(--heading)]"
@@ -235,10 +200,7 @@ function DashboardBody({
         </div>
       </section>
 
-      <section
-        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4"
-        aria-labelledby="ops-control-status-heading"
-      >
+      <section className={CARD_CLASS} aria-labelledby="ops-control-status-heading">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <h2
             id="ops-control-status-heading"
@@ -246,7 +208,9 @@ function DashboardBody({
           >
             Transaction controls status
           </h2>
-          <StatusPill value={controls.overallTransactionsStatus} />
+          <AdminStatusPill value={controls.overallTransactionsStatus}>
+            {controls.overallTransactionsStatus}
+          </AdminStatusPill>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {controls.controls.map((c) => (
@@ -255,7 +219,7 @@ function DashboardBody({
                 {c.name}
               </p>
               <p className="mt-1">
-                <StatusPill value={c.state} />
+                <AdminStatusPill value={c.state}>{c.state}</AdminStatusPill>
               </p>
             </div>
           ))}
@@ -347,14 +311,11 @@ function DashboardBody({
               for the full filtered list.
             </p>
           ) : null}
-          <p className="sm:col-span-2 text-xs">
-            <Link
-              href="/admin/reconciliation"
-              className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-            >
+          <div className="sm:col-span-2">
+            <AdminButton href="/admin/reconciliation" variant="primary" size="sm">
               Open reconciliation center
-            </Link>
-          </p>
+            </AdminButton>
+          </div>
         </HealthCard>
 
         <HealthCard
@@ -521,8 +482,8 @@ export default async function AdminOperationsPage() {
       };
     }
     return (
-      <div className="space-y-6">
-        <header>
+      <div className="min-w-0 space-y-6">
+        <header className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight">Operations</h1>
           <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
             System health and safe runtime pause switches.

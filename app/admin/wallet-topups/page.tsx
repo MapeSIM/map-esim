@@ -1,11 +1,17 @@
-import Link from "next/link";
 import { requireRole } from "@/app/lib/auth/session";
 import { getAdminTopupsPage } from "@/app/lib/admin/topups";
+import { AdminButton, AdminStatusPill } from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
 const UNAVAILABLE =
   "Wallet top-up data is temporarily unavailable. Please refresh shortly.";
+
+const EMPTY_CLASS =
+  "rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]";
+
+const CARD_CLASS =
+  "min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm";
 
 function buildHref(page: number): string {
   if (page <= 1) return "/admin/wallet-topups";
@@ -25,7 +31,7 @@ export default async function AdminWalletTopupsPage({
     data = await getAdminTopupsPage(params.page);
   } catch {
     return (
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <h1 className="text-2xl font-bold tracking-tight">Wallet top-ups</h1>
         <div
           className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
@@ -38,8 +44,8 @@ export default async function AdminWalletTopupsPage({
   }
 
   return (
-    <div className="space-y-8">
-      <header>
+    <div className="min-w-0 space-y-8">
+      <header className="min-w-0">
         <h1 className="text-2xl font-bold tracking-tight">Wallet top-ups</h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
           Read-only gateway-independent top-up records. Manual paid marking and
@@ -48,44 +54,41 @@ export default async function AdminWalletTopupsPage({
       </header>
 
       {data.rows.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]">
-          No wallet top-ups yet.
-        </div>
+        <div className={EMPTY_CLASS}>No wallet top-ups yet.</div>
       ) : (
-        <ul className="space-y-3">
+        <ul className="min-w-0 space-y-3">
           {data.rows.map((row) => (
-            <li
-              key={row.id}
-              className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <p className="font-semibold text-[var(--heading)]">
-                    {row.customerLabel}
+            <li key={row.id} className={CARD_CLASS}>
+              <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 space-y-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <p className="min-w-0 font-semibold text-[var(--heading)]">
+                      {row.customerLabel}
+                    </p>
+                    <AdminStatusPill value={row.statusLabel}>
+                      {row.statusLabel}
+                    </AdminStatusPill>
+                  </div>
+                  <p className="text-[var(--text-muted)]">{row.gatewayLabel}</p>
+                  <p className="font-semibold tabular-nums text-[var(--heading)]">
+                    {row.creditAmountLabel} USD
                   </p>
-                  <p className="mt-1 text-[var(--text-muted)]">
-                    {row.statusLabel} · {row.gatewayLabel}
+                  <p className="text-xs text-[var(--text-soft)]">
+                    Charge {row.chargeLabel} · Created {row.createdAtLabel}
+                  </p>
+                  <p className="text-xs text-[var(--text-soft)]">
+                    Provider ref {row.providerRefMasked} · Ledger{" "}
+                    {row.walletTransactionLabel}
                   </p>
                 </div>
-                <p className="font-semibold tabular-nums text-[var(--heading)]">
-                  {row.creditAmountLabel} USD
-                </p>
-              </div>
-              <p className="mt-2 text-xs text-[var(--text-soft)]">
-                Charge {row.chargeLabel} · Created {row.createdAtLabel}
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-soft)]">
-                Provider ref {row.providerRefMasked} · Ledger{" "}
-                {row.walletTransactionLabel}
-              </p>
-              <p className="mt-3">
-                <Link
+                <AdminButton
                   href={`/admin/wallet-topups/${encodeURIComponent(row.id)}`}
-                  className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+                  variant="primary"
+                  className="shrink-0"
                 >
                   View top-up
-                </Link>
-              </p>
+                </AdminButton>
+              </div>
             </li>
           ))}
         </ul>
@@ -93,26 +96,30 @@ export default async function AdminWalletTopupsPage({
 
       {data.totalPages > 1 ? (
         <nav
-          className="flex flex-wrap items-center justify-between gap-3 text-sm"
+          className="flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--text-muted)]"
           aria-label="Wallet top-up pages"
         >
-          <p className="text-[var(--text-muted)]">
+          <p>
             Page {data.page} of {data.totalPages}
           </p>
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             {data.page > 1 ? (
-              <Link href={buildHref(data.page - 1)} className="font-semibold underline-offset-2 hover:underline">
+              <AdminButton href={buildHref(data.page - 1)} variant="secondary">
                 Previous
-              </Link>
+              </AdminButton>
             ) : (
-              <span className="text-[var(--text-soft)]">Previous</span>
+              <AdminButton variant="secondary" disabled>
+                Previous
+              </AdminButton>
             )}
             {data.page < data.totalPages ? (
-              <Link href={buildHref(data.page + 1)} className="font-semibold underline-offset-2 hover:underline">
+              <AdminButton href={buildHref(data.page + 1)} variant="secondary">
                 Next
-              </Link>
+              </AdminButton>
             ) : (
-              <span className="text-[var(--text-soft)]">Next</span>
+              <AdminButton variant="secondary" disabled>
+                Next
+              </AdminButton>
             )}
           </div>
         </nav>
