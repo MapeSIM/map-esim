@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { PaymentGatewayAdapter } from "@/app/lib/payments/adapter";
-import { parsePaymentGatewayProvider } from "@/app/lib/payments/gatewaySelect";
+import { resolveHostedCheckoutProvider } from "@/app/lib/payments/gatewaySelect";
 import { tryCreateSafepayAdapter } from "@/app/lib/payments/safepayAdapter";
 import { isPaymentGatewayEnabledFlag } from "@/app/lib/payments/safepayConfig";
 import { tryCreateSimpaisaAdapter } from "@/app/lib/payments/simpaisaAdapter";
@@ -76,10 +76,11 @@ export const misconfiguredPaymentAdapter: PaymentGatewayAdapter = {
 };
 
 /**
- * Active payment adapter.
+ * Active payment adapter (customer + partner hosted checkout).
  * Requires PAYMENT_GATEWAY_ENABLED exact "true" + valid selected provider config.
- * Unset PAYMENT_GATEWAY_PROVIDER selects Safepay (Production default).
- * Explicit SIMPAISA selects Simpaisa (Partner Add Funds).
+ * Unset PAYMENT_GATEWAY_PROVIDER selects Simpaisa (customer default).
+ * While customer Safepay checkout is disabled, SAFEPAY resolves to Simpaisa.
+ * Safepay adapter factory remains for re-enable; webhooks/admin do not use this.
  * Never falls back to a fake/success adapter.
  */
 export function getActivePaymentAdapter(): PaymentGatewayAdapter {
@@ -87,7 +88,7 @@ export function getActivePaymentAdapter(): PaymentGatewayAdapter {
     return disabledPaymentAdapter;
   }
 
-  const selected = parsePaymentGatewayProvider(
+  const selected = resolveHostedCheckoutProvider(
     process.env.PAYMENT_GATEWAY_PROVIDER
   );
   if (!selected) {
@@ -121,7 +122,7 @@ export function isPaymentGatewayConfigured(): boolean {
   if (!isPaymentGatewayEnabledFlag(process.env.PAYMENT_GATEWAY_ENABLED)) {
     return false;
   }
-  const selected = parsePaymentGatewayProvider(
+  const selected = resolveHostedCheckoutProvider(
     process.env.PAYMENT_GATEWAY_PROVIDER
   );
   if (!selected) return false;

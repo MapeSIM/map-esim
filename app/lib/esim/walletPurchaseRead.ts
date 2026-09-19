@@ -26,7 +26,7 @@ import {
 import { isPurchaseDeliveryEmailLocked } from "@/app/lib/esim/esimDeliveryEmailState";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
 import { isCustomerPaymentCheckoutDisabled } from "@/app/lib/payments/customerPaymentCheckoutPolicy";
-import { parsePaymentGatewayProvider } from "@/app/lib/payments/gatewaySelect";
+import { resolveHostedCheckoutProvider } from "@/app/lib/payments/gatewaySelect";
 import { formatUsdCents } from "@/app/lib/wallet/display";
 import { pointsNeededToUnlockRewards } from "@/app/lib/rewards/rewardConstants";
 import { isRewardRedemptionEligible } from "@/app/lib/rewards/rewardPoints";
@@ -39,7 +39,7 @@ function displayOrUnavailable(value: string | null | undefined): string {
 function resolveActivePaymentProviderLabel(): "SAFEPAY" | "SIMPAISA" | null {
   if (!isPaymentGatewayConfigured()) return null;
   if (isCustomerPaymentCheckoutDisabled()) return null;
-  const selected = parsePaymentGatewayProvider(
+  const selected = resolveHostedCheckoutProvider(
     process.env.PAYMENT_GATEWAY_PROVIDER
   );
   if (selected === "SIMPAISA" || selected === "SAFEPAY") return selected;

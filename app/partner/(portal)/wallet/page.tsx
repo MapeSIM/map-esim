@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getPartnerPortalSummary } from "@/app/lib/partner/partnerAccess";
 import { requireRole } from "@/app/lib/auth/session";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
-import { parsePaymentGatewayProvider } from "@/app/lib/payments/gatewaySelect";
+import { resolveHostedCheckoutProvider } from "@/app/lib/payments/gatewaySelect";
 import PartnerWalletAddFundsForm from "@/app/components/partner/PartnerWalletAddFundsForm";
 
 export const dynamic = "force-dynamic";
@@ -52,8 +52,9 @@ export default async function PartnerWalletPage() {
     );
   }
 
-  // Partner Add Funds is Simpaisa-only; do not show a live form while Safepay is active.
-  const selectedProvider = parsePaymentGatewayProvider(
+  // Partner Add Funds is Simpaisa-only; hosted checkout resolves SAFEPAY → Simpaisa
+  // while the Safepay customer kill switch is on.
+  const selectedProvider = resolveHostedCheckoutProvider(
     process.env.PAYMENT_GATEWAY_PROVIDER
   );
   const gatewayReady =

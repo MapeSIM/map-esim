@@ -42,7 +42,7 @@ import {
   CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE,
   isCustomerPaymentCheckoutDisabled,
 } from "@/app/lib/payments/customerPaymentCheckoutPolicy";
-import { parsePaymentGatewayProvider } from "@/app/lib/payments/gatewaySelect";
+import { resolveHostedCheckoutProvider } from "@/app/lib/payments/gatewaySelect";
 import { parseSimpaisaWalletCheckoutFields } from "@/app/lib/payments/simpaisaPkrQuote";
 import {
   normalizeOfferId,
@@ -377,7 +377,7 @@ export async function confirmWalletEsimPurchaseAction(
     let walletOperatorId: string | undefined;
     let customerMsisdn: string | undefined;
 
-    const selected = parsePaymentGatewayProvider(
+    const selected = resolveHostedCheckoutProvider(
       process.env.PAYMENT_GATEWAY_PROVIDER
     );
     if (selected === "SIMPAISA") {
