@@ -9,6 +9,10 @@ import { canAccessAdminPath } from "../app/lib/admin/adminPageAccess";
 import {
   buildAbsolutePackageCheckoutUrl,
   buildPackageCheckoutPath,
+  buildPackageShareClipboardText,
+  buildPackageShareMessage,
+  buildPackageShareWhatsAppText,
+  packageShareFlagEmoji,
 } from "../app/lib/support/packageShareLink";
 
 const root = join(__dirname, "..");
@@ -45,6 +49,35 @@ function main() {
   );
   console.log("PASS countries_copy_link_uses_destination_code");
 
+  // Copy Link uses the same formatted share message as WhatsApp.
+  const shareFields = {
+    offerId: "offer_pk_100mb",
+    country: "PK",
+    destination: "Pakistan",
+    dataAllowance: "1 GB",
+    validity: "7 days",
+  };
+  const copyText = buildPackageShareClipboardText(shareFields);
+  const waText = buildPackageShareWhatsAppText(shareFields);
+  const message = buildPackageShareMessage(shareFields);
+  assert.ok(copyText);
+  assert.equal(copyText, waText);
+  assert.equal(copyText, message);
+  assert.match(copyText!, /Pakistan/);
+  assert.match(copyText!, /1 GB/);
+  assert.match(copyText!, /7 days/);
+  assert.match(copyText!, /Activate:/);
+  assert.ok(
+    copyText!.includes(
+      "https://mapesim.com/account/esim/buy?offerId=offer_pk_100mb&country=PK"
+    )
+  );
+  assert.equal(packageShareFlagEmoji("PK"), "🇵🇰");
+  assert.match(copyText!, /🇵🇰 Pakistan/);
+  assert.match(copyText!, /📶 1 GB/);
+  assert.match(copyText!, /⏳ 7 days/);
+  console.log("PASS countries_copy_link_formatted_share_message");
+
   assert.equal(
     canAccessAdminPath(["ESIM_FULFILLMENT"], "/admin/countries"),
     true
@@ -75,8 +108,12 @@ function main() {
   assert.match(detailPage, /country=\{code\}/);
   assert.doesNotMatch(detailPage, /prepareAdminPackageAssignment|walletPurchase/);
   assert.match(directory, /\/admin\/countries\/\$\{encodeURIComponent/);
-  assert.match(controls, /buildAbsolutePackageCheckoutUrlFromOffer/);
+  assert.match(controls, /buildPackageShareClipboardText/);
+  assert.match(controls, /buildPackageShareWhatsAppHref/);
   assert.match(controls, /Copied|Copy Link/);
+  assert.match(helpers, /buildPackageShareMessage/);
+  assert.match(helpers, /buildPackageShareClipboardText/);
+  assert.match(helpers, /Activate:/);
   assert.match(helpers, /buildCheckoutHref/);
   assert.match(nav, /href: "\/admin\/countries"/);
   assert.match(access, /path\.startsWith\("\/admin\/countries"\)/);

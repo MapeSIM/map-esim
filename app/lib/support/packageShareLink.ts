@@ -5,7 +5,7 @@
  * Builds absolute customer buy links from catalog offerId + country only.
  * Never includes purchaseId, providerOrderId, fromOrder, wallet, or payment refs.
  */
-import { BRAND_NAME, BRAND_SITE_URL } from "@/app/lib/brand";
+import { BRAND_SITE_URL } from "@/app/lib/brand";
 import { buildCheckoutHref } from "@/app/lib/plans/plan-utils";
 import type { VesimOffer } from "@/app/lib/vesim/offers";
 
@@ -147,10 +147,29 @@ function assertSafePackageSharePayload(value: string): void {
   }
 }
 
+/** ISO-2 → regional-indicator flag emoji; null for region-* / invalid. */
+export function packageShareFlagEmoji(countryHint: string): string | null {
+  const code = normalizePackageShareCountry(countryHint);
+  if (!code || !/^[A-Z]{2}$/.test(code)) return null;
+  const base = 0x1f1e6;
+  return String.fromCodePoint(
+    base + code.charCodeAt(0) - 65,
+    base + code.charCodeAt(1) - 65
+  );
+}
+
 /**
- * WhatsApp message: destination + package label + absolute buy link.
+ * Shared admin Copy Link + WhatsApp package message (same text).
+ * Format:
+ * 🇵🇰 {country}
+ * 📶 {data}
+ * ⏳ {validity}
+ * Activate:
+ * {checkout URL}
+ *
+ * Does not change checkout URL generation.
  */
-export function buildPackageShareWhatsAppText(
+export function buildPackageShareMessage(
   input: PackageShareLinkInput
 ): string | null {
   const checkoutUrl = buildAbsolutePackageCheckoutUrl({
@@ -159,13 +178,43 @@ export function buildPackageShareWhatsAppText(
   });
   if (!checkoutUrl) return null;
 
-  const label = buildPackageShareLabel(input);
-  const intro = label
-    ? `Here is the ${BRAND_NAME} eSIM package for ${label}:`
-    : `Here is the ${BRAND_NAME} eSIM package:`;
-  const text = `${intro}\n${checkoutUrl}`;
+  const destination = sanitizeLabelField(input.destination);
+  const dataAllowance = sanitizeLabelField(input.dataAllowance);
+  const validity = sanitizeLabelField(input.validity);
+  const flag = packageShareFlagEmoji(input.country);
+
+  const lines: string[] = [];
+  if (destination) {
+    lines.push(flag ? `${flag} ${destination}` : destination);
+  }
+  if (dataAllowance) {
+    lines.push(`📶 ${dataAllowance}`);
+  }
+  if (validity) {
+    lines.push(`⏳ ${validity}`);
+  }
+  lines.push("Activate:");
+  lines.push(checkoutUrl);
+
+  const text = lines.join("\n");
   assertSafePackageSharePayload(text);
   return text;
+}
+
+/** Clipboard text for Admin Copy Link — same as WhatsApp body. */
+export function buildPackageShareClipboardText(
+  input: PackageShareLinkInput
+): string | null {
+  return buildPackageShareMessage(input);
+}
+
+/**
+ * WhatsApp message body — same helper as Copy Link.
+ */
+export function buildPackageShareWhatsAppText(
+  input: PackageShareLinkInput
+): string | null {
+  return buildPackageShareMessage(input);
 }
 
 /** Open WhatsApp share sheet with prefilled package message (no fixed phone). */

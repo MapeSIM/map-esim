@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   buildAbsolutePackageCheckoutUrlFromOffer,
+  buildPackageShareClipboardText,
   buildPackageShareWhatsAppHref,
 } from "@/app/lib/support/packageShareLink";
 
@@ -17,6 +18,7 @@ type Props = {
 
 /**
  * Admin/support package share controls — customer buy deep link only.
+ * Copy Link and WhatsApp use the same formatted share message.
  * Never surfaces purchaseId, providerOrderId, or wallet/payment refs.
  */
 export default function AdminPackageShareControls({
@@ -34,23 +36,27 @@ export default function AdminPackageShareControls({
     { id: offerId },
     country
   );
-  const whatsappHref = checkoutUrl
-    ? buildPackageShareWhatsAppHref({
-        offerId,
-        country,
-        destination,
-        planName,
-        dataAllowance,
-        validity,
-      })
+  const shareInput = {
+    offerId,
+    country,
+    destination,
+    planName,
+    dataAllowance,
+    validity,
+  };
+  const shareText = checkoutUrl
+    ? buildPackageShareClipboardText(shareInput)
+    : null;
+  const whatsappHref = shareText
+    ? buildPackageShareWhatsAppHref(shareInput)
     : null;
 
-  if (!checkoutUrl) return null;
+  if (!checkoutUrl || !shareText) return null;
 
   async function copyLink() {
     setCopyError(null);
     try {
-      await navigator.clipboard.writeText(checkoutUrl!);
+      await navigator.clipboard.writeText(shareText!);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
