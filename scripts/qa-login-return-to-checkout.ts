@@ -15,6 +15,7 @@ import {
   resolvePostSignInPath,
   safeCallbackPath,
 } from "../app/lib/auth/redirects";
+import { buildPackageCheckoutPath } from "../app/lib/support/packageShareLink";
 
 const root = join(__dirname, "..");
 
@@ -47,6 +48,19 @@ function main() {
   );
   assert.equal(
     buildWalletBuyReturnPath({ offerId: "offer_abc", country: "PK" }),
+    buyHref
+  );
+  // Admin package share Copy Link uses the same buy deep link (offerId+country).
+  assert.equal(
+    buildPackageCheckoutPath({ offerId: "offer_abc", country: "PK" }),
+    buyHref
+  );
+  assert.equal(
+    resolvePostSignInPath(
+      "CUSTOMER",
+      buildPackageCheckoutPath({ offerId: "offer_abc", country: "PK" })!,
+      opts
+    ),
     buyHref
   );
   console.log("PASS package_selection_login_returns_to_checkout");

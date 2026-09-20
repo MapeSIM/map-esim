@@ -194,6 +194,11 @@ const EXISTING_QA: QaJob[] = [
     script: "qa:admin-operations-health",
     label: "admin operations health",
   },
+  {
+    kind: "npm",
+    script: "qa:admin-package-share-link",
+    label: "admin package share links",
+  },
   { kind: "npm", script: "email:qa", label: "email channels" },
   { kind: "npm", script: "qa:plans-discovery", label: "plans discovery" },
   {

@@ -51,6 +51,7 @@
     "qa:admin-wallet-credit": "tsx scripts/qa-admin-wallet-credit.ts",
     "qa:admin-wallet-debit": "tsx scripts/qa-admin-wallet-debit.ts",
     "qa:admin-package-assignment": "tsx scripts/qa-admin-package-assignment.ts",
+    "qa:admin-package-share-link": "tsx scripts/qa-admin-package-share-link.ts",
     "qa:customer-wallet-purchase": "tsx scripts/qa-customer-wallet-purchase.ts",
     "qa:esim-purchase-split-funding": "tsx scripts/qa-esim-purchase-split-funding.ts",
     "qa:esim-purchase-funding-choice": "tsx scripts/qa-esim-purchase-funding-choice.ts",
