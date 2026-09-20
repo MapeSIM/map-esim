@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import AbandonedCheckoutReviewGuidanceBanner from "@/app/components/account/AbandonedCheckoutReviewGuidanceBanner";
 import WalletPurchaseConfirmForm from "@/app/components/account/WalletPurchaseConfirmForm";
 import { buildWalletBuyReviewReturnPath } from "@/app/lib/auth/redirects";
 import { requireRole } from "@/app/lib/auth/session";
+import { resolveAbandonedCheckoutReviewGuidance } from "@/app/lib/esim/customerPurchaseStatusMessaging";
 import { getWalletPurchaseReview } from "@/app/lib/esim/walletPurchaseRead";
 import { resolveCheckoutBackHref } from "@/app/lib/plans/checkoutBackHref";
 import { WalletEsimPurchaseStatus } from "@prisma/client";
@@ -49,11 +51,18 @@ export default async function AccountWalletBuyReviewPage({
           <p className="text-sm font-medium text-[var(--heading)]">
             Purchase details are temporarily unavailable. Please try again shortly.
           </p>
+          <Link
+            href="/account/esim/buy"
+            className="mt-4 inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]"
+          >
+            Start a new purchase
+          </Link>
         </div>
       </div>
     );
   }
 
+  // Invalid id shape already 404'd above; missing / wrong-owner rows stay 404.
   if (!review) notFound();
 
   if (review.status === WalletEsimPurchaseStatus.COMPLETED) {
@@ -80,6 +89,12 @@ export default async function AccountWalletBuyReviewPage({
 
   if (!review.canConfirm) notFound();
 
+  const guidance = resolveAbandonedCheckoutReviewGuidance({
+    status: review.status,
+    updatedAt: review.updatedAt,
+    pendingGatewayAttemptId: review.pendingGatewayAttemptId,
+  });
+
   const back = resolveCheckoutBackHref({
     destinationCode: review.destinationCode,
     destinationName: review.destinationName,
@@ -99,6 +114,10 @@ export default async function AccountWalletBuyReviewPage({
           Review your plan and choose how to fund this purchase.
         </p>
       </div>
+
+      {guidance ? (
+        <AbandonedCheckoutReviewGuidanceBanner guidance={guidance} />
+      ) : null}
 
       <WalletPurchaseConfirmForm key={review.purchaseId} review={review} />
     </div>

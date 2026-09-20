@@ -213,6 +213,11 @@ const EXISTING_QA: QaJob[] = [
   },
   {
     kind: "npm",
+    script: "qa:abandoned-checkout-review-ux",
+    label: "abandoned checkout review UX",
+  },
+  {
+    kind: "npm",
     script: "qa:affiliates-partnerships",
     label: "affiliates & partnerships",
   },

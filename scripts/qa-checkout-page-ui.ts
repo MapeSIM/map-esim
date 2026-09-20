@@ -113,6 +113,10 @@ function main() {
   assert.match(review, />Checkout</);
   assert.match(review, /Review your plan and choose how to fund/);
   assert.match(review, /WalletPurchaseConfirmForm/);
+  assert.match(review, /resolveAbandonedCheckoutReviewGuidance/);
+  assert.match(review, /AbandonedCheckoutReviewGuidanceBanner/);
+  assert.match(review, /if \(!purchaseId\) notFound\(\)/);
+  assert.match(review, /if \(!review\) notFound\(\)/);
   console.log("PASS review_page_heading_preserved");
 
   assert.match(guest, /lg:grid-cols-\[minmax\(0,1\.2fr\)_minmax\(18rem,0\.8fr\)\]/);

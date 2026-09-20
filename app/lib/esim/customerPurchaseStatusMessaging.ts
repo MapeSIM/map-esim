@@ -32,6 +32,28 @@ export const CUSTOMER_STALE_CHECKOUT_DISPLAY_MS = 30 * 60 * 1000;
 export const CUSTOMER_STALE_CHECKOUT_MESSAGE =
   "This checkout may no longer be active. You can continue checkout or start again.";
 
+/** Review deep-link (abandoned email CTA) — display only. */
+export const CUSTOMER_ABANDONED_REVIEW_STALE_TITLE =
+  "This checkout may be outdated";
+
+export const CUSTOMER_ABANDONED_REVIEW_OUTDATED_TITLE =
+  "This checkout link is outdated";
+
+export const CUSTOMER_ABANDONED_REVIEW_OUTDATED_MESSAGE =
+  "This unfinished checkout is too old to rely on. Starting a new purchase is recommended. You can still continue below if you prefer.";
+
+export const CUSTOMER_ABANDONED_REVIEW_PAYMENT_ENDED_TITLE =
+  "Payment was not completed";
+
+export const CUSTOMER_ABANDONED_REVIEW_PAYMENT_ENDED_MESSAGE =
+  "The previous payment attempt expired or was cancelled. No eSIM was created. You can continue checkout below or start a new purchase.";
+
+export const CUSTOMER_ABANDONED_REVIEW_START_NEW_LABEL =
+  "Start a new purchase";
+
+export const CUSTOMER_ABANDONED_REVIEW_CONTINUE_LABEL =
+  "Continue this checkout";
+
 /** Customer UI only. Does not delete rows or change purchase status. */
 export const CUSTOMER_PENDING_PURCHASES_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -192,4 +214,78 @@ export function isCustomerPendingPurchaseVisibleInUi(input: {
         : Date.now();
   if (!Number.isFinite(nowMs)) return false;
   return nowMs - updatedMs <= CUSTOMER_PENDING_PURCHASES_MAX_AGE_MS;
+}
+
+export type AbandonedCheckoutReviewGuidanceKind =
+  | "payment_not_completed"
+  | "outdated"
+  | "stale";
+
+export type AbandonedCheckoutReviewGuidance = {
+  kind: AbandonedCheckoutReviewGuidanceKind;
+  title: string;
+  body: string;
+  startNewPurchaseLabel: string;
+  continueLabel: string;
+};
+
+/**
+ * Display-only guidance for abandoned-checkout review deep links.
+ * Does not change purchase status, funding, or auth.
+ * Fresh READY / in-flight AWAITING (with pending attempt) → null.
+ */
+export function resolveAbandonedCheckoutReviewGuidance(input: {
+  status: string;
+  updatedAt: Date | string | number;
+  pendingGatewayAttemptId?: string | null;
+  now?: Date | number;
+}): AbandonedCheckoutReviewGuidance | null {
+  const status = (input.status ?? "").trim();
+  if (status !== "READY" && status !== "AWAITING_GATEWAY_PAYMENT") {
+    return null;
+  }
+
+  const pendingId = (input.pendingGatewayAttemptId ?? "").trim();
+  if (status === "AWAITING_GATEWAY_PAYMENT" && !pendingId) {
+    return {
+      kind: "payment_not_completed",
+      title: CUSTOMER_ABANDONED_REVIEW_PAYMENT_ENDED_TITLE,
+      body: CUSTOMER_ABANDONED_REVIEW_PAYMENT_ENDED_MESSAGE,
+      startNewPurchaseLabel: CUSTOMER_ABANDONED_REVIEW_START_NEW_LABEL,
+      continueLabel: CUSTOMER_ABANDONED_REVIEW_CONTINUE_LABEL,
+    };
+  }
+
+  if (
+    !isCustomerPendingPurchaseVisibleInUi({
+      updatedAt: input.updatedAt,
+      now: input.now,
+    })
+  ) {
+    return {
+      kind: "outdated",
+      title: CUSTOMER_ABANDONED_REVIEW_OUTDATED_TITLE,
+      body: CUSTOMER_ABANDONED_REVIEW_OUTDATED_MESSAGE,
+      startNewPurchaseLabel: CUSTOMER_ABANDONED_REVIEW_START_NEW_LABEL,
+      continueLabel: CUSTOMER_ABANDONED_REVIEW_CONTINUE_LABEL,
+    };
+  }
+
+  if (
+    isCustomerStaleCheckoutDisplay({
+      status,
+      updatedAt: input.updatedAt,
+      now: input.now,
+    })
+  ) {
+    return {
+      kind: "stale",
+      title: CUSTOMER_ABANDONED_REVIEW_STALE_TITLE,
+      body: CUSTOMER_STALE_CHECKOUT_MESSAGE,
+      startNewPurchaseLabel: CUSTOMER_ABANDONED_REVIEW_START_NEW_LABEL,
+      continueLabel: CUSTOMER_ABANDONED_REVIEW_CONTINUE_LABEL,
+    };
+  }
+
+  return null;
 }

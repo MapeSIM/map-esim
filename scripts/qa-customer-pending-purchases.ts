@@ -144,6 +144,10 @@ function main() {
     customerPendingPurchaseHref("AWAITING_GATEWAY_PAYMENT", "p1"),
     "/account/esim/buy/review?purchase=p1"
   );
+  assert.match(
+    read("app/lib/esim/customerPurchaseStatusMessaging.ts"),
+    /resolveAbandonedCheckoutReviewGuidance/
+  );
   console.log("PASS stale_checkout_display_only");
 
   assert.equal(CUSTOMER_PENDING_PURCHASES_MAX_AGE_MS, 3 * 24 * 60 * 60 * 1000);

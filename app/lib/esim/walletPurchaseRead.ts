@@ -91,6 +91,8 @@ export type WalletPurchaseReview = {
   idempotencyKey: string;
   status: WalletEsimPurchaseStatus;
   canConfirm: boolean;
+  /** Purchase last update — display-only for stale abandoned-checkout guidance. */
+  updatedAt: Date;
   /** Latest in-flight gateway attempt when checkout is awaiting mobile payment. */
   pendingGatewayAttemptId: string | null;
   alternateDeliveryEmail: string | null;
@@ -132,6 +134,7 @@ export async function getWalletPurchaseReview(
       gatewayAmountCents: true,
       fundingSource: true,
       status: true,
+      updatedAt: true,
       idempotencyKey: true,
       adminUserId: true,
       alternateDeliveryEmail: true,
@@ -274,6 +277,7 @@ export async function getWalletPurchaseReview(
     canConfirm:
       row.status === WalletEsimPurchaseStatus.READY ||
       row.status === WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+    updatedAt: row.updatedAt,
     pendingGatewayAttemptId,
     alternateDeliveryEmail: snapshotOrderAlternateDeliveryEmail(row),
     deliveryEmailLocked: isPurchaseDeliveryEmailLocked(

@@ -398,28 +398,39 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
           role="status"
         >
           <p className="text-sm font-medium text-[var(--heading)]">
-            Mobile payment is still pending. Wallet funds stay reserved until
-            payment is verified or you cancel.
+            {review.pendingGatewayAttemptId
+              ? "Mobile payment is still pending. Wallet funds stay reserved until payment is verified or you cancel."
+              : "No active mobile payment is in progress. A previous attempt may have expired or been cancelled. Cancel below to unlock any reserved wallet funds, or start a new purchase."}
           </p>
-          <form
-            action={cancelPendingEsimGatewayCheckoutAction}
-            className="mt-3"
-          >
-            <input type="hidden" name="purchaseId" value={review.purchaseId} />
-            {review.pendingGatewayAttemptId ? (
-              <input
-                type="hidden"
-                name="attemptId"
-                value={review.pendingGatewayAttemptId}
-              />
-            ) : null}
-            <button
-              type="submit"
-              className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface)]/80"
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <form
+              action={cancelPendingEsimGatewayCheckoutAction}
+              className="inline-flex"
             >
-              Cancel payment & unlock wallet
-            </button>
-          </form>
+              <input type="hidden" name="purchaseId" value={review.purchaseId} />
+              {review.pendingGatewayAttemptId ? (
+                <input
+                  type="hidden"
+                  name="attemptId"
+                  value={review.pendingGatewayAttemptId}
+                />
+              ) : null}
+              <button
+                type="submit"
+                className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface)]/80"
+              >
+                Cancel payment & unlock wallet
+              </button>
+            </form>
+            {!review.pendingGatewayAttemptId ? (
+              <Link
+                href="/account/esim/buy"
+                className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]"
+              >
+                Start a new purchase
+              </Link>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
