@@ -131,7 +131,12 @@ export const ADMIN_NAV_LINKS = [
   { href: "/admin/wallet-topups", label: "Wallet Top-ups", exact: false },
   { href: "/admin/refund-requests", label: "Refund Requests", exact: false },
   { href: "/admin/reconciliation", label: "Reconciliation", exact: false },
-  { href: "/admin/operations", label: "Operations", exact: false },
+  { href: "/admin/operations", label: "Operations", exact: true },
+  {
+    href: "/admin/operations/wallet-reservations",
+    label: "Wallet Reservations",
+    exact: false,
+  },
   { href: "/admin/alerts", label: "Alerts", exact: false },
   { href: "/admin/emails", label: "Email Center", exact: false },
   { href: "/admin/email-campaigns", label: "Email Campaigns", exact: false },

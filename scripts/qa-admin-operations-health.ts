@@ -152,7 +152,8 @@ function main() {
       .webhookVerification,
     "HEALTHY"
   );
-  assert.match(page, /NOT_IMPLEMENTED/);
+  assert.match(page, /payment\.integrationStatus/);
+  assert.match(shared, /NOT_IMPLEMENTED/);
   assert.match(service, /isGuestVesimCheckoutEnabled/);
   assert.match(service, /SIMPAISA_WEBHOOK_SECRET/);
   assert.match(service, /SAFEPAY_WEBHOOK_SECRET/);

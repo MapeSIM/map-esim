@@ -148,6 +148,25 @@ function DashboardBody({
         <p className="mt-2 text-xs text-[var(--text-soft)]">
           Generated {data.generatedAtLabel}
         </p>
+        <p className="mt-3 flex flex-wrap gap-2">
+          <AdminButton
+            href="/admin/operations/wallet-reservations"
+            variant="secondary"
+            size="sm"
+          >
+            Wallet reservations
+          </AdminButton>
+          <AdminButton href="/admin/alerts" variant="ghost" size="sm">
+            Alerts
+          </AdminButton>
+          <AdminButton
+            href="/admin/reconciliation?filter=funds_reserved"
+            variant="ghost"
+            size="sm"
+          >
+            Funds reserved (recon)
+          </AdminButton>
+        </p>
       </header>
 
       <section className={CARD_CLASS} aria-labelledby="ops-alerts-summary-heading">
