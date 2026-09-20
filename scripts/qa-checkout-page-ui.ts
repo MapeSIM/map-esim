@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { normalizeCustomerBuyCountryHint } from "../app/lib/plans/customerBuyCountryHint";
 
 const root = join(__dirname, "..");
 
@@ -157,6 +158,19 @@ function main() {
   assert.match(pkg, /qa:checkout-page-ui/);
   assert.match(prelaunch, /qa:checkout-page-ui/);
   console.log("PASS payment_flow_untouched");
+
+  // Customer buy country query: ISO preserved; display names normalize; invalid safe.
+  const buyPage = read("app/account/esim/buy/page.tsx");
+  assert.match(buyPage, /normalizeCustomerBuyCountryHint/);
+  assert.match(buyPage, /buildWalletBuyReturnPath/);
+  assert.doesNotMatch(
+    buyPage,
+    /normalizePackageShareCountry|buildPackageCheckoutPath/
+  );
+  assert.equal(normalizeCustomerBuyCountryHint("PK"), "PK");
+  assert.equal(normalizeCustomerBuyCountryHint("Pakistan"), "PK");
+  assert.equal(normalizeCustomerBuyCountryHint("NotARealCountry"), null);
+  console.log("PASS customer_buy_country_query_normalize");
 
   console.log("ALL PASS qa-checkout-page-ui");
 }

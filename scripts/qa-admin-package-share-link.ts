@@ -13,6 +13,7 @@ import {
   resolvePostSignInPath,
   safeCallbackPath,
 } from "../app/lib/auth/redirects";
+import { normalizeCustomerBuyCountryHint } from "../app/lib/plans/customerBuyCountryHint";
 import {
   buildAbsolutePackageCheckoutUrl,
   buildAbsolutePackageCheckoutUrlFromOffer,
@@ -95,8 +96,21 @@ function main() {
     null
   );
   assert.equal(normalizePackageShareOfferId("bad id!!"), null);
+  // Admin Copy Link generation still rejects display names (codes only).
   assert.equal(normalizePackageShareCountry("Pakistan"), null);
+  assert.equal(normalizePackageShareCountry("PK"), "PK");
   console.log("PASS package_share_rejects_invalid_inputs");
+
+  // Customer buy URL consumption normalizes display names; Admin Copy Link unchanged.
+  assert.equal(normalizeCustomerBuyCountryHint("PK"), "PK");
+  assert.equal(normalizeCustomerBuyCountryHint("pk"), "PK");
+  assert.equal(normalizeCustomerBuyCountryHint("Pakistan"), "PK");
+  assert.equal(normalizeCustomerBuyCountryHint("  pakistan  "), "PK");
+  assert.equal(normalizeCustomerBuyCountryHint("region-asia"), "region-asia");
+  assert.equal(normalizeCustomerBuyCountryHint("NotARealCountry"), null);
+  assert.equal(normalizeCustomerBuyCountryHint("http://evil"), null);
+  assert.equal(normalizeCustomerBuyCountryHint(""), null);
+  console.log("PASS customer_buy_country_display_name_normalize");
 
   // 5) Customer checkout return path preservation (same as Buy Now deep link)
   const returnPath = buildWalletBuyReturnPath({ offerId, country });
@@ -136,6 +150,11 @@ function main() {
   assert.match(read("app/admin/countries/page.tsx"), /AdminCountriesDirectory/);
   assert.match(buyPage, /buildWalletBuyReturnPath/);
   assert.match(buyPage, /requireRole\(\s*"CUSTOMER"/);
+  assert.match(buyPage, /normalizeCustomerBuyCountryHint/);
+  assert.doesNotMatch(
+    buyPage,
+    /const countryHint = sanitizeCountryHint\(query\.country\)/
+  );
   assert.match(helpers, /buildCheckoutHref/);
   assert.match(helpers, /never passes/);
   assert.match(helpers, /fromOrder \(that is purchase/);

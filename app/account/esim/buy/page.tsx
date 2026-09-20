@@ -21,9 +21,9 @@ import {
 import { prisma } from "@/app/lib/db";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
 import { resolveCheckoutBackHref } from "@/app/lib/plans/checkoutBackHref";
+import { normalizeCustomerBuyCountryHint } from "@/app/lib/plans/customerBuyCountryHint";
 import {
   normalizeOfferId,
-  sanitizeCountryHint,
 } from "@/app/lib/vesim/server";
 
 export const dynamic = "force-dynamic";
@@ -110,7 +110,8 @@ export default async function AccountWalletBuyPage({
     })
   );
   const offerIdHint = normalizeOfferId(query.offerId);
-  const countryHint = sanitizeCountryHint(query.country);
+  // Display names (e.g. country=Pakistan) normalize to ISO; invalid stay null.
+  const countryHint = normalizeCustomerBuyCountryHint(query.country);
   const fromOrderId = normalizeAddDataFromOrderId(query.fromOrder);
   const gatewayReady = isPaymentGatewayConfigured();
 

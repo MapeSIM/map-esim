@@ -34,7 +34,8 @@ function main() {
     }),
     "https://mapesim.com/account/esim/buy?offerId=offer_pk_100mb&country=PK"
   );
-  // Display names are not valid country hints for checkout deep links.
+  // Display names are rejected for Admin Copy Link generation (codes only).
+  // Customer buy page normalizes display names separately.
   assert.equal(
     buildPackageCheckoutPath({
       offerId: "offer_pk_100mb",
@@ -81,6 +82,7 @@ function main() {
   assert.match(access, /path\.startsWith\("\/admin\/countries"\)/);
   assert.match(access, /ESIM_FULFILLMENT/);
   assert.match(buyPage, /buildWalletBuyReturnPath/);
+  assert.match(buyPage, /normalizeCustomerBuyCountryHint/);
   assert.match(pkg, /qa:admin-countries-package-share/);
   // Customer surfaces must not import admin countries copy UI.
   assert.doesNotMatch(
