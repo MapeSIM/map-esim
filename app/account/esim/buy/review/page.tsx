@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import AbandonedCheckoutNonConfirmablePanel from "@/app/components/account/AbandonedCheckoutNonConfirmablePanel";
 import AbandonedCheckoutReviewGuidanceBanner from "@/app/components/account/AbandonedCheckoutReviewGuidanceBanner";
 import WalletPurchaseConfirmForm from "@/app/components/account/WalletPurchaseConfirmForm";
 import { buildWalletBuyReviewReturnPath } from "@/app/lib/auth/redirects";
 import { requireRole } from "@/app/lib/auth/session";
-import { resolveAbandonedCheckoutReviewGuidance } from "@/app/lib/esim/customerPurchaseStatusMessaging";
+import {
+  resolveAbandonedCheckoutNonConfirmableGuidance,
+  resolveAbandonedCheckoutReviewGuidance,
+} from "@/app/lib/esim/customerPurchaseStatusMessaging";
 import { getWalletPurchaseReview } from "@/app/lib/esim/walletPurchaseRead";
 import { resolveCheckoutBackHref } from "@/app/lib/plans/checkoutBackHref";
 import { WalletEsimPurchaseStatus } from "@prisma/client";
@@ -87,7 +91,23 @@ export default async function AccountWalletBuyReviewPage({
 
   // AWAITING_GATEWAY_PAYMENT stays on checkout so the customer can resume/cancel safely.
 
-  if (!review.canConfirm) notFound();
+  // Owned but non-confirmable (e.g. DRAFT): friendly explanation, not a bare 404.
+  if (!review.canConfirm) {
+    const nonConfirmable = resolveAbandonedCheckoutNonConfirmableGuidance(
+      review.status
+    );
+    return (
+      <div className="space-y-6">
+        <Link
+          href="/account/esim/buy"
+          className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+        >
+          ← Back to package selection
+        </Link>
+        <AbandonedCheckoutNonConfirmablePanel guidance={nonConfirmable} />
+      </div>
+    );
+  }
 
   const guidance = resolveAbandonedCheckoutReviewGuidance({
     status: review.status,

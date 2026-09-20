@@ -182,6 +182,12 @@ function main() {
   assert.match(page, /Split payment reservations/);
   assert.match(page, /Payment detail/);
   assert.match(page, /Reconciliation/);
+  // Phase 6 mobile polish: card list on small screens; table stays md+.
+  assert.match(page, /data-wallet-reservations-mobile/);
+  assert.match(page, /md:hidden/);
+  assert.match(page, /hidden[\s\S]*?md:block/);
+  assert.match(page, /data-reservation-action-links/);
+  assert.match(page, /flex flex-wrap gap-2/);
   assert.doesNotMatch(page, /Release Reservation|Refund wallet funds|markPaid/i);
   assert.doesNotMatch(
     service,

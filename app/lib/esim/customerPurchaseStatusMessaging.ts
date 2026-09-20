@@ -75,6 +75,19 @@ export const CUSTOMER_ABANDONED_REVIEW_START_NEW_LABEL =
 export const CUSTOMER_ABANDONED_REVIEW_CONTINUE_LABEL =
   "Continue this checkout";
 
+/** Owned purchase on review link that can no longer be confirmed (e.g. DRAFT). */
+export const CUSTOMER_ABANDONED_REVIEW_NON_CONFIRMABLE_TITLE =
+  "This checkout can't be continued";
+
+export const CUSTOMER_ABANDONED_REVIEW_NON_CONFIRMABLE_MESSAGE =
+  "This purchase is no longer available to complete from this link. No eSIM was created from it. Start a new purchase to choose a plan again.";
+
+export const CUSTOMER_ABANDONED_REVIEW_DRAFT_TITLE =
+  "This checkout isn't ready yet";
+
+export const CUSTOMER_ABANDONED_REVIEW_DRAFT_MESSAGE =
+  "This purchase was never finished setting up, so it can't be confirmed from this link. Start a new purchase to continue.";
+
 /** Customer UI only. Does not delete rows or change purchase status. */
 export const CUSTOMER_PENDING_PURCHASES_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -324,4 +337,38 @@ export function resolveAbandonedCheckoutReviewGuidance(input: {
   }
 
   return null;
+}
+
+export type AbandonedCheckoutNonConfirmableKind = "draft" | "unavailable";
+
+export type AbandonedCheckoutNonConfirmableGuidance = {
+  kind: AbandonedCheckoutNonConfirmableKind;
+  title: string;
+  body: string;
+  startNewPurchaseLabel: string;
+};
+
+/**
+ * Display-only copy when an owned review deep link hits a known
+ * non-confirmable status (after terminal redirects). Never used for
+ * missing ids or wrong-owner rows (those stay 404).
+ */
+export function resolveAbandonedCheckoutNonConfirmableGuidance(
+  status: string
+): AbandonedCheckoutNonConfirmableGuidance {
+  const value = (status ?? "").trim();
+  if (value === "DRAFT") {
+    return {
+      kind: "draft",
+      title: CUSTOMER_ABANDONED_REVIEW_DRAFT_TITLE,
+      body: CUSTOMER_ABANDONED_REVIEW_DRAFT_MESSAGE,
+      startNewPurchaseLabel: CUSTOMER_ABANDONED_REVIEW_START_NEW_LABEL,
+    };
+  }
+  return {
+    kind: "unavailable",
+    title: CUSTOMER_ABANDONED_REVIEW_NON_CONFIRMABLE_TITLE,
+    body: CUSTOMER_ABANDONED_REVIEW_NON_CONFIRMABLE_MESSAGE,
+    startNewPurchaseLabel: CUSTOMER_ABANDONED_REVIEW_START_NEW_LABEL,
+  };
 }

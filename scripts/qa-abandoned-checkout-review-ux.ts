@@ -6,12 +6,15 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  CUSTOMER_ABANDONED_REVIEW_DRAFT_MESSAGE,
+  CUSTOMER_ABANDONED_REVIEW_NON_CONFIRMABLE_MESSAGE,
   CUSTOMER_ABANDONED_REVIEW_OUTDATED_MESSAGE,
   CUSTOMER_ABANDONED_REVIEW_PAYMENT_ENDED_MESSAGE,
   CUSTOMER_ABANDONED_REVIEW_START_NEW_LABEL,
   CUSTOMER_PENDING_PURCHASES_MAX_AGE_MS,
   CUSTOMER_STALE_CHECKOUT_DISPLAY_MS,
   CUSTOMER_STALE_CHECKOUT_MESSAGE,
+  resolveAbandonedCheckoutNonConfirmableGuidance,
   resolveAbandonedCheckoutReviewGuidance,
 } from "../app/lib/esim/customerPurchaseStatusMessaging";
 
@@ -76,7 +79,7 @@ function main() {
   assert.equal(ended?.body, CUSTOMER_ABANDONED_REVIEW_PAYMENT_ENDED_MESSAGE);
   console.log("PASS payment_not_completed_guidance");
 
-  // Non-confirmable statuses → null (page redirects / 404 elsewhere)
+  // Non-confirmable statuses → guidance resolver returns null (page shows panel / redirects)
   assert.equal(
     resolveAbandonedCheckoutReviewGuidance({
       status: "COMPLETED",
@@ -93,12 +96,28 @@ function main() {
     }),
     null
   );
-  console.log("PASS non_confirmable_statuses_skip_guidance");
+  console.log("PASS non_confirmable_statuses_skip_stale_guidance");
+
+  const draft = resolveAbandonedCheckoutNonConfirmableGuidance("DRAFT");
+  assert.equal(draft.kind, "draft");
+  assert.equal(draft.body, CUSTOMER_ABANDONED_REVIEW_DRAFT_MESSAGE);
+  assert.equal(draft.startNewPurchaseLabel, CUSTOMER_ABANDONED_REVIEW_START_NEW_LABEL);
+
+  const unavailable = resolveAbandonedCheckoutNonConfirmableGuidance("UNKNOWN");
+  assert.equal(unavailable.kind, "unavailable");
+  assert.equal(
+    unavailable.body,
+    CUSTOMER_ABANDONED_REVIEW_NON_CONFIRMABLE_MESSAGE
+  );
+  console.log("PASS non_confirmable_owned_review_guidance");
 
   // Wiring: review page keeps security 404s; shows banner; keeps form for READY/AWAITING
   const reviewPage = read("app/account/esim/buy/review/page.tsx");
   const banner = read(
     "app/components/account/AbandonedCheckoutReviewGuidanceBanner.tsx"
+  );
+  const nonConfirmablePanel = read(
+    "app/components/account/AbandonedCheckoutNonConfirmablePanel.tsx"
   );
   const form = read("app/components/account/WalletPurchaseConfirmForm.tsx");
   const readSrc = read("app/lib/esim/walletPurchaseRead.ts");
@@ -106,7 +125,9 @@ function main() {
 
   assert.match(reviewPage, /if \(!purchaseId\) notFound\(\)/);
   assert.match(reviewPage, /if \(!review\) notFound\(\)/);
-  assert.match(reviewPage, /if \(!review\.canConfirm\) notFound\(\)/);
+  assert.doesNotMatch(reviewPage, /if \(!review\.canConfirm\) notFound\(\)/);
+  assert.match(reviewPage, /resolveAbandonedCheckoutNonConfirmableGuidance/);
+  assert.match(reviewPage, /AbandonedCheckoutNonConfirmablePanel/);
   assert.match(reviewPage, /resolveAbandonedCheckoutReviewGuidance/);
   assert.match(reviewPage, /AbandonedCheckoutReviewGuidanceBanner/);
   assert.match(reviewPage, /WalletPurchaseConfirmForm/);
@@ -114,6 +135,9 @@ function main() {
   assert.match(banner, /href="\/account\/esim\/buy"/);
   assert.match(banner, /startNewPurchaseLabel/);
   assert.match(banner, /data-abandoned-review-guidance/);
+  assert.match(nonConfirmablePanel, /data-abandoned-review-non-confirmable/);
+  assert.match(nonConfirmablePanel, /href="\/account\/esim\/buy"/);
+  assert.match(nonConfirmablePanel, /startNewPurchaseLabel/);
   assert.match(form, /CUSTOMER_AWAITING_GATEWAY_INACTIVE_MESSAGE/);
   assert.match(form, /CUSTOMER_AWAITING_GATEWAY_ACTIVE_MESSAGE/);
   assert.match(form, /CUSTOMER_ABANDONED_REVIEW_START_NEW_LABEL/);
@@ -121,10 +145,13 @@ function main() {
   assert.match(messaging, /No active mobile payment is in progress/);
   assert.match(messaging, /Mobile payment is still pending/);
   assert.match(messaging, /Start a new purchase/);
+  assert.match(messaging, /CUSTOMER_ABANDONED_REVIEW_DRAFT_MESSAGE/);
   assert.match(readSrc, /updatedAt:\s*row\.updatedAt/);
   assert.match(messaging, /resolveAbandonedCheckoutReviewGuidance/);
+  assert.match(messaging, /resolveAbandonedCheckoutNonConfirmableGuidance/);
   assert.doesNotMatch(reviewPage, /confirmWalletEsimPurchaseAction|maybeReleasePending/);
   assert.doesNotMatch(banner, /prisma|walletPurchaseActions/);
+  assert.doesNotMatch(nonConfirmablePanel, /prisma|walletPurchaseActions/);
   console.log("PASS abandoned_review_ux_wiring");
 
   console.log("OK qa-abandoned-checkout-review-ux");
