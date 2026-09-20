@@ -293,6 +293,18 @@ function main() {
   assert.match(page, /isWalletReservationAlertInventoryCode/);
   assert.match(page, /Wallet reservation inventory/);
   assert.match(page, /Open related admin view/);
+  // Phase 6: hide Wallet Reservations CTAs without Operations access (no extra grants).
+  assert.match(page, /canAccessAdminPath/);
+  assert.match(page, /loadAdminAccess/);
+  assert.match(page, /canOpenWalletReservations/);
+  assert.match(
+    page,
+    /canOpenWalletReservations\s*\?\s*\([\s\S]*?Wallet Reservations/
+  );
+  assert.match(
+    page,
+    /canOpenWalletReservations\s*&&\s*[\s\S]*?isWalletReservationAlertInventoryCode/
+  );
   // Primary deep-links unchanged in collectors (UI-only Phase 5.3B).
   assert.match(service, /code:\s*"WALLET_PURCHASE_STUCK_BEFORE_PROVIDER"/);
   assert.match(

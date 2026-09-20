@@ -26,6 +26,8 @@ import {
   loadNotificationViewsForAlerts,
   loadRecentNotificationActivity,
 } from "@/app/lib/admin/alertNotificationState";
+import { canAccessAdminPath } from "@/app/lib/admin/adminPageAccess";
+import { loadAdminAccess } from "@/app/lib/admin/adminPermissionAccess";
 import { formatUtcTimestamp } from "@/app/lib/admin/operationsHealthShared";
 import {
   AdminButton,
@@ -64,15 +66,19 @@ function AlertCard({
   notificationStatus,
   lastAttemptLabel,
   lastSuccessLabel,
+  canOpenWalletReservations,
 }: {
   alert: MonitoringAlert;
   notificationStatus: DerivedNotificationDisplayStatus;
   lastAttemptLabel: string;
   lastSuccessLabel: string;
+  canOpenWalletReservations: boolean;
 }) {
   const href =
     alert.href && isSafeAdminHref(alert.href) ? alert.href : undefined;
+  // Secondary inventory CTA only — primary alert.href deep links stay unchanged.
   const inventoryHref =
+    canOpenWalletReservations &&
     isWalletReservationAlertInventoryCode(alert.code) &&
     isSafeAdminHref(ADMIN_WALLET_RESERVATIONS_HREF)
       ? ADMIN_WALLET_RESERVATIONS_HREF
@@ -173,7 +179,12 @@ export default async function AdminAlertsPage({
 }: {
   searchParams: Promise<{ severity?: string; category?: string }>;
 }) {
-  await requireActiveAdminForAlerts();
+  const { admin } = await requireActiveAdminForAlerts();
+  const access = await loadAdminAccess(admin.id);
+  const canOpenWalletReservations = canAccessAdminPath(
+    access?.permissions ?? [],
+    ADMIN_WALLET_RESERVATIONS_HREF
+  );
   const params = await searchParams;
 
   let data;
@@ -231,17 +242,19 @@ export default async function AdminAlertsPage({
           {summary.freshness.replaceAll("_", " ")}
         </p>
         <p className="mt-3 flex flex-wrap gap-2">
-          <AdminButton
-            href={
-              isSafeAdminHref(ADMIN_WALLET_RESERVATIONS_HREF)
-                ? ADMIN_WALLET_RESERVATIONS_HREF
-                : "/admin/operations"
-            }
-            variant="secondary"
-            size="sm"
-          >
-            Wallet Reservations
-          </AdminButton>
+          {canOpenWalletReservations ? (
+            <AdminButton
+              href={
+                isSafeAdminHref(ADMIN_WALLET_RESERVATIONS_HREF)
+                  ? ADMIN_WALLET_RESERVATIONS_HREF
+                  : "/admin/operations"
+              }
+              variant="secondary"
+              size="sm"
+            >
+              Wallet Reservations
+            </AdminButton>
+          ) : null}
           <AdminButton href="/admin/operations" variant="ghost" size="sm">
             Operations
           </AdminButton>
@@ -364,6 +377,7 @@ export default async function AdminAlertsPage({
                     ? formatUtcTimestamp(view.lastSuccessAt)
                     : "—"
                 }
+                canOpenWalletReservations={canOpenWalletReservations}
               />
             );
           })}

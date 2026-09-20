@@ -126,19 +126,48 @@ const WHATSAPP_ALLOWED_EXACT = new Set([
   "/device-compatibility",
 ]);
 
+function normalizeWhatsAppPath(pathname: string): string {
+  return (pathname || "/").split("?")[0].split("#")[0] || "/";
+}
+
 function matchesWhatsAppBlocked(pathname: string): boolean {
   return WHATSAPP_BLOCKED_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
 }
 
+/**
+ * Wallet checkout review has a fixed mobile sticky payment bar (~8.5–12.5rem).
+ * FAB must clear that bar (+ safe-area) when both could share the viewport.
+ */
+export function isWhatsAppStickyPaymentClearanceRoute(pathname: string): boolean {
+  const path = normalizeWhatsAppPath(pathname);
+  return (
+    path === "/account/esim/buy" || path.startsWith("/account/esim/buy/")
+  );
+}
+
 /** True when the floating WhatsApp button may render on this pathname. */
 export function isWhatsAppSupportRoute(pathname: string): boolean {
-  const path = (pathname || "/").split("?")[0].split("#")[0] || "/";
+  const path = normalizeWhatsAppPath(pathname);
+  // Wallet checkout: support FAB allowed; bottom clearance clears sticky pay bar.
+  if (isWhatsAppStickyPaymentClearanceRoute(path)) return true;
   if (matchesWhatsAppBlocked(path)) return false;
   if (WHATSAPP_ALLOWED_EXACT.has(path)) return true;
   if (path.startsWith("/countries/")) return true;
   return false;
+}
+
+/**
+ * Bottom offset for the FAB. On sticky-checkout paths (if ever shown), clear
+ * the tallest sticky pay bar + gap while still honoring safe-area.
+ */
+export function whatsAppFabBottomClass(pathname: string): string {
+  if (isWhatsAppStickyPaymentClearanceRoute(pathname)) {
+    // 12.5rem sticky + 0.75rem gap; safe-area already in sticky spacer.
+    return "bottom-[calc(12.5rem+0.75rem+env(safe-area-inset-bottom,0px))] lg:bottom-[max(1.25rem,env(safe-area-inset-bottom,0px))]";
+  }
+  return "bottom-[max(1.25rem,env(safe-area-inset-bottom,0px))]";
 }
 
 export type PublicWhatsAppSupportConfig =

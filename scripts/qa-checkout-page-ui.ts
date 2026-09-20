@@ -60,6 +60,18 @@ function main() {
     );
   }
   console.log("PASS sticky_bar_mobile_clearance_360_390_412");
+  // Phase 6: WhatsApp FAB clears sticky pay bar (+ safe-area); checkout pay flow untouched.
+  const whatsappShared = read("app/lib/support/whatsappSupportShared.ts");
+  const whatsappButton = read("app/components/support/WhatsAppSupportButton.tsx");
+  assert.match(whatsappShared, /isWhatsAppStickyPaymentClearanceRoute/);
+  assert.match(whatsappShared, /whatsAppFabBottomClass/);
+  assert.match(whatsappShared, /12\.5rem.*safe-area-inset-bottom/);
+  assert.match(whatsappButton, /whatsAppFabBottomClass/);
+  assert.match(whatsappButton, /data-whatsapp-sticky-clearance/);
+  // Sticky bar stays z-40; FAB stays z-30 but sits above the bar vertically.
+  assert.match(confirm, /fixed inset-x-0 bottom-0 z-40/);
+  assert.match(whatsappButton, /fixed z-30/);
+  console.log("PASS whatsapp_fab_sticky_clearance");
   // Conversion polish: sticky disabled reason + zero-due Covered/Wallet labels.
   assert.match(confirm, /stickyDisabledReason/);
   assert.match(confirm, /dueLabel/);

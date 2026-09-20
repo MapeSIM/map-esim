@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   isWhatsAppSupportRoute,
+  whatsAppFabBottomClass,
   type PublicWhatsAppSupportConfig,
 } from "@/app/lib/support/whatsappSupportShared";
 
@@ -24,6 +25,8 @@ function parsePublicConfig(data: unknown): PublicWhatsAppSupportConfig {
  * Floating WhatsApp support button (bottom-left).
  * Fetches runtime config on mount and route changes. Renders nothing when off
  * or on disallowed routes. Independent of Tawk / marketing consent.
+ * On wallet checkout paths the FAB sits above the sticky payment bar and
+ * respects mobile safe-area so it never covers the pay CTA.
  */
 export default function WhatsAppSupportButton() {
   const pathname = usePathname() || "/";
@@ -66,13 +69,19 @@ export default function WhatsAppSupportButton() {
 
   if (!routeOk || !config.enabled) return null;
 
+  const bottomClass = whatsAppFabBottomClass(pathname);
+
   return (
     <a
       href={config.href}
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Chat with MAP eSIM on WhatsApp"
-      className="fixed z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-md transition hover:bg-[#1ebe57] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--page-bg)] bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-[max(1.25rem,env(safe-area-inset-left))]"
+      data-whatsapp-fab="true"
+      data-whatsapp-sticky-clearance={
+        bottomClass.includes("12.5rem") ? "true" : "false"
+      }
+      className={`fixed z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-md transition hover:bg-[#1ebe57] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--page-bg)] left-[max(1.25rem,env(safe-area-inset-left))] ${bottomClass}`}
     >
       <svg
         viewBox="0 0 24 24"

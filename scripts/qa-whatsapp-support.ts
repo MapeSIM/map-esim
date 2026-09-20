@@ -11,10 +11,12 @@ import {
   WHATSAPP_MESSAGE_MAX,
   WHATSAPP_SUPPORT_CONFIG_ID,
   buildWhatsAppClickToChatUrl,
+  isWhatsAppStickyPaymentClearanceRoute,
   isWhatsAppSupportRoute,
   parseWhatsAppDefaultMessage,
   parseWhatsAppPhoneDigits,
   toPublicWhatsAppSupportConfig,
+  whatsAppFabBottomClass,
 } from "../app/lib/support/whatsappSupportShared";
 
 const root = join(__dirname, "..");
@@ -154,6 +156,9 @@ function main() {
     "/device-compatibility",
     "/support",
     "/contact",
+    // Phase 6: support FAB on wallet checkout; elevated above sticky pay bar.
+    "/account/esim/buy",
+    "/account/esim/buy/review",
   ]) {
     assert.equal(isWhatsAppSupportRoute(path), true, `allow ${path}`);
   }
@@ -178,6 +183,25 @@ function main() {
     assert.equal(isWhatsAppSupportRoute(path), false, `deny ${path}`);
   }
   console.log("PASS route_allow_deny");
+
+  // Sticky payment clearance (FAB above ~12.5rem bar + safe-area on mobile).
+  assert.equal(
+    isWhatsAppStickyPaymentClearanceRoute("/account/esim/buy/review"),
+    true
+  );
+  assert.equal(isWhatsAppStickyPaymentClearanceRoute("/countries"), false);
+  assert.match(
+    whatsAppFabBottomClass("/account/esim/buy"),
+    /12\.5rem.*safe-area-inset-bottom/
+  );
+  assert.match(
+    whatsAppFabBottomClass("/"),
+    /max\(1\.25rem,\s*env\(safe-area-inset-bottom/
+  );
+  assert.match(button, /whatsAppFabBottomClass/);
+  assert.match(button, /data-whatsapp-sticky-clearance/);
+  assert.match(button, /safe-area-inset-left/);
+  console.log("PASS sticky_payment_fab_clearance");
 
   // --- Admin write path security markers ---
   assert.match(mut, /assertSameOriginAdminRequest/);
