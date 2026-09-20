@@ -47,6 +47,13 @@ export default async function AdminPaymentRecoveryPage({
           <AdminButton href="/admin/payments" variant="ghost" size="sm">
             ← Payments
           </AdminButton>
+          <AdminButton
+            href="/admin/payments/pending"
+            variant="ghost"
+            size="sm"
+          >
+            Pending payment tools
+          </AdminButton>
         </p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight">
           Payment recovery
@@ -137,9 +144,18 @@ export default async function AdminPaymentRecoveryPage({
                     {row.suggestedSafeAction}
                   </td>
                   <td className="px-3 py-3 align-top">
-                    <AdminButton href={row.href} variant="primary" size="sm">
-                      Open
-                    </AdminButton>
+                    <div className="flex flex-col gap-2">
+                      <AdminButton href={row.href} variant="primary" size="sm">
+                        Open
+                      </AdminButton>
+                      <AdminButton
+                        href={`/admin/payments/pending/${encodeURIComponent(row.attemptId)}`}
+                        variant="secondary"
+                        size="sm"
+                      >
+                        Pending tools
+                      </AdminButton>
+                    </div>
                   </td>
                 </tr>
               ))}

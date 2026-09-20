@@ -1,5 +1,12 @@
 import { requireRole } from "@/app/lib/auth/session";
+import {
+  adminWalletReservationStatusLabel,
+  buildAdminWalletPurchaseReconciliationHref,
+  formatAdminReservedWalletListFragment,
+  isAdminWalletReconciliationLinkApplicable,
+} from "@/app/lib/admin/adminWalletReservationDisplay";
 import { listPendingGatewayPaymentAttempts } from "@/app/lib/admin/pendingPaymentVerify";
+import { formatUsdCents } from "@/app/lib/wallet/display";
 import { AdminButton, AdminStatusPill } from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +53,13 @@ export default async function AdminPendingPaymentsPage() {
           <AdminButton href="/admin/payments" variant="ghost" size="sm">
             Payments hub
           </AdminButton>
+          <AdminButton
+            href="/admin/payments/recovery"
+            variant="ghost"
+            size="sm"
+          >
+            Payment recovery
+          </AdminButton>
           <AdminButton href="/admin/payments/failed" variant="ghost" size="sm">
             Failed payments
           </AdminButton>
@@ -65,46 +79,68 @@ export default async function AdminPendingPaymentsPage() {
         </div>
       ) : (
         <ul className="space-y-3">
-          {rows.map((row) => (
-            <li key={row.attemptId} className={CARD_CLASS}>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0 space-y-2">
-                  <p className="font-semibold text-[var(--heading)]">
-                    Attempt {row.attemptId}
-                  </p>
-                  <p className="text-[var(--text-muted)]">
-                    Purchase {row.purchaseId}
-                    {row.gatewayProvider
-                      ? ` · ${row.gatewayProvider}`
-                      : ""}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <AdminStatusPill value={row.attemptStatus}>
-                      {row.attemptStatus}
-                    </AdminStatusPill>
-                    <AdminStatusPill value={row.purchaseStatus}>
-                      {row.purchaseStatus}
-                    </AdminStatusPill>
-                    <span className="text-xs text-[var(--text-soft)]">
-                      {row.gatewayAmountCents} {row.currency}
-                    </span>
+          {rows.map((row) => {
+            const reservedFragment = formatAdminReservedWalletListFragment(
+              row.walletAppliedCents
+            );
+            const showRecon = isAdminWalletReconciliationLinkApplicable({
+              purchaseStatus: row.purchaseStatus,
+              attemptStatus: row.attemptStatus,
+            });
+            return (
+              <li key={row.attemptId} className={CARD_CLASS}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 space-y-2">
+                    <p className="font-semibold text-[var(--heading)]">
+                      Attempt {row.attemptId}
+                    </p>
+                    <p className="text-[var(--text-muted)]">
+                      Purchase {row.purchaseId}
+                      {row.gatewayProvider
+                        ? ` · ${row.gatewayProvider}`
+                        : ""}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <AdminStatusPill value={row.attemptStatus}>
+                        {adminWalletReservationStatusLabel(row.attemptStatus)}
+                      </AdminStatusPill>
+                      <AdminStatusPill value={row.purchaseStatus}>
+                        {adminWalletReservationStatusLabel(row.purchaseStatus)}
+                      </AdminStatusPill>
+                      <span className="text-xs text-[var(--text-soft)]">
+                        {formatUsdCents(row.gatewayAmountCents)} {row.currency}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[var(--text-soft)]">
+                      Tracker {row.trackerRefMasked}
+                      {reservedFragment
+                        ? ` · ${reservedFragment}`
+                        : " · gateway-only"}
+                    </p>
                   </div>
-                  <p className="text-xs text-[var(--text-soft)]">
-                    Tracker {row.trackerRefMasked}
-                    {row.walletAppliedCents > 0
-                      ? ` · wallet reserved ${row.walletAppliedCents}`
-                      : " · gateway-only"}
-                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {showRecon ? (
+                      <AdminButton
+                        href={buildAdminWalletPurchaseReconciliationHref(
+                          row.purchaseId
+                        )}
+                        variant="secondary"
+                        size="sm"
+                      >
+                        Reconciliation
+                      </AdminButton>
+                    ) : null}
+                    <AdminButton
+                      href={`/admin/payments/${encodeURIComponent(row.attemptId)}`}
+                      variant="primary"
+                    >
+                      Open
+                    </AdminButton>
+                  </div>
                 </div>
-                <AdminButton
-                  href={`/admin/payments/${encodeURIComponent(row.attemptId)}`}
-                  variant="primary"
-                >
-                  Open
-                </AdminButton>
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

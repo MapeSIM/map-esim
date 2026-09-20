@@ -78,6 +78,7 @@ export function resolveAdminStatusPillTone(
     normalized === "PAYMENT_PENDING" ||
     normalized === "AWAITING_PAYMENT" ||
     normalized === "AWAITING_GATEWAY_PAYMENT" ||
+    normalized === "FUNDS_RESERVED" ||
     normalized === "UNVERIFIED" ||
     normalized === "MISSING" ||
     normalized === "DRAFT" ||

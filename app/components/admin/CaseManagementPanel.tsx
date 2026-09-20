@@ -30,6 +30,7 @@ import {
   RESOLVE_CASE_PHRASE,
   UNLOCK_CASE_PHRASE,
 } from "@/app/lib/admin/reconciliationCaseShared";
+import { ADMIN_REFUND_WALLET_FUNDS_BLURB } from "@/app/lib/admin/adminWalletReservationDisplay";
 
 const initial: CaseManagementFormState = null;
 
@@ -704,11 +705,16 @@ export default function CaseManagementPanel(props: {
                 Refund wallet funds
               </h3>
               <p className="text-sm text-[var(--text-muted)]">
+                {ADMIN_REFUND_WALLET_FUNDS_BLURB}
+              </p>
+              <p className="text-sm text-[var(--text-muted)]">
                 {props.walletRefundMessage}
               </p>
               <p className="text-sm font-medium text-[var(--danger-text)]">
                 Warning: this action changes financial state by restoring the
-                original reserved wallet amount exactly once.
+                original reserved wallet amount exactly once. Use only for
+                confirmed refund cases — not for releasing a pending gateway
+                hold.
               </p>
               <input type="hidden" name="sourceType" value={props.sourceType} />
               <input type="hidden" name="attemptId" value={props.attemptId} />

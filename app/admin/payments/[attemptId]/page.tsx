@@ -2,6 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import PendingPaymentVerifyForm from "@/app/components/admin/PendingPaymentVerifyForm";
 import PendingSimpaisaInvestigateForm from "@/app/components/admin/PendingSimpaisaInvestigateForm";
+import {
+  adminWalletReservationStatusLabel,
+  buildAdminWalletPurchaseReconciliationHref,
+  formatAdminReservedWalletAmount,
+  isAdminWalletReconciliationLinkApplicable,
+} from "@/app/lib/admin/adminWalletReservationDisplay";
 import { getAdminPaymentDetail } from "@/app/lib/admin/paymentDashboard";
 import { getAdminPaymentRecoveryDetailExtras } from "@/app/lib/admin/paymentRecovery";
 import {
@@ -34,6 +40,10 @@ export default async function AdminPaymentDetailPage({
   if (!detail) notFound();
 
   const recovery = await getAdminPaymentRecoveryDetailExtras(detail.attemptId);
+  const showRecon = isAdminWalletReconciliationLinkApplicable({
+    purchaseStatus: detail.purchaseStatus,
+    attemptStatus: detail.attemptStatus,
+  });
 
   return (
     <div className="min-w-0 space-y-8">
@@ -42,6 +52,13 @@ export default async function AdminPaymentDetailPage({
           <AdminButton href="/admin/payments" variant="ghost" size="sm">
             ← Payments
           </AdminButton>
+          <AdminButton
+            href="/admin/payments/pending"
+            variant="ghost"
+            size="sm"
+          >
+            Pending payment tools
+          </AdminButton>
           {recovery?.isRecoveryCandidate ? (
             <AdminButton
               href="/admin/payments/recovery"
@@ -49,6 +66,17 @@ export default async function AdminPaymentDetailPage({
               size="sm"
             >
               Payment recovery
+            </AdminButton>
+          ) : null}
+          {showRecon ? (
+            <AdminButton
+              href={buildAdminWalletPurchaseReconciliationHref(
+                detail.purchaseId
+              )}
+              variant="ghost"
+              size="sm"
+            >
+              Reconciliation
             </AdminButton>
           ) : null}
         </div>
@@ -61,10 +89,10 @@ export default async function AdminPaymentDetailPage({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <AdminStatusPill value={detail.attemptStatus}>
-            {detail.attemptStatus}
+            {adminWalletReservationStatusLabel(detail.attemptStatus)}
           </AdminStatusPill>
           <AdminStatusPill value={detail.purchaseStatus}>
-            {detail.purchaseStatus}
+            {adminWalletReservationStatusLabel(detail.purchaseStatus)}
           </AdminStatusPill>
           <AdminStatusPill value={detail.webhookLabel}>
             {detail.webhookLabel}
@@ -197,10 +225,10 @@ export default async function AdminPaymentDetailPage({
             </dt>
             <dd className="mt-1 flex flex-wrap items-center gap-2">
               <AdminStatusPill value={detail.attemptStatus}>
-                {detail.attemptStatus}
+                {adminWalletReservationStatusLabel(detail.attemptStatus)}
               </AdminStatusPill>
               <AdminStatusPill value={detail.purchaseStatus}>
-                {detail.purchaseStatus}
+                {adminWalletReservationStatusLabel(detail.purchaseStatus)}
               </AdminStatusPill>
             </dd>
           </div>
@@ -240,9 +268,7 @@ export default async function AdminPaymentDetailPage({
               Wallet reserved
             </dt>
             <dd className="mt-1 text-[var(--heading)]">
-              {detail.walletAppliedCents > 0
-                ? `${detail.walletAppliedCents} cents`
-                : "none (gateway-only)"}
+              {formatAdminReservedWalletAmount(detail.walletAppliedCents)}
             </dd>
           </div>
           <div>
@@ -277,12 +303,23 @@ export default async function AdminPaymentDetailPage({
               Customer timeline
             </AdminButton>
           ) : null}
+          {showRecon ? (
+            <AdminButton
+              href={buildAdminWalletPurchaseReconciliationHref(
+                detail.purchaseId
+              )}
+              variant="secondary"
+              size="sm"
+            >
+              Open reconciliation
+            </AdminButton>
+          ) : null}
           <AdminButton
             href={`/admin/payments/pending/${encodeURIComponent(detail.attemptId)}`}
             variant="secondary"
             size="sm"
           >
-            Legacy pending page
+            Pending payment tools
           </AdminButton>
         </div>
       </section>

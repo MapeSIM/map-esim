@@ -11,6 +11,7 @@ import {
   PENDING_PAYMENT_VERIFY_REASON_MAX,
   SIMPAISA_SUCCESS_WEBHOOK_REQUIRED_MESSAGE,
 } from "@/app/lib/admin/pendingSimpaisaPaymentInvestigateShared";
+import { ADMIN_RELEASE_RESERVATION_BLURB } from "@/app/lib/admin/adminWalletReservationDisplay";
 
 const initialCheckState: SimpaisaPendingInvestigateFormState = null;
 const initialReleaseState: SimpaisaPendingReleaseFormState = null;
@@ -194,10 +195,10 @@ export default function PendingSimpaisaInvestigateForm(props: {
             Release reservation
           </h3>
           <p className="text-sm text-[var(--text-muted)]">
-            Inquire confirmed failed/terminal unpaid and this purchase still
-            shows reserved wallet funds. Release re-runs Inquire and only then
-            calls the existing reservation release helper. It never funds or
-            marks paid.
+            {ADMIN_RELEASE_RESERVATION_BLURB} Inquire must confirm
+            failed/terminal unpaid and this purchase must still show reserved
+            wallet funds. Release re-runs Inquire and only then calls the
+            existing reservation release helper.
           </p>
           <form action={releaseAction} className="space-y-3">
             <input

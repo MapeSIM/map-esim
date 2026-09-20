@@ -2,8 +2,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import PendingPaymentVerifyForm from "@/app/components/admin/PendingPaymentVerifyForm";
 import PendingSimpaisaInvestigateForm from "@/app/components/admin/PendingSimpaisaInvestigateForm";
+import {
+  adminWalletReservationStatusLabel,
+  buildAdminWalletPurchaseReconciliationHref,
+  formatAdminReservedWalletAmount,
+  isAdminWalletReconciliationLinkApplicable,
+} from "@/app/lib/admin/adminWalletReservationDisplay";
 import { getPendingGatewayPaymentAttemptDetail } from "@/app/lib/admin/pendingPaymentVerify";
 import { requireRole } from "@/app/lib/auth/session";
+import { AdminButton, AdminStatusPill } from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +25,10 @@ export default async function AdminPendingPaymentDetailPage({
   if (!detail) notFound();
 
   const isSimpaisa = detail.gatewayProvider === "SIMPAISA";
+  const showRecon = isAdminWalletReconciliationLinkApplicable({
+    purchaseStatus: detail.purchaseStatus,
+    attemptStatus: detail.attemptStatus,
+  });
 
   return (
     <div className="space-y-8">
@@ -36,6 +47,19 @@ export default async function AdminPendingPaymentDetailPage({
           >
             Pending payments
           </Link>
+          {showRecon ? (
+            <>
+              <span className="text-[var(--text-soft)]"> · </span>
+              <Link
+                href={buildAdminWalletPurchaseReconciliationHref(
+                  detail.purchaseId
+                )}
+                className="font-semibold text-[var(--accent-strong)]"
+              >
+                Reconciliation
+              </Link>
+            </>
+          ) : null}
         </p>
         <h1 className="text-2xl font-bold tracking-tight">
           Payment attempt
@@ -45,6 +69,19 @@ export default async function AdminPendingPaymentDetailPage({
             ? "Read-only local state plus authenticated Simpaisa Inquire. Funding remains webhook-authoritative."
             : "Read-only local state plus authenticated Safepay verification. Funding remains webhook-authoritative."}
         </p>
+        {showRecon ? (
+          <p className="flex flex-wrap gap-2 pt-1">
+            <AdminButton
+              href={buildAdminWalletPurchaseReconciliationHref(
+                detail.purchaseId
+              )}
+              variant="secondary"
+              size="sm"
+            >
+              Open reconciliation
+            </AdminButton>
+          </p>
+        ) : null}
       </header>
 
       <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm sm:p-5">
@@ -77,8 +114,13 @@ export default async function AdminPendingPaymentDetailPage({
             <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
               Local statuses
             </dt>
-            <dd className="mt-1 text-[var(--heading)]">
-              attempt {detail.attemptStatus} · purchase {detail.purchaseStatus}
+            <dd className="mt-1 flex flex-wrap items-center gap-2">
+              <AdminStatusPill value={detail.attemptStatus}>
+                {adminWalletReservationStatusLabel(detail.attemptStatus)}
+              </AdminStatusPill>
+              <AdminStatusPill value={detail.purchaseStatus}>
+                {adminWalletReservationStatusLabel(detail.purchaseStatus)}
+              </AdminStatusPill>
             </dd>
           </div>
           <div>
@@ -95,9 +137,7 @@ export default async function AdminPendingPaymentDetailPage({
               Wallet reserved
             </dt>
             <dd className="mt-1 text-[var(--heading)]">
-              {detail.walletAppliedCents > 0
-                ? `${detail.walletAppliedCents} cents`
-                : "none (gateway-only)"}
+              {formatAdminReservedWalletAmount(detail.walletAppliedCents)}
             </dd>
           </div>
           <div>
