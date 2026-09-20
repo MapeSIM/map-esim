@@ -21,6 +21,32 @@ export const WALLET_RESERVATION_MONITOR_STALE_MS =
 export const WALLET_RESERVATION_MONITOR_POLICY_BLURB =
   "Read-only inventory of open wallet holds. Does not release reservations, refund, fund, or mark paid. Use Pending payment tools or Reconciliation for gated actions.";
 
+/** Canonical Operations inventory path for open wallet holds. */
+export const ADMIN_WALLET_RESERVATIONS_HREF =
+  "/admin/operations/wallet-reservations";
+
+/**
+ * Alert codes that should offer a secondary inventory link on the Alerts UI.
+ * Primary alert href stays case/payment detail — collectors unchanged.
+ */
+export const WALLET_RESERVATION_ALERT_INVENTORY_CODES = [
+  "WALLET_PURCHASE_STUCK_BEFORE_PROVIDER",
+  "WALLET_PURCHASE_RECONCILIATION_REQUIRED",
+  "WALLET_PURCHASE_REFUND_INCOMPLETE",
+  "PAYMENT_AWAITING_GATEWAY_STALE",
+] as const;
+
+export type WalletReservationAlertInventoryCode =
+  (typeof WALLET_RESERVATION_ALERT_INVENTORY_CODES)[number];
+
+export function isWalletReservationAlertInventoryCode(
+  code: string | null | undefined
+): boolean {
+  return (WALLET_RESERVATION_ALERT_INVENTORY_CODES as readonly string[]).includes(
+    String(code ?? "").trim()
+  );
+}
+
 /** Purchase statuses that can represent an open wallet reservation. */
 export const WALLET_RESERVATION_MONITOR_STATUSES = [
   "FUNDS_RESERVED",

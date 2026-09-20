@@ -12,6 +12,10 @@ import {
   type MonitoringAlert,
 } from "@/app/lib/admin/monitoringAlertShared";
 import {
+  ADMIN_WALLET_RESERVATIONS_HREF,
+  isWalletReservationAlertInventoryCode,
+} from "@/app/lib/admin/walletReservationMonitorShared";
+import {
   deriveDisplayStatus,
   formatNotificationStatusLabel,
   isAlertEligibleForNotification,
@@ -68,6 +72,11 @@ function AlertCard({
 }) {
   const href =
     alert.href && isSafeAdminHref(alert.href) ? alert.href : undefined;
+  const inventoryHref =
+    isWalletReservationAlertInventoryCode(alert.code) &&
+    isSafeAdminHref(ADMIN_WALLET_RESERVATIONS_HREF)
+      ? ADMIN_WALLET_RESERVATIONS_HREF
+      : undefined;
   return (
     <article className={CARD_CLASS} aria-labelledby={`alert-${alert.id}`}>
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
@@ -141,11 +150,18 @@ function AlertCard({
         <span className="font-semibold">Recommended next step: </span>
         {alert.recommendedAction}
       </p>
-      {href ? (
-        <div className="mt-3">
-          <AdminButton href={href} variant="primary" size="sm">
-            Open related admin view
-          </AdminButton>
+      {href || inventoryHref ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {href ? (
+            <AdminButton href={href} variant="primary" size="sm">
+              Open related admin view
+            </AdminButton>
+          ) : null}
+          {inventoryHref ? (
+            <AdminButton href={inventoryHref} variant="secondary" size="sm">
+              Wallet reservation inventory
+            </AdminButton>
+          ) : null}
         </div>
       ) : null}
     </article>
@@ -213,6 +229,22 @@ export default async function AdminAlertsPage({
           Generated {data.generatedAtLabel} · Detection{" "}
           {summary.detectionStatus.replaceAll("_", " ")} ·{" "}
           {summary.freshness.replaceAll("_", " ")}
+        </p>
+        <p className="mt-3 flex flex-wrap gap-2">
+          <AdminButton
+            href={
+              isSafeAdminHref(ADMIN_WALLET_RESERVATIONS_HREF)
+                ? ADMIN_WALLET_RESERVATIONS_HREF
+                : "/admin/operations"
+            }
+            variant="secondary"
+            size="sm"
+          >
+            Wallet Reservations
+          </AdminButton>
+          <AdminButton href="/admin/operations" variant="ghost" size="sm">
+            Operations
+          </AdminButton>
         </p>
       </header>
 

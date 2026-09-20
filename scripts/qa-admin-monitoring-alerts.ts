@@ -288,6 +288,26 @@ function main() {
   assert.match(page, /Active alert summary|Alert severity filters/);
   assert.match(page, /No active alerts match/);
   assert.match(page, /Recommended next step/);
+  assert.match(page, /Wallet Reservations/);
+  assert.match(page, /ADMIN_WALLET_RESERVATIONS_HREF|wallet-reservations/);
+  assert.match(page, /isWalletReservationAlertInventoryCode/);
+  assert.match(page, /Wallet reservation inventory/);
+  assert.match(page, /Open related admin view/);
+  // Primary deep-links unchanged in collectors (UI-only Phase 5.3B).
+  assert.match(service, /code:\s*"WALLET_PURCHASE_STUCK_BEFORE_PROVIDER"/);
+  assert.match(
+    service,
+    /href:\s*reconHref\("wallet_purchase",\s*row\.id\)/
+  );
+  assert.match(service, /code:\s*"PAYMENT_AWAITING_GATEWAY_STALE"/);
+  assert.match(
+    service,
+    /href:\s*`\/admin\/payments\/\$\{encodeURIComponent\(row\.id\)\}`/
+  );
+  assert.doesNotMatch(
+    service,
+    /ADMIN_WALLET_RESERVATIONS_HREF|wallet-reservations/
+  );
   assert.match(opsPage, /getMonitoringAlertSummary/);
   assert.match(opsPage, /Open alert center/);
   assert.match(opsPage, /Active alerts summary/);

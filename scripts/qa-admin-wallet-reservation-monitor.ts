@@ -7,6 +7,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { MONITORING_THRESHOLDS } from "../app/lib/admin/monitoringAlertShared";
 import {
+  ADMIN_WALLET_RESERVATIONS_HREF,
+  WALLET_RESERVATION_ALERT_INVENTORY_CODES,
   WALLET_RESERVATION_MONITOR_POLICY_BLURB,
   WALLET_RESERVATION_MONITOR_STALE_MS,
   WALLET_RESERVATION_MONITOR_TAKE,
@@ -14,6 +16,7 @@ import {
   isOpenWalletReservation,
   isSplitPaymentReservation,
   isStaleWalletReservation,
+  isWalletReservationAlertInventoryCode,
   sumReservedWalletCents,
   walletReservationAgeLabel,
   walletReservationPackageLabel,
@@ -140,12 +143,35 @@ function main() {
   assert.equal(formatWalletReservationTotalUsd(1500), "$15.00");
   console.log("PASS stale_age_package_totals");
 
+  assert.equal(
+    ADMIN_WALLET_RESERVATIONS_HREF,
+    "/admin/operations/wallet-reservations"
+  );
+  assert.deepEqual([...WALLET_RESERVATION_ALERT_INVENTORY_CODES], [
+    "WALLET_PURCHASE_STUCK_BEFORE_PROVIDER",
+    "WALLET_PURCHASE_RECONCILIATION_REQUIRED",
+    "WALLET_PURCHASE_REFUND_INCOMPLETE",
+    "PAYMENT_AWAITING_GATEWAY_STALE",
+  ]);
+  assert.equal(
+    isWalletReservationAlertInventoryCode(
+      "WALLET_PURCHASE_STUCK_BEFORE_PROVIDER"
+    ),
+    true
+  );
+  assert.equal(
+    isWalletReservationAlertInventoryCode("EMAIL_ORDER_FAILED"),
+    false
+  );
+  console.log("PASS alert_inventory_nav_helpers");
+
   const page = read("app/admin/operations/wallet-reservations/page.tsx");
   const service = read("app/lib/admin/walletReservationMonitor.ts");
   const shared = read("app/lib/admin/walletReservationMonitorShared.ts");
   const nav = read("app/components/admin/AdminNav.tsx");
   const access = read("app/lib/admin/adminPageAccess.ts");
   const opsPage = read("app/admin/operations/page.tsx");
+  const alertsPage = read("app/admin/alerts/page.tsx");
   const pkg = read("package.json");
 
   assert.match(page, /requireActiveAdminForOperations/);
@@ -176,6 +202,10 @@ function main() {
   assert.match(nav, /Wallet Reservations/);
   assert.match(access, /\/admin\/operations\/wallet-reservations/);
   assert.match(opsPage, /\/admin\/operations\/wallet-reservations/);
+  assert.match(alertsPage, /ADMIN_WALLET_RESERVATIONS_HREF/);
+  assert.match(alertsPage, /isWalletReservationAlertInventoryCode/);
+  assert.match(alertsPage, /Wallet Reservations/);
+  assert.match(alertsPage, /Wallet reservation inventory/);
   assert.match(pkg, /"qa:admin-wallet-reservation-monitor"/);
   console.log("PASS ui_nav_and_no_mutations");
 
