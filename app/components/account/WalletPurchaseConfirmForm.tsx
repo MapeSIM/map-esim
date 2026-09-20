@@ -26,6 +26,12 @@ import {
   type WalletPurchaseActionState,
 } from "@/app/lib/esim/walletPurchaseFormState";
 import { CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE } from "@/app/lib/payments/customerPaymentCheckoutPolicy";
+import {
+  CUSTOMER_AWAITING_GATEWAY_ACTIVE_MESSAGE,
+  CUSTOMER_AWAITING_GATEWAY_CANCEL_LABEL,
+  CUSTOMER_AWAITING_GATEWAY_INACTIVE_MESSAGE,
+  CUSTOMER_ABANDONED_REVIEW_START_NEW_LABEL,
+} from "@/app/lib/esim/customerPurchaseStatusMessaging";
 import type { CustomerEsimPaymentMode } from "@/app/lib/esim/walletPurchaseValidation";
 import { useWalletFromPaymentMode } from "@/app/lib/esim/walletPurchaseValidation";
 import type { WalletPurchaseReview } from "@/app/lib/esim/walletPurchaseRead";
@@ -399,8 +405,8 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
         >
           <p className="text-sm font-medium text-[var(--heading)]">
             {review.pendingGatewayAttemptId
-              ? "Mobile payment is still pending. Wallet funds stay reserved until payment is verified or you cancel."
-              : "No active mobile payment is in progress. A previous attempt may have expired or been cancelled. Cancel below to unlock any reserved wallet funds, or start a new purchase."}
+              ? CUSTOMER_AWAITING_GATEWAY_ACTIVE_MESSAGE
+              : CUSTOMER_AWAITING_GATEWAY_INACTIVE_MESSAGE}
           </p>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <form
@@ -419,7 +425,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 type="submit"
                 className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface)]/80"
               >
-                Cancel payment & unlock wallet
+                {CUSTOMER_AWAITING_GATEWAY_CANCEL_LABEL}
               </button>
             </form>
             {!review.pendingGatewayAttemptId ? (
@@ -427,7 +433,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 href="/account/esim/buy"
                 className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]"
               >
-                Start a new purchase
+                {CUSTOMER_ABANDONED_REVIEW_START_NEW_LABEL}
               </Link>
             ) : null}
           </div>

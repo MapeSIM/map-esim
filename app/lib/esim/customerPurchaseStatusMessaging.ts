@@ -12,7 +12,7 @@ export const CUSTOMER_PURCHASE_PROCESSING_MESSAGE =
   "Your payment is confirmed. Your eSIM is being prepared. We'll notify you once it's ready.";
 
 export const CUSTOMER_PURCHASE_REVIEW_NEEDED_MESSAGE =
-  "Your payment is under review. Please do not make another purchase. We'll update you once the review is complete.";
+  "This purchase needs a short review before it can finish. Please do not start another purchase for the same package. Any wallet amount already reserved stays held until review completes — we'll email you with the outcome.";
 
 export const CUSTOMER_PURCHASE_PROCESSING_TITLE =
   "Your eSIM is being prepared";
@@ -20,11 +20,32 @@ export const CUSTOMER_PURCHASE_PROCESSING_TITLE =
 export const CUSTOMER_PURCHASE_REVIEW_NEEDED_TITLE =
   "Your purchase is under review";
 
+/** Wallet funds held while provider work is still in progress (not a final failure). */
+export const CUSTOMER_PURCHASE_RESERVATION_PENDING_TITLE =
+  "Wallet amount reserved";
+
+export const CUSTOMER_PURCHASE_RESERVATION_PENDING_MESSAGE =
+  "Part of your wallet balance is reserved for this purchase while we finish preparing your eSIM. Please wait and do not buy the same package again. We'll update you when it's ready.";
+
 export const CUSTOMER_PURCHASE_CHECKOUT_MESSAGE =
   "Continue checkout to finish this purchase.";
 
 export const CUSTOMER_PURCHASE_PAYMENT_PENDING_MESSAGE =
-  "Your payment is not completed. Continue checkout to finish paying.";
+  "Your payment is not completed. Continue checkout to finish paying. Any wallet amount already reserved stays held until payment succeeds or you cancel.";
+
+/** Review page banner when a hosted payment session is still open. */
+export const CUSTOMER_AWAITING_GATEWAY_ACTIVE_MESSAGE =
+  "Mobile payment is still pending. Wallet funds stay reserved until payment is verified or you cancel.";
+
+/**
+ * Review page banner when purchase is AWAITING_GATEWAY_PAYMENT but no
+ * in-flight attempt remains (expired/cancelled/abandoned session).
+ */
+export const CUSTOMER_AWAITING_GATEWAY_INACTIVE_MESSAGE =
+  "No active mobile payment is in progress. A previous attempt may have expired or been cancelled. Use Cancel below to unlock any reserved wallet funds, or start a new purchase.";
+
+export const CUSTOMER_AWAITING_GATEWAY_CANCEL_LABEL =
+  "Cancel payment & unlock wallet";
 
 /** Display-only age for stale checkout copy. Does not expire attempts or release funds. */
 export const CUSTOMER_STALE_CHECKOUT_DISPLAY_MS = 30 * 60 * 1000;
@@ -46,7 +67,7 @@ export const CUSTOMER_ABANDONED_REVIEW_PAYMENT_ENDED_TITLE =
   "Payment was not completed";
 
 export const CUSTOMER_ABANDONED_REVIEW_PAYMENT_ENDED_MESSAGE =
-  "The previous payment attempt expired or was cancelled. No eSIM was created. You can continue checkout below or start a new purchase.";
+  "The previous payment attempt expired or was cancelled. No eSIM was created. If wallet funds are still reserved, cancel on checkout to unlock them, or start a new purchase.";
 
 export const CUSTOMER_ABANDONED_REVIEW_START_NEW_LABEL =
   "Start a new purchase";
@@ -71,6 +92,7 @@ export type CustomerPendingPurchaseStatus =
 
 export type CustomerPurchaseStatusMessagingKind =
   | "processing"
+  | "reservation_pending"
   | "review_needed";
 
 export type CustomerPendingPurchaseAction =
@@ -89,12 +111,11 @@ export function resolveCustomerPurchaseStatusMessaging(
   status: string
 ): CustomerPurchaseStatusMessagingKind | null {
   const value = (status ?? "").trim();
-  if (
-    value === "FUNDED" ||
-    value === "PROVIDER_PENDING" ||
-    value === "FUNDS_RESERVED"
-  ) {
+  if (value === "FUNDED") {
     return "processing";
+  }
+  if (value === "PROVIDER_PENDING" || value === "FUNDS_RESERVED") {
+    return "reservation_pending";
   }
   if (value === "RECONCILIATION_REQUIRED") return "review_needed";
   return null;
@@ -107,6 +128,12 @@ export function customerPurchaseStatusMessage(
     return {
       title: CUSTOMER_PURCHASE_PROCESSING_TITLE,
       body: CUSTOMER_PURCHASE_PROCESSING_MESSAGE,
+    };
+  }
+  if (kind === "reservation_pending") {
+    return {
+      title: CUSTOMER_PURCHASE_RESERVATION_PENDING_TITLE,
+      body: CUSTOMER_PURCHASE_RESERVATION_PENDING_MESSAGE,
     };
   }
   return {
@@ -144,6 +171,15 @@ export function resolveCustomerPendingPurchaseVisibility(
     return {
       action: "view_status",
       statusLabel: "Preparing eSIM",
+      ctaLabel: "View status",
+      title: copy.title,
+      body: copy.body,
+    };
+  }
+  if (kind === "reservation_pending") {
+    return {
+      action: "view_status",
+      statusLabel: "Wallet reserved",
       ctaLabel: "View status",
       title: copy.title,
       body: copy.body,

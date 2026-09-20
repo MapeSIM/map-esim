@@ -9,6 +9,7 @@ import {
   CUSTOMER_PENDING_PURCHASE_STATUSES,
   CUSTOMER_PENDING_PURCHASES_MAX_AGE_MS,
   CUSTOMER_PURCHASE_PROCESSING_MESSAGE,
+  CUSTOMER_PURCHASE_RESERVATION_PENDING_MESSAGE,
   CUSTOMER_PURCHASE_REVIEW_NEEDED_MESSAGE,
   CUSTOMER_STALE_CHECKOUT_DISPLAY_MS,
   CUSTOMER_STALE_CHECKOUT_MESSAGE,
@@ -53,15 +54,22 @@ function main() {
     "/account/esim/buy/review?purchase=p1"
   );
 
-  for (const status of [
-    "FUNDS_RESERVED",
-    "FUNDED",
-    "PROVIDER_PENDING",
-  ] as const) {
+  for (const status of ["FUNDED"] as const) {
     const vis = resolveCustomerPendingPurchaseVisibility(status);
     assert.equal(vis?.action, "view_status");
     assert.equal(vis?.ctaLabel, "View status");
     assert.equal(vis?.body, CUSTOMER_PURCHASE_PROCESSING_MESSAGE);
+    assert.equal(
+      customerPendingPurchaseHref(status, "p1"),
+      "/account/esim/buy/review-needed?purchase=p1"
+    );
+  }
+
+  for (const status of ["FUNDS_RESERVED", "PROVIDER_PENDING"] as const) {
+    const vis = resolveCustomerPendingPurchaseVisibility(status);
+    assert.equal(vis?.action, "view_status");
+    assert.equal(vis?.statusLabel, "Wallet reserved");
+    assert.equal(vis?.body, CUSTOMER_PURCHASE_RESERVATION_PENDING_MESSAGE);
     assert.equal(
       customerPendingPurchaseHref(status, "p1"),
       "/account/esim/buy/review-needed?purchase=p1"

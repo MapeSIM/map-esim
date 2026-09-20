@@ -33,7 +33,8 @@ export default async function AccountWalletBuyReviewNeededPage({
   if (!kind) notFound();
 
   const copy = customerPurchaseStatusMessage(kind);
-  const showReservedAmount = kind === "review_needed";
+  const showReservedAmount =
+    kind === "review_needed" || kind === "reservation_pending";
 
   return (
     <div className="mx-auto max-w-xl space-y-8">
@@ -55,12 +56,22 @@ export default async function AccountWalletBuyReviewNeededPage({
         </dl>
       ) : null}
 
-      <Link
-        href="/account/wallet"
-        className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface-2)]"
-      >
-        Back to wallet
-      </Link>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+        <Link
+          href="/account/wallet"
+          className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface-2)]"
+        >
+          Back to wallet
+        </Link>
+        {kind === "review_needed" ? (
+          <Link
+            href="/contact"
+            className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]"
+          >
+            Contact support
+          </Link>
+        ) : null}
+      </div>
     </div>
   );
 }

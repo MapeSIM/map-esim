@@ -114,9 +114,13 @@ function main() {
   assert.match(banner, /href="\/account\/esim\/buy"/);
   assert.match(banner, /startNewPurchaseLabel/);
   assert.match(banner, /data-abandoned-review-guidance/);
-  assert.match(form, /No active mobile payment is in progress/);
-  assert.match(form, /Start a new purchase/);
-  assert.match(form, /Mobile payment is still pending/);
+  assert.match(form, /CUSTOMER_AWAITING_GATEWAY_INACTIVE_MESSAGE/);
+  assert.match(form, /CUSTOMER_AWAITING_GATEWAY_ACTIVE_MESSAGE/);
+  assert.match(form, /CUSTOMER_ABANDONED_REVIEW_START_NEW_LABEL/);
+  assert.match(form, /CUSTOMER_AWAITING_GATEWAY_CANCEL_LABEL/);
+  assert.match(messaging, /No active mobile payment is in progress/);
+  assert.match(messaging, /Mobile payment is still pending/);
+  assert.match(messaging, /Start a new purchase/);
   assert.match(readSrc, /updatedAt:\s*row\.updatedAt/);
   assert.match(messaging, /resolveAbandonedCheckoutReviewGuidance/);
   assert.doesNotMatch(reviewPage, /confirmWalletEsimPurchaseAction|maybeReleasePending/);

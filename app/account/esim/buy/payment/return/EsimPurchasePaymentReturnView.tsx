@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import {
   CUSTOMER_PURCHASE_PROCESSING_MESSAGE,
   CUSTOMER_PURCHASE_REVIEW_NEEDED_MESSAGE,
+  CUSTOMER_PURCHASE_REVIEW_NEEDED_TITLE,
 } from "@/app/lib/esim/customerPurchaseStatusMessaging";
 import type { EsimPaymentReturnKind } from "@/app/lib/esim/esimPurchasePaymentReturnState";
 import { esimPurchasePaymentReviewHref } from "@/app/lib/esim/esimPurchasePaymentReturnState";
@@ -76,17 +77,19 @@ export function EsimPurchasePaymentReturnView({
     return (
       <ReturnShell>
         <h1 className="text-2xl font-bold tracking-tight">
-          Purchase under review
+          {CUSTOMER_PURCHASE_REVIEW_NEEDED_TITLE}
         </h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
           {CUSTOMER_PURCHASE_REVIEW_NEEDED_MESSAGE}
         </p>
         <StatusCard>
-          Refresh this page for an update, or contact support with your order
-          details if the status does not change.
+          Do not start another purchase for the same package. Refresh for an
+          update, or contact support if the status does not change. Reserved
+          wallet funds stay held until review finishes.
         </StatusCard>
         <ActionRow>
           <PrimaryLink href={refreshHref}>Refresh status</PrimaryLink>
+          <SecondaryLink href="/contact">Contact support</SecondaryLink>
           <SecondaryLink href="/account">Account</SecondaryLink>
         </ActionRow>
       </ReturnShell>

@@ -278,7 +278,7 @@ function main() {
   );
   assert.equal(
     CUSTOMER_PURCHASE_REVIEW_NEEDED_MESSAGE,
-    "Your payment is under review. Please do not make another purchase. We'll update you once the review is complete."
+    "This purchase needs a short review before it can finish. Please do not start another purchase for the same package. Any wallet amount already reserved stays held until review completes — we'll email you with the outcome."
   );
   assert.match(
     read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
