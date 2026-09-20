@@ -49,6 +49,9 @@ function main() {
   const shared = read("app/lib/admin/operationsHealthShared.ts");
   const service = read("app/lib/admin/operationsHealth.ts");
   const page = read("app/admin/operations/page.tsx");
+  const reservationShared = read(
+    "app/lib/admin/walletReservationMonitorShared.ts"
+  );
   const nav = read("app/components/admin/AdminNav.tsx");
   const layout = read("app/admin/layout.tsx");
   const headersSrc = read("app/lib/security/headers.ts");
@@ -226,6 +229,20 @@ function main() {
   assert.match(page, /Open reconciliation center/);
   assert.match(page, /Payment gateway readiness/);
   assert.match(page, /Security & production readiness/);
+  assert.match(page, /getWalletReservationMonitorDashboard/);
+  assert.match(page, /ADMIN_WALLET_RESERVATIONS_HREF/);
+  assert.match(page, /Wallet reservations summary/);
+  assert.match(page, /Open wallet holds/);
+  assert.match(page, /Total reserved USD/);
+  assert.match(page, /Stale reservations/);
+  assert.match(page, /Split payment holds/);
+  assert.match(page, /Open Wallet Reservations/);
+  assert.match(
+    reservationShared,
+    /ADMIN_WALLET_RESERVATIONS_HREF\s*=\s*"\/admin\/operations\/wallet-reservations"/
+  );
+  assert.doesNotMatch(page, /Release Reservation|Refund wallet funds|markPaid/i);
+  assert.doesNotMatch(page, /reservationSummary\.rows/);
   assert.doesNotMatch(page, /"use client"/);
   assert.match(page, /dynamic = "force-dynamic"/);
   console.log("PASS ui_nav_wiring");

@@ -201,7 +201,17 @@ function main() {
   assert.match(nav, /\/admin\/operations\/wallet-reservations/);
   assert.match(nav, /Wallet Reservations/);
   assert.match(access, /\/admin\/operations\/wallet-reservations/);
-  assert.match(opsPage, /\/admin\/operations\/wallet-reservations/);
+  assert.match(opsPage, /\/admin\/operations\/wallet-reservations|ADMIN_WALLET_RESERVATIONS_HREF/);
+  assert.match(opsPage, /getWalletReservationMonitorDashboard/);
+  assert.match(opsPage, /ADMIN_WALLET_RESERVATIONS_HREF/);
+  assert.match(opsPage, /Wallet reservations summary/);
+  assert.match(opsPage, /Open wallet holds/);
+  assert.match(opsPage, /Total reserved USD/);
+  assert.match(opsPage, /Stale reservations/);
+  assert.match(opsPage, /Split payment holds/);
+  assert.match(opsPage, /Open Wallet Reservations/);
+  assert.doesNotMatch(opsPage, /Release Reservation|Refund wallet funds|markPaid/i);
+  assert.doesNotMatch(opsPage, /reservationSummary\.rows/);
   assert.match(alertsPage, /ADMIN_WALLET_RESERVATIONS_HREF/);
   assert.match(alertsPage, /isWalletReservationAlertInventoryCode/);
   assert.match(alertsPage, /Wallet Reservations/);

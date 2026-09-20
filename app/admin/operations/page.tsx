@@ -13,6 +13,14 @@ import {
   getMonitoringAlertSummary,
   type MonitoringAlertSummary,
 } from "@/app/lib/admin/monitoringAlerts";
+import {
+  getWalletReservationMonitorDashboard,
+  type WalletReservationMonitorDashboard,
+} from "@/app/lib/admin/walletReservationMonitor";
+import {
+  ADMIN_WALLET_RESERVATIONS_HREF,
+} from "@/app/lib/admin/walletReservationMonitorShared";
+import { isSafeAdminHref } from "@/app/lib/admin/monitoringAlertShared";
 import { getAdminWhatsAppSupportView } from "@/app/lib/support/whatsappSupport";
 import {
   AdminButton,
@@ -121,10 +129,12 @@ function WarningList({ warnings }: { warnings: OpsWarning[] }) {
 function DashboardBody({
   data,
   alertSummary,
+  reservationSummary,
   whatsappSupport,
 }: {
   data: OperationsHealthDashboard;
   alertSummary: MonitoringAlertSummary;
+  reservationSummary: WalletReservationMonitorDashboard | null;
   whatsappSupport: Awaited<ReturnType<typeof getAdminWhatsAppSupportView>>;
 }) {
   const app = data.applicationDatabase;
@@ -134,6 +144,9 @@ function DashboardBody({
   const payment = data.payment;
   const security = data.security;
   const controls = data.operationalControls;
+  const reservationsHref = isSafeAdminHref(ADMIN_WALLET_RESERVATIONS_HREF)
+    ? ADMIN_WALLET_RESERVATIONS_HREF
+    : "/admin/operations";
 
   return (
     <div className="min-w-0 space-y-8">
@@ -150,7 +163,7 @@ function DashboardBody({
         </p>
         <p className="mt-3 flex flex-wrap gap-2">
           <AdminButton
-            href="/admin/operations/wallet-reservations"
+            href={reservationsHref}
             variant="secondary"
             size="sm"
           >
@@ -203,6 +216,59 @@ function DashboardBody({
         <div className="mt-3">
           <AdminButton href="/admin/alerts" variant="primary" size="sm">
             Open alert center
+          </AdminButton>
+        </div>
+      </section>
+
+      <section
+        className={CARD_CLASS}
+        aria-labelledby="ops-wallet-reservations-summary-heading"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h2
+            id="ops-wallet-reservations-summary-heading"
+            className="text-base font-semibold tracking-tight text-[var(--heading)]"
+          >
+            Wallet reservations summary
+          </h2>
+        </div>
+        {reservationSummary ? (
+          <>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <AdminKpiCard
+                label="Open wallet holds"
+                value={reservationSummary.openCount}
+              />
+              <AdminKpiCard
+                label="Total reserved USD"
+                value={reservationSummary.totalReservedUsdLabel}
+              />
+              <AdminKpiCard
+                label="Stale reservations"
+                value={reservationSummary.staleCount}
+              />
+              <AdminKpiCard
+                label="Split payment holds"
+                value={reservationSummary.splitCount}
+              />
+            </div>
+            <p className="mt-4 text-[11px] text-[var(--text-soft)]">
+              Checked {reservationSummary.checkedAtLabel} · stale ≥{" "}
+              {reservationSummary.staleMinutes} minutes
+              {reservationSummary.truncated
+                ? " · inventory sample truncated"
+                : ""}
+            </p>
+          </>
+        ) : (
+          <p className="mt-3 text-sm text-[var(--text-muted)]" role="status">
+            Wallet reservation summary is temporarily unavailable. Open the
+            inventory for a full check.
+          </p>
+        )}
+        <div className="mt-3">
+          <AdminButton href={reservationsHref} variant="primary" size="sm">
+            Open Wallet Reservations
           </AdminButton>
         </div>
       </section>
@@ -480,12 +546,18 @@ export default async function AdminOperationsPage() {
   let data: OperationsHealthDashboard;
   let alertSummary: MonitoringAlertSummary;
   let whatsappSupport: Awaited<ReturnType<typeof getAdminWhatsAppSupportView>>;
+  let reservationSummary: WalletReservationMonitorDashboard | null = null;
   try {
-    [data, alertSummary, whatsappSupport] = await Promise.all([
+    const [health, alerts, whatsapp, reservations] = await Promise.all([
       getOperationsHealthDashboard(),
       getMonitoringAlertSummary(),
       getAdminWhatsAppSupportView(),
+      getWalletReservationMonitorDashboard().catch(() => null),
     ]);
+    data = health;
+    alertSummary = alerts;
+    whatsappSupport = whatsapp;
+    reservationSummary = reservations;
   } catch {
     // Health may fail independently — still try to load WhatsApp config for ops.
     try {
@@ -525,6 +597,7 @@ export default async function AdminOperationsPage() {
     <DashboardBody
       data={data}
       alertSummary={alertSummary}
+      reservationSummary={reservationSummary}
       whatsappSupport={whatsappSupport}
     />
   );
