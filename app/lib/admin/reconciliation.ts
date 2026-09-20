@@ -33,10 +33,12 @@ import {
   isValidReconciliationSourceType,
   orderEmailInboxStatusOr,
   parseReconciliationFilter,
+  summarizeSimpleReconciliationBuckets,
   type ReconciliationCategory,
   type ReconciliationFilter,
   type ReconciliationPurchaseType,
   type ReconciliationSourceType,
+  type SimpleReconciliationSummary,
 } from "@/app/lib/admin/reconciliationClassify";
 import { ORDER_EMAIL_NOT_CONFIGURED_LABEL } from "@/app/lib/admin/reconciliationCaseShared";
 import { redirect } from "next/navigation";
@@ -255,6 +257,7 @@ export async function getReconciliationListPage(options: {
   filter: ReconciliationFilter;
   filterLabel: string;
   rows: ReconciliationListRow[];
+  summary: SimpleReconciliationSummary;
   unavailable: boolean;
 }> {
   const filter = parseReconciliationFilter(options.filter);
@@ -568,7 +571,6 @@ export async function getReconciliationListPage(options: {
         updatedAt: row.updatedAt,
         now,
       });
-      if (!categoryMatchesFilter(category, filter, { locked: Boolean(row.reconciliationLockedAt), escalated: Boolean(row.reconciliationEscalatedAt) })) continue;
       const purchaseType: ReconciliationPurchaseType = row.adminUserId
         ? "Admin-assisted wallet"
         : "Self-service wallet";
@@ -627,14 +629,6 @@ export async function getReconciliationListPage(options: {
         updatedAt: row.updatedAt,
         now,
       });
-      if (
-        !categoryMatchesFilter(category, filter, {
-          locked: Boolean(row.reconciliationLockedAt),
-          escalated: Boolean(row.reconciliationEscalatedAt),
-        })
-      ) {
-        continue;
-      }
       const partnerUser = row.partner?.user ?? null;
       rows.push({
         sourceType: "partner_purchase",
@@ -689,7 +683,6 @@ export async function getReconciliationListPage(options: {
         updatedAt: row.updatedAt,
         now,
       });
-      if (!categoryMatchesFilter(category, filter, { locked: Boolean(row.reconciliationLockedAt), escalated: Boolean(row.reconciliationEscalatedAt) })) continue;
       rows.push({
         sourceType: "assignment",
         attemptId: row.id,
@@ -736,7 +729,6 @@ export async function getReconciliationListPage(options: {
         updatedAt: row.updatedAt,
         now,
       });
-      if (!categoryMatchesFilter(category, filter, { locked: Boolean(row.reconciliationLockedAt), escalated: Boolean(row.reconciliationEscalatedAt) })) continue;
       rows.push({
         sourceType: "topup",
         attemptId: row.id,
@@ -792,7 +784,6 @@ export async function getReconciliationListPage(options: {
         updatedAt: row.updatedAt,
         now,
       });
-      if (!categoryMatchesFilter(category, filter, { locked: Boolean(row.reconciliationLockedAt), escalated: Boolean(row.reconciliationEscalatedAt) })) continue;
       rows.push({
         sourceType: "order_email",
         attemptId: row.id,
@@ -846,7 +837,6 @@ export async function getReconciliationListPage(options: {
         updatedAt: row.updatedAt,
         now,
       });
-      if (!categoryMatchesFilter(category, filter, { locked: Boolean(row.reconciliationLockedAt), escalated: Boolean(row.reconciliationEscalatedAt) })) continue;
       rows.push({
         sourceType: "order_email",
         attemptId: `assignment:${row.id}`,
@@ -893,7 +883,6 @@ export async function getReconciliationListPage(options: {
         updatedAt: row.updatedAt,
         now,
       });
-      if (!categoryMatchesFilter(category, filter, { locked: Boolean(row.reconciliationLockedAt), escalated: Boolean(row.reconciliationEscalatedAt) })) continue;
       const user = row.wallet.user;
       rows.push({
         sourceType: "wallet_email",
@@ -937,7 +926,6 @@ export async function getReconciliationListPage(options: {
         updatedAt: row.updatedAt,
         now,
       });
-      if (!categoryMatchesFilter(category, filter, { locked: Boolean(row.reconciliationLockedAt), escalated: Boolean(row.reconciliationEscalatedAt) })) continue;
       rows.push({
         sourceType: "iccid",
         attemptId: row.id,
@@ -984,10 +972,20 @@ export async function getReconciliationListPage(options: {
         a.attemptId.localeCompare(b.attemptId)
     );
 
+    const candidateRows = rows.slice(0, RECONCILIATION_LIST_LIMIT);
+    const summary = summarizeSimpleReconciliationBuckets(candidateRows);
+    const filteredRows = candidateRows.filter((row) =>
+      categoryMatchesFilter(row.category, filter, {
+        locked: row.locked,
+        escalated: row.escalated,
+      })
+    );
+
     return {
       filter,
       filterLabel: filterLabel(filter),
-      rows: rows.slice(0, RECONCILIATION_LIST_LIMIT),
+      rows: filteredRows,
+      summary,
       unavailable: false,
     };
   } catch {
@@ -995,6 +993,7 @@ export async function getReconciliationListPage(options: {
       filter,
       filterLabel: filterLabel(filter),
       rows: [],
+      summary: { needAction: 0, waiting: 0, resolved: 0 },
       unavailable: true,
     };
   }

@@ -19,6 +19,10 @@ import {
   parseReconciliationFilter,
   RECONCILIATION_FILTERS,
   RECONCILIATION_STUCK_AGE_MS,
+  simpleReconciliationBucket,
+  simpleReconciliationIssue,
+  simpleReconciliationNextStep,
+  summarizeSimpleReconciliationBuckets,
 } from "../app/lib/admin/reconciliationClassify";
 import { ORDER_EMAIL_NOT_CONFIGURED_LABEL } from "../app/lib/admin/reconciliationCaseShared";
 import { maskProviderOrderRef } from "../app/lib/admin/display";
@@ -283,6 +287,61 @@ function main() {
   assert.equal(freshSendingCat, "PROVIDER_UNKNOWN");
   console.log("PASS classifier_local_db_only");
 
+  assert.equal(
+    simpleReconciliationIssue("FUNDS_RESERVED_STUCK"),
+    "Wallet funds are held while checkout is stuck"
+  );
+  assert.equal(
+    simpleReconciliationIssue("MISSING_PROVIDER_REFERENCE"),
+    "Missing provider order reference"
+  );
+  assert.equal(
+    simpleReconciliationBucket({ category: "RESOLVED" }),
+    "resolved"
+  );
+  assert.equal(
+    simpleReconciliationBucket({
+      category: "LOCAL_FINALIZATION_FAILED",
+      escalated: true,
+    }),
+    "need_action"
+  );
+  assert.equal(
+    simpleReconciliationBucket({
+      category: "REFUND_INCOMPLETE",
+      locked: true,
+    }),
+    "waiting"
+  );
+  assert.equal(
+    simpleReconciliationBucket({ category: "PROVIDER_UNKNOWN" }),
+    "waiting"
+  );
+  assert.equal(
+    simpleReconciliationBucket({ category: "LOCAL_FINALIZATION_FAILED" }),
+    "need_action"
+  );
+  assert.match(
+    simpleReconciliationNextStep("REFUND_INCOMPLETE"),
+    /refund recovery/i
+  );
+  assert.match(
+    simpleReconciliationNextStep("PROVIDER_UNKNOWN", { locked: true }),
+    /locked for controlled recovery/i
+  );
+  const simpleSummary = summarizeSimpleReconciliationBuckets([
+    { category: "LOCAL_FINALIZATION_FAILED" },
+    { category: "FUNDS_RESERVED_STUCK" },
+    { category: "RESOLVED" },
+    { category: "REFUND_INCOMPLETE", escalated: true },
+  ]);
+  assert.deepEqual(simpleSummary, {
+    needAction: 2,
+    waiting: 1,
+    resolved: 1,
+  });
+  console.log("PASS simple_reconciliation_ux_helpers");
+
   assert.match(service, /import "server-only"/);
   assert.match(service, /requireActiveAdminForReconciliation/);
   assert.match(service, /role !== Role\.ADMIN/);
@@ -307,6 +366,9 @@ function main() {
   assert.match(service, /sending \(uncertain\)/);
   assert.match(service, /ORDER_EMAIL_NOT_CONFIGURED_LABEL|Installation email service is not configured/);
   assert.match(service, /isNotConfiguredOrderEmailDelivery/);
+  assert.match(service, /summarizeSimpleReconciliationBuckets/);
+  assert.match(service, /summary:/);
+  assert.match(service, /candidateRows/);
   assert.doesNotMatch(service, /emailDeliveryStatus:\s*"sending"[\s\S]{0,80}deliverOrderEmail/);
   console.log("PASS reconciliation_service_readonly_no_vesim");
 
@@ -319,6 +381,25 @@ function main() {
     listPage,
     /Provider observations never auto-authorize refund/
   );
+  assert.match(listPage, /Need Action/);
+  assert.match(listPage, /Waiting/);
+  assert.match(listPage, /Resolved/);
+  assert.match(listPage, /AdminKpiCard/);
+  assert.match(listPage, /Advanced Filters/);
+  assert.match(listPage, /Open Case/);
+  assert.match(listPage, /Recommended next step/);
+  assert.match(listPage, /simpleReconciliationIssue/);
+  assert.match(listPage, /simpleReconciliationNextStep/);
+  assert.match(listPage, /data\.summary\.needAction/);
+  assert.match(listPage, /RECONCILIATION_FILTERS/);
+  assert.match(listPage, /filterLabel\(f\)/);
+  assert.match(listPage, /TechnicalTable|Reference/);
+  assert.match(classify, /case "provider_uncertain":[\s\S]*return "Provider uncertain"/);
+  assert.match(classify, /case "funds_reserved":[\s\S]*return "Funds reserved"/);
+  assert.match(classify, /case "refund_pending":[\s\S]*return "Refund pending"/);
+  assert.match(classify, /case "finalization_failed":[\s\S]*return "Finalization failed"/);
+  assert.match(classify, /case "missing_provider_reference":[\s\S]*return "Missing provider reference"/);
+  assert.match(classify, /case "iccid_pending":[\s\S]*return "ICCID pending/);
   assert.doesNotMatch(listPage, /Recovery actions are not available in this phase/);
   assert.doesNotMatch(
     listPage,
@@ -414,7 +495,7 @@ function main() {
   );
   console.log("PASS no_provider_call_in_classify_or_persist");
 
-  console.log("ALL_QA_PASSED=12");
+  console.log("ALL_QA_PASSED=13");
 }
 
 main();

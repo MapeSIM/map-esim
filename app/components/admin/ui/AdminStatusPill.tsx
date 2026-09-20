@@ -86,7 +86,9 @@ export function resolveAdminStatusPillTone(
     normalized === "DISABLED" ||
     normalized === "NO" ||
     normalized === "NOT_EXPECTED" ||
-    normalized === "LOCKED"
+    normalized === "LOCKED" ||
+    normalized === "WAITING" ||
+    normalized === "NEED_ACTION"
   ) {
     return "warning";
   }

@@ -440,6 +440,121 @@ export function filterLabel(filter: ReconciliationFilter): string {
   }
 }
 
+/** Simple admin UX buckets — display only; does not change case classification. */
+export type SimpleReconciliationBucket =
+  | "need_action"
+  | "waiting"
+  | "resolved";
+
+export type SimpleReconciliationSummary = {
+  needAction: number;
+  waiting: number;
+  resolved: number;
+};
+
+export function simpleReconciliationIssue(
+  category: ReconciliationCategory
+): string {
+  switch (category) {
+    case "PROVIDER_UNKNOWN":
+      return "Payment or provider result is unclear";
+    case "PROVIDER_ORDER_OBSERVED":
+      return "Provider shows an order, local finish may be incomplete";
+    case "LOCAL_FINALIZATION_FAILED":
+      return "Could not finish creating the local order";
+    case "FUNDS_RESERVED_STUCK":
+      return "Wallet funds are held while checkout is stuck";
+    case "REFUND_INCOMPLETE":
+      return "A refund still needs to be completed";
+    case "MISSING_PROVIDER_REFERENCE":
+      return "Missing provider order reference";
+    case "ORDER_EMAIL_FAILED":
+      return "Order / install email failed to send";
+    case "WALLET_EMAIL_FAILED":
+      return "Wallet notification email failed";
+    case "ICCID_PENDING":
+      return "eSIM ICCID still needs capture";
+    case "ICCID_CONFLICT":
+      return "eSIM ICCID conflict needs review";
+    case "RESOLVED":
+      return "This case is resolved";
+    default:
+      return "Needs admin review";
+  }
+}
+
+export function simpleReconciliationNextStep(
+  category: ReconciliationCategory,
+  options?: { locked?: boolean; escalated?: boolean }
+): string {
+  if (category === "RESOLVED") {
+    return "No action needed — case already resolved.";
+  }
+  if (options?.escalated) {
+    return "Open the case and follow the escalated recovery path.";
+  }
+  if (options?.locked) {
+    return "Open the case — it is locked for controlled recovery.";
+  }
+  switch (category) {
+    case "FUNDS_RESERVED_STUCK":
+      return "Open the case to confirm whether to finish or safely release the hold.";
+    case "REFUND_INCOMPLETE":
+      return "Open the case and continue the refund recovery steps.";
+    case "LOCAL_FINALIZATION_FAILED":
+      return "Open the case to review evidence and local finalization options.";
+    case "MISSING_PROVIDER_REFERENCE":
+    case "PROVIDER_UNKNOWN":
+    case "PROVIDER_ORDER_OBSERVED":
+      return "Open the case and refresh provider evidence before any money movement.";
+    case "ORDER_EMAIL_FAILED":
+    case "WALLET_EMAIL_FAILED":
+      return "Open the case to review email delivery and safe resend options.";
+    case "ICCID_PENDING":
+    case "ICCID_CONFLICT":
+      return "Open the case to capture or resolve ICCID safely.";
+    default:
+      return "Open the case to review evidence and choose a safe next action.";
+  }
+}
+
+export function simpleReconciliationBucket(input: {
+  category: ReconciliationCategory;
+  locked?: boolean;
+  escalated?: boolean;
+}): SimpleReconciliationBucket {
+  if (input.category === "RESOLVED") return "resolved";
+  if (input.escalated) return "need_action";
+  if (input.locked) return "waiting";
+  if (
+    input.category === "FUNDS_RESERVED_STUCK" ||
+    input.category === "PROVIDER_UNKNOWN" ||
+    input.category === "ICCID_PENDING"
+  ) {
+    return "waiting";
+  }
+  return "need_action";
+}
+
+export function summarizeSimpleReconciliationBuckets(
+  rows: Array<{
+    category: ReconciliationCategory;
+    locked?: boolean;
+    escalated?: boolean;
+  }>
+): SimpleReconciliationSummary {
+  let needAction = 0;
+  let waiting = 0;
+  let resolved = 0;
+  for (const row of rows) {
+    const bucket = simpleReconciliationBucket(row);
+    if (bucket === "need_action") needAction += 1;
+    else if (bucket === "waiting") waiting += 1;
+    else resolved += 1;
+  }
+  return { needAction, waiting, resolved };
+}
+
 export function isValidReconciliationSourceType(
   raw: string | null | undefined
 ): raw is ReconciliationSourceType {
