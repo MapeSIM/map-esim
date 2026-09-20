@@ -92,6 +92,9 @@ export function requiredAdminAccessForPath(pathname: string): AdminPathAccess {
     }
     return { mode: "any-of", permissions: ["CUSTOMERS_VIEW"] };
   }
+  if (path.startsWith("/admin/countries")) {
+    return { mode: "any-of", permissions: ["ESIM_FULFILLMENT"] };
+  }
 
   if (path.startsWith("/admin/")) {
     return { mode: "super-only" };
@@ -117,6 +120,7 @@ export const ADMIN_NAV_LINKS = [
   { href: "/admin/revenue", label: "Revenue", exact: false },
   { href: "/admin/orders", label: "Orders", exact: false },
   { href: "/admin/customers", label: "Customers", exact: false },
+  { href: "/admin/countries", label: "Countries", exact: false },
   { href: "/admin/partners", label: "Partners", exact: false },
   { href: "/admin/promo-codes", label: "Promo Codes", exact: false },
   { href: "/admin/payments", label: "Payments", exact: true },

@@ -36,6 +36,7 @@ const navSections: readonly AdminNavSection[] = [
     links: [
       { href: "/admin/orders", label: "Orders", exact: false },
       { href: "/admin/customers", label: "Customers", exact: false },
+      { href: "/admin/countries", label: "Countries", exact: false },
       { href: "/admin/partners", label: "Partners", exact: false },
       { href: "/admin/promo-codes", label: "Promo Codes", exact: false },
     ],

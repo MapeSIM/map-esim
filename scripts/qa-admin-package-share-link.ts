@@ -132,6 +132,8 @@ function main() {
   assert.match(controls, /Share on WhatsApp/);
   assert.match(assignForm, /AdminPackageShareControls/);
   assert.match(walletBuyForm, /AdminPackageShareControls/);
+  assert.match(read("app/admin/countries/[code]/page.tsx"), /AdminPackageShareControls/);
+  assert.match(read("app/admin/countries/page.tsx"), /AdminCountriesDirectory/);
   assert.match(buyPage, /buildWalletBuyReturnPath/);
   assert.match(buyPage, /requireRole\(\s*"CUSTOMER"/);
   assert.match(helpers, /buildCheckoutHref/);
