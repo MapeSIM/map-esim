@@ -90,6 +90,11 @@ const navSections: readonly AdminNavSection[] = [
     links: [
       { href: "/admin/audit-logs", label: "Audit Logs", exact: false },
       { href: "/admin/admin-users", label: "Admin Users", exact: false },
+      {
+        href: "/admin/test-data-cleanup",
+        label: "Test Data Cleanup",
+        exact: false,
+      },
       { href: "/admin/settings", label: "Settings", exact: false },
     ],
   },

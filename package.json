@@ -78,6 +78,7 @@
     "qa:admin-payment-recovery": "tsx scripts/qa-admin-payment-recovery.ts",
     "qa:admin-wallet-reservation-ux": "tsx scripts/qa-admin-wallet-reservation-ux.ts",
     "qa:admin-wallet-reservation-monitor": "tsx scripts/qa-admin-wallet-reservation-monitor.ts",
+    "qa:admin-test-data-cleanup-preview": "tsx scripts/qa-admin-test-data-cleanup-preview.ts",
     "qa:admin-wallet-ledger": "tsx scripts/qa-admin-wallet-ledger.ts",
     "qa:admin-failed-payments": "tsx scripts/qa-admin-failed-payments.ts",
     "qa:admin-webhook-receipts": "tsx scripts/qa-admin-webhook-receipts.ts",

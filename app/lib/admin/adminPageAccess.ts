@@ -26,6 +26,9 @@ export function requiredAdminAccessForPath(pathname: string): AdminPathAccess {
   if (path.startsWith("/admin/admin-users")) {
     return { mode: "any-of", permissions: ["MANAGE_ADMINS"] };
   }
+  if (path.startsWith("/admin/test-data-cleanup")) {
+    return { mode: "any-of", permissions: ["MANAGE_ADMINS"] };
+  }
   if (path.startsWith("/admin/settings")) {
     return { mode: "any-of", permissions: ["SETTINGS_MANAGE"] };
   }
@@ -142,5 +145,10 @@ export const ADMIN_NAV_LINKS = [
   { href: "/admin/email-campaigns", label: "Email Campaigns", exact: false },
   { href: "/admin/audit-logs", label: "Audit Logs", exact: false },
   { href: "/admin/admin-users", label: "Admin Users", exact: false },
+  {
+    href: "/admin/test-data-cleanup",
+    label: "Test Data Cleanup",
+    exact: false,
+  },
   { href: "/admin/settings", label: "Settings", exact: false },
 ] as const;
