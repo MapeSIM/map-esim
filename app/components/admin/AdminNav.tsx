@@ -66,14 +66,22 @@ const navSections: readonly AdminNavSection[] = [
     id: "operations",
     title: "Operations",
     links: [
-      { href: "/admin/reconciliation", label: "Reconciliation", exact: false },
-      { href: "/admin/operations", label: "Operations", exact: true },
       {
-        href: "/admin/operations/wallet-reservations",
-        label: "Wallet Reservations",
+        href: "/admin/reconciliation",
+        label: "Problems & Recovery",
         exact: false,
       },
-      { href: "/admin/alerts", label: "Alerts", exact: false },
+      {
+        href: "/admin/operations",
+        label: "Operations Dashboard",
+        exact: true,
+      },
+      {
+        href: "/admin/operations/wallet-reservations",
+        label: "Wallet Holds",
+        exact: false,
+      },
+      { href: "/admin/alerts", label: "System Alerts", exact: false },
     ],
   },
   {

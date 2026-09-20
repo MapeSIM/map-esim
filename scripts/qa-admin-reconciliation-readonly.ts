@@ -419,7 +419,7 @@ function main() {
     detailPage,
     /may already be resolved, may no longer require reconciliation/
   );
-  assert.match(detailPage, /Back to Reconciliation/);
+  assert.match(detailPage, /Back to Problems & Recovery/);
   assert.match(detailPage, /Back to Admin/);
   assert.match(
     detailPage,
@@ -437,7 +437,7 @@ function main() {
     detailPage,
     /Refund now|Finalize order|Resend email|Run backfill|ICCID backfill/i
   );
-  assert.match(nav, /Reconciliation/);
+  assert.match(nav, /Problems & Recovery/);
   assert.match(nav, /\/admin\/reconciliation/);
   console.log("PASS readonly_ui_and_nav");
 

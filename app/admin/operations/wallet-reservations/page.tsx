@@ -54,7 +54,7 @@ function ReservationActionLinks({
           variant="secondary"
           size="sm"
         >
-          Reconciliation
+          Problems & Recovery
         </AdminButton>
       ) : null}
     </div>
@@ -73,12 +73,10 @@ export default async function AdminWalletReservationsMonitorPage() {
         <header className="min-w-0 space-y-2">
           <p className="text-sm">
             <AdminButton href="/admin/operations" variant="ghost" size="sm">
-              ← Operations
+              ← Operations Dashboard
             </AdminButton>
           </p>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Wallet reservations
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight">Wallet Holds</h1>
         </header>
         <div
           className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
@@ -97,17 +95,17 @@ export default async function AdminWalletReservationsMonitorPage() {
       <header className="min-w-0 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <AdminButton href="/admin/operations" variant="ghost" size="sm">
-            ← Operations
+            ← Operations Dashboard
           </AdminButton>
           <AdminButton href="/admin/alerts" variant="ghost" size="sm">
-            Alerts
+            System Alerts
           </AdminButton>
           <AdminButton
             href="/admin/reconciliation?filter=funds_reserved"
             variant="ghost"
             size="sm"
           >
-            Reconciliation (funds reserved)
+            Problems & Recovery (funds reserved)
           </AdminButton>
           <AdminButton
             href="/admin/payments/pending"
@@ -118,9 +116,7 @@ export default async function AdminWalletReservationsMonitorPage() {
           </AdminButton>
         </div>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Wallet reservations
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight">Wallet Holds</h1>
           <p className="mt-2 max-w-3xl text-sm text-[var(--text-muted)]">
             {data.policyBlurb}
           </p>
@@ -137,16 +133,16 @@ export default async function AdminWalletReservationsMonitorPage() {
         className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
       >
         <AdminKpiCard
-          label="Open wallet reservations"
+          label="Open wallet holds"
           value={data.openCount}
         />
         <AdminKpiCard
           label="Total reserved USD"
           value={data.totalReservedUsdLabel}
         />
-        <AdminKpiCard label="Stale reservations" value={data.staleCount} />
+        <AdminKpiCard label="Stale holds" value={data.staleCount} />
         <AdminKpiCard
-          label="Split payment reservations"
+          label="Split payment holds"
           value={data.splitCount}
         />
       </section>

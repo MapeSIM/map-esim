@@ -148,15 +148,31 @@ function DashboardBody({
     ? ADMIN_WALLET_RESERVATIONS_HREF
     : "/admin/operations";
 
+  const issuesNeedingAttention =
+    recon.actionableCount +
+    (alertSummary.detectionStatus === "UNAVAILABLE"
+      ? 0
+      : alertSummary.criticalCount + alertSummary.highCount);
+  const reservedWalletAmount =
+    reservationSummary?.totalReservedUsdLabel ?? "—";
+  const pendingItems = reservationSummary?.openCount ?? recon.openCount;
+  const systemWarnings =
+    data.warnings.length +
+    (alertSummary.detectionStatus === "UNAVAILABLE"
+      ? 0
+      : alertSummary.warningCount);
+
   return (
     <div className="min-w-0 space-y-8">
       <header className="min-w-0">
-        <h1 className="text-2xl font-bold tracking-tight">Operations</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          Operations Dashboard
+        </h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          System health and safe runtime pause switches. Health cards are
-          read-only. Operational controls pause new transaction initiation only
-          — they never cancel in-flight work, refund, email, or mutate wallets,
-          orders, ICCIDs, or reconciliation cases.
+          A simple view of system health and safe runtime pause switches. Health
+          cards are read-only. Operational controls pause new transaction
+          initiation only — they never cancel in-flight work, refund, email, or
+          mutate wallets, orders, ICCIDs, or reconciliation cases.
         </p>
         <p className="mt-2 text-xs text-[var(--text-soft)]">
           Generated {data.generatedAtLabel}
@@ -167,20 +183,37 @@ function DashboardBody({
             variant="secondary"
             size="sm"
           >
-            Wallet reservations
+            Wallet Holds
           </AdminButton>
           <AdminButton href="/admin/alerts" variant="ghost" size="sm">
-            Alerts
+            System Alerts
           </AdminButton>
           <AdminButton
             href="/admin/reconciliation?filter=funds_reserved"
             variant="ghost"
             size="sm"
           >
-            Funds reserved (recon)
+            Problems & Recovery (funds reserved)
           </AdminButton>
         </p>
       </header>
+
+      <section
+        aria-label="Operations summary"
+        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+        data-operations-simple-summary="true"
+      >
+        <AdminKpiCard
+          label="Issues needing attention"
+          value={issuesNeedingAttention}
+        />
+        <AdminKpiCard
+          label="Reserved wallet amount"
+          value={reservedWalletAmount}
+        />
+        <AdminKpiCard label="Pending items" value={pendingItems} />
+        <AdminKpiCard label="System warnings" value={systemWarnings} />
+      </section>
 
       <section className={CARD_CLASS} aria-labelledby="ops-alerts-summary-heading">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -188,7 +221,7 @@ function DashboardBody({
             id="ops-alerts-summary-heading"
             className="text-base font-semibold tracking-tight text-[var(--heading)]"
           >
-            Active alerts summary
+            System Alerts summary
           </h2>
           <AdminStatusPill value={alertSummary.detectionStatus}>
             {alertSummary.detectionStatus}
@@ -215,7 +248,7 @@ function DashboardBody({
         </p>
         <div className="mt-3">
           <AdminButton href="/admin/alerts" variant="primary" size="sm">
-            Open alert center
+            Open System Alerts
           </AdminButton>
         </div>
       </section>
@@ -229,7 +262,7 @@ function DashboardBody({
             id="ops-wallet-reservations-summary-heading"
             className="text-base font-semibold tracking-tight text-[var(--heading)]"
           >
-            Wallet reservations summary
+            Wallet Holds summary
           </h2>
         </div>
         {reservationSummary ? (
@@ -262,13 +295,13 @@ function DashboardBody({
           </>
         ) : (
           <p className="mt-3 text-sm text-[var(--text-muted)]" role="status">
-            Wallet reservation summary is temporarily unavailable. Open the
-            inventory for a full check.
+            Wallet Holds summary is temporarily unavailable. Open the inventory
+            for a full check.
           </p>
         )}
         <div className="mt-3">
           <AdminButton href={reservationsHref} variant="primary" size="sm">
-            Open Wallet Reservations
+            Open Wallet Holds
           </AdminButton>
         </div>
       </section>
@@ -392,13 +425,13 @@ function DashboardBody({
           />
           {recon.truncated ? (
             <p className="sm:col-span-2 text-xs text-[var(--text-muted)]">
-              Counts may be truncated for large workloads. Open Reconciliation
-              for the full filtered list.
+              Counts may be truncated for large workloads. Open Problems &
+              Recovery for the full filtered list.
             </p>
           ) : null}
           <div className="sm:col-span-2">
             <AdminButton href="/admin/reconciliation" variant="primary" size="sm">
-              Open reconciliation center
+              Open Problems & Recovery
             </AdminButton>
           </div>
         </HealthCard>
@@ -575,7 +608,9 @@ export default async function AdminOperationsPage() {
     return (
       <div className="min-w-0 space-y-6">
         <header className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight">Operations</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Operations Dashboard
+          </h1>
           <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
             System health and safe runtime pause switches.
           </p>

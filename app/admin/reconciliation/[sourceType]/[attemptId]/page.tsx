@@ -100,7 +100,7 @@ export default async function AdminReconciliationDetailPage({
     return (
       <div className="min-w-0 space-y-6">
         <AdminButton href="/admin/reconciliation" variant="ghost" size="sm">
-          ← Back to reconciliation
+          ← Back to Problems & Recovery
         </AdminButton>
         <div className={UNAVAILABLE_CLASS} role="status">
           <p className="text-sm font-medium text-[var(--heading)]">
@@ -122,7 +122,7 @@ export default async function AdminReconciliationDetailPage({
         <div className="min-w-0 space-y-6">
           <header className="min-w-0 space-y-3">
             <AdminButton href="/admin/reconciliation" variant="ghost" size="sm">
-              ← Back to reconciliation
+              ← Back to Problems & Recovery
             </AdminButton>
             <div>
               <h1 className="text-2xl font-bold tracking-tight">
@@ -141,7 +141,7 @@ export default async function AdminReconciliationDetailPage({
           </div>
           <div className="flex flex-wrap gap-3">
             <AdminButton href="/admin/reconciliation" variant="primary">
-              Back to Reconciliation
+              Back to Problems & Recovery
             </AdminButton>
             <AdminButton href="/admin" variant="secondary">
               Back to Admin
@@ -175,7 +175,7 @@ export default async function AdminReconciliationDetailPage({
     <div className="min-w-0 space-y-8">
       <header className="min-w-0 space-y-3">
         <AdminButton href="/admin/reconciliation" variant="ghost" size="sm">
-          ← Back to reconciliation
+          ← Back to Problems & Recovery
         </AdminButton>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">

@@ -277,7 +277,8 @@ function main() {
   assert.doesNotMatch(mut, /ENABLE_GUEST|guest checkout.*enable/i);
   assert.doesNotMatch(panel, /enable guest|payment gateway.*enable/i);
   assert.match(panel, /cannot enable incomplete features/i);
-  assert.match(page, /NOT_IMPLEMENTED \/ DISABLED/);
+  assert.match(page, /guestCheckoutStatus/);
+  assert.match(healthShared, /NOT_IMPLEMENTED \/ DISABLED/);
   assert.equal(
     paymentGatewayCardDefaults().guestCheckout,
     "NOT_IMPLEMENTED / DISABLED"

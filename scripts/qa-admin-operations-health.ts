@@ -224,19 +224,28 @@ function main() {
 
   // --- UI / nav wiring ---
   assert.match(nav, /\/admin\/operations/);
-  assert.match(nav, /Operations/);
+  assert.match(nav, /Operations Dashboard/);
+  assert.match(nav, /Problems & Recovery/);
+  assert.match(nav, /Wallet Holds/);
+  assert.match(nav, /System Alerts/);
   assert.match(page, /Operations health data is temporarily unavailable/);
-  assert.match(page, /Open reconciliation center/);
+  assert.match(page, /Operations Dashboard/);
+  assert.match(page, /Issues needing attention/);
+  assert.match(page, /Reserved wallet amount/);
+  assert.match(page, /Pending items/);
+  assert.match(page, /System warnings/);
+  assert.match(page, /data-operations-simple-summary/);
+  assert.match(page, /Open Problems & Recovery/);
   assert.match(page, /Payment gateway readiness/);
   assert.match(page, /Security & production readiness/);
   assert.match(page, /getWalletReservationMonitorDashboard/);
   assert.match(page, /ADMIN_WALLET_RESERVATIONS_HREF/);
-  assert.match(page, /Wallet reservations summary/);
+  assert.match(page, /Wallet Holds summary/);
   assert.match(page, /Open wallet holds/);
   assert.match(page, /Total reserved USD/);
   assert.match(page, /Stale reservations/);
   assert.match(page, /Split payment holds/);
-  assert.match(page, /Open Wallet Reservations/);
+  assert.match(page, /Open Wallet Holds/);
   assert.match(
     reservationShared,
     /ADMIN_WALLET_RESERVATIONS_HREF\s*=\s*"\/admin\/operations\/wallet-reservations"/

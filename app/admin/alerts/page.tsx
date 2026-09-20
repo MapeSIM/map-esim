@@ -165,7 +165,7 @@ function AlertCard({
           ) : null}
           {inventoryHref ? (
             <AdminButton href={inventoryHref} variant="secondary" size="sm">
-              Wallet reservation inventory
+              Wallet Holds inventory
             </AdminButton>
           ) : null}
         </div>
@@ -207,7 +207,7 @@ export default async function AdminAlertsPage({
     return (
       <div className="min-w-0 space-y-6">
         <header className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight">Alerts</h1>
+          <h1 className="text-2xl font-bold tracking-tight">System Alerts</h1>
           <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
             Read-only internal monitoring for operational risk.
           </p>
@@ -229,7 +229,7 @@ export default async function AdminAlertsPage({
   return (
     <div className="min-w-0 space-y-8">
       <header className="min-w-0">
-        <h1 className="text-2xl font-bold tracking-tight">Alerts</h1>
+        <h1 className="text-2xl font-bold tracking-tight">System Alerts</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
           Read-only internal alert center. Alerts are derived from local database
           evidence and safe configuration checks. This page never refunds,
@@ -252,11 +252,11 @@ export default async function AdminAlertsPage({
               variant="secondary"
               size="sm"
             >
-              Wallet Reservations
+              Wallet Holds
             </AdminButton>
           ) : null}
           <AdminButton href="/admin/operations" variant="ghost" size="sm">
-            Operations
+            Operations Dashboard
           </AdminButton>
         </p>
       </header>
@@ -343,11 +343,12 @@ export default async function AdminAlertsPage({
           </p>
           <p className="mt-2">
             Informational payment and security readiness alerts appear when
-            detection is healthy. Use Operations for configuration context.
+            detection is healthy. Use Operations Dashboard for configuration
+            context.
           </p>
           <div className="mt-4">
             <AdminButton href="/admin/operations" variant="primary" size="sm">
-              Open Operations
+              Open Operations Dashboard
             </AdminButton>
           </div>
         </div>

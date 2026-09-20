@@ -176,12 +176,12 @@ function main() {
 
   assert.match(page, /requireActiveAdminForOperations/);
   assert.match(page, /getWalletReservationMonitorDashboard/);
-  assert.match(page, /Open wallet reservations/);
+  assert.match(page, /Open wallet holds/);
   assert.match(page, /Total reserved USD/);
-  assert.match(page, /Stale reservations/);
-  assert.match(page, /Split payment reservations/);
+  assert.match(page, /Stale holds/);
+  assert.match(page, /Split payment holds/);
   assert.match(page, /Payment detail/);
-  assert.match(page, /Reconciliation/);
+  assert.match(page, /Problems & Recovery/);
   // Phase 6 mobile polish: card list on small screens; table stays md+.
   assert.match(page, /data-wallet-reservations-mobile/);
   assert.match(page, /md:hidden/);
@@ -205,23 +205,23 @@ function main() {
   assert.match(service, /RECONCILIATION_REQUIRED/);
 
   assert.match(nav, /\/admin\/operations\/wallet-reservations/);
-  assert.match(nav, /Wallet Reservations/);
+  assert.match(nav, /Wallet Holds/);
   assert.match(access, /\/admin\/operations\/wallet-reservations/);
   assert.match(opsPage, /\/admin\/operations\/wallet-reservations|ADMIN_WALLET_RESERVATIONS_HREF/);
   assert.match(opsPage, /getWalletReservationMonitorDashboard/);
   assert.match(opsPage, /ADMIN_WALLET_RESERVATIONS_HREF/);
-  assert.match(opsPage, /Wallet reservations summary/);
+  assert.match(opsPage, /Wallet Holds summary/);
   assert.match(opsPage, /Open wallet holds/);
   assert.match(opsPage, /Total reserved USD/);
   assert.match(opsPage, /Stale reservations/);
   assert.match(opsPage, /Split payment holds/);
-  assert.match(opsPage, /Open Wallet Reservations/);
+  assert.match(opsPage, /Open Wallet Holds/);
   assert.doesNotMatch(opsPage, /Release Reservation|Refund wallet funds|markPaid/i);
   assert.doesNotMatch(opsPage, /reservationSummary\.rows/);
   assert.match(alertsPage, /ADMIN_WALLET_RESERVATIONS_HREF/);
   assert.match(alertsPage, /isWalletReservationAlertInventoryCode/);
-  assert.match(alertsPage, /Wallet Reservations/);
-  assert.match(alertsPage, /Wallet reservation inventory/);
+  assert.match(alertsPage, /Wallet Holds/);
+  assert.match(alertsPage, /Wallet Holds inventory/);
   assert.match(pkg, /"qa:admin-wallet-reservation-monitor"/);
   console.log("PASS ui_nav_and_no_mutations");
 

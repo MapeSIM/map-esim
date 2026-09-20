@@ -284,22 +284,22 @@ function main() {
 
   // Dashboard / nav
   assert.match(nav, /href: "\/admin\/alerts"/);
-  assert.match(nav, /label: "Alerts"/);
+  assert.match(nav, /label: "System Alerts"/);
   assert.match(page, /Active alert summary|Alert severity filters/);
   assert.match(page, /No active alerts match/);
   assert.match(page, /Recommended next step/);
-  assert.match(page, /Wallet Reservations/);
+  assert.match(page, /Wallet Holds/);
   assert.match(page, /ADMIN_WALLET_RESERVATIONS_HREF|wallet-reservations/);
   assert.match(page, /isWalletReservationAlertInventoryCode/);
-  assert.match(page, /Wallet reservation inventory/);
+  assert.match(page, /Wallet Holds inventory/);
   assert.match(page, /Open related admin view/);
-  // Phase 6: hide Wallet Reservations CTAs without Operations access (no extra grants).
+  // Phase 6: hide Wallet Holds CTAs without Operations access (no extra grants).
   assert.match(page, /canAccessAdminPath/);
   assert.match(page, /loadAdminAccess/);
   assert.match(page, /canOpenWalletReservations/);
   assert.match(
     page,
-    /canOpenWalletReservations\s*\?\s*\([\s\S]*?Wallet Reservations/
+    /canOpenWalletReservations\s*\?\s*\([\s\S]*?Wallet Holds/
   );
   assert.match(
     page,
@@ -321,8 +321,8 @@ function main() {
     /ADMIN_WALLET_RESERVATIONS_HREF|wallet-reservations/
   );
   assert.match(opsPage, /getMonitoringAlertSummary/);
-  assert.match(opsPage, /Open alert center/);
-  assert.match(opsPage, /Active alerts summary/);
+  assert.match(opsPage, /Open System Alerts/);
+  assert.match(opsPage, /System Alerts summary/);
   assert.match(pkg, /qa:admin-monitoring-alerts/);
   console.log("PASS dashboard_nav");
 
