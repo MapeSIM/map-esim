@@ -38,6 +38,7 @@ type Props = {
   iccidMasked: string;
   iccidRevealable: boolean;
   hasActiveShareToken: boolean;
+  partnerDisplayName?: string | null;
   destination: string | null;
   planName: string | null;
   dataAllowance: string | null;
@@ -52,6 +53,7 @@ export default function PartnerEsimInstallPanel({
   iccidMasked,
   iccidRevealable,
   hasActiveShareToken,
+  partnerDisplayName = null,
   destination,
   planName,
   dataAllowance,
@@ -228,6 +230,7 @@ export default function PartnerEsimInstallPanel({
           <PartnerEsimShareControls
             orderId={orderId}
             hasActiveToken={hasActiveShareToken}
+            partnerDisplayName={partnerDisplayName}
             destination={destination}
             planName={planName}
             dataAllowance={dataAllowance}

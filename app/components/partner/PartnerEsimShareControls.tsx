@@ -14,6 +14,7 @@ import {
 import {
   assertSafeSharePayload,
   buildAbsoluteShareUrl,
+  buildPartnerShareClipboardText,
   buildPartnerWebSharePayload,
   buildPartnerWhatsAppShareHref,
 } from "@/app/lib/partner/partnerShareCopy";
@@ -21,6 +22,8 @@ import {
 type Props = {
   orderId: string;
   hasActiveToken: boolean;
+  /** Partner share-settings company name (optional; MAP fallback in copy). */
+  partnerDisplayName?: string | null;
   destination: string | null;
   planName: string | null;
   dataAllowance: string | null;
@@ -31,6 +34,7 @@ type Props = {
 export default function PartnerEsimShareControls({
   orderId,
   hasActiveToken,
+  partnerDisplayName = null,
   destination,
   planName,
   dataAllowance,
@@ -52,6 +56,17 @@ export default function PartnerEsimShareControls({
     } catch {
       return null;
     }
+  }
+
+  function shareCopyInput(shareUrl: string) {
+    return {
+      shareUrl,
+      partnerDisplayName,
+      destination,
+      planName,
+      dataAllowance,
+      validity,
+    };
   }
 
   async function createOrRegenerate() {
@@ -103,25 +118,20 @@ export default function PartnerEsimShareControls({
     const url = currentShareUrl();
     if (!url) return;
     try {
-      assertSafeSharePayload(url);
-      await navigator.clipboard.writeText(url);
+      const text = buildPartnerShareClipboardText(shareCopyInput(url));
+      assertSafeSharePayload(text);
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      setError("Could not copy the share link.");
+      setError("Could not copy the share message.");
     }
   }
 
   async function webShare() {
     const url = currentShareUrl();
     if (!url) return;
-    const payload = buildPartnerWebSharePayload({
-      shareUrl: url,
-      destination,
-      planName,
-      dataAllowance,
-      validity,
-    });
+    const payload = buildPartnerWebSharePayload(shareCopyInput(url));
     try {
       assertSafeSharePayload(payload.text);
       assertSafeSharePayload(payload.title);
@@ -130,12 +140,14 @@ export default function PartnerEsimShareControls({
         await navigator.share(payload);
         return;
       }
-      await navigator.clipboard.writeText(url);
+      const text = buildPartnerShareClipboardText(shareCopyInput(url));
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
       try {
-        await navigator.clipboard.writeText(url);
+        const text = buildPartnerShareClipboardText(shareCopyInput(url));
+        await navigator.clipboard.writeText(text);
         setCopied(true);
         window.setTimeout(() => setCopied(false), 2000);
       } catch {
@@ -145,14 +157,8 @@ export default function PartnerEsimShareControls({
   }
 
   const shareUrl = currentShareUrl();
-  const packageFields = {
-    destination,
-    planName,
-    dataAllowance,
-    validity,
-  };
   const whatsappHref = shareUrl
-    ? buildPartnerWhatsAppShareHref({ shareUrl, ...packageFields })
+    ? buildPartnerWhatsAppShareHref(shareCopyInput(shareUrl))
     : null;
 
   const body = (

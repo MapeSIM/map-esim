@@ -3,6 +3,9 @@
  * activation codes, wallet, discount, or payment data.
  */
 
+import { BRAND_NAME } from "@/app/lib/brand";
+import { displayShareCompanyName } from "@/app/lib/partner/partnerShareBrandingValidate";
+
 export type PartnerSharePackageFields = {
   destination?: string | null;
   planName?: string | null;
@@ -12,6 +15,8 @@ export type PartnerSharePackageFields = {
 
 export type PartnerShareCopyInput = PartnerSharePackageFields & {
   shareUrl: string;
+  /** Partner share-settings company name (display-sanitized; falls back to MAP). */
+  partnerDisplayName?: string | null;
 };
 
 const OMITTED_FIELD =
@@ -38,6 +43,13 @@ function sanitizeShareField(value: unknown): string | null {
     return null;
   }
   return trimmed;
+}
+
+/** Selected share-settings name, or MAP brand fallback. */
+export function resolvePartnerShareDisplayName(
+  value: string | null | undefined
+): string {
+  return displayShareCompanyName(value) || BRAND_NAME;
 }
 
 export function buildPartnerSharePackageLabel(
@@ -84,7 +96,16 @@ export function countShareUrlOccurrences(haystack: string, shareUrl: string): nu
   return count;
 }
 
-function shareIntroLine(input: PartnerSharePackageFields): string {
+/**
+ * Intro line: partner display name + destination + data + validity.
+ * Plan name is optional enrichment when present and safe.
+ */
+export function buildPartnerShareIntroLine(
+  input: PartnerSharePackageFields & {
+    partnerDisplayName?: string | null;
+  }
+): string {
+  const partner = resolvePartnerShareDisplayName(input.partnerDisplayName);
   const destination = sanitizeShareField(input.destination);
   const planName = sanitizeShareField(input.planName);
   const dataAllowance = sanitizeShareField(input.dataAllowance);
@@ -92,23 +113,34 @@ function shareIntroLine(input: PartnerSharePackageFields): string {
   const title = [destination, planName].filter(Boolean).join(" ");
   const spec = [dataAllowance, validity].filter(Boolean).join(", ");
   if (title && spec) {
-    return `Here are the eSIM QR details for ${title} (${spec}):`;
+    return `Here are the eSIM QR details from ${partner} for ${title} (${spec}):`;
   }
-  if (title) return `Here are the eSIM QR details for ${title}:`;
-  if (spec) return `Here are the eSIM QR details (${spec}):`;
-  return "Here are the eSIM QR details:";
+  if (title) {
+    return `Here are the eSIM QR details from ${partner} for ${title}:`;
+  }
+  if (spec) {
+    return `Here are the eSIM QR details from ${partner} (${spec}):`;
+  }
+  return `Here are the eSIM QR details from ${partner}:`;
 }
 
-export function buildPartnerShareWhatsAppText(
+/** Full share message (intro + activation URL) — Copy + WhatsApp. */
+export function buildPartnerShareClipboardText(
   input: PartnerShareCopyInput
 ): string {
   const shareUrl = (input.shareUrl ?? "").trim();
-  const text = `${shareIntroLine(input)}\n${shareUrl}`;
+  const text = `${buildPartnerShareIntroLine(input)}\n${shareUrl}`;
   if (countShareUrlOccurrences(text, shareUrl) !== 1) {
     throw new Error("share_payload_url_count");
   }
   assertSafeSharePayload(text);
   return text;
+}
+
+export function buildPartnerShareWhatsAppText(
+  input: PartnerShareCopyInput
+): string {
+  return buildPartnerShareClipboardText(input);
 }
 
 export function buildPartnerWhatsAppShareHref(
@@ -125,9 +157,10 @@ export function buildPartnerWebSharePayload(input: PartnerShareCopyInput): {
   url: string;
 } {
   const shareUrl = (input.shareUrl ?? "").trim();
-  const text = shareIntroLine(input);
+  const partner = resolvePartnerShareDisplayName(input.partnerDisplayName);
+  const text = buildPartnerShareIntroLine(input);
   const payload = {
-    title: "Your eSIM details",
+    title: `Your eSIM from ${partner}`,
     text,
     url: shareUrl,
   };

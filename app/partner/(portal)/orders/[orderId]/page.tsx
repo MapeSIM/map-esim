@@ -9,6 +9,8 @@ import {
   listPartnerRefundRequestSummaries,
   toPartnerRefundCardState,
 } from "@/app/lib/partner/partnerRefundRequest";
+import { getPartnerShareBranding } from "@/app/lib/partner/partnerShareBranding";
+import { displayShareCompanyName } from "@/app/lib/partner/partnerShareBrandingValidate";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +54,18 @@ export default async function PartnerOrderDetailPage({
     partnerUserId: user.id,
     orderId: detail.orderId,
   });
+
+  let partnerDisplayName: string | null = null;
+  try {
+    const branding = await getPartnerShareBranding(user.id);
+    if (branding.ok) {
+      partnerDisplayName = displayShareCompanyName(
+        branding.branding.companyName
+      );
+    }
+  } catch {
+    partnerDisplayName = null;
+  }
 
   let refundRequest: ReturnType<typeof toPartnerRefundCardState> | null = null;
   try {
@@ -97,6 +111,7 @@ export default async function PartnerOrderDetailPage({
           addDataSourceOrderId: detail.addDataSourceOrderId,
         }}
         refundRequest={refundRequest}
+        partnerDisplayName={partnerDisplayName}
         variant="detail"
       />
     </div>

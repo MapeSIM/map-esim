@@ -83,12 +83,15 @@ type Props = {
   row: PartnerOrderListRow;
   refundRequest: PartnerRefundRequestCardState;
   variant?: "list" | "detail";
+  /** Partner share-settings company name for outbound share messages. */
+  partnerDisplayName?: string | null;
 };
 
 export default function PartnerEsimOrderCard({
   row,
   refundRequest,
   variant = "detail",
+  partnerDisplayName = null,
 }: Props) {
   const [showUsage, setShowUsage] = useState(false);
   const completed = row.statusBadge === "Completed";
@@ -231,6 +234,7 @@ export default function PartnerEsimOrderCard({
             iccidMasked={row.iccidMasked}
             iccidRevealable={row.iccidRevealable}
             hasActiveShareToken={row.hasActiveShareToken}
+            partnerDisplayName={partnerDisplayName}
             destination={row.destination}
             planName={row.planName}
             dataAllowance={row.dataAllowance}
