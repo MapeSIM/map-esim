@@ -5,6 +5,11 @@ import {
   retryEmailCenterSendAction,
   type EmailCenterRetryFormState,
 } from "@/app/lib/admin/emailCenterActions";
+import {
+  EMAIL_CENTER_RESEND_BUTTON_LABEL,
+  EMAIL_CENTER_RESEND_PENDING_LABEL,
+  EMAIL_CENTER_RESEND_SAFE_HINT,
+} from "@/app/lib/admin/emailCenterShared";
 
 const initialState: EmailCenterRetryFormState = null;
 
@@ -19,7 +24,7 @@ export default function EmailCenterRetryButton(props: {
   );
 
   return (
-    <div className="space-y-1">
+    <div className="max-w-xs space-y-1">
       <form action={formAction}>
         <input type="hidden" name="retryKind" value={props.retryKind} />
         <input type="hidden" name="targetId" value={props.targetId} />
@@ -31,9 +36,14 @@ export default function EmailCenterRetryButton(props: {
           disabled={pending}
           className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--heading)] disabled:opacity-60"
         >
-          {pending ? "Retrying…" : "Retry Send"}
+          {pending
+            ? EMAIL_CENTER_RESEND_PENDING_LABEL
+            : EMAIL_CENTER_RESEND_BUTTON_LABEL}
         </button>
       </form>
+      <p className="text-[11px] leading-snug text-[var(--text-soft)]">
+        {EMAIL_CENTER_RESEND_SAFE_HINT}
+      </p>
       {state?.ok ? (
         <p className="text-xs font-medium text-[var(--accent-strong)]" role="status">
           {state.message}

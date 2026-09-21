@@ -8,6 +8,17 @@ export const EMAIL_CENTER_PAGE_LIMIT = 80;
 export const EMAIL_CENTER_TABS = ["all", "failed"] as const;
 export type EmailCenterTab = (typeof EMAIL_CENTER_TABS)[number];
 
+/** UX category filters — display/filter only; does not change delivery. */
+export const EMAIL_CENTER_CATEGORIES = [
+  "all",
+  "orders",
+  "payments",
+  "refunds",
+  "wallet",
+  "other",
+] as const;
+export type EmailCenterCategory = (typeof EMAIL_CENTER_CATEGORIES)[number];
+
 /** Known outgoing-email audit actions (status lives in metadata.deliveryStatus). */
 export const EMAIL_CENTER_AUDIT_ACTIONS = [
   "refund.email_received",
@@ -58,11 +69,26 @@ export type EmailCenterKind =
   | "reconciliation_resend"
   | "other";
 
+export type EmailCenterStatusBucket = "sent" | "failed" | "pending";
+
+export type EmailCenterSummary = {
+  sent: number;
+  failed: number;
+  pending: number;
+};
+
 const FAILED_DELIVERY = new Set([
   "failed",
   "not_configured",
   "invalid_email",
 ]);
+
+const SENT_DELIVERY = new Set(["sent", "already_sent", "skipped"]);
+
+export const EMAIL_CENTER_RESEND_BUTTON_LABEL = "Try sending again";
+export const EMAIL_CENTER_RESEND_PENDING_LABEL = "Sending again…";
+export const EMAIL_CENTER_RESEND_SAFE_HINT =
+  "Safe retry only: uses the same email helper. It does not move money or change payment, refund, or wallet status.";
 
 export function parseEmailCenterTab(
   raw: string | null | undefined
@@ -71,8 +97,88 @@ export function parseEmailCenterTab(
   return v === "failed" ? "failed" : "all";
 }
 
+export function parseEmailCenterCategory(
+  raw: string | null | undefined
+): EmailCenterCategory {
+  const v = (raw ?? "").trim().toLowerCase();
+  if (
+    v === "orders" ||
+    v === "payments" ||
+    v === "refunds" ||
+    v === "wallet" ||
+    v === "other"
+  ) {
+    return v;
+  }
+  return "all";
+}
+
+export function emailCenterCategoryLabel(
+  category: EmailCenterCategory
+): string {
+  switch (category) {
+    case "orders":
+      return "Orders / install";
+    case "payments":
+      return "Payments";
+    case "refunds":
+      return "Refunds";
+    case "wallet":
+      return "Wallet";
+    case "other":
+      return "Other";
+    default:
+      return "All categories";
+  }
+}
+
+export function emailCenterCategoryForKind(
+  kind: EmailCenterKind
+): Exclude<EmailCenterCategory, "all"> {
+  switch (kind) {
+    case "order_install":
+    case "recon_required":
+    case "partner_recon_required":
+    case "reconciliation_resend":
+      return "orders";
+    case "payment_failure":
+    case "payment_received_pending":
+      return "payments";
+    case "refund_status":
+    case "partner_refund_status":
+    case "vesim_review":
+      return "refunds";
+    case "wallet_transaction":
+      return "wallet";
+    default:
+      return "other";
+  }
+}
+
+export function normalizeEmailCenterSearchQuery(
+  raw: string | null | undefined
+): string {
+  return (raw ?? "").trim().slice(0, 100);
+}
+
 export function emailCenterTabHref(tab: EmailCenterTab): string {
-  return tab === "failed" ? "/admin/emails?tab=failed" : "/admin/emails";
+  return buildAdminEmailCenterHref({ tab });
+}
+
+export function buildAdminEmailCenterHref(options: {
+  tab?: EmailCenterTab | string | null;
+  category?: EmailCenterCategory | string | null;
+  q?: string | null;
+}): string {
+  const params = new URLSearchParams();
+  const tab = parseEmailCenterTab(options.tab);
+  const category = parseEmailCenterCategory(options.category);
+  const q = normalizeEmailCenterSearchQuery(options.q);
+  if (tab === "failed") params.set("tab", "failed");
+  if (category !== "all") params.set("category", category);
+  if (q) params.set("q", q);
+  const qs = params.toString();
+  return qs ? `/admin/emails?${qs}` : "/admin/emails";
 }
 
 export function isFailedEmailDeliveryStatus(
@@ -123,6 +229,30 @@ export function deliveryStatusLabel(status: string): string {
     default:
       return status.trim() || "Unknown";
   }
+}
+
+export function emailCenterStatusBucket(
+  status: string | null | undefined
+): EmailCenterStatusBucket {
+  const normalized = normalizeDeliveryStatus(status);
+  if (isFailedEmailDeliveryStatus(normalized)) return "failed";
+  if (SENT_DELIVERY.has(normalized)) return "sent";
+  return "pending";
+}
+
+export function summarizeEmailCenterRows(
+  rows: Array<{ deliveryStatus: string }>
+): EmailCenterSummary {
+  let sent = 0;
+  let failed = 0;
+  let pending = 0;
+  for (const row of rows) {
+    const bucket = emailCenterStatusBucket(row.deliveryStatus);
+    if (bucket === "sent") sent += 1;
+    else if (bucket === "failed") failed += 1;
+    else pending += 1;
+  }
+  return { sent, failed, pending };
 }
 
 export function emailCenterKindFromAction(action: string): EmailCenterKind {
@@ -181,6 +311,38 @@ export function sanitizeFailureReason(
   if (!t) return null;
   // Never surface raw SMTP payloads or oversized blobs.
   return t.slice(0, 120);
+}
+
+export function emailCenterRowMatchesSearch(
+  row: {
+    kindLabel: string;
+    actionLabel: string;
+    targetType: string;
+    targetId: string;
+    emailEvent: string | null;
+    orderId: string | null;
+    recipientSearchText: string | null;
+    deliveryStatusLabel: string;
+    failureReason: string | null;
+  },
+  rawQuery: string | null | undefined
+): boolean {
+  const q = normalizeEmailCenterSearchQuery(rawQuery).toLowerCase();
+  if (!q) return true;
+  const haystack = [
+    row.kindLabel,
+    row.actionLabel,
+    row.targetType,
+    row.targetId,
+    row.emailEvent ?? "",
+    row.orderId ?? "",
+    row.recipientSearchText ?? "",
+    row.deliveryStatusLabel,
+    row.failureReason ?? "",
+  ]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(q);
 }
 
 export function isRefundStatusEmailEvent(

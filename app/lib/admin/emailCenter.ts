@@ -11,14 +11,22 @@ import {
   EMAIL_CENTER_AUDIT_ACTIONS,
   EMAIL_CENTER_PAGE_LIMIT,
   deliveryStatusLabel,
+  emailCenterCategoryForKind,
   emailCenterKindFromAction,
   emailCenterKindLabel,
+  emailCenterRowMatchesSearch,
   isFailedEmailDeliveryStatus,
   isRefundStatusEmailEvent,
   normalizeDeliveryStatus,
+  normalizeEmailCenterSearchQuery,
+  parseEmailCenterCategory,
+  parseEmailCenterTab,
   sanitizeFailureReason,
+  summarizeEmailCenterRows,
+  type EmailCenterCategory,
   type EmailCenterKind,
   type EmailCenterRetryKind,
+  type EmailCenterSummary,
   type EmailCenterTab,
 } from "@/app/lib/admin/emailCenterShared";
 
@@ -32,12 +40,24 @@ export type EmailCenterRow = {
   failureReason: string | null;
   targetType: string;
   targetId: string;
+  orderId: string | null;
+  /** Non-secret search text only (ids / types) — never raw mailbox addresses. */
+  recipientSearchText: string | null;
   createdAtMs: number;
   createdAtLabel: string;
   canRetry: boolean;
   retryKind: EmailCenterRetryKind | null;
   /** Refund / partner refund event, when present. */
   emailEvent: string | null;
+};
+
+export type AdminEmailCenterPageResult = {
+  rows: EmailCenterRow[];
+  summary: EmailCenterSummary;
+  tab: EmailCenterTab;
+  category: EmailCenterCategory;
+  search: string;
+  totalBeforeFilter: number;
 };
 
 function shortId(id: string): string {
@@ -153,6 +173,10 @@ function rowFromAudit(log: {
       metaString(meta, "errorCode")
   );
   const emailEvent = metaString(meta, "emailEvent");
+  const orderId =
+    metaString(meta, "orderId") ??
+    metaString(meta, "purchaseId") ??
+    metaString(meta, "walletTransactionId");
   const retry = resolveRetry({
     kind,
     deliveryStatus,
@@ -173,6 +197,10 @@ function rowFromAudit(log: {
     failureReason,
     targetType: log.targetType,
     targetId,
+    orderId,
+    recipientSearchText: [log.targetType, targetId, orderId ?? ""]
+      .filter(Boolean)
+      .join(" "),
     createdAtMs: log.createdAt.getTime(),
     createdAtLabel: formatUtcTimestamp(log.createdAt),
     canRetry: retry.canRetry,
@@ -209,6 +237,8 @@ function rowFromModel(options: {
     failureReason: sanitizeFailureReason(options.failureReason),
     targetType: options.targetType,
     targetId: options.targetId,
+    orderId: null,
+    recipientSearchText: `${options.targetType} ${options.targetId}`,
     createdAtMs: options.createdAt.getTime(),
     createdAtLabel: formatUtcTimestamp(options.createdAt),
     canRetry: retry.canRetry,
@@ -482,4 +512,46 @@ export async function listAdminEmailCenter(options: {
 
   merged.sort((a, b) => b.createdAtMs - a.createdAtMs);
   return merged.slice(0, limit);
+}
+
+/**
+ * Email Center page data: summary + filtered list.
+ * Filtering is display-only; delivery/retry helpers are unchanged.
+ */
+export async function getAdminEmailCenterPage(options: {
+  tab?: string | null;
+  category?: string | null;
+  q?: string | null;
+  limit?: number;
+}): Promise<AdminEmailCenterPageResult> {
+  const tab = parseEmailCenterTab(options.tab);
+  const category = parseEmailCenterCategory(options.category);
+  const search = normalizeEmailCenterSearchQuery(options.q);
+  const allRows = await listAdminEmailCenter({
+    tab: "all",
+    limit: options.limit ?? EMAIL_CENTER_PAGE_LIMIT,
+  });
+  const summary = summarizeEmailCenterRows(allRows);
+
+  const rows = allRows.filter((row) => {
+    if (tab === "failed" && !isFailedEmailDeliveryStatus(row.deliveryStatus)) {
+      return false;
+    }
+    if (
+      category !== "all" &&
+      emailCenterCategoryForKind(row.kind) !== category
+    ) {
+      return false;
+    }
+    return emailCenterRowMatchesSearch(row, search);
+  });
+
+  return {
+    rows,
+    summary,
+    tab,
+    category,
+    search,
+    totalBeforeFilter: allRows.length,
+  };
 }
