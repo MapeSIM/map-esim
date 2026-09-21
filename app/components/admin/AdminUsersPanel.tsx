@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useId } from "react";
+import { useActionState, useId, useState } from "react";
 import {
   assignAdminTeamRoleAction,
   deactivateAdminAction,
@@ -10,7 +10,12 @@ import {
   updateAdminPermissionsAction,
   type AdminUsersFormState,
 } from "@/app/lib/admin/adminUsersActions";
-import type { AdminUserListRow } from "@/app/lib/admin/adminUsersShared";
+import {
+  adminUserPermissionsSummaryLabel,
+  adminUserStatusDisplayLabel,
+  summarizeAdminPermissionCategories,
+  type AdminUserListRow,
+} from "@/app/lib/admin/adminUsersShared";
 import {
   ADMIN_PERMISSIONS,
   ADMIN_PERMISSION_LABELS,
@@ -163,11 +168,7 @@ export function InviteAdminForm() {
   );
 }
 
-function ResendSetupLinkButton({
-  row,
-}: {
-  row: AdminUserListRow;
-}) {
+function ResendSetupLinkButton({ row }: { row: AdminUserListRow }) {
   const [state, formAction, pending] = useActionState(
     resendAdminInviteAction,
     null
@@ -209,7 +210,7 @@ function DisableButton({
       <button
         type="submit"
         disabled={pending}
-        className="text-sm font-semibold text-[var(--danger-text)] outline-none hover:underline focus-visible:underline disabled:opacity-60"
+        className="rounded-xl border border-[var(--danger-border)] px-3 py-1.5 text-sm font-semibold text-[var(--danger-text)] outline-none hover:bg-[var(--surface-2)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
       >
         {pending ? "Updating…" : label}
       </button>
@@ -218,11 +219,7 @@ function DisableButton({
   );
 }
 
-function EnableButton({
-  row,
-}: {
-  row: AdminUserListRow;
-}) {
+function EnableButton({ row }: { row: AdminUserListRow }) {
   const [state, formAction, pending] = useActionState(
     reactivateAdminAction,
     null
@@ -238,7 +235,7 @@ function EnableButton({
       <button
         type="submit"
         disabled={pending}
-        className="text-sm font-semibold text-[var(--accent-strong)] outline-none hover:underline focus-visible:underline disabled:opacity-60"
+        className="rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1.5 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--surface-2)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
       >
         {pending ? "Enabling…" : "Enable"}
       </button>
@@ -273,6 +270,38 @@ function AssignRoleForm({ row }: { row: AdminUserListRow }) {
   );
 }
 
+function PermissionCategorySummary({ row }: { row: AdminUserListRow }) {
+  const categories = summarizeAdminPermissionCategories(row.permissions);
+  return (
+    <ul
+      className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
+      data-admin-permission-categories="true"
+      aria-label="Permission categories"
+    >
+      {categories.map((category) => (
+        <li
+          key={category.id}
+          className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm"
+        >
+          <p className="font-medium text-[var(--heading)]">
+            <span aria-hidden="true">{category.emoji} </span>
+            {category.label}
+          </p>
+          <p
+            className={
+              category.allowed
+                ? "mt-1 text-xs font-semibold text-[var(--accent-strong)]"
+                : "mt-1 text-xs font-semibold text-[var(--text-muted)]"
+            }
+          >
+            {category.allowed ? "Allowed" : "Not Allowed"}
+          </p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function PermissionsForm({ row }: { row: AdminUserListRow }) {
   const [state, formAction, pending] = useActionState(
     updateAdminPermissionsAction,
@@ -280,23 +309,39 @@ function PermissionsForm({ row }: { row: AdminUserListRow }) {
   );
   if (row.teamRole === "SUPER_ADMIN") {
     return (
-      <p className="text-xs text-[var(--text-muted)]">Full access</p>
+      <div className="space-y-3">
+        <PermissionCategorySummary row={row} />
+        <p className="text-xs text-[var(--text-muted)]">Full access</p>
+      </div>
     );
   }
 
   const selected = new Set(row.permissions);
   return (
-    <form action={formAction} className="space-y-2">
+    <form action={formAction} className="space-y-3">
       <input type="hidden" name="targetUserId" value={row.id} />
       <input
         type="hidden"
         name="expectedVersion"
         value={String(row.adminStatusVersion)}
       />
-      <fieldset className="grid gap-1 sm:grid-cols-2">
-        <legend className="sr-only">Permissions</legend>
-        {ADMIN_PERMISSIONS.filter((permission) => permission !== "MANAGE_ADMINS").map(
-          (permission) => (
+      <div
+        className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--heading)]"
+        role="status"
+        data-admin-access-warning="true"
+      >
+        Changing admin access affects what this user can manage.
+      </div>
+      <PermissionCategorySummary row={row} />
+      <details className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+        <summary className="cursor-pointer text-sm font-semibold text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]">
+          Advanced permission details
+        </summary>
+        <fieldset className="mt-3 grid gap-1 sm:grid-cols-2">
+          <legend className="sr-only">Permissions</legend>
+          {ADMIN_PERMISSIONS.filter(
+            (permission) => permission !== "MANAGE_ADMINS"
+          ).map((permission) => (
             <label
               key={permission}
               className="flex items-start gap-2 text-xs text-[var(--text)]"
@@ -310,18 +355,177 @@ function PermissionsForm({ row }: { row: AdminUserListRow }) {
               />
               <span>{ADMIN_PERMISSION_LABELS[permission]}</span>
             </label>
-          )
-        )}
-      </fieldset>
+          ))}
+        </fieldset>
+      </details>
       <button
         type="submit"
         disabled={pending}
-        className="text-sm font-semibold text-[var(--accent-strong)] outline-none hover:underline focus-visible:underline disabled:opacity-60"
+        className="rounded-xl bg-[var(--accent-strong)] px-3 py-1.5 text-sm font-semibold text-white outline-none hover:opacity-95 focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
       >
         {pending ? "Saving permissions…" : "Save permissions"}
       </button>
       <FormMessage state={state} />
     </form>
+  );
+}
+
+function AdminUserCard({ row }: { row: AdminUserListRow }) {
+  const [panel, setPanel] = useState<"none" | "view" | "edit">("none");
+  const statusLabel = adminUserStatusDisplayLabel(row.status);
+  const permissionsSummary = adminUserPermissionsSummaryLabel(row.permissions);
+
+  return (
+    <li
+      className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"
+      data-admin-user-card="true"
+    >
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-2">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              Name
+            </p>
+            <p className="mt-0.5 break-words font-semibold text-[var(--heading)]">
+              {row.name}
+              {row.isSelf ? (
+                <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
+                  (you)
+                </span>
+              ) : null}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              Email
+            </p>
+            <p className="mt-0.5 break-words text-sm text-[var(--text)]">
+              {row.email}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className="inline-flex rounded-lg bg-[var(--surface-2)] px-2 py-1 text-xs font-semibold text-[var(--heading)] ring-1 ring-[var(--border)]">
+              Role: {row.teamRoleLabel}
+            </span>
+            <span
+              className={`inline-flex rounded-lg px-2 py-1 text-xs font-semibold ${statusBadgeClass(row.status)}`}
+              title={row.status}
+            >
+              Status: {statusLabel}
+              <span className="sr-only"> ({row.status})</span>
+            </span>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              Main permissions
+            </p>
+            <p className="mt-0.5 text-sm text-[var(--heading)]">
+              {permissionsSummary}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              Last activity
+            </p>
+            <p className="mt-0.5 text-sm text-[var(--text-muted)]">
+              Last login: {row.lastAdminLoginLabel}
+            </p>
+          </div>
+          {row.status === "INVITED" ? (
+            <p className="text-xs text-[var(--text-muted)]">
+              Invitation pending — password not set yet.
+            </p>
+          ) : null}
+        </div>
+
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              setPanel((current) => (current === "view" ? "none" : "view"))
+            }
+            className="rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1.5 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--surface-2)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+          >
+            View Admin
+          </button>
+          {!row.isSelf ? (
+            <button
+              type="button"
+              onClick={() =>
+                setPanel((current) => (current === "edit" ? "none" : "edit"))
+              }
+              className="rounded-xl bg-[var(--accent-strong)] px-3 py-1.5 text-sm font-semibold text-white outline-none hover:opacity-95 focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            >
+              Edit Access
+            </button>
+          ) : null}
+          {!row.isSelf && row.status === "ACTIVE" ? (
+            <DisableButton row={row} label="Deactivate" />
+          ) : null}
+          {!row.isSelf && row.status === "INVITED" ? (
+            <DisableButton row={row} label="Deactivate" />
+          ) : null}
+          {!row.isSelf && row.status === "DISABLED" ? (
+            <EnableButton row={row} />
+          ) : null}
+        </div>
+      </div>
+
+      {panel === "view" ? (
+        <div
+          className="mt-4 space-y-3 border-t border-[var(--border)] pt-4"
+          data-admin-user-view="true"
+        >
+          <h3 className="text-sm font-semibold text-[var(--heading)]">
+            Admin overview
+          </h3>
+          <PermissionCategorySummary row={row} />
+          <p className="text-xs text-[var(--text-muted)]">
+            Role {row.teamRoleLabel} · Status {statusLabel} ({row.status}) ·
+            Last login {row.lastAdminLoginLabel}
+          </p>
+        </div>
+      ) : null}
+
+      {panel === "edit" && !row.isSelf ? (
+        <div
+          className="mt-4 space-y-4 border-t border-[var(--border)] pt-4"
+          data-admin-user-edit="true"
+        >
+          <h3 className="text-sm font-semibold text-[var(--heading)]">
+            Edit access
+          </h3>
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              Role
+            </p>
+            <AssignRoleForm row={row} />
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              Permissions
+            </p>
+            <PermissionsForm row={row} />
+          </div>
+          {row.status === "INVITED" ? (
+            <div className="flex flex-col items-start gap-2">
+              <ResendSetupLinkButton row={row} />
+              <DisableButton row={row} label="Remove access" />
+            </div>
+          ) : null}
+          {row.status === "ACTIVE" ? (
+            <DisableButton row={row} label="Disable" />
+          ) : null}
+          {row.status === "DISABLED" ? <EnableButton row={row} /> : null}
+        </div>
+      ) : null}
+
+      {row.isSelf && panel === "view" ? (
+        <p className="mt-3 text-xs text-[var(--text-muted)]">
+          Super Admin access is managed by another Super Admin.
+        </p>
+      ) : null}
+    </li>
   );
 }
 
@@ -335,80 +539,14 @@ export function AdminUsersTable({ rows }: { rows: AdminUserListRow[] }) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-[var(--border)]">
-      <table className="min-w-full text-left text-sm">
-        <thead className="border-b border-[var(--border)] bg-[var(--surface-2)] text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-          <tr>
-            <th className="px-3 py-3 font-semibold">Name</th>
-            <th className="px-3 py-3 font-semibold">Email</th>
-            <th className="px-3 py-3 font-semibold">Role</th>
-            <th className="px-3 py-3 font-semibold">Status</th>
-            <th className="px-3 py-3 font-semibold">Last login</th>
-            <th className="px-3 py-3 font-semibold">Access</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr
-              key={row.id}
-              className="border-b border-[var(--border)] last:border-b-0 align-top"
-            >
-              <td className="px-3 py-3 font-medium text-[var(--heading)]">
-                {row.name}
-                {row.isSelf ? (
-                  <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
-                    (you)
-                  </span>
-                ) : null}
-              </td>
-              <td className="px-3 py-3 text-[var(--text)]">{row.email}</td>
-              <td className="px-3 py-3 text-[var(--text)]">
-                {row.isSelf ? (
-                  <span>{row.teamRoleLabel}</span>
-                ) : (
-                  <AssignRoleForm row={row} />
-                )}
-              </td>
-              <td className="px-3 py-3">
-                <span
-                  className={`inline-flex rounded-lg px-2 py-1 text-xs font-semibold ${statusBadgeClass(row.status)}`}
-                >
-                  {row.status}
-                </span>
-                {row.status === "INVITED" ? (
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">
-                    Invitation pending — password not set yet.
-                  </p>
-                ) : null}
-              </td>
-              <td className="px-3 py-3 text-[var(--text-muted)]">
-                {row.lastAdminLoginLabel}
-              </td>
-              <td className="px-3 py-3">
-                {row.isSelf ? (
-                  <p className="text-xs text-[var(--text-muted)]">
-                    Super Admin access is managed by another Super Admin.
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    <PermissionsForm row={row} />
-                    {row.status === "INVITED" ? (
-                      <div className="flex flex-col items-start gap-2">
-                        <ResendSetupLinkButton row={row} />
-                        <DisableButton row={row} label="Remove access" />
-                      </div>
-                    ) : null}
-                    {row.status === "ACTIVE" ? (
-                      <DisableButton row={row} label="Disable" />
-                    ) : null}
-                    {row.status === "DISABLED" ? <EnableButton row={row} /> : null}
-                  </div>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ul
+      className="space-y-3"
+      aria-label="Administrators"
+      data-admin-users-simple-list="true"
+    >
+      {rows.map((row) => (
+        <AdminUserCard key={row.id} row={row} />
+      ))}
+    </ul>
   );
 }

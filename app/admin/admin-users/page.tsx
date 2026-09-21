@@ -41,10 +41,10 @@ export default async function AdminUsersPage() {
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Admin Users</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Super Admin only. Create team members, assign roles, and control
-          exactly which admin pages they can use. Disabled admins cannot sign
-          in. Password hashes, setup links, and session details are never shown
-          here.
+          Manage who can use the admin portal. Create team members, assign
+          roles, and review access in plain language. Disabled admins cannot
+          sign in. Password hashes, setup links, and session details are never
+          shown here.
         </p>
       </header>
 

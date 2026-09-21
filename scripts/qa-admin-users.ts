@@ -17,6 +17,10 @@ async function main() {
     resolveAdminAccountStatus,
     isActiveAdminForProtection,
   } = await import("../app/lib/auth/adminAccessShared");
+  const {
+    summarizeAdminPermissionCategories,
+    adminUserStatusDisplayLabel,
+  } = await import("../app/lib/admin/adminUsersShared");
 
   assert.equal(
     resolveAdminAccountStatus({
@@ -78,6 +82,25 @@ async function main() {
       emailVerifiedAt: new Date(),
     }),
     true
+  );
+  assert.equal(adminUserStatusDisplayLabel("ACTIVE"), "Active");
+  assert.equal(adminUserStatusDisplayLabel("DISABLED"), "Inactive");
+  assert.equal(adminUserStatusDisplayLabel("INVITED"), "Invited");
+  const categorySummary = summarizeAdminPermissionCategories([
+    "CUSTOMERS_VIEW",
+    "ORDERS_VIEW",
+  ]);
+  assert.equal(
+    categorySummary.find((c) => c.id === "customers")?.allowed,
+    true
+  );
+  assert.equal(
+    categorySummary.find((c) => c.id === "orders")?.allowed,
+    true
+  );
+  assert.equal(
+    categorySummary.find((c) => c.id === "payments")?.allowed,
+    false
   );
   console.log("PASS status_resolution_and_last_active_definition");
 
@@ -267,21 +290,57 @@ async function main() {
 
   const page = read("app/admin/admin-users/page.tsx");
   const panel = read("app/components/admin/AdminUsersPanel.tsx");
+  const shared = read("app/lib/admin/adminUsersShared.ts");
+  const perms = read("app/lib/admin/adminPermissions.ts");
   const nav = read("app/components/admin/AdminNav.tsx");
   assert.match(nav, /\/admin\/admin-users/);
   assert.match(nav, /Admin Users/);
   assert.match(page, /InviteAdminForm/);
   assert.match(page, /AdminUsersTable/);
+  assert.match(page, /assertAdminPermission/);
+  assert.match(page, /MANAGE_ADMINS/);
+  assert.match(page, /requireRole\(["']ADMIN["']\)/);
   assert.match(panel, /Create admin user|Invite Admin/);
   assert.match(panel, /ACTIVE|INVITED|DISABLED/);
+  assert.match(panel, /adminUserStatusDisplayLabel|Status:/);
+  assert.match(shared, /return "Active"/);
+  assert.match(shared, /return "Inactive"/);
   assert.match(panel, /Disable|Deactivate/);
   assert.match(panel, /Enable|Reactivate/);
   assert.match(panel, /Assign role/);
   assert.match(panel, /Save permissions|Full access/);
-  assert.match(panel, /Last login/);
+  assert.match(panel, /Last login|Last activity/);
+  assert.match(panel, /View Admin/);
+  assert.match(panel, /Edit Access/);
+  assert.match(panel, /data-admin-users-simple-list/);
+  assert.match(panel, /data-admin-user-card/);
+  assert.match(panel, /summarizeAdminPermissionCategories|data-admin-permission-categories/);
+  assert.match(panel, /Allowed|Not Allowed/);
+  assert.match(shared, /emoji: "👥"/);
+  assert.match(shared, /label: "Customers"/);
+  assert.match(shared, /emoji: "📦"/);
+  assert.match(shared, /label: "Orders"/);
+  assert.match(shared, /emoji: "💳"/);
+  assert.match(shared, /label: "Payments"/);
+  assert.match(shared, /emoji: "⚙️"/);
+  assert.match(shared, /label: "Operations"/);
+  assert.match(shared, /emoji: "🔒"/);
+  assert.match(shared, /label: "Security"/);
+  assert.match(shared, /emoji: "🛠"/);
+  assert.match(shared, /label: "Settings"/);
+  assert.match(
+    panel,
+    /Changing admin access affects what this user can manage/
+  );
+  assert.match(panel, /Advanced permission details/);
   assert.match(panel, /Resend setup link/);
   assert.match(panel, /Invitation pending/);
   assert.match(panel, /isSelf/);
+  assert.match(shared, /summarizeAdminPermissionCategories/);
+  assert.match(shared, /ADMIN_PERMISSION_UX_CATEGORIES/);
+  assert.match(perms, /hasAdminPermission/);
+  assert.match(perms, /resolveAdminPermissions/);
+  assert.match(perms, /MANAGE_ADMINS/);
   assert.doesNotMatch(panel, /passwordHash|resetToken|adminSessionVersion|rawToken/);
   assert.doesNotMatch(page, /passwordHash|resetToken|adminSessionVersion|rawToken/);
   assert.match(page, /never\s+shown/i);
