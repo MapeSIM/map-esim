@@ -34,6 +34,7 @@ import {
 import {
   loadPublicOffersForCountry,
   withPublicOfferRefreshTimeout,
+  type PublicOfferRefreshMode,
 } from "@/app/lib/vesim/publicOfferSnapshotRefresh";
 import { unstable_cache } from "next/cache";
 import {
@@ -367,9 +368,13 @@ const loadCachedFlagOffPublicOffersForCountry = unstable_cache(
  * publicReadsOn=false or missing tables: 300s Data Cache of strict live lists.
  * publicReadsOn=true: durable PostgreSQL snapshot only; missing → throw.
  * Never use for purchase validation.
+ *
+ * refreshMode defaults to blocking (browse/API). Soft order-catalog reads pass
+ * "background" so stale refresh does not block the response.
  */
 export async function fetchPublicOffersForCountry(
-  country: string
+  country: string,
+  options?: { refreshMode?: PublicOfferRefreshMode }
 ): Promise<VesimOffer[]> {
   const key = publicOffersCountryKey(country);
   if (!key) {
@@ -384,6 +389,7 @@ export async function fetchPublicOffersForCountry(
         PUBLIC_OFFER_REFRESH_TIMEOUT_MS
       ),
     loadFlagOffCached: loadCachedFlagOffPublicOffersForCountry,
+    refreshMode: options?.refreshMode,
   });
   return applyAsiaPublicCatalog(
     key,

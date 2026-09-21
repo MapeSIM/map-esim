@@ -15,14 +15,52 @@ type SessionPayload = {
   } | null;
 } | null;
 
+/** Routes where login/logout redirects commonly land or start. */
+const AUTH_FLOW_PATH =
+  /^\/(signin|signup|oauth-consent|verify-email|verify-reset-code|forgot-password|reset-password|admin-setup-password)(\/|$)/i;
+
+const PROTECTED_PREFIXES = [
+  "/account",
+  "/partner",
+  "/admin",
+  "/dashboard",
+  "/oauth-consent",
+] as const;
+
+function isProtectedPath(pathname: string): boolean {
+  return PROTECTED_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
+
+/**
+ * Anonymous users: skip marketing-only path hops.
+ * Always sync when authenticated, or when crossing auth/protected boundaries
+ * (post-login / post-logout redirects).
+ */
+function shouldSyncOnPathnameChange(options: {
+  previousPathname: string | null;
+  nextPathname: string;
+  knownAuthenticated: boolean;
+}): boolean {
+  if (options.knownAuthenticated) return true;
+  const prev = options.previousPathname;
+  const next = options.nextPathname;
+  if (!prev) return true;
+  if (AUTH_FLOW_PATH.test(prev) || AUTH_FLOW_PATH.test(next)) return true;
+  if (isProtectedPath(prev) || isProtectedPath(next)) return true;
+  return false;
+}
+
 /**
  * Client session island for the public shell (Phase 1: root layout stays
  * free of auth()/cookies() so marketing/catalog HTML can cache).
  *
  * Single-flight /api/auth/session sync:
- * - mount + pathname change
- * - focus / visibility / pageshow
- * - next-auth BroadcastChannel
+ * - mount
+ * - pathname change when authenticated or crossing auth/protected boundaries
+ * - focus / visibility / pageshow when authenticated (anonymous skipped)
+ * - next-auth BroadcastChannel (always — cross-tab login/logout)
  * - Sign out form submit (same-path soft redirect)
  *
  * user.id → always apply Account. Logged-out applies only for the latest request.
@@ -37,8 +75,11 @@ export default function NavbarShell() {
   const requestIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
+  const knownAuthenticatedRef = useRef(false);
+  const previousPathnameRef = useRef<string | null>(null);
 
   const applyLoggedOut = useCallback(() => {
+    knownAuthenticatedRef.current = false;
     setAuthHref("/signin");
     setAuthLabel("Sign in");
     setCustomer(null);
@@ -49,6 +90,7 @@ export default function NavbarShell() {
     (
       session: NonNullable<NonNullable<SessionPayload>["user"]> & { id: string }
     ) => {
+      knownAuthenticatedRef.current = true;
       const sessionRole = coerceAppRole(session.role);
       const { href, label } = navAuthLink({
         userId: session.id,
@@ -137,10 +179,13 @@ export default function NavbarShell() {
       if (document.visibilityState && document.visibilityState !== "visible") {
         return;
       }
+      // Anonymous: skip focus/visibility churn (BroadcastChannel covers cross-tab auth).
+      if (!knownAuthenticatedRef.current) return;
       void syncSession();
     }
 
     function onPageShow() {
+      if (!knownAuthenticatedRef.current) return;
       void syncSession();
     }
 
@@ -178,8 +223,19 @@ export default function NavbarShell() {
     };
   }, [applyLoggedOut, syncSession]);
 
-  // Mount + soft navigations (post-login / post-logout redirects).
+  // Mount + selective path navigations (post-login / post-logout / authenticated).
   useEffect(() => {
+    const previous = previousPathnameRef.current;
+    previousPathnameRef.current = pathname;
+    if (
+      !shouldSyncOnPathnameChange({
+        previousPathname: previous,
+        nextPathname: pathname,
+        knownAuthenticated: knownAuthenticatedRef.current,
+      })
+    ) {
+      return;
+    }
     void syncSession();
   }, [pathname, syncSession]);
 

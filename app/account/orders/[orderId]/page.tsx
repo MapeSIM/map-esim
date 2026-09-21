@@ -137,7 +137,6 @@ export default async function AccountOrderDetailPage({
                     width={56}
                     height={42}
                     className="h-8 w-auto object-cover sm:h-9"
-                    unoptimized
                   />
                 </div>
               ) : null}

@@ -166,6 +166,7 @@
     "@auth/prisma-adapter": "^2.11.3",
     "@prisma/client": "^6.19.3",
     "@vercel/blob": "^2.8.0",
+    "@vercel/speed-insights": "^2.0.0",
     "bcryptjs": "^3.0.3",
     "https-proxy-agent": "^9.1.0",
     "lucide-react": "^1.28.0",

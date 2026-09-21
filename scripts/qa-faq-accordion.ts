@@ -1,5 +1,5 @@
 /**
- * Offline QA: exclusive FAQ accordion UX (display only).
+ * Offline QA: server-friendly FAQ accordion (native details/summary).
  */
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
@@ -18,13 +18,13 @@ function main() {
   const how = read("app/how-it-works/page.tsx");
   const countrySeo = read("app/components/countries/CountrySeoContent.tsx");
 
-  assert.match(accordion, /"use client"/);
+  assert.doesNotMatch(accordion, /["']use client["']/);
+  assert.doesNotMatch(accordion, /useState/);
   assert.match(accordion, /defaultOpenFirst = true/);
-  assert.match(accordion, /useState<number \| null>/);
-  assert.match(accordion, /defaultOpenFirst && items\.length > 0 \? 0 : null/);
-  assert.match(accordion, /current === index \? null : index/);
-  assert.match(accordion, /aria-expanded=\{open\}/);
-  assert.match(accordion, /aria-controls=\{panelId\}/);
+  assert.match(accordion, /<details/);
+  assert.match(accordion, /<summary/);
+  assert.match(accordion, /name=\{groupName\}/);
+  assert.match(accordion, /openByDefault/);
   console.log("PASS accordion_contract");
 
   assert.match(home, /FaqAccordion/);
@@ -34,9 +34,6 @@ function main() {
   assert.match(countrySeo, /FaqAccordion/);
   assert.match(countrySeo, /items=\{content\.faqs\}/);
   assert.match(countrySeo, /faqPage\(/);
-  assert.doesNotMatch(home, /<details/);
-  assert.doesNotMatch(how, /<details/);
-  assert.doesNotMatch(countrySeo, /<details/);
   console.log("PASS surfaces_wired");
 
   console.log("ALL_QA_PASSED=faq-accordion");

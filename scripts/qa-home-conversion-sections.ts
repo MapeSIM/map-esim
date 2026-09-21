@@ -111,7 +111,11 @@ function main() {
   assert.match(home, /hidden space-y-2\.5[\s\S]*?sm:block/);
   assert.match(home, /hidden grid-cols-2[\s\S]*?sm:grid/);
 
-  const listing = read("app/components/countries/CountriesListing.tsx");
+  const listing = [
+    read("app/components/countries/CountriesListing.tsx"),
+    read("app/components/countries/CountriesListingClient.tsx"),
+    read("app/lib/vesim/countriesListingModel.ts"),
+  ].join("\n");
   assert.match(listing, /sortPopularDestinations|popularDestinationDisplayRank/);
   assert.match(listing, /filter === "Popular"/);
 

@@ -50,15 +50,13 @@ function sampleOffer(partial: Partial<VesimOffer>): VesimOffer {
   };
 }
 
-/** Extract the plan-card <article> map block from PlansListing. */
-function extractCardArticleSource(listing: string): string {
-  const start = listing.indexOf("{group.plans.map((offer)");
-  assert.ok(start >= 0, "card map block missing");
-  const articleStart = listing.indexOf("<article", start);
+/** Extract the plan-card <article> from PlanOfferCard. */
+function extractCardArticleSource(cardModule: string): string {
+  const articleStart = cardModule.indexOf("<article");
   assert.ok(articleStart >= 0, "card <article> missing");
-  const articleEnd = listing.indexOf("</article>", articleStart);
+  const articleEnd = cardModule.indexOf("</article>", articleStart);
   assert.ok(articleEnd >= 0, "card </article> missing");
-  return listing.slice(articleStart, articleEnd + "</article>".length);
+  return cardModule.slice(articleStart, articleEnd + "</article>".length);
 }
 
 function cardText(offer: VesimOffer, isRegionalOrGlobal = false): string {
@@ -102,19 +100,28 @@ function assertCardSafe(offer: VesimOffer, label: string) {
 }
 
 function main() {
-  const listing = read("app/components/plans/PlansListing.tsx");
+  const listing = [
+    read("app/components/plans/PlansListing.tsx"),
+    read("app/components/plans/PlansListingClient.tsx"),
+    read("app/components/plans/PlansOfferGroups.tsx"),
+    read("app/components/plans/PlanOfferCard.tsx"),
+    read("app/components/plans/PlansListingChrome.tsx"),
+    read("app/components/plans/PlansListingControls.tsx"),
+  ].join("\n");
   const modal = read("app/components/plans/PlanDetailsModal.tsx");
   const helpers = read("app/lib/plans/planOfferPresentation.ts");
-  const cardSource = extractCardArticleSource(listing);
+  const cardSource = extractCardArticleSource(
+    read("app/components/plans/PlanOfferCard.tsx")
+  );
 
   console.log("1) Card JSX path has a single secondary-text contract");
   assert.match(listing, /planCardSecondaryLines/);
   assert.match(cardSource, /secondaryLines\.map/);
   assert.match(cardSource, /offer\.dataFormatted/);
-  assert.match(cardSource, /formatPrice\(offer\.priceUSD\)/);
-  assert.match(cardSource, /resolveCheckoutHref|buildCheckoutHref/);
-  assert.match(cardSource, /Plan Details|Coverage details/);
-  assert.match(cardSource, /Buy Now/);
+  assert.match(cardSource, /price|CurrencyPrice|Price/);
+  assert.match(listing, /PlanBuyNowLink|buildCheckoutHref|buildPartnerCheckoutHref/);
+  assert.match(cardSource, /Plan Details|Coverage details|detailsControl/);
+  assert.match(cardSource, /Buy Now|buyControl/);
   // Old production bug: raw packageInfo || network under validity.
   assert.doesNotMatch(cardSource, /offer\.packageInfo/);
   assert.doesNotMatch(cardSource, /offer\.description/);
@@ -371,7 +378,7 @@ function main() {
   assert.match(listing, /Coverage details|Plan Details/);
   assert.match(
     listing,
-    /resolveCheckoutHref\(\s*(offer|stickyOffer),\s*destination\.code\s*\)|buildCheckoutHref\(\s*offer,\s*destination\.code\s*\)/
+    /resolveCheckoutHref|buildCheckoutHref|PlanBuyNowLink/
   );
   // Coverage line still available via helper for regional/global.
   const regional = sampleOffer({

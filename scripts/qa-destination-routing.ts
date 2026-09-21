@@ -38,7 +38,11 @@ function asDestination(raw: {
 
 function main() {
   const destinationsSrc = read("app/lib/vesim/destinations.ts");
-  const listing = read("app/components/countries/CountriesListing.tsx");
+  const listing = [
+    read("app/components/countries/CountriesListing.tsx"),
+    read("app/components/countries/CountriesListingClient.tsx"),
+    read("app/lib/vesim/countriesListingModel.ts"),
+  ].join("\n");
   const countryPage = readHead("app/countries/[id]/page.tsx");
 
   console.log("1) Non-ISO provider codes get distinct route identity");

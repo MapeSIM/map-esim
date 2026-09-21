@@ -20,7 +20,10 @@ function read(rel: string): string {
 
 function main() {
   const page = read("app/countries/page.tsx");
-  const listing = read("app/components/countries/CountriesListing.tsx");
+  const listing = [
+    read("app/components/countries/CountriesListing.tsx"),
+    read("app/components/countries/CountriesListingClient.tsx"),
+  ].join("\n");
   const destinations = read("app/lib/vesim/destinations.ts");
   const api = read("app/api/vesim/destinations/route.ts");
   const pkg = read("package.json");
@@ -38,7 +41,14 @@ function main() {
   console.log("   ok");
 
   console.log("2) Client soft-refresh never clears last good catalog");
-  assert.match(listing, /^["']use client["']/m);
+  assert.doesNotMatch(
+    read("app/components/countries/CountriesListing.tsx"),
+    /^["']use client["']/m
+  );
+  assert.match(
+    read("app/components/countries/CountriesListingClient.tsx"),
+    /^["']use client["']/m
+  );
   assert.match(listing, /parsePublicDestinations/);
   assert.match(listing, /shouldAcceptPublicDestinationCatalog/);
   assert.match(listing, /fetch\(["'`]\/api\/vesim\/destinations/);

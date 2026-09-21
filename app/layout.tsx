@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import NavbarShell from "./components/NavbarShell";
 import Footer from "./components/Footer";
@@ -7,7 +8,7 @@ import PreferenceStorageSync from "./components/cookies/PreferenceStorageSync";
 import { CurrencyProvider } from "./components/currency/CurrencyProvider";
 import JsonLd from "./components/seo/JsonLd";
 import ThemeProvider from "./components/theme/ThemeProvider";
-import WhatsAppSupportButton from "./components/support/WhatsAppSupportButton";
+import DeferredWhatsAppSupportButton from "./components/support/DeferredWhatsAppSupportButton";
 import HideOnShare from "./components/share/HideOnShare";
 import { BRAND_NAME, BRAND_SITE_URL, BRAND_TAGLINE } from "@/app/lib/brand";
 import {
@@ -77,11 +78,12 @@ export default function RootLayout({
               {children}
               <HideOnShare>
                 <Footer />
-                <WhatsAppSupportButton />
+                <DeferredWhatsAppSupportButton />
               </HideOnShare>
             </CurrencyProvider>
           </ThemeProvider>
         </CookieConsentProvider>
+        <SpeedInsights />
       </body>
     </html>
   );

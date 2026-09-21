@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import dynamic from "next/dynamic";
 import {
   acceptAllConsent,
   COOKIE_CONSENT_NAME,
@@ -25,9 +26,19 @@ import {
   setPreferencePersistenceAllowed,
 } from "@/app/lib/cookies/preferenceStorage";
 import CookieConsentBanner from "@/app/components/cookies/CookieConsentBanner";
-import CookiePreferencesModal from "@/app/components/cookies/CookiePreferencesModal";
-import ConsentScriptGate from "@/app/components/cookies/ConsentScriptGate";
 import HideOnShare from "@/app/components/share/HideOnShare";
+
+/** Preferences UI is unused until opened — keep it off the initial consent chunk. */
+const CookiePreferencesModal = dynamic(
+  () => import("@/app/components/cookies/CookiePreferencesModal"),
+  { ssr: false }
+);
+
+/** Tawk gate is non-critical for first paint; consent rules stay inside the gate. */
+const ConsentScriptGate = dynamic(
+  () => import("@/app/components/cookies/ConsentScriptGate"),
+  { ssr: false }
+);
 
 type CookieConsentContextValue = {
   consent: CookieConsentRecord | null;
@@ -80,6 +91,8 @@ export default function CookieConsentProvider({
     if (initialConsent) return;
     const stored = parseCookieConsent(readBrowserCookie(COOKIE_CONSENT_NAME));
     if (!stored) return;
+    // Intentional: client-only cookie rehydrate after cacheable SSR shell.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- browser cookie sync
     setConsent(stored);
     setBannerVisible(false);
   }, [initialConsent]);
@@ -176,7 +189,9 @@ export default function CookieConsentProvider({
       <HideOnShare>
         <ConsentScriptGate />
         <CookieConsentBanner pending={pending} />
-        <CookiePreferencesModal pending={pending} />
+        {preferencesOpen ? (
+          <CookiePreferencesModal pending={pending} />
+        ) : null}
       </HideOnShare>
     </CookieConsentContext.Provider>
   );

@@ -99,8 +99,10 @@ function main() {
 
   const accordion = read("app/components/faq/FaqAccordion.tsx");
   assert.match(accordion, /defaultOpenFirst/);
-  assert.match(accordion, /aria-expanded/);
-  assert.match(accordion, /current === index \? null : index/);
+  assert.match(accordion, /<details/);
+  assert.match(accordion, /<summary/);
+  assert.match(accordion, /name=\{groupName\}/);
+  assert.doesNotMatch(accordion, /["']use client["']/);
   console.log("PASS faq_accordion_behavior");
 
   assert.match(graph, /export function faqPage/);

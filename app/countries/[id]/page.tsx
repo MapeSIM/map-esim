@@ -68,7 +68,11 @@ async function loadPublicOffers(countryCode: string): Promise<{
   error: string;
 }> {
   try {
-    const raw = await fetchPublicOffersForCountry(countryCode);
+    // Snapshot-first: return last-good immediately; leased VeSIM refresh runs
+    // after the response. Checkout still uses verifyOfferAuthoritative (live).
+    const raw = await fetchPublicOffersForCountry(countryCode, {
+      refreshMode: "background",
+    });
     return { offers: toPublicVesimOffers(raw), error: "" };
   } catch {
     return {

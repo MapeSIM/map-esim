@@ -26,7 +26,15 @@ function read(rel: string): string {
 
 function main() {
   const presentation = read("app/lib/vesim/destinationPresentation.ts");
-  const listing = read("app/components/countries/CountriesListing.tsx");
+  const listing = [
+    read("app/components/countries/CountriesListing.tsx"),
+    read("app/components/countries/CountriesListingClient.tsx"),
+    read("app/components/countries/CountriesDestinationGrid.tsx"),
+    read("app/components/countries/CompactDestinationCard.tsx"),
+    read("app/components/countries/DestinationFlagBadge.tsx"),
+    read("app/components/countries/CountriesListingControls.tsx"),
+    read("app/lib/vesim/countriesListingModel.ts"),
+  ].join("\n");
   const destinations = read("app/lib/vesim/destinations.ts");
 
   console.log("1) Raw code display normalization");

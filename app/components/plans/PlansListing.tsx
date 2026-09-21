@@ -1,402 +1,53 @@
-"use client";
-
-import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
-import dynamic from "next/dynamic";
 import Link from "next/link";
-import Image from "next/image";
-import { useSearchParams } from "next/navigation";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Filter,
-  Globe2,
-  MapPinned,
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import type { ReactNode } from "react";
 import type { VesimOffer } from "@/app/lib/vesim/offers";
 import {
   destinationPath,
   type VesimDestination,
 } from "@/app/lib/vesim/destinations";
-import {
-  destinationDisplayName,
-  resolveDestinationFlagVisual,
-} from "@/app/lib/vesim/destinationPresentation";
-import { countriesListingHrefFromPlanParams } from "@/app/lib/vesim/countriesListingReturn";
-import { PAKISTAN_FLAG_PUBLIC_PATH } from "@/app/lib/seo/siteGraph";
-import SortSelect from "@/app/components/plans/SortSelect";
-import { useCurrency } from "@/app/components/currency/CurrencyProvider";
-import {
-  buildCheckoutHref,
-  buildPartnerCheckoutHref,
-  filterOffers,
-  formatValidityCardValue,
-  formatValidityPill,
-  groupOffersByDuration,
-  isUnlimitedOffer,
-  sortOffers,
-  summarizeCategories,
-  summarizePlanTypes,
-  uniqueCoveredCountries,
-  uniqueDataAmounts,
-  uniqueValidities,
-  type CategoryFilter,
-  type PlanFiltersState,
-  type PlanTypeFilter,
-  type SortOption,
-} from "@/app/lib/plans/plan-utils";
-import { planPurchaseTrustLine } from "@/app/lib/plans/planCardConversion";
-import {
-  planCardLineLabel,
-  planCardSecondaryLines,
-} from "@/app/lib/plans/planOfferPresentation";
+import { destinationDisplayName } from "@/app/lib/vesim/destinationPresentation";
+import CurrencyPrice from "@/app/components/plans/CurrencyPrice";
+import PlansListingBackLink from "@/app/components/plans/PlansListingBackLink";
+import PlansListingClient from "@/app/components/plans/PlansListingClient";
+import PlansListingFlag from "@/app/components/plans/PlansListingFlag";
+import PlansOfferGroups from "@/app/components/plans/PlansOfferGroups";
+import { buildDefaultPlansListingModel } from "@/app/lib/plans/planListingModel";
 
-const PlanDetailsModal = dynamic(
-  () => import("@/app/components/plans/PlanDetailsModal"),
-  { ssr: false }
-);
-
-type PlansListingProps = {
+export type PlansListingProps = {
   destination: VesimDestination;
   offers: VesimOffer[];
   loading?: boolean;
   error?: string;
   countryNames?: Record<string, string>;
   relatedRegional?: VesimDestination | null;
-  checkoutHref?: (offer: VesimOffer, destinationCode: string) => string;
   children?: ReactNode;
 };
 
-const SORT_OPTIONS: { value: SortOption; label: string }[] = [
-  { value: "price-asc", label: "Price: Low to High" },
-  { value: "price-desc", label: "Price: High to Low" },
-  { value: "data-asc", label: "Data: Low to High" },
-  { value: "data-desc", label: "Data: High to Low" },
-  { value: "validity-asc", label: "Validity: Shortest" },
-  { value: "validity-desc", label: "Validity: Longest" },
-];
-
-function PlansListingFlag({
-  destination,
-  size = "hero",
-}: {
-  destination: VesimDestination;
-  size?: "hero" | "compact";
-}) {
-  const [imageFailed, setImageFailed] = useState(false);
-  const visual = resolveDestinationFlagVisual(destination);
-  const imageSrc =
-    destination.code.toUpperCase() === "PK"
-      ? PAKISTAN_FLAG_PUBLIC_PATH
-      : visual.type === "image"
-        ? visual.src
-        : null;
-
-  if (destination.kind === "regional") {
-    return (
-      <span className="flex h-full w-full flex-col items-center justify-center rounded-2xl bg-[var(--accent-strong)]/10 text-[var(--accent-strong)]">
-        <MapPinned className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
-      </span>
-    );
-  }
-
-  if (destination.kind === "global") {
-    return (
-      <Globe2 className="h-6 w-6 text-[var(--accent-strong)] sm:h-7 sm:w-7" />
-    );
-  }
-
-  if (imageSrc && !imageFailed) {
-    return (
-      <Image
-        src={imageSrc}
-        alt=""
-        width={size === "hero" ? 64 : 40}
-        height={size === "hero" ? 64 : 28}
-        sizes={size === "hero" ? "64px" : "40px"}
-        priority={size === "hero"}
-        onError={() => setImageFailed(true)}
-        className={
-          size === "hero"
-            ? "h-full w-full rounded-2xl object-cover"
-            : "h-7 w-10 rounded-md object-cover"
-        }
-      />
-    );
-  }
-
-  if (visual.type === "emoji") {
-    return (
-      <span
-        className={
-          size === "hero" ? "text-2xl sm:text-3xl" : "text-2xl leading-none"
-        }
-        aria-hidden="true"
-      >
-        {visual.emoji}
-      </span>
-    );
-  }
-
-  return (
-    <span
-      className="text-xs font-bold tracking-wide text-[var(--heading)] sm:text-sm"
-      aria-hidden="true"
-    >
-      {visual.type === "initials"
-        ? visual.initials
-        : destination.code.trim().toUpperCase().slice(0, 4) || "?"}
-    </span>
-  );
-}
-
-function PillButton({
-  active,
-  onClick,
-  children,
-  disabled = false,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`
-        inline-flex h-10 items-center justify-center rounded-full
-        border px-3 text-xs font-semibold transition
-        focus-visible:outline-none focus-visible:ring-2
-        focus-visible:ring-[var(--accent-strong)]/55 focus-visible:ring-offset-2
-        focus-visible:ring-offset-[var(--page-bg)]
-        disabled:cursor-not-allowed disabled:opacity-45
-        sm:px-4 sm:text-sm
-        ${
-          active
-            ? "border-[var(--accent-strong)] bg-[var(--accent-strong)] text-[var(--accent-ink)] shadow-[0_0_0_1px_rgba(124,255,0,0.25)]"
-            : "border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text)] hover:border-[var(--border-hover)] hover:bg-[var(--surface-2)]"
-        }
-      `}
-    >
-      {children}
-    </button>
-  );
-}
-
-function FilterChip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`
-        rounded-full border px-3.5 py-2 text-xs font-semibold transition
-        ${
-          active
-            ? "border-[var(--accent-strong)] bg-[var(--accent-strong)] text-[var(--accent-ink)] shadow-[0_0_0_1px_rgba(124,255,0,0.2)]"
-            : "border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--text)] hover:border-[var(--border-hover)]"
-        }
-      `}
-    >
-      {children}
-    </button>
-  );
-}
-
-export default function PlansListing(props: PlansListingProps) {
-  return (
-    <Suspense fallback={<PlansListingContent {...props} />}>
-      <PlansListingContent {...props} />
-    </Suspense>
-  );
-}
-
-function PlansListingContent({
+/**
+ * Destination plans shell (Server Component).
+ * Default plan cards render as RSC HTML; filters/sort/modal stay in client islands.
+ * Do not load the main plan grid with next/dynamic ssr:false.
+ */
+export default function PlansListing({
   destination,
   offers,
   loading = false,
   error = "",
   countryNames = {},
   relatedRegional = null,
-  checkoutHref,
   children,
 }: PlansListingProps) {
-  const isRegionalOrGlobal =
-    destination.kind === "regional" || destination.kind === "global";
-
-  const [planType, setPlanType] = useState<PlanTypeFilter>("data");
-  const [category, setCategory] = useState<CategoryFilter>("standard");
-  const [dataAmounts, setDataAmounts] = useState<string[]>([]);
-  const [validities, setValidities] = useState<number[]>([]);
-  const [coveredCountries, setCoveredCountries] = useState<string[]>([]);
-  const [sort, setSort] = useState<SortOption>("price-asc");
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [selectedOffer, setSelectedOffer] = useState<VesimOffer | null>(null);
-  const [signedIn, setSignedIn] = useState(false);
-  const [partnerCheckout, setPartnerCheckout] = useState(false);
-  const { formatPrice } = useCurrency();
-  const purchaseTrustLine = planPurchaseTrustLine(signedIn);
-  const searchParams = useSearchParams();
-  const destinationsBackHref = useMemo(
-    () => countriesListingHrefFromPlanParams((key) => searchParams.get(key)),
-    [searchParams]
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/auth/session", { cache: "no-store" })
-      .then((res) => res.json())
-      .then((session: { user?: { role?: string } } | null) => {
-        if (cancelled || !session?.user) return;
-        setSignedIn(true);
-        if (session.user.role === "PARTNER") {
-          setPartnerCheckout(true);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const resolveCheckoutHref =
-    checkoutHref ??
-    (partnerCheckout ? buildPartnerCheckoutHref : buildCheckoutHref);
-
-  const planTypeSummary = useMemo(() => summarizePlanTypes(offers), [offers]);
-  const categorySummary = useMemo(() => summarizeCategories(offers), [offers]);
-  const showPlanTypeToggle =
-    planTypeSummary.dataOnly > 0 && planTypeSummary.withVoice > 0;
-
-  // Show package tabs only when unlimited plans exist (avoid empty/disabled Unlimited).
-  const showPackageTabs = offers.length > 0 && categorySummary.unlimited > 0;
-  const unlimitedTabEnabled = categorySummary.unlimited > 0;
-
-  // Clamp via derived state so disabled Unlimited never filters/shows as active.
-  const activeCategory: CategoryFilter =
-    showPackageTabs && category === "unlimited" && unlimitedTabEnabled
-      ? "unlimited"
-      : "standard";
-
-  const categoryOffers = useMemo(
-    () =>
-      offers.filter((offer) =>
-        activeCategory === "unlimited"
-          ? isUnlimitedOffer(offer)
-          : !isUnlimitedOffer(offer)
-      ),
-    [offers, activeCategory]
-  );
-
-  const filters: PlanFiltersState = useMemo(
-    () => ({
-      planType: showPlanTypeToggle ? planType : "data",
-      category: activeCategory,
-      dataAmounts,
-      validities,
-      coveredCountries,
-    }),
-    [
-      showPlanTypeToggle,
-      planType,
-      activeCategory,
-      dataAmounts,
-      validities,
-      coveredCountries,
-    ]
-  );
-
-  const filtered = useMemo(
-    () => sortOffers(filterOffers(offers, filters), sort),
-    [offers, filters, sort]
-  );
-
-  const groups = useMemo(
-    () => groupOffersByDuration(filtered, sort),
-    [filtered, sort]
-  );
-  // Filter pills reflect the active package tab only.
-  const dataOptions = useMemo(
-    () => uniqueDataAmounts(categoryOffers),
-    [categoryOffers]
-  );
-  const validityOptions = useMemo(
-    () => uniqueValidities(categoryOffers),
-    [categoryOffers]
-  );
-  const coverageOptions = useMemo(
-    () =>
-      isRegionalOrGlobal ? uniqueCoveredCountries(categoryOffers) : [],
-    [isRegionalOrGlobal, categoryOffers]
-  );
-
-  function selectCategory(next: CategoryFilter) {
-    if (next === "unlimited" && !unlimitedTabEnabled) return;
-    setCategory(next);
-    setDataAmounts([]);
-    setValidities([]);
-    setCoveredCountries([]);
-  }
-
-  const activeFilterCount =
-    dataAmounts.length + validities.length + coveredCountries.length;
-
-  function toggleDataAmount(value: string) {
-    setDataAmounts((current) =>
-      current.includes(value)
-        ? current.filter((item) => item !== value)
-        : [...current, value]
-    );
-  }
-
-  function toggleValidity(value: number) {
-    setValidities((current) =>
-      current.includes(value)
-        ? current.filter((item) => item !== value)
-        : [...current, value]
-    );
-  }
-
-  function toggleCoverage(value: string) {
-    setCoveredCountries((current) =>
-      current.includes(value)
-        ? current.filter((item) => item !== value)
-        : [...current, value]
-    );
-  }
-
-  function clearFilters() {
-    setDataAmounts([]);
-    setValidities([]);
-    setCoveredCountries([]);
-  }
-
+  const defaultModel = buildDefaultPlansListingModel(offers, destination);
   const displayName = destinationDisplayName(destination);
   const heading = `${displayName} eSIM Plans`;
-
   const planCountLabel = `${offers.length} plan${
     offers.length === 1 ? "" : "s"
   } available`;
-  const heroFromPrice =
+  const hasHeroFromPrice =
     !loading &&
     destination.minPrice != null &&
-    Number.isFinite(destination.minPrice)
-      ? formatPrice(destination.minPrice)
-      : null;
-  const heroSummary = loading
-    ? "Loading available plans..."
-    : heroFromPrice
-      ? `From ${heroFromPrice} · ${planCountLabel}`
-      : planCountLabel;
+    Number.isFinite(destination.minPrice);
 
   const relatedRegionalHref = relatedRegional
     ? destinationPath(relatedRegional)
@@ -404,40 +55,36 @@ function PlansListingContent({
   const relatedRegionalName = relatedRegional
     ? destinationDisplayName(relatedRegional)
     : null;
-  const relatedRegionalFromPrice =
+  const relatedRegionalHasPrice =
     relatedRegional?.minPrice != null &&
-    Number.isFinite(relatedRegional.minPrice)
-      ? formatPrice(relatedRegional.minPrice)
-      : null;
+    Number.isFinite(relatedRegional.minPrice);
   const relatedRegionalPlanCount =
     relatedRegional?.offerCount != null && relatedRegional.offerCount > 0
       ? `${relatedRegional.offerCount} plan${
           relatedRegional.offerCount === 1 ? "" : "s"
         } available`
       : null;
-  const relatedRegionalMeta = [
-    relatedRegionalFromPrice ? `From ${relatedRegionalFromPrice}` : null,
-    relatedRegionalPlanCount,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+
+  const defaultGrid =
+    !loading && !error && offers.length > 0 ? (
+      <PlansOfferGroups
+        groups={defaultModel.groups}
+        destination={destination}
+        isRegionalOrGlobal={defaultModel.isRegionalOrGlobal}
+        filteredCount={defaultModel.filtered.length}
+        categoryOffersCount={defaultModel.categoryOffers.length}
+        activeCategoryLabel={defaultModel.activeCategory}
+        totalOffersCount={offers.length}
+        showPackageTabs={defaultModel.showPackageTabs}
+      />
+    ) : null;
 
   return (
     <main className="min-h-screen overflow-x-clip bg-[var(--page-bg)] text-[var(--heading)]">
       <section className="theme-hero border-b border-[var(--border)]">
         {/* Extra mobile top padding keeps hero clear of the sticky navbar. */}
         <div className="mx-auto max-w-[1200px] px-4 pb-3 pt-6 sm:px-6 sm:py-8">
-          <Link
-            href={destinationsBackHref}
-            className="
-              mb-3 inline-flex max-w-full items-center gap-2 text-sm font-medium
-              text-[var(--text-muted)] transition hover:text-[var(--accent-strong)]
-              sm:mb-5
-            "
-          >
-            <ArrowLeft className="h-4 w-4 shrink-0" />
-            <span className="truncate">All Destinations</span>
-          </Link>
+          <PlansListingBackLink />
 
           <div className="flex items-start gap-3 sm:gap-4">
             <div
@@ -463,370 +110,30 @@ function PlansListingContent({
                 {heading}
               </h1>
               <p className="mt-1 text-sm text-[var(--text-muted)] sm:mt-1.5 sm:text-base">
-                {heroSummary}
+                {loading ? (
+                  "Loading available plans..."
+                ) : hasHeroFromPrice ? (
+                  <>
+                    From <CurrencyPrice amountUsd={destination.minPrice} /> ·{" "}
+                    {planCountLabel}
+                  </>
+                ) : (
+                  planCountLabel
+                )}
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-[1200px] px-4 pt-4 pb-6 sm:px-6 sm:py-10">
-        <p className="mb-3 text-xs leading-snug text-[var(--text-muted)] sm:mb-6 sm:text-sm sm:leading-relaxed">
-          Confirm your phone supports eSIM and is unlocked.{" "}
-          <Link
-            href="/device-compatibility"
-            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
-          >
-            Check compatibility →
-          </Link>
-        </p>
-        {loading && (
-          <div className="rounded-3xl border border-[var(--border-strong)] bg-[var(--surface)] p-10 text-center text-[var(--text)]">
-            Loading eSIM plans...
-          </div>
-        )}
-
-        {!loading && error && (
-          <div className="rounded-3xl border border-[var(--danger-border)] bg-[var(--danger-bg)] p-8 text-center">
-            <h2 className="text-xl font-bold text-[var(--danger-text)]">
-              Could not load plans
-            </h2>
-            <p className="mt-3 text-sm text-[var(--danger-text)]">{error}</p>
-          </div>
-        )}
-
-        {!loading && !error && offers.length === 0 && (
-          <div className="rounded-3xl border border-[var(--border-strong)] bg-[var(--surface)] p-10 text-center">
-            <h2 className="text-xl font-bold">No plans available</h2>
-            <p className="mt-3 text-sm text-[var(--text-muted)]">
-              No eSIM offers were returned for {destination.name} right now.
-            </p>
-          </div>
-        )}
-
-        {!loading && !error && offers.length > 0 && (
-          <>
-            <div className="rounded-3xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-3 shadow-[0_12px_40px_rgba(0,0,0,0.22)] sm:p-5">
-              <div className="flex flex-col gap-2.5 sm:gap-4">
-                {showPlanTypeToggle && (
-                  <div className="flex flex-wrap gap-2">
-                    <PillButton
-                      active={planType === "data"}
-                      onClick={() => setPlanType("data")}
-                    >
-                      Data only ({planTypeSummary.dataOnly})
-                    </PillButton>
-                    <PillButton
-                      active={planType === "voice"}
-                      onClick={() => setPlanType("voice")}
-                    >
-                      Data + SMS & Voice ({planTypeSummary.withVoice})
-                    </PillButton>
-                  </div>
-                )}
-
-                {showPackageTabs && (
-                  <div className="space-y-1.5 sm:space-y-2">
-                    <p className="hidden text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] sm:block">
-                      Package type
-                    </p>
-                    <div className="flex w-full flex-row flex-wrap gap-2">
-                      <PillButton
-                        active={activeCategory === "standard"}
-                        onClick={() => selectCategory("standard")}
-                        disabled={categorySummary.standard === 0}
-                      >
-                        {`Standard · ${categorySummary.standard} plan${
-                          categorySummary.standard === 1 ? "" : "s"
-                        }`}
-                      </PillButton>
-                      <PillButton
-                        active={activeCategory === "unlimited"}
-                        onClick={() => selectCategory("unlimited")}
-                        disabled={!unlimitedTabEnabled}
-                      >
-                        {`Unlimited · ${categorySummary.unlimited} plan${
-                          categorySummary.unlimited === 1 ? "" : "s"
-                        }`}
-                      </PillButton>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex w-full flex-row items-center gap-2 sm:justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setFiltersOpen((open) => !open)}
-                    className={`
-                      inline-flex h-10 min-w-0 flex-1 items-center justify-center gap-2
-                      rounded-full border px-4 text-sm font-semibold transition
-                      sm:h-11 sm:w-auto sm:flex-none sm:px-5
-                      ${
-                        filtersOpen || activeFilterCount > 0
-                          ? "border-[var(--accent-strong)] bg-[var(--accent-strong)]/12 text-[var(--heading)]"
-                          : "border-[var(--border-strong)] bg-[var(--surface)] text-[var(--heading)] hover:border-[var(--border-hover)]"
-                      }
-                    `}
-                  >
-                    <Filter className="h-4 w-4 text-[var(--accent-strong)]" />
-                    Filters
-                    {activeFilterCount > 0 && (
-                      <span className="rounded-full bg-[var(--accent-strong)] px-2 py-0.5 text-xs font-bold text-[var(--accent-ink)]">
-                        {activeFilterCount}
-                      </span>
-                    )}
-                  </button>
-
-                  <SortSelect
-                    value={sort}
-                    onChange={setSort}
-                    options={SORT_OPTIONS}
-                  />
-                </div>
-              </div>
-
-              {filtersOpen && (
-                <div className="mt-5 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-3)] p-4 sm:p-5">
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                      Refine plans
-                    </h2>
-                    {activeFilterCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={clearFilters}
-                        className="text-xs font-semibold text-[var(--accent-strong)] hover:underline"
-                      >
-                        Clear all
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="space-y-5">
-                    <div>
-                      <p className="mb-3 text-sm font-semibold text-[var(--heading)]">
-                        Data amount
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {dataOptions.map((amount) => (
-                          <FilterChip
-                            key={amount}
-                            active={dataAmounts.includes(amount)}
-                            onClick={() => toggleDataAmount(amount)}
-                          >
-                            {amount}
-                          </FilterChip>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="mb-3 text-sm font-semibold text-[var(--heading)]">
-                        Validity period
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {validityOptions.map((days) => (
-                          <FilterChip
-                            key={days}
-                            active={validities.includes(days)}
-                            onClick={() => toggleValidity(days)}
-                          >
-                            {formatValidityPill(days)}
-                          </FilterChip>
-                        ))}
-                      </div>
-                    </div>
-
-                    {coverageOptions.length > 0 && (
-                      <div>
-                        <p className="mb-3 text-sm font-semibold text-[var(--heading)]">
-                          Countries covered
-                        </p>
-                        <div className="flex max-h-44 flex-wrap gap-2 overflow-y-auto">
-                          {coverageOptions.map((code) => (
-                            <FilterChip
-                              key={code}
-                              active={coveredCountries.includes(code)}
-                              onClick={() => toggleCoverage(code)}
-                            >
-                              {countryNames[code] || code}
-                            </FilterChip>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-4 flex items-center justify-between gap-3 sm:mt-8">
-              <p className="text-sm font-medium text-[var(--text-muted)]">
-                Showing {filtered.length} of {categoryOffers.length}{" "}
-                {activeCategory === "unlimited" ? "unlimited" : "standard"}{" "}
-                plans
-                {showPackageTabs && categoryOffers.length !== offers.length
-                  ? ` (${offers.length} total)`
-                  : ""}
-              </p>
-            </div>
-
-            {filtered.length === 0 ? (
-              <div className="mt-4 rounded-3xl border border-[var(--border-strong)] bg-[var(--surface)] p-8 text-center sm:mt-6">
-                <h3 className="text-lg font-semibold">No matching plans</h3>
-                <p className="mt-2 text-sm text-[var(--text-muted)]">
-                  {activeCategory === "unlimited" &&
-                  categorySummary.unlimited === 0
-                    ? "This destination has no unlimited packages right now."
-                    : "Try clearing one or more filters to see more results."}
-                </p>
-              </div>
-            ) : (
-              <div className="mt-4 space-y-6 sm:mt-6 sm:space-y-10">
-                {groups.map((group) => (
-                  <section key={group.label}>
-                    <div className="mb-3 flex items-end justify-between gap-3 border-b border-[var(--border)] pb-2 sm:mb-4 sm:pb-3">
-                      <h2 className="text-lg font-bold text-[var(--heading)] sm:text-2xl">
-                        {group.label}
-                      </h2>
-                      <p className="text-sm text-[var(--text-soft)]">
-                        {`${group.plans.length} plan${group.plans.length === 1 ? "" : "s"}`}
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                      {group.plans.map((offer) => {
-                        // Include coverage when present (regional/global) —
-                        // never invent coverage; helpers only emit existing counts.
-                        const secondaryLines = planCardSecondaryLines(offer, {
-                          isRegionalOrGlobal,
-                          formatValidity: formatValidityCardValue,
-                        });
-                        return (
-                          <article
-                            key={offer.id}
-                            className="
-                              group flex h-full min-w-0 flex-col rounded-[22px]
-                              border border-[var(--border)] bg-[var(--surface)] p-4
-                              shadow-[0_10px_28px_rgba(0,0,0,0.2)]
-                              transition duration-200
-                              hover:-translate-y-1 hover:border-[var(--border-hover)]
-                              hover:shadow-[0_18px_40px_rgba(0,0,0,0.32)]
-                              sm:p-5 md:min-h-[220px]
-                            "
-                          >
-                            <div className="flex min-w-0 items-start justify-between gap-3">
-                              <h3 className="min-w-0 break-words text-[1.65rem] font-bold leading-none tracking-tight text-[var(--heading)] sm:text-3xl">
-                                <span className="sr-only">Data </span>
-                                {offer.dataFormatted}
-                              </h3>
-                              <p className="shrink-0 text-right text-xl font-bold leading-none text-[var(--accent-strong)] sm:text-2xl">
-                                <span className="sr-only">Price </span>
-                                {formatPrice(offer.priceUSD)}
-                              </p>
-                            </div>
-
-                            {/*
-                              Card secondary copy MUST come only from
-                              planCardSecondaryLines — never packageInfo,
-                              description, notes, or raw network.
-                            */}
-                            <div className="mt-4 flex flex-col gap-1.5 text-sm md:flex-1">
-                              {secondaryLines.map((line) => (
-                                <p
-                                  key={`${offer.id}-${line.kind}`}
-                                  className={
-                                    line.kind === "validity"
-                                      ? "text-[var(--heading)]"
-                                      : line.kind === "operator"
-                                        ? "truncate text-[var(--text-soft)]"
-                                        : line.kind === "voice"
-                                          ? "break-words text-[var(--text)]"
-                                          : "text-[var(--text)]"
-                                  }
-                                >
-                                  <span
-                                    className={
-                                      line.kind === "validity"
-                                        ? "font-semibold text-[var(--heading)]"
-                                        : "font-medium text-[var(--text-soft)]"
-                                    }
-                                  >
-                                    {planCardLineLabel(line.kind)}
-                                  </span>
-                                  <span className="text-[var(--text-soft)]">
-                                    {" "}
-                                    ·{" "}
-                                  </span>
-                                  <span
-                                    className={
-                                      line.kind === "validity"
-                                        ? "font-medium"
-                                        : line.kind === "voice"
-                                          ? "break-words"
-                                          : undefined
-                                    }
-                                  >
-                                    {line.text}
-                                  </span>
-                                </p>
-                              ))}
-                            </div>
-
-                            <div className="mt-auto space-y-2.5 pt-3 md:pt-5">
-                              {/*
-                                Mobile (1-col): Buy Now first, Plan Details second.
-                                Wider (≥400px 2-col): Details left, Buy Now right.
-                              */}
-                              <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
-                                <Link
-                                  href={resolveCheckoutHref(
-                                    offer,
-                                    destination.code
-                                  )}
-                                  className="
-                                    order-1 inline-flex min-h-11 items-center justify-center
-                                    rounded-xl bg-[var(--accent-strong)] px-3 text-sm font-bold
-                                    text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]
-                                    min-[400px]:order-2
-                                  "
-                                >
-                                  Buy Now
-                                </Link>
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedOffer(offer)}
-                                  className="
-                                    order-2 inline-flex min-h-11 items-center justify-center
-                                    rounded-xl border border-[var(--border-strong)]
-                                    bg-[var(--surface)] px-3 text-sm font-semibold
-                                    text-[var(--heading)] transition
-                                    hover:bg-[var(--surface-2)]
-                                    min-[400px]:order-1
-                                  "
-                                >
-                                  {isRegionalOrGlobal
-                                    ? "Coverage details"
-                                    : "Plan Details"}
-                                </button>
-                              </div>
-                              {purchaseTrustLine ? (
-                                <p className="text-center text-xs leading-snug text-[var(--text-muted)]">
-                                  {purchaseTrustLine}
-                                </p>
-                              ) : null}
-                            </div>
-                          </article>
-                        );
-                      })}
-                    </div>
-                  </section>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </section>
+      <PlansListingClient
+        destination={destination}
+        offers={offers}
+        loading={loading}
+        error={error}
+        countryNames={countryNames}
+        defaultGrid={defaultGrid}
+      />
 
       {relatedRegional && relatedRegionalHref && relatedRegionalName ? (
         <section
@@ -848,11 +155,18 @@ function PlansListingContent({
                 <p className="truncate text-base font-semibold text-[var(--heading)]">
                   {relatedRegionalName}
                 </p>
-                {relatedRegionalMeta ? (
+                {(relatedRegionalHasPrice || relatedRegionalPlanCount) && (
                   <p className="mt-1 text-sm text-[var(--text-muted)]">
-                    {relatedRegionalMeta}
+                    {relatedRegionalHasPrice ? (
+                      <>
+                        From{" "}
+                        <CurrencyPrice amountUsd={relatedRegional.minPrice} />
+                        {relatedRegionalPlanCount ? " · " : ""}
+                      </>
+                    ) : null}
+                    {relatedRegionalPlanCount}
                   </p>
-                ) : null}
+                )}
               </div>
               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-[var(--accent-strong)]">
                 View plans
@@ -864,15 +178,6 @@ function PlansListingContent({
       ) : null}
 
       {children}
-      <PlanDetailsModal
-          offer={selectedOffer}
-          destination={destination}
-          countryNames={countryNames}
-          onClose={() => setSelectedOffer(null)}
-          coverageFocused={isRegionalOrGlobal}
-          checkoutHref={resolveCheckoutHref}
-          purchaseTrustLine={purchaseTrustLine}
-        />
     </main>
   );
 }

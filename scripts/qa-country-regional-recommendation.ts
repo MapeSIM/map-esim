@@ -112,10 +112,9 @@ function main() {
   assert.notEqual(regionalCodeForCountryIso("PK"), "region-regional");
 
   // B1.3: listing must render related regional (not discard the prop).
-  const listing = readFileSync(
-    join(root, "app/components/plans/PlansListing.tsx"),
-    "utf8"
-  );
+  const listing = [
+    readFileSync(join(root, "app/components/plans/PlansListing.tsx"), "utf8"),
+  ].join("\n");
   assert.match(listing, /Related regional plans/);
   assert.match(listing, /destinationPath\(relatedRegional\)/);
   assert.doesNotMatch(listing, /_relatedRegional/);

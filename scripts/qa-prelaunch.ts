@@ -512,7 +512,12 @@ function checkDestinationIntegrity() {
     }
   }
 
-  const listing = read("app/components/countries/CountriesListing.tsx");
+  const listing = [
+    read("app/components/countries/CountriesListing.tsx"),
+    read("app/components/countries/CountriesDestinationGrid.tsx"),
+    read("app/components/countries/CompactDestinationCard.tsx"),
+    read("app/lib/vesim/countriesListingModel.ts"),
+  ].join("\n");
   if (!/destinationReactKey|kind\}-\$\{destination\.code\}/.test(listing)) {
     add(
       "FAIL",
@@ -536,7 +541,11 @@ function checkDestinationIntegrity() {
 function checkPlanCardContract() {
   // Full contract covered by qa:plan-card-presentation; add a static safety net.
   const presentation = read("app/lib/plans/planOfferPresentation.ts");
-  const listing = read("app/components/plans/PlansListing.tsx");
+  const listing = [
+    read("app/components/plans/PlansListing.tsx"),
+    read("app/components/plans/PlansOfferGroups.tsx"),
+    read("app/components/plans/PlanOfferCard.tsx"),
+  ].join("\n");
 
   if (!/isForbiddenPlanCardText|planCardSecondaryText/.test(presentation)) {
     add(

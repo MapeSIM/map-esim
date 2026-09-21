@@ -34,9 +34,20 @@ function main() {
   assert.match(offersApi, /fetchPublicOffersForCountry/);
   assert.match(offersApi, /toPublicVesimOffers/);
   assert.doesNotMatch(offersApi, /fetchOffersForCountry\(/);
-  assert.match(listing, /^["']use client["']/m);
-  assert.match(listing, /useCurrency/);
-  assert.match(listing, /dynamic\(/);
+  // Listing shell is RSC; interactive currency + modal live in client islands.
+  assert.doesNotMatch(listing, /^["']use client["']/m);
+  assert.match(
+    read("app/components/plans/PlansListingClient.tsx"),
+    /^["']use client["']/m
+  );
+  assert.match(
+    read("app/components/plans/CurrencyPrice.tsx"),
+    /useCurrency/
+  );
+  assert.match(
+    read("app/components/plans/PlansListingClient.tsx"),
+    /dynamic\(/
+  );
 
   // Purchase validation must stay on the live no-store offer fetch.
   const server = read("app/lib/vesim/server.ts");

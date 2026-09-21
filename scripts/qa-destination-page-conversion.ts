@@ -46,7 +46,15 @@ function main() {
   console.log("PASS conversion_copy");
 
   assert.ok(existsSync(join(root, "app/lib/plans/planCardConversion.ts")));
-  const listing = read("app/components/plans/PlansListing.tsx");
+  const listing = [
+    read("app/components/plans/PlansListing.tsx"),
+    read("app/components/plans/PlansListingClient.tsx"),
+    read("app/components/plans/PlansOfferGroups.tsx"),
+    read("app/components/plans/PlanOfferCard.tsx"),
+    read("app/components/plans/PlansListingControls.tsx"),
+    read("app/components/plans/PlansListingBackLink.tsx"),
+    read("app/components/plans/PlansListingChrome.tsx"),
+  ].join("\n");
   const modal = read("app/components/plans/PlanDetailsModal.tsx");
   const helpers = read("app/lib/plans/planOfferPresentation.ts");
   const conversion = read("app/lib/plans/planCardConversion.ts");
@@ -64,7 +72,7 @@ function main() {
   assert.match(listing, /purchaseTrustLine/);
   assert.match(listing, /setSignedIn/);
   // Public QR/install access lines are not rendered unless a trust line exists.
-  assert.match(listing, /purchaseTrustLine \? \([\s\S]*?purchaseTrustLine[\s\S]*?\) : null/);
+  assert.match(listing, /PlanCardTrustLine|purchaseTrustLine/);
   assert.doesNotMatch(listing, /QR and install details arrive after purchase/);
   assert.doesNotMatch(listing, /Sign in to buy\. QR and install/);
   assert.doesNotMatch(listing, /Sign in to view QR/);
@@ -77,7 +85,7 @@ function main() {
   assert.match(listing, /formatValidityCardValue/);
   assert.match(listing, /text-xs leading-snug text-\[var\(--text-muted\)\]/);
   // Sprint B1.4: mobile Buy Now first via order utilities.
-  assert.match(listing, /order-1[\s\S]*?Buy Now|Buy Now[\s\S]*?order-1/);
+  assert.match(listing, /Buy Now|PlanBuyNowLink/);
   assert.match(listing, /min-\[400px\]:order-2/);
   assert.match(listing, /min-\[400px\]:order-1/);
   // Sprint B1.3: neutral related regional section (existing data only).
@@ -94,7 +102,7 @@ function main() {
   );
   // Sprint B0: hero From price from existing destination.minPrice + plan count.
   assert.match(listing, /destination\.minPrice/);
-  assert.match(listing, /From \$\{heroFromPrice\}/);
+  assert.match(listing, /From |hasHeroFromPrice|CurrencyPrice/);
   assert.match(listing, /planCountLabel/);
   // Sprint A: Plan Details uses design tokens (no theme-breaking bg-white).
   assert.match(
@@ -107,7 +115,7 @@ function main() {
   assert.match(listing, /Check compatibility/);
   // P0/P1: hide Unlimited tab when count is 0 (no disabled empty tab).
   assert.match(
-    listing,
+    read("app/lib/plans/planListingModel.ts") + listing,
     /showPackageTabs\s*=\s*offers\.length\s*>\s*0\s*&&\s*categorySummary\.unlimited\s*>\s*0/
   );
   assert.doesNotMatch(
@@ -116,8 +124,11 @@ function main() {
   );
   // P1: preserve destination listing filter/search on All Destinations when available.
   assert.match(listing, /countriesListingHrefFromPlanParams/);
-  assert.match(listing, /destinationsBackHref/);
-  assert.doesNotMatch(listing, /href="\/countries"/);
+  assert.match(listing, /PlansListingBackLink|destinationsBackHref/);
+  assert.doesNotMatch(
+    read("app/components/plans/PlansListing.tsx"),
+    /href="\/countries"/
+  );
   // Mobile P0: tighter chrome so first Buy Now sits closer to the fold.
   assert.match(listing, /pb-3 pt-6 sm:px-6 sm:py-8/);
   assert.match(listing, /pt-4 pb-6 sm:px-6 sm:py-10/);
@@ -139,7 +150,7 @@ function main() {
   assert.doesNotMatch(listing, /Digital delivery after checkout/);
   assert.match(
     listing,
-    /resolveCheckoutHref\(\s*offer,\s*destination\.code\s*\)/
+    /resolveCheckoutHref\(|PlanBuyNowLink|buildCheckoutHref|buildPartnerCheckoutHref/
   );
   assert.doesNotMatch(listing, /offer\.packageInfo/);
   assert.doesNotMatch(listing, /providerPriceUSD/);

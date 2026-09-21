@@ -14,6 +14,7 @@
  * 9. rollback anytime through guarded disable
  */
 import type { PrismaClient } from "@prisma/client";
+import { after } from "next/server";
 import type { VesimOffer } from "@/app/lib/vesim/offers";
 import { logPublicOfferSnapshotFailure } from "@/app/lib/vesim/publicOfferSnapshotGuard";
 import {
@@ -37,6 +38,23 @@ export type PublicOfferLiveFetcher = (
   country: string,
   options?: { signal?: AbortSignal }
 ) => Promise<VesimOffer[]>;
+
+/**
+ * blocking (default): await leased refresh before returning (browse / API).
+ * background: return last-good snapshot immediately; refresh after the response
+ * when possible (order soft-catalog reads — avoids up to 4s request wait).
+ */
+export type PublicOfferRefreshMode = "blocking" | "background";
+
+function schedulePublicOfferRefreshTask(task: () => Promise<void>): void {
+  const run = () => task().catch(() => undefined);
+  try {
+    after(run);
+  } catch {
+    // Non-request contexts (scripts / tests): still fire without blocking callers.
+    void run();
+  }
+}
 
 export async function withPublicOfferRefreshTimeout<T>(
   work: (signal: AbortSignal) => Promise<T>,
@@ -217,6 +235,9 @@ async function refreshLeasedPublicOfferSnapshot(options: {
  * Flag-on: PostgreSQL snapshot only. Missing/malformed → throw (API 503).
  * Timeout/provider/CAS/lease-release failures return the last-good snapshot.
  * Never cold-inserts from the request path when publicReadsOn=true.
+ *
+ * refreshMode "background": still claims a lease and runs the same refresh
+ * helper, but does not await it on the request path (returns stored first).
  */
 export async function loadPublicOffersForCountry(options: {
   client: PrismaClient;
@@ -226,6 +247,7 @@ export async function loadPublicOffersForCountry(options: {
   now?: Date;
   timeoutMs?: number;
   releaseLease?: LeaseCleanup;
+  refreshMode?: PublicOfferRefreshMode;
 }): Promise<VesimOffer[]> {
   const country = options.country.trim();
   if (!country) {
@@ -233,6 +255,7 @@ export async function loadPublicOffersForCountry(options: {
   }
 
   const now = options.now ?? new Date();
+  const refreshMode = options.refreshMode ?? "blocking";
   const control = await readPublicOfferSnapshotControl(options.client);
 
   if (!control.ok || !control.publicReadsOn) {
@@ -277,16 +300,25 @@ export async function loadPublicOffersForCountry(options: {
     return stored;
   }
 
-  try {
-    const refreshed = await refreshLeasedPublicOfferSnapshot({
-      client: options.client,
-      destinationCode: country,
-      fetchLive: options.fetchLive,
-      now,
-      claimToken: lease.claimToken,
-      timeoutMs: options.timeoutMs,
-      releaseLease: options.releaseLease,
+  const refreshOptions = {
+    client: options.client,
+    destinationCode: country,
+    fetchLive: options.fetchLive,
+    now,
+    claimToken: lease.claimToken,
+    timeoutMs: options.timeoutMs,
+    releaseLease: options.releaseLease,
+  };
+
+  if (refreshMode === "background") {
+    schedulePublicOfferRefreshTask(async () => {
+      await refreshLeasedPublicOfferSnapshot(refreshOptions);
     });
+    return stored;
+  }
+
+  try {
+    const refreshed = await refreshLeasedPublicOfferSnapshot(refreshOptions);
     if (refreshed.payloadReplaced && refreshed.offers) {
       return refreshed.offers;
     }

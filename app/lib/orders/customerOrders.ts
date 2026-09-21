@@ -112,6 +112,8 @@ function resolveCatalogCountryHint(
 /**
  * Public browse catalog only (snapshot / cached lists). Soft-fails — never throws to callers.
  * Not used for purchase validation or pricing.
+ * Uses snapshot-first / background refresh so order pages are not blocked up to 4s
+ * waiting on a stale public-offer refresh.
  */
 export async function lookupOfferTopUpFromCatalog(
   offerIdRaw: string | null | undefined,
@@ -131,7 +133,9 @@ export async function lookupOfferTopUpFromCatalog(
   let offers = catalogCache.get(country);
   if (offers === undefined) {
     try {
-      offers = await fetchPublicOffersForCountry(country);
+      offers = await fetchPublicOffersForCountry(country, {
+        refreshMode: "background",
+      });
       catalogCache.set(country, offers);
     } catch {
       catalogCache.set(country, null);

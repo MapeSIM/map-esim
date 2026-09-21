@@ -27,12 +27,18 @@ import {
   PAKISTAN_DESTINATION_PATH,
   PAKISTAN_FLAG_PUBLIC_PATH,
 } from "@/app/lib/seo/siteGraph";
+import dynamic from "next/dynamic";
 import ThemeToggle from "./ThemeToggle";
-import CurrencySelector from "./currency/CurrencySelector";
 import {
   HOME_DISCOVERY_CTA_HREF,
   HOME_DISCOVERY_CTA_LABEL,
 } from "@/app/lib/home/homeConversionSections";
+
+/** Non-critical navbar chrome — keep CurrencyProvider; defer selector UI only. */
+const CurrencySelector = dynamic(
+  () => import("./currency/CurrencySelector"),
+  { ssr: false }
+);
 
 type NavLink = {
   href: string;
@@ -126,6 +132,8 @@ export default function Navbar({
   const isLoggedOut = authHref === "/signin";
 
   useEffect(() => {
+    // Client-only portal target for the mobile drawer.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- document portal gate
     setPortalReady(true);
   }, []);
 

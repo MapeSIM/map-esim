@@ -110,7 +110,10 @@ function main() {
   const destinations = read("app/lib/vesim/destinations.ts");
   const countryDetail = read("app/countries/[id]/page.tsx");
   const countriesList = read("app/countries/page.tsx");
-  const countriesListing = read("app/components/countries/CountriesListing.tsx");
+  const countriesListing = [
+    read("app/components/countries/CountriesListing.tsx"),
+    read("app/components/countries/CountriesListingClient.tsx"),
+  ].join("\n");
   const currencyFormat = read("app/lib/currency/format.ts");
   const currencies = read("app/lib/currency/currencies.ts");
   const pkg = read("package.json");

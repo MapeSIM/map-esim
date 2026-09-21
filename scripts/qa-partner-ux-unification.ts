@@ -27,7 +27,11 @@ function main() {
   const accountPage = read("app/account/page.tsx");
   const catalogRead = read("app/lib/partner/partnerCatalogRead.ts");
   const buyPage = read("app/partner/(portal)/buy/page.tsx");
-  const plansListing = read("app/components/plans/PlansListing.tsx");
+  const plansListing = [
+    read("app/components/plans/PlansListing.tsx"),
+    read("app/components/plans/PlansListingClient.tsx"),
+    read("app/components/plans/PlansListingChrome.tsx"),
+  ].join("\n");
   const access = read("app/lib/partner/partnerAccess.ts");
   const authConfig = read("auth.config.ts");
 

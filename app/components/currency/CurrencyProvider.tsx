@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 import { useCookieConsent } from "@/app/components/cookies/CookieConsentProvider";
 import { readBrowserCookie } from "@/app/lib/cookies/browserCookie";
 import {
@@ -17,6 +18,7 @@ import {
   FALLBACK_USD_RATES,
   type CurrencyCode,
 } from "@/app/lib/currency/currencies";
+import { pathnameNeedsLiveCurrencyRates } from "@/app/lib/currency/currencyRatesScope";
 import { formatMoney, type CurrencyRates } from "@/app/lib/currency/format";
 import { setCurrencyPreferenceAction } from "@/app/lib/cookies/preferenceActions";
 import {
@@ -46,6 +48,7 @@ export function CurrencyProvider({
   /** Server-resolved currency; must match first client render. */
   initialCurrency?: CurrencyCode;
 }) {
+  const pathname = usePathname() || "/";
   const { canLoad } = useCookieConsent();
   const persistPreferences = canLoad("preferences");
   const previousPersist = useRef<boolean | null>(null);
@@ -55,6 +58,7 @@ export function CurrencyProvider({
   const [rates, setRates] = useState<CurrencyRates>(FALLBACK_USD_RATES);
   const currencyRef = useRef(currency);
   const hydratedPreference = useRef(false);
+  const liveRatesLoadedRef = useRef(false);
 
   useEffect(() => {
     currencyRef.current = currency;
@@ -67,10 +71,18 @@ export function CurrencyProvider({
     const stored = parseCurrencyPreferenceCookie(
       readBrowserCookie(CURRENCY_PREFERENCE_COOKIE)
     );
-    if (stored) setCurrencyState(stored);
+    if (stored) {
+      // Intentional: client-only preference cookie rehydrate after cacheable SSR.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser cookie sync
+      setCurrencyState(stored);
+    }
   }, [persistPreferences]);
 
+  // Live FX only on routes that display converted prices; elsewhere keep fallbacks.
   useEffect(() => {
+    if (!pathnameNeedsLiveCurrencyRates(pathname)) return;
+    if (liveRatesLoadedRef.current) return;
+
     let cancelled = false;
 
     async function loadRates() {
@@ -79,22 +91,24 @@ export function CurrencyProvider({
           cache: "force-cache",
         });
         const data = await response.json();
-        if (!cancelled && data?.rates && typeof data.rates === "object") {
+        if (cancelled) return;
+        if (data?.rates && typeof data.rates === "object") {
           setRates({
             ...FALLBACK_USD_RATES,
             ...data.rates,
           });
         }
+        liveRatesLoadedRef.current = true;
       } catch {
-        // Keep fallback rates.
+        // Keep fallback rates; allow retry on the next priced-route visit.
       }
     }
 
-    loadRates();
+    void loadRates();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [pathname]);
 
   // Consent transitions only — never restore from localStorage.
   useEffect(() => {

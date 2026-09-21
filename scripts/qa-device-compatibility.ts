@@ -15,7 +15,10 @@ function read(rel: string): string {
 function main() {
   const pagePath = "app/device-compatibility/page.tsx";
   const page = read(pagePath);
-  const plansListing = read("app/components/plans/PlansListing.tsx");
+  const plansListing = [
+    read("app/components/plans/PlansListing.tsx"),
+    read("app/components/plans/PlansListingClient.tsx"),
+  ].join("\n");
   const footer = read("app/components/Footer.tsx");
   const pkg = read("package.json");
   const wallet = read("app/lib/esim/walletPurchase.ts");

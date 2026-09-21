@@ -68,7 +68,6 @@ export function CustomerEsimOrderCard({
                 width={56}
                 height={42}
                 className="h-9 w-auto object-cover"
-                unoptimized
               />
             ) : (
               <span className="text-xs font-bold text-[var(--text-soft)]">
