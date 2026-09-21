@@ -102,7 +102,7 @@ export default function AccountMenu({ userName, userEmail, links }: Props) {
             role="dialog"
             aria-modal="true"
             aria-label="Account menu"
-            className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(100vw-1.5rem,18rem)] rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[0_16px_40px_rgba(0,0,0,0.35)]"
+            className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(18rem,calc(100dvw-1.5rem))] max-w-[18rem] rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[0_16px_40px_rgba(0,0,0,0.35)]"
           >
             <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
               Account

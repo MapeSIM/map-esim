@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import NavbarShell from "./components/NavbarShell";
@@ -42,6 +42,13 @@ export const metadata: Metadata = {
     description: BRAND_TAGLINE,
     images: [DEFAULT_SOCIAL_SHARE_IMAGE.url],
   },
+};
+
+/** Fit all phone widths; pinch-zoom remains available for accessibility. */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 /**

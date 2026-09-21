@@ -357,7 +357,7 @@ export default function Navbar({
                 aria-modal="true"
                 aria-label={BRAND_NAME}
                 className="
-                  fixed top-0 right-0 z-[110] flex h-[100dvh] w-[min(92vw,24rem)]
+                  fixed top-0 right-0 z-[110] flex h-[100dvh] w-[min(92dvw,24rem)]
                   max-w-[24rem] flex-col overflow-hidden
                   rounded-l-[1.75rem] border-l border-[var(--border)]
                   bg-[var(--surface)] text-[var(--heading)]
