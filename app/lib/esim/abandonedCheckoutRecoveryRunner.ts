@@ -2,6 +2,9 @@
  * Cron runner: find idle unfinished self-serve checkouts and trigger
  * once-only abandoned-checkout recovery emails.
  * Never mutates payment, wallet, pricing, or checkout state.
+ *
+ * Per run: at most one email per customer (newest idle purchase by updatedAt).
+ * Sibling abandoned purchases in the same batch are not scheduled.
  */
 import "server-only";
 
@@ -14,14 +17,20 @@ import {
 import { scheduleAbandonedCheckoutNotification } from "@/app/lib/esim/abandonedCheckoutNotification";
 import {
   ABANDONED_CHECKOUT_BATCH_SIZE,
+  coalesceAbandonedCheckoutCandidatesByCustomer,
   resolveAbandonedCheckoutIdleMs,
   resolveAbandonedCheckoutMaxAgeMs,
+  type AbandonedCheckoutCandidateRef,
 } from "@/app/lib/esim/abandonedCheckoutRecoveryShared";
 
 export type AbandonedCheckoutRecoveryRunCounts = {
+  /** Raw eligible purchase rows before per-customer coalescing. */
   candidates: number;
+  /** Purchases scheduled after coalescing (≤ one per customer). */
   scheduled: number;
-  /** Candidates listed but not scheduled (dry-run mode). */
+  /** Sibling purchases dropped so the same customer is not emailed twice. */
+  coalescedSkipped: number;
+  /** Coalesced candidates listed but not scheduled (dry-run mode). */
   dryRunListed: number;
 };
 
@@ -34,7 +43,12 @@ export type AbandonedCheckoutRecoveryRunResult = {
 };
 
 function emptyCounts(): AbandonedCheckoutRecoveryRunCounts {
-  return { candidates: 0, scheduled: 0, dryRunListed: 0 };
+  return {
+    candidates: 0,
+    scheduled: 0,
+    coalescedSkipped: 0,
+    dryRunListed: 0,
+  };
 }
 
 /**
@@ -46,7 +60,7 @@ export async function listAbandonedCheckoutRecoveryCandidates(options: {
   take?: number;
   idleMs?: number;
   maxAgeMs?: number;
-}) {
+}): Promise<AbandonedCheckoutCandidateRef[]> {
   const now = options.now instanceof Date ? options.now : new Date();
   const idleMs = options.idleMs ?? resolveAbandonedCheckoutIdleMs();
   const maxAgeMs = options.maxAgeMs ?? resolveAbandonedCheckoutMaxAgeMs();
@@ -58,7 +72,7 @@ export async function listAbandonedCheckoutRecoveryCandidates(options: {
   const idleBefore = new Date(now.getTime() - idleMs);
   const notOlderThan = new Date(now.getTime() - maxAgeMs);
 
-  return prisma.walletEsimPurchase.findMany({
+  const rows = await prisma.walletEsimPurchase.findMany({
     where: {
       adminUserId: null,
       status: {
@@ -85,8 +99,14 @@ export async function listAbandonedCheckoutRecoveryCandidates(options: {
     },
     orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
     take,
-    select: { id: true },
+    select: { id: true, customerUserId: true, updatedAt: true },
   });
+
+  return rows.map((row) => ({
+    id: row.id,
+    customerUserId: row.customerUserId,
+    updatedAt: row.updatedAt,
+  }));
 }
 
 export async function runAbandonedCheckoutRecovery(options?: {
@@ -108,7 +128,13 @@ export async function runAbandonedCheckoutRecovery(options?: {
     });
     counts.candidates = candidates.length;
 
-    for (const row of candidates) {
+    const coalesced = coalesceAbandonedCheckoutCandidatesByCustomer(candidates);
+    counts.coalescedSkipped = Math.max(
+      0,
+      candidates.length - coalesced.length
+    );
+
+    for (const row of coalesced) {
       if (dryRun) {
         counts.dryRunListed += 1;
         continue;

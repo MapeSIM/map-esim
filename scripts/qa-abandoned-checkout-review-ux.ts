@@ -17,6 +17,7 @@ import {
   resolveAbandonedCheckoutNonConfirmableGuidance,
   resolveAbandonedCheckoutReviewGuidance,
 } from "../app/lib/esim/customerPurchaseStatusMessaging";
+import { coalesceAbandonedCheckoutCandidatesByCustomer } from "../app/lib/esim/abandonedCheckoutRecoveryShared";
 
 const root = join(__dirname, "..");
 
@@ -153,6 +154,28 @@ function main() {
   assert.doesNotMatch(banner, /prisma|walletPurchaseActions/);
   assert.doesNotMatch(nonConfirmablePanel, /prisma|walletPurchaseActions/);
   console.log("PASS abandoned_review_ux_wiring");
+
+  // Per-customer coalescing (recovery runner) — newest updatedAt wins.
+  const older = new Date(now - 60_000);
+  const newer = new Date(now - 30_000);
+  const coalesced = coalesceAbandonedCheckoutCandidatesByCustomer([
+    { id: "p_old", customerUserId: "cust_a", updatedAt: older },
+    { id: "p_new", customerUserId: "cust_a", updatedAt: newer },
+    { id: "p_other", customerUserId: "cust_b", updatedAt: older },
+  ]);
+  assert.equal(coalesced.length, 2);
+  assert.equal(
+    coalesced.find((r) => r.customerUserId === "cust_a")?.id,
+    "p_new"
+  );
+  assert.equal(
+    coalesced.find((r) => r.customerUserId === "cust_b")?.id,
+    "p_other"
+  );
+  const runner = read("app/lib/esim/abandonedCheckoutRecoveryRunner.ts");
+  assert.match(runner, /coalesceAbandonedCheckoutCandidatesByCustomer/);
+  assert.match(runner, /coalescedSkipped/);
+  console.log("PASS abandoned_recovery_customer_coalesce");
 
   console.log("OK qa-abandoned-checkout-review-ux");
 }

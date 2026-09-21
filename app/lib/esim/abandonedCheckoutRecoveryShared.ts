@@ -7,6 +7,59 @@
 export const ABANDONED_CHECKOUT_IDLE_MS_DEFAULT = 30 * 60 * 1000;
 
 /**
+ * One recovery-email candidate (purchase + owner). Used to coalesce
+ * multiple idle purchases for the same customer into a single send.
+ */
+export type AbandonedCheckoutCandidateRef = {
+  id: string;
+  customerUserId: string;
+  updatedAt: Date;
+};
+
+/**
+ * Keep at most one purchase per customer — the newest by updatedAt
+ * (tie-break: higher id). Sibling rows in the same batch are dropped
+ * so only one abandoned-checkout email is scheduled per customer per run.
+ */
+export function coalesceAbandonedCheckoutCandidatesByCustomer(
+  candidates: readonly AbandonedCheckoutCandidateRef[]
+): AbandonedCheckoutCandidateRef[] {
+  const byCustomer = new Map<string, AbandonedCheckoutCandidateRef>();
+
+  for (const row of candidates) {
+    const customerId = (row.customerUserId ?? "").trim();
+    const purchaseId = (row.id ?? "").trim();
+    if (!customerId || !purchaseId) continue;
+
+    const normalized: AbandonedCheckoutCandidateRef = {
+      id: purchaseId,
+      customerUserId: customerId,
+      updatedAt:
+        row.updatedAt instanceof Date
+          ? row.updatedAt
+          : new Date(row.updatedAt),
+    };
+
+    const existing = byCustomer.get(customerId);
+    if (!existing) {
+      byCustomer.set(customerId, normalized);
+      continue;
+    }
+
+    const existingMs = existing.updatedAt.getTime();
+    const nextMs = normalized.updatedAt.getTime();
+    const preferNext =
+      nextMs > existingMs ||
+      (nextMs === existingMs && normalized.id > existing.id);
+    if (preferNext) {
+      byCustomer.set(customerId, normalized);
+    }
+  }
+
+  return [...byCustomer.values()];
+}
+
+/**
  * Do not recover checkouts older than this (matches pending-purchase UI window).
  * Prevents endless mail to ancient READY rows.
  */
