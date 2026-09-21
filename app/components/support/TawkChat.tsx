@@ -1,6 +1,5 @@
 "use client";
 
-import Script from "next/script";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo } from "react";
 import { getTawkEmbedSrc } from "@/app/lib/support/tawkConfig";
@@ -28,6 +27,15 @@ function hideTawkWidget(): void {
     window.Tawk_API?.hideWidget?.();
   } catch {
     // Widget may not be ready.
+  }
+}
+
+function showTawkWidget(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.Tawk_API?.showWidget?.();
+  } catch {
+    // Script may still be loading.
   }
 }
 
@@ -62,6 +70,54 @@ function unloadTawkWidget(): void {
   }
 }
 
+function hasTawkScript(embedSrc: string): boolean {
+  return Boolean(
+    document.getElementById(SCRIPT_ID) ||
+      document.querySelector(`script[src="${embedSrc}"]`) ||
+      document.querySelector('script[src*="embed.tawk.to"]')
+  );
+}
+
+/** Bind onLoad so the bubble appears once Tawk finishes bootstrapping. */
+function bindTawkOnLoad(): void {
+  window.Tawk_API = window.Tawk_API || {};
+  window.Tawk_LoadStart = window.Tawk_LoadStart || new Date();
+  // Intentionally do not set visitor name/email or custom attributes.
+
+  window.Tawk_API.onLoad = () => {
+    try {
+      if (isTawkEnabledRoute(window.location.pathname || "/")) {
+        window.Tawk_API?.showWidget?.();
+      } else {
+        window.Tawk_API?.hideWidget?.();
+      }
+    } catch {
+      // Ignore widget API errors.
+    }
+  };
+}
+
+/**
+ * Inject the embed once. next/script remount after unload often skips re-exec
+ * for a stable id under App Router SPA navigations.
+ */
+function ensureTawkScript(embedSrc: string): void {
+  if (hasTawkScript(embedSrc)) return;
+
+  bindTawkOnLoad();
+
+  const script = document.createElement("script");
+  script.id = SCRIPT_ID;
+  script.async = true;
+  script.src = embedSrc;
+  script.charset = "UTF-8";
+  script.setAttribute("crossorigin", "*");
+  script.onerror = () => {
+    unloadTawkWidget();
+  };
+  document.body.appendChild(script);
+}
+
 /**
  * Consent- and route-gated Tawk widget.
  * Does not attach visitor identity, order data, or other account attributes.
@@ -83,37 +139,27 @@ export default function TawkChat({
   const widgetVisible = consentReady && routeAllowed;
 
   useEffect(() => {
-    if (!consentReady || !routeAllowed) {
+    if (!consentReady || !embedSrc) {
       unloadTawkWidget();
       return;
     }
 
-    window.Tawk_API = window.Tawk_API || {};
-    window.Tawk_LoadStart = window.Tawk_LoadStart || new Date();
-    // Intentionally do not set visitor name/email or custom attributes.
-
-    window.Tawk_API.onLoad = () => {
-      try {
-        if (isTawkEnabledRoute(window.location.pathname || "/")) {
-          window.Tawk_API?.showWidget?.();
-        } else {
-          window.Tawk_API?.hideWidget?.();
-        }
-      } catch {
-        // Ignore widget API errors.
-      }
-    };
-
-    if (widgetVisible) {
-      try {
-        window.Tawk_API.showWidget?.();
-      } catch {
-        // Script may still be loading.
-      }
-    } else {
-      hideTawkWidget();
+    if (!routeAllowed) {
+      // Restricted routes: fully unload (privacy), not merely hide.
+      unloadTawkWidget();
+      return;
     }
-  }, [consentReady, routeAllowed, widgetVisible]);
+
+    bindTawkOnLoad();
+
+    if (hasTawkScript(embedSrc)) {
+      // SPA navigation back onto an allowlisted route: script already present.
+      showTawkWidget();
+      return;
+    }
+
+    ensureTawkScript(embedSrc);
+  }, [consentReady, routeAllowed, widgetVisible, pathname, embedSrc]);
 
   useEffect(() => {
     return () => {
@@ -121,28 +167,18 @@ export default function TawkChat({
     };
   }, []);
 
-  if (!consentReady || !embedSrc || !routeAllowed) {
+  if (!widgetVisible) {
     return null;
   }
 
   return (
-    <>
-      <Script
-        id={SCRIPT_ID}
-        src={embedSrc}
-        strategy="lazyOnload"
-        onError={() => {
-          unloadTawkWidget();
-        }}
-      />
-      <style>{`
-        #tawkchat-minified-box,
-        #tawkchat-minified-wrapper,
-        .widget-visible {
-          bottom: max(1rem, env(safe-area-inset-bottom, 0px)) !important;
-          right: max(1rem, env(safe-area-inset-right, 0px)) !important;
-        }
-      `}</style>
-    </>
+    <style>{`
+      #tawkchat-minified-box,
+      #tawkchat-minified-wrapper,
+      .widget-visible {
+        bottom: max(1rem, env(safe-area-inset-bottom, 0px)) !important;
+        right: max(1rem, env(safe-area-inset-right, 0px)) !important;
+      }
+    `}</style>
   );
 }
