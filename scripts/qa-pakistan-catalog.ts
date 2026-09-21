@@ -192,7 +192,7 @@ function main() {
   assert.match(server, /fetchPublicOffersForCountry/);
   assert.match(
     server,
-    /return applyAsiaPublicCatalog\(\s*key,\s*applyPakistanPublicCatalog\(key, offers\)\s*\)/
+    /return applyAsiaPublicCatalog\(\s*key,\s*withPakistan\s*\)|applyAsiaPublicCatalog\(\s*key,\s*applyPakistanPublicCatalog/
   );
   assert.match(
     server,

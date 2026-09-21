@@ -24,6 +24,11 @@ export const dynamic = "force-dynamic";
 const PORTAL_UNAVAILABLE =
   "Orders are temporarily unavailable. Please refresh shortly.";
 
+function buildPartnerOrdersHref(page: number): string {
+  if (page <= 1) return "/partner/orders";
+  return `/partner/orders?page=${page}`;
+}
+
 function AttentionCard({
   row,
   refundRequest,
@@ -81,12 +86,17 @@ function AttentionCard({
   );
 }
 
-export default async function PartnerOrdersPage() {
+export default async function PartnerOrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const user = await requireRole("PARTNER");
+  const params = await searchParams;
 
   let data: Awaited<ReturnType<typeof listPartnerOrdersPage>>;
   try {
-    data = await listPartnerOrdersPage(user.id);
+    data = await listPartnerOrdersPage(user.id, { page: params.page });
   } catch {
     return (
         <div className={`${partnerCardClass} px-5 py-8`} role="status">
@@ -180,17 +190,55 @@ export default async function PartnerOrdersPage() {
             to find a plan.
           </p>
         ) : (
-          <ul className="space-y-3">
-            {data.orders.map((row) => (
-              <li key={row.orderId} className="min-w-0">
-                <PartnerEsimOrderCard
-                  row={row}
-                  refundRequest={refundByPurchase.get(row.purchaseId) ?? null}
-                  variant="list"
-                />
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="space-y-3">
+              {data.orders.map((row) => (
+                <li key={row.orderId} className="min-w-0">
+                  <PartnerEsimOrderCard
+                    row={row}
+                    refundRequest={refundByPurchase.get(row.purchaseId) ?? null}
+                    variant="list"
+                  />
+                </li>
+              ))}
+            </ul>
+            {data.totalPages > 1 ? (
+              <nav
+                className="flex min-w-0 flex-wrap items-center justify-between gap-3 pt-2 text-sm"
+                aria-label="Partner eSIM pages"
+              >
+                <p className="text-[var(--text-muted)]">
+                  Page {data.page} of {data.totalPages}
+                  <span className="text-[var(--text-soft)]">
+                    {" "}
+                    · {data.totalMatched} total
+                  </span>
+                </p>
+                <div className="flex gap-3">
+                  {data.page > 1 ? (
+                    <Link
+                      href={buildPartnerOrdersHref(data.page - 1)}
+                      className="font-semibold text-[var(--heading)] underline-offset-2 hover:underline"
+                    >
+                      Previous
+                    </Link>
+                  ) : (
+                    <span className="text-[var(--text-soft)]">Previous</span>
+                  )}
+                  {data.page < data.totalPages ? (
+                    <Link
+                      href={buildPartnerOrdersHref(data.page + 1)}
+                      className="font-semibold text-[var(--heading)] underline-offset-2 hover:underline"
+                    >
+                      Next
+                    </Link>
+                  ) : (
+                    <span className="text-[var(--text-soft)]">Next</span>
+                  )}
+                </div>
+              </nav>
+            ) : null}
+          </>
         )}
       </section>
     </div>

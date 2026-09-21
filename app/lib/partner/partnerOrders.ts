@@ -24,6 +24,7 @@ import {
   PARTNER_ORDERS_PAGE_LIMIT,
   displayOrUnavailable,
   formatPartnerOrderDate,
+  parsePartnerOrdersPage,
   partnerAttentionKindFromStatus,
   partnerAttentionMessage,
   partnerAttentionTitle,
@@ -34,7 +35,6 @@ import {
   type PartnerOrderStatusBadge,
 } from "@/app/lib/partner/partnerOrdersDisplay";
 import { formatUsdCents } from "@/app/lib/wallet/display";
-import type { VesimOffer } from "@/app/lib/vesim/offers";
 import { normalizeOfferId } from "@/app/lib/vesim/server";
 
 function partnerIccidMasked(
@@ -94,7 +94,239 @@ export type PartnerAttentionRow = {
 export type PartnerOrdersPageData = {
   orders: PartnerOrderListRow[];
   attention: PartnerAttentionRow[];
+  page: number;
+  pageSize: number;
+  totalMatched: number;
+  totalPages: number;
 };
+
+export type PartnerOrdersQueryInput = {
+  page?: string | null;
+};
+
+/** List CTA only — detail still runs catalog eligibility. */
+function listPageAddDataEligible(input: {
+  isRefunded: boolean;
+  installEligible: boolean;
+  offerId: string | null;
+  providerOrderId: string | null;
+}): boolean {
+  return (
+    !input.isRefunded &&
+    input.installEligible &&
+    Boolean(input.offerId) &&
+    Boolean(input.providerOrderId)
+  );
+}
+
+const partnerPurchaseListSelect = {
+  id: true,
+  status: true,
+  offerId: true,
+  destinationCode: true,
+  destinationName: true,
+  planName: true,
+  dataAllowance: true,
+  validity: true,
+  retailPriceCents: true,
+  partnerChargeCents: true,
+  createdAt: true,
+  completedAt: true,
+  orderId: true,
+  providerOrderId: true,
+  idempotencyKey: true,
+  order: {
+    select: {
+      id: true,
+      destination: true,
+      planName: true,
+      dataAllowance: true,
+      validity: true,
+      status: true,
+      createdAt: true,
+      iccidLast4: true,
+      iccidEncrypted: true,
+      offerId: true,
+      providerOrderId: true,
+    },
+  },
+} as const;
+
+/**
+ * Completed Partner Orders for the active Partner only (newest first, paginated).
+ * Also returns non-order attention purchases (pending / under review / failed-refunded).
+ * List pages skip public-catalog top-up lookups (detail still uses them).
+ */
+export async function listPartnerOrdersPage(
+  partnerUserId: string,
+  input: PartnerOrdersQueryInput = {}
+): Promise<PartnerOrdersPageData | null> {
+  const actor = await requireActivePartnerActor(partnerUserId);
+  if (!actor) return null;
+
+  const pageSize = PARTNER_ORDERS_PAGE_LIMIT;
+  let page = parsePartnerOrdersPage(input.page);
+
+  const completedWhere = {
+    partnerId: actor.partnerId,
+    status: PartnerEsimPurchaseStatus.COMPLETED,
+    orderId: { not: null },
+  };
+
+  const totalMatched = await prisma.partnerEsimPurchase.count({
+    where: completedWhere,
+  });
+  const totalPages =
+    totalMatched === 0 ? 0 : Math.ceil(totalMatched / pageSize);
+  if (totalPages > 0 && page > totalPages) {
+    page = totalPages;
+  }
+
+  const [completedPurchases, attentionPurchases] = await Promise.all([
+    prisma.partnerEsimPurchase.findMany({
+      where: completedWhere,
+      orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: partnerPurchaseListSelect,
+    }),
+    prisma.partnerEsimPurchase.findMany({
+      where: {
+        partnerId: actor.partnerId,
+        status: {
+          in: [
+            PartnerEsimPurchaseStatus.PROVIDER_PENDING,
+            PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED,
+            PartnerEsimPurchaseStatus.FAILED_REFUNDED,
+          ],
+        },
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: PARTNER_ORDERS_PAGE_LIMIT,
+      select: partnerPurchaseListSelect,
+    }),
+  ]);
+
+  const orders: PartnerOrderListRow[] = [];
+  const attention: PartnerAttentionRow[] = [];
+
+  for (const row of completedPurchases) {
+    if (!row.orderId || !row.order) continue;
+
+    const destination = displayOrUnavailable(
+      row.order.destination || row.destinationName || row.destinationCode
+    );
+    const planName = displayOrUnavailable(row.order.planName || row.planName);
+    const dataAllowance = displayOrUnavailable(
+      row.order.dataAllowance || row.dataAllowance
+    );
+    const validity = displayOrUnavailable(row.order.validity || row.validity);
+    const retailPriceLabel = `${formatUsdCents(row.retailPriceCents)} USD`;
+    const partnerDebitLabel = `${formatUsdCents(row.partnerChargeCents)} USD`;
+    const statusBadge = partnerOrderStatusFromPurchase(row.status);
+    const purchasedAtLabel = formatPartnerOrderDate(
+      row.completedAt ?? row.createdAt
+    );
+    const isRefunded = statusBadge === "Failed — balance returned";
+    const installEligible =
+      row.order.status === OrderStatus.COMPLETED &&
+      statusBadge === "Completed";
+    const offerIdForEligibility =
+      normalizeOfferId(row.offerId) ||
+      normalizeOfferId(row.order.offerId) ||
+      null;
+    const providerOrderId =
+      (row.order.providerOrderId ?? "").trim() ||
+      (row.providerOrderId ?? "").trim() ||
+      null;
+    const addDataEligible = listPageAddDataEligible({
+      isRefunded,
+      installEligible,
+      offerId: offerIdForEligibility,
+      providerOrderId,
+    });
+    const addDataPurchase = resolveAddDataPurchaseLabel(row.idempotencyKey);
+
+    orders.push({
+      purchaseId: row.id,
+      orderId: row.order.id,
+      shortReference: shortPartnerOrderReference(row.order.id),
+      destination,
+      flagUrl: customerFlagImageUrl(row.destinationCode),
+      planName,
+      dataAllowance,
+      validity,
+      retailPriceLabel,
+      partnerDebitLabel,
+      statusBadge,
+      purchasedAtLabel,
+      iccidMasked: partnerIccidMasked(
+        row.order.iccidLast4,
+        Boolean(row.order.iccidEncrypted?.trim()),
+        row.order.status
+      ),
+      iccidRevealable: Boolean(row.order.iccidEncrypted?.trim()),
+      hasActiveShareToken: false,
+      addDataEligible,
+      isAddDataPurchase: addDataPurchase.isAddDataPurchase,
+      addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
+    });
+  }
+
+  for (const row of attentionPurchases) {
+    const kind = partnerAttentionKindFromStatus(row.status);
+    if (!kind) continue;
+
+    const destination = displayOrUnavailable(
+      row.order?.destination || row.destinationName || row.destinationCode
+    );
+    const planName = displayOrUnavailable(row.order?.planName || row.planName);
+    const retailPriceLabel = `${formatUsdCents(row.retailPriceCents)} USD`;
+    const partnerDebitLabel = `${formatUsdCents(row.partnerChargeCents)} USD`;
+    const statusBadge = partnerOrderStatusFromPurchase(row.status);
+    const purchasedAtLabel = formatPartnerOrderDate(
+      row.completedAt ?? row.createdAt
+    );
+
+    attention.push({
+      purchaseId: row.id,
+      shortReference: shortPartnerPurchaseReference(row.id),
+      destination,
+      planName,
+      retailPriceLabel,
+      partnerDebitLabel,
+      statusBadge,
+      kind,
+      title: partnerAttentionTitle(kind),
+      message: partnerAttentionMessage(kind),
+      purchasedAtLabel,
+    });
+  }
+
+  if (orders.length > 0) {
+    const activeShares = await prisma.partnerEsimShareToken.findMany({
+      where: {
+        partnerId: actor.partnerId,
+        revokedAt: null,
+        orderId: { in: orders.map((order) => order.orderId) },
+      },
+      select: { orderId: true },
+    });
+    const active = new Set(activeShares.map((token) => token.orderId));
+    for (const order of orders) {
+      order.hasActiveShareToken = active.has(order.orderId);
+    }
+  }
+
+  return {
+    orders,
+    attention,
+    page,
+    pageSize,
+    totalMatched,
+    totalPages,
+  };
+}
 
 export type PartnerOrderDetail = {
   orderId: string;
@@ -128,178 +360,6 @@ export type PartnerOrderDetail = {
   /** Source MAP order id when isAddDataPurchase; never confuse with addDataEligible. */
   addDataSourceOrderId: string | null;
 };
-
-/**
- * Completed Partner Orders for the active Partner only (newest first).
- * Also returns non-order attention purchases (pending / under review / failed-refunded).
- */
-export async function listPartnerOrdersPage(
-  partnerUserId: string
-): Promise<PartnerOrdersPageData | null> {
-  const actor = await requireActivePartnerActor(partnerUserId);
-  if (!actor) return null;
-
-  const purchases = await prisma.partnerEsimPurchase.findMany({
-    where: {
-      partnerId: actor.partnerId,
-      status: {
-        in: [
-          PartnerEsimPurchaseStatus.COMPLETED,
-          PartnerEsimPurchaseStatus.PROVIDER_PENDING,
-          PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED,
-          PartnerEsimPurchaseStatus.FAILED_REFUNDED,
-        ],
-      },
-    },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: PARTNER_ORDERS_PAGE_LIMIT,
-    select: {
-      id: true,
-      status: true,
-      offerId: true,
-      destinationCode: true,
-      destinationName: true,
-      planName: true,
-      dataAllowance: true,
-      validity: true,
-      retailPriceCents: true,
-      partnerChargeCents: true,
-      createdAt: true,
-      completedAt: true,
-      orderId: true,
-      providerOrderId: true,
-      idempotencyKey: true,
-      order: {
-        select: {
-          id: true,
-          destination: true,
-          planName: true,
-          dataAllowance: true,
-          validity: true,
-          status: true,
-          createdAt: true,
-          iccidLast4: true,
-          iccidEncrypted: true,
-          offerId: true,
-          providerOrderId: true,
-        },
-      },
-    },
-  });
-
-  const orders: PartnerOrderListRow[] = [];
-  const attention: PartnerAttentionRow[] = [];
-  const catalogCache = new Map<string, VesimOffer[] | null>();
-
-  for (const row of purchases) {
-    const destination = displayOrUnavailable(
-      row.order?.destination || row.destinationName || row.destinationCode
-    );
-    const planName = displayOrUnavailable(row.order?.planName || row.planName);
-    const dataAllowance = displayOrUnavailable(
-      row.order?.dataAllowance || row.dataAllowance
-    );
-    const validity = displayOrUnavailable(row.order?.validity || row.validity);
-    const retailPriceLabel = `${formatUsdCents(row.retailPriceCents)} USD`;
-    const partnerDebitLabel = `${formatUsdCents(row.partnerChargeCents)} USD`;
-    const statusBadge = partnerOrderStatusFromPurchase(row.status);
-    const purchasedAtLabel = formatPartnerOrderDate(
-      row.completedAt ?? row.createdAt
-    );
-
-    if (
-      row.status === PartnerEsimPurchaseStatus.COMPLETED &&
-      row.orderId &&
-      row.order
-    ) {
-      const isRefunded = statusBadge === "Failed — balance returned";
-      const installEligible =
-        row.order.status === OrderStatus.COMPLETED &&
-        statusBadge === "Completed";
-      const offerIdForEligibility =
-        normalizeOfferId(row.offerId) ||
-        normalizeOfferId(row.order.offerId) ||
-        null;
-      const providerOrderId =
-        (row.order.providerOrderId ?? "").trim() ||
-        (row.providerOrderId ?? "").trim() ||
-        null;
-      const catalog = await lookupOfferTopUpFromCatalog(
-        offerIdForEligibility,
-        row.destinationCode,
-        catalogCache
-      );
-      const addData = buildAddDataEligibility({
-        providerOrderId,
-        offerId: offerIdForEligibility,
-        isRefunded,
-        installEligible,
-        catalog,
-      });
-      const addDataPurchase = resolveAddDataPurchaseLabel(row.idempotencyKey);
-
-      orders.push({
-        purchaseId: row.id,
-        orderId: row.order.id,
-        shortReference: shortPartnerOrderReference(row.order.id),
-        destination,
-        flagUrl: customerFlagImageUrl(row.destinationCode),
-        planName,
-        dataAllowance,
-        validity,
-        retailPriceLabel,
-        partnerDebitLabel,
-        statusBadge,
-        purchasedAtLabel,
-        iccidMasked: partnerIccidMasked(
-          row.order.iccidLast4,
-          Boolean(row.order.iccidEncrypted?.trim()),
-          row.order.status
-        ),
-        iccidRevealable: Boolean(row.order.iccidEncrypted?.trim()),
-        hasActiveShareToken: false,
-        addDataEligible: addData.addDataEligible,
-        isAddDataPurchase: addDataPurchase.isAddDataPurchase,
-        addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
-      });
-      continue;
-    }
-
-    const kind = partnerAttentionKindFromStatus(row.status);
-    if (!kind) continue;
-
-    attention.push({
-      purchaseId: row.id,
-      shortReference: shortPartnerPurchaseReference(row.id),
-      destination,
-      planName,
-      retailPriceLabel,
-      partnerDebitLabel,
-      statusBadge,
-      kind,
-      title: partnerAttentionTitle(kind),
-      message: partnerAttentionMessage(kind),
-      purchasedAtLabel,
-    });
-  }
-
-  if (orders.length > 0) {
-    const activeShares = await prisma.partnerEsimShareToken.findMany({
-      where: {
-        partnerId: actor.partnerId,
-        revokedAt: null,
-        orderId: { in: orders.map((order) => order.orderId) },
-      },
-      select: { orderId: true },
-    });
-    const active = new Set(activeShares.map((token) => token.orderId));
-    for (const order of orders) {
-      order.hasActiveShareToken = active.has(order.orderId);
-    }
-  }
-
-  return { orders, attention };
-}
 
 /**
  * Load one Order only when linked to this Partner via PartnerEsimPurchase.

@@ -289,7 +289,14 @@ async function main() {
     /Purchase\/checkout\/admin validation must keep using this path/
   );
   assert.match(read("app/lib/esim/adminPackageAssignmentRead.ts"), /fetchOffersForCountry/);
-  assert.match(read("app/lib/partner/partnerCatalogRead.ts"), /fetchOffersForCountry/);
+  const partnerCatalog = read("app/lib/partner/partnerCatalogRead.ts");
+  assert.match(partnerCatalog, /fetchPublicOffersForCountry/);
+  assert.match(partnerCatalog, /fetchPublicDestinationCatalog/);
+  assert.doesNotMatch(partnerCatalog, /fetchOffersForCountry\(/);
+  assert.match(
+    read("app/lib/partner/partnerEsimPurchase.ts"),
+    /verifyOfferAuthoritative/
+  );
   console.log("   ok");
 
   console.log("10) No silent successful empty catalog; seed never flips reads");

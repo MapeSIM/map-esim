@@ -67,6 +67,7 @@ export default async function AdminCountryPackagesPage({
                 alt=""
                 width={36}
                 height={24}
+                sizes="36px"
                 className="h-6 w-auto object-cover"
               />
             </span>

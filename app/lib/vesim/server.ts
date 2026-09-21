@@ -371,10 +371,17 @@ const loadCachedFlagOffPublicOffersForCountry = unstable_cache(
  *
  * refreshMode defaults to blocking (browse/API). Soft order-catalog reads pass
  * "background" so stale refresh does not block the response.
+ *
+ * applyAsiaCustomerOverlay defaults true (customer storefront). Partner catalog
+ * browse passes false so Asia customer retail pins do not affect Partner list
+ * prices; purchase still uses verifyOfferAuthoritative (live) with markup false.
  */
 export async function fetchPublicOffersForCountry(
   country: string,
-  options?: { refreshMode?: PublicOfferRefreshMode }
+  options?: {
+    refreshMode?: PublicOfferRefreshMode;
+    applyAsiaCustomerOverlay?: boolean;
+  }
 ): Promise<VesimOffer[]> {
   const key = publicOffersCountryKey(country);
   if (!key) {
@@ -391,10 +398,11 @@ export async function fetchPublicOffersForCountry(
     loadFlagOffCached: loadCachedFlagOffPublicOffersForCountry,
     refreshMode: options?.refreshMode,
   });
-  return applyAsiaPublicCatalog(
-    key,
-    applyPakistanPublicCatalog(key, offers)
-  );
+  const withPakistan = applyPakistanPublicCatalog(key, offers);
+  if (options?.applyAsiaCustomerOverlay === false) {
+    return withPakistan;
+  }
+  return applyAsiaPublicCatalog(key, withPakistan);
 }
 
 export async function verifyOfferAuthoritative(options: {

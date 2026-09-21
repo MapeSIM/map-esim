@@ -70,7 +70,7 @@ import {
   type OperationalControlsHealthSnapshot,
 } from "@/app/lib/admin/operationalControlsPolicy";
 
-const METRICS_TAKE = 500;
+const METRICS_TAKE = 120;
 
 export type HealthCardMeta = {
   checkedAtLabel: string;

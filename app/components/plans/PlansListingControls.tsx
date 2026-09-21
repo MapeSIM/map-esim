@@ -1,14 +1,24 @@
 "use client";
 
 import { type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { Filter } from "lucide-react";
-import SortSelect from "@/app/components/plans/SortSelect";
 import {
   formatValidityPill,
   type CategoryFilter,
   type PlanTypeFilter,
   type SortOption,
 } from "@/app/lib/plans/plan-utils";
+
+const SortSelect = dynamic(() => import("@/app/components/plans/SortSelect"), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="h-11 min-w-[10.5rem] rounded-xl border border-[var(--border-strong)] bg-[var(--surface-2)]"
+      aria-hidden
+    />
+  ),
+});
 
 export type PlansListingControlsProps = {
   showPlanTypeToggle: boolean;

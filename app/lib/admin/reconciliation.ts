@@ -46,7 +46,7 @@ import { formatUsdCents } from "@/app/lib/wallet/display";
 import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
 
-export const RECONCILIATION_LIST_LIMIT = 100;
+export const RECONCILIATION_LIST_LIMIT = 40;
 
 export type ReconciliationListRow = {
   sourceType: ReconciliationSourceType;

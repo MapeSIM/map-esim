@@ -79,6 +79,7 @@ export default function Footer() {
               alt={BRAND_LOGO_ALT}
               width={184}
               height={48}
+              sizes="150px"
               className="h-9 w-[150px] max-w-[150px] object-contain object-left dark:hidden"
               unoptimized
             />
@@ -87,6 +88,7 @@ export default function Footer() {
               alt=""
               width={184}
               height={48}
+              sizes="150px"
               className="hidden h-9 w-[150px] max-w-[150px] object-contain object-left dark:block"
               unoptimized
               aria-hidden="true"

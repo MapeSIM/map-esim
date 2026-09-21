@@ -22,6 +22,7 @@ import {
   WALLET_RESERVATION_MONITOR_POLICY_BLURB,
   WALLET_RESERVATION_MONITOR_STALE_MS,
   WALLET_RESERVATION_MONITOR_TAKE,
+  WALLET_RESERVATION_SUMMARY_TAKE,
   walletReservationAgeLabel,
   walletReservationPackageLabel,
 } from "@/app/lib/admin/walletReservationMonitorShared";
@@ -66,6 +67,18 @@ function customerLabelFrom(user: {
   return `${name} · ${maskAdminEmail(user.email)}`;
 }
 
+const OPEN_RESERVATION_WHERE = {
+  refundTransactionId: null,
+  walletAppliedCents: { gt: 0 },
+  status: {
+    in: [
+      WalletEsimPurchaseStatus.FUNDS_RESERVED,
+      WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+      WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED,
+    ],
+  },
+};
+
 /**
  * Open wallet reservation inventory for Operations.
  * Call only after admin Operations access checks.
@@ -77,17 +90,7 @@ export async function getWalletReservationMonitorDashboard(
   const take = WALLET_RESERVATION_MONITOR_TAKE;
 
   const rows = await prisma.walletEsimPurchase.findMany({
-    where: {
-      refundTransactionId: null,
-      walletAppliedCents: { gt: 0 },
-      status: {
-        in: [
-          WalletEsimPurchaseStatus.FUNDS_RESERVED,
-          WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
-          WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED,
-        ],
-      },
-    },
+    where: OPEN_RESERVATION_WHERE,
     orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
     take,
     select: {
@@ -176,5 +179,66 @@ export async function getWalletReservationMonitorDashboard(
     splitCount,
     truncated: rows.length >= take,
     rows: mapped,
+  };
+}
+
+/**
+ * Ops Dashboard KPI summary — same open-hold classification, no inventory row DTOs.
+ * Full inventory remains on `/admin/operations/wallet-reservations`.
+ */
+export async function getWalletReservationMonitorSummary(
+  now: Date = new Date()
+): Promise<WalletReservationMonitorDashboard> {
+  const nowMs = now.getTime();
+  const take = WALLET_RESERVATION_SUMMARY_TAKE;
+
+  const rows = await prisma.walletEsimPurchase.findMany({
+    where: OPEN_RESERVATION_WHERE,
+    orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+    take,
+    select: {
+      id: true,
+      status: true,
+      walletAppliedCents: true,
+      gatewayAmountCents: true,
+      refundTransactionId: true,
+      updatedAt: true,
+    },
+  });
+
+  const openRows = rows.filter((row) =>
+    isOpenWalletReservation({
+      status: row.status,
+      walletAppliedCents: row.walletAppliedCents,
+      refundTransactionId: row.refundTransactionId,
+    })
+  );
+
+  const totalCents = sumReservedWalletCents(openRows);
+  const staleCount = openRows.filter((row) =>
+    isStaleWalletReservation({
+      updatedAt: row.updatedAt,
+      nowMs,
+      staleMs: WALLET_RESERVATION_MONITOR_STALE_MS,
+    })
+  ).length;
+  const splitCount = openRows.filter((row) =>
+    isSplitPaymentReservation({
+      status: row.status,
+      walletAppliedCents: row.walletAppliedCents,
+      gatewayAmountCents: row.gatewayAmountCents,
+    })
+  ).length;
+
+  return {
+    checkedAtLabel: formatUtcTimestamp(now),
+    staleMinutes: Math.round(WALLET_RESERVATION_MONITOR_STALE_MS / 60_000),
+    policyBlurb: WALLET_RESERVATION_MONITOR_POLICY_BLURB,
+    openCount: openRows.length,
+    totalReservedUsdLabel: formatWalletReservationTotalUsd(totalCents),
+    staleCount,
+    splitCount,
+    truncated: rows.length >= take,
+    rows: [],
   };
 }

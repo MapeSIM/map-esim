@@ -303,6 +303,7 @@ function main() {
   assert.ok(liveFetch);
   assert.doesNotMatch(liveFetch, /applyAsiaPublicCatalog/);
   assert.match(partnerCatalog, /applyAsiaTemporaryMarkup:\s*false/);
+  assert.match(partnerCatalog, /applyAsiaCustomerOverlay:\s*false/);
   assert.match(partnerPurchase, /applyAsiaTemporaryMarkup:\s*false/);
   assert.doesNotMatch(retailPricing, /asiaCatalogPolicy|ASIA_TEMPORARY/);
   assert.match(pkg, /"qa:asia-catalog"/);

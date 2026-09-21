@@ -5,7 +5,15 @@
 
 import { PartnerEsimPurchaseStatus } from "@prisma/client";
 
-export const PARTNER_ORDERS_PAGE_LIMIT = 100;
+export const PARTNER_ORDERS_PAGE_LIMIT = 20;
+
+export function parsePartnerOrdersPage(
+  raw: string | null | undefined
+): number {
+  const n = Number.parseInt(String(raw ?? "").trim(), 10);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(n, 500);
+}
 
 /** Completed Partner eSIM with install credentials, no activation evidence. */
 export const PARTNER_ESIM_READY_LABEL = "Ready to install";

@@ -67,6 +67,7 @@ export function CustomerEsimOrderCard({
                 alt=""
                 width={56}
                 height={42}
+                sizes="56px"
                 className="h-9 w-auto object-cover"
               />
             ) : (

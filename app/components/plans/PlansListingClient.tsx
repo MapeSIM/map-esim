@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import type { VesimOffer } from "@/app/lib/vesim/offers";
@@ -23,6 +23,7 @@ import {
   DEFAULT_SORT,
   isDefaultPlansListingState,
 } from "@/app/lib/plans/planListingModel";
+import { useShellAuth } from "@/app/components/auth/ShellAuthContext";
 import PlansListingControls from "@/app/components/plans/PlansListingControls";
 import PlansOfferGroups from "@/app/components/plans/PlansOfferGroups";
 import { PlansListingChromeProvider } from "@/app/components/plans/PlansListingChrome";
@@ -67,26 +68,8 @@ export default function PlansListingClient({
   const [sort, setSort] = useState<SortOption>(DEFAULT_SORT);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState<VesimOffer | null>(null);
-  const [signedIn, setSignedIn] = useState(false);
-  const [partnerCheckout, setPartnerCheckout] = useState(false);
+  const { signedIn, isPartner: partnerCheckout } = useShellAuth();
   const purchaseTrustLine = planPurchaseTrustLine(signedIn);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/auth/session", { cache: "no-store" })
-      .then((res) => res.json())
-      .then((session: { user?: { role?: string } } | null) => {
-        if (cancelled || !session?.user) return;
-        setSignedIn(true);
-        if (session.user.role === "PARTNER") {
-          setPartnerCheckout(true);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const resolveCheckoutHref = partnerCheckout
     ? buildPartnerCheckoutHref

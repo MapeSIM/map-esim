@@ -39,12 +39,20 @@ export async function GET(req: Request) {
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      country,
-      count: offers.length,
-      offers: toPublicVesimOffers(offers),
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        country,
+        count: offers.length,
+        offers: toPublicVesimOffers(offers),
+      },
+      {
+        // Align with destination catalog / offer snapshot stale window (300s).
+        headers: {
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+        },
+      }
+    );
   } catch (error: unknown) {
     if (error instanceof PublicOfferSnapshotError) {
       return NextResponse.json(

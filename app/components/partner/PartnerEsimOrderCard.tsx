@@ -111,6 +111,7 @@ export default function PartnerEsimOrderCard({
                 alt=""
                 width={40}
                 height={30}
+                sizes="40px"
                 className="h-7 w-auto object-cover"
               />
             </div>
@@ -170,6 +171,7 @@ export default function PartnerEsimOrderCard({
                 alt=""
                 width={40}
                 height={30}
+                sizes="40px"
                 className="h-7 w-auto object-cover"
               />
             </div>

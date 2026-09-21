@@ -15,6 +15,9 @@ import { formatUsdCents } from "@/app/lib/wallet/display";
 
 export const WALLET_RESERVATION_MONITOR_TAKE = 200;
 
+/** Ops home summary sample — counts only; full inventory stays on Wallet Holds page. */
+export const WALLET_RESERVATION_SUMMARY_TAKE = 120;
+
 export const WALLET_RESERVATION_MONITOR_STALE_MS =
   MONITORING_THRESHOLDS.STALE_PURCHASE_AGE_MS;
 

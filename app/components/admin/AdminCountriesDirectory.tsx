@@ -69,6 +69,7 @@ export default function AdminCountriesDirectory({ destinations }: Props) {
                       alt=""
                       width={28}
                       height={20}
+                      sizes="28px"
                       className="h-5 w-auto object-cover"
                     />
                   </span>

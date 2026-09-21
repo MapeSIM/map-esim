@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import {
   getReconciliationListPage,
@@ -26,6 +27,9 @@ const UNAVAILABLE =
 
 const EMPTY_CLASS =
   "rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]";
+
+const CARD_CLASS =
+  "min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5";
 
 function buildHref(filter: ReconciliationFilter): string {
   if (filter === "needs_review") return "/admin/reconciliation";
@@ -297,9 +301,6 @@ export default async function AdminReconciliationPage({
   await requireActiveAdminForReconciliation();
   const params = await searchParams;
 
-  const data = await getReconciliationListPage({ filter: params.filter });
-  const advancedOpen = data.filter !== "needs_review";
-
   return (
     <div className="min-w-0 space-y-8">
       <header className="min-w-0">
@@ -322,100 +323,127 @@ export default async function AdminReconciliationPage({
         remain blocked.
       </div>
 
-      {data.unavailable ? (
-        <div
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-          role="status"
-        >
-          <p className="text-sm font-medium text-[var(--heading)]">
-            {UNAVAILABLE}
-          </p>
+      <Suspense fallback={<ReconciliationBodyFallback />}>
+        <ReconciliationBody filter={params.filter} />
+      </Suspense>
+    </div>
+  );
+}
+
+function ReconciliationBodyFallback() {
+  return (
+    <div className={`${CARD_CLASS} px-5 py-8`} role="status" aria-busy="true">
+      <p className="text-sm font-medium text-[var(--heading)]">
+        Loading reconciliation KPIs and cases…
+      </p>
+    </div>
+  );
+}
+
+async function ReconciliationBody({
+  filter,
+}: {
+  filter?: string;
+}) {
+  const data = await getReconciliationListPage({ filter });
+  const advancedOpen = data.filter !== "needs_review";
+
+  if (data.unavailable) {
+    return (
+      <div
+        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
+        role="status"
+      >
+        <p className="text-sm font-medium text-[var(--heading)]">
+          {UNAVAILABLE}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <section
+        aria-label="Reconciliation summary"
+        className="grid gap-3 sm:grid-cols-3"
+      >
+        <AdminKpiCard label="Need Action" value={data.summary.needAction} />
+        <AdminKpiCard label="Waiting" value={data.summary.waiting} />
+        <AdminKpiCard label="Resolved" value={data.summary.resolved} />
+      </section>
+
+      {data.filter !== "needs_review" ? (
+        <p className="text-sm text-[var(--text-muted)]">
+          Showing filter:{" "}
+          <span className="font-medium text-[var(--heading)]">
+            {data.filterLabel}
+          </span>
+          {" · "}
+          <Link
+            href="/admin/reconciliation"
+            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+          >
+            Clear filter
+          </Link>
+        </p>
+      ) : null}
+
+      {data.rows.length === 0 ? (
+        <div className={EMPTY_CLASS} role="status">
+          No reconciliation cases match “{data.filterLabel}”.
         </div>
       ) : (
-        <>
-          <section
-            aria-label="Reconciliation summary"
-            className="grid gap-3 sm:grid-cols-3"
-          >
-            <AdminKpiCard label="Need Action" value={data.summary.needAction} />
-            <AdminKpiCard label="Waiting" value={data.summary.waiting} />
-            <AdminKpiCard label="Resolved" value={data.summary.resolved} />
-          </section>
+        <ul
+          className="space-y-3"
+          aria-label="Reconciliation cases"
+          data-reconciliation-simple-cases="true"
+        >
+          {data.rows.map((row) => (
+            <SimpleCaseCard
+              key={`${row.sourceType}:${row.attemptId}`}
+              row={row}
+            />
+          ))}
+        </ul>
+      )}
 
-          {data.filter !== "needs_review" ? (
-            <p className="text-sm text-[var(--text-muted)]">
-              Showing filter:{" "}
-              <span className="font-medium text-[var(--heading)]">
-                {data.filterLabel}
-              </span>
-              {" · "}
-              <Link
-                href="/admin/reconciliation"
-                className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-              >
-                Clear filter
-              </Link>
-            </p>
-          ) : null}
+      <details
+        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4"
+        {...(advancedOpen ? { open: true } : {})}
+      >
+        <summary className="cursor-pointer text-sm font-semibold text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]">
+          Advanced Filters
+        </summary>
+        <div className="mt-4 space-y-4">
+          <nav
+            className="flex min-w-0 flex-wrap gap-2"
+            aria-label="Reconciliation filters"
+          >
+            {RECONCILIATION_FILTERS.map((f) => {
+              const active = data.filter === f;
+              return (
+                <AdminButton
+                  key={f}
+                  href={buildHref(f)}
+                  variant={active ? "primary" : "secondary"}
+                  size="sm"
+                  className="!h-10 !px-4 !text-sm"
+                >
+                  {filterLabel(f)}
+                </AdminButton>
+              );
+            })}
+          </nav>
 
           {data.rows.length === 0 ? (
             <div className={EMPTY_CLASS} role="status">
-              No reconciliation cases match “{data.filterLabel}”.
+              No technical rows for “{data.filterLabel}”.
             </div>
           ) : (
-            <ul
-              className="space-y-3"
-              aria-label="Reconciliation cases"
-              data-reconciliation-simple-cases="true"
-            >
-              {data.rows.map((row) => (
-                <SimpleCaseCard
-                  key={`${row.sourceType}:${row.attemptId}`}
-                  row={row}
-                />
-              ))}
-            </ul>
+            <TechnicalTable rows={data.rows} />
           )}
-
-          <details
-            className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4"
-            {...(advancedOpen ? { open: true } : {})}
-          >
-            <summary className="cursor-pointer text-sm font-semibold text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]">
-              Advanced Filters
-            </summary>
-            <div className="mt-4 space-y-4">
-              <nav
-                className="flex min-w-0 flex-wrap gap-2"
-                aria-label="Reconciliation filters"
-              >
-                {RECONCILIATION_FILTERS.map((f) => {
-                  const active = data.filter === f;
-                  return (
-                    <AdminButton
-                      key={f}
-                      href={buildHref(f)}
-                      variant={active ? "primary" : "secondary"}
-                      size="sm"
-                      className="!h-10 !px-4 !text-sm"
-                    >
-                      {filterLabel(f)}
-                    </AdminButton>
-                  );
-                })}
-              </nav>
-
-              {data.rows.length === 0 ? (
-                <div className={EMPTY_CLASS} role="status">
-                  No technical rows for “{data.filterLabel}”.
-                </div>
-              ) : (
-                <TechnicalTable rows={data.rows} />
-              )}
-            </div>
-          </details>
-        </>
-      )}
-    </div>
+        </div>
+      </details>
+    </>
   );
 }

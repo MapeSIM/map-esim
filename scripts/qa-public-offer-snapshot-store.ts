@@ -221,7 +221,9 @@ function sourceContracts() {
   assert.doesNotMatch(api, /fetchOffersForCountry\(/);
   assert.match(checkout, /verifyOfferAuthoritative/);
   assert.doesNotMatch(checkout, /fetchPublicOffersForCountry/);
-  assert.match(partner, /fetchOffersForCountry/);
+  assert.match(partner, /fetchPublicOffersForCountry/);
+  assert.match(partner, /fetchPublicDestinationCatalog/);
+  assert.doesNotMatch(partner, /fetchOffersForCountry\(/);
   assert.match(admin, /fetchOffersForCountry/);
   assert.doesNotMatch(seed, /fullCatalog/);
   assert.doesNotMatch(seed, /publicOfferSnapshotControl\.(update|updateMany)/);

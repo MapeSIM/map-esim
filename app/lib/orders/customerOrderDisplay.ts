@@ -3,7 +3,15 @@
  * No Prisma, no secrets, no provider calls.
  */
 
-export const CUSTOMER_ORDERS_PAGE_LIMIT = 100;
+export const CUSTOMER_ORDERS_PAGE_LIMIT = 20;
+
+export function parseCustomerOrdersPage(
+  raw: string | null | undefined
+): number {
+  const n = Number.parseInt(String(raw ?? "").trim(), 10);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(n, 500);
+}
 
 export type CustomerEsimStatusBadge =
   | "Completed"

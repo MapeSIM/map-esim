@@ -208,7 +208,7 @@ function main() {
   assert.match(nav, /Wallet Holds/);
   assert.match(access, /\/admin\/operations\/wallet-reservations/);
   assert.match(opsPage, /\/admin\/operations\/wallet-reservations|ADMIN_WALLET_RESERVATIONS_HREF/);
-  assert.match(opsPage, /getWalletReservationMonitorDashboard/);
+  assert.match(opsPage, /getWalletReservationMonitorSummary/);
   assert.match(opsPage, /ADMIN_WALLET_RESERVATIONS_HREF/);
   assert.match(opsPage, /Wallet Holds summary/);
   assert.match(opsPage, /Open wallet holds/);

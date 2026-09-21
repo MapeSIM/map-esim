@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Suspense, cache, type ReactNode } from "react";
 import {
   getOperationsHealthDashboard,
   requireActiveAdminForOperations,
@@ -14,7 +14,7 @@ import {
   type MonitoringAlertSummary,
 } from "@/app/lib/admin/monitoringAlerts";
 import {
-  getWalletReservationMonitorDashboard,
+  getWalletReservationMonitorSummary,
   type WalletReservationMonitorDashboard,
 } from "@/app/lib/admin/walletReservationMonitor";
 import {
@@ -35,6 +35,10 @@ const UNAVAILABLE =
 
 const CARD_CLASS =
   "min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5";
+
+const loadOpsHealth = cache(getOperationsHealthDashboard);
+const loadAlertSummary = cache(getMonitoringAlertSummary);
+const loadReservationSummary = cache(getWalletReservationMonitorSummary);
 
 function Metric({
   label,
@@ -126,23 +130,16 @@ function WarningList({ warnings }: { warnings: OpsWarning[] }) {
   );
 }
 
-function DashboardBody({
+function OperationsPriorityView({
   data,
   alertSummary,
   reservationSummary,
-  whatsappSupport,
 }: {
   data: OperationsHealthDashboard;
   alertSummary: MonitoringAlertSummary;
   reservationSummary: WalletReservationMonitorDashboard | null;
-  whatsappSupport: Awaited<ReturnType<typeof getAdminWhatsAppSupportView>>;
 }) {
-  const app = data.applicationDatabase;
   const recon = data.reconciliation;
-  const email = data.email;
-  const provider = data.provider;
-  const payment = data.payment;
-  const security = data.security;
   const controls = data.operationalControls;
   const reservationsHref = isSafeAdminHref(ADMIN_WALLET_RESERVATIONS_HREF)
     ? ADMIN_WALLET_RESERVATIONS_HREF
@@ -351,7 +348,27 @@ function DashboardBody({
           {controls.freshness.replaceAll("_", " ")}
         </p>
       </section>
+    </div>
+  );
+}
 
+function OperationsDeferredView({
+  data,
+  whatsappSupport,
+}: {
+  data: OperationsHealthDashboard;
+  whatsappSupport: Awaited<ReturnType<typeof getAdminWhatsAppSupportView>>;
+}) {
+  const app = data.applicationDatabase;
+  const recon = data.reconciliation;
+  const email = data.email;
+  const provider = data.provider;
+  const payment = data.payment;
+  const security = data.security;
+  const controls = data.operationalControls;
+
+  return (
+    <div className="min-w-0 space-y-8">
       <OperationalControlsPanel
         controls={controls.controls}
         overallStatus={controls.overallTransactionsStatus}
@@ -573,38 +590,53 @@ function DashboardBody({
   );
 }
 
-export default async function AdminOperationsPage() {
-  await requireActiveAdminForOperations();
+function PriorityFallback() {
+  return (
+    <div
+      className={`${CARD_CLASS} px-5 py-8`}
+      role="status"
+      aria-busy="true"
+    >
+      <p className="text-sm font-medium text-[var(--heading)]">
+        Loading operations KPIs and alerts…
+      </p>
+    </div>
+  );
+}
 
-  let data: OperationsHealthDashboard;
-  let alertSummary: MonitoringAlertSummary;
-  let whatsappSupport: Awaited<ReturnType<typeof getAdminWhatsAppSupportView>>;
+function DeferredFallback() {
+  return (
+    <div
+      className={`${CARD_CLASS} px-5 py-8`}
+      role="status"
+      aria-busy="true"
+    >
+      <p className="text-sm font-medium text-[var(--heading)]">
+        Loading controls and detailed health cards…
+      </p>
+    </div>
+  );
+}
+
+async function OperationsPrioritySection() {
+  let data: OperationsHealthDashboard | null = null;
+  let alertSummary: MonitoringAlertSummary | null = null;
   let reservationSummary: WalletReservationMonitorDashboard | null = null;
+  let failed = false;
   try {
-    const [health, alerts, whatsapp, reservations] = await Promise.all([
-      getOperationsHealthDashboard(),
-      getMonitoringAlertSummary(),
-      getAdminWhatsAppSupportView(),
-      getWalletReservationMonitorDashboard().catch(() => null),
+    const [health, alerts, reservations] = await Promise.all([
+      loadOpsHealth(),
+      loadAlertSummary(),
+      loadReservationSummary().catch(() => null),
     ]);
     data = health;
     alertSummary = alerts;
-    whatsappSupport = whatsapp;
     reservationSummary = reservations;
   } catch {
-    // Health may fail independently — still try to load WhatsApp config for ops.
-    try {
-      whatsappSupport = await getAdminWhatsAppSupportView();
-    } catch {
-      whatsappSupport = {
-        enabled: false,
-        phoneDisplay: "",
-        message: "",
-        version: 1,
-        updatedAtLabel: null,
-        updatedByAdminIdSafe: null,
-      };
-    }
+    failed = true;
+  }
+
+  if (failed || !data || !alertSummary) {
     return (
       <div className="min-w-0 space-y-6">
         <header className="min-w-0">
@@ -623,17 +655,61 @@ export default async function AdminOperationsPage() {
             {UNAVAILABLE}
           </p>
         </div>
-        <WhatsAppSupportPanel initial={whatsappSupport} />
       </div>
     );
   }
 
   return (
-    <DashboardBody
+    <OperationsPriorityView
       data={data}
       alertSummary={alertSummary}
       reservationSummary={reservationSummary}
-      whatsappSupport={whatsappSupport}
     />
+  );
+}
+
+async function OperationsDeferredSection() {
+  let data: OperationsHealthDashboard | null = null;
+  let whatsappSupport: Awaited<
+    ReturnType<typeof getAdminWhatsAppSupportView>
+  > | null = null;
+  let failed = false;
+  try {
+    const [health, whatsapp] = await Promise.all([
+      loadOpsHealth(),
+      getAdminWhatsAppSupportView(),
+    ]);
+    data = health;
+    whatsappSupport = whatsapp;
+  } catch {
+    failed = true;
+  }
+
+  if (!failed && data && whatsappSupport) {
+    return (
+      <OperationsDeferredView data={data} whatsappSupport={whatsappSupport} />
+    );
+  }
+
+  try {
+    whatsappSupport = await getAdminWhatsAppSupportView();
+  } catch {
+    return null;
+  }
+  return <WhatsAppSupportPanel initial={whatsappSupport} />;
+}
+
+export default async function AdminOperationsPage() {
+  await requireActiveAdminForOperations();
+
+  return (
+    <div className="min-w-0 space-y-8">
+      <Suspense fallback={<PriorityFallback />}>
+        <OperationsPrioritySection />
+      </Suspense>
+      <Suspense fallback={<DeferredFallback />}>
+        <OperationsDeferredSection />
+      </Suspense>
+    </div>
   );
 }

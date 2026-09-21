@@ -15,6 +15,7 @@ import {
   normalizeCustomerOrderSearch,
   parseCustomerEsimStatusFilter,
   parseCustomerOrderDateFilter,
+  parseCustomerOrdersPage,
   resolveCustomerEsimStatusBadge,
   customerEsimStatusLabel,
   shortCustomerOrderReference,
@@ -289,7 +290,10 @@ export type CustomerOrdersListResult = {
   status: CustomerEsimStatusFilter;
   from: string;
   to: string;
+  page: number;
+  pageSize: number;
   totalMatched: number;
+  totalPages: number;
 };
 
 export type CustomerOrdersQueryInput = {
@@ -297,12 +301,130 @@ export type CustomerOrdersQueryInput = {
   status?: string | null;
   from?: string | null;
   to?: string | null;
+  page?: string | null;
 };
+
+/** List CTA only — detail/add-data still run full catalog eligibility. */
+function listPageAddDataEligible(input: {
+  isRefunded: boolean;
+  installEligible: boolean;
+  offerId: string | null;
+  providerOrderId: string | null;
+}): boolean {
+  return (
+    !input.isRefunded &&
+    input.installEligible &&
+    Boolean(input.offerId) &&
+    Boolean(input.providerOrderId)
+  );
+}
+
+function buildCustomerOrdersWhere(
+  userId: string,
+  status: CustomerEsimStatusFilter,
+  search: string,
+  from: string,
+  to: string
+): Prisma.OrderWhereInput {
+  const where: Prisma.OrderWhereInput = { userId };
+  const and: Prisma.OrderWhereInput[] = [];
+
+  if (from || to) {
+    const createdAt: Prisma.DateTimeFilter = {};
+    if (from) {
+      createdAt.gte = new Date(`${from}T00:00:00.000Z`);
+    }
+    if (to) {
+      createdAt.lte = new Date(`${to}T23:59:59.999Z`);
+    }
+    and.push({ createdAt });
+  }
+
+  if (search) {
+    const searchLast4 = search.replace(/\D+/g, "").slice(-4);
+    const or: Prisma.OrderWhereInput[] = [
+      { id: { contains: search, mode: "insensitive" } },
+      { destination: { contains: search, mode: "insensitive" } },
+      { planName: { contains: search, mode: "insensitive" } },
+      { dataAllowance: { contains: search, mode: "insensitive" } },
+    ];
+    if (searchLast4.length === 4) {
+      or.push({ iccidLast4: searchLast4 });
+    }
+    and.push({ OR: or });
+  }
+
+  if (status === "REFUNDED") {
+    and.push({ walletEsimPurchase: { status: "FAILED_REFUNDED" } });
+  } else if (status === "REVIEW_NEEDED") {
+    and.push({
+      OR: [
+        { walletEsimPurchase: { status: "RECONCILIATION_REQUIRED" } },
+        { adminPackageAssignment: { status: "RECONCILIATION_REQUIRED" } },
+      ],
+    });
+  } else if (status === "FAILED") {
+    and.push({
+      OR: [
+        { status: OrderStatus.FAILED },
+        { adminPackageAssignment: { status: "FAILED" } },
+      ],
+    });
+    and.push({
+      NOT: { walletEsimPurchase: { status: "FAILED_REFUNDED" } },
+    });
+  } else if (status === "COMPLETED") {
+    and.push({ status: OrderStatus.COMPLETED });
+    and.push({
+      NOT: {
+        OR: [
+          { walletEsimPurchase: { status: "FAILED_REFUNDED" } },
+          { walletEsimPurchase: { status: "RECONCILIATION_REQUIRED" } },
+          { adminPackageAssignment: { status: "RECONCILIATION_REQUIRED" } },
+          { adminPackageAssignment: { status: "FAILED" } },
+        ],
+      },
+    });
+  } else if (status === "PROCESSING") {
+    and.push({
+      OR: [
+        { status: OrderStatus.PENDING },
+        {
+          walletEsimPurchase: {
+            status: {
+              in: ["FUNDED", "PROVIDER_PENDING", "FUNDS_RESERVED", "READY"],
+            },
+          },
+        },
+        {
+          adminPackageAssignment: {
+            status: { in: ["PROVIDER_PENDING", "READY"] },
+          },
+        },
+      ],
+    });
+    and.push({
+      NOT: {
+        OR: [
+          { walletEsimPurchase: { status: "FAILED_REFUNDED" } },
+          { walletEsimPurchase: { status: "RECONCILIATION_REQUIRED" } },
+          { adminPackageAssignment: { status: "RECONCILIATION_REQUIRED" } },
+          { status: OrderStatus.FAILED },
+          { adminPackageAssignment: { status: "FAILED" } },
+        ],
+      },
+    });
+  }
+
+  if (and.length > 0) {
+    where.AND = and;
+  }
+  return where;
+}
 
 /**
  * Orders linked to this CUSTOMER userId only — never by email or browser id.
- * Local DB for order rows. Add More Data flags may soft-read the public offer
- * catalog (snapshot/cache) by offerId — never install secrets or broker order payloads.
+ * List pages skip public-catalog top-up lookups (detail/add-data still use them).
  */
 export async function listCustomerOrders(
   userId: string,
@@ -313,59 +435,74 @@ export async function listCustomerOrders(
   const status = parseCustomerEsimStatusFilter(input.status);
   const from = parseCustomerOrderDateFilter(input.from);
   const to = parseCustomerOrderDateFilter(input.to);
+  let page = parseCustomerOrdersPage(input.page);
+  const pageSize = CUSTOMER_ORDERS_PAGE_LIMIT;
 
   if (!id || id.length > 64) {
-    return { rows: [], search, status, from, to, totalMatched: 0 };
+    return {
+      rows: [],
+      search,
+      status,
+      from,
+      to,
+      page: 1,
+      pageSize,
+      totalMatched: 0,
+      totalPages: 0,
+    };
+  }
+
+  const where = buildCustomerOrdersWhere(id, status, search, from, to);
+  const totalMatched = await prisma.order.count({ where });
+  const totalPages =
+    totalMatched === 0 ? 0 : Math.ceil(totalMatched / pageSize);
+  if (totalPages > 0 && page > totalPages) {
+    page = totalPages;
   }
 
   const rows = await prisma.order.findMany({
-    where: { userId: id },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: CUSTOMER_ORDERS_PAGE_LIMIT,
-    select: {
-      id: true,
-      offerId: true,
-      providerOrderId: true,
-      destination: true,
-      planName: true,
-      dataAllowance: true,
-      validity: true,
-      status: true,
-      createdAt: true,
-      displayAmount: true,
-      displayCurrency: true,
-      providerAmount: true,
-      providerCurrency: true,
-      fundingSource: true,
-      iccidLast4: true,
-      iccidEncrypted: true,
-      walletEsimPurchase: {
-        select: {
-          status: true,
-          offerId: true,
-          destinationCode: true,
-          emailDeliveryStatus: true,
-          priceCents: true,
-          idempotencyKey: true,
+      where,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: {
+        id: true,
+        offerId: true,
+        providerOrderId: true,
+        destination: true,
+        planName: true,
+        dataAllowance: true,
+        validity: true,
+        status: true,
+        createdAt: true,
+        displayAmount: true,
+        displayCurrency: true,
+        providerAmount: true,
+        providerCurrency: true,
+        fundingSource: true,
+        iccidLast4: true,
+        iccidEncrypted: true,
+        walletEsimPurchase: {
+          select: {
+            status: true,
+            offerId: true,
+            destinationCode: true,
+            emailDeliveryStatus: true,
+            priceCents: true,
+            idempotencyKey: true,
+          },
+        },
+        adminPackageAssignment: {
+          select: {
+            status: true,
+            offerId: true,
+            destinationCode: true,
+            emailDeliveryStatus: true,
+          },
         },
       },
-      adminPackageAssignment: {
-        select: {
-          status: true,
-          offerId: true,
-          destinationCode: true,
-          emailDeliveryStatus: true,
-        },
-      },
-    },
-  });
+    });
 
-  const searchLower = search.toLowerCase();
-  const searchLast4 = search.replace(/\D+/g, "").slice(-4);
-  const fromMs = from ? Date.parse(`${from}T00:00:00.000Z`) : null;
-  const toMs = to ? Date.parse(`${to}T23:59:59.999Z`) : null;
-
-  const catalogCache = new Map<string, VesimOffer[] | null>();
   const mapped: CustomerOrderListRow[] = [];
 
   for (const row of rows) {
@@ -374,10 +511,8 @@ export async function listCustomerOrders(
       walletPurchaseStatus: row.walletEsimPurchase?.status,
       assignmentStatus: row.adminPackageAssignment?.status,
     });
+    // Safety net — approximate DB status filters may include edge cases.
     if (!customerStatusMatchesFilter(statusBadge, status)) continue;
-
-    if (fromMs != null && row.createdAt.getTime() < fromMs) continue;
-    if (toMs != null && row.createdAt.getTime() > toMs) continue;
 
     const iccidMasked = customerIccidDisplay(
       row.iccidLast4,
@@ -387,22 +522,6 @@ export async function listCustomerOrders(
     const planName = displayOrUnavailable(row.planName);
     const destination = displayOrUnavailable(row.destination);
     const dataAllowance = displayOrUnavailable(row.dataAllowance);
-
-    if (searchLower) {
-      const hay = [
-        row.id,
-        destination,
-        planName,
-        dataAllowance,
-        row.iccidLast4 ?? "",
-      ]
-        .join(" ")
-        .toLowerCase();
-      const last4Hit =
-        searchLast4.length === 4 &&
-        (row.iccidLast4 ?? "").replace(/\D+/g, "") === searchLast4;
-      if (!hay.includes(searchLower) && !last4Hit) continue;
-    }
 
     const amount = decimalToNumber(row.displayAmount ?? row.providerAmount);
     const currency =
@@ -429,17 +548,11 @@ export async function listCustomerOrders(
       normalizeOfferId(row.adminPackageAssignment?.offerId) ||
       null;
     const providerOrderId = (row.providerOrderId ?? "").trim() || null;
-    const catalog = await lookupOfferTopUpFromCatalog(
-      offerId,
-      flagCode,
-      catalogCache
-    );
-    const addData = buildAddDataEligibility({
-      providerOrderId,
-      offerId,
+    const addDataEligible = listPageAddDataEligible({
       isRefunded,
       installEligible,
-      catalog,
+      offerId,
+      providerOrderId,
     });
     const addDataPurchase = resolveAddDataPurchaseLabel(
       row.walletEsimPurchase?.idempotencyKey
@@ -462,13 +575,13 @@ export async function listCustomerOrders(
       emailDeliveryLabel,
       installEligible,
       isRefunded,
-      offerId: addData.offerId,
-      providerOrderId: addData.providerOrderId,
-      supportTopUp: addData.supportTopUp,
-      supportTopUpType: addData.supportTopUpType,
-      rechargeOrderId: addData.rechargeOrderId,
-      addDataEligible: addData.addDataEligible,
-      addDataBlockedReason: addData.addDataBlockedReason,
+      offerId,
+      providerOrderId,
+      supportTopUp: addDataEligible,
+      supportTopUpType: null,
+      rechargeOrderId: providerOrderId,
+      addDataEligible,
+      addDataBlockedReason: addDataEligible ? null : "not_ready",
       isAddDataPurchase: addDataPurchase.isAddDataPurchase,
       addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
     });
@@ -480,7 +593,10 @@ export async function listCustomerOrders(
     status,
     from,
     to,
-    totalMatched: mapped.length,
+    page,
+    pageSize,
+    totalMatched,
+    totalPages,
   };
 }
 

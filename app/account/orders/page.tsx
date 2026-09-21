@@ -5,6 +5,23 @@ import { listCustomerOrders } from "@/app/lib/orders/customerOrders";
 
 export const dynamic = "force-dynamic";
 
+function buildOrdersHref(input: {
+  page: number;
+  search: string;
+  status: string;
+  from: string;
+  to: string;
+}): string {
+  const params = new URLSearchParams();
+  if (input.search) params.set("q", input.search);
+  if (input.status && input.status !== "ALL") params.set("status", input.status);
+  if (input.from) params.set("from", input.from);
+  if (input.to) params.set("to", input.to);
+  if (input.page > 1) params.set("page", String(input.page));
+  const qs = params.toString();
+  return qs ? `/account/orders?${qs}` : "/account/orders";
+}
+
 export default async function AccountOrdersPage({
   searchParams,
 }: {
@@ -13,6 +30,7 @@ export default async function AccountOrdersPage({
     status?: string;
     from?: string;
     to?: string;
+    page?: string;
   }>;
 }) {
   const user = await requireSession("/account/orders");
@@ -22,6 +40,7 @@ export default async function AccountOrdersPage({
     status: params.status,
     from: params.from,
     to: params.to,
+    page: params.page,
   });
 
   return (
@@ -144,13 +163,63 @@ export default async function AccountOrdersPage({
           )}
         </div>
       ) : (
-        <ul className="space-y-4">
-          {result.rows.map((order) => (
-            <li key={order.id}>
-              <CustomerEsimOrderCard order={order} />
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="space-y-4">
+            {result.rows.map((order) => (
+              <li key={order.id}>
+                <CustomerEsimOrderCard order={order} />
+              </li>
+            ))}
+          </ul>
+          {result.totalPages > 1 ? (
+            <nav
+              className="flex min-w-0 flex-wrap items-center justify-between gap-3 pt-2 text-sm"
+              aria-label="My eSIM pages"
+            >
+              <p className="text-[var(--text-muted)]">
+                Page {result.page} of {result.totalPages}
+                <span className="text-[var(--text-soft)]">
+                  {" "}
+                  · {result.totalMatched} total
+                </span>
+              </p>
+              <div className="flex gap-3">
+                {result.page > 1 ? (
+                  <Link
+                    href={buildOrdersHref({
+                      page: result.page - 1,
+                      search: result.search,
+                      status: result.status,
+                      from: result.from,
+                      to: result.to,
+                    })}
+                    className="font-semibold text-[var(--heading)] underline-offset-2 hover:underline"
+                  >
+                    Previous
+                  </Link>
+                ) : (
+                  <span className="text-[var(--text-soft)]">Previous</span>
+                )}
+                {result.page < result.totalPages ? (
+                  <Link
+                    href={buildOrdersHref({
+                      page: result.page + 1,
+                      search: result.search,
+                      status: result.status,
+                      from: result.from,
+                      to: result.to,
+                    })}
+                    className="font-semibold text-[var(--heading)] underline-offset-2 hover:underline"
+                  >
+                    Next
+                  </Link>
+                ) : (
+                  <span className="text-[var(--text-soft)]">Next</span>
+                )}
+              </div>
+            </nav>
+          ) : null}
+        </>
       )}
     </div>
   );

@@ -1,22 +1,31 @@
 /**
  * Partner catalog reads — MAP retail offers only.
+ * Browse uses public destination/offer snapshots (fast).
+ * Purchase still verifies live via verifyOfferAuthoritative.
  * Never exposes discount, provider cost, or partner charge.
  */
 import "server-only";
 
-import {
-  listAdminAssignmentDestinations,
-  type AdminDestinationOption,
-} from "@/app/lib/esim/adminPackageAssignmentRead";
 import { applyPakistanPublicCatalog } from "@/app/lib/plans/pakistanCatalogPolicy";
+import { destinationDisplayName } from "@/app/lib/vesim/destinationPresentation";
 import {
-  fetchOffersForCountry,
+  fetchPublicDestinationCatalog,
+  fetchPublicOffersForCountry,
   sanitizeCountryHint,
   toVerifiedCheckoutOffer,
 } from "@/app/lib/vesim/server";
 import { formatUsdCents } from "@/app/lib/wallet/display";
+import { PublicOfferSnapshotError } from "@/app/lib/vesim/publicOfferSnapshot";
 
-export type PartnerCatalogDestination = AdminDestinationOption;
+export type PartnerCatalogDestination = {
+  code: string;
+  name: string;
+  kind: string;
+  flag?: string;
+  isPopular?: boolean;
+  slug?: string;
+  searchAliases?: string[];
+};
 
 /** Retail-facing offer card. No discount / provider / charge fields. */
 export type PartnerCatalogOffer = {
@@ -29,15 +38,35 @@ export type PartnerCatalogOffer = {
   destinationLabel: string;
 };
 
+/**
+ * Partner destination picker — public cached catalog (not live VeSIM).
+ */
 export async function listPartnerCatalogDestinations(): Promise<
   PartnerCatalogDestination[]
 > {
-  return listAdminAssignmentDestinations();
+  try {
+    const destinations = await fetchPublicDestinationCatalog();
+    return destinations
+      .filter((d) => Boolean(d.code?.trim()))
+      .slice(0, 400)
+      .map((d) => ({
+        code: d.code,
+        name: destinationDisplayName(d),
+        kind: d.kind,
+        flag: d.flag,
+        isPopular: d.isPopular === true,
+        slug: d.slug,
+        searchAliases: d.searchAliases,
+      }));
+  } catch {
+    return [];
+  }
 }
 
 /**
- * List MAP retail offers for a destination.
+ * List MAP retail offers for a destination (public snapshot / background refresh).
  * Strips supplier cost — Partner never sees providerPriceUSD.
+ * Buy/prepare still calls verifyOfferAuthoritative (live VeSIM).
  */
 export async function listPartnerCatalogOffers(
   destinationCode: string
@@ -48,7 +77,10 @@ export async function listPartnerCatalogOffers(
   try {
     const offers = applyPakistanPublicCatalog(
       code,
-      await fetchOffersForCountry(code)
+      await fetchPublicOffersForCountry(code, {
+        refreshMode: "background",
+        applyAsiaCustomerOverlay: false,
+      })
     );
     const out: PartnerCatalogOffer[] = [];
     for (const offer of offers) {
@@ -72,7 +104,10 @@ export async function listPartnerCatalogOffers(
       });
     }
     return out;
-  } catch {
+  } catch (error) {
+    if (error instanceof PublicOfferSnapshotError) {
+      return [];
+    }
     return [];
   }
 }

@@ -238,7 +238,7 @@ function main() {
   assert.match(page, /Open Problems & Recovery/);
   assert.match(page, /Payment gateway readiness/);
   assert.match(page, /Security & production readiness/);
-  assert.match(page, /getWalletReservationMonitorDashboard/);
+  assert.match(page, /getWalletReservationMonitorSummary/);
   assert.match(page, /ADMIN_WALLET_RESERVATIONS_HREF/);
   assert.match(page, /Wallet Holds summary/);
   assert.match(page, /Open wallet holds/);

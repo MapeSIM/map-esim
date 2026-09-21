@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { coerceAppRole } from "@/app/lib/auth/appRole";
 import { navAuthLink } from "@/app/lib/auth/redirects";
+import { useShellAuthPublisher } from "@/app/components/auth/ShellAuthContext";
 import Navbar, { type NavbarCustomerSummary } from "./Navbar";
 
 type SessionPayload = {
@@ -67,6 +68,7 @@ function shouldSyncOnPathnameChange(options: {
  */
 export default function NavbarShell() {
   const pathname = usePathname() || "/";
+  const setShellAuth = useShellAuthPublisher();
   const [authHref, setAuthHref] = useState("/signin");
   const [authLabel, setAuthLabel] = useState("Sign in");
   const [customer, setCustomer] = useState<NavbarCustomerSummary | null>(null);
@@ -80,11 +82,12 @@ export default function NavbarShell() {
 
   const applyLoggedOut = useCallback(() => {
     knownAuthenticatedRef.current = false;
+    setShellAuth({ signedIn: false, isPartner: false });
     setAuthHref("/signin");
     setAuthLabel("Sign in");
     setCustomer(null);
     setPartner(null);
-  }, []);
+  }, [setShellAuth]);
 
   const applyAuthenticated = useCallback(
     (
@@ -98,6 +101,10 @@ export default function NavbarShell() {
       });
       setAuthHref(href);
       setAuthLabel(label);
+      setShellAuth({
+        signedIn: true,
+        isPartner: sessionRole === "PARTNER",
+      });
 
       if (sessionRole === "CUSTOMER") {
         setCustomer({
@@ -124,7 +131,7 @@ export default function NavbarShell() {
       setCustomer(null);
       setPartner(null);
     },
-    []
+    [setShellAuth]
   );
 
   const syncSession = useCallback(async () => {

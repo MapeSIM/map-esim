@@ -3,6 +3,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import NavbarShell from "./components/NavbarShell";
 import Footer from "./components/Footer";
+import { ShellAuthProvider } from "./components/auth/ShellAuthContext";
 import CookieConsentProvider from "./components/cookies/CookieConsentProvider";
 import PreferenceStorageSync from "./components/cookies/PreferenceStorageSync";
 import { CurrencyProvider } from "./components/currency/CurrencyProvider";
@@ -71,15 +72,17 @@ export default function RootLayout({
           <ThemeProvider>
             <PreferenceStorageSync />
             <CurrencyProvider>
-              <HideOnShare>
-                <JsonLd data={siteGraph} />
-                <NavbarShell />
-              </HideOnShare>
-              {children}
-              <HideOnShare>
-                <Footer />
-                <DeferredWhatsAppSupportButton />
-              </HideOnShare>
+              <ShellAuthProvider>
+                <HideOnShare>
+                  <JsonLd data={siteGraph} />
+                  <NavbarShell />
+                </HideOnShare>
+                {children}
+                <HideOnShare>
+                  <Footer />
+                  <DeferredWhatsAppSupportButton />
+                </HideOnShare>
+              </ShellAuthProvider>
             </CurrencyProvider>
           </ThemeProvider>
         </CookieConsentProvider>
