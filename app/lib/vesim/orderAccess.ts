@@ -200,10 +200,7 @@ export function buildAuthorizedOrderPath(
   return `${path}?${params.toString()}`;
 }
 
-export function getOrderAccessSuccessUrl(
-  orderId: string,
-  accessToken: string
-): string {
+function resolveAppOrigin(): string {
   const base = (
     process.env.APP_BASE_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
@@ -219,7 +216,32 @@ export function getOrderAccessSuccessUrl(
   } catch {
     // keep default
   }
+  return origin;
+}
 
+/**
+ * Absolute HTTPS URL for the scannable install QR PNG (email / Gmail proxy safe).
+ * Token authorizes order access only — never embeds LPA or activation secrets.
+ */
+export function getOrderAccessQrImageUrl(
+  orderId: string,
+  accessToken: string,
+  disposition: "inline" | "attachment" = "inline"
+): string | null {
+  const id = orderId.trim();
+  const access = accessToken.trim();
+  if (!id || !access) return null;
+  const path = buildAuthorizedOrderPath("/api/vesim/install/qr", id, access, {
+    disposition,
+  });
+  return `${resolveAppOrigin()}${path}`;
+}
+
+export function getOrderAccessSuccessUrl(
+  orderId: string,
+  accessToken: string
+): string {
+  const origin = resolveAppOrigin();
   const params = new URLSearchParams({
     orderId,
     access: accessToken,

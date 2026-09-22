@@ -123,6 +123,7 @@ export async function deliverOrderEmailAfterCheckout(options: {
     orderAccessUrl: accessToken
       ? getOrderAccessSuccessUrl(orderId, accessToken)
       : undefined,
+    accessToken: accessToken || undefined,
     assistedWalletPurchaseNotice: Boolean(options.assistedWalletPurchaseNotice),
   });
 

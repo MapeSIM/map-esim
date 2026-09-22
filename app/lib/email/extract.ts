@@ -4,7 +4,9 @@ import {
   getIphoneInstallGuideUrl,
 } from "@/app/lib/email/activation";
 import type { OrderEmailPayload } from "@/app/lib/email/types";
+import { isValidInstallQrValue } from "@/app/lib/email/qr";
 import type { VerifiedCheckoutOffer } from "@/app/lib/vesim/server";
+import { getOrderAccessQrImageUrl } from "@/app/lib/vesim/orderAccess";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -213,6 +215,8 @@ export function buildOrderEmailPayload(options: {
   verifiedOffer: VerifiedCheckoutOffer;
   orderPayload: JsonRecord;
   orderAccessUrl?: string;
+  /** Opaque order-access token — used only to mint HTTPS QR image URL. */
+  accessToken?: string;
   assistedWalletPurchaseNotice?: boolean;
 }): OrderEmailPayload | null {
   const install = extractInstallDetails(options.orderPayload);
@@ -239,6 +243,21 @@ export function buildOrderEmailPayload(options: {
 
   const officialLinks = extractOfficialActivationLinks(options.orderPayload);
 
+  const accessToken = options.accessToken?.trim() || "";
+  const hasScannableQr = Boolean(
+    (install.qrValue && isValidInstallQrValue(install.qrValue)) ||
+      (install.smdpAddress &&
+        install.activationCode &&
+        isValidInstallQrValue(
+          `LPA:1$${install.smdpAddress}$${install.activationCode}`
+        ))
+  );
+  const qrImageUrl =
+    hasScannableQr && accessToken
+      ? getOrderAccessQrImageUrl(options.orderId.trim(), accessToken, "inline") ||
+        undefined
+      : undefined;
+
   return {
     customerEmail: options.customerEmail.trim(),
     orderId: options.orderId.trim(),
@@ -254,6 +273,7 @@ export function buildOrderEmailPayload(options: {
     androidActivationUrl: officialLinks.androidActivationUrl,
     androidGuideUrl: getAndroidInstallGuideUrl(),
     iphoneGuideUrl: getIphoneInstallGuideUrl(),
+    qrImageUrl,
     orderAccessUrl: options.orderAccessUrl?.trim() || undefined,
     supportPurchaseNotice: options.assistedWalletPurchaseNotice
       ? ASSISTED_WALLET_PURCHASE_EMAIL_NOTICE

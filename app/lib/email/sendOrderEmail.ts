@@ -8,7 +8,6 @@ import {
 } from "@/app/lib/email/deliveryStore";
 import { buildDownloadableQrFilename } from "@/app/lib/email/format";
 import {
-  ESIM_QR_CID,
   generateEsimQrPngBuffer,
   resolveInstallQrValue,
 } from "@/app/lib/email/qr";
@@ -23,12 +22,44 @@ import type {
 } from "@/app/lib/email/types";
 import { isValidEmail } from "@/app/lib/vesim/server";
 
-const INLINE_QR_FILENAME = "map-esim-qr-inline.png";
+function resolveHttpsQrImageSrc(payload: OrderEmailPayload): string | undefined {
+  const raw = payload.qrImageUrl?.trim() || "";
+  if (!raw) return undefined;
+  // Never allow CID or data-URI in production HTML (Gmail/Outlook break these).
+  if (/^cid:/i.test(raw) || /^data:/i.test(raw)) return undefined;
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return undefined;
+    }
+    // Production emails should be HTTPS; allow http only for local APP_BASE_URL.
+    if (
+      parsed.protocol === "http:" &&
+      parsed.hostname !== "localhost" &&
+      parsed.hostname !== "127.0.0.1"
+    ) {
+      return undefined;
+    }
+    if (!parsed.pathname.includes("/api/vesim/install/qr")) {
+      return undefined;
+    }
+    if (!parsed.searchParams.get("access") || !parsed.searchParams.get("orderId")) {
+      return undefined;
+    }
+    return parsed.toString();
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Sends a branded MAP eSIM order email via the ORDERS channel.
  * Never throws to callers for SMTP failures — returns a safe status.
  * Never logs credentials or raw provider payloads.
+ *
+ * HTML QR uses an absolute HTTPS order-access URL (Gmail/Outlook compatible).
+ * A downloadable PNG attachment is still included when LPA is available.
+ * CID is not used for the HTML <img> src.
  */
 export async function sendOrderEmail(
   payload: OrderEmailPayload
@@ -67,21 +98,17 @@ export async function sendOrderEmail(
   }
 
   try {
-    // QR is generated only from verified order payload fields — never client params.
+    // QR PNG is generated only from verified order payload fields — never client params.
     const installValue = resolveInstallQrValue(payload);
     const qrPng = installValue
       ? await generateEsimQrPngBuffer(installValue)
       : null;
 
+    const httpsQrSrc =
+      qrPng && installValue ? resolveHttpsQrImageSrc(payload) : undefined;
+
     const attachments = qrPng
       ? [
-          {
-            filename: INLINE_QR_FILENAME,
-            content: qrPng,
-            contentType: "image/png",
-            cid: ESIM_QR_CID,
-            contentDisposition: "inline" as const,
-          },
           {
             filename: buildDownloadableQrFilename(
               payload.destination,
@@ -100,9 +127,13 @@ export async function sendOrderEmail(
       channel: "orders",
       to: customerEmail,
       subject: `Your eSIM is Ready! — ${destinationLabel} | MAP eSIM`,
-      text: renderOrderEmailText(payload, { hasQrAttachment: Boolean(qrPng) }),
+      text: renderOrderEmailText(payload, {
+        hasQrAttachment: Boolean(qrPng),
+        hasQrImage: Boolean(httpsQrSrc),
+      }),
       html: renderOrderEmailHtml(payload, {
-        qrImageSrc: qrPng ? `cid:${ESIM_QR_CID}` : undefined,
+        qrImageSrc: httpsQrSrc,
+        hasQrAttachment: Boolean(qrPng),
       }),
       attachments,
       headers: {

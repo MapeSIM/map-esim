@@ -33,6 +33,12 @@ export type OrderEmailPayload = {
   /** Absolute URL to the MAP eSIM iPhone installation guide. */
   iphoneGuideUrl?: string;
   /**
+   * Absolute HTTPS URL for the install QR PNG (signed order-access token).
+   * Used as HTML <img src> for Gmail/Outlook. Never a CID or data: URI in production.
+   * Never includes LPA / ICCID / activation secrets in the URL.
+   */
+  qrImageUrl?: string;
+  /**
    * Opaque authorized success-page URL (includes signed access token only).
    * Never includes LPA / ICCID / activation secrets.
    */

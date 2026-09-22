@@ -241,9 +241,17 @@ function main() {
   assert.equal(inviteHtml.includes("Admin account setup code"), true);
   assert.equal(inviteHtml.includes("Password reset code"), false);
 
-  const orderHtml = renderOrderEmailHtml(getSampleOrderEmailPayload());
+  const orderHtml = renderOrderEmailHtml(getSampleOrderEmailPayload(), {
+    qrImageSrc:
+      "https://mapesim.com/api/vesim/install/qr?orderId=sample&access=token&disposition=inline",
+    hasQrAttachment: true,
+  });
   assertUnifiedEmailFooter(orderHtml, "order");
   assert.equal(orderHtml.includes("localhost"), false);
+  assert.equal(orderHtml.includes("cid:mapesim-esim-qr@mapesim.com"), false);
+  assert.equal(orderHtml.includes("/api/vesim/install/qr"), true);
+  assert.equal(orderHtml.includes("Your eSIM is Ready!"), true);
+  assert.equal(orderHtml.includes("Open secure install page"), true);
 
   const changed = renderPasswordChangedEmailHtml("qa@mapesim.com");
   assertUnifiedEmailFooter(changed, "password-changed");

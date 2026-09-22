@@ -1,7 +1,7 @@
 import QRCode from "qrcode";
 import type { OrderEmailPayload } from "@/app/lib/email/types";
 
-/** Stable CID used by Nodemailer inline PNG attachments. */
+/** Stable CID historically used for Nodemailer inline PNG (no longer used as HTML img src). */
 export const ESIM_QR_CID = "mapesim-esim-qr@mapesim.com";
 
 const MIN_LEN = 8;

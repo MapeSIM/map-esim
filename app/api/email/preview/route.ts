@@ -15,10 +15,13 @@ import {
  * Uses sanitized sample data — never real credentials, order secrets,
  * or client/query-parameter installation values.
  *
+ * Production send uses absolute HTTPS `/api/vesim/install/qr?access=…` for the
+ * QR <img>. Preview embeds a local data-URL so the QR is visible without a
+ * live token, and annotates the production URL shape in HTML comments.
+ *
  * Optional scenario switch (layout only):
  *   /api/email/preview
  *   /api/email/preview?scenario=with-iphone-link
- * Activation URLs are never taken from query params.
  */
 export async function GET(req: NextRequest) {
   if (process.env.NODE_ENV === "production") {
@@ -33,16 +36,22 @@ export async function GET(req: NextRequest) {
 
   const sample = getSampleOrderEmailPayload({ withOfficialIphoneLink });
   const installValue = resolveInstallQrValue(sample);
-  const qrImageSrc = installValue
+  const qrDataUrl = installValue
     ? await generateEsimQrDataUrl(installValue)
     : null;
 
   const html = renderOrderEmailHtml(sample, {
-    qrImageSrc: qrImageSrc || undefined,
+    // Visible QR for local preview only — production uses sample.qrImageUrl HTTPS.
+    qrImageSrc: qrDataUrl || sample.qrImageUrl,
+    hasQrAttachment: Boolean(qrDataUrl),
     logoImageSrc: EMAIL_LOGO_PUBLIC_PATH,
   });
 
-  const attachmentNote = qrImageSrc
+  const productionUrlNote = sample.qrImageUrl
+    ? `<!-- production QR img src shape: ${sample.qrImageUrl} -->`
+    : "<!-- production QR img src: omitted when access token unavailable -->";
+
+  const attachmentNote = qrDataUrl
     ? `<!-- preview: downloadable attachment filename would be ${buildDownloadableQrFilename(
         sample.destination,
         sample.orderId
@@ -52,13 +61,18 @@ export async function GET(req: NextRequest) {
   const scenarioNote = `<!-- preview scenario: ${
     withOfficialIphoneLink ? "with-iphone-link" : "default-no-official-iphone-link"
   } -->`;
+  const cidBanNote =
+    "<!-- production must not use cid: for QR HTML img (Gmail/Outlook) -->";
 
-  return new NextResponse(`${scenarioNote}\n${attachmentNote}\n${html}`, {
-    status: 200,
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "no-store",
-      "X-Robots-Tag": "noindex, nofollow",
-    },
-  });
+  return new NextResponse(
+    `${scenarioNote}\n${productionUrlNote}\n${cidBanNote}\n${attachmentNote}\n${html}`,
+    {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Robots-Tag": "noindex, nofollow",
+      },
+    }
+  );
 }

@@ -154,23 +154,33 @@ async function main() {
   assert.ok(lpa && lpa.startsWith("LPA:1$"));
   const png = await generateEsimQrPngBuffer(lpa);
   assert.ok(png && png.length > 100);
+  const httpsQr =
+    "https://mapesim.com/api/vesim/install/qr?orderId=sample&access=token&disposition=inline";
   const htmlWithQr = renderOrderEmailHtml(sample, {
-    qrImageSrc: "cid:mapesim-esim-qr@mapesim.com",
+    qrImageSrc: httpsQr,
+    hasQrAttachment: true,
   });
   assert.equal(htmlWithQr.includes("Scan to install your eSIM"), true);
-  assert.equal(htmlWithQr.includes("cid:mapesim-esim-qr@mapesim.com"), true);
+  assert.equal(htmlWithQr.includes(httpsQr), true);
+  assert.equal(htmlWithQr.includes("cid:mapesim-esim-qr@mapesim.com"), false);
   assert.equal(htmlWithQr.includes("Complete LPA installation value"), true);
+  assert.equal(htmlWithQr.includes("Open secure install page"), true);
   const htmlNoQr = renderOrderEmailHtml({
     ...sample,
     qrValue: undefined,
     smdpAddress: undefined,
     activationCode: undefined,
+    qrImageUrl: undefined,
   });
   assert.equal(htmlNoQr.includes("Scan to install your eSIM"), false);
   assert.equal(htmlNoQr.includes("cid:mapesim-esim-qr@mapesim.com"), false);
-  // Brand logo footer may still include an <img>; QR CID must stay absent.
-  assert.equal(htmlNoQr.includes("cid:mapesim-brand-logo@mapesim.com"), true);
-  console.log("   ok -> PNG QR + CID template; logo footer without QR CID");
+  // Brand logo footer uses absolute HTTPS — never logo CID in HTML.
+  assert.equal(htmlNoQr.includes("cid:mapesim-brand-logo@mapesim.com"), false);
+  assert.equal(
+    htmlNoQr.includes("https://mapesim.com/brand/map-esim-logo.png"),
+    true
+  );
+  console.log("   ok -> PNG QR + HTTPS template; no CID in HTML");
 
   // Prove install extraction works for common VeSIM-like shapes.
   const install = extractInstallDetails({

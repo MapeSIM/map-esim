@@ -2,7 +2,6 @@ import type { OrderEmailPayload } from "@/app/lib/email/types";
 import { BRAND_NAME } from "@/app/lib/brand";
 import {
   BORDER,
-  BRAND_INK,
   CARD_BG,
   escapeHtml,
   renderEmailFooterText,
@@ -12,34 +11,33 @@ import {
 import { renderTransactionalEmailLayoutHtml } from "@/app/lib/email/emailLayout";
 import {
   EMAIL_FONT_STACK,
-  EMAIL_SURFACE_MUTED,
   renderEmailCtaButton,
   renderEmailDetailRow,
   renderEmailHeroBand,
   renderEmailLead,
   renderEmailNotice,
-  renderEmailParagraph,
   renderEmailSummaryPanel,
   renderEmailSupportBlock,
-  renderEmailTextLink,
 } from "@/app/lib/email/emailUi";
 import { resolveEmailLogoSrc } from "@/app/lib/email/logo";
 import {
   formatDestinationHeadline,
   maskOrderReference,
 } from "@/app/lib/email/format";
-import { ESIM_QR_CID } from "@/app/lib/email/qr";
 
 export type OrderEmailHtmlOptions = {
   /**
    * Image source for the scannable QR.
-   * Nodemailer: `cid:${ESIM_QR_CID}`
-   * Preview: `data:image/png;base64,...`
-   * Omit when no valid QR should be shown.
+   * Production: absolute HTTPS `/api/vesim/install/qr?…` (order-access token).
+   * Preview may use `data:image/png;base64,…` for local rendering only.
+   * Never use `cid:` for production HTML (Gmail/Outlook break CID images).
    */
   qrImageSrc?: string;
+  /** True when a downloadable PNG QR attachment is included on the message. */
+  hasQrAttachment?: boolean;
   /**
-   * Brand logo source. Nodemailer uses CID; preview may use `/brand/...`.
+   * Brand logo source. Production footer resolves to absolute HTTPS;
+   * preview may use `/brand/...`.
    */
   logoImageSrc?: string;
 };
@@ -49,11 +47,21 @@ function optionalDetailRow(label: string, value?: string): string {
   return renderEmailDetailRow(label, value);
 }
 
+function planChipLine(payload: OrderEmailPayload): string {
+  const plan = (payload.planName ?? "").trim();
+  const destination = formatDestinationHeadline(payload.destination);
+  if (plan && plan !== "—") {
+    return `${destination} · ${plan}`;
+  }
+  return destination;
+}
+
 function installQrSection(
   payload: OrderEmailPayload,
-  qrImageSrc?: string
+  options: { qrImageSrc?: string; hasQrAttachment?: boolean }
 ): string {
-  const hasQrImage = Boolean(qrImageSrc);
+  const hasQrImage = Boolean(options.qrImageSrc);
+  const hasQrAttachment = Boolean(options.hasQrAttachment);
   const hasManualFallbacks = Boolean(
     payload.smdpAddress ||
       payload.activationCode ||
@@ -61,188 +69,153 @@ function installQrSection(
       payload.iccid
   );
 
-  if (!hasQrImage && !hasManualFallbacks) {
+  if (!hasQrImage && !hasQrAttachment && !hasManualFallbacks) {
     return "";
   }
 
   const qrImageBlock = hasQrImage
     ? `
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 16px;">
         <tr>
-          <td align="center" style="padding:20px 16px;border:1px solid ${BORDER};border-radius:12px;background:${CARD_BG};">
-            <p style="margin:0 0 14px;font-family:${EMAIL_FONT_STACK};color:${TEXT_PRIMARY};font-size:16px;font-weight:800;line-height:1.3;">
+          <td align="center" style="padding:22px 16px;border:1px solid ${BORDER};border-radius:14px;background:${CARD_BG};">
+            <p style="margin:0 0 6px;font-family:${EMAIL_FONT_STACK};color:${TEXT_PRIMARY};font-size:16px;font-weight:800;line-height:1.3;">
               Scan to install your eSIM
             </p>
+            <p style="margin:0 0 16px;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:13px;line-height:1.5;">
+              Open your camera or eSIM settings and scan this code.
+            </p>
             <img
-              src="${escapeHtml(qrImageSrc!)}"
+              src="${escapeHtml(options.qrImageSrc!)}"
               width="280"
               height="280"
               alt="eSIM installation QR code"
               style="display:block;margin:0 auto;width:280px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;"
             />
-            <p style="margin:14px 0 0;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:13px;line-height:1.5;">
-              Open your phone camera or eSIM installer and scan this code.
+            <p style="margin:16px 0 0;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:12px;line-height:1.5;">
+              Personal install code for this order — do not forward this email.
             </p>
           </td>
         </tr>
       </table>
     `
-    : renderEmailNotice(
-        "A scannable QR code was not available for this order. Use the manual installation details below."
-      );
+    : hasQrAttachment
+      ? renderEmailNotice(
+          "A scannable QR image is attached to this email. Open the PNG attachment to scan, or use the secure install page below.",
+          { title: "Use the attached QR image" }
+        )
+      : renderEmailNotice(
+          "A scannable QR code was not available for this order. Use the manual installation details below."
+        );
 
-  const downloadNotice = hasQrImage
-    ? renderEmailNotice(
-        "Download the attached QR image and save it securely to your photos before installation.",
-        { title: "QR Code Download Available" }
-      )
+  const orderPageCta = payload.orderAccessUrl
+    ? `
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 12px;">
+        <tr>
+          <td align="center">
+            ${renderEmailCtaButton(
+              payload.orderAccessUrl,
+              "Open secure install page",
+              { primary: true, fullWidth: true }
+            )}
+          </td>
+        </tr>
+      </table>
+    `
     : "";
 
-  const deviceActions = deviceActionsSection(payload, hasQrImage);
+  const attachmentHint =
+    hasQrAttachment && hasQrImage
+      ? `<p style="margin:0 0 18px;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:13px;line-height:1.55;text-align:center;">
+          A downloadable QR PNG is also attached — save it to your photos before you travel.
+        </p>`
+      : "";
 
-  const fallbackRows = [
-    optionalDetailRow("SM-DP+ address", payload.smdpAddress),
-    optionalDetailRow("Activation code", payload.activationCode),
-    optionalDetailRow("Complete LPA installation value", payload.qrValue),
-    optionalDetailRow("ICCID", payload.iccid),
-  ].join("");
-
-  const fallbackBlock = renderEmailSummaryPanel(
-    "Manual installation details",
-    fallbackRows,
-    {
-      intro:
-        "If scanning is unavailable, enter these verified details manually on your device.",
-    }
-  );
-
-  return `${qrImageBlock}${deviceActions}${downloadNotice}${fallbackBlock}`;
+  return `${qrImageBlock}${orderPageCta}${attachmentHint}`;
 }
 
 function deviceActionsSection(
   payload: OrderEmailPayload,
-  hasQrImage: boolean
+  hasQrImage: boolean,
+  hasQrAttachment: boolean
 ): string {
   const iphoneUrl = payload.iphoneActivationUrl?.trim();
   const androidUrl = payload.androidActivationUrl?.trim();
   const androidGuideUrl = payload.androidGuideUrl?.trim();
   const iphoneGuideUrl = payload.iphoneGuideUrl?.trim();
+  const scanHint = hasQrImage
+    ? "Scan the QR code above"
+    : hasQrAttachment
+      ? "Open the attached QR PNG"
+      : "Use the manual details below";
 
-  const hasIphoneButton = Boolean(iphoneUrl);
-  const hasAndroidDirect = Boolean(androidUrl);
+  const iphoneSteps = `
+    <p style="margin:0 0 8px;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:12px;line-height:1.6;text-align:left;">
+      1. ${escapeHtml(scanHint)} (or use Install on iPhone when available).<br/>
+      2. Settings → Cellular / Mobile Service → Add eSIM.<br/>
+      3. Confirm with Apple’s Allow / Continue prompts.<br/>
+      4. Enable Data Roaming after you arrive.
+    </p>`;
 
-  if (
-    !hasIphoneButton &&
-    !hasQrImage &&
-    !androidGuideUrl &&
-    !iphoneGuideUrl &&
-    !hasAndroidDirect
-  ) {
-    return "";
-  }
+  const androidSteps = `
+    <p style="margin:0 0 8px;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:12px;line-height:1.6;text-align:left;">
+      1. ${escapeHtml(scanHint)} (or use Install on Android when available).<br/>
+      2. Settings → Network &amp; Internet → SIMs → Add eSIM.<br/>
+      3. Follow on-screen prompts for your device.<br/>
+      4. Enable Data Roaming after you arrive.
+    </p>`;
 
-  const iphoneBlock = hasIphoneButton
-    ? `
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 16px;">
-        <tr>
-          <td align="center">
-            ${renderEmailCtaButton(iphoneUrl!, "Install on iPhone")}
-            <p style="margin:0 0 8px;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:12px;line-height:1.5;text-align:center;">
-              On iOS 17.4 or later, tap the button and follow Apple’s confirmation steps.
-            </p>
-            <p style="margin:0;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:12px;line-height:1.5;text-align:center;">
-              Installation still requires the normal Apple Allow/Continue confirmation.
-            </p>
-          </td>
-        </tr>
-      </table>
-    `
+  const iphoneCta = iphoneUrl
+    ? renderEmailCtaButton(iphoneUrl, "Install on iPhone")
     : iphoneGuideUrl
-      ? `
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 16px;">
-        <tr>
-          <td align="center" style="padding:16px 14px;border:1px solid ${BORDER};border-radius:12px;background:${EMAIL_SURFACE_MUTED};">
-            <p style="margin:0 0 10px;font-family:${EMAIL_FONT_STACK};color:${TEXT_PRIMARY};font-size:14px;font-weight:800;">
-              iPhone installation
-            </p>
-            <p style="margin:0 0 12px;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:12px;line-height:1.55;">
-              No official one-tap activation link was supplied for this order. Use the QR code below or the iPhone guide.
-            </p>
-            ${renderEmailCtaButton(iphoneGuideUrl, "View iPhone Installation Guide", {
-              primary: false,
-            })}
-          </td>
-        </tr>
-      </table>
-    `
+      ? renderEmailCtaButton(iphoneGuideUrl, "iPhone installation guide", {
+          primary: false,
+        })
       : "";
 
-  const iphoneQrFallback = hasQrImage
-    ? `
-      <p style="margin:0 0 16px;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:12px;line-height:1.55;text-align:center;">
-        On iOS 17.4 or later, you can also press and hold the QR code in Mail or Safari and select Add eSIM.
-      </p>
-    `
-    : "";
+  const androidCta = androidUrl
+    ? renderEmailCtaButton(androidUrl, "Install on Android", { primary: false })
+    : androidGuideUrl
+      ? renderEmailCtaButton(androidGuideUrl, "Android installation guide", {
+          primary: false,
+        })
+      : "";
 
-  let androidBlock = "";
-  if (hasAndroidDirect) {
-    androidBlock = `
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 8px;">
-        <tr>
-          <td align="center">
-            ${renderEmailCtaButton(androidUrl!, "Install on Android", {
-              primary: false,
-            })}
-            <p style="margin:0;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:12px;line-height:1.5;text-align:center;">
-              Uses the official activation link supplied for this order. Android support varies by device and carrier app.
-            </p>
-          </td>
-        </tr>
-      </table>
-    `;
-  } else if (hasQrImage || androidGuideUrl) {
-    androidBlock = `
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 8px;">
-        <tr>
-          <td align="center" style="padding:16px 14px;border:1px solid ${BORDER};border-radius:12px;background:${EMAIL_SURFACE_MUTED};">
-            <p style="margin:0 0 10px;font-family:${EMAIL_FONT_STACK};color:${TEXT_PRIMARY};font-size:14px;font-weight:800;">
-              Android installation
-            </p>
-            <p style="margin:0 0 12px;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:12px;line-height:1.55;">
-              One-click Android installation is not universally available. Download the attached QR image, then follow the Android guide.
-            </p>
-            ${
-              hasQrImage
-                ? `<p style="margin:0 0 10px;font-family:${EMAIL_FONT_STACK};color:${TEXT_PRIMARY};font-size:13px;font-weight:800;">Download QR for Android</p>
-                   <p style="margin:0 0 12px;font-family:${EMAIL_FONT_STACK};color:${TEXT_SECONDARY};font-size:12px;line-height:1.5;">Use the downloadable PNG attached to this email.</p>`
-                : ""
-            }
-            ${
-              androidGuideUrl
-                ? renderEmailCtaButton(
-                    androidGuideUrl,
-                    "View Android Installation Guide",
-                    { primary: false }
-                  )
-                : ""
-            }
-          </td>
-        </tr>
-      </table>
-    `;
+  if (
+    !iphoneCta &&
+    !androidCta &&
+    !hasQrImage &&
+    !hasQrAttachment
+  ) {
+    return "";
   }
 
   return `
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px;">
       <tr>
-        <td style="padding:18px 16px;border:1px solid ${BORDER};border-radius:12px;background:${CARD_BG};">
+        <td style="padding:16px 14px;border:1px solid ${BORDER};border-radius:12px;background:${CARD_BG};">
           <p style="margin:0 0 14px;font-family:${EMAIL_FONT_STACK};color:${TEXT_PRIMARY};font-size:13px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;">
-            Device installation actions
+            Device installation
           </p>
-          ${iphoneBlock}
-          ${iphoneQrFallback}
-          ${androidBlock}
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+            <tr>
+              <td style="padding:0 0 14px;border-bottom:1px solid ${BORDER};">
+                <p style="margin:0 0 8px;font-family:${EMAIL_FONT_STACK};color:${TEXT_PRIMARY};font-size:14px;font-weight:800;">
+                  iPhone
+                </p>
+                ${iphoneSteps}
+                ${iphoneCta}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:14px 0 0;">
+                <p style="margin:0 0 8px;font-family:${EMAIL_FONT_STACK};color:${TEXT_PRIMARY};font-size:14px;font-weight:800;">
+                  Android
+                </p>
+                ${androidSteps}
+                ${androidCta}
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
     </table>
@@ -252,66 +225,39 @@ function deviceActionsSection(
 function planDetailsSection(payload: OrderEmailPayload): string {
   const rows = [
     optionalDetailRow("Destination", payload.destination),
-    optionalDetailRow("Plan name", payload.planName),
-    optionalDetailRow("Data allowance", payload.dataAllowance),
+    optionalDetailRow("Plan", payload.planName),
+    optionalDetailRow("Data", payload.dataAllowance),
     optionalDetailRow("Validity", payload.validity),
-    optionalDetailRow("Order ID", maskOrderReference(payload.orderId)),
+    optionalDetailRow("Order", maskOrderReference(payload.orderId)),
   ].join("");
 
   return renderEmailSummaryPanel("Plan details", rows);
 }
 
-function howToInstallSection(hasQrImage: boolean): string {
-  const steps = hasQrImage
-    ? [
-        "Download or save the attached QR code.",
-        "iPhone: Settings → Cellular/Mobile Service → Add eSIM.",
-        "Android: Settings → Network & Internet → SIMs → Add eSIM.",
-        "Select “Use QR Code” and scan the saved image from another screen where required.",
-        "Enable Data Roaming after arriving at the destination.",
-      ]
-    : [
-        "Open your device settings and choose Add eSIM / Add mobile plan.",
-        "iPhone: Settings → Cellular/Mobile Service → Add eSIM → Enter Details Manually.",
-        "Android: Settings → Network & Internet → SIMs → Add eSIM → Enter SM-DP+ details.",
-        "Enter the verified SM-DP+ address and activation code from this email.",
-        "Enable Data Roaming after arriving at the destination.",
-      ];
+function manualDetailsSection(payload: OrderEmailPayload): string {
+  const fallbackRows = [
+    optionalDetailRow("SM-DP+ address", payload.smdpAddress),
+    optionalDetailRow("Activation code", payload.activationCode),
+    optionalDetailRow("Complete LPA installation value", payload.qrValue),
+    optionalDetailRow("ICCID", payload.iccid),
+  ].join("");
 
-  const items = steps
-    .map(
-      (step, index) => `
-      <tr>
-        <td valign="top" width="28" style="padding:0 0 10px;font-family:${EMAIL_FONT_STACK};color:${BRAND_INK};font-size:14px;font-weight:800;">
-          ${index + 1}.
-        </td>
-        <td style="padding:0 0 10px;font-family:${EMAIL_FONT_STACK};color:${TEXT_PRIMARY};font-size:13px;line-height:1.55;">
-          ${escapeHtml(step)}
-        </td>
-      </tr>
-    `
-    )
-    .join("");
-
-  return `
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px;">
-      <tr>
-        <td style="padding:18px 16px;border:1px solid ${BORDER};border-radius:12px;background:${CARD_BG};">
-          <p style="margin:0 0 12px;font-family:${EMAIL_FONT_STACK};color:${TEXT_PRIMARY};font-size:13px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;">
-            How to Install
-          </p>
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-            ${items}
-          </table>
-        </td>
-      </tr>
-    </table>
-  `;
+  return renderEmailSummaryPanel(
+    "Can't scan? Enter details manually",
+    fallbackRows,
+    {
+      intro:
+        "Use these verified details only if scanning is unavailable on your device.",
+    }
+  );
 }
 
-function introCopy(hasQrImage: boolean): string {
+function introCopy(hasQrImage: boolean, hasQrAttachment: boolean): string {
   if (hasQrImage) {
-    return "Your eSIM purchase was successful. Your installation QR code is included below and attached as a downloadable image.";
+    return "Your eSIM purchase was successful. Scan the QR below, open your secure install page, or use the attached QR image.";
+  }
+  if (hasQrAttachment) {
+    return "Your eSIM purchase was successful. Open the attached QR image or your secure install page to set up the eSIM.";
   }
   return "Your eSIM purchase was successful. Use the verified manual installation details below on your device.";
 }
@@ -327,18 +273,18 @@ export function renderOrderEmailHtml(
   options: OrderEmailHtmlOptions = {}
 ): string {
   const hasQrImage = Boolean(options.qrImageSrc);
-  const installSection = installQrSection(payload, options.qrImageSrc);
-  const destinationHeadline = formatDestinationHeadline(payload.destination);
-  const logoSrc = resolveEmailLogoSrc(options.logoImageSrc);
+  const attachFlag =
+    options.hasQrAttachment !== undefined
+      ? options.hasQrAttachment
+      : hasQrImage;
 
-  const orderPageLink = payload.orderAccessUrl
-    ? renderEmailParagraph(
-        `Prefer the website? ${renderEmailTextLink(
-          payload.orderAccessUrl,
-          "Open your secure order page"
-        )}`
-      )
-    : "";
+  const installSection = installQrSection(payload, {
+    qrImageSrc: options.qrImageSrc,
+    hasQrAttachment: attachFlag,
+  });
+  const destinationHeadline = formatDestinationHeadline(payload.destination);
+  const chip = planChipLine(payload);
+  const logoSrc = resolveEmailLogoSrc(options.logoImageSrc);
 
   return renderTransactionalEmailLayoutHtml({
     title: `Your eSIM is Ready! — ${BRAND_NAME}`,
@@ -349,68 +295,79 @@ export function renderOrderEmailHtml(
               ${renderEmailHeroBand({
                 eyebrow: BRAND_NAME,
                 title: "Your eSIM is Ready!",
-                subtitle: destinationHeadline,
+                subtitle: chip,
               })}
-              ${renderEmailLead(escapeHtml(introCopy(hasQrImage)))}
+              ${renderEmailLead(
+                escapeHtml(introCopy(hasQrImage, attachFlag))
+              )}
               ${supportPurchaseNoticeSection(payload)}
               ${installSection}
+              ${deviceActionsSection(payload, hasQrImage, attachFlag)}
               ${planDetailsSection(payload)}
-              ${howToInstallSection(hasQrImage)}
-              ${orderPageLink}
+              ${manualDetailsSection(payload)}
               ${renderEmailSupportBlock()}`,
   });
 }
 
 export function renderOrderEmailText(
   payload: OrderEmailPayload,
-  options: { hasQrAttachment?: boolean } = {}
+  options: { hasQrAttachment?: boolean; hasQrImage?: boolean } = {}
 ): string {
   const destinationHeadline = formatDestinationHeadline(payload.destination);
-  const hasQr = Boolean(options.hasQrAttachment);
+  const hasQrAttachment = Boolean(options.hasQrAttachment);
+  const hasQrImage = Boolean(options.hasQrImage);
+  const hasQr = hasQrAttachment || hasQrImage;
   const lines = [
     `${BRAND_NAME} — Your eSIM is Ready!`,
     destinationHeadline,
     "",
-    introCopy(hasQr),
+    introCopy(hasQrImage, hasQrAttachment),
   ];
   if (payload.supportPurchaseNotice?.trim()) {
     lines.push("", payload.supportPurchaseNotice.trim());
+  }
+  if (payload.orderAccessUrl) {
+    lines.push("", `Secure install page: ${payload.orderAccessUrl}`);
+  }
+  if (payload.qrImageUrl) {
+    lines.push(`Install QR image: ${payload.qrImageUrl}`);
+  }
+  if (hasQrAttachment) {
+    lines.push("", "A downloadable QR PNG is attached to this email.");
   }
   lines.push(
     "",
     "Plan details",
     `Destination: ${payload.destination}`,
-    `Plan name: ${payload.planName}`,
-    `Data allowance: ${payload.dataAllowance}`,
+    `Plan: ${payload.planName}`,
+    `Data: ${payload.dataAllowance}`,
     `Validity: ${payload.validity}`,
-    `Order ID: ${maskOrderReference(payload.orderId)}`,
+    `Order: ${maskOrderReference(payload.orderId)}`,
     "",
-    "Device installation actions"
+    "Device installation"
   );
   if (payload.iphoneActivationUrl) {
     lines.push(
-      "Install on iPhone: use the official activation button/link in the HTML email.",
-      "On iOS 17.4 or later, tap the button and follow Apple’s confirmation steps."
+      "Install on iPhone: use the official activation button/link in the HTML email."
     );
   } else if (payload.iphoneGuideUrl) {
-    lines.push(`View iPhone Installation Guide: ${payload.iphoneGuideUrl}`);
-  }
-  if (hasQr) {
-    lines.push(
-      "On iOS 17.4 or later, you can also press and hold the QR code in Mail or Safari and select Add eSIM.",
-      "Download QR for Android: use the downloadable PNG attached to this email."
-    );
+    lines.push(`iPhone installation guide: ${payload.iphoneGuideUrl}`);
   }
   if (payload.androidActivationUrl) {
     lines.push(
       "An official Android activation link is included in the HTML email for this order."
     );
   } else if (payload.androidGuideUrl) {
-    lines.push(`View Android Installation Guide: ${payload.androidGuideUrl}`);
+    lines.push(`Android installation guide: ${payload.androidGuideUrl}`);
   }
 
-  if (payload.smdpAddress || payload.activationCode || payload.qrValue || payload.iccid) {
-    lines.push("", "Manual installation details");
+  if (
+    payload.smdpAddress ||
+    payload.activationCode ||
+    payload.qrValue ||
+    payload.iccid
+  ) {
+    lines.push("", "Can't scan? Enter details manually");
     if (payload.smdpAddress) lines.push(`SM-DP+ address: ${payload.smdpAddress}`);
     if (payload.activationCode) {
       lines.push(`Activation code: ${payload.activationCode}`);
@@ -421,27 +378,20 @@ export function renderOrderEmailText(
     if (payload.iccid) lines.push(`ICCID: ${payload.iccid}`);
   }
 
-  lines.push("", "How to Install");
+  lines.push("", "How to install");
   if (hasQr) {
     lines.push(
-      "1. Download or save the attached QR code.",
+      "1. Scan the QR, open the attached PNG, or use the secure install page.",
       "2. iPhone: Settings → Cellular/Mobile Service → Add eSIM.",
       "3. Android: Settings → Network & Internet → SIMs → Add eSIM.",
-      "4. Select “Use QR Code” and scan the saved image from another screen where required.",
-      "5. Enable Data Roaming after arriving at the destination."
+      "4. Enable Data Roaming after arriving at the destination."
     );
   } else {
     lines.push(
       "1. Open your device settings and choose Add eSIM / Add mobile plan.",
-      "2. iPhone: Settings → Cellular/Mobile Service → Add eSIM → Enter Details Manually.",
-      "3. Android: Settings → Network & Internet → SIMs → Add eSIM → Enter SM-DP+ details.",
-      "4. Enter the verified SM-DP+ address and activation code from this email.",
-      "5. Enable Data Roaming after arriving at the destination."
+      "2. Enter the verified SM-DP+ address and activation code from this email.",
+      "3. Enable Data Roaming after arriving at the destination."
     );
-  }
-
-  if (payload.orderAccessUrl) {
-    lines.push("", `Secure order page: ${payload.orderAccessUrl}`);
   }
 
   lines.push("", renderEmailFooterText());
@@ -453,9 +403,11 @@ export function renderOrderEmailText(
 export function getSampleOrderEmailPayload(
   options: { withOfficialIphoneLink?: boolean } = {}
 ): OrderEmailPayload {
+  const orderId = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+  const access = "sample-opaque-token";
   const base: OrderEmailPayload = {
     customerEmail: "customer@example.com",
-    orderId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    orderId,
     destination: "Pakistan",
     planName: "Pakistan 1GB / 7 Days",
     dataAllowance: "1 GB",
@@ -466,17 +418,14 @@ export function getSampleOrderEmailPayload(
     qrValue: "LPA:1$smdp.example.invalid$SAMPLE-ACTIVATION-CODE",
     androidGuideUrl: "https://mapesim.com/install/android",
     iphoneGuideUrl: "https://mapesim.com/install/iphone",
-    orderAccessUrl:
-      "https://mapesim.com/success?orderId=a1b2c3d4-e5f6-7890-abcd-ef1234567890&access=sample-opaque-token",
+    orderAccessUrl: `https://mapesim.com/success?orderId=${orderId}&access=${access}`,
+    qrImageUrl: `https://mapesim.com/api/vesim/install/qr?orderId=${encodeURIComponent(orderId)}&access=${encodeURIComponent(access)}&disposition=inline`,
   };
 
   if (options.withOfficialIphoneLink) {
-    // Sample official Apple host URL for layout preview only — not from client params.
     base.iphoneActivationUrl =
       "https://esimsetup.apple.com/esim_qrcode_provisioning";
   }
 
   return base;
 }
-
-export { ESIM_QR_CID };

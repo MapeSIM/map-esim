@@ -126,6 +126,7 @@
     "qa:install-guides": "tsx scripts/qa-install-guides.ts",
     "qa:vesim-provider-email": "tsx scripts/qa-vesim-provider-email.ts",
     "qa:esim-install-email-delivery": "tsx scripts/qa-esim-install-email-delivery.ts",
+    "qa:order-email-qr-https": "tsx scripts/qa-order-email-qr-https.ts",
     "qa:esim-alternate-delivery-email-schema": "tsx scripts/qa-esim-alternate-delivery-email-schema.ts",
     "qa:esim-alternate-delivery-email": "tsx scripts/qa-esim-alternate-delivery-email.ts",
     "qa:iccid-persistence": "tsx scripts/qa-iccid-persistence.ts",

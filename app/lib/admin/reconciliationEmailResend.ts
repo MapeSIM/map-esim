@@ -700,6 +700,7 @@ async function resendPurchaseOrderEmail(
     orderAccessUrl: accessToken
       ? getOrderAccessSuccessUrl(row.providerOrderId, accessToken)
       : undefined,
+    accessToken: accessToken || undefined,
     assistedWalletPurchaseNotice: Boolean(row.adminUserId),
   });
   if (!emailPayload) {
@@ -808,6 +809,7 @@ async function resendAssignmentOrderEmail(
     orderAccessUrl: accessToken
       ? getOrderAccessSuccessUrl(row.providerOrderId, accessToken)
       : undefined,
+    accessToken: accessToken || undefined,
   });
   if (!emailPayload) {
     await prisma.adminPackageAssignment.updateMany({
