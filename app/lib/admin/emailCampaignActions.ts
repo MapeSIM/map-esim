@@ -45,6 +45,7 @@ export async function createEmailCampaignAction(
       subject: String(formData.get("subject") ?? ""),
       bodyText: String(formData.get("bodyText") ?? ""),
       audienceRaw: String(formData.get("audience") ?? ""),
+      templateKeyRaw: String(formData.get("templateKey") ?? ""),
     });
     redirect(`/admin/email-campaigns/${created.id}`);
   } catch (error) {

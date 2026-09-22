@@ -21,14 +21,22 @@ import {
   EMAIL_CAMPAIGN_BODY_MAX,
   EMAIL_CAMPAIGN_CHANNEL,
   EMAIL_CAMPAIGN_CONFIRM_PHRASE,
+  EMAIL_CAMPAIGN_SELECTABLE_TEMPLATES,
   EMAIL_CAMPAIGN_SEND_BATCH,
   EMAIL_CAMPAIGN_SUBJECT_MAX,
+  EMAIL_CAMPAIGN_TEMPLATE_KEYS,
+  EMAIL_CAMPAIGN_TEMPLATE_PRESETS,
   emailCampaignAudienceLabel,
+  emailCampaignTemplateLabel,
   parseEmailCampaignAudience,
+  parseEmailCampaignTemplateKey,
   sanitizeCampaignBody,
   sanitizeCampaignSubject,
 } from "../app/lib/admin/emailCampaignShared";
-import { renderCampaignEmailHtml } from "../app/lib/email/campaignTemplate";
+import {
+  renderCampaignEmailHtml,
+  renderCampaignEmailText,
+} from "../app/lib/email/campaignTemplate";
 
 const root = join(__dirname, "..");
 
@@ -64,6 +72,9 @@ function main() {
   const schema = assertFile("prisma/schema.prisma");
   const migration = assertFile(
     "prisma/migrations/20260912180000_add_email_campaigns/migration.sql"
+  );
+  const templateKeyMigration = assertFile(
+    "prisma/migrations/20260922190000_add_email_campaign_template_key/migration.sql"
   );
   const pkg = assertFile("package.json");
   const sendOrderEmail = assertFile("app/lib/email/sendOrderEmail.ts");
@@ -131,12 +142,87 @@ function main() {
   assert.match(template, /escapeHtml\(body\)/);
   console.log("   ok");
 
+  console.log("2b) Reusable campaign templates");
+  assert.deepEqual([...EMAIL_CAMPAIGN_TEMPLATE_KEYS], [
+    "ANNOUNCEMENT",
+    "OFFER",
+    "ALERT",
+    "CLASSIC",
+  ]);
+  assert.deepEqual([...EMAIL_CAMPAIGN_SELECTABLE_TEMPLATES], [
+    "ANNOUNCEMENT",
+    "OFFER",
+    "ALERT",
+  ]);
+  assert.equal(parseEmailCampaignTemplateKey(""), "CLASSIC");
+  assert.equal(parseEmailCampaignTemplateKey("offer"), "OFFER");
+  assert.equal(parseEmailCampaignTemplateKey("unknown"), "CLASSIC");
+  assert.equal(
+    emailCampaignTemplateLabel("ANNOUNCEMENT"),
+    "Simple Announcement"
+  );
+  assert.equal(emailCampaignTemplateLabel("OFFER"), "Offer / Discount");
+  assert.equal(
+    emailCampaignTemplateLabel("ALERT"),
+    "Alert / Important Update"
+  );
+  assert.equal(emailCampaignTemplateLabel(null), "Classic travel promo");
+  for (const key of EMAIL_CAMPAIGN_TEMPLATE_KEYS) {
+    const preset = EMAIL_CAMPAIGN_TEMPLATE_PRESETS[key];
+    assert.equal(preset.key, key);
+    assert.ok(preset.label.length > 0);
+    assert.ok(preset.defaultSubject.length > 0);
+    assert.ok(preset.defaultBody.length > 0);
+  }
+  const classicHtml = renderCampaignEmailHtml({
+    subject: "Classic subject",
+    bodyText: "Classic body",
+    templateKey: "CLASSIC",
+  });
+  assert.match(classicHtml, /Stay connected wherever you go/);
+  assert.match(classicHtml, /Global Coverage/);
+  assert.match(classicHtml, /Buy eSIM Now/);
+  const announcementHtml = renderCampaignEmailHtml({
+    subject: "Announce subject",
+    bodyText: "Announce body",
+    templateKey: "ANNOUNCEMENT",
+  });
+  assert.match(announcementHtml, /Announcement/);
+  assert.doesNotMatch(announcementHtml, /Global Coverage/);
+  const offerHtml = renderCampaignEmailHtml({
+    subject: "Offer subject",
+    bodyText: "Offer body",
+    templateKey: "OFFER",
+  });
+  assert.match(offerHtml, /Special offer/);
+  assert.match(offerHtml, /Browse eSIM plans/);
+  assert.match(offerHtml, /Limited-time promo/);
+  const alertHtml = renderCampaignEmailHtml({
+    subject: "Alert subject",
+    bodyText: "Alert body",
+    templateKey: "ALERT",
+  });
+  assert.match(alertHtml, /Important update/);
+  assert.match(alertHtml, /What you need to know/);
+  const offerText = renderCampaignEmailText({
+    subject: "Offer subject",
+    bodyText: "Offer body",
+    templateKey: "OFFER",
+  });
+  assert.match(offerText, /Browse eSIM plans:/);
+  assert.match(template, /case "ANNOUNCEMENT"/);
+  assert.match(template, /case "OFFER"/);
+  assert.match(template, /case "ALERT"/);
+  assert.match(template, /case "CLASSIC"/);
+  console.log("   ok");
+
   console.log("3) Schema and migration store history + logs");
   assert.match(schema, /enum EmailCampaignAudience/);
   assert.match(schema, /ALL_CUSTOMERS/);
   assert.match(schema, /PURCHASED_CUSTOMERS/);
   assert.match(schema, /ACTIVE_CUSTOMERS/);
   assert.match(schema, /model EmailCampaign /);
+  assert.match(schema, /templateKey\s+String\s+@default\("CLASSIC"\)/);
   assert.match(schema, /model EmailCampaignRecipient /);
   assert.match(schema, /emailCampaignsCreated/);
   assert.match(schema, /emailCampaignRecipients/);
@@ -148,6 +234,10 @@ function main() {
     /UNIQUE INDEX "EmailCampaignRecipient_campaignId_customerUserId_key"/
   );
   assert.doesNotMatch(migration, /WalletAccount|PaymentAttempt|VeSim/);
+  assert.match(
+    templateKeyMigration,
+    /ADD COLUMN "templateKey" TEXT NOT NULL DEFAULT 'CLASSIC'/
+  );
   console.log("   ok");
 
   console.log("4) Admin UI + nav");
@@ -164,9 +254,12 @@ function main() {
   assert.match(detailPage, /EmailCampaignBulkSendForm/);
   assert.match(detailPage, /Eligible now/);
   assert.match(detailPage, /Send log/);
+  assert.match(detailPage, /detail\.templateLabel/);
   assert.match(form, /name="subject"/);
   assert.match(form, /name="bodyText"/);
   assert.match(form, /name="audience"/);
+  assert.match(form, /name="templateKey"/);
+  assert.match(form, /EMAIL_CAMPAIGN_SELECTABLE_TEMPLATES/);
   assert.match(form, /EMAIL_CAMPAIGN_AUDIENCES\.map/);
   assert.match(form, /defaultValue="ALL_CUSTOMERS"/);
   assert.match(shared, /"PURCHASED_CUSTOMERS"/);
@@ -193,6 +286,8 @@ function main() {
   assert.match(service, /email_campaign\.test_sent/);
   assert.match(service, /email_campaign\.bulk_started/);
   assert.match(service, /email_campaign\.bulk_completed/);
+  assert.match(service, /templateKey/);
+  assert.match(actions, /templateKeyRaw/);
   assert.doesNotMatch(service, /metadata:\s*\{[^}]*\bemail\s*:/);
   assert.match(actions, /requireRole\("ADMIN"\)/);
   assert.match(actions, /revalidatePath\("\/admin\/email-campaigns"\)/);

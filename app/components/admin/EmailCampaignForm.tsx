@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import {
   createEmailCampaignAction,
   type EmailCampaignActionState,
@@ -9,9 +9,15 @@ import {
   EMAIL_CAMPAIGN_AUDIENCE_HELP,
   EMAIL_CAMPAIGN_AUDIENCES,
   EMAIL_CAMPAIGN_BODY_MAX,
+  EMAIL_CAMPAIGN_SELECTABLE_TEMPLATES,
   EMAIL_CAMPAIGN_SUBJECT_MAX,
+  EMAIL_CAMPAIGN_TEMPLATE_PRESETS,
   emailCampaignAudienceLabel,
+  parseEmailCampaignTemplateKey,
+  type EmailCampaignTemplateKey,
 } from "@/app/lib/admin/emailCampaignShared";
+
+const DEFAULT_TEMPLATE: EmailCampaignTemplateKey = "ANNOUNCEMENT";
 
 export default function EmailCampaignForm() {
   const [state, action, pending] = useActionState<
@@ -19,8 +25,58 @@ export default function EmailCampaignForm() {
     FormData
   >(createEmailCampaignAction, null);
 
+  const [templateKey, setTemplateKey] =
+    useState<EmailCampaignTemplateKey>(DEFAULT_TEMPLATE);
+  const preset = useMemo(
+    () => EMAIL_CAMPAIGN_TEMPLATE_PRESETS[templateKey],
+    [templateKey]
+  );
+  const [subject, setSubject] = useState(preset.defaultSubject);
+  const [bodyText, setBodyText] = useState(preset.defaultBody);
+
+  function applyTemplate(nextKey: EmailCampaignTemplateKey) {
+    const next = EMAIL_CAMPAIGN_TEMPLATE_PRESETS[nextKey];
+    setTemplateKey(nextKey);
+    setSubject(next.defaultSubject);
+    setBodyText(next.defaultBody);
+  }
+
   return (
     <form action={action} className="space-y-5">
+      <div>
+        <label
+          htmlFor="campaign-template"
+          className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+        >
+          Template
+        </label>
+        <select
+          id="campaign-template"
+          name="templateKey"
+          required
+          value={templateKey}
+          onChange={(event) =>
+            applyTemplate(parseEmailCampaignTemplateKey(event.target.value))
+          }
+          className="mt-1 w-full rounded-[12px] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--heading)]"
+        >
+          {EMAIL_CAMPAIGN_SELECTABLE_TEMPLATES.map((key) => (
+            <option key={key} value={key}>
+              {EMAIL_CAMPAIGN_TEMPLATE_PRESETS[key].label}
+            </option>
+          ))}
+        </select>
+        <p className="mt-2 text-xs text-[var(--text-muted)]">
+          {preset.description} Subject and content load from the template and
+          stay fully editable.
+        </p>
+        {state && !state.ok && state.fieldErrors?.templateKey ? (
+          <p className="mt-1 text-sm text-red-700 dark:text-red-300" role="alert">
+            {state.fieldErrors.templateKey}
+          </p>
+        ) : null}
+      </div>
+
       <div>
         <label
           htmlFor="campaign-subject"
@@ -34,6 +90,8 @@ export default function EmailCampaignForm() {
           type="text"
           required
           maxLength={EMAIL_CAMPAIGN_SUBJECT_MAX}
+          value={subject}
+          onChange={(event) => setSubject(event.target.value)}
           className="mt-1 w-full rounded-[12px] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--heading)]"
         />
         {state && !state.ok && state.fieldErrors?.subject ? (
@@ -56,6 +114,8 @@ export default function EmailCampaignForm() {
           required
           rows={10}
           maxLength={EMAIL_CAMPAIGN_BODY_MAX}
+          value={bodyText}
+          onChange={(event) => setBodyText(event.target.value)}
           className="mt-1 w-full rounded-[12px] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--heading)]"
         />
         {state && !state.ok && state.fieldErrors?.bodyText ? (

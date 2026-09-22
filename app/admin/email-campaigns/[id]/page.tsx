@@ -68,6 +68,7 @@ export default async function AdminEmailCampaignDetailPage({
       <dl className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 sm:px-5">
         <DetailRow label="Subject" value={detail.subject} />
         <DetailRow label="Audience" value={detail.audienceLabel} />
+        <DetailRow label="Template" value={detail.templateLabel} />
         <DetailRow label="Status" value={detail.statusLabel} />
         <DetailRow
           label="Eligible now"

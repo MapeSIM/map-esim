@@ -20,7 +20,9 @@ import {
   emailCampaignAudienceLabel,
   emailCampaignRecipientStatusLabel,
   emailCampaignStatusLabel,
+  emailCampaignTemplateLabel,
   parseEmailCampaignAudience,
+  parseEmailCampaignTemplateKey,
   sanitizeCampaignBody,
   sanitizeCampaignSubject,
   type EmailCampaignAudienceId,
@@ -105,9 +107,11 @@ async function sendCampaignMessage(input: {
   to: string;
   subject: string;
   bodyText: string;
+  templateKey?: string | null;
 }): Promise<{ ok: true } | { ok: false; reason: string }> {
   const subject = sanitizeCampaignSubject(input.subject);
   const bodyText = sanitizeCampaignBody(input.bodyText);
+  const templateKey = parseEmailCampaignTemplateKey(input.templateKey);
   if (!subject || !bodyText) {
     return { ok: false, reason: "send_failed" };
   }
@@ -115,8 +119,8 @@ async function sendCampaignMessage(input: {
     channel: EMAIL_CAMPAIGN_CHANNEL,
     to: input.to,
     subject,
-    text: renderCampaignEmailText({ subject, bodyText }),
-    html: renderCampaignEmailHtml({ subject, bodyText }),
+    text: renderCampaignEmailText({ subject, bodyText, templateKey }),
+    html: renderCampaignEmailHtml({ subject, bodyText, templateKey }),
   });
 }
 
@@ -174,6 +178,8 @@ export type AdminEmailCampaignDetail = {
   id: string;
   subject: string;
   bodyText: string;
+  templateKey: string;
+  templateLabel: string;
   previewHtml: string;
   audience: EmailCampaignAudienceId;
   audienceLabel: string;
@@ -232,9 +238,12 @@ export async function getAdminEmailCampaignDetail(
     id: row.id,
     subject: row.subject,
     bodyText: row.bodyText,
+    templateKey: parseEmailCampaignTemplateKey(row.templateKey),
+    templateLabel: emailCampaignTemplateLabel(row.templateKey),
     previewHtml: renderCampaignEmailHtml({
       subject: row.subject,
       bodyText: row.bodyText,
+      templateKey: row.templateKey,
     }),
     audience,
     audienceLabel: emailCampaignAudienceLabel(row.audience),
@@ -266,10 +275,12 @@ export async function createAdminEmailCampaign(input: {
   subject: string;
   bodyText: string;
   audienceRaw: string;
+  templateKeyRaw?: string;
 }): Promise<{ id: string }> {
   const subject = sanitizeCampaignSubject(input.subject);
   const bodyText = sanitizeCampaignBody(input.bodyText);
   const audience = parseEmailCampaignAudience(input.audienceRaw);
+  const templateKey = parseEmailCampaignTemplateKey(input.templateKeyRaw);
   if (!subject) {
     throw new EmailCampaignError("Enter a subject.", "subject");
   }
@@ -284,6 +295,7 @@ export async function createAdminEmailCampaign(input: {
       createdByAdminId: input.adminUserId,
       subject,
       bodyText,
+      templateKey,
       audience: audience as EmailCampaignAudience,
       status: EmailCampaignStatus.DRAFT,
     },
@@ -295,7 +307,7 @@ export async function createAdminEmailCampaign(input: {
       action: "email_campaign.created",
       targetType: "EmailCampaign",
       targetId: created.id,
-      metadata: { audience },
+      metadata: { audience, templateKey },
     },
   });
   return created;
@@ -308,7 +320,13 @@ export async function sendAdminEmailCampaignTest(input: {
 }): Promise<void> {
   const campaign = await prisma.emailCampaign.findUnique({
     where: { id: input.campaignId.trim() },
-    select: { id: true, subject: true, bodyText: true, status: true },
+    select: {
+      id: true,
+      subject: true,
+      bodyText: true,
+      templateKey: true,
+      status: true,
+    },
   });
   if (!campaign) {
     throw new EmailCampaignError("Campaign not found.");
@@ -321,6 +339,7 @@ export async function sendAdminEmailCampaignTest(input: {
     to,
     subject: campaign.subject,
     bodyText: campaign.bodyText,
+    templateKey: campaign.templateKey,
   });
   if (!result.ok) {
     throw new EmailCampaignError(
@@ -400,6 +419,7 @@ export async function sendAdminEmailCampaignBulk(input: {
       id: true,
       subject: true,
       bodyText: true,
+      templateKey: true,
       audience: true,
       status: true,
     },
@@ -496,6 +516,7 @@ export async function sendAdminEmailCampaignBulk(input: {
       to: row.email,
       subject: campaign.subject,
       bodyText: campaign.bodyText,
+      templateKey: campaign.templateKey,
     });
     if (result.ok) {
       sentThisBatch += 1;

@@ -141,3 +141,85 @@ export function campaignCanContinueBulkSend(
 ): boolean {
   return String(status ?? "").trim() === "SENDING";
 }
+
+/** Reusable campaign HTML layouts (first phase). */
+export const EMAIL_CAMPAIGN_TEMPLATE_KEYS = [
+  "ANNOUNCEMENT",
+  "OFFER",
+  "ALERT",
+  "CLASSIC",
+] as const;
+
+export type EmailCampaignTemplateKey =
+  (typeof EMAIL_CAMPAIGN_TEMPLATE_KEYS)[number];
+
+/** Templates offered in the create-campaign selector (phase 1). */
+export const EMAIL_CAMPAIGN_SELECTABLE_TEMPLATES = [
+  "ANNOUNCEMENT",
+  "OFFER",
+  "ALERT",
+] as const satisfies readonly EmailCampaignTemplateKey[];
+
+export type EmailCampaignTemplatePreset = {
+  key: EmailCampaignTemplateKey;
+  label: string;
+  description: string;
+  defaultSubject: string;
+  defaultBody: string;
+};
+
+export const EMAIL_CAMPAIGN_TEMPLATE_PRESETS: Record<
+  EmailCampaignTemplateKey,
+  EmailCampaignTemplatePreset
+> = {
+  ANNOUNCEMENT: {
+    key: "ANNOUNCEMENT",
+    label: "Simple Announcement",
+    description: "Clean brand update for news, launches, and general notices.",
+    defaultSubject: "A quick update from MAP eSIM",
+    defaultBody:
+      "Hi,\n\nWe have a short update for you.\n\n[Share your announcement here.]\n\nThank you for traveling with MAP eSIM.",
+  },
+  OFFER: {
+    key: "OFFER",
+    label: "Offer / Discount",
+    description: "Promo-focused layout with a clear call-to-action to buy eSIM.",
+    defaultSubject: "Limited-time eSIM offer from MAP eSIM",
+    defaultBody:
+      "Hi,\n\nFor a limited time, enjoy a special offer on selected eSIM plans.\n\nOffer details: [describe discount or promo]\nValid until: [date]\n\nOpen MAP eSIM to browse destinations and claim your plan while the offer lasts.",
+  },
+  ALERT: {
+    key: "ALERT",
+    label: "Alert / Important Update",
+    description: "High-visibility layout for service notices and important changes.",
+    defaultBody:
+      "Hi,\n\nThis is an important update about your MAP eSIM service.\n\n[Explain what changed and what customers should do.]\n\nIf you need help, reply to this email or contact support@mapesim.com.",
+    defaultSubject: "Important update from MAP eSIM",
+  },
+  CLASSIC: {
+    key: "CLASSIC",
+    label: "Classic travel promo",
+    description: "Original campaign layout with travel hero and feature cards.",
+    defaultSubject: "Stay connected wherever you go",
+    defaultBody:
+      "Hi,\n\nExplore MAP eSIM destinations and get connected before you travel.\n\nBrowse plans and install by QR in minutes.",
+  },
+};
+
+export function parseEmailCampaignTemplateKey(
+  raw: string | null | undefined
+): EmailCampaignTemplateKey {
+  const value = String(raw ?? "")
+    .trim()
+    .toUpperCase();
+  return (EMAIL_CAMPAIGN_TEMPLATE_KEYS as readonly string[]).includes(value)
+    ? (value as EmailCampaignTemplateKey)
+    : "CLASSIC";
+}
+
+export function emailCampaignTemplateLabel(
+  key: string | null | undefined
+): string {
+  const parsed = parseEmailCampaignTemplateKey(key);
+  return EMAIL_CAMPAIGN_TEMPLATE_PRESETS[parsed].label;
+}

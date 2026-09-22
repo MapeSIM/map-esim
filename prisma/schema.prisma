@@ -1713,6 +1713,8 @@ model EmailCampaign {
   createdByAdminId String
   subject          String
   bodyText         String
+  /// Layout key for HTML rendering. CLASSIC preserves the original campaign layout.
+  templateKey      String               @default("CLASSIC")
   audience         EmailCampaignAudience
   status           EmailCampaignStatus  @default(DRAFT)
   /// Audience size snapshotted when bulk send starts (0 until then).
