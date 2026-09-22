@@ -97,6 +97,16 @@ export async function acceptGoogleOauthConsentAction(
     },
   });
 
+  try {
+    const { ensureCustomerWalletAccount } = await import(
+      "@/app/lib/wallet/ensureCustomerWalletAccount"
+    );
+    await ensureCustomerWalletAccount(userId);
+  } catch {
+    // Consent already saved — never block account entry on wallet bootstrap.
+    console.error("ensure_customer_wallet", "oauth_consent_failed");
+  }
+
   const rawCallback = String(formData.get("callbackUrl") || "");
   const requestOrigin = await readRequestOrigin();
   const next = safeCallbackPath(rawCallback, "/", { requestOrigin });

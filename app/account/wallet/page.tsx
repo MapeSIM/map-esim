@@ -22,6 +22,16 @@ export default async function AccountWalletPage({
   const params = await searchParams;
   const gatewayReady = isPaymentGatewayConfigured();
 
+  // Backfill zero-balance wallet for verified CUSTOMERS missing a row.
+  try {
+    const { ensureCustomerWalletAccount } = await import(
+      "@/app/lib/wallet/ensureCustomerWalletAccount"
+    );
+    await ensureCustomerWalletAccount(user.id);
+  } catch {
+    // Page still loads; hasWallet / unavailable UI covers missing row.
+  }
+
   let data: Awaited<ReturnType<typeof getCustomerWalletTransactions>>;
   try {
     data = await getCustomerWalletTransactions(user.id, params.page);

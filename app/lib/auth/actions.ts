@@ -371,6 +371,15 @@ export async function verifyEmailOtpAction(
   }
 
   if (user.emailVerifiedAt) {
+    // Heal legacy verified customers that never received a wallet row.
+    try {
+      const { ensureCustomerWalletAccount } = await import(
+        "@/app/lib/wallet/ensureCustomerWalletAccount"
+      );
+      await ensureCustomerWalletAccount(user.id);
+    } catch {
+      console.error("ensure_customer_wallet", "verify_already_verified_failed");
+    }
     redirect(verifiedSignInPath);
   }
 
@@ -407,6 +416,16 @@ export async function verifyEmailOtpAction(
     targetType: "User",
     targetId: user.id,
   });
+
+  try {
+    const { ensureCustomerWalletAccount } = await import(
+      "@/app/lib/wallet/ensureCustomerWalletAccount"
+    );
+    await ensureCustomerWalletAccount(user.id);
+  } catch {
+    // Verification already committed — never block sign-in on wallet bootstrap.
+    console.error("ensure_customer_wallet", "verify_email_failed");
+  }
 
   redirect(verifiedSignInPath);
 }

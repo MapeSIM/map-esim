@@ -67,6 +67,19 @@ export function MapEsimPrismaAdapter(prisma: PrismaClient): Adapter {
         // Referral attribution must never fail OAuth user create.
       }
 
+      // Verified Google CUSTOMERs get a zero-balance wallet immediately.
+      if (created.emailVerifiedAt) {
+        try {
+          const { ensureCustomerWalletAccount } = await import(
+            "@/app/lib/wallet/ensureCustomerWalletAccount"
+          );
+          await ensureCustomerWalletAccount(created.id);
+        } catch {
+          // Wallet bootstrap must never fail OAuth user create.
+          console.error("ensure_customer_wallet", "oauth_create_failed");
+        }
+      }
+
       // Standard AdapterUser shape (includes emailVerified for Auth.js).
       return toAdapterUser(created);
     },
