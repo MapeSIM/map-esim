@@ -142,22 +142,32 @@ export function campaignCanContinueBulkSend(
   return String(status ?? "").trim() === "SENDING";
 }
 
-/** Reusable campaign HTML layouts (first phase). */
+/** Reusable campaign HTML layouts. CLASSIC is legacy-only (not in selector). */
 export const EMAIL_CAMPAIGN_TEMPLATE_KEYS = [
   "ANNOUNCEMENT",
   "OFFER",
   "ALERT",
+  "TRAVEL_PROMOTION",
+  "DISCOUNT_PROMO",
+  "FEATURE_UPDATE",
+  "WELCOME",
+  "MAINTENANCE_ALERT",
   "CLASSIC",
 ] as const;
 
 export type EmailCampaignTemplateKey =
   (typeof EMAIL_CAMPAIGN_TEMPLATE_KEYS)[number];
 
-/** Templates offered in the create-campaign selector (phase 1). */
+/** Templates offered in the create-campaign selector. */
 export const EMAIL_CAMPAIGN_SELECTABLE_TEMPLATES = [
   "ANNOUNCEMENT",
   "OFFER",
   "ALERT",
+  "TRAVEL_PROMOTION",
+  "DISCOUNT_PROMO",
+  "FEATURE_UPDATE",
+  "WELCOME",
+  "MAINTENANCE_ALERT",
 ] as const satisfies readonly EmailCampaignTemplateKey[];
 
 export type EmailCampaignTemplatePreset = {
@@ -192,9 +202,49 @@ export const EMAIL_CAMPAIGN_TEMPLATE_PRESETS: Record<
     key: "ALERT",
     label: "Alert / Important Update",
     description: "High-visibility layout for service notices and important changes.",
+    defaultSubject: "Important update from MAP eSIM",
     defaultBody:
       "Hi,\n\nThis is an important update about your MAP eSIM service.\n\n[Explain what changed and what customers should do.]\n\nIf you need help, reply to this email or contact support@mapesim.com.",
-    defaultSubject: "Important update from MAP eSIM",
+  },
+  TRAVEL_PROMOTION: {
+    key: "TRAVEL_PROMOTION",
+    label: "Travel Promotion",
+    description: "Destination-focused promo for upcoming trips and travel seasons.",
+    defaultSubject: "Get travel-ready with MAP eSIM",
+    defaultBody:
+      "Hi,\n\nPlanning a trip? Stay online from the moment you land with MAP eSIM.\n\nDestination: [country or region]\nSuggested plan: [data / days]\n\nBrowse destinations, buy in minutes, and install by QR before you fly.",
+  },
+  DISCOUNT_PROMO: {
+    key: "DISCOUNT_PROMO",
+    label: "Discount / Promo",
+    description: "Sale-style layout for coupon codes and time-limited discounts.",
+    defaultSubject: "Your MAP eSIM discount is waiting",
+    defaultBody:
+      "Hi,\n\nEnjoy a special discount on selected MAP eSIM plans.\n\nPromo code: [CODE]\nDiscount: [e.g. 10% off]\nValid until: [date]\n\nApply your code at checkout and stay connected for less.",
+  },
+  FEATURE_UPDATE: {
+    key: "FEATURE_UPDATE",
+    label: "Feature Update",
+    description: "Product news layout for new features and improvements.",
+    defaultSubject: "What's new at MAP eSIM",
+    defaultBody:
+      "Hi,\n\nWe've improved MAP eSIM to make travel connectivity even easier.\n\nWhat's new:\n• [Feature 1]\n• [Feature 2]\n• [Feature 3]\n\nOpen the site or app to try the update on your next trip.",
+  },
+  WELCOME: {
+    key: "WELCOME",
+    label: "Welcome Email",
+    description: "Warm onboarding layout for new customers.",
+    defaultSubject: "Welcome to MAP eSIM",
+    defaultBody:
+      "Hi,\n\nWelcome to MAP eSIM — we're glad you're here.\n\nHere's how to get started:\n1. Choose a destination\n2. Buy a data plan\n3. Install by QR and connect\n\nIf you need help at any step, contact support@mapesim.com.",
+  },
+  MAINTENANCE_ALERT: {
+    key: "MAINTENANCE_ALERT",
+    label: "Maintenance Alert",
+    description: "Service notice layout for planned maintenance and downtime.",
+    defaultSubject: "Scheduled maintenance notice from MAP eSIM",
+    defaultBody:
+      "Hi,\n\nWe have scheduled maintenance that may briefly affect MAP eSIM services.\n\nWhen: [date / time and timezone]\nExpected impact: [what customers may notice]\n\nWe will restore full service as soon as maintenance is complete. Thank you for your patience.",
   },
   CLASSIC: {
     key: "CLASSIC",

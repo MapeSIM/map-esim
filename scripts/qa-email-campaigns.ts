@@ -147,15 +147,26 @@ function main() {
     "ANNOUNCEMENT",
     "OFFER",
     "ALERT",
+    "TRAVEL_PROMOTION",
+    "DISCOUNT_PROMO",
+    "FEATURE_UPDATE",
+    "WELCOME",
+    "MAINTENANCE_ALERT",
     "CLASSIC",
   ]);
   assert.deepEqual([...EMAIL_CAMPAIGN_SELECTABLE_TEMPLATES], [
     "ANNOUNCEMENT",
     "OFFER",
     "ALERT",
+    "TRAVEL_PROMOTION",
+    "DISCOUNT_PROMO",
+    "FEATURE_UPDATE",
+    "WELCOME",
+    "MAINTENANCE_ALERT",
   ]);
   assert.equal(parseEmailCampaignTemplateKey(""), "CLASSIC");
   assert.equal(parseEmailCampaignTemplateKey("offer"), "OFFER");
+  assert.equal(parseEmailCampaignTemplateKey("welcome"), "WELCOME");
   assert.equal(parseEmailCampaignTemplateKey("unknown"), "CLASSIC");
   assert.equal(
     emailCampaignTemplateLabel("ANNOUNCEMENT"),
@@ -165,6 +176,14 @@ function main() {
   assert.equal(
     emailCampaignTemplateLabel("ALERT"),
     "Alert / Important Update"
+  );
+  assert.equal(emailCampaignTemplateLabel("TRAVEL_PROMOTION"), "Travel Promotion");
+  assert.equal(emailCampaignTemplateLabel("DISCOUNT_PROMO"), "Discount / Promo");
+  assert.equal(emailCampaignTemplateLabel("FEATURE_UPDATE"), "Feature Update");
+  assert.equal(emailCampaignTemplateLabel("WELCOME"), "Welcome Email");
+  assert.equal(
+    emailCampaignTemplateLabel("MAINTENANCE_ALERT"),
+    "Maintenance Alert"
   );
   assert.equal(emailCampaignTemplateLabel(null), "Classic travel promo");
   for (const key of EMAIL_CAMPAIGN_TEMPLATE_KEYS) {
@@ -204,6 +223,41 @@ function main() {
   });
   assert.match(alertHtml, /Important update/);
   assert.match(alertHtml, /What you need to know/);
+  const travelHtml = renderCampaignEmailHtml({
+    subject: "Travel subject",
+    bodyText: "Travel body",
+    templateKey: "TRAVEL_PROMOTION",
+  });
+  assert.match(travelHtml, /Travel promotion/);
+  assert.match(travelHtml, /Browse destinations/);
+  const discountHtml = renderCampaignEmailHtml({
+    subject: "Discount subject",
+    bodyText: "Discount body",
+    templateKey: "DISCOUNT_PROMO",
+  });
+  assert.match(discountHtml, /Discount \/ promo/);
+  assert.match(discountHtml, /Promo details/);
+  const featureHtml = renderCampaignEmailHtml({
+    subject: "Feature subject",
+    bodyText: "Feature body",
+    templateKey: "FEATURE_UPDATE",
+  });
+  assert.match(featureHtml, /Feature update/);
+  assert.match(featureHtml, /Release notes/);
+  const welcomeHtml = renderCampaignEmailHtml({
+    subject: "Welcome subject",
+    bodyText: "Welcome body",
+    templateKey: "WELCOME",
+  });
+  assert.match(welcomeHtml, /Welcome/);
+  assert.match(welcomeHtml, /Getting started/);
+  const maintenanceHtml = renderCampaignEmailHtml({
+    subject: "Maintenance subject",
+    bodyText: "Maintenance body",
+    templateKey: "MAINTENANCE_ALERT",
+  });
+  assert.match(maintenanceHtml, /Maintenance alert/);
+  assert.match(maintenanceHtml, /Maintenance details/);
   const offerText = renderCampaignEmailText({
     subject: "Offer subject",
     bodyText: "Offer body",
@@ -213,6 +267,11 @@ function main() {
   assert.match(template, /case "ANNOUNCEMENT"/);
   assert.match(template, /case "OFFER"/);
   assert.match(template, /case "ALERT"/);
+  assert.match(template, /case "TRAVEL_PROMOTION"/);
+  assert.match(template, /case "DISCOUNT_PROMO"/);
+  assert.match(template, /case "FEATURE_UPDATE"/);
+  assert.match(template, /case "WELCOME"/);
+  assert.match(template, /case "MAINTENANCE_ALERT"/);
   assert.match(template, /case "CLASSIC"/);
   console.log("   ok");
 

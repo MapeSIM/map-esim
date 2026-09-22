@@ -274,6 +274,123 @@ ${renderCampaignBodySectionHtml(subject, htmlBody, "What you need to know")}
 ${renderEmailSupportBlock()}`;
 }
 
+function renderTravelPromotionContentHtml(
+  subject: string,
+  htmlBody: string
+): string {
+  return `
+${renderBrandIntroHtml()}
+${renderNavyBandHtml({
+  eyebrow: "Travel promotion",
+  title: subject || "Get travel-ready",
+  subtitle: "Stay connected abroad — buy eSIM data before you fly.",
+  ctaLabel: "Browse destinations",
+  ctaHref: BUY_ESIM_HREF,
+})}
+${renderCampaignBodySectionHtml(subject, htmlBody, "Trip details")}
+${renderEmailSupportBlock()}`;
+}
+
+function renderDiscountPromoContentHtml(
+  subject: string,
+  htmlBody: string
+): string {
+  return `
+${renderBrandIntroHtml()}
+${renderNavyBandHtml({
+  eyebrow: "Discount / promo",
+  title: subject || "Your eSIM discount",
+  subtitle: "Use your promo details below and save on selected travel data plans.",
+  ctaLabel: "Shop eSIM plans",
+  ctaHref: BUY_ESIM_HREF,
+})}
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 18px;width:100%;border-collapse:separate;">
+  <tr>
+    <td style="padding:14px 16px;border:1px solid ${EMAIL_NOTICE_BORDER};border-radius:12px;background:${EMAIL_NOTICE_BG};">
+      <p style="margin:0;font-family:${EMAIL_FONT_STACK};font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:${BRAND_INK};">
+        Promo details
+      </p>
+      <p style="margin:8px 0 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:1.55;color:${TEXT_SECONDARY};">
+        Enter any promo code at checkout. Terms and availability can change.
+      </p>
+    </td>
+  </tr>
+</table>
+${renderCampaignBodySectionHtml(subject, htmlBody, "How to save")}
+${renderEmailSupportBlock()}`;
+}
+
+function renderFeatureUpdateContentHtml(
+  subject: string,
+  htmlBody: string
+): string {
+  return `
+${renderBrandIntroHtml()}
+${renderNavyBandHtml({
+  eyebrow: "Feature update",
+  title: subject || "What's new",
+  subtitle: "Product improvements to make MAP eSIM simpler for every trip.",
+})}
+${renderCampaignBodySectionHtml(subject, htmlBody, "Release notes")}
+${renderEmailSupportBlock()}`;
+}
+
+function renderWelcomeContentHtml(subject: string, htmlBody: string): string {
+  return `
+${renderBrandIntroHtml()}
+${renderNavyBandHtml({
+  eyebrow: "Welcome",
+  title: subject || "Welcome to MAP eSIM",
+  subtitle: "You're all set to buy travel data and install by QR in minutes.",
+  ctaLabel: "Explore destinations",
+  ctaHref: BUY_ESIM_HREF,
+})}
+${renderCampaignBodySectionHtml(subject, htmlBody, "Getting started")}
+${renderEmailSupportBlock()}`;
+}
+
+function renderMaintenanceAlertContentHtml(
+  subject: string,
+  htmlBody: string
+): string {
+  return `
+${renderBrandIntroHtml()}
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 22px;width:100%;border-collapse:separate;">
+  <tr>
+    <td style="padding:0;border-radius:14px;border:1px solid ${BORDER};overflow:hidden;background:${CARD_BG};">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;">
+        <tr>
+          <td width="6" bgcolor="${BRAND_LIME}" style="width:6px;background-color:${BRAND_LIME};font-size:0;line-height:0;">&nbsp;</td>
+          <td style="padding:22px 20px;">
+            <p style="margin:0 0 8px;font-family:${EMAIL_FONT_STACK};font-size:11px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:${BRAND_INK};">
+              Maintenance alert
+            </p>
+            <h1 style="margin:0 0 10px;font-family:${EMAIL_FONT_STACK};font-size:22px;line-height:1.3;font-weight:800;color:${TEXT_PRIMARY};">
+              ${escapeHtml(subject || "Scheduled maintenance")}
+            </h1>
+            <p style="margin:0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:1.55;color:${TEXT_SECONDARY};">
+              Please review the schedule and expected impact below.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+${renderCampaignBodySectionHtml(subject, htmlBody, "Maintenance details")}
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 8px;width:100%;">
+  <tr>
+    <td style="padding:0;">
+      <p style="margin:0 0 12px;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:1.55;color:${TEXT_SECONDARY};">
+        Questions? Contact
+        <a href="${escapeHtml(SUPPORT_HREF)}" style="color:${BRAND_INK};font-weight:700;text-decoration:underline;">support@mapesim.com</a>.
+      </p>
+    </td>
+  </tr>
+</table>
+${renderEmailSupportBlock()}`;
+}
+
 function renderTemplateContentHtml(
   templateKey: EmailCampaignTemplateKey,
   subject: string,
@@ -286,6 +403,16 @@ function renderTemplateContentHtml(
       return renderOfferContentHtml(subject, htmlBody);
     case "ALERT":
       return renderAlertContentHtml(subject, htmlBody);
+    case "TRAVEL_PROMOTION":
+      return renderTravelPromotionContentHtml(subject, htmlBody);
+    case "DISCOUNT_PROMO":
+      return renderDiscountPromoContentHtml(subject, htmlBody);
+    case "FEATURE_UPDATE":
+      return renderFeatureUpdateContentHtml(subject, htmlBody);
+    case "WELCOME":
+      return renderWelcomeContentHtml(subject, htmlBody);
+    case "MAINTENANCE_ALERT":
+      return renderMaintenanceAlertContentHtml(subject, htmlBody);
     case "CLASSIC":
     default:
       return renderClassicContentHtml(subject, htmlBody);
@@ -340,18 +467,30 @@ export function renderCampaignEmailText(input: {
     ].join("\n");
   }
 
-  const headline =
-    templateKey === "OFFER"
-      ? "Special offer"
-      : templateKey === "ALERT"
-        ? "Important update"
-        : "Announcement";
+  const headlineByKey: Partial<Record<EmailCampaignTemplateKey, string>> = {
+    OFFER: "Special offer",
+    ALERT: "Important update",
+    ANNOUNCEMENT: "Announcement",
+    TRAVEL_PROMOTION: "Travel promotion",
+    DISCOUNT_PROMO: "Discount / promo",
+    FEATURE_UPDATE: "Feature update",
+    WELCOME: "Welcome",
+    MAINTENANCE_ALERT: "Maintenance alert",
+  };
+  const headline = headlineByKey[templateKey] ?? "Announcement";
 
   const lines = [BRAND_NAME, BRAND_TAGLINE, "", headline, subject, "", body, ""];
   if (templateKey === "OFFER") {
     lines.push(`Browse eSIM plans: ${BUY_ESIM_HREF}`, "");
   }
-  if (templateKey === "ALERT") {
+  if (
+    templateKey === "TRAVEL_PROMOTION" ||
+    templateKey === "DISCOUNT_PROMO" ||
+    templateKey === "WELCOME"
+  ) {
+    lines.push(`Browse destinations: ${BUY_ESIM_HREF}`, "");
+  }
+  if (templateKey === "ALERT" || templateKey === "MAINTENANCE_ALERT") {
     lines.push("Need help? Contact support@mapesim.com", "");
   }
   lines.push(renderEmailFooterText());
