@@ -47,7 +47,9 @@ export default async function AccountWalletTopUpDetailPage({
               ? "Top-up under review"
               : view.isFailedOrExpired
                 ? "Top-up not completed"
-                : "Top-up status"}
+                : view.awaitingWalletApproval
+                  ? "Waiting for payment approval"
+                  : "Top-up status"}
         </h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
           Values are loaded from your account records. Refreshing this page does
@@ -82,8 +84,23 @@ export default async function AccountWalletTopUpDetailPage({
           <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
             PKR payment
           </dt>
-          <dd className="font-semibold text-[var(--heading)]">{view.chargeNotice}</dd>
+          <dd className="font-semibold text-[var(--heading)]">
+            {view.pkrAmountLabel ?? view.chargeNotice}
+          </dd>
         </div>
+        {view.paymentMethodLabel ? (
+          <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[180px_1fr]">
+            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              Payment method
+            </dt>
+            <dd className="font-semibold text-[var(--heading)]">
+              {view.paymentMethodLabel}
+              {view.customerMsisdnMasked
+                ? ` · ${view.customerMsisdnMasked}`
+                : ""}
+            </dd>
+          </div>
+        ) : null}
         <div className="grid gap-1 border-b border-[var(--border)] py-3 sm:grid-cols-[180px_1fr]">
           <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
             Gateway
@@ -128,15 +145,59 @@ export default async function AccountWalletTopUpDetailPage({
         </div>
       ) : null}
 
-      {view.isPending && !view.isCredited ? (
+      {view.awaitingWalletApproval ? (
+        <div className="space-y-3 text-sm text-[var(--text-muted)]">
+          <p>
+            Approve the payment in your mobile wallet app if prompted. This page
+            updates after a verified payment confirmation — refreshing does not
+            credit your wallet.
+          </p>
+          <p>
+            You will receive{" "}
+            <span className="font-semibold text-[var(--heading)]">
+              {view.creditAmountLabel} USD
+            </span>{" "}
+            wallet credit after payment succeeds
+            {view.pkrAmountLabel ? (
+              <>
+                {" "}
+                (you pay{" "}
+                <span className="font-semibold text-[var(--heading)]">
+                  {view.pkrAmountLabel}
+                </span>
+                )
+              </>
+            ) : null}
+            .
+          </p>
+        </div>
+      ) : null}
+
+      {view.isPending && !view.isCredited && !view.awaitingWalletApproval ? (
         <div className="space-y-4">
           <p className="text-sm text-[var(--text-muted)]">
-            Secure checkout will confirm the PKR amount when a payment provider
-            is available. You cannot mark this payment successful yourself.
+            {view.simpaisaWalletCheckout
+              ? "Select JazzCash or Easypaisa, enter your mobile number, and continue. Your wallet is credited only after a verified payment confirmation."
+              : "Secure checkout will confirm the payment amount with the payment provider. You cannot mark this payment successful yourself."}
           </p>
+          {view.pkrAmountLabel && view.simpaisaWalletCheckout ? (
+            <p className="text-sm text-[var(--text-muted)]">
+              Estimated charge:{" "}
+              <span className="font-semibold text-[var(--heading)]">
+                {view.pkrAmountLabel}
+              </span>{" "}
+              for{" "}
+              <span className="font-semibold text-[var(--heading)]">
+                {view.creditAmountLabel} USD
+              </span>{" "}
+              wallet credit.
+            </p>
+          ) : null}
           <WalletTopupCheckoutButton
             topupId={view.topupId}
             enabled={view.canAttemptCheckout}
+            simpaisaWalletCheckout={view.simpaisaWalletCheckout}
+            usdCents={view.creditAmountCents}
           />
         </div>
       ) : null}

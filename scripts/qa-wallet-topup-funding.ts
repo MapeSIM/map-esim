@@ -44,24 +44,28 @@ function main() {
   );
   console.log("PASS topup_checkout_session_return");
 
-  // 2) Authoritative amount from persisted top-up — not browser/webhook alone.
+  // 2) Authoritative USD credit; Simpaisa charges PKR via shared quote.
+  assert.match(topup, /quoteSimpaisaPkrChargeFromUsdCents/);
+  assert.match(topup, /simpaisaChargeMatchesQuote/);
+  assert.match(topup, /parseSimpaisaWalletCheckoutFields/);
+  assert.match(topup, /maskSimpaisaMsisdn/);
+  assert.match(topup, /resumeSimpaisaWalletCheckout/);
   assert.match(
     topup,
-    /chargeAmountMinor:\s*topup\.creditAmountCents/
+    /usdCents:\s*topup\.creditAmountCents/
   );
   assert.match(
     topup,
-    /chargeAmountMinor !== topup\.creditAmountCents/
-  );
-  assert.match(
-    topup,
-    /topup\.chargeAmountMinor !== topup\.creditAmountCents/
+    /sessionChargeAmountMinor !== topup\.creditAmountCents/
   );
   assert.match(
     topup,
     /balanceCents:\s*\{\s*increment:\s*topup\.creditAmountCents/
   );
   assert.match(actions, /browserReturnMustNotCreditWallet/);
+  assert.match(actions, /parseSimpaisaWalletCheckoutFields/);
+  assert.match(actions, /walletOperatorId/);
+  assert.match(actions, /customerMsisdn/);
   assert.doesNotMatch(actions, /applyVerifiedTopupPaymentEvent/);
   console.log("PASS authoritative_amount");
 

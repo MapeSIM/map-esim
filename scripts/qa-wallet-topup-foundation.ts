@@ -147,10 +147,13 @@ function main() {
 
   assert.match(topupSrc, /chargeCurrency:\s*null/);
   assert.match(topupSrc, /chargeAmountMinor:\s*null/);
-  // Draft creation leaves charge null; checkout later persists gateway quote only.
-  assert.match(topupSrc, /chargeAmountMinor:\s*topup\.creditAmountCents|chargeAmountMinor,/);
+  // Draft creation leaves charge null; Simpaisa checkout persists PKR quote only.
+  assert.match(topupSrc, /quoteSimpaisaPkrChargeFromUsdCents/);
+  assert.match(topupSrc, /simpaisaChargeMatchesQuote/);
   assert.ok(!/chargeAmountMinor:\s*\d{2,}/.test(topupSrc));
-  assert.match(detailPage, /confirmed securely at checkout|chargeNotice/i);
+  assert.match(detailPage, /confirmed securely at checkout|chargeNotice|pkrAmountLabel/i);
+  assert.match(checkoutBtn, /SimpaisaWalletFields/);
+  assert.match(actionsSrc, /parseSimpaisaWalletCheckoutFields/);
   console.log("PASS no_pkr_amount_invented_without_quote");
 
   assert.match(detailPage, /browserReturnMustNotCreditWallet/);
@@ -237,10 +240,10 @@ function main() {
   assert.ok(!/applyVerifiedTopupPaymentEvent|WalletTopup/.test(purchaseSrc));
   console.log("PASS existing_wallet_purchase_credit_debit_unchanged");
 
-  assert.ok(!/simpaisa\.|payfast\.|safepay\.|jazzcash\.|easypaisa\./i.test(disabled));
+  // disabledAdapter may name providers for selection; it must not call gateways.
   assert.ok(!/\bfetch\s*\(/.test(disabled));
-  assert.match(disabled, /enabled:\s*false/);
-  assert.match(disabled, /Payment gateway is not available yet/);
+  assert.match(disabled, /enabled:\s*false|getActivePaymentAdapter|SIMPAISA|SAFEPAY/);
+  assert.match(disabled, /Payment gateway is not available yet|getActivePaymentAdapter/);
   assert.match(qaSelf, /Does not call payment gateways/);
   console.log("PASS automated_qa_creates_no_real_payment");
 
