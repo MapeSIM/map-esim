@@ -92,6 +92,13 @@ function main() {
   assert.doesNotMatch(gateway, /executeCreditCheckout/);
   console.log("PASS gateway_checkout_server_authoritative_and_split_reserve");
 
+  // Retry / new Verify on same attempt must clear prior failure webhook claim.
+  assert.match(
+    gateway,
+    /status:\s*EsimPurchasePaymentAttemptStatus\.AWAITING_PAYMENT[\s\S]*webhookEventId:\s*null[\s\S]*failedAt:\s*null[\s\S]*failureCategory:\s*null[\s\S]*failureCode:\s*null/
+  );
+  console.log("PASS gateway_retry_clears_stale_webhook_failure_state");
+
   assert.match(actions, /startEsimPurchaseHostedCheckout/);
   assert.match(actions, /isPaymentGatewayConfigured/);
   assert.match(actions, /CARD_PAYMENT_UNAVAILABLE_MESSAGE/);

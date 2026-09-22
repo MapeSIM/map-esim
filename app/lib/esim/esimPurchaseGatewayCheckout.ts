@@ -763,6 +763,9 @@ export async function startEsimPurchaseHostedCheckout(
   }
 
   await prisma.$transaction(async (tx) => {
+    // New Verify / retry session: clear prior failure webhook claim so a later
+    // success event can CAS-claim (webhookEventId must be null). Stale failedAt
+    // / webhookEventId from an earlier txn id blocked production funding.
     await tx.esimPurchasePaymentAttempt.update({
       where: { id: attempt!.id },
       data: {
@@ -773,6 +776,8 @@ export async function startEsimPurchaseHostedCheckout(
         fxRateSnapshot: session.fxRateSnapshot ?? fxRateSnapshot,
         expiresAt: session.expiresAt,
         status: EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
+        webhookEventId: null,
+        failedAt: null,
         failureCategory: null,
         failureCode: null,
       },
