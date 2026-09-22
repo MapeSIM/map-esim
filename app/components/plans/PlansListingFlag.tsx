@@ -5,7 +5,6 @@ import Image from "next/image";
 import { Globe2, MapPinned } from "lucide-react";
 import type { VesimDestination } from "@/app/lib/vesim/destinations";
 import { resolveDestinationFlagVisual } from "@/app/lib/vesim/destinationPresentation";
-import { PAKISTAN_FLAG_PUBLIC_PATH } from "@/app/lib/seo/siteGraph";
 
 export default function PlansListingFlag({
   destination,
@@ -16,12 +15,7 @@ export default function PlansListingFlag({
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const visual = resolveDestinationFlagVisual(destination);
-  const imageSrc =
-    destination.code.toUpperCase() === "PK"
-      ? PAKISTAN_FLAG_PUBLIC_PATH
-      : visual.type === "image"
-        ? visual.src
-        : null;
+  const imageSrc = visual.type === "image" ? visual.src : null;
 
   if (destination.kind === "regional") {
     return (
@@ -43,14 +37,15 @@ export default function PlansListingFlag({
         src={imageSrc}
         alt=""
         width={size === "hero" ? 64 : 40}
-        height={size === "hero" ? 64 : 28}
+        height={size === "hero" ? 48 : 28}
         sizes={size === "hero" ? "64px" : "40px"}
         priority={size === "hero"}
+        unoptimized
         onError={() => setImageFailed(true)}
         className={
           size === "hero"
-            ? "h-full w-full rounded-2xl object-cover"
-            : "h-7 w-10 rounded-md object-cover"
+            ? "h-full w-full rounded-2xl object-contain"
+            : "h-7 w-10 rounded-md object-contain"
         }
       />
     );

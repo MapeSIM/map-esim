@@ -143,8 +143,14 @@ function main() {
   console.log("3) Flag fallback — no broken flagcdn / wrong national flag");
   assert.equal(destinationFlagcdnUrl("IC"), null);
   assert.equal(destinationFlagcdnUrl("AN"), null);
-  assert.equal(destinationFlagcdnUrl("SM"), "https://flagcdn.com/w80/sm.png");
-  assert.equal(destinationFlagcdnUrl("PK"), "https://flagcdn.com/w80/pk.png");
+  assert.equal(destinationFlagcdnUrl("SM"), "https://flagcdn.com/sm.svg");
+  assert.equal(destinationFlagcdnUrl("PK"), "/flags/pk.svg");
+  assert.equal(destinationFlagcdnUrl("SA"), "/flags/sa.svg");
+  assert.equal(destinationFlagcdnUrl("AE"), "/flags/ae.svg");
+  assert.equal(destinationFlagcdnUrl("TR"), "/flags/tr.svg");
+  assert.equal(destinationFlagcdnUrl("GB"), "/flags/gb.svg");
+  assert.equal(destinationFlagcdnUrl("US"), "/flags/us.svg");
+  assert.equal(destinationFlagcdnUrl("FR"), "/flags/fr.svg");
   assert.equal(destinationFlagcdnUrl("USPR"), null);
   assert.equal(isSafeDestinationFlagEmoji("AN", "🇳🇱"), false);
   assert.equal(isSafeDestinationFlagEmoji("IC", "🇮🇨"), true);

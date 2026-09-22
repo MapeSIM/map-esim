@@ -42,6 +42,21 @@ export const FLAGCDN_UNSUPPORTED_CODES: ReadonlySet<string> = new Set([
   "IC", // Canary Islands (exceptional reservation; flagcdn 404)
 ]);
 
+/**
+ * Self-hosted SVG flags under `/public/flags/{code}.svg`.
+ * Prefer these for crisp, identical aspect-ratio rendering (esp. mobile).
+ */
+export const LOCAL_FLAG_SVG_CODES: ReadonlySet<string> = new Set([
+  "AE",
+  "DE",
+  "FR",
+  "GB",
+  "PK",
+  "SA",
+  "TR",
+  "US",
+]);
+
 /** Provider emoji known to be the wrong national flag for the destination. */
 const UNSAFE_FLAG_EMOJI_BY_CODE: Readonly<Record<string, ReadonlySet<string>>> =
   {
@@ -95,14 +110,21 @@ export function destinationFlagInitials(
   return c.slice(0, 2);
 }
 
-/** flagcdn URL only when a 2-letter code is known to resolve. */
+/**
+ * Consistent SVG flag URL for a 2-letter country code.
+ * Prefers self-hosted `/flags/{code}.svg`, else flagcdn SVG (not cropped PNG).
+ */
 export function destinationFlagcdnUrl(
   code: string | null | undefined
 ): string | null {
   const c = normalizeDestinationCode(code);
   if (!/^[A-Z]{2}$/.test(c)) return null;
   if (FLAGCDN_UNSUPPORTED_CODES.has(c)) return null;
-  return `https://flagcdn.com/w80/${c.toLowerCase()}.png`;
+  const lower = c.toLowerCase();
+  if (LOCAL_FLAG_SVG_CODES.has(c)) {
+    return `/flags/${lower}.svg`;
+  }
+  return `https://flagcdn.com/${lower}.svg`;
 }
 
 export function isRegionalIndicatorFlagEmoji(
@@ -136,7 +158,7 @@ export type DestinationFlagVisual =
 
 /**
  * Resolve flag presentation for country destinations.
- * Prefer flagcdn → safe emoji → initials (never a fabricated wrong flag).
+ * Prefer SVG assets → safe emoji → initials (never a fabricated wrong flag).
  */
 export function resolveDestinationFlagVisual(
   destination: DestinationPresentationInput
@@ -160,4 +182,9 @@ export function resolveDestinationFlagVisual(
     type: "initials",
     initials: destinationFlagInitials(destination.code),
   };
+}
+
+/** next/image should skip optimization for SVG flag assets. */
+export function isDestinationFlagSvgSrc(src: string | null | undefined): boolean {
+  return Boolean(src && /\.svg(?:$|\?)/i.test(src));
 }

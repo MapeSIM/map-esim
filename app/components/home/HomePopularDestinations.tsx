@@ -7,7 +7,6 @@ import {
   HOME_POPULAR_SECTION_INTRO,
   HOME_POPULAR_SECTION_TITLE,
 } from "@/app/lib/home/homeConversionSections";
-import { PAKISTAN_FLAG_PUBLIC_PATH } from "@/app/lib/seo/siteGraph";
 import { destinationFlagcdnUrl } from "@/app/lib/vesim/destinationPresentation";
 
 export function HomePopularDestinations() {
@@ -43,10 +42,7 @@ export function HomePopularDestinations() {
 
         <ul className="mt-5 grid grid-cols-1 gap-3 sm:mt-8 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
           {HOME_POPULAR_DESTINATIONS.map((destination) => {
-            const flagSrc =
-              destination.code === "PK"
-                ? PAKISTAN_FLAG_PUBLIC_PATH
-                : destinationFlagcdnUrl(destination.code);
+            const flagSrc = destinationFlagcdnUrl(destination.code);
             return (
               <li key={destination.id}>
                 <Link
@@ -59,18 +55,19 @@ export function HomePopularDestinations() {
                     sm:p-5
                   "
                 >
-                  <span className="flex h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)]">
+                  <span className="relative flex h-[30px] w-[45px] shrink-0 overflow-hidden rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)]">
                     {flagSrc ? (
                       <Image
                         src={flagSrc}
                         alt=""
-                        width={48}
-                        height={48}
-                        sizes="48px"
+                        width={45}
+                        height={30}
+                        sizes="45px"
+                        unoptimized
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <span className="flex h-full w-full items-center justify-center text-xs font-bold text-[var(--heading)]">
+                      <span className="flex h-full w-full items-center justify-center text-[10px] font-bold text-[var(--heading)]">
                         {destination.code}
                       </span>
                     )}

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 30" role="img" aria-label="Flag of Turkey">
+  <rect width="45" height="30" fill="#e30a17"/>
+  <circle cx="16" cy="15" r="7.5" fill="#ffffff"/>
+  <circle cx="18.5" cy="15" r="6" fill="#e30a17"/>
+  <polygon
+    fill="#ffffff"
+    points="25.5,15 27.1,16.1 26.5,18 28.3,17.2 30,18 29.3,16.1 30.9,15 29.3,13.9 30,12 28.3,12.8 26.5,12 27.1,13.9"
+  />
+</svg>

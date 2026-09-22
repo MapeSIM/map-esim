@@ -185,7 +185,9 @@ export function customerEsimStatusHelp(
   }
 }
 
-/** ISO-2 country/region code for flagcdn — empty when unknown. */
+import { destinationFlagcdnUrl } from "@/app/lib/vesim/destinationPresentation";
+
+/** ISO-2 country/region code for SVG flag assets — empty when unknown. */
 export function normalizeFlagCountryCode(
   code: string | null | undefined
 ): string {
@@ -197,9 +199,7 @@ export function normalizeFlagCountryCode(
 export function customerFlagImageUrl(
   countryCode: string | null | undefined
 ): string | null {
-  const code = normalizeFlagCountryCode(countryCode);
-  if (!code) return null;
-  return `https://flagcdn.com/w80/${code}.png`;
+  return destinationFlagcdnUrl(countryCode);
 }
 
 export function formatCustomerOrderAmount(

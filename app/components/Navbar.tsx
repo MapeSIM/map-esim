@@ -99,7 +99,7 @@ function NavLinkLabel({
         alt=""
         width={18}
         height={12}
-        className="h-3 w-[18px] shrink-0 rounded-[2px] object-cover ring-1 ring-[var(--border-strong)]"
+        className="h-3 w-[18px] shrink-0 rounded-[2px] object-contain ring-1 ring-[var(--border-strong)]"
         unoptimized
         aria-hidden="true"
       />

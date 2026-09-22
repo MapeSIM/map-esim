@@ -57,7 +57,8 @@ function DestinationFlagMark({
         height={16}
         sizes="22px"
         onError={() => setImageFailed(true)}
-        className="h-4 w-[22px] rounded-[3px] object-cover"
+        unoptimized
+        className="h-4 w-[22px] rounded-[3px] object-contain"
       />
     );
   }

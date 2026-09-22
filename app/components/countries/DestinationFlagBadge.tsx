@@ -37,18 +37,24 @@ export default function DestinationFlagBadge({
 
   if (visual.type === "image" && !imageFailed) {
     return (
-      <Image
-        src={visual.src}
-        alt=""
-        width={44}
-        height={32}
-        sizes="44px"
-        onError={() => setImageFailed(true)}
+      <span
         className="
-          h-8 w-11 shrink-0 rounded-md
-          border border-[var(--border-strong)] object-cover
+          relative flex h-[30px] w-[45px] shrink-0 overflow-hidden
+          rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)]
         "
-      />
+        aria-hidden="true"
+      >
+        <Image
+          src={visual.src}
+          alt=""
+          width={45}
+          height={30}
+          sizes="45px"
+          unoptimized
+          onError={() => setImageFailed(true)}
+          className="h-full w-full object-cover"
+        />
+      </span>
     );
   }
 

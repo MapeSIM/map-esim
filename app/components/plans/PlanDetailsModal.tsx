@@ -22,7 +22,7 @@ import {
   planDetailOperatorLabel,
   planDetailPackageInfo,
 } from "@/app/lib/plans/planOfferPresentation";
-import { destinationDisplayName } from "@/app/lib/vesim/destinationPresentation";
+import { destinationDisplayName, destinationFlagcdnUrl } from "@/app/lib/vesim/destinationPresentation";
 import { useCurrency } from "@/app/components/currency/CurrencyProvider";
 
 type PlanDetailsModalProps = {
@@ -160,22 +160,30 @@ export default function PlanDetailsModal({
         <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] px-5 py-5 sm:px-6">
           <div className="min-w-0">
             <div className="mb-3 flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] text-[var(--accent-soft)]">
-                {destination.kind === "country" &&
-                destination.code.length === 2 ? (
-                  <Image
-                    src={`https://flagcdn.com/w80/${destination.code.toLowerCase()}.png`}
-                    alt=""
-                    width={44}
-                    height={32}
-                    sizes="44px"
-                    className="h-full w-full object-cover"
-                  />
-                ) : destination.kind === "regional" ? (
-                  <MapPinned className="h-5 w-5" aria-hidden="true" />
-                ) : (
-                  <Globe2 className="h-5 w-5" aria-hidden="true" />
-                )}
+              <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] p-1 text-[var(--accent-soft)]">
+                {(() => {
+                  const flagSrc =
+                    destination.kind === "country"
+                      ? destinationFlagcdnUrl(destination.code)
+                      : null;
+                  if (flagSrc) {
+                    return (
+                      <Image
+                        src={flagSrc}
+                        alt=""
+                        width={44}
+                        height={32}
+                        sizes="44px"
+                        unoptimized
+                        className="h-full w-full object-contain"
+                      />
+                    );
+                  }
+                  if (destination.kind === "regional") {
+                    return <MapPinned className="h-5 w-5" aria-hidden="true" />;
+                  }
+                  return <Globe2 className="h-5 w-5" aria-hidden="true" />;
+                })()}
               </span>
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)]/90">
