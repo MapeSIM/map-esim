@@ -25,6 +25,14 @@ export type AuthField = {
   defaultValue?: string;
   /** Optional helper under the label. */
   hint?: string;
+  /**
+   * Hide the field behind a click-to-expand control (e.g. optional referral).
+   * When `defaultOpen` or `defaultValue` is set, start expanded (URL prefill).
+   */
+  collapsible?: {
+    summary: string;
+    defaultOpen?: boolean;
+  };
   /** Show live password checklist under this field. */
   showRequirements?: boolean;
   /** Name of the password field this confirm field should match. */
@@ -32,6 +40,68 @@ export type AuthField = {
   /** Watch this email field for “must not equal email” rule. */
   emailFieldName?: string;
 };
+
+function CollapsibleOptionalField({
+  field,
+  error,
+  onValueChange,
+}: {
+  field: AuthField;
+  error?: string;
+  onValueChange: (name: string, value: string) => void;
+}) {
+  const [open, setOpen] = useState(
+    Boolean(field.collapsible?.defaultOpen || field.defaultValue)
+  );
+  const expanded = open || Boolean(error);
+
+  if (!expanded) {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="text-sm font-medium text-[var(--accent-strong)] underline-offset-2 hover:underline"
+        >
+          {field.collapsible?.summary}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <label
+        htmlFor={field.name}
+        className="mb-1.5 block text-sm font-medium text-[var(--heading)]"
+      >
+        {field.label}
+      </label>
+      {field.hint ? (
+        <p className="mb-1.5 text-xs text-[var(--text-muted)]">
+          {field.hint}
+        </p>
+      ) : null}
+      <input
+        id={field.name}
+        name={field.name}
+        type={field.type || "text"}
+        autoComplete={field.autoComplete}
+        required={field.required !== false}
+        defaultValue={field.defaultValue}
+        onChange={(event) =>
+          onValueChange(field.name, event.currentTarget.value)
+        }
+        className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-4 py-3 text-sm text-[var(--heading)] outline-none focus:border-[var(--accent-strong)]"
+      />
+      {error ? (
+        <p className="mt-1 text-xs text-[var(--danger-text)]" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 export function AuthForm({
   action,
@@ -128,6 +198,17 @@ export function AuthForm({
                 />
               ) : null}
             </div>
+          );
+        }
+
+        if (field.collapsible) {
+          return (
+            <CollapsibleOptionalField
+              key={field.name}
+              field={field}
+              error={state.fieldErrors?.[field.name]}
+              onValueChange={setFieldValue}
+            />
           );
         }
 

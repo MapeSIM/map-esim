@@ -57,11 +57,15 @@ export default async function SignupPage({
   if (referralProgramEnabled) {
     fields.push({
       name: "referralCode",
-      label: "Referral Code (Optional)",
+      label: "Referral code",
       autoComplete: "off",
       required: false,
       defaultValue: referralCode || undefined,
       hint: "If a friend shared a code with you, enter it here. You can leave this blank.",
+      collapsible: {
+        summary: "Have a referral code?",
+        defaultOpen: Boolean(referralCode),
+      },
     });
   }
 

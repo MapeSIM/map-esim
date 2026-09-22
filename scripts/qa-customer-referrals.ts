@@ -147,10 +147,13 @@ function main() {
   const referralService = read("app/lib/referrals/referralService.ts");
   assert.match(signupPage, /getReferralProgramSettings/);
   assert.match(signupPage, /referralProgramEnabled/);
-  assert.match(signupPage, /Referral Code \(Optional\)/);
+  assert.match(signupPage, /Have a referral code\?/);
+  assert.match(signupPage, /collapsible:/);
+  assert.match(signupPage, /defaultOpen:\s*Boolean\(referralCode\)/);
   assert.match(signupPage, /ReferralRefCookieBootstrap/);
   assert.match(signupPage, /required: false/);
   assert.doesNotMatch(signupPage, /hiddenFields/);
+  assert.match(authForm, /CollapsibleOptionalField/);
   assert.match(authForm, /defaultValue=\{field\.defaultValue\}/);
   assert.match(signupActions, /validateOptionalSignupReferralCode/);
   assert.match(signupActions, /getReferralProgramSettings/);
