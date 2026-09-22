@@ -150,6 +150,7 @@
     "qa:admin-reconciliation-iccid-backfill": "tsx scripts/qa-admin-reconciliation-iccid-backfill.ts",
     "qa:admin-reconciliation-local-finalization": "tsx scripts/qa-admin-reconciliation-local-finalization.ts",
     "qa:admin-reconciliation-wallet-refund": "tsx scripts/qa-admin-reconciliation-wallet-refund.ts",
+    "qa:admin-recon-fund-fulfill-recovery": "tsx scripts/qa-admin-recon-fund-fulfill-recovery.ts",
     "qa:admin-reconciliation-final": "tsx scripts/qa-admin-reconciliation-final.ts",
     "qa:admin-operations-health": "tsx scripts/qa-admin-operations-health.ts",
     "qa:admin-operations-controls": "tsx scripts/qa-admin-operations-controls.ts",

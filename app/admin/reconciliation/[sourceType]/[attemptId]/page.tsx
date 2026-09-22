@@ -311,6 +311,9 @@ export default async function AdminReconciliationDetailPage({
           partnerRefundSupported={caseUi.partnerRefundSupported}
           partnerRefundAllowed={caseUi.partnerRefundAllowed}
           partnerRefundMessage={caseUi.partnerRefundMessage}
+          fundFulfillRecoverySupported={caseUi.fundFulfillRecoverySupported}
+          fundFulfillRecoveryAllowed={caseUi.fundFulfillRecoveryAllowed}
+          fundFulfillRecoveryMessage={caseUi.fundFulfillRecoveryMessage}
         />
       ) : null}
 

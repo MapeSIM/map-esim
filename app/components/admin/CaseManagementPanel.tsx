@@ -9,6 +9,7 @@ import {
   finalizeReconciliationLocalRecordAction,
   refundReconciliationPartnerPurchaseAction,
   refundReconciliationWalletPurchaseAction,
+  recoverFundedEsimFulfillmentAction,
   resendReconciliationEmailAction,
   resolveReconciliationCaseAction,
   unlockReconciliationCaseAction,
@@ -30,6 +31,7 @@ import {
   RESOLVE_CASE_PHRASE,
   UNLOCK_CASE_PHRASE,
 } from "@/app/lib/admin/reconciliationCaseShared";
+import { RECOVER_PAYMENT_CREATE_ESIM_PHRASE } from "@/app/lib/admin/reconciliationFundFulfillRecoveryShared";
 import { ADMIN_REFUND_WALLET_FUNDS_BLURB } from "@/app/lib/admin/adminWalletReservationDisplay";
 
 const initial: CaseManagementFormState = null;
@@ -113,6 +115,9 @@ export default function CaseManagementPanel(props: {
   partnerRefundSupported: boolean;
   partnerRefundAllowed: boolean;
   partnerRefundMessage: string;
+  fundFulfillRecoverySupported: boolean;
+  fundFulfillRecoveryAllowed: boolean;
+  fundFulfillRecoveryMessage: string;
 }) {
   const [lockState, lockAction, lockPending] = useActionState(
     lockReconciliationCaseAction,
@@ -156,6 +161,8 @@ export default function CaseManagementPanel(props: {
   );
   const [partnerRefundState, partnerRefundAction, partnerRefundPending] =
     useActionState(refundReconciliationPartnerPurchaseAction, initial);
+  const [fundFulfillState, fundFulfillAction, fundFulfillPending] =
+    useActionState(recoverFundedEsimFulfillmentAction, initial);
 
   const readOnly = props.resolved;
   const busy =
@@ -169,7 +176,8 @@ export default function CaseManagementPanel(props: {
     iccidPending ||
     finalizePending ||
     refundPending ||
-    partnerRefundPending;
+    partnerRefundPending ||
+    fundFulfillPending;
 
   return (
     <section className="space-y-5 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
@@ -178,9 +186,12 @@ export default function CaseManagementPanel(props: {
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           Lock, escalate, or mark resolved when local evidence shows no active
           risk. Dedicated recovery actions below can restore the original
-          customer or Partner balance only after provider verification. They
-          never place provider orders. ICCID backfill writes only a missing
-          ICCID when provider evidence confirms it.
+          customer or Partner balance only after provider verification, or —
+          when gated — recover a confirmed Simpaisa payment into existing eSIM
+          fulfillment. Refund actions never place provider orders. Payment
+          recovery creates a provider order only through the existing
+          fulfillFunded path after live Inquire confirmation. ICCID backfill
+          writes only a missing ICCID when provider evidence confirms it.
         </p>
       </div>
 
@@ -821,6 +832,69 @@ export default function CaseManagementPanel(props: {
                 className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {partnerRefundPending ? "Refunding…" : "Refund Partner funds"}
+              </button>
+            </form>
+          ) : null}
+
+          {props.fundFulfillRecoverySupported ? (
+            <form action={fundFulfillAction} className="space-y-3">
+              <h3 className="text-sm font-semibold text-[var(--heading)]">
+                Recover Payment & Create eSIM
+              </h3>
+              <p className="text-sm text-[var(--text-muted)]">
+                {props.fundFulfillRecoveryMessage}
+              </p>
+              <p className="text-sm font-medium text-[var(--danger-text)]">
+                Warning: live Simpaisa Inquire must confirm payment. This marks
+                the purchase FUNDED when needed and creates a VeSIM order via
+                the existing fulfillment path. Use only for claim_failed /
+                funding_finalize_failed cases with no provider order.
+              </p>
+              <input type="hidden" name="sourceType" value={props.sourceType} />
+              <input type="hidden" name="attemptId" value={props.attemptId} />
+              <div>
+                <label
+                  htmlFor="fund-fulfill-reason"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Reason
+                </label>
+                <textarea
+                  id="fund-fulfill-reason"
+                  name="reason"
+                  required
+                  maxLength={CASE_REASON_MAX}
+                  rows={2}
+                  disabled={busy || !props.fundFulfillRecoveryAllowed}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                />
+                <FieldError state={fundFulfillState} field="reason" />
+              </div>
+              <div>
+                <label
+                  htmlFor="fund-fulfill-confirm"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Type {RECOVER_PAYMENT_CREATE_ESIM_PHRASE}
+                </label>
+                <input
+                  id="fund-fulfill-confirm"
+                  name="confirmPhrase"
+                  required
+                  disabled={busy || !props.fundFulfillRecoveryAllowed}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                />
+                <FieldError state={fundFulfillState} field="confirmPhrase" />
+              </div>
+              <ActionMessage state={fundFulfillState} />
+              <button
+                type="submit"
+                disabled={busy || !props.fundFulfillRecoveryAllowed}
+                className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {fundFulfillPending
+                  ? "Recovering…"
+                  : "Recover Payment & Create eSIM"}
               </button>
             </form>
           ) : null}

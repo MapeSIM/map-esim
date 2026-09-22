@@ -5,7 +5,7 @@
  */
 import "server-only";
 
-import { Role } from "@prisma/client";
+import { PaymentGatewayProvider, Role } from "@prisma/client";
 import { headers } from "next/headers";
 import { prisma } from "@/app/lib/db";
 import { writeAuditLog } from "@/app/lib/auth/audit";
@@ -49,6 +49,11 @@ import {
   type ResolutionEligibility,
 } from "@/app/lib/admin/reconciliationCaseShared";
 import { PROVIDER_REFRESH_STALE_CLAIM_MS } from "@/app/lib/admin/providerRefreshShared";
+import {
+  evaluateFundFulfillRecoveryEligibility,
+  fundFulfillRecoveryBlockerLabel,
+  isFundFulfillRecoverySourceType,
+} from "@/app/lib/admin/reconciliationFundFulfillRecoveryShared";
 
 export {
   CASE_REASON_MAX,
@@ -144,6 +149,9 @@ export type CaseManagementUiState = {
   partnerRefundSupported: boolean;
   partnerRefundAllowed: boolean;
   partnerRefundMessage: string;
+  fundFulfillRecoverySupported: boolean;
+  fundFulfillRecoveryAllowed: boolean;
+  fundFulfillRecoveryMessage: string;
 };
 
 const PUBLIC_ERROR = "Unable to update this case right now.";
@@ -816,6 +824,76 @@ export async function getCaseManagementEligibility(options: {
     }
   }
 
+  const fundFulfillSupported = isFundFulfillRecoverySourceType(ids.sourceType);
+  let fundFulfillEligibility = null as ReturnType<
+    typeof evaluateFundFulfillRecoveryEligibility
+  > | null;
+  if (fundFulfillSupported) {
+    const purchaseExtras = await prisma.walletEsimPurchase.findUnique({
+      where: { id: ids.recordId },
+      select: {
+        walletAppliedCents: true,
+        debitTransaction: { select: { status: true } },
+        paymentAttempts: {
+          where: {
+            gatewayProvider: PaymentGatewayProvider.SIMPAISA,
+            gatewayPaymentRef: { not: null },
+          },
+          orderBy: { updatedAt: "desc" },
+          take: 1,
+          select: {
+            gatewayProvider: true,
+            gatewayPaymentRef: true,
+            gatewayAmountCents: true,
+            chargeAmountMinor: true,
+          },
+        },
+      },
+    });
+    const attempt = purchaseExtras?.paymentAttempts[0] ?? null;
+    fundFulfillEligibility = evaluateFundFulfillRecoveryEligibility({
+      sourceType: ids.sourceType,
+      alreadyResolved: resolved,
+      locked,
+      lockedByAdminId: row.reconciliationLockedByAdminId,
+      currentAdminId: (options.adminUserId ?? "").trim(),
+      status: row.status,
+      failureCategory: row.failureCategory,
+      failureCode: row.failureCode,
+      orderId: row.orderId,
+      providerOrderId: row.providerOrderId,
+      refundTransactionId: row.refundTransactionId,
+      walletAppliedCents: purchaseExtras?.walletAppliedCents ?? null,
+      debitTransactionId: row.debitTransactionId,
+      debitStatus:
+        purchaseExtras?.debitTransaction?.status ?? row.debitStatus ?? null,
+      gatewayProvider: attempt?.gatewayProvider ?? null,
+      gatewayPaymentRef: attempt?.gatewayPaymentRef ?? null,
+      chargeAmountMinor: attempt?.chargeAmountMinor ?? null,
+      gatewayAmountCents: attempt?.gatewayAmountCents ?? null,
+      providerRefreshInProgress: refreshInProgress,
+    });
+  }
+
+  let fundFulfillRecoveryMessage =
+    "Payment recovery into eSIM fulfillment is not available for this case type.";
+  if (fundFulfillEligibility) {
+    if (!fundFulfillEligibility.allowed) {
+      fundFulfillRecoveryMessage = fundFulfillEligibility.blockers
+        .map(fundFulfillRecoveryBlockerLabel)
+        .join(" ");
+    } else if (fundFulfillEligibility.alreadyCompleted) {
+      fundFulfillRecoveryMessage =
+        "Purchase already completed with a linked order. Submit only confirms idempotent success.";
+    } else if (fundFulfillEligibility.mode === "fulfill_only") {
+      fundFulfillRecoveryMessage =
+        "Purchase is already FUNDED with no provider order. Live Simpaisa Inquire will re-verify payment, then existing fulfillment will create the eSIM.";
+    } else {
+      fundFulfillRecoveryMessage =
+        "Simpaisa payment appears confirmed but funding claim failed. Live Inquire will re-verify payment, mark the purchase FUNDED, then reuse existing eSIM fulfillment. This creates a provider order.";
+    }
+  }
+
   return {
     stateLabel: caseManagementStateLabel({
       resolvedAt: row.reconciliationResolvedAt,
@@ -874,6 +952,9 @@ export async function getCaseManagementEligibility(options: {
     partnerRefundSupported,
     partnerRefundAllowed: Boolean(partnerRefundEligibility?.allowed),
     partnerRefundMessage,
+    fundFulfillRecoverySupported: fundFulfillSupported,
+    fundFulfillRecoveryAllowed: Boolean(fundFulfillEligibility?.allowed),
+    fundFulfillRecoveryMessage,
   };
 }
 

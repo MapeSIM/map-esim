@@ -32,6 +32,10 @@ import {
   evaluateProviderRefundEvidence,
   evaluateWalletRefundLocalEligibility,
 } from "../app/lib/admin/reconciliationCaseShared";
+import {
+  FUND_FULFILL_RECOVERY_SOURCE_TYPES,
+  isFundFulfillRecoverySourceType,
+} from "../app/lib/admin/reconciliationFundFulfillRecoveryShared";
 import { isProviderRefreshSourceType } from "../app/lib/admin/providerRefreshShared";
 
 const root = join(__dirname, "..");
@@ -51,7 +55,8 @@ type ActionKey =
   | "clear_stuck_send"
   | "iccid_backfill"
   | "local_finalization"
-  | "wallet_refund";
+  | "wallet_refund"
+  | "fund_fulfill_recovery";
 
 const ALL_ACTIONS: ActionKey[] = [
   "provider_refresh",
@@ -65,6 +70,7 @@ const ALL_ACTIONS: ActionKey[] = [
   "iccid_backfill",
   "local_finalization",
   "wallet_refund",
+  "fund_fulfill_recovery",
 ];
 
 function emailResendSupported(source: string): boolean {
@@ -99,6 +105,8 @@ function expectedSupport(source: string, action: ActionKey): boolean {
       return isLocalFinalizationSourceType(source);
     case "wallet_refund":
       return isWalletRefundSourceType(source);
+    case "fund_fulfill_recovery":
+      return isFundFulfillRecoverySourceType(source);
   }
 }
 
@@ -111,6 +119,7 @@ const RECON_QA_SCRIPTS = [
   "qa:admin-reconciliation-iccid-backfill",
   "qa:admin-reconciliation-local-finalization",
   "qa:admin-reconciliation-wallet-refund",
+  "qa:admin-recon-fund-fulfill-recovery",
 ] as const;
 
 function runNpmScript(script: string) {
@@ -135,6 +144,9 @@ function main() {
   );
   const providerRefresh = read("app/lib/admin/providerRefresh.ts");
   const walletRefund = read("app/lib/admin/reconciliationWalletRefund.ts");
+  const fundFulfill = read(
+    "app/lib/admin/reconciliationFundFulfillRecovery.ts"
+  );
   const localFinalize = read(
     "app/lib/admin/reconciliationLocalFinalization.ts"
   );
@@ -176,6 +188,7 @@ function main() {
     iccid_backfill: true,
     local_finalization: true,
     wallet_refund: true,
+    fund_fulfill_recovery: true,
   });
   assert.deepEqual(matrix.assignment, {
     provider_refresh: true,
@@ -189,6 +202,7 @@ function main() {
     iccid_backfill: true,
     local_finalization: true,
     wallet_refund: false,
+    fund_fulfill_recovery: false,
   });
   assert.deepEqual(matrix.topup, {
     provider_refresh: false,
@@ -202,6 +216,7 @@ function main() {
     iccid_backfill: false,
     local_finalization: false,
     wallet_refund: false,
+    fund_fulfill_recovery: false,
   });
   assert.deepEqual(matrix.order_email, {
     provider_refresh: false,
@@ -215,6 +230,7 @@ function main() {
     iccid_backfill: false,
     local_finalization: false,
     wallet_refund: false,
+    fund_fulfill_recovery: false,
   });
   assert.deepEqual(matrix.wallet_email, {
     provider_refresh: false,
@@ -228,6 +244,7 @@ function main() {
     iccid_backfill: false,
     local_finalization: false,
     wallet_refund: false,
+    fund_fulfill_recovery: false,
   });
   assert.deepEqual(matrix.iccid, {
     provider_refresh: false,
@@ -241,9 +258,11 @@ function main() {
     iccid_backfill: true,
     local_finalization: false,
     wallet_refund: false,
+    fund_fulfill_recovery: false,
   });
 
   assert.deepEqual([...WALLET_REFUND_SOURCE_TYPES], ["wallet_purchase"]);
+  assert.deepEqual([...FUND_FULFILL_RECOVERY_SOURCE_TYPES], ["wallet_purchase"]);
   assert.deepEqual([...LOCAL_FINALIZATION_SOURCE_TYPES], [
     "wallet_purchase",
     "partner_purchase",
@@ -259,10 +278,12 @@ function main() {
   // --- UI fail-closed for unsupported recoveries ---
   assert.match(panel, /props\.walletRefundSupported\s*\?/);
   assert.match(panel, /props\.localFinalizationSupported\s*\?/);
+  assert.match(panel, /props\.fundFulfillRecoverySupported\s*\?/);
   assert.match(panel, /props\.iccidBackfillSupported\s*\?/);
   assert.match(panel, /props\.emailResendSupported\s*\?/);
   assert.match(panel, /props\.clearStuckSendAllowed\s*\?/);
   assert.match(panel, /Refund wallet funds/);
+  assert.match(panel, /Recover Payment & Create eSIM/);
   assert.match(detailPage, /sourceType === "wallet_purchase"/);
   assert.match(detailPage, /sourceType === "assignment"/);
   assert.match(detailPage, /ProviderRefreshForm/);
@@ -271,6 +292,7 @@ function main() {
   // --- State transitions: recoveries must not auto unlock/resolve/de-escalate ---
   for (const [name, src] of [
     ["wallet_refund", walletRefund],
+    ["fund_fulfill_recovery", fundFulfill],
     ["local_finalization", localFinalize],
     ["iccid_backfill", iccidBackfill],
     ["email_resend", emailResend],

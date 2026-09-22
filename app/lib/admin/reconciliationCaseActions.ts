@@ -17,6 +17,7 @@ import { backfillReconciliationIccid } from "@/app/lib/admin/reconciliationIccid
 import { finalizeReconciliationLocalRecord } from "@/app/lib/admin/reconciliationLocalFinalization";
 import { refundReconciliationWalletPurchase } from "@/app/lib/admin/reconciliationWalletRefund";
 import { refundReconciliationPartnerPurchase } from "@/app/lib/admin/reconciliationPartnerRefund";
+import { recoverReconciliationFundAndFulfill } from "@/app/lib/admin/reconciliationFundFulfillRecovery";
 
 export type CaseManagementFormState = CaseActionResult | null;
 
@@ -276,6 +277,33 @@ export async function refundReconciliationPartnerPurchaseAction(
   void formData.get("partnerWalletId");
 
   const result = await refundReconciliationPartnerPurchase({
+    adminUserId: admin.id,
+    sourceType,
+    attemptId,
+    reason: String(formData.get("reason") ?? ""),
+    confirmPhrase: String(formData.get("confirmPhrase") ?? ""),
+  });
+  if (result.ok) revalidateCase(sourceType, attemptId);
+  return result;
+}
+
+export async function recoverFundedEsimFulfillmentAction(
+  _prev: CaseManagementFormState,
+  formData: FormData
+): Promise<CaseManagementFormState> {
+  const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "RECONCILIATION");
+  const sourceType = String(formData.get("sourceType") ?? "").trim();
+  const attemptId = String(formData.get("attemptId") ?? "").trim();
+  void formData.get("caseStatus");
+  void formData.get("eligible");
+  // Never trust admin-supplied payment/funding fields.
+  void formData.get("gatewayPaymentRef");
+  void formData.get("amountCents");
+  void formData.get("chargeAmountMinor");
+  void formData.get("webhookEventId");
+
+  const result = await recoverReconciliationFundAndFulfill({
     adminUserId: admin.id,
     sourceType,
     attemptId,
