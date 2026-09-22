@@ -21,6 +21,10 @@ export type AuthField = {
   type?: string;
   autoComplete?: string;
   required?: boolean;
+  /** Prefill for optional fields (e.g. signup referral from ?ref=). */
+  defaultValue?: string;
+  /** Optional helper under the label. */
+  hint?: string;
   /** Show live password checklist under this field. */
   showRequirements?: boolean;
   /** Name of the password field this confirm field should match. */
@@ -135,12 +139,18 @@ export function AuthForm({
             >
               {field.label}
             </label>
+            {field.hint ? (
+              <p className="mb-1.5 text-xs text-[var(--text-muted)]">
+                {field.hint}
+              </p>
+            ) : null}
             <input
               id={field.name}
               name={field.name}
               type={field.type || "text"}
               autoComplete={field.autoComplete}
               required={field.required !== false}
+              defaultValue={field.defaultValue}
               onChange={(event) =>
                 setFieldValue(field.name, event.currentTarget.value)
               }

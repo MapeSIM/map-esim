@@ -160,6 +160,29 @@ export async function signupAction(
     return { ok: false, error: "Unable to create an account with that email." };
   }
 
+  const {
+    attachReferralOnSignupBestEffort,
+    validateOptionalSignupReferralCode,
+  } = await import("@/app/lib/referrals/referralService");
+  const { getReferralProgramSettings } = await import(
+    "@/app/lib/referrals/referralProgramConfig"
+  );
+  const referralSettings = await getReferralProgramSettings();
+  let referralCodeToAttach: string | null = null;
+  if (referralSettings.enabled) {
+    const referralCheck = await validateOptionalSignupReferralCode(
+      formData.get("referralCode")
+    );
+    if (!referralCheck.ok) {
+      return {
+        ok: false,
+        fieldErrors: { referralCode: referralCheck.message },
+        error: referralCheck.message,
+      };
+    }
+    referralCodeToAttach = referralCheck.code;
+  }
+
   const passwordHash = await hashPassword(parsed.data.password);
   const consent = signupConsentRecord();
   const user = await prisma.user.create({
@@ -182,13 +205,12 @@ export async function signupAction(
     },
   });
 
-  const { attachReferralOnSignupBestEffort } = await import(
-    "@/app/lib/referrals/referralService"
-  );
-  await attachReferralOnSignupBestEffort({
-    referredUserId: user.id,
-    code: formData.get("referralCode"),
-  });
+  if (referralSettings.enabled && referralCodeToAttach) {
+    await attachReferralOnSignupBestEffort({
+      referredUserId: user.id,
+      code: referralCodeToAttach,
+    });
+  }
 
   const issued = await issueEmailOtp({
     userId: user.id,

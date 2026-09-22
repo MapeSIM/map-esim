@@ -143,10 +143,24 @@ function main() {
   const signupPage = read("app/signup/page.tsx");
   const signupActions = read("app/lib/auth/actions.ts");
   const oauthAdapter = read("app/lib/auth/prismaAdapter.ts");
+  const authForm = read("app/components/auth/AuthForm.tsx");
+  const referralService = read("app/lib/referrals/referralService.ts");
+  assert.match(signupPage, /getReferralProgramSettings/);
+  assert.match(signupPage, /referralProgramEnabled/);
+  assert.match(signupPage, /Referral Code \(Optional\)/);
   assert.match(signupPage, /ReferralRefCookieBootstrap/);
-  assert.match(signupPage, /hiddenFields/);
-  assert.match(signupPage, /referralCode/);
+  assert.match(signupPage, /required: false/);
+  assert.doesNotMatch(signupPage, /hiddenFields/);
+  assert.match(authForm, /defaultValue=\{field\.defaultValue\}/);
+  assert.match(signupActions, /validateOptionalSignupReferralCode/);
+  assert.match(signupActions, /getReferralProgramSettings/);
   assert.match(signupActions, /attachReferralOnSignupBestEffort/);
+  assert.match(signupActions, /fieldErrors:\s*\{\s*referralCode:/);
+  assert.match(referralService, /validateOptionalSignupReferralCode/);
+  assert.match(
+    referralService,
+    /getReferralProgramSettings[\s\S]*if \(!settings\.enabled\) return/
+  );
   assert.match(oauthAdapter, /attachReferralOnSignupBestEffort/);
   assert.match(oauthAdapter, /REFERRAL_COOKIE_NAME/);
   console.log("   ok");
@@ -154,7 +168,7 @@ function main() {
   console.log("4) Post-purchase reward uses admin settings");
   const walletPurchase = read("app/lib/esim/walletPurchase.ts");
   const recon = read("app/lib/admin/reconciliationLocalFinalization.ts");
-  const service = read("app/lib/referrals/referralService.ts");
+  const service = referralService;
   assert.match(walletPurchase, /awardReferralRewardBestEffort/);
   assert.match(
     walletPurchase,

@@ -8,7 +8,8 @@ import {
 import { normalizeReferralCode } from "@/app/lib/referrals/referralCode";
 
 /**
- * Persists ?ref= for OAuth signup attribution (email signup uses a hidden field).
+ * Persists ?ref= for OAuth signup attribution.
+ * Email signup uses the visible optional referral field (prefilled from ?ref=).
  */
 export default function ReferralRefCookieBootstrap({
   code,

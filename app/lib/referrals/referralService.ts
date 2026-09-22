@@ -82,15 +82,64 @@ export async function ensureUserReferralCode(
   return null;
 }
 
+/** Friendly copy when a typed referral code cannot be used at signup. */
+export const REFERRAL_CODE_INVALID_MESSAGE =
+  "That referral code wasn't found. Check it and try again, or leave this blank.";
+
+export const REFERRAL_CODE_FORMAT_MESSAGE =
+  "Enter a valid referral code, or leave this blank.";
+
+/**
+ * Validate an optional signup referral code while the program is enabled.
+ * Empty/blank → ok with null (no attribution).
+ * Non-empty invalid format or unknown code → friendly failure (do not create user yet).
+ */
+export async function validateOptionalSignupReferralCode(
+  raw: unknown
+): Promise<
+  | { ok: true; code: string | null }
+  | { ok: false; message: string }
+> {
+  const trimmed =
+    typeof raw === "string" ? raw.trim() : String(raw ?? "").trim();
+  if (!trimmed) return { ok: true, code: null };
+
+  const code = normalizeReferralCode(trimmed);
+  if (!code) {
+    return { ok: false, message: REFERRAL_CODE_FORMAT_MESSAGE };
+  }
+
+  const referrer = await prisma.user.findFirst({
+    where: {
+      referralCode: code,
+      role: Role.CUSTOMER,
+      deletedAt: null,
+    },
+    select: { id: true },
+  });
+  if (!referrer) {
+    return { ok: false, message: REFERRAL_CODE_INVALID_MESSAGE };
+  }
+
+  return { ok: true, code };
+}
+
 /**
  * Attribute a new signup to a referrer code. Best-effort; never fails signup.
  * First attributed referrer wins (unique referredUserId).
+ * No-ops when the admin referral program is disabled.
  */
 export async function attachReferralOnSignupBestEffort(options: {
   referredUserId: string;
   code: unknown;
 }): Promise<void> {
   try {
+    const { getReferralProgramSettings } = await import(
+      "@/app/lib/referrals/referralProgramConfig"
+    );
+    const settings = await getReferralProgramSettings();
+    if (!settings.enabled) return;
+
     const referredUserId = options.referredUserId.trim();
     const code = normalizeReferralCode(options.code);
     if (!referredUserId || !code) return;
