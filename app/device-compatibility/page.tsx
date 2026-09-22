@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, LockKeyhole, Smartphone } from "lucide-react";
 import { BRAND_NAME } from "@/app/lib/brand";
 import { absoluteCanonical } from "@/app/lib/seo/canonical";
+import { publicPageShareMeta } from "@/app/lib/seo/socialShareMeta";
 
 const title = `Check Device Compatibility | ${BRAND_NAME}`;
 const description =
@@ -13,18 +14,7 @@ export const metadata: Metadata = {
   title,
   description,
   alternates: { canonical },
-  openGraph: {
-    title,
-    description,
-    url: canonical,
-    siteName: BRAND_NAME,
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title,
-    description,
-  },
+  ...publicPageShareMeta({ title, description, url: canonical }),
   robots: { index: true, follow: true },
 };
 

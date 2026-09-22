@@ -15,6 +15,7 @@ import Breadcrumbs from "@/app/components/seo/Breadcrumbs";
 import JsonLd from "@/app/components/seo/JsonLd";
 import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from "@/app/lib/brand";
 import { absoluteCanonical } from "@/app/lib/seo/canonical";
+import { publicPageShareMeta } from "@/app/lib/seo/socialShareMeta";
 import {
   breadcrumbList,
   SITE_ORG_ID,
@@ -31,18 +32,7 @@ export const metadata: Metadata = {
   title,
   description,
   alternates: { canonical },
-  openGraph: {
-    title,
-    description,
-    url: canonical,
-    siteName: BRAND_NAME,
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title,
-    description,
-  },
+  ...publicPageShareMeta({ title, description, url: canonical }),
   robots: { index: true, follow: true },
 };
 

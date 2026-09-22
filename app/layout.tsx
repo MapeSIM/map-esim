@@ -20,7 +20,9 @@ import {
   organizationNode,
   websiteNode,
 } from "@/app/lib/seo/siteGraph";
-import { DEFAULT_SOCIAL_SHARE_IMAGE } from "@/app/lib/seo/socialShareMeta";
+import { defaultSocialShareImages } from "@/app/lib/seo/socialShareMeta";
+
+const { openGraphImages, twitterImages } = defaultSocialShareImages();
 
 export const metadata: Metadata = {
   metadataBase: new URL(BRAND_SITE_URL),
@@ -34,13 +36,13 @@ export const metadata: Metadata = {
     // child routes that omit their own og:url and confused crawler canonicals.
     siteName: BRAND_NAME,
     type: "website",
-    images: [DEFAULT_SOCIAL_SHARE_IMAGE],
+    images: openGraphImages,
   },
   twitter: {
     card: "summary_large_image",
     title: BRAND_NAME,
     description: BRAND_TAGLINE,
-    images: [DEFAULT_SOCIAL_SHARE_IMAGE.url],
+    images: twitterImages,
   },
 };
 

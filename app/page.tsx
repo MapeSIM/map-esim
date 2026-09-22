@@ -25,7 +25,7 @@ import {
   HOME_DISCOVERY_CTA_LABEL,
 } from "@/app/lib/home/homeConversionSections";
 import { absoluteCanonical } from "@/app/lib/seo/canonical";
-import { DEFAULT_SOCIAL_SHARE_IMAGE } from "@/app/lib/seo/socialShareMeta";
+import { publicPageShareMeta } from "@/app/lib/seo/socialShareMeta";
 
 const homeCanonical = absoluteCanonical("/");
 const homeTitle = `Buy Travel eSIM Online | ${BRAND_NAME}`;
@@ -35,20 +35,11 @@ export const metadata: Metadata = {
   title: homeTitle,
   description: homeDescription,
   alternates: { canonical: homeCanonical },
-  openGraph: {
+  ...publicPageShareMeta({
     title: homeTitle,
     description: homeDescription,
     url: homeCanonical,
-    siteName: BRAND_NAME,
-    type: "website",
-    images: [DEFAULT_SOCIAL_SHARE_IMAGE],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: homeTitle,
-    description: homeDescription,
-    images: [DEFAULT_SOCIAL_SHARE_IMAGE.url],
-  },
+  }),
 };
 
 const categories = [

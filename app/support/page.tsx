@@ -14,22 +14,18 @@ import {
 } from "lucide-react";
 import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from "@/app/lib/brand";
 import { absoluteCanonical } from "@/app/lib/seo/canonical";
+import { publicPageShareMeta } from "@/app/lib/seo/socialShareMeta";
 
 const canonical = absoluteCanonical("/support");
+const title = `Support Center | ${BRAND_NAME}`;
+const description =
+  "Get help with MAP eSIM installation, activation, orders, wallet balance and travel connectivity.";
 
 export const metadata: Metadata = {
-  title: `Support Center | ${BRAND_NAME}`,
-  description:
-    "Get help with MAP eSIM installation, activation, orders, wallet balance and travel connectivity.",
+  title,
+  description,
   alternates: { canonical },
-  openGraph: {
-    title: `Support Center | ${BRAND_NAME}`,
-    description:
-      "Get help with MAP eSIM installation, activation, orders, wallet balance and travel connectivity.",
-    url: canonical,
-    siteName: BRAND_NAME,
-    type: "website",
-  },
+  ...publicPageShareMeta({ title, description, url: canonical }),
 };
 
 const quickHelp = [

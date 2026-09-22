@@ -14,8 +14,8 @@ function read(rel: string): string {
 }
 
 function main() {
-  assert.equal(absoluteCanonical("/"), "https://mapesim.com/");
-  assert.equal(absoluteCanonical(""), "https://mapesim.com/");
+  assert.equal(absoluteCanonical("/"), "https://mapesim.com");
+  assert.equal(absoluteCanonical(""), "https://mapesim.com");
   assert.equal(absoluteCanonical("/countries"), "https://mapesim.com/countries");
   assert.equal(absoluteCanonical("/plans"), "https://mapesim.com/plans");
   assert.equal(
@@ -31,30 +31,42 @@ function main() {
   assert.match(home, /absoluteCanonical\("\/"\)/);
   assert.doesNotMatch(home, /canonical:\s*"\/"/);
   assert.match(home, /Buy Travel eSIM Online/);
-  assert.match(home, /DEFAULT_SOCIAL_SHARE_IMAGE|opengraph-image/);
-  assert.match(home, /summary_large_image/);
+  assert.match(home, /publicPageShareMeta|DEFAULT_SOCIAL_SHARE_IMAGE|opengraph-image/);
+  assert.match(home, /publicPageShareMeta|summary_large_image/);
 
   const rootLayout = read("app/layout.tsx");
   assert.doesNotMatch(rootLayout, /openGraph:\s*\{[^}]*url:\s*BRAND_SITE_URL/);
   assert.match(rootLayout, /Do not set openGraph\.url here/);
-  assert.match(rootLayout, /DEFAULT_SOCIAL_SHARE_IMAGE/);
+  assert.match(rootLayout, /defaultSocialShareImages|DEFAULT_SOCIAL_SHARE_IMAGE/);
   assert.match(rootLayout, /summary_large_image/);
   assert.match(
     read("app/lib/seo/socialShareMeta.ts"),
     /DEFAULT_SOCIAL_SHARE_IMAGE/
   );
+  assert.match(
+    read("app/lib/seo/socialShareMeta.ts"),
+    /export function publicPageShareMeta/
+  );
+  assert.match(
+    read("app/lib/seo/socialShareMeta.ts"),
+    /export function defaultSocialShareImages/
+  );
 
   const countries = read("app/countries/layout.tsx");
   assert.match(countries, /absoluteCanonical\("\/countries"\)/);
+  assert.match(countries, /publicPageShareMeta/);
 
   const plans = read("app/plans/layout.tsx");
   assert.match(plans, /absoluteCanonical\("\/plans"\)/);
+  assert.match(plans, /publicPageShareMeta/);
 
   const device = read("app/device-compatibility/page.tsx");
   assert.match(device, /absoluteCanonical\("\/device-compatibility"\)/);
+  assert.match(device, /publicPageShareMeta/);
 
   const destination = read("app/countries/[id]/layout.tsx");
   assert.match(destination, /absoluteCanonical\(path\)/);
+  assert.match(destination, /publicPageShareMeta/);
 
   const account = read("app/account/layout.tsx");
   assert.match(account, /robots:\s*\{\s*index:\s*false/);
