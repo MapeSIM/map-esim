@@ -79,6 +79,109 @@ function amountsMatch(input: {
   );
 }
 
+/** Purchase may enter webhook-driven RECON only from these pre-fund states. */
+const PURCHASE_PRE_FUND_RECON_STATUSES: WalletEsimPurchaseStatus[] = [
+  WalletEsimPurchaseStatus.READY,
+  WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+  WalletEsimPurchaseStatus.FUNDS_RESERVED,
+];
+
+const ATTEMPT_PRE_FUND_RECON_STATUSES: EsimPurchasePaymentAttemptStatus[] = [
+  EsimPurchasePaymentAttemptStatus.DRAFT,
+  EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
+  EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING,
+];
+
+function isPurchasePaymentSuccessTerminal(
+  status: WalletEsimPurchaseStatus
+): boolean {
+  return (
+    status === WalletEsimPurchaseStatus.FUNDED ||
+    status === WalletEsimPurchaseStatus.PROVIDER_PENDING ||
+    status === WalletEsimPurchaseStatus.COMPLETED
+  );
+}
+
+async function applyPreFundPurchaseReconciliation(
+  db: Prisma.TransactionClient,
+  options: {
+    purchaseId: string;
+    failureCategory: string;
+    failureCode: string;
+  }
+): Promise<boolean> {
+  const updated = await db.walletEsimPurchase.updateMany({
+    where: {
+      id: options.purchaseId,
+      status: { in: PURCHASE_PRE_FUND_RECON_STATUSES },
+    },
+    data: {
+      status: WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED,
+      failureCategory: options.failureCategory,
+      failureCode: options.failureCode,
+      reconciliationState: "awaiting_manual_review",
+    },
+  });
+  return updated.count === 1;
+}
+
+async function applyPreFundAttemptReconciliation(
+  db: Prisma.TransactionClient,
+  options: {
+    attemptId: string;
+    webhookEventId: string;
+    failureCategory: string;
+    failureCode: string;
+  }
+): Promise<boolean> {
+  const updated = await db.esimPurchasePaymentAttempt.updateMany({
+    where: {
+      id: options.attemptId,
+      status: { in: ATTEMPT_PRE_FUND_RECON_STATUSES },
+    },
+    data: {
+      status: EsimPurchasePaymentAttemptStatus.RECONCILIATION_REQUIRED,
+      webhookEventId: options.webhookEventId,
+      failureCategory: options.failureCategory,
+      failureCode: options.failureCode,
+      reconciliationState: "awaiting_manual_review",
+    },
+  });
+  return updated.count === 1;
+}
+
+/** After FUNDED→PROVIDER_PENDING claim; never clobber COMPLETED or FUNDED. */
+async function applyProviderPendingPurchaseReconciliation(
+  purchaseId: string,
+  data: {
+    failureCategory: string;
+    failureCode: string;
+    providerOrderId?: string | null;
+    providerResultKind?: string | null;
+  }
+): Promise<boolean> {
+  const updated = await prisma.walletEsimPurchase.updateMany({
+    where: {
+      id: purchaseId,
+      status: WalletEsimPurchaseStatus.PROVIDER_PENDING,
+      orderId: null,
+    },
+    data: {
+      status: WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED,
+      failureCategory: data.failureCategory,
+      failureCode: data.failureCode,
+      reconciliationState: "awaiting_manual_review",
+      ...(data.providerOrderId !== undefined
+        ? { providerOrderId: data.providerOrderId }
+        : {}),
+      ...(data.providerResultKind !== undefined
+        ? { providerResultKind: data.providerResultKind }
+        : {}),
+    },
+  });
+  return updated.count === 1;
+}
+
 /**
  * Apply a signature-verified Safepay event to an eSIM payment attempt.
  * Never call from browser return URLs.
@@ -308,56 +411,11 @@ export async function applyVerifiedEsimPurchasePaymentEvent(
         })
       : false;
 
-  if (!match && !usdMatch) {
-    await prisma.$transaction(async (tx) => {
-      await tx.esimPurchasePaymentAttempt.update({
-        where: { id: attempt!.id },
-        data: {
-          status: EsimPurchasePaymentAttemptStatus.RECONCILIATION_REQUIRED,
-          webhookEventId: eventId,
-          failureCategory: "amount_currency_mismatch",
-          failureCode: "webhook_mismatch",
-          reconciliationState: "awaiting_manual_review",
-        },
-      });
-      await tx.walletEsimPurchase.update({
-        where: { id: attempt!.purchaseId },
-        data: {
-          status: WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED,
-          failureCategory: "amount_currency_mismatch",
-          failureCode: "webhook_mismatch",
-          reconciliationState: "awaiting_manual_review",
-        },
-      });
-      await tx.auditLog.create({
-        data: {
-          actorUserId: null,
-          action: WALLET_PURCHASE_RECONCILIATION,
-          targetType: "EsimPurchasePaymentAttempt",
-          targetId: attempt!.id,
-          metadata: {
-            method: "verified_webhook",
-            failureCategory: "amount_currency_mismatch",
-          },
-        },
-      });
-    });
-    return {
-      duplicate: false,
-      purchaseId: attempt.purchaseId,
-      paymentAttemptId: attempt.id,
-      purchaseStatus: WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED,
-      attemptStatus: EsimPurchasePaymentAttemptStatus.RECONCILIATION_REQUIRED,
-      outcome: "reconciliation",
-    };
-  }
-
   // Authoritative success/funded state must short-circuit failure release.
   // A later signed failure must never unlock wallet after confirmed funding.
-  const purchaseAlreadyFunded =
-    attempt.purchase.status === WalletEsimPurchaseStatus.FUNDED ||
-    attempt.purchase.status === WalletEsimPurchaseStatus.PROVIDER_PENDING ||
-    attempt.purchase.status === WalletEsimPurchaseStatus.COMPLETED;
+  const purchaseAlreadyFunded = isPurchasePaymentSuccessTerminal(
+    attempt.purchase.status
+  );
   const paymentAlreadyConfirmed =
     attempt.status === EsimPurchasePaymentAttemptStatus.PAYMENT_CONFIRMED;
 
@@ -375,6 +433,80 @@ export async function applyVerifiedEsimPurchasePaymentEvent(
       purchaseStatus: attempt.purchase.status,
       attemptStatus: attempt.status,
       outcome: event.paymentStatus === "failed" ? "ignored" : "duplicate",
+    };
+  }
+
+  if (!match && !usdMatch) {
+    let purchaseReconciled = false;
+    let attemptReconciled = false;
+    await prisma.$transaction(async (tx) => {
+      attemptReconciled = await applyPreFundAttemptReconciliation(tx, {
+        attemptId: attempt!.id,
+        webhookEventId: eventId,
+        failureCategory: "amount_currency_mismatch",
+        failureCode: "webhook_mismatch",
+      });
+      purchaseReconciled = await applyPreFundPurchaseReconciliation(tx, {
+        purchaseId: attempt!.purchaseId,
+        failureCategory: "amount_currency_mismatch",
+        failureCode: "webhook_mismatch",
+      });
+      if (purchaseReconciled || attemptReconciled) {
+        await tx.auditLog.create({
+          data: {
+            actorUserId: null,
+            action: WALLET_PURCHASE_RECONCILIATION,
+            targetType: "EsimPurchasePaymentAttempt",
+            targetId: attempt!.id,
+            metadata: {
+              method: "verified_webhook",
+              failureCategory: "amount_currency_mismatch",
+            },
+          },
+        });
+      }
+    });
+
+    const fresh = await prisma.walletEsimPurchase.findUnique({
+      where: { id: attempt.purchaseId },
+      select: { status: true },
+    });
+    const freshAttempt = await prisma.esimPurchasePaymentAttempt.findUnique({
+      where: { id: attempt.id },
+      select: { status: true },
+    });
+    const purchaseStatus =
+      fresh?.status ?? attempt.purchase.status;
+    const attemptStatus = freshAttempt?.status ?? attempt.status;
+
+    if (
+      !purchaseReconciled &&
+      !attemptReconciled &&
+      (isPurchasePaymentSuccessTerminal(purchaseStatus) ||
+        attemptStatus === EsimPurchasePaymentAttemptStatus.PAYMENT_CONFIRMED)
+    ) {
+      return {
+        duplicate: true,
+        purchaseId: attempt.purchaseId,
+        paymentAttemptId: attempt.id,
+        purchaseStatus,
+        attemptStatus,
+        outcome: "ignored",
+      };
+    }
+
+    return {
+      duplicate: false,
+      purchaseId: attempt.purchaseId,
+      paymentAttemptId: attempt.id,
+      purchaseStatus,
+      attemptStatus,
+      outcome:
+        purchaseStatus === WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED ||
+        attemptStatus ===
+          EsimPurchasePaymentAttemptStatus.RECONCILIATION_REQUIRED
+          ? "reconciliation"
+          : "ignored",
     };
   }
 
@@ -560,24 +692,66 @@ export async function applyVerifiedEsimPurchasePaymentEvent(
         outcome: "duplicate",
       };
     }
-    await prisma.walletEsimPurchase
-      .update({
-        where: { id: attempt.purchaseId },
-        data: {
-          status: WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED,
+    const freshPurchase = await prisma.walletEsimPurchase.findUnique({
+      where: { id: attempt.purchaseId },
+      select: { status: true },
+    });
+    const freshAttempt = await prisma.esimPurchasePaymentAttempt.findUnique({
+      where: { id: attempt.id },
+      select: { status: true },
+    });
+    const purchaseStatus =
+      freshPurchase?.status ?? attempt.purchase.status;
+    const attemptStatus = freshAttempt?.status ?? attempt.status;
+
+    if (
+      isPurchasePaymentSuccessTerminal(purchaseStatus) ||
+      attemptStatus === EsimPurchasePaymentAttemptStatus.PAYMENT_CONFIRMED
+    ) {
+      if (
+        event.paymentStatus === "confirmed" &&
+        purchaseStatus === WalletEsimPurchaseStatus.FUNDED
+      ) {
+        await fulfillFundedEsimPurchase(attempt.purchaseId).catch(
+          () => undefined
+        );
+      }
+      return {
+        duplicate: true,
+        purchaseId: attempt.purchaseId,
+        paymentAttemptId: attempt.id,
+        purchaseStatus,
+        attemptStatus,
+        outcome: "duplicate",
+      };
+    }
+
+    const purchaseReconciled = await prisma
+      .$transaction(async (tx) =>
+        applyPreFundPurchaseReconciliation(tx, {
+          purchaseId: attempt.purchaseId,
           failureCategory: "funding_finalize_failed",
           failureCode: "claim_failed",
-          reconciliationState: "awaiting_manual_review",
-        },
-      })
-      .catch(() => undefined);
+        })
+      )
+      .catch(() => false);
+
+    const afterPurchase = await prisma.walletEsimPurchase.findUnique({
+      where: { id: attempt.purchaseId },
+      select: { status: true },
+    });
+    const afterAttempt = await prisma.esimPurchasePaymentAttempt.findUnique({
+      where: { id: attempt.id },
+      select: { status: true },
+    });
+
     return {
       duplicate: false,
       purchaseId: attempt.purchaseId,
       paymentAttemptId: attempt.id,
-      purchaseStatus: WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED,
-      attemptStatus: attempt.status,
-      outcome: "reconciliation",
+      purchaseStatus: afterPurchase?.status ?? purchaseStatus,
+      attemptStatus: afterAttempt?.status ?? attemptStatus,
+      outcome: purchaseReconciled ? "reconciliation" : "ignored",
     };
   }
 
@@ -875,14 +1049,9 @@ async function fulfillFundedEsimPurchaseAfterPayment(
     countryHint: sanitizeCountryHint(purchase.destinationCode),
   });
   if (!verifiedOffer) {
-    await prisma.walletEsimPurchase.update({
-      where: { id: purchase.id },
-      data: {
-        status: WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED,
-        failureCategory: "offer_unavailable_after_funding",
-        failureCode: "offer_missing",
-        reconciliationState: "awaiting_manual_review",
-      },
+    await applyProviderPendingPurchaseReconciliation(purchase.id, {
+      failureCategory: "offer_unavailable_after_funding",
+      failureCode: "offer_missing",
     });
     return { ok: false };
   }
@@ -897,14 +1066,9 @@ async function fulfillFundedEsimPurchaseAfterPayment(
       localOrderId: addDataSourceOrderId,
     });
     if (!rechargeOrderId) {
-      await prisma.walletEsimPurchase.update({
-        where: { id: purchase.id },
-        data: {
-          status: WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED,
-          failureCategory: "add_data_source_unavailable",
-          failureCode: "missing_provider_order",
-          reconciliationState: "awaiting_manual_review",
-        },
+      await applyProviderPendingPurchaseReconciliation(purchase.id, {
+        failureCategory: "add_data_source_unavailable",
+        failureCode: "missing_provider_order",
       });
       return { ok: false };
     }
@@ -931,10 +1095,9 @@ async function fulfillFundedEsimPurchaseAfterPayment(
             : checkout.code,
       }).catch(() => undefined);
     }
-    await prisma.walletEsimPurchase.update({
-      where: { id: purchase.id },
-      data: {
-        status: WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED,
+    const reconciled = await applyProviderPendingPurchaseReconciliation(
+      purchase.id,
+      {
         failureCategory:
           checkout.kind === "declined"
             ? "provider_declined_after_funding"
@@ -943,10 +1106,10 @@ async function fulfillFundedEsimPurchaseAfterPayment(
           checkout.kind === "declined"
             ? `http_${checkout.httpStatus}`
             : checkout.code,
-        reconciliationState: "awaiting_manual_review",
-      },
-    });
-    await prisma.auditLog
+      }
+    );
+    if (reconciled) {
+      await prisma.auditLog
       .create({
         data: {
           actorUserId: null,
@@ -960,6 +1123,7 @@ async function fulfillFundedEsimPurchaseAfterPayment(
         },
       })
       .catch(() => undefined);
+    }
     return { ok: false };
   }
 
@@ -1080,19 +1244,12 @@ async function fulfillFundedEsimPurchaseAfterPayment(
       providerResultKind: "success",
       safeProviderStatusCode: "local_finalize_failed",
     }).catch(() => undefined);
-    await prisma.walletEsimPurchase
-      .update({
-        where: { id: purchase.id },
-        data: {
-          status: WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED,
-          failureCategory: "local_finalize_failed",
-          failureCode: "after_provider_success",
-          reconciliationState: "awaiting_manual_review",
-          providerOrderId: checkout.providerOrderId,
-          providerResultKind: "success",
-        },
-      })
-      .catch(() => undefined);
+    await applyProviderPendingPurchaseReconciliation(purchase.id, {
+      failureCategory: "local_finalize_failed",
+      failureCode: "after_provider_success",
+      providerOrderId: checkout.providerOrderId,
+      providerResultKind: "success",
+    }).catch(() => undefined);
     return { ok: false };
   }
 }

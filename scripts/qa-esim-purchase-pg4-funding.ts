@@ -202,6 +202,23 @@ function main() {
     apply,
     /debitTransactionId:\s*purchaseNow\.debitTransactionId/
   );
+  // Payment CAS: RECON only from pre-fund purchase states; never clobber FUNDED/COMPLETED.
+  assert.match(apply, /PURCHASE_PRE_FUND_RECON_STATUSES/);
+  assert.match(apply, /applyPreFundPurchaseReconciliation/);
+  assert.match(apply, /applyPreFundAttemptReconciliation/);
+  assert.match(
+    apply,
+    /isPurchasePaymentSuccessTerminal[\s\S]*outcome:\s*"duplicate"/
+  );
+  assert.match(
+    apply,
+    /applyProviderPendingPurchaseReconciliation[\s\S]*PROVIDER_PENDING[\s\S]*orderId:\s*null/
+  );
+  assert.match(
+    apply,
+    /paymentAlreadyConfirmed[\s\S]*purchaseAlreadyFunded[\s\S]*amount_currency_mismatch/
+  );
+  console.log("PASS payment_reconciliation_cas_guards");
   // Defense in wallet primitive.
   assert.match(
     walletPurchase,
