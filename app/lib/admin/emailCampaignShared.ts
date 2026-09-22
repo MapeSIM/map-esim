@@ -32,10 +32,33 @@ export const EMAIL_CAMPAIGN_CONFIRM_PHRASE = "SEND CUSTOMER CAMPAIGN";
 export const EMAIL_CAMPAIGN_SUBJECT_MAX = 160;
 export const EMAIL_CAMPAIGN_BODY_MAX = 20_000;
 export const EMAIL_CAMPAIGN_SEND_BATCH = 20;
+/** Default pause between SMTP batches (ms). Override with EMAIL_CAMPAIGN_BATCH_DELAY_MS. */
+export const EMAIL_CAMPAIGN_BATCH_DELAY_MS_DEFAULT = 2_000;
+export const EMAIL_CAMPAIGN_BATCH_DELAY_MS_MAX = 60_000;
+/** Max batches processed in one server action invocation (queue continues client-side). */
+export const EMAIL_CAMPAIGN_MAX_BATCHES_PER_RUN = 5;
 export const EMAIL_CAMPAIGN_HISTORY_LIMIT = 50;
 export const EMAIL_CAMPAIGN_LOG_LIMIT = 80;
 
+/** Exact confirm phrase required before resending failed recipients. */
+export const EMAIL_CAMPAIGN_RESEND_FAILED_PHRASE = "RESEND FAILED EMAILS";
+
 export const EMAIL_CAMPAIGN_CHANNEL = "support" as const;
+
+/**
+ * Configurable inter-batch delay for SMTP rate limits.
+ * Pass process.env.EMAIL_CAMPAIGN_BATCH_DELAY_MS from server code.
+ * Invalid / omitted → default. Clamped to 0…EMAIL_CAMPAIGN_BATCH_DELAY_MS_MAX.
+ */
+export function resolveEmailCampaignBatchDelayMs(
+  raw: string | null | undefined
+): number {
+  const value = Number.parseInt(String(raw ?? "").trim(), 10);
+  if (!Number.isFinite(value) || value < 0) {
+    return EMAIL_CAMPAIGN_BATCH_DELAY_MS_DEFAULT;
+  }
+  return Math.min(value, EMAIL_CAMPAIGN_BATCH_DELAY_MS_MAX);
+}
 
 export function parseEmailCampaignAudience(
   raw: string | null | undefined
@@ -140,6 +163,25 @@ export function campaignCanContinueBulkSend(
   status: string | null | undefined
 ): boolean {
   return String(status ?? "").trim() === "SENDING";
+}
+
+/**
+ * Resend Failed is available after a bulk run finished with failures.
+ * Does not apply to draft/test campaigns (no recipient rows yet).
+ */
+export function campaignCanResendFailed(
+  status: string | null | undefined,
+  failedCount: number
+): boolean {
+  if (!Number.isFinite(failedCount) || failedCount <= 0) return false;
+  const value = String(status ?? "").trim();
+  return value === "SENT" || value === "FAILED";
+}
+
+export function campaignResendFailedPhraseMatches(
+  raw: string | null | undefined
+): boolean {
+  return String(raw ?? "").trim() === EMAIL_CAMPAIGN_RESEND_FAILED_PHRASE;
 }
 
 /** Reusable campaign HTML layouts. CLASSIC is legacy-only (not in selector). */

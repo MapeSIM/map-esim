@@ -14,13 +14,19 @@ import {
 } from "../app/lib/brand";
 import {
   campaignCanContinueBulkSend,
+  campaignCanResendFailed,
   campaignCanStartBulkSend,
   campaignConfirmPhraseMatches,
+  campaignResendFailedPhraseMatches,
   EMAIL_CAMPAIGN_AUDIENCE_HELP,
   EMAIL_CAMPAIGN_AUDIENCES,
+  EMAIL_CAMPAIGN_BATCH_DELAY_MS_DEFAULT,
+  EMAIL_CAMPAIGN_BATCH_DELAY_MS_MAX,
   EMAIL_CAMPAIGN_BODY_MAX,
   EMAIL_CAMPAIGN_CHANNEL,
   EMAIL_CAMPAIGN_CONFIRM_PHRASE,
+  EMAIL_CAMPAIGN_MAX_BATCHES_PER_RUN,
+  EMAIL_CAMPAIGN_RESEND_FAILED_PHRASE,
   EMAIL_CAMPAIGN_SELECTABLE_TEMPLATES,
   EMAIL_CAMPAIGN_SEND_BATCH,
   EMAIL_CAMPAIGN_SUBJECT_MAX,
@@ -30,6 +36,7 @@ import {
   emailCampaignTemplateLabel,
   parseEmailCampaignAudience,
   parseEmailCampaignTemplateKey,
+  resolveEmailCampaignBatchDelayMs,
   sanitizeCampaignBody,
   sanitizeCampaignSubject,
 } from "../app/lib/admin/emailCampaignShared";
@@ -99,18 +106,32 @@ function main() {
   assert.match(EMAIL_CAMPAIGN_AUDIENCE_HELP.PURCHASED_CUSTOMERS, /completed purchase/);
   assert.match(EMAIL_CAMPAIGN_AUDIENCE_HELP.ACTIVE_CUSTOMERS, /not blocked/);
   assert.equal(EMAIL_CAMPAIGN_CONFIRM_PHRASE, "SEND CUSTOMER CAMPAIGN");
+  assert.equal(EMAIL_CAMPAIGN_RESEND_FAILED_PHRASE, "RESEND FAILED EMAILS");
   assert.equal(EMAIL_CAMPAIGN_CHANNEL, "support");
   assert.equal(EMAIL_CAMPAIGN_SUBJECT_MAX, 160);
   assert.equal(EMAIL_CAMPAIGN_BODY_MAX, 20_000);
   assert.equal(EMAIL_CAMPAIGN_SEND_BATCH, 20);
+  assert.equal(EMAIL_CAMPAIGN_BATCH_DELAY_MS_DEFAULT, 2_000);
+  assert.equal(EMAIL_CAMPAIGN_MAX_BATCHES_PER_RUN, 5);
+  assert.equal(resolveEmailCampaignBatchDelayMs(undefined), 2_000);
+  assert.equal(resolveEmailCampaignBatchDelayMs("1500"), 1500);
+  assert.equal(resolveEmailCampaignBatchDelayMs("-1"), 2_000);
+  assert.equal(resolveEmailCampaignBatchDelayMs("999999"), EMAIL_CAMPAIGN_BATCH_DELAY_MS_MAX);
   assert.equal(campaignConfirmPhraseMatches("SEND CUSTOMER CAMPAIGN"), true);
   assert.equal(campaignConfirmPhraseMatches(" send customer campaign "), false);
   assert.equal(campaignConfirmPhraseMatches("SEND"), false);
+  assert.equal(campaignResendFailedPhraseMatches("RESEND FAILED EMAILS"), true);
+  assert.equal(campaignResendFailedPhraseMatches("resend failed emails"), false);
   assert.equal(campaignCanStartBulkSend("DRAFT"), true);
   assert.equal(campaignCanStartBulkSend("TEST_SENT"), true);
   assert.equal(campaignCanStartBulkSend("SENDING"), false);
   assert.equal(campaignCanContinueBulkSend("SENDING"), true);
   assert.equal(campaignCanContinueBulkSend("DRAFT"), false);
+  assert.equal(campaignCanResendFailed("SENT", 3), true);
+  assert.equal(campaignCanResendFailed("FAILED", 1), true);
+  assert.equal(campaignCanResendFailed("SENT", 0), false);
+  assert.equal(campaignCanResendFailed("SENDING", 5), false);
+  assert.equal(campaignCanResendFailed("DRAFT", 2), false);
   assert.equal(parseEmailCampaignAudience("all_customers"), "ALL_CUSTOMERS");
   assert.equal(parseEmailCampaignAudience("admins"), null);
   assert.equal(sanitizeCampaignSubject("  Hello\nWorld  "), "Hello World");
@@ -311,9 +332,13 @@ function main() {
   assert.match(detailPage, /srcDoc=\{detail\.previewHtml\}/);
   assert.match(detailPage, /EmailCampaignTestForm/);
   assert.match(detailPage, /EmailCampaignBulkSendForm/);
+  assert.match(detailPage, /EmailCampaignResendFailedForm/);
+  assert.match(detailPage, /Resend failed emails/);
   assert.match(detailPage, /Eligible now/);
   assert.match(detailPage, /Send log/);
   assert.match(detailPage, /detail\.templateLabel/);
+  assert.match(detailPage, /batchDelayMs=\{detail\.batchDelayMs\}/);
+  assert.match(detailPage, /autoStart/);
   assert.match(form, /name="subject"/);
   assert.match(form, /name="bodyText"/);
   assert.match(form, /name="audience"/);
@@ -324,10 +349,13 @@ function main() {
   assert.match(shared, /"PURCHASED_CUSTOMERS"/);
   assert.match(shared, /"ACTIVE_CUSTOMERS"/);
   assert.match(sendForms, /EMAIL_CAMPAIGN_CONFIRM_PHRASE/);
+  assert.match(sendForms, /EMAIL_CAMPAIGN_RESEND_FAILED_PHRASE/);
   assert.match(sendForms, /name="confirmPhrase"/);
   assert.match(sendForms, /name="expectedRecipientCount"/);
   assert.match(sendForms, /Send test email/);
   assert.match(sendForms, /Send to \$\{recipientCount\} customers/);
+  assert.match(sendForms, /Resend Failed/);
+  assert.match(sendForms, /useAutoContinueQueue|Sending queue/);
   console.log("   ok");
 
   console.log("5) Audience + send safety");
@@ -339,6 +367,13 @@ function main() {
   assert.match(service, /expectedRecipientCount !== liveCount/);
   assert.match(service, /campaignConfirmPhraseMatches/);
   assert.match(service, /EMAIL_CAMPAIGN_SEND_BATCH/);
+  assert.match(service, /EMAIL_CAMPAIGN_MAX_BATCHES_PER_RUN/);
+  assert.match(service, /resolveEmailCampaignBatchDelayMs/);
+  assert.match(service, /processPendingCampaignBatches/);
+  assert.match(service, /resendAdminEmailCampaignFailed/);
+  assert.match(service, /EmailCampaignRecipientStatus\.FAILED/);
+  assert.match(service, /email_campaign\.failed_resend_started/);
+  assert.match(service, /email_campaign\.smtp_failure/);
   assert.match(service, /channel: EMAIL_CAMPAIGN_CHANNEL/);
   assert.match(service, /sendChannelMail/);
   assert.match(service, /email_campaign\.created/);
@@ -347,10 +382,12 @@ function main() {
   assert.match(service, /email_campaign\.bulk_completed/);
   assert.match(service, /templateKey/);
   assert.match(actions, /templateKeyRaw/);
+  assert.match(actions, /resendEmailCampaignFailedAction/);
   assert.doesNotMatch(service, /metadata:\s*\{[^}]*\bemail\s*:/);
   assert.match(actions, /requireRole\("ADMIN"\)/);
   assert.match(actions, /revalidatePath\("\/admin\/email-campaigns"\)/);
   assert.match(shared, /EMAIL_CAMPAIGN_CHANNEL = "support"/);
+  assert.match(shared, /campaignCanResendFailed/);
   console.log("   ok");
 
   console.log("6) Isolated from payments, wallet, VeSIM, order mail");

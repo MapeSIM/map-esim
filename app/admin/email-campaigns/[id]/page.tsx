@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   EmailCampaignBulkSendForm,
+  EmailCampaignResendFailedForm,
   EmailCampaignTestForm,
 } from "@/app/components/admin/EmailCampaignSendForms";
 import { getAdminEmailCampaignDetail } from "@/app/lib/admin/emailCampaigns";
@@ -131,6 +132,7 @@ export default async function AdminEmailCampaignDetailPage({
             campaignId={detail.id}
             recipientCount={detail.liveRecipientCount}
             mode="start"
+            batchDelayMs={detail.batchDelayMs}
           />
         </section>
       ) : null}
@@ -138,7 +140,7 @@ export default async function AdminEmailCampaignDetailPage({
       {detail.canContinueBulk ? (
         <section className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 sm:px-5">
           <h2 className="text-lg font-semibold tracking-tight">
-            Continue sending
+            Send queue
           </h2>
           <p className="text-sm text-[var(--heading)]">
             Pending recipients remaining: <strong>{detail.pendingCount}</strong>
@@ -147,6 +149,25 @@ export default async function AdminEmailCampaignDetailPage({
             campaignId={detail.id}
             recipientCount={detail.liveRecipientCount}
             mode="continue"
+            batchDelayMs={detail.batchDelayMs}
+            autoStart
+          />
+        </section>
+      ) : null}
+
+      {detail.canResendFailed ? (
+        <section className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 sm:px-5">
+          <h2 className="text-lg font-semibold tracking-tight">
+            Resend failed emails
+          </h2>
+          <p className="text-sm text-[var(--text-muted)]">
+            Re-queues only recipients with status Failed. Sent emails are never
+            resent.
+          </p>
+          <EmailCampaignResendFailedForm
+            campaignId={detail.id}
+            failedCount={detail.failedCount}
+            batchDelayMs={detail.batchDelayMs}
           />
         </section>
       ) : null}

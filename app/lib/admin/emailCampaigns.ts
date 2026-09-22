@@ -13,16 +13,20 @@ import {
   EMAIL_CAMPAIGN_CHANNEL,
   EMAIL_CAMPAIGN_HISTORY_LIMIT,
   EMAIL_CAMPAIGN_LOG_LIMIT,
+  EMAIL_CAMPAIGN_MAX_BATCHES_PER_RUN,
   EMAIL_CAMPAIGN_SEND_BATCH,
   campaignCanContinueBulkSend,
+  campaignCanResendFailed,
   campaignCanStartBulkSend,
   campaignConfirmPhraseMatches,
+  campaignResendFailedPhraseMatches,
   emailCampaignAudienceLabel,
   emailCampaignRecipientStatusLabel,
   emailCampaignStatusLabel,
   emailCampaignTemplateLabel,
   parseEmailCampaignAudience,
   parseEmailCampaignTemplateKey,
+  resolveEmailCampaignBatchDelayMs,
   sanitizeCampaignBody,
   sanitizeCampaignSubject,
   type EmailCampaignAudienceId,
@@ -196,6 +200,8 @@ export type AdminEmailCampaignDetail = {
   createdAtLabel: string;
   canStartBulk: boolean;
   canContinueBulk: boolean;
+  canResendFailed: boolean;
+  batchDelayMs: number;
   logs: Array<{
     id: string;
     email: string;
@@ -234,6 +240,9 @@ export async function getAdminEmailCampaignDetail(
       where: { campaignId: row.id, status: EmailCampaignRecipientStatus.PENDING },
     }),
   ]);
+  const batchDelayMs = resolveEmailCampaignBatchDelayMs(
+    process.env.EMAIL_CAMPAIGN_BATCH_DELAY_MS
+  );
   return {
     id: row.id,
     subject: row.subject,
@@ -260,6 +269,8 @@ export async function getAdminEmailCampaignDetail(
     createdAtLabel: formatCreatedAt(row.createdAt),
     canStartBulk: campaignCanStartBulkSend(row.status),
     canContinueBulk: campaignCanContinueBulkSend(row.status) && pendingCount > 0,
+    canResendFailed: campaignCanResendFailed(row.status, row.failedCount),
+    batchDelayMs,
     logs: row.recipients.map((log) => ({
       id: log.id,
       email: log.email,
@@ -407,6 +418,149 @@ async function refreshCampaignCounts(campaignId: string): Promise<void> {
   });
 }
 
+function sleep(ms: number): Promise<void> {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function logCampaignSmtpFailure(input: {
+  campaignId: string;
+  recipientId: string;
+  reason: string;
+}): void {
+  console.error(
+    JSON.stringify({
+      event: "email_campaign.smtp_failure",
+      campaignId: input.campaignId,
+      recipientId: input.recipientId,
+      reason: input.reason,
+      channel: EMAIL_CAMPAIGN_CHANNEL,
+    })
+  );
+}
+
+async function sendOnePendingRecipient(input: {
+  campaignId: string;
+  recipientId: string;
+  email: string;
+  subject: string;
+  bodyText: string;
+  templateKey: string | null;
+}): Promise<"sent" | "failed" | "skipped"> {
+  const result = await sendCampaignMessage({
+    to: input.email,
+    subject: input.subject,
+    bodyText: input.bodyText,
+    templateKey: input.templateKey,
+  });
+  if (result.ok) {
+    await prisma.emailCampaignRecipient.update({
+      where: { id: input.recipientId },
+      data: {
+        status: EmailCampaignRecipientStatus.SENT,
+        sentAt: new Date(),
+        errorCode: null,
+      },
+    });
+    return "sent";
+  }
+
+  logCampaignSmtpFailure({
+    campaignId: input.campaignId,
+    recipientId: input.recipientId,
+    reason: result.reason,
+  });
+
+  const status =
+    result.reason === "invalid_recipient"
+      ? EmailCampaignRecipientStatus.SKIPPED
+      : EmailCampaignRecipientStatus.FAILED;
+  await prisma.emailCampaignRecipient.update({
+    where: { id: input.recipientId },
+    data: {
+      status,
+      errorCode: result.reason,
+    },
+  });
+  return status === EmailCampaignRecipientStatus.SKIPPED ? "skipped" : "failed";
+}
+
+/**
+ * Drain PENDING recipients in batches with configurable delay between batches.
+ * Never selects SENT rows. Returns remaining PENDING count.
+ */
+async function processPendingCampaignBatches(input: {
+  campaignId: string;
+  subject: string;
+  bodyText: string;
+  templateKey: string | null;
+  adminUserId: string;
+}): Promise<{ sentThisRun: number; remaining: number; status: string }> {
+  const delayMs = resolveEmailCampaignBatchDelayMs(
+    process.env.EMAIL_CAMPAIGN_BATCH_DELAY_MS
+  );
+  let sentThisRun = 0;
+  let batches = 0;
+
+  while (batches < EMAIL_CAMPAIGN_MAX_BATCHES_PER_RUN) {
+    const pending = await prisma.emailCampaignRecipient.findMany({
+      where: {
+        campaignId: input.campaignId,
+        status: EmailCampaignRecipientStatus.PENDING,
+      },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take: EMAIL_CAMPAIGN_SEND_BATCH,
+      select: { id: true, email: true },
+    });
+    if (pending.length === 0) break;
+
+    if (batches > 0 && delayMs > 0) {
+      await sleep(delayMs);
+    }
+
+    for (const row of pending) {
+      const outcome = await sendOnePendingRecipient({
+        campaignId: input.campaignId,
+        recipientId: row.id,
+        email: row.email,
+        subject: input.subject,
+        bodyText: input.bodyText,
+        templateKey: input.templateKey,
+      });
+      if (outcome === "sent") sentThisRun += 1;
+    }
+    batches += 1;
+  }
+
+  await refreshCampaignCounts(input.campaignId);
+  const remaining = await prisma.emailCampaignRecipient.count({
+    where: {
+      campaignId: input.campaignId,
+      status: EmailCampaignRecipientStatus.PENDING,
+    },
+  });
+  const latest = await prisma.emailCampaign.findUnique({
+    where: { id: input.campaignId },
+    select: { status: true },
+  });
+  if (remaining === 0) {
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: input.adminUserId,
+        action: "email_campaign.bulk_completed",
+        targetType: "EmailCampaign",
+        targetId: input.campaignId,
+        metadata: { remaining: 0 },
+      },
+    });
+  }
+  return {
+    sentThisRun,
+    remaining,
+    status: latest?.status ?? EmailCampaignStatus.SENDING,
+  };
+}
+
 export async function sendAdminEmailCampaignBulk(input: {
   adminUserId: string;
   campaignId: string;
@@ -500,73 +654,108 @@ export async function sendAdminEmailCampaignBulk(input: {
     });
   }
 
-  const pending = await prisma.emailCampaignRecipient.findMany({
-    where: {
-      campaignId: campaign.id,
-      status: EmailCampaignRecipientStatus.PENDING,
-    },
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-    take: EMAIL_CAMPAIGN_SEND_BATCH,
-    select: { id: true, email: true },
+  const result = await processPendingCampaignBatches({
+    campaignId: campaign.id,
+    subject: campaign.subject,
+    bodyText: campaign.bodyText,
+    templateKey: campaign.templateKey,
+    adminUserId: input.adminUserId,
   });
 
-  let sentThisBatch = 0;
-  for (const row of pending) {
-    const result = await sendCampaignMessage({
-      to: row.email,
-      subject: campaign.subject,
-      bodyText: campaign.bodyText,
-      templateKey: campaign.templateKey,
-    });
-    if (result.ok) {
-      sentThisBatch += 1;
-      await prisma.emailCampaignRecipient.update({
-        where: { id: row.id },
-        data: {
-          status: EmailCampaignRecipientStatus.SENT,
-          sentAt: new Date(),
-          errorCode: null,
-        },
-      });
-    } else {
-      await prisma.emailCampaignRecipient.update({
-        where: { id: row.id },
-        data: {
-          status:
-            result.reason === "invalid_recipient"
-              ? EmailCampaignRecipientStatus.SKIPPED
-              : EmailCampaignRecipientStatus.FAILED,
-          errorCode: result.reason,
-        },
-      });
-    }
-  }
-
-  await refreshCampaignCounts(campaign.id);
-  const remaining = await prisma.emailCampaignRecipient.count({
-    where: {
-      campaignId: campaign.id,
-      status: EmailCampaignRecipientStatus.PENDING,
-    },
-  });
-  const latest = await prisma.emailCampaign.findUnique({
-    where: { id: campaign.id },
-    select: { status: true },
-  });
-  if (remaining === 0) {
-    await prisma.auditLog.create({
-      data: {
-        actorUserId: input.adminUserId,
-        action: "email_campaign.bulk_completed",
-        targetType: "EmailCampaign",
-        targetId: campaign.id,
-        metadata: { remaining: 0 },
-      },
-    });
-  }
   return {
-    sentThisBatch,
-    remaining,
-    status: latest?.status ?? campaign.status,
+    sentThisBatch: result.sentThisRun,
+    remaining: result.remaining,
+    status: result.status,
+  };
+}
+
+/**
+ * Re-queue FAILED recipients only (never SENT) and continue batched send.
+ */
+export async function resendAdminEmailCampaignFailed(input: {
+  adminUserId: string;
+  campaignId: string;
+  confirmPhrase: string;
+}): Promise<{ sentThisBatch: number; remaining: number; status: string }> {
+  const campaign = await prisma.emailCampaign.findUnique({
+    where: { id: input.campaignId.trim() },
+    select: {
+      id: true,
+      subject: true,
+      bodyText: true,
+      templateKey: true,
+      status: true,
+      failedCount: true,
+    },
+  });
+  if (!campaign) {
+    throw new EmailCampaignError("Campaign not found.");
+  }
+  if (!campaignCanResendFailed(campaign.status, campaign.failedCount)) {
+    throw new EmailCampaignError("There are no failed recipients to resend.");
+  }
+  if (!campaignResendFailedPhraseMatches(input.confirmPhrase)) {
+    throw new EmailCampaignError(
+      "Type the confirmation phrase exactly to resend failed emails.",
+      "confirmPhrase"
+    );
+  }
+
+  const claimed = await prisma.emailCampaign.updateMany({
+    where: {
+      id: campaign.id,
+      status: {
+        in: [EmailCampaignStatus.SENT, EmailCampaignStatus.FAILED],
+      },
+    },
+    data: {
+      status: EmailCampaignStatus.SENDING,
+      completedAt: null,
+      lastError: null,
+    },
+  });
+  if (claimed.count !== 1) {
+    throw new EmailCampaignError("This campaign is no longer recoverable.");
+  }
+
+  // FAILED → PENDING only. SENT / SKIPPED / PENDING rows are untouched.
+  const requeued = await prisma.emailCampaignRecipient.updateMany({
+    where: {
+      campaignId: campaign.id,
+      status: EmailCampaignRecipientStatus.FAILED,
+    },
+    data: {
+      status: EmailCampaignRecipientStatus.PENDING,
+      errorCode: null,
+      sentAt: null,
+    },
+  });
+  if (requeued.count <= 0) {
+    await refreshCampaignCounts(campaign.id);
+    throw new EmailCampaignError("There are no failed recipients to resend.");
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      actorUserId: input.adminUserId,
+      action: "email_campaign.failed_resend_started",
+      targetType: "EmailCampaign",
+      targetId: campaign.id,
+      metadata: { requeuedCount: requeued.count },
+    },
+  });
+
+  const result = await processPendingCampaignBatches({
+    campaignId: campaign.id,
+    subject: campaign.subject,
+    bodyText: campaign.bodyText,
+    templateKey: campaign.templateKey,
+    adminUserId: input.adminUserId,
+  });
+
+  return {
+    sentThisBatch: result.sentThisRun,
+    remaining: result.remaining,
+    status: result.status,
   };
 }

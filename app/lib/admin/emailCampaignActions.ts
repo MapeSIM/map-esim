@@ -7,13 +7,20 @@ import { requireRole } from "@/app/lib/auth/session";
 import {
   createAdminEmailCampaign,
   EmailCampaignError,
+  resendAdminEmailCampaignFailed,
   sendAdminEmailCampaignBulk,
   sendAdminEmailCampaignTest,
 } from "@/app/lib/admin/emailCampaigns";
 
 export type EmailCampaignActionState =
   | null
-  | { ok: true; message: string }
+  | {
+      ok: true;
+      message: string;
+      remaining?: number;
+      sentThisBatch?: number;
+      status?: string;
+    }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 function revalidateCampaignPaths(campaignId: string): void {
@@ -106,12 +113,18 @@ export async function sendEmailCampaignBulkAction(
     if (result.remaining > 0) {
       return {
         ok: true,
-        message: `Sent ${result.sentThisBatch} in this batch. ${result.remaining} remaining — continue sending.`,
+        message: `Queued send in progress: ${result.sentThisBatch} sent this run. ${result.remaining} remaining.`,
+        remaining: result.remaining,
+        sentThisBatch: result.sentThisBatch,
+        status: result.status,
       };
     }
     return {
       ok: true,
       message: `Campaign send finished. Status: ${result.status}.`,
+      remaining: 0,
+      sentThisBatch: result.sentThisBatch,
+      status: result.status,
     };
   } catch (error) {
     if (error instanceof EmailCampaignError) {
@@ -122,5 +135,47 @@ export async function sendEmailCampaignBulkAction(
       };
     }
     return { ok: false, error: "Campaign could not be sent." };
+  }
+}
+
+export async function resendEmailCampaignFailedAction(
+  _prev: EmailCampaignActionState,
+  formData: FormData
+): Promise<EmailCampaignActionState> {
+  const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, ["EMAIL_CAMPAIGNS", "CUSTOMER_ANNOUNCEMENTS"]);
+  try {
+    const campaignId = String(formData.get("campaignId") ?? "");
+    const result = await resendAdminEmailCampaignFailed({
+      adminUserId: admin.id,
+      campaignId,
+      confirmPhrase: String(formData.get("confirmPhrase") ?? ""),
+    });
+    revalidateCampaignPaths(campaignId);
+    if (result.remaining > 0) {
+      return {
+        ok: true,
+        message: `Resend in progress: ${result.sentThisBatch} sent this run. ${result.remaining} remaining.`,
+        remaining: result.remaining,
+        sentThisBatch: result.sentThisBatch,
+        status: result.status,
+      };
+    }
+    return {
+      ok: true,
+      message: `Failed-email resend finished. Status: ${result.status}.`,
+      remaining: 0,
+      sentThisBatch: result.sentThisBatch,
+      status: result.status,
+    };
+  } catch (error) {
+    if (error instanceof EmailCampaignError) {
+      return {
+        ok: false,
+        error: error.message,
+        fieldErrors: error.field ? { [error.field]: error.message } : undefined,
+      };
+    }
+    return { ok: false, error: "Failed emails could not be resent." };
   }
 }

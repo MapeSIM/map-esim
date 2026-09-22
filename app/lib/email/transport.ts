@@ -185,8 +185,20 @@ export async function sendChannelMail(options: {
       },
     });
     return { ok: true };
-  } catch {
-    console.error(`Email send failed for channel "${options.channel}"`);
+  } catch (error) {
+    // Log provider failure code only — never message/stack (may include SMTP secrets).
+    const code =
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      typeof (error as { code?: unknown }).code === "string"
+        ? String((error as { code: string }).code).slice(0, 64)
+        : "";
+    console.error(
+      `Email send failed for channel "${options.channel}"${
+        code ? ` code=${code}` : ""
+      }`
+    );
     return { ok: false, reason: "send_failed" };
   }
 }
