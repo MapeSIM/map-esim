@@ -24,6 +24,7 @@ import {
   partnerEsimPurchasePaymentCancelPath,
   partnerEsimPurchasePaymentReturnPath,
 } from "../app/lib/partner/partnerEsimPurchaseCheckoutPaths";
+import { resolvePartnerPaymentReturnKind } from "../app/lib/partner/partnerEsimPurchasePaymentReturnState";
 
 const root = join(__dirname, "..");
 
@@ -183,6 +184,73 @@ function main() {
   console.log("5) Customer checkout untouched by partner buy");
   assert.doesNotMatch(buy, /WalletEsimPurchase|startEsimPurchaseHostedCheckout/);
   assert.doesNotMatch(gateway, /WalletEsimPurchase|esimPurchasePaymentAttempt/);
+  console.log("   ok");
+
+  console.log("6) Partner payment return UX follows durable statuses");
+  const returnPage = read(
+    "app/partner/(portal)/catalog/payment/return/[attemptId]/page.tsx"
+  );
+  const returnView = read(
+    "app/partner/(portal)/catalog/payment/return/PartnerEsimPurchasePaymentReturnView.tsx"
+  );
+  const returnState = read(
+    "app/lib/partner/partnerEsimPurchasePaymentReturnState.ts"
+  );
+  assert.match(gateway, /export async function getOwnedPartnerEsimPurchasePaymentAttempt/);
+  assert.match(returnPage, /getOwnedPartnerEsimPurchasePaymentAttempt/);
+  assert.match(returnPage, /resolvePartnerPaymentReturnKind/);
+  assert.match(returnPage, /browserReturnMustNotFundPartnerEsimPurchase/);
+  assert.match(returnPage, /kind === "completed"/);
+  assert.doesNotMatch(returnPage, /applyVerifiedPartnerEsimPurchasePaymentEvent/);
+  assert.doesNotMatch(returnPage, /executePartnerEsimProviderPurchase/);
+  assert.match(returnState, /resolveEsimPaymentReturnKind/);
+  assert.match(returnView, /kind === "verified"/);
+  assert.match(returnView, /kind === "not_completed"/);
+  assert.match(returnView, /kind === "invalid"/);
+  assert.match(returnView, /Payment processing/);
+  assert.match(returnView, /Payment verified/);
+  assert.match(returnView, /Payment not completed/);
+  assert.match(returnView, /Payment reference not found/);
+  // Must not always claim success regardless of status.
+  assert.doesNotMatch(
+    returnPage,
+    /<h1[^>]*>Payment received<\/h1>/
+  );
+  assert.equal(
+    resolvePartnerPaymentReturnKind({
+      purchaseStatus: "FUNDED",
+      attemptStatus: "PAYMENT_CONFIRMED",
+    }),
+    "verified"
+  );
+  assert.equal(
+    resolvePartnerPaymentReturnKind({
+      purchaseStatus: "AWAITING_GATEWAY_PAYMENT",
+      attemptStatus: "AWAITING_PAYMENT",
+    }),
+    "pending"
+  );
+  assert.equal(
+    resolvePartnerPaymentReturnKind({
+      purchaseStatus: "READY",
+      attemptStatus: "CANCELLED",
+    }),
+    "not_completed"
+  );
+  assert.equal(
+    resolvePartnerPaymentReturnKind({
+      purchaseStatus: "AWAITING_GATEWAY_PAYMENT",
+      attemptStatus: "FAILED",
+    }),
+    "not_completed"
+  );
+  assert.equal(
+    resolvePartnerPaymentReturnKind({
+      purchaseStatus: "COMPLETED",
+      attemptStatus: "PAYMENT_CONFIRMED",
+    }),
+    "completed"
+  );
   console.log("   ok");
 
   console.log("ALL_QA_PASSED=partner-split-payment-phase2");

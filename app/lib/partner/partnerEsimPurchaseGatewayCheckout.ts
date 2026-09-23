@@ -95,6 +95,69 @@ export type StartPartnerEsimPurchaseHostedCheckoutResult = {
   walletAppliedCents: number;
 };
 
+/** Display-only return-page view. Never funds or mutates payment state. */
+export type OwnedPartnerPaymentAttemptView = {
+  attemptId: string;
+  purchaseId: string;
+  status: EsimPurchasePaymentAttemptStatus;
+  purchaseStatus: PartnerEsimPurchaseStatus;
+  gatewayProvider: PaymentGatewayProvider | null;
+};
+
+/**
+ * Load a Partner payment attempt owned by the signed-in partner user.
+ * Read-only — used by the browser return page for UX status only.
+ */
+export async function getOwnedPartnerEsimPurchasePaymentAttempt(
+  partnerUserId: string,
+  attemptId: string
+): Promise<OwnedPartnerPaymentAttemptView | null> {
+  const ownerId = partnerUserId.trim();
+  const id = attemptId.trim();
+  if (!ownerId || !id || ownerId.length > 64 || id.length > 64) return null;
+  if (!/^[A-Za-z0-9_-]+$/.test(id)) return null;
+
+  const row = await prisma.partnerEsimPurchasePaymentAttempt.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      status: true,
+      gatewayProvider: true,
+      purchase: {
+        select: {
+          id: true,
+          status: true,
+          partner: {
+            select: {
+              userId: true,
+              disabledAt: true,
+              user: { select: { role: true, deletedAt: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (
+    !row ||
+    row.purchase.partner.userId !== ownerId ||
+    row.purchase.partner.disabledAt ||
+    row.purchase.partner.user.deletedAt ||
+    row.purchase.partner.user.role !== Role.PARTNER
+  ) {
+    return null;
+  }
+
+  return {
+    attemptId: row.id,
+    purchaseId: row.purchase.id,
+    status: row.status,
+    purchaseStatus: row.purchase.status,
+    gatewayProvider: row.gatewayProvider ?? null,
+  };
+}
+
 function mapWalletError(error: unknown): never {
   if (error instanceof PartnerPurchaseWalletError) {
     if (error.code === "INSUFFICIENT_FUNDS") {
