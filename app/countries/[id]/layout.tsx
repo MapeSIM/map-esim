@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { BRAND_NAME } from "@/app/lib/brand";
 import { absoluteCanonical } from "@/app/lib/seo/canonical";
+import { buildCountrySeoDescription } from "@/app/lib/seo/countryPageContent";
 import { resolveDestinationForSeo } from "@/app/lib/seo/destinationCatalog";
 import { publicPageShareMeta } from "@/app/lib/seo/socialShareMeta";
 import { destinationPath } from "@/app/lib/vesim/destinations";
@@ -36,7 +37,10 @@ export async function generateMetadata({
   const canonical = absoluteCanonical(path);
   const label = destinationDisplayName(destination);
   const title = `${label} eSIM | ${BRAND_NAME}`;
-  const description = `Travel data eSIM plans for ${label} from ${BRAND_NAME}.`;
+  const description = buildCountrySeoDescription({
+    name: label,
+    kind: destination.kind,
+  });
 
   return {
     title,

@@ -79,6 +79,15 @@ function main() {
   const countryPage = read("app/countries/[id]/page.tsx");
   assert.doesNotMatch(countryPage, /^["']use client["']/m);
   assert.match(countryPage, /fetchPublicOffersForCountry/);
+  assert.match(countryPage, /permanentRedirect/);
+  assert.match(countryPage, /destinationRouteId/);
+
+  const sitemap = read("app/sitemap.ts");
+  assert.match(sitemap, /lastModified/);
+
+  const graph = read("app/lib/seo/siteGraph.ts");
+  assert.match(graph, /logo:\s*\{/);
+  assert.match(graph, /ImageObject/);
 
   console.log("ALL_QA_PASSED=seo-canonical");
 }

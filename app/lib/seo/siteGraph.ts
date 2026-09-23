@@ -1,4 +1,5 @@
 import {
+  BRAND_LOGO_PUBLIC_PATH,
   BRAND_NAME,
   BRAND_SITE_URL,
   BRAND_SOCIAL_LINKS,
@@ -23,6 +24,10 @@ export function organizationNode() {
     url: BRAND_SITE_URL,
     email: BRAND_SUPPORT_EMAIL,
     description: BRAND_TAGLINE,
+    logo: {
+      "@type": "ImageObject",
+      url: `${BRAND_SITE_URL}${BRAND_LOGO_PUBLIC_PATH}`,
+    },
     sameAs: BRAND_SOCIAL_LINKS.map((link) => link.href),
   };
 }

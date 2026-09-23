@@ -34,8 +34,11 @@ const staticRoutes: StaticRoute[] = [
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const lastModified = new Date();
+
   const marketingPages: MetadataRoute.Sitemap = staticRoutes.map((route) => ({
     url: route.path === "/" ? BRAND_SITE_URL : `${BRAND_SITE_URL}${route.path}`,
+    lastModified,
     changeFrequency: route.changeFrequency,
     priority: route.priority,
   }));
@@ -44,6 +47,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const destinationPages: MetadataRoute.Sitemap = destinationPaths.map(
     (path) => ({
       url: `${BRAND_SITE_URL}${path}`,
+      lastModified,
       changeFrequency: "weekly" as const,
       priority: 0.85,
     })

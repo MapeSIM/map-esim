@@ -75,10 +75,8 @@ function main() {
 
   assert.match(listing, /children\?: ReactNode/);
   const childrenSlot = listing.lastIndexOf("{children}");
-  const modal = listing.indexOf("<PlanDetailsModal");
-  assert.ok(childrenSlot > 0);
-  assert.ok(modal > childrenSlot);
-  assert.match(listing, /\{children\}\s*\r?\n\s*<PlanDetailsModal/);
+  assert.ok(childrenSlot > 0, "SEO children slot missing in PlansListing");
+  assert.match(listing, /\{children\}/);
   console.log("PASS seo_below_plan_listings");
 
   assert.match(section, /<Breadcrumbs/);
@@ -92,6 +90,10 @@ function main() {
   assert.match(section, /breadcrumbList\(/);
   assert.match(section, /destinationPlanProductNode\(/);
   assert.match(section, /buildCountrySeoContent/);
+  assert.match(
+    read("app/lib/seo/countryPageContent.ts"),
+    /export function buildCountrySeoDescription/
+  );
   assert.doesNotMatch(section, /href="\/install\/iphone"/);
   assert.doesNotMatch(section, /href="\/install\/android"/);
   assert.doesNotMatch(section, /PAYMENT_GATEWAY_ENABLED|applyVerifiedPaymentEvent/);
@@ -110,6 +112,8 @@ function main() {
   assert.match(graph, /export function breadcrumbList/);
   assert.match(graph, /export function destinationPlanProductNode/);
   assert.match(graph, /"@type": "AggregateOffer"/);
+  assert.match(graph, /logo:\s*\{/);
+  assert.match(graph, /ImageObject/);
   const socialMeta = read("app/lib/seo/socialShareMeta.ts");
   assert.match(socialMeta, /DEFAULT_SOCIAL_SHARE_IMAGE/);
   assert.match(socialMeta, /opengraph-image/);

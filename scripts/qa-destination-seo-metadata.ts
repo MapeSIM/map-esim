@@ -3,10 +3,10 @@
  * Does not call VeSIM, invent offers, merge destinations, or touch checkout.
  */
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { absoluteCanonical } from "../app/lib/seo/canonical";
+import { buildCountrySeoDescription } from "../app/lib/seo/countryPageContent";
 import {
   destinationPath,
   findDestinationBySlug,
@@ -20,10 +20,6 @@ const root = join(__dirname, "..");
 
 function read(rel: string): string {
   return readFileSync(join(root, rel), "utf8");
-}
-
-function readHead(rel: string): string {
-  return execSync(`git show "HEAD:${rel}"`, { encoding: "utf8", cwd: root });
 }
 
 function asDestination(raw: {
@@ -43,7 +39,10 @@ function seoFields(destination: VesimDestination) {
     path,
     canonical: absoluteCanonical(path),
     title: `${label} eSIM | ${BRAND_NAME}`,
-    description: `Travel data eSIM plans for ${label} from ${BRAND_NAME}.`,
+    description: buildCountrySeoDescription({
+      name: label,
+      kind: destination.kind,
+    }),
     robotsIndex: true,
   };
 }
@@ -51,7 +50,9 @@ function seoFields(destination: VesimDestination) {
 function main() {
   const layout = read("app/countries/[id]/layout.tsx");
   const seoCatalog = read("app/lib/seo/destinationCatalog.ts");
-  const page = readHead("app/countries/[id]/page.tsx");
+  const page = read("app/countries/[id]/page.tsx");
+  const sitemap = read("app/sitemap.ts");
+  const graph = read("app/lib/seo/siteGraph.ts");
 
   console.log("1) SEO resolver shares page-body catalog + slug finder");
   assert.match(seoCatalog, /fetchPublicDestinationCatalog/);
@@ -61,9 +62,12 @@ function main() {
   assert.match(layout, /resolveDestinationForSeo/);
   assert.match(layout, /destinationPath\(destination\)/);
   assert.match(layout, /destinationDisplayName\(destination\)/);
+  assert.match(layout, /buildCountrySeoDescription/);
   assert.match(layout, /robots:\s*\{\s*index:\s*true/);
   assert.match(page, /fetchPublicDestinationCatalog/);
   assert.match(page, /findDestinationBySlug/);
+  assert.match(page, /permanentRedirect/);
+  assert.match(page, /destinationRouteId/);
   console.log("   ok");
 
   console.log("2) PR and USPR resolve independently for metadata");
@@ -85,14 +89,19 @@ function main() {
   assert.equal(prMeta.canonical, "https://mapesim.com/countries/puerto-rico");
   assert.equal(prMeta.title, `Puerto Rico eSIM | ${BRAND_NAME}`);
   assert.equal(prMeta.robotsIndex, true);
+  assert.match(prMeta.description, /Puerto Rico/);
+  assert.match(prMeta.description, /Buy a travel eSIM/);
+  assert.doesNotMatch(prMeta.description, /Travel data eSIM plans for/);
 
   assert.equal(usprMeta.path, "/countries/uspr");
   assert.equal(usprMeta.canonical, "https://mapesim.com/countries/uspr");
   assert.equal(usprMeta.title, `Puerto Rico (US) eSIM | ${BRAND_NAME}`);
   assert.equal(usprMeta.robotsIndex, true);
+  assert.match(usprMeta.description, /Puerto Rico \(US\)/);
 
   assert.notEqual(prMeta.canonical, usprMeta.canonical);
   assert.notEqual(prMeta.title, usprMeta.title);
+  assert.notEqual(prMeta.description, usprMeta.description);
   console.log("   ok");
 
   console.log("3) False noindex path only when unresolved");
@@ -102,6 +111,12 @@ function main() {
   );
   assert.match(layout, /robots:\s*\{\s*index:\s*false/);
   assert.doesNotMatch(seoCatalog, /mergeDestinations|dedupeDestinations/);
+  console.log("   ok");
+
+  console.log("4) Sitemap lastModified + Organization logo");
+  assert.match(sitemap, /lastModified/);
+  assert.match(graph, /logo:\s*\{/);
+  assert.match(graph, /BRAND_LOGO_PUBLIC_PATH|ImageObject/);
   console.log("   ok");
 
   console.log("PASS destination_seo_metadata_qa");

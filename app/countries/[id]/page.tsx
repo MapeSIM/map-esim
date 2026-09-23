@@ -4,6 +4,8 @@ import { countries as staticCountries } from "@/app/data/countries";
 import { toPublicVesimOffers, type VesimOffer } from "@/app/lib/vesim/offers";
 import type { VesimDestination } from "@/app/lib/vesim/destinations";
 import {
+  destinationPath,
+  destinationRouteId,
   findDestinationBySlug,
   findRelatedRegionalDestination,
   retailMinFromProviderStartingPrice,
@@ -15,7 +17,7 @@ import {
   fetchPublicDestinationCatalog,
   fetchPublicOffersForCountry,
 } from "@/app/lib/vesim/server";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 
 /** Align with public destination catalog cache; keep crawlers on fresh plan HTML. */
 export const revalidate = 300;
@@ -127,6 +129,12 @@ export default async function CountryDetailPage({
 
   if (!matched) {
     notFound();
+  }
+
+  // Permanent redirect ISO/alias URLs to the canonical destination slug.
+  const canonicalRouteId = destinationRouteId(matched);
+  if (id.toLowerCase() !== canonicalRouteId.toLowerCase()) {
+    permanentRedirect(destinationPath(matched));
   }
 
   const relatedRegional =

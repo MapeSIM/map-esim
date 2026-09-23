@@ -3,6 +3,8 @@
  * Presentation only — no pricing, checkout, or provider I/O.
  */
 
+import { BRAND_NAME } from "@/app/lib/brand";
+
 export type CountrySeoDestinationInput = {
   name: string;
   kind: "country" | "regional" | "global";
@@ -24,6 +26,26 @@ export type CountrySeoContentModel = {
   faqs: CountrySeoFaq[];
   breadcrumbs: Array<{ name: string; path: string }>;
 };
+
+/**
+ * Unique, destination-based meta description for country pages.
+ * Titles stay elsewhere; avoids keyword stuffing.
+ */
+export function buildCountrySeoDescription(input: {
+  name: string;
+  kind: "country" | "regional" | "global";
+}): string {
+  const label = (input.name ?? "").trim() || "this destination";
+  const kind = input.kind;
+
+  if (kind === "regional") {
+    return `Compare ${label} regional travel eSIM plans from ${BRAND_NAME}. Review data amounts and validity, then buy online and install by QR before you travel.`;
+  }
+  if (kind === "global") {
+    return `Browse global travel eSIM plans from ${BRAND_NAME} for multi-country trips. Compare data and validity, then checkout and install by QR when you are ready.`;
+  }
+  return `Buy a travel eSIM for ${label} from ${BRAND_NAME}. Compare data plans and validity on this page, then install by QR — no physical SIM swap required.`;
+}
 
 export function buildCountrySeoContent(
   input: CountrySeoDestinationInput
