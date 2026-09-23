@@ -6,6 +6,7 @@
  */
 import "server-only";
 
+import { cache } from "react";
 import { OperationalControlKey } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
 import {
@@ -162,7 +163,8 @@ function viewForKey(
   };
 }
 
-export async function getOperationalControlsHealthSnapshot(): Promise<OperationalControlsHealthSnapshot> {
+export const getOperationalControlsHealthSnapshot = cache(
+  async (): Promise<OperationalControlsHealthSnapshot> => {
   const checkedAt = new Date();
   const checkedAtLabel = formatUtcTimestamp(checkedAt);
   const guestCheckoutStatus = "NOT_IMPLEMENTED / DISABLED" as const;
@@ -220,4 +222,5 @@ export async function getOperationalControlsHealthSnapshot(): Promise<Operationa
       readOk: false,
     };
   }
-}
+  }
+);

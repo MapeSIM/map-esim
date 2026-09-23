@@ -280,10 +280,18 @@ async function main() {
     server,
     /export async function verifyOfferAuthoritative[\s\S]*fetchOffersForCountry\(/
   );
-  assert.doesNotMatch(
-    server,
-    /verifyOfferAuthoritative[\s\S]*fetchPublicOffersForCountry/
-  );
+  {
+    const verifyStart = server.indexOf(
+      "export async function verifyOfferAuthoritative"
+    );
+    assert.ok(verifyStart >= 0);
+    const nextExport = server.indexOf("\nexport ", verifyStart + 10);
+    const verifyBody = server.slice(
+      verifyStart,
+      nextExport === -1 ? server.length : nextExport
+    );
+    assert.doesNotMatch(verifyBody, /fetchPublicOffersForCountry/);
+  }
   assert.match(
     server,
     /Purchase\/checkout\/admin validation must keep using this path/

@@ -21,6 +21,7 @@ import {
 import {
   buildVesimOffersQuery,
   collectAllOfferPagePayloads,
+  collectOfferPagePayloadsUntilMatch,
   isUsableOffersPage,
   isUsablePublicOffersPage,
   mergeOfferPageItems,
@@ -279,16 +280,34 @@ async function collectDestinationOfferPages(
 }
 
 /**
- * Live provider offer fetch (no-store), all pages.
+ * Live provider offer fetch (no-store).
  * Purchase/checkout/admin validation must keep using this path.
+ * Default: all pages (admin catalog / full destination lists).
+ * `stopWhenOfferId`: page-until-found for authoritative single-offer verify —
+ * still live, fail-closed; never uses public snapshots for pricing.
  * Uses ?page=&limit=1024 — never fullCatalog=1.
  */
 export async function fetchOffersForCountry(
   country: string,
-  token?: TokenResult
+  token?: TokenResult,
+  options?: { stopWhenOfferId?: string }
 ): Promise<VesimOffer[]> {
   const destination = country.trim();
   if (!destination) return [];
+
+  const stopId = normalizeOfferId(options?.stopWhenOfferId);
+  if (stopId) {
+    const collected = await collectDestinationOfferPagesUntilMatch(
+      destination,
+      token,
+      stopId
+    );
+    if (!collected.ok) {
+      return [];
+    }
+    const allRawOffers = mergeOfferPageItems(collected.payloads);
+    return normalizeOffers({ offers: allRawOffers });
+  }
 
   const collected = await collectDestinationOfferPages(
     destination,
@@ -303,6 +322,41 @@ export async function fetchOffersForCountry(
 
   const allRawOffers = mergeOfferPageItems(collected.payloads);
   return normalizeOffers({ offers: allRawOffers });
+}
+
+async function collectDestinationOfferPagesUntilMatch(
+  destination: string,
+  token: TokenResult | undefined,
+  stopWhenOfferId: string
+) {
+  const baseUrl = getVesimBaseUrl();
+  const target = stopWhenOfferId.trim().toUpperCase();
+  return collectOfferPagePayloadsUntilMatch(
+    async (page) => {
+      const query = buildVesimOffersQuery(destination, page);
+      const url = `${baseUrl}/api/esim/offers?${query.toString()}`;
+      const response = token
+        ? await fetch(url, {
+            headers: {
+              Authorization: `${token.tokenType} ${token.accessToken}`,
+              Accept: "application/json",
+            },
+            cache: "no-store",
+          })
+        : await vesimAuthorizedFetch(url);
+      const payload = await readJsonSafe(response);
+      return { httpOk: response.ok, payload };
+    },
+    {
+      isPageUsable: isUsableOffersPage,
+      shouldStop: (payload) => {
+        const pageOffers = normalizeOffers({
+          offers: mergeOfferPageItems([payload]),
+        });
+        return Boolean(findOfferById(pageOffers, target));
+      },
+    }
+  );
 }
 
 /**
@@ -428,7 +482,9 @@ export async function verifyOfferAuthoritative(options: {
   const token = await getBrokerToken();
 
   for (const country of candidates) {
-    const offers = await fetchOffersForCountry(country, token);
+    const offers = await fetchOffersForCountry(country, token, {
+      stopWhenOfferId: offerId,
+    });
     const match = findOfferById(offers, offerId);
     if (!match) continue;
 

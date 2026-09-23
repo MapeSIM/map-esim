@@ -6,6 +6,7 @@
  */
 import "server-only";
 
+import { cache } from "react";
 import {
   Role,
   WalletEsimPurchaseStatus,
@@ -16,6 +17,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/app/lib/db";
 import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
+import { loadConsentGateUser } from "@/app/lib/auth/legalConsentGate";
 import { getEmailChannelsReadiness } from "@/app/lib/email/config";
 import { isIccidEncryptionConfigured } from "@/app/lib/orders/iccidCrypto";
 import { isGuestVesimCheckoutEnabled } from "@/app/lib/vesim/guestCheckoutGate";
@@ -102,14 +104,27 @@ export type MonitoringAlertsDashboard = {
 export async function requireActiveAdminForAlerts() {
   const sessionUser = await requireRole("ADMIN");
   await assertAdminPermission(sessionUser.id, "ALERTS_VIEW");
-  const admin = await prisma.user.findUnique({
-    where: { id: sessionUser.id },
-    select: { id: true, role: true, deletedAt: true, adminDisabledAt: true, name: true },
-  });
-  if (!admin || admin.deletedAt || admin.role !== Role.ADMIN || admin.adminDisabledAt) {
+  // Reuse consent-gate user (already loaded by requireRole) — same disabled /
+  // deleted / role checks without a third Prisma round-trip.
+  const dbUser = await loadConsentGateUser(sessionUser.id);
+  if (
+    !dbUser ||
+    dbUser.deletedAt ||
+    dbUser.role !== Role.ADMIN ||
+    dbUser.adminDisabledAt
+  ) {
     redirect("/signin");
   }
-  return { sessionUser, admin };
+  return {
+    sessionUser,
+    admin: {
+      id: sessionUser.id,
+      role: Role.ADMIN,
+      deletedAt: dbUser.deletedAt,
+      adminDisabledAt: dbUser.adminDisabledAt,
+      name: sessionUser.name,
+    },
+  };
 }
 
 function reconHref(sourceType: string, recordId: string): string {
@@ -1585,7 +1600,7 @@ async function collectRecordAlerts(now: Date): Promise<{
  * Collect all derived ACTIVE alerts. Read-only.
  * One immutable checkedAt is used for every age/threshold rule in a run.
  */
-export async function collectMonitoringAlerts(options?: {
+async function collectMonitoringAlertsImpl(options?: {
   checkedAt?: Date;
 }): Promise<{
   alerts: MonitoringAlert[];
@@ -1602,23 +1617,34 @@ export async function collectMonitoringAlerts(options?: {
   const alerts: MonitoringAlert[] = [];
   let recordsEvaluated = false;
 
+  const [dbSettled, migSettled, controlsSettled] = await Promise.all([
+    probeDatabase()
+      .then((db) => ({ ok: true as const, db }))
+      .catch(() => ({ ok: false as const })),
+    readLatestMigration()
+      .then((mig) => ({ ok: true as const, mig }))
+      .catch(() => ({ ok: false as const })),
+    getOperationalControlsHealthSnapshot()
+      .then((controls) => ({ ok: true as const, controls }))
+      .catch(() => ({ ok: false as const })),
+  ]);
+
   let db = {
     status: "UNKNOWN" as HealthStatus,
     latencyMs: null as number | null,
     ok: false,
   };
-  try {
-    db = await probeDatabase();
-  } catch {
+  if (dbSettled.ok) {
+    db = dbSettled.db;
+  } else {
     sectionErrors.push("DATABASE");
     db = { status: "UNAVAILABLE", latencyMs: null, ok: false };
   }
 
   let migrationUnknown = true;
-  try {
-    const mig = await readLatestMigration();
-    migrationUnknown = mig.unknown;
-  } catch {
+  if (migSettled.ok) {
+    migrationUnknown = migSettled.mig.unknown;
+  } else {
     sectionErrors.push("MIGRATION");
     migrationUnknown = true;
   }
@@ -1662,9 +1688,9 @@ export async function collectMonitoringAlerts(options?: {
   const vesimValid = isVesimEnvironmentConfigured();
 
   let controls: Awaited<ReturnType<typeof getOperationalControlsHealthSnapshot>>;
-  try {
-    controls = await getOperationalControlsHealthSnapshot();
-  } catch {
+  if (controlsSettled.ok) {
+    controls = controlsSettled.controls;
+  } else {
     sectionErrors.push("OPERATIONAL_CONTROL");
     controls = {
       checkedAtLabel: formatUtcTimestamp(now),
@@ -1751,6 +1777,28 @@ export async function collectMonitoringAlerts(options?: {
     checkedAt: now,
     completeness,
   };
+}
+
+/** Default (no checkedAt) path — one aggregation per request when dashboard + summary both run. */
+const collectMonitoringAlertsCached = cache(async () =>
+  collectMonitoringAlertsImpl()
+);
+
+export async function collectMonitoringAlerts(options?: {
+  checkedAt?: Date;
+}): Promise<{
+  alerts: MonitoringAlert[];
+  sectionErrors: string[];
+  checkedAt: Date;
+  completeness: AggregationCompleteness;
+}> {
+  if (
+    options?.checkedAt instanceof Date &&
+    Number.isFinite(options.checkedAt.getTime())
+  ) {
+    return collectMonitoringAlertsImpl(options);
+  }
+  return collectMonitoringAlertsCached();
 }
 
 export async function getMonitoringAlertsDashboard(options?: {

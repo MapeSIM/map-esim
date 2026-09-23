@@ -11,6 +11,7 @@ import {
   VESIM_OFFERS_PAGE_LIMIT,
   buildVesimOffersQuery,
   collectAllOfferPagePayloads,
+  collectOfferPagePayloadsUntilMatch,
   isUsableOffersPage,
   mergeOfferPageItems,
   readOffersTotalPages,
@@ -184,6 +185,80 @@ async function main() {
   assert.equal(multiIds.join(","), "P1,P2,P3,P4");
   console.log("PASS multi_page_combines_totalPages");
 
+  // ── Early-exit verify helper: stop when offer found; full scan when missing ─
+  const earlyCalls: number[] = [];
+  const early = await collectOfferPagePayloadsUntilMatch(
+    async (page) => {
+      earlyCalls.push(page);
+      if (page === 1) {
+        return {
+          httpOk: true,
+          payload: pagePayload({
+            page: 1,
+            totalPages: 3,
+            offers: [{ id: "E1", name: "E1", dataMB: 100, priceUSD: 1 }],
+          }),
+        };
+      }
+      if (page === 2) {
+        return {
+          httpOk: true,
+          payload: pagePayload({
+            page: 2,
+            totalPages: 3,
+            offers: [{ id: "TARGET", name: "T", dataMB: 200, priceUSD: 2 }],
+          }),
+        };
+      }
+      return {
+        httpOk: true,
+        payload: pagePayload({
+          page: 3,
+          totalPages: 3,
+          offers: [{ id: "E3", name: "E3", dataMB: 300, priceUSD: 3 }],
+        }),
+      };
+    },
+    {
+      shouldStop: (payload) =>
+        mergeOfferPageItems([payload]).some((raw) => {
+          const offer = normalizeOffer(raw);
+          return offer?.id === "TARGET";
+        }),
+    }
+  );
+  assert.equal(early.ok, true);
+  if (!early.ok) throw new Error("unreachable");
+  assert.equal(early.matched, true);
+  assert.deepEqual(earlyCalls, [1, 2]);
+  assert.equal(early.payloads.length, 2);
+  console.log("PASS page_until_match_early_exit");
+
+  const missCalls: number[] = [];
+  const miss = await collectOfferPagePayloadsUntilMatch(
+    async (page) => {
+      missCalls.push(page);
+      return {
+        httpOk: true,
+        payload: pagePayload({
+          page,
+          totalPages: 2,
+          offers: [
+            { id: `M${page}`, name: `M${page}`, dataMB: 100, priceUSD: 1 },
+          ],
+        }),
+      };
+    },
+    {
+      shouldStop: () => false,
+    }
+  );
+  assert.equal(miss.ok, true);
+  if (!miss.ok) throw new Error("unreachable");
+  assert.equal(miss.matched, false);
+  assert.deepEqual(missCalls, [1, 2]);
+  console.log("PASS page_until_match_full_scan_on_miss");
+
   // ── 5. No duplicate page fetch / infinite loop; missing totalPages ──────
   const missingTpCalls: number[] = [];
   const missingTp = await collectAllOfferPagePayloads(async (page) => {
@@ -238,6 +313,7 @@ async function main() {
   assert.match(pagination, /VESIM_OFFERS_PAGE_LIMIT\s*=\s*1024/);
   assert.match(pagination, /buildVesimOffersQuery/);
   assert.match(pagination, /collectAllOfferPagePayloads/);
+  assert.match(pagination, /collectOfferPagePayloadsUntilMatch/);
   // Never request the raw provider catalog dump for filtered browsing.
   assert.doesNotMatch(pagination, /params\.set\(\s*["']fullCatalog["']/);
   assert.doesNotMatch(pagination, /[?&]fullCatalog=/);
@@ -245,6 +321,8 @@ async function main() {
   assert.doesNotMatch(server, /[?&]fullCatalog=/);
 
   assert.match(server, /collectAllOfferPagePayloads/);
+  assert.match(server, /collectOfferPagePayloadsUntilMatch/);
+  assert.match(server, /stopWhenOfferId/);
   assert.match(server, /buildVesimOffersQuery/);
   assert.match(server, /mergeOfferPageItems/);
   assert.match(
@@ -262,14 +340,20 @@ async function main() {
   );
   assert.doesNotMatch(server, /loadCachedPublicOffersForCountry/);
   assert.doesNotMatch(server, /PublicOfferKeepStaleError/);
-  assert.match(
-    server,
-    /export async function verifyOfferAuthoritative[\s\S]*fetchOffersForCountry\(/
-  );
-  assert.doesNotMatch(
-    server,
-    /verifyOfferAuthoritative[\s\S]*fetchPublicOffersForCountry/
-  );
+  {
+    const verifyStart = server.indexOf(
+      "export async function verifyOfferAuthoritative"
+    );
+    assert.ok(verifyStart >= 0, "verifyOfferAuthoritative export missing");
+    const nextExport = server.indexOf("\nexport ", verifyStart + 10);
+    const verifyBody = server.slice(
+      verifyStart,
+      nextExport === -1 ? server.length : nextExport
+    );
+    assert.match(verifyBody, /fetchOffersForCountry\(/);
+    assert.match(verifyBody, /stopWhenOfferId/);
+    assert.doesNotMatch(verifyBody, /fetchPublicOffersForCountry/);
+  }
 
   assert.match(countryPage, /fetchPublicOffersForCountry/);
   assert.match(offersApi, /fetchPublicOffersForCountry/);

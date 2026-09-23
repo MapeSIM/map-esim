@@ -192,17 +192,21 @@ export default async function AdminAlertsPage({
     new Map();
   let recentActivity: SanitizedRecentDeliveryView[] = [];
   try {
-    data = await getMonitoringAlertsDashboard({
-      severity: params.severity,
-      category: params.category,
-    });
+    const [dashboard, recent] = await Promise.all([
+      getMonitoringAlertsDashboard({
+        severity: params.severity,
+        category: params.category,
+      }),
+      loadRecentNotificationActivity(20),
+    ]);
+    data = dashboard;
+    recentActivity = recent;
     // Read-only notification status — never triggers sends on page render.
     const checkedAt = new Date();
     notifyViews = await loadNotificationViewsForAlerts({
       alertIds: data.alerts.map((a) => a.id),
       checkedAt,
     });
-    recentActivity = await loadRecentNotificationActivity(20);
   } catch {
     return (
       <div className="min-w-0 space-y-6">

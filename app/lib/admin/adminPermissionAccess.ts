@@ -3,6 +3,7 @@
  */
 import "server-only";
 
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { prisma } from "@/app/lib/db";
 import { requireRole } from "@/app/lib/auth/session";
@@ -21,41 +22,45 @@ export type LoadedAdminAccess = {
   permissions: Set<AdminPermissionName>;
 };
 
-export async function loadAdminAccess(
-  userId: string
-): Promise<LoadedAdminAccess | null> {
-  const id = (userId ?? "").trim();
-  if (!id || id.length > 64) return null;
+/**
+ * Request-scoped admin grants. Layout path ACL + page assertAdminPermission
+ * share one Prisma read per admin id without skipping disabled/deleted checks.
+ */
+export const loadAdminAccess = cache(
+  async (userId: string): Promise<LoadedAdminAccess | null> => {
+    const id = (userId ?? "").trim();
+    if (!id || id.length > 64) return null;
 
-  const admin = await prisma.user.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      role: true,
-      deletedAt: true,
-      adminDisabledAt: true,
-      adminTeamRole: true,
-      adminPermissionGrants: {
-        select: { permission: true, effect: true },
+    const admin = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        role: true,
+        deletedAt: true,
+        adminDisabledAt: true,
+        adminTeamRole: true,
+        adminPermissionGrants: {
+          select: { permission: true, effect: true },
+        },
       },
-    },
-  });
+    });
 
-  if (!admin || isAdminAccessDenied(admin)) {
-    return null;
+    if (!admin || isAdminAccessDenied(admin)) {
+      return null;
+    }
+
+    const permissions = resolveAdminPermissions({
+      teamRole: admin.adminTeamRole,
+      grants: admin.adminPermissionGrants,
+    });
+
+    return {
+      userId: admin.id,
+      teamRole: admin.adminTeamRole,
+      permissions,
+    };
   }
-
-  const permissions = resolveAdminPermissions({
-    teamRole: admin.adminTeamRole,
-    grants: admin.adminPermissionGrants,
-  });
-
-  return {
-    userId: admin.id,
-    teamRole: admin.adminTeamRole,
-    permissions,
-  };
-}
+);
 
 export async function actorHasAdminPermission(
   userId: string,

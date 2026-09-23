@@ -119,14 +119,18 @@ export default async function AdminRevenuePage() {
   let insights: Awaited<ReturnType<typeof getAdminBusinessInsights>> | null =
     null;
   try {
-    revenue = await getAdminRevenueOverview();
+    const now = new Date();
+    const [rev, ins] = await Promise.all([
+      getAdminRevenueOverview(now),
+      getAdminBusinessInsights(now).then(
+        (value) => value,
+        () => null
+      ),
+    ]);
+    revenue = rev;
+    insights = ins;
   } catch {
     return <RevenueUnavailable />;
-  }
-  try {
-    insights = await getAdminBusinessInsights();
-  } catch {
-    insights = null;
   }
 
   return (

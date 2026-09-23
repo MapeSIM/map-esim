@@ -157,3 +157,59 @@ export async function collectAllOfferPagePayloads(
 
   return { ok: true, payloads };
 }
+
+/**
+ * Live verify helper: fetch pages until `shouldStop(payload)` is true, then
+ * return early. Still fail closed on unusable pages / safety-cap overflow.
+ * When no page matches, fetches the full planned set (same completeness as
+ * collectAllOfferPagePayloads) so "not found" is authoritative.
+ */
+export async function collectOfferPagePayloadsUntilMatch(
+  fetchPage: (page: number) => Promise<OfferPageFetchResult>,
+  options: {
+    shouldStop: (payload: unknown) => boolean;
+    isPageUsable?: (httpOk: boolean, payload: unknown) => boolean;
+  }
+): Promise<
+  | { ok: true; payloads: unknown[]; matched: boolean }
+  | { ok: false }
+> {
+  const isPageUsable = options.isPageUsable ?? isUsableOffersPage;
+  const first = await fetchPage(1);
+  if (!isPageUsable(first.httpOk, first.payload)) {
+    return { ok: false };
+  }
+
+  const plan = resolveOffersFetchPlan(first.payload);
+  if (plan.exceedsSafetyCap) {
+    return { ok: false };
+  }
+
+  const payloads: unknown[] = [first.payload];
+  const requestedPages = [1];
+
+  if (options.shouldStop(first.payload)) {
+    return { ok: true, payloads, matched: true };
+  }
+
+  for (let page = 2; page <= plan.pagesToFetch; page++) {
+    const next = await fetchPage(page);
+    if (!isPageUsable(next.httpOk, next.payload)) {
+      return { ok: false };
+    }
+    payloads.push(next.payload);
+    requestedPages.push(page);
+    if (options.shouldStop(next.payload)) {
+      if (new Set(requestedPages).size !== requestedPages.length) {
+        return { ok: false };
+      }
+      return { ok: true, payloads, matched: true };
+    }
+  }
+
+  if (new Set(requestedPages).size !== requestedPages.length) {
+    return { ok: false };
+  }
+
+  return { ok: true, payloads, matched: false };
+}

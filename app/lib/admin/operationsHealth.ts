@@ -932,18 +932,24 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
     latestFailureOrUncertainty: null as Date | null,
   };
   let migration = { name: null as string | null, finishedAt: null as Date | null };
+  let operationalControls: Awaited<
+    ReturnType<typeof getOperationalControlsHealthSnapshot>
+  >;
 
   if (db.status === "HEALTHY") {
-    const [{ cases, truncated }, emailTs, providerTs, mig] = await Promise.all([
-      collectReconciliationCases(checkedAt),
-      collectEmailTimestamps(checkedAt),
-      collectProviderObservationTimestamps(),
-      readLatestMigration(),
-    ]);
+    const [{ cases, truncated }, emailTs, providerTs, mig, controls] =
+      await Promise.all([
+        collectReconciliationCases(checkedAt),
+        collectEmailTimestamps(checkedAt),
+        collectProviderObservationTimestamps(),
+        readLatestMigration(),
+        getOperationalControlsHealthSnapshot(),
+      ]);
     reconciliation = summarizeReconciliation(cases, truncated, checkedAt);
     emailExtra = emailTs;
     providerObs = providerTs;
     migration = mig;
+    operationalControls = controls;
   } else {
     reconciliation = {
       checkedAtLabel: nowLabel(checkedAt),
@@ -965,6 +971,7 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
       refreshOrRecoveryInProgressCount: 0,
       truncated: false,
     };
+    operationalControls = await getOperationalControlsHealthSnapshot();
   }
 
   let smtpReadiness = getEmailChannelsReadiness();
@@ -1047,8 +1054,6 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
     // Guest checkout is not implemented — controls must never enable it.
     guestCheckout: "NOT_IMPLEMENTED / DISABLED",
   };
-
-  const operationalControls = await getOperationalControlsHealthSnapshot();
 
   const authSecretConfigured = Boolean((process.env.AUTH_SECRET ?? "").trim());
   const iccidKeyConfigured = isIccidEncryptionConfigured();
