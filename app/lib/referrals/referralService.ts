@@ -600,7 +600,11 @@ export async function awardReferralRewardInTx(
 
 /**
  * Post-commit referral reward. Never rolls back Order / wallet debit.
+ * Interactive tx needs headroom beyond Prisma's 5s default — remote DB +
+ * program config ensure/read + wallet credit + audit regularly exceed it (P2028).
  */
+const REFERRAL_REWARD_TX = { maxWait: 10_000, timeout: 20_000 } as const;
+
 export async function awardReferralRewardBestEffort(options: {
   customerUserId: string;
   purchaseId: string;
@@ -611,7 +615,7 @@ export async function awardReferralRewardBestEffort(options: {
   try {
     const result = await prisma.$transaction(async (tx) => {
       return awardReferralRewardInTx(tx, options);
-    });
+    }, REFERRAL_REWARD_TX);
     walletTransactionId = result.walletTransactionId;
     if (result.credited && walletTransactionId) {
       scheduleWalletTransactionNotification(walletTransactionId);
