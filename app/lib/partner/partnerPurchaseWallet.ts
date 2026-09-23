@@ -6,6 +6,7 @@
 import "server-only";
 
 import {
+  PartnerEsimPurchaseStatus,
   PartnerWalletTransactionType,
   Prisma,
   Role,
@@ -31,6 +32,59 @@ export function partnerEsimPurchaseRefundIdempotencyKey(
 ): string {
   const id = partnerEsimPurchaseId.trim();
   return `partner_esim_refund_${id}`.slice(0, 128);
+}
+
+/**
+ * Gateway reservation release key — scoped to the active debit so
+ * cancel → READY → reserve → cancel cycles can credit again.
+ */
+export function partnerEsimPurchaseGatewayReleaseIdempotencyKey(
+  partnerEsimPurchaseId: string,
+  debitTransactionId: string
+): string {
+  const purchaseId = partnerEsimPurchaseId.trim();
+  const debitId = debitTransactionId.trim();
+  return `partner_esim_release_gw_${purchaseId}_${debitId}`.slice(0, 128);
+}
+
+/**
+ * Next debit idempotency key for a purchase. Reuses the base key while the
+ * purchase still holds that debit; otherwise allocates `…:N` after a release.
+ */
+export async function allocatePartnerEsimPurchaseDebitIdempotencyKey(
+  tx: Prisma.TransactionClient,
+  partnerEsimPurchaseId: string
+): Promise<string> {
+  const purchaseId = assertPurchaseId(partnerEsimPurchaseId);
+  const base = partnerEsimPurchaseDebitIdempotencyKey(purchaseId);
+  const existing = await tx.partnerWalletTransaction.findUnique({
+    where: { idempotencyKey: base },
+    select: { id: true },
+  });
+  if (!existing) return base;
+
+  const purchase = await tx.partnerEsimPurchase.findUnique({
+    where: { id: purchaseId },
+    select: { debitTransactionId: true, status: true },
+  });
+  if (
+    purchase?.debitTransactionId === existing.id &&
+    (purchase.status === "AWAITING_GATEWAY_PAYMENT" ||
+      purchase.status === "FUNDS_RESERVED" ||
+      purchase.status === "PROVIDER_PENDING" ||
+      purchase.status === "FUNDED")
+  ) {
+    return base;
+  }
+
+  const priorCount = await tx.partnerWalletTransaction.count({
+    where: {
+      referenceType: PARTNER_ESIM_PURCHASE_DEBIT_REF,
+      referenceId: purchaseId,
+      type: PartnerWalletTransactionType.ESIM_PURCHASE_DEBIT,
+    },
+  });
+  return `partner_esim_debit_${purchaseId}:${priorCount + 1}`.slice(0, 128);
 }
 
 export type PartnerPurchaseWalletTxResult = {
@@ -112,6 +166,8 @@ export async function reservePartnerPurchaseFundsInTx(
     partnerEsimPurchaseId: string;
     /** Server-authoritative partnerChargeCents snapshot — never trust client. */
     amountCents: number;
+    /** Optional override; defaults to allocated debit key for this purchase. */
+    idempotencyKey?: string;
   }
 ): Promise<PartnerPurchaseWalletTxResult> {
   const partnerId = options.partnerId.trim();
@@ -126,7 +182,10 @@ export async function reservePartnerPurchaseFundsInTx(
     );
   }
 
-  const idempotencyKey = partnerEsimPurchaseDebitIdempotencyKey(purchaseId);
+  const idempotencyKey = (
+    options.idempotencyKey?.trim() ||
+    (await allocatePartnerEsimPurchaseDebitIdempotencyKey(tx, purchaseId))
+  ).slice(0, 128);
 
   for (let attempt = 0; attempt < PARTNER_PURCHASE_WALLET_CAS_MAX_ATTEMPTS; attempt++) {
     try {
@@ -326,8 +385,11 @@ export async function refundPartnerPurchaseFundsInTx(
   options: {
     partnerId: string;
     partnerEsimPurchaseId: string;
-    /** Exact original partnerChargeCents — never recalculate from discount. */
+    /** Exact original partnerChargeCents / walletAppliedCents — never recalculate. */
     amountCents: number;
+    /** Optional override (gateway release uses debit-scoped keys). */
+    idempotencyKey?: string;
+    reason?: string;
   }
 ): Promise<PartnerPurchaseWalletTxResult> {
   const partnerId = options.partnerId.trim();
@@ -342,7 +404,10 @@ export async function refundPartnerPurchaseFundsInTx(
     );
   }
 
-  const idempotencyKey = partnerEsimPurchaseRefundIdempotencyKey(purchaseId);
+  const idempotencyKey = (
+    options.idempotencyKey?.trim() ||
+    partnerEsimPurchaseRefundIdempotencyKey(purchaseId)
+  ).slice(0, 128);
 
   for (let attempt = 0; attempt < PARTNER_PURCHASE_WALLET_CAS_MAX_ATTEMPTS; attempt++) {
     try {
@@ -351,6 +416,7 @@ export async function refundPartnerPurchaseFundsInTx(
         purchaseId,
         amountCents,
         idempotencyKey,
+        reason: options.reason ?? "Partner eSIM purchase refund",
       });
     } catch (error) {
       if (
@@ -376,6 +442,7 @@ async function refundCreditAttempt(
     purchaseId: string;
     amountCents: number;
     idempotencyKey: string;
+    reason: string;
   }
 ): Promise<PartnerPurchaseWalletTxResult> {
   const existing = await tx.partnerWalletTransaction.findUnique({
@@ -483,7 +550,7 @@ async function refundCreditAttempt(
         amountCents: options.amountCents,
         balanceBeforeCents,
         balanceAfterCents,
-        reason: "Partner eSIM purchase refund",
+        reason: options.reason,
         referenceType: PARTNER_ESIM_PURCHASE_REFUND_REF,
         referenceId: options.purchaseId,
         idempotencyKey: options.idempotencyKey,
@@ -512,4 +579,207 @@ async function refundCreditAttempt(
     }
     throw error;
   }
+}
+
+/**
+ * Release a still-pending Partner split gateway reservation and restore READY.
+ * Debit-scoped release keys allow cancel → READY → reserve → cancel cycles.
+ * Never marks FUNDED / PROVIDER_PENDING / COMPLETED / RECONCILIATION purchases.
+ */
+export async function releasePartnerGatewayReservationInTx(
+  tx: Prisma.TransactionClient,
+  options: {
+    partnerId: string;
+    partnerEsimPurchaseId: string;
+    /** Exact walletAppliedCents reserved before gateway — never recalculate. */
+    amountCents: number;
+  }
+): Promise<{
+  outcome: "created" | "already_released" | "linked_existing";
+  refundTransactionId: string | null;
+}> {
+  const partnerId = options.partnerId.trim();
+  const purchaseId = assertPurchaseId(options.partnerEsimPurchaseId);
+  const amountCents = options.amountCents;
+
+  if (!partnerId || partnerId.length > 64) {
+    throw new PartnerPurchaseWalletError(
+      "PARTNER_UNAVAILABLE",
+      "Partner is unavailable."
+    );
+  }
+  if (
+    !Number.isInteger(amountCents) ||
+    !Number.isSafeInteger(amountCents) ||
+    amountCents < 0
+  ) {
+    throw new PartnerPurchaseWalletError(
+      "INVALID_AMOUNT",
+      "Purchase wallet amount is invalid."
+    );
+  }
+
+  const purchase = await tx.partnerEsimPurchase.findUnique({
+    where: { id: purchaseId },
+    select: {
+      id: true,
+      partnerId: true,
+      status: true,
+      walletAppliedCents: true,
+      debitTransactionId: true,
+      refundTransactionId: true,
+    },
+  });
+
+  if (!purchase || purchase.partnerId !== partnerId) {
+    throw new PartnerPurchaseWalletError(
+      "INVALID_PURCHASE",
+      "Purchase reference is invalid."
+    );
+  }
+
+  if (
+    purchase.status === PartnerEsimPurchaseStatus.READY &&
+    !purchase.debitTransactionId
+  ) {
+    return { outcome: "already_released", refundTransactionId: null };
+  }
+
+  const releasable =
+    purchase.status === PartnerEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT ||
+    purchase.status === PartnerEsimPurchaseStatus.FUNDS_RESERVED;
+  if (!releasable) {
+    return { outcome: "already_released", refundTransactionId: null };
+  }
+
+  if (purchase.walletAppliedCents !== amountCents) {
+    throw new PartnerPurchaseWalletError(
+      "INVALID_AMOUNT",
+      "Purchase wallet amount is invalid."
+    );
+  }
+
+  // Gateway-only: no wallet debit — just restore READY.
+  if (amountCents <= 0) {
+    const cleared = await tx.partnerEsimPurchase.updateMany({
+      where: {
+        id: purchaseId,
+        partnerId,
+        status: {
+          in: [
+            PartnerEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+            PartnerEsimPurchaseStatus.FUNDS_RESERVED,
+          ],
+        },
+      },
+      data: {
+        status: PartnerEsimPurchaseStatus.READY,
+        debitTransactionId: null,
+        refundTransactionId: null,
+        failureCategory: null,
+        failureCode: null,
+      },
+    });
+    if (cleared.count !== 1) {
+      return { outcome: "already_released", refundTransactionId: null };
+    }
+    return { outcome: "created", refundTransactionId: null };
+  }
+
+  if (!purchase.debitTransactionId) {
+    throw new PartnerPurchaseWalletError(
+      "INVALID_PURCHASE",
+      "Purchase reference is invalid."
+    );
+  }
+
+  const releaseKey = partnerEsimPurchaseGatewayReleaseIdempotencyKey(
+    purchaseId,
+    purchase.debitTransactionId
+  );
+
+  const existingRelease = await tx.partnerWalletTransaction.findUnique({
+    where: { idempotencyKey: releaseKey },
+    select: { id: true, amountCents: true, type: true },
+  });
+
+  if (existingRelease) {
+    if (
+      existingRelease.amountCents !== amountCents ||
+      existingRelease.type !== PartnerWalletTransactionType.ESIM_PURCHASE_REFUND
+    ) {
+      throw new PartnerPurchaseWalletError(
+        "IDEMPOTENCY_CONFLICT",
+        "This purchase wallet request conflicts with an existing ledger entry."
+      );
+    }
+    const relinked = await tx.partnerEsimPurchase.updateMany({
+      where: {
+        id: purchaseId,
+        partnerId,
+        status: {
+          in: [
+            PartnerEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+            PartnerEsimPurchaseStatus.FUNDS_RESERVED,
+          ],
+        },
+      },
+      data: {
+        status: PartnerEsimPurchaseStatus.READY,
+        debitTransactionId: null,
+        refundTransactionId: null,
+        failureCategory: null,
+        failureCode: null,
+      },
+    });
+    if (relinked.count !== 1) {
+      return {
+        outcome: "already_released",
+        refundTransactionId: existingRelease.id,
+      };
+    }
+    return {
+      outcome: "linked_existing",
+      refundTransactionId: existingRelease.id,
+    };
+  }
+
+  // CAS claim before credit so a concurrent FUND cannot lose to a late release.
+  const claimed = await tx.partnerEsimPurchase.updateMany({
+    where: {
+      id: purchaseId,
+      partnerId,
+      status: {
+        in: [
+          PartnerEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+          PartnerEsimPurchaseStatus.FUNDS_RESERVED,
+        ],
+      },
+      debitTransactionId: purchase.debitTransactionId,
+    },
+    data: {
+      status: PartnerEsimPurchaseStatus.READY,
+      debitTransactionId: null,
+      refundTransactionId: null,
+      failureCategory: null,
+      failureCode: null,
+    },
+  });
+  if (claimed.count !== 1) {
+    return { outcome: "already_released", refundTransactionId: null };
+  }
+
+  const credited = await refundPartnerPurchaseFundsInTx(tx, {
+    partnerId,
+    partnerEsimPurchaseId: purchaseId,
+    amountCents,
+    idempotencyKey: releaseKey,
+    reason: "Partner eSIM gateway reservation release",
+  });
+
+  return {
+    outcome:
+      credited.outcome === "created" ? "created" : "linked_existing",
+    refundTransactionId: credited.transactionId,
+  };
 }

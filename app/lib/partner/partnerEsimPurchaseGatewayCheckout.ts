@@ -30,7 +30,7 @@ import {
 } from "@/app/lib/partner/partnerPurchaseFunding";
 import {
   PartnerPurchaseWalletError,
-  refundPartnerPurchaseFundsInTx,
+  releasePartnerGatewayReservationInTx,
   reservePartnerPurchaseFundsInTx,
 } from "@/app/lib/partner/partnerPurchaseWallet";
 import {
@@ -415,24 +415,12 @@ async function restoreSplitWalletBestEffort(options: {
   purchaseId: string;
   walletAppliedCents: number;
 }): Promise<void> {
-  if (options.walletAppliedCents <= 0) return;
   try {
     await prisma.$transaction(async (tx) => {
-      const refunded = await refundPartnerPurchaseFundsInTx(tx, {
+      await releasePartnerGatewayReservationInTx(tx, {
         partnerId: options.partnerId,
         partnerEsimPurchaseId: options.purchaseId,
-        amountCents: options.walletAppliedCents,
-      });
-      await tx.partnerEsimPurchase.updateMany({
-        where: {
-          id: options.purchaseId,
-          partnerId: options.partnerId,
-          status: PartnerEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
-        },
-        data: {
-          status: PartnerEsimPurchaseStatus.FAILED_REFUNDED,
-          refundTransactionId: refunded.transactionId,
-        },
+        amountCents: Math.max(0, options.walletAppliedCents),
       });
     });
   } catch {

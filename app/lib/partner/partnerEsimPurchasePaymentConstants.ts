@@ -13,6 +13,10 @@ export const PARTNER_ESIM_PAYMENT_FAILED =
   "partner.esim_purchase_payment_failed";
 export const PARTNER_ESIM_PAYMENT_RECONCILIATION =
   "partner.esim_purchase_payment_reconciliation";
+export const PARTNER_ESIM_PAYMENT_RESERVATION_RELEASED =
+  "partner.esim_purchase_payment_reservation_released";
+export const PARTNER_ESIM_PAYMENT_EXPIRED =
+  "partner.esim_purchase_payment_expired";
 
 export function partnerEsimPurchaseMerchantUserKey(attemptId: string): string {
   return `${PARTNER_ESIM_PURCHASE_USER_KEY_PREFIX}${attemptId.trim()}`;

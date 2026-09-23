@@ -15,8 +15,10 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
 import {
+  PARTNER_ESIM_PAYMENT_EXPIRED,
   PARTNER_ESIM_PAYMENT_FAILED,
   PARTNER_ESIM_PAYMENT_RECONCILIATION,
+  PARTNER_ESIM_PAYMENT_RESERVATION_RELEASED,
   PARTNER_ESIM_PAYMENT_WEBHOOK_DUPLICATE,
   PARTNER_ESIM_PURCHASE_FUNDED,
   parsePartnerEsimPurchaseAttemptIdFromMerchantUserKey,
@@ -25,7 +27,7 @@ import {
   executePartnerEsimProviderPurchase,
 } from "@/app/lib/partner/partnerEsimPurchaseProvider";
 import {
-  refundPartnerPurchaseFundsInTx,
+  releasePartnerGatewayReservationInTx,
 } from "@/app/lib/partner/partnerPurchaseWallet";
 import type { NormalizedPaymentEvent } from "@/app/lib/payments/types";
 
@@ -178,6 +180,10 @@ async function releaseOnGatewayFailure(options: {
   eventId: string;
   failureCategory: string;
 }): Promise<ApplyVerifiedPartnerEsimPaymentResult> {
+  let claimed = false;
+  let finalPurchaseStatus: PartnerEsimPurchaseStatus | null = null;
+  let finalAttemptStatus: EsimPurchasePaymentAttemptStatus | null = null;
+
   try {
     await prisma.$transaction(async (tx) => {
       const attemptClaim = await tx.partnerEsimPurchasePaymentAttempt.updateMany({
@@ -195,34 +201,26 @@ async function releaseOnGatewayFailure(options: {
         },
       });
       if (attemptClaim.count !== 1) {
-        throw new Error("ATTEMPT_FAIL_CLAIM_FAILED");
-      }
-
-      let refundTransactionId: string | null = null;
-      if (options.walletAppliedCents > 0) {
-        const refunded = await refundPartnerPurchaseFundsInTx(tx, {
-          partnerId: options.partnerId,
-          partnerEsimPurchaseId: options.purchaseId,
-          amountCents: options.walletAppliedCents,
+        const current = await tx.partnerEsimPurchasePaymentAttempt.findUnique({
+          where: { id: options.attemptId },
+          select: {
+            status: true,
+            purchase: { select: { status: true } },
+          },
         });
-        refundTransactionId = refunded.transactionId;
+        finalAttemptStatus = current?.status ?? null;
+        finalPurchaseStatus = current?.purchase.status ?? null;
+        return;
       }
+      claimed = true;
 
-      const purchaseClaim = await tx.partnerEsimPurchase.updateMany({
-        where: {
-          id: options.purchaseId,
-          status: PartnerEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
-        },
-        data: {
-          status: PartnerEsimPurchaseStatus.FAILED_REFUNDED,
-          refundTransactionId,
-          failureCategory: options.failureCategory,
-          failureCode: "payment_failed",
-        },
+      // Restore READY (customer parity) so Partner can retry checkout.
+      // Debit-scoped release keys allow a later reserve→release cycle.
+      await releasePartnerGatewayReservationInTx(tx, {
+        partnerId: options.partnerId,
+        partnerEsimPurchaseId: options.purchaseId,
+        amountCents: Math.max(0, options.walletAppliedCents),
       });
-      if (purchaseClaim.count !== 1) {
-        throw new Error("PURCHASE_FAIL_CLAIM_FAILED");
-      }
 
       await tx.auditLog.create({
         data: {
@@ -235,9 +233,22 @@ async function releaseOnGatewayFailure(options: {
             purchaseId: options.purchaseId,
             walletAppliedCents: options.walletAppliedCents,
             failureCategory: options.failureCategory,
+            restoreReady: true,
           } satisfies Prisma.InputJsonValue,
         },
       });
+
+      const after = await tx.partnerEsimPurchasePaymentAttempt.findUnique({
+        where: { id: options.attemptId },
+        select: {
+          status: true,
+          purchase: { select: { status: true } },
+        },
+      });
+      finalAttemptStatus =
+        after?.status ?? EsimPurchasePaymentAttemptStatus.FAILED;
+      finalPurchaseStatus =
+        after?.purchase.status ?? PartnerEsimPurchaseStatus.READY;
     });
   } catch {
     return {
@@ -250,23 +261,244 @@ async function releaseOnGatewayFailure(options: {
     };
   }
 
-  const fresh = await prisma.partnerEsimPurchase.findUnique({
-    where: { id: options.purchaseId },
-    select: { status: true },
-  });
-  const freshAttempt = await prisma.partnerEsimPurchasePaymentAttempt.findUnique({
-    where: { id: options.attemptId },
-    select: { status: true },
-  });
+  if (!claimed) {
+    return {
+      duplicate:
+        finalAttemptStatus === EsimPurchasePaymentAttemptStatus.FAILED ||
+        finalAttemptStatus ===
+          EsimPurchasePaymentAttemptStatus.PAYMENT_CONFIRMED,
+      purchaseId: options.purchaseId,
+      paymentAttemptId: options.attemptId,
+      purchaseStatus: finalPurchaseStatus,
+      attemptStatus: finalAttemptStatus,
+      outcome:
+        finalAttemptStatus ===
+          EsimPurchasePaymentAttemptStatus.PAYMENT_CONFIRMED ||
+        finalPurchaseStatus === PartnerEsimPurchaseStatus.FUNDED ||
+        finalPurchaseStatus === PartnerEsimPurchaseStatus.PROVIDER_PENDING ||
+        finalPurchaseStatus === PartnerEsimPurchaseStatus.COMPLETED
+          ? "ignored"
+          : "duplicate",
+    };
+  }
 
   return {
     duplicate: false,
     purchaseId: options.purchaseId,
     paymentAttemptId: options.attemptId,
-    purchaseStatus: fresh?.status ?? null,
-    attemptStatus: freshAttempt?.status ?? null,
+    purchaseStatus: finalPurchaseStatus,
+    attemptStatus: finalAttemptStatus,
     outcome: "failed_refunded",
   };
+}
+
+/**
+ * Idempotent release of a still-pending Partner split reservation (cancel/abandon).
+ * Never marks gateway payment confirmed and never funds from browser return.
+ */
+export async function maybeReleasePendingPartnerGatewayReservation(options: {
+  partnerUserId: string;
+  purchaseId: string;
+  attemptId: string;
+  /** When set, marks the open attempt CANCELLED / EXPIRED after release. */
+  attemptTerminalStatus?:
+    | "CANCELLED"
+    | "EXPIRED";
+}): Promise<{ released: boolean }> {
+  const partnerUserId = options.partnerUserId.trim();
+  const purchaseId = options.purchaseId.trim();
+  const attemptId = options.attemptId.trim();
+  if (!partnerUserId || !purchaseId || !attemptId) {
+    return { released: false };
+  }
+
+  let released = false;
+
+  await prisma.$transaction(async (tx) => {
+    const attempt = await tx.partnerEsimPurchasePaymentAttempt.findUnique({
+      where: { id: attemptId },
+      select: {
+        id: true,
+        status: true,
+        purchaseId: true,
+        purchase: {
+          select: {
+            id: true,
+            partnerId: true,
+            status: true,
+            walletAppliedCents: true,
+            debitTransactionId: true,
+            partner: {
+              select: {
+                userId: true,
+                disabledAt: true,
+                user: { select: { role: true, deletedAt: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (
+      !attempt ||
+      attempt.purchaseId !== purchaseId ||
+      attempt.purchase.partner.userId !== partnerUserId ||
+      attempt.purchase.partner.user.deletedAt ||
+      attempt.purchase.partner.user.role !== Role.PARTNER
+    ) {
+      return;
+    }
+
+    if (
+      attempt.status === EsimPurchasePaymentAttemptStatus.PAYMENT_CONFIRMED ||
+      attempt.purchase.status === PartnerEsimPurchaseStatus.FUNDED ||
+      attempt.purchase.status === PartnerEsimPurchaseStatus.COMPLETED ||
+      attempt.purchase.status === PartnerEsimPurchaseStatus.PROVIDER_PENDING ||
+      attempt.purchase.status ===
+        PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED
+    ) {
+      return;
+    }
+
+    const canRelease =
+      attempt.purchase.status ===
+        PartnerEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT ||
+      attempt.purchase.status === PartnerEsimPurchaseStatus.FUNDS_RESERVED;
+
+    if (canRelease) {
+      const release = await releasePartnerGatewayReservationInTx(tx, {
+        partnerId: attempt.purchase.partnerId,
+        partnerEsimPurchaseId: purchaseId,
+        amountCents: Math.max(0, attempt.purchase.walletAppliedCents),
+      });
+
+      if (
+        release.outcome === "created" ||
+        release.outcome === "linked_existing"
+      ) {
+        released = true;
+      }
+    }
+
+    const purchaseAfter = await tx.partnerEsimPurchase.findUnique({
+      where: { id: purchaseId },
+      select: { status: true, debitTransactionId: true },
+    });
+    const purchaseReadyClean =
+      purchaseAfter?.status === PartnerEsimPurchaseStatus.READY &&
+      !purchaseAfter.debitTransactionId;
+
+    // Never CANCELLED/EXPIRED an attempt if funding won the race.
+    const terminal = options.attemptTerminalStatus;
+    if (
+      purchaseReadyClean &&
+      (terminal === "CANCELLED" || terminal === "EXPIRED")
+    ) {
+      const attemptData =
+        terminal === "CANCELLED"
+          ? {
+              status: EsimPurchasePaymentAttemptStatus.CANCELLED,
+              cancelledAt: new Date(),
+              failureCategory: "checkout_cancelled",
+              failureCode: "cancelled",
+            }
+          : {
+              status: EsimPurchasePaymentAttemptStatus.EXPIRED,
+              failureCategory: "checkout_expired",
+              failureCode: "expired",
+            };
+      const marked = await tx.partnerEsimPurchasePaymentAttempt.updateMany({
+        where: {
+          id: attemptId,
+          webhookEventId: null,
+          status: { in: ATTEMPT_OPEN },
+        },
+        data: attemptData,
+      });
+      if (marked.count === 1) {
+        released = true;
+      }
+    }
+
+    if (released) {
+      await tx.auditLog.create({
+        data: {
+          actorUserId: partnerUserId,
+          action: PARTNER_ESIM_PAYMENT_RESERVATION_RELEASED,
+          targetType: "PartnerEsimPurchasePaymentAttempt",
+          targetId: attemptId,
+          metadata: {
+            purchaseId,
+            walletAppliedCents: attempt.purchase.walletAppliedCents,
+            attemptTerminalStatus: options.attemptTerminalStatus ?? null,
+          } satisfies Prisma.InputJsonValue,
+        },
+      });
+    }
+  });
+
+  return { released };
+}
+
+/**
+ * Expire/stale recovery for one Partner payment attempt.
+ * Releases reserved wallet and restores purchase READY. Never funds.
+ */
+export async function expireStalePartnerGatewayPaymentAttempt(options: {
+  attemptId: string;
+}): Promise<{ released: boolean; purchaseId: string | null }> {
+  const attemptId = options.attemptId.trim();
+  if (!attemptId || attemptId.length > 64) {
+    return { released: false, purchaseId: null };
+  }
+
+  const row = await prisma.partnerEsimPurchasePaymentAttempt.findUnique({
+    where: { id: attemptId },
+    select: {
+      id: true,
+      status: true,
+      expiresAt: true,
+      updatedAt: true,
+      purchase: {
+        select: {
+          id: true,
+          status: true,
+          partner: { select: { userId: true } },
+        },
+      },
+    },
+  });
+
+  if (!row) {
+    return { released: false, purchaseId: null };
+  }
+
+  const result = await maybeReleasePendingPartnerGatewayReservation({
+    partnerUserId: row.purchase.partner.userId,
+    purchaseId: row.purchase.id,
+    attemptId: row.id,
+    attemptTerminalStatus: "EXPIRED",
+  });
+
+  if (result.released) {
+    await prisma.auditLog
+      .create({
+        data: {
+          actorUserId: null,
+          action: PARTNER_ESIM_PAYMENT_EXPIRED,
+          targetType: "PartnerEsimPurchasePaymentAttempt",
+          targetId: row.id,
+          metadata: {
+            purchaseId: row.purchase.id,
+            method: "stale_recovery",
+          },
+        },
+      })
+      .catch(() => undefined);
+  }
+
+  return { released: result.released, purchaseId: row.purchase.id };
 }
 
 export async function applyVerifiedPartnerEsimPurchasePaymentEvent(
