@@ -116,6 +116,10 @@ enum OrderFundingSource {
   DIRECT_PAYMENT
   /// Partner prepaid wallet (PartnerWalletAccount) — never Customer WalletAccount.
   PARTNER_BALANCE
+  /// Partner package: wallet contribution + gateway remainder.
+  PARTNER_SPLIT
+  /// Partner package: full partnerChargeCents via gateway (walletAppliedCents = 0).
+  PARTNER_GATEWAY
 }
 
 enum AdminPackageAssignmentStatus {
@@ -141,12 +145,17 @@ enum WalletEsimPurchaseStatus {
   RECONCILIATION_REQUIRED
 }
 
-/// Durable Partner wallet-funded eSIM purchase attempt (provider write outside Prisma tx).
-/// Mirrors WalletEsimPurchase terminology for equivalent states; no gateway split path.
+/// Durable Partner eSIM purchase attempt (provider write outside Prisma tx).
+/// Mirrors WalletEsimPurchase terminology. Wallet-only uses READY→FUNDS_RESERVED→PROVIDER_PENDING;
+/// split/gateway remainder uses AWAITING_GATEWAY_PAYMENT→FUNDED before provider (app Phase 2+).
 enum PartnerEsimPurchaseStatus {
   DRAFT
   READY
+  /// Waiting for verified gateway payment of gatewayAmountCents (split / gateway-only).
+  AWAITING_GATEWAY_PAYMENT
   FUNDS_RESERVED
+  /// Funding fully secured (wallet reserved + gateway confirmed when required).
+  FUNDED
   PROVIDER_PENDING
   COMPLETED
   FAILED_REFUNDED
@@ -935,8 +944,9 @@ model WalletEsimPurchase {
   @@index([abandonedCheckoutEmailNotificationStatus])
 }
 
-/// Durable PARTNER wallet-funded eSIM purchase attempt (provider write outside Prisma tx).
+/// Durable PARTNER eSIM purchase attempt (provider write outside Prisma tx).
 /// Completely separate from WalletEsimPurchase / Customer WalletAccount.
+/// Phase 1 schema: funding breakdown columns + paymentAttempts relation; wallet-only app path unchanged.
 model PartnerEsimPurchase {
   id                               String                    @id @default(cuid())
   partnerId                        String
@@ -952,8 +962,14 @@ model PartnerEsimPurchase {
   discountBps                      Int
   /// PartnerProfile.discountVersion snapshot at reserve/confirm time.
   discountVersion                  Int
-  /// Actual Partner wallet debit snapshot (integer USD cents). Refunds must reuse this.
+  /// Total Partner charge snapshot (integer USD cents). Wallet debit uses walletAppliedCents.
   partnerChargeCents               Int
+  /// Partner chose to apply wallet funds (server-persisted; never trust browser money).
+  useWallet                        Boolean                   @default(true)
+  /// Server-calculated wallet contribution in USD cents (wallet-only: equals partnerChargeCents).
+  walletAppliedCents               Int
+  /// Server-calculated gateway remainder in USD cents (wallet-only: 0).
+  gatewayAmountCents               Int                       @default(0)
   /// Provider cost snapshot (integer USD cents) for floor checks / admin visibility.
   providerCostCents                Int
   currency                         String                    @default("USD")
@@ -1009,6 +1025,7 @@ model PartnerEsimPurchase {
   debitTransaction                 PartnerWalletTransaction? @relation("PartnerPurchaseDebitTx", fields: [debitTransactionId], references: [id], onDelete: SetNull)
   refundTransaction                PartnerWalletTransaction? @relation("PartnerPurchaseRefundTx", fields: [refundTransactionId], references: [id], onDelete: SetNull)
   refundRequests                   PartnerRefundRequest[]
+  paymentAttempts                  PartnerEsimPurchasePaymentAttempt[]
 
   @@index([partnerId])
   @@index([status])
@@ -1023,6 +1040,51 @@ model PartnerEsimPurchase {
   @@index([providerRefreshClaimedAt])
   @@index([providerRefreshResult])
   @@index([reconRequiredEmailNotificationStatus])
+}
+
+/// Gateway payment attempt for a Partner eSIM purchase remainder (not Partner wallet top-up).
+/// Separate from EsimPurchasePaymentAttempt (customer WalletEsimPurchase only).
+model PartnerEsimPurchasePaymentAttempt {
+  id                     String                           @id @default(cuid())
+  purchaseId             String
+  /// Authoritative gateway charge in USD cents (matches purchase.gatewayAmountCents at create time).
+  gatewayAmountCents     Int
+  currency               String                           @default("USD")
+  /// Charge currency (e.g. PKR) only when a verified gateway quote exists.
+  chargeCurrency         String?
+  /// Charge amount in minor units only when a verified gateway quote exists.
+  chargeAmountMinor      Int?
+  fxRateSnapshot         String?
+  gatewayProvider        PaymentGatewayProvider?
+  /// Stored only when required for reconciliation; masked in Partner UI.
+  gatewayPaymentRef      String?
+  status                 EsimPurchasePaymentAttemptStatus @default(DRAFT)
+  checkoutIdempotencyKey String                           @unique
+  /// Unique verified webhook/event id when available.
+  webhookEventId         String?                          @unique
+  failureCategory        String?
+  failureCode            String?
+  reconciliationState    String?
+  expiresAt              DateTime?
+  paymentConfirmedAt     DateTime?
+  cancelledAt            DateTime?
+  failedAt               DateTime?
+  refundedAt             DateTime?
+  /// Partner payment-failure email: null | sending | sent | failed | not_configured | skipped
+  failureEmailNotificationStatus String?
+  failureEmailNotifiedAt         DateTime?
+  /// Snapshot at claim time: whether the email should mention wallet funds returned.
+  failureEmailWalletReturned     Boolean?
+  createdAt              DateTime                         @default(now())
+  updatedAt              DateTime                         @updatedAt
+  purchase               PartnerEsimPurchase              @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([purchaseId, createdAt])
+  @@index([gatewayProvider])
+  @@index([failureEmailNotificationStatus])
 }
 
 /// Opaque Partner eSIM share token. Store SHA-256 hash only; never persist or log the raw token.

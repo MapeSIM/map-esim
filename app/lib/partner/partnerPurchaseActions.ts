@@ -1,15 +1,18 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   normalizeAddDataFromOrderId,
   resolvePartnerAddDataIdempotencyKey,
 } from "@/app/lib/esim/addDataCheckout";
 import { parseWalletPurchaseIdempotencyKey } from "@/app/lib/esim/walletPurchaseValidation";
+import { prisma } from "@/app/lib/db";
 import {
   listPartnerCatalogOffers,
   type PartnerCatalogOffer,
 } from "@/app/lib/partner/partnerCatalogRead";
+import { isPartnerEsimSplitPaymentEnabled } from "@/app/lib/partner/partnerEsimSplitPaymentPolicy";
 import { resolvePartnerOwnedRechargeOrderId } from "@/app/lib/partner/partnerAddDataCheckout";
 import { getPartnerOwnedOrderDetail } from "@/app/lib/partner/partnerOrders";
 import { buyPartnerEsimPurchase } from "@/app/lib/partner/partnerPurchaseBuy";
@@ -25,7 +28,8 @@ import {
 } from "@/app/lib/vesim/server";
 
 /**
- * Load MAP retail offers for Partner catalog (no provider cost / discount).
+ * Load Partner-priced catalog offers (final Partner price labels only).
+ * Never trusts browser money / discount fields.
  */
 export async function loadPartnerCatalogOffersAction(
   destinationCode: string
@@ -33,7 +37,23 @@ export async function loadPartnerCatalogOffersAction(
   const user = await requireRole("PARTNER");
   const actor = await requireActivePartnerActor(user.id);
   if (!actor) return [];
-  return listPartnerCatalogOffers(destinationCode);
+
+  const [profile, wallet] = await Promise.all([
+    prisma.partnerProfile.findUnique({
+      where: { id: actor.partnerId },
+      select: { discountBps: true },
+    }),
+    prisma.partnerWalletAccount.findUnique({
+      where: { partnerId: actor.partnerId },
+      select: { balanceCents: true },
+    }),
+  ]);
+
+  return listPartnerCatalogOffers(destinationCode, {
+    discountBps: profile?.discountBps ?? 0,
+    walletBalanceCents: wallet?.balanceCents ?? 0,
+    splitPaymentEnabled: isPartnerEsimSplitPaymentEnabled(),
+  });
 }
 
 /**
@@ -69,6 +89,11 @@ export async function buyPartnerEsimAction(
   void formData.get("promoCode");
   void formData.get("discountCents");
   void formData.get("finalPriceCents");
+  void formData.get("walletAppliedCents");
+  void formData.get("gatewayAmountCents");
+
+  const walletOperatorId = String(formData.get("walletOperatorId") ?? "").trim();
+  const customerMsisdn = String(formData.get("customerMsisdn") ?? "").trim();
 
   if (!offerId) {
     return {
@@ -100,6 +125,14 @@ export async function buyPartnerEsimAction(
     offerId,
     countryHint,
     idempotencyKey: idempotencyParsed.value,
+    walletOperatorId: walletOperatorId || undefined,
+    customerMsisdn: customerMsisdn || undefined,
+  }).then((result) => {
+    if (result.ok && result.kind === "checkout_redirect") {
+      // Must stay outside try/catch — redirect() throws NEXT_REDIRECT.
+      redirect(result.checkoutUrl);
+    }
+    return result;
   });
 }
 

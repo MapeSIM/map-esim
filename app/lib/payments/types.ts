@@ -16,7 +16,8 @@ export type PaymentGatewayProviderName =
 export type PaymentCheckoutPurpose =
   | "WALLET_TOPUP"
   | "PARTNER_WALLET_TOPUP"
-  | "ESIM_PURCHASE";
+  | "ESIM_PURCHASE"
+  | "PARTNER_ESIM_PURCHASE";
 
 export type NormalizedPaymentStatus =
   | "confirmed"
@@ -59,10 +60,17 @@ export type CreateEsimPurchaseCheckoutInput = CreateCheckoutSessionBase & {
   metadata?: Readonly<Record<string, string>>;
 };
 
+export type CreatePartnerEsimPurchaseCheckoutInput = CreateCheckoutSessionBase & {
+  purpose: "PARTNER_ESIM_PURCHASE";
+  paymentAttemptId: string;
+  purchaseId: string;
+};
+
 export type CreateCheckoutSessionInput =
   | CreateWalletTopupCheckoutInput
   | CreatePartnerWalletTopupCheckoutInput
-  | CreateEsimPurchaseCheckoutInput;
+  | CreateEsimPurchaseCheckoutInput
+  | CreatePartnerEsimPurchaseCheckoutInput;
 
 export type CreateCheckoutSessionResult =
   | {

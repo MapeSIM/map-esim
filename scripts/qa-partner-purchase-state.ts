@@ -454,6 +454,9 @@ async function main() {
           await prisma.partnerProfile.findUniqueOrThrow({ where: { id: partnerId } })
         ).discountVersion,
         partnerChargeCents: 950,
+        useWallet: true,
+        walletAppliedCents: 950,
+        gatewayAmountCents: 0,
         providerCostCents: 800,
         status: PartnerEsimPurchaseStatus.READY,
         idempotencyKey: idem("lready"),

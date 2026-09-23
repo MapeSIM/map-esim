@@ -20,6 +20,7 @@ import type {
   PartnerCatalogOffer,
 } from "@/app/lib/partner/partnerCatalogRead";
 import { initialPartnerPurchaseActionState } from "@/app/lib/partner/partnerPurchaseFormState";
+import SimpaisaWalletFields from "@/app/components/account/SimpaisaWalletFields";
 import { filterPlansDiscoveryDestinations } from "@/app/lib/plans/plansDiscovery";
 import {
   resolveDestinationFlagVisual,
@@ -30,6 +31,8 @@ import type { VesimDestination } from "@/app/lib/vesim/destinations";
 type Props = {
   destinations: PartnerCatalogDestination[];
   balanceLabel: string;
+  /** When true, show Simpaisa fields for gateway remainder (feature-flagged). */
+  splitPaymentEnabled?: boolean;
 };
 
 function newIdempotencyKey(): string {
@@ -114,6 +117,7 @@ function DestinationFlagMark({
 export default function PartnerCatalogBuy({
   destinations,
   balanceLabel,
+  splitPaymentEnabled = false,
 }: Props) {
   const searchFieldId = useId();
   const offersHeadingId = useId();
@@ -201,9 +205,15 @@ export default function PartnerCatalogBuy({
           ).
         </p>
         <p className="mt-1 text-[var(--text-muted)]">
-          Catalog prices match MAP eSIM retail. Your Partner rate is applied
-          automatically at purchase.
+          Prices shown are your Partner price for each plan.
         </p>
+        {splitPaymentEnabled ? (
+          <p className="mt-2 text-xs text-[var(--text-muted)]">
+            If your Partner balance is short, the remainder can be paid with
+            JazzCash or Easypaisa. Full-balance purchases still use Partner
+            wallet only.
+          </p>
+        ) : null}
       </div>
 
       {showResult ? (
@@ -343,7 +353,7 @@ export default function PartnerCatalogBuy({
         </h2>
         {!selectedCode ? (
           <p className="mt-3 text-sm text-[var(--text-muted)]">
-            Select a destination to view MAP retail plans.
+            Select a destination to view Partner plans.
           </p>
         ) : offersLoading ? (
           <p className="mt-3 text-sm text-[var(--text-muted)]" role="status">
@@ -375,10 +385,32 @@ export default function PartnerCatalogBuy({
                       {offer.validityLabel}
                     </p>
                     <p className="text-lg font-bold tabular-nums text-[var(--heading)]">
-                      {offer.retailPriceLabel}
+                      {offer.partnerPriceLabel}
                     </p>
+                    {offer.fundingDisplay?.requiresGateway ? (
+                      <dl className="mt-2 space-y-1 text-sm text-[var(--text-muted)]">
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                          <dt>Total amount</dt>
+                          <dd className="font-semibold tabular-nums text-[var(--heading)]">
+                            {offer.fundingDisplay.totalLabel}
+                          </dd>
+                        </div>
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                          <dt>Wallet applied</dt>
+                          <dd className="font-semibold tabular-nums text-[var(--heading)]">
+                            {offer.fundingDisplay.walletAppliedLabel}
+                          </dd>
+                        </div>
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                          <dt>Remaining to pay</dt>
+                          <dd className="font-semibold tabular-nums text-[var(--heading)]">
+                            {offer.fundingDisplay.gatewayRemainingLabel}
+                          </dd>
+                        </div>
+                      </dl>
+                    ) : null}
                   </div>
-                  <form action={buyAction} className="shrink-0">
+                  <form action={buyAction} className="shrink-0 space-y-3 sm:min-w-[220px]">
                     <input type="hidden" name="offerId" value={offer.offerId} />
                     <input
                       type="hidden"
@@ -392,6 +424,22 @@ export default function PartnerCatalogBuy({
                         idempotencyByOffer[offer.offerId] || newIdempotencyKey()
                       }
                     />
+                    {splitPaymentEnabled ? (
+                      <SimpaisaWalletFields
+                        usdCents={0}
+                        disabled={buyPending}
+                        operatorError={
+                          !buyState.ok && buyState.fieldErrors?.walletOperatorId
+                            ? buyState.fieldErrors.walletOperatorId
+                            : undefined
+                        }
+                        msisdnError={
+                          !buyState.ok && buyState.fieldErrors?.customerMsisdn
+                            ? buyState.fieldErrors.customerMsisdn
+                            : undefined
+                        }
+                      />
+                    ) : null}
                     <button
                       type="submit"
                       disabled={buyPending}

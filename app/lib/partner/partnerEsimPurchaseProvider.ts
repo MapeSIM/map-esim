@@ -229,10 +229,18 @@ async function claimPartnerProviderExecution(
     where: {
       id: purchaseId,
       status: PartnerEsimPurchaseStatus.PROVIDER_PENDING,
-      debitTransactionId: { not: null },
       orderId: null,
       refundTransactionId: null,
       providerRefreshClaimedAt: null,
+      OR: [
+        { debitTransactionId: { not: null } },
+        {
+          AND: [
+            { walletAppliedCents: 0 },
+            { gatewayAmountCents: { gt: 0 } },
+          ],
+        },
+      ],
     },
     data: {
       providerRefreshClaimedAt: new Date(),
@@ -336,16 +344,24 @@ async function refundConfirmedProviderFailure(options: {
         select: {
           status: true,
           partnerChargeCents: true,
+          walletAppliedCents: true,
           refundTransactionId: true,
           debitTransactionId: true,
+          fundingSource: true,
         },
       });
 
-      if (
-        current?.status === PartnerEsimPurchaseStatus.FAILED_REFUNDED &&
-        current.refundTransactionId
-      ) {
-        return current.refundTransactionId;
+      if (current?.status === PartnerEsimPurchaseStatus.FAILED_REFUNDED) {
+        if (current.refundTransactionId) {
+          return current.refundTransactionId;
+        }
+        if (current.walletAppliedCents === 0) {
+          return `gateway_only_nofund_${options.purchaseId}`;
+        }
+        throw new PartnerEsimPurchaseError(
+          "RECONCILIATION_REQUIRED",
+          "This purchase requires reconciliation. Do not retry."
+        );
       }
 
       if (current?.status !== PartnerEsimPurchaseStatus.PROVIDER_PENDING) {
@@ -355,21 +371,32 @@ async function refundConfirmedProviderFailure(options: {
         );
       }
 
-      if (
-        !current.debitTransactionId ||
-        current.partnerChargeCents !== options.partnerChargeCents
-      ) {
+      if (current.partnerChargeCents !== options.partnerChargeCents) {
         throw new PartnerEsimPurchaseError(
           "INVALID_STATE",
           "This purchase is unavailable."
         );
       }
 
-      const refunded = await refundPartnerPurchaseFundsInTx(tx, {
-        partnerId: options.partnerId,
-        partnerEsimPurchaseId: options.purchaseId,
-        amountCents: options.partnerChargeCents,
-      });
+      const refundAmountCents = current.walletAppliedCents;
+      if (refundAmountCents > 0 && !current.debitTransactionId) {
+        throw new PartnerEsimPurchaseError(
+          "INVALID_STATE",
+          "This purchase is unavailable."
+        );
+      }
+
+      let refundTransactionId: string | null = null;
+      let refundOutcome: string | null = null;
+      if (refundAmountCents > 0) {
+        const refunded = await refundPartnerPurchaseFundsInTx(tx, {
+          partnerId: options.partnerId,
+          partnerEsimPurchaseId: options.purchaseId,
+          amountCents: refundAmountCents,
+        });
+        refundTransactionId = refunded.transactionId;
+        refundOutcome = refunded.outcome;
+      }
 
       if (options.afterRefundInTx) {
         await options.afterRefundInTx(tx);
@@ -390,7 +417,7 @@ async function refundConfirmedProviderFailure(options: {
         where: { id: options.purchaseId },
         data: {
           status: PartnerEsimPurchaseStatus.FAILED_REFUNDED,
-          refundTransactionId: refunded.transactionId,
+          refundTransactionId,
           failureCategory: "provider_declined",
           failureCode: "refunded",
           providerRefreshClaimedAt: null,
@@ -405,15 +432,16 @@ async function refundConfirmedProviderFailure(options: {
           targetId: options.purchaseId,
           metadata: {
             purchaseId: options.purchaseId,
-            fundingSource: OrderFundingSource.PARTNER_BALANCE,
+            fundingSource: current.fundingSource,
             partnerChargeCents: options.partnerChargeCents,
-            refundTransactionId: refunded.transactionId,
-            refundOutcome: refunded.outcome,
+            walletAppliedCents: refundAmountCents,
+            refundTransactionId,
+            refundOutcome,
           } satisfies Prisma.InputJsonValue,
         },
       });
 
-      return refunded.transactionId;
+      return refundTransactionId ?? `gateway_only_nofund_${options.purchaseId}`;
     });
     return refundTransactionId;
   } catch (error) {
@@ -454,6 +482,8 @@ export async function executePartnerEsimProviderPurchase(
       partnerChargeCents: true,
       providerCostCents: true,
       currency: true,
+      walletAppliedCents: true,
+      gatewayAmountCents: true,
       debitTransactionId: true,
       refundTransactionId: true,
       orderId: true,
@@ -489,7 +519,9 @@ export async function executePartnerEsimProviderPurchase(
   if (purchase.status === PartnerEsimPurchaseStatus.FAILED_REFUNDED) {
     throw new PartnerEsimPurchaseError(
       "PROVIDER_FAILED",
-      "This purchase failed and the Partner wallet amount was restored."
+      purchase.walletAppliedCents > 0
+        ? "This purchase failed and the Partner wallet amount was restored."
+        : "This purchase failed after payment. Contact support if you were charged."
     );
   }
 
@@ -507,7 +539,11 @@ export async function executePartnerEsimProviderPurchase(
     );
   }
 
-  if (!purchase.debitTransactionId) {
+  const gatewayOnlyFunded =
+    purchase.walletAppliedCents === 0 &&
+    purchase.gatewayAmountCents > 0 &&
+    !purchase.debitTransactionId;
+  if (!purchase.debitTransactionId && !gatewayOnlyFunded) {
     throw new PartnerEsimPurchaseError(
       "INVALID_STATE",
       "This purchase is under review. Please contact support."
@@ -539,13 +575,10 @@ export async function executePartnerEsimProviderPurchase(
         duplicate: true,
       };
     }
-    if (
-      again?.status === PartnerEsimPurchaseStatus.FAILED_REFUNDED &&
-      again.refundTransactionId
-    ) {
+    if (again?.status === PartnerEsimPurchaseStatus.FAILED_REFUNDED) {
       throw new PartnerEsimPurchaseError(
         "PROVIDER_FAILED",
-        "This purchase failed and the Partner wallet amount was restored."
+        "This purchase failed and could not be completed."
       );
     }
     if (again?.status === PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED) {

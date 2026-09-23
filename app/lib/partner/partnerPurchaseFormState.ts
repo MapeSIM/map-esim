@@ -24,6 +24,7 @@ export const PARTNER_PURCHASE_UNAVAILABLE_MESSAGE =
 export type PartnerPurchaseResultKind =
   | "success"
   | "duplicate_success"
+  | "checkout_redirect"
   | "insufficient_balance"
   | "pricing_changed"
   | "purchases_paused"
@@ -41,10 +42,17 @@ export type PartnerPurchaseActionState =
       message: string;
     }
   | {
+      ok: true;
+      kind: "checkout_redirect";
+      purchaseId: string;
+      checkoutUrl: string;
+      message: string;
+    }
+  | {
       ok: false;
       kind: Exclude<
         PartnerPurchaseResultKind,
-        "success" | "duplicate_success" | "idle"
+        "success" | "duplicate_success" | "checkout_redirect" | "idle"
       >;
       message: string;
       purchaseId?: string;
@@ -52,6 +60,8 @@ export type PartnerPurchaseActionState =
         offerId?: string;
         destination?: string;
         idempotencyKey?: string;
+        walletOperatorId?: string;
+        customerMsisdn?: string;
       };
     };
 

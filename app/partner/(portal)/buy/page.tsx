@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { requireRole } from "@/app/lib/auth/session";
+import { prisma } from "@/app/lib/db";
 import {
   getPartnerPortalSummary,
   requireActivePartnerActor,
 } from "@/app/lib/partner/partnerAccess";
 import { listPartnerCatalogOffers } from "@/app/lib/partner/partnerCatalogRead";
+import { isPartnerEsimSplitPaymentEnabled } from "@/app/lib/partner/partnerEsimSplitPaymentPolicy";
 import PartnerStorefrontBuy from "@/app/components/partner/PartnerStorefrontBuy";
 import {
   normalizeOfferId,
@@ -54,10 +56,23 @@ export default async function PartnerStorefrontBuyPage({
     );
   }
 
-  const [offers, summary] = await Promise.all([
-    listPartnerCatalogOffers(country),
+  const splitPaymentEnabled = isPartnerEsimSplitPaymentEnabled();
+  const [profile, wallet, summary] = await Promise.all([
+    prisma.partnerProfile.findUnique({
+      where: { id: actor.partnerId },
+      select: { discountBps: true },
+    }),
+    prisma.partnerWalletAccount.findUnique({
+      where: { partnerId: actor.partnerId },
+      select: { balanceCents: true },
+    }),
     getPartnerPortalSummary(user.id),
   ]);
+  const offers = await listPartnerCatalogOffers(country, {
+    discountBps: profile?.discountBps ?? 0,
+    walletBalanceCents: wallet?.balanceCents ?? 0,
+    splitPaymentEnabled,
+  });
   const offer = offers.find((row) => row.offerId === offerId) ?? null;
 
   if (!offer) {
@@ -83,13 +98,14 @@ export default async function PartnerStorefrontBuyPage({
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Confirm purchase</h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Retail price is shown. Your Partner discount is applied server-side.
+          Review your Partner price, then confirm the purchase.
         </p>
       </header>
       <PartnerStorefrontBuy
         offer={offer}
         destinationCode={country}
         balanceLabel={summary?.balanceLabel ?? "$0.00"}
+        splitPaymentEnabled={splitPaymentEnabled}
       />
     </div>
   );

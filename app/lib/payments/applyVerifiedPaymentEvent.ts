@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/app/lib/db";
 import { applyVerifiedEsimPurchasePaymentEvent } from "@/app/lib/esim/esimPurchasePaymentApply";
+import { applyVerifiedPartnerEsimPurchasePaymentEvent } from "@/app/lib/partner/partnerEsimPurchasePaymentApply";
 import { parsePartnerTopupIdFromMerchantUserKey } from "@/app/lib/partner/partnerWalletTopupConstants";
 import { applyVerifiedPartnerTopupPaymentEvent } from "@/app/lib/partner/partnerWalletTopup";
 import type { NormalizedPaymentEvent } from "@/app/lib/payments/types";
@@ -20,6 +21,11 @@ export type ApplyVerifiedPaymentEventResult =
     }
   | {
       kind: "partner_wallet_topup";
+      duplicate: boolean;
+      outcome: string;
+    }
+  | {
+      kind: "partner_esim_purchase";
       duplicate: boolean;
       outcome: string;
     }
@@ -76,6 +82,23 @@ export async function applyVerifiedPaymentEvent(
     if (event.purpose === "PARTNER_WALLET_TOPUP") {
       return { kind: "ignored", reason: "unknown_reference" };
     }
+  }
+
+  // Partner eSIM split checkout (pesim_) — confirm attempt → FUNDED → VeSIM.
+  if (event.purpose === "PARTNER_ESIM_PURCHASE") {
+    const result = await applyVerifiedPartnerEsimPurchasePaymentEvent(event);
+    if (
+      result.outcome === "ignored" &&
+      !result.paymentAttemptId &&
+      !result.purchaseId
+    ) {
+      return { kind: "ignored", reason: "unknown_reference" };
+    }
+    return {
+      kind: "partner_esim_purchase",
+      duplicate: result.duplicate,
+      outcome: result.outcome,
+    };
   }
 
   if (event.purpose === "WALLET_TOPUP" && topupId) {

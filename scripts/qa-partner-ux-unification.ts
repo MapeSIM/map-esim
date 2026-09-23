@@ -27,6 +27,11 @@ function main() {
   const accountPage = read("app/account/page.tsx");
   const catalogRead = read("app/lib/partner/partnerCatalogRead.ts");
   const buyPage = read("app/partner/(portal)/buy/page.tsx");
+  const catalogBuy = read("app/components/partner/PartnerCatalogBuy.tsx");
+  const storefrontBuy = read("app/components/partner/PartnerStorefrontBuy.tsx");
+  const addDataPage = read(
+    "app/partner/(portal)/orders/[orderId]/add-data/page.tsx"
+  );
   const plansListing = [
     read("app/components/plans/PlansListing.tsx"),
     read("app/components/plans/PlansListingClient.tsx"),
@@ -94,7 +99,31 @@ function main() {
   assert.doesNotMatch(rootLayout, /from ["']next\/headers["']/);
   assert.match(accountPage, /AccountActionRow/);
   assert.match(catalogRead, /partnerCatalogOfferForbiddenKeys|discountBps|providerCost/);
+  assert.match(catalogRead, /partnerPriceLabel/);
+  assert.match(catalogRead, /fundingDisplay/);
+  assert.doesNotMatch(catalogRead, /retailPriceLabel:/);
   assert.match(buyPage, /buyPartnerEsim|listPartnerCatalogOffers|requireRole\(["']PARTNER["']\)/);
+  assert.match(buyPage, /Partner price|your Partner price/i);
+  assert.doesNotMatch(
+    buyPage,
+    /Retail price is shown|Partner discount is applied server-side/
+  );
+  assert.match(catalogBuy, /partnerPriceLabel/);
+  assert.match(catalogBuy, /Total amount|Wallet applied|Remaining to pay/);
+  assert.doesNotMatch(catalogBuy, /retailPriceLabel/);
+  assert.doesNotMatch(
+    catalogBuy,
+    /Catalog prices match MAP eSIM retail|Your Partner rate is applied|discountPercent|%\s*off/i
+  );
+  assert.match(storefrontBuy, /partnerPriceLabel/);
+  assert.match(storefrontBuy, /Total amount|Wallet applied|Remaining to pay/);
+  assert.doesNotMatch(storefrontBuy, /retailPriceLabel/);
+  assert.doesNotMatch(
+    storefrontBuy,
+    /Catalog prices match MAP eSIM retail|Your Partner rate is applied/i
+  );
+  assert.match(addDataPage, /partnerDebitLabel|Partner price/);
+  assert.doesNotMatch(addDataPage, /Retail\s+|retailPriceLabel/);
   assert.match(plansListing, /buildPartnerCheckoutHref/);
   assert.match(authConfig, /\/partner\/buy/);
   assert.match(authConfig, /\/account\/esim\/buy/);

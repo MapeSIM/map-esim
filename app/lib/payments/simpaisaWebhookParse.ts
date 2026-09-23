@@ -60,6 +60,10 @@ function resolvePurpose(userKey: string): PaymentCheckoutPurpose {
   if (userKey.trim().startsWith("ptop_")) {
     return "PARTNER_WALLET_TOPUP";
   }
+  // Partner eSIM purchase remainder — Phase 2+ (apply funding in Phase 3).
+  if (userKey.trim().startsWith("pesim_")) {
+    return "PARTNER_ESIM_PURCHASE";
+  }
   // Customer wallet top-up vs eSIM resolved by DB lookup on userKey in dispatch.
   return "ESIM_PURCHASE";
 }
@@ -178,6 +182,12 @@ export function parseSimpaisaWebhookEvent(input: {
         ? userKey.slice("ptop_".length).trim() || null
         : null
       : null;
+  const partnerEsimAttemptId =
+    purpose === "PARTNER_ESIM_PURCHASE"
+      ? userKey.startsWith("pesim_")
+        ? userKey.slice("pesim_".length).trim() || null
+        : null
+      : null;
 
   return {
     signatureVerified: input.signatureVerified,
@@ -186,7 +196,8 @@ export function parseSimpaisaWebhookEvent(input: {
     eventId,
     providerPaymentRef: transactionId,
     localTopupId: partnerTopupId,
-    paymentAttemptId: userKey,
+    paymentAttemptId:
+      purpose === "PARTNER_ESIM_PURCHASE" ? partnerEsimAttemptId : userKey,
     purchaseId: null,
     paymentStatus,
     chargeCurrency: currency,

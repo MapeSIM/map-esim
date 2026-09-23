@@ -6,6 +6,7 @@ import {
 } from "@/app/lib/partner/partnerAccess";
 import { listPartnerCatalogDestinations } from "@/app/lib/partner/partnerCatalogRead";
 import PartnerCatalogBuy from "@/app/components/partner/PartnerCatalogBuy";
+import { isPartnerEsimSplitPaymentEnabled } from "@/app/lib/partner/partnerEsimSplitPaymentPolicy";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +65,7 @@ export default async function PartnerCatalogPage() {
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Catalog</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Same MAP eSIM retail plans as the public storefront. Prefer{" "}
+          Browse destinations and buy with your Partner balance. Prefer{" "}
           <Link
             href="/countries"
             className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
@@ -79,6 +80,7 @@ export default async function PartnerCatalogPage() {
       <PartnerCatalogBuy
         destinations={destinations}
         balanceLabel={balanceLabel}
+        splitPaymentEnabled={isPartnerEsimSplitPaymentEnabled()}
       />
     </div>
   );

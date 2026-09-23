@@ -56,9 +56,8 @@ export default async function PartnerOrderAddDataPage({
               Top up this eSIM
             </p>
             <p className="mt-2 text-sm text-[var(--text-muted)]">
-              Same package will be charged from your Partner balance using your
-              Partner discount. Data is added to this eSIM — a new eSIM is not
-              created.
+              Same package will be charged from your Partner balance. Data is
+              added to this eSIM — a new eSIM is not created.
             </p>
             <p className="mt-2 text-sm text-[var(--text-muted)]">
               Plan:{" "}
@@ -66,9 +65,9 @@ export default async function PartnerOrderAddDataPage({
                 {detail.planName}
               </span>
               {" · "}
-              Retail{" "}
+              Partner price{" "}
               <span className="font-semibold tabular-nums text-[var(--heading)]">
-                {detail.retailPriceLabel}
+                {detail.partnerDebitLabel}
               </span>
             </p>
             <div className="mt-4">

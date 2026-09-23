@@ -141,9 +141,32 @@ async function main() {
       countryCode: offerState.countryCode,
     });
     assert.ok(catalogOffer);
-    assert.equal(catalogOffer!.retailPriceLabel, "$10.00 USD");
+    assert.equal(catalogOffer!.partnerPriceLabel, "$10.00 USD");
     assert.equal(catalogOffer!.dataLabel, "1 GB");
     assert.equal(catalogOffer!.validityLabel, "7 Days");
+    assert.equal(catalogOffer!.fundingDisplay, null);
+    const discounted = partnerCatalogOfferFromRetail({
+      offerId: offerState.offerId,
+      name: offerState.name,
+      dataFormatted: offerState.dataFormatted,
+      durationDays: offerState.durationDays,
+      priceUSD: offerState.priceUSD,
+      countryName: offerState.countryName,
+      countryCode: offerState.countryCode,
+      discountBps: 500,
+      walletBalanceCents: 250,
+      splitPaymentEnabled: true,
+    });
+    assert.ok(discounted);
+    assert.equal(discounted!.partnerPriceLabel, "$9.50 USD");
+    assert.ok(discounted!.fundingDisplay);
+    assert.equal(discounted!.fundingDisplay!.requiresGateway, true);
+    assert.equal(discounted!.fundingDisplay!.totalLabel, "$9.50 USD");
+    assert.equal(discounted!.fundingDisplay!.walletAppliedLabel, "$2.50 USD");
+    assert.equal(
+      discounted!.fundingDisplay!.gatewayRemainingLabel,
+      "$7.00 USD"
+    );
     const payloadJson = JSON.stringify(catalogOffer);
     for (const key of partnerCatalogOfferForbiddenKeys()) {
       assert.equal(payloadJson.includes(key), false, `leaked ${key}`);

@@ -86,17 +86,25 @@ async function main() {
   assert.match(schema, /ESIM_PURCHASE_DEBIT/);
   assert.match(schema, /ESIM_PURCHASE_REFUND/);
   assert.match(schema, /PARTNER_BALANCE/);
+  assert.match(schema, /PARTNER_SPLIT/);
+  assert.match(schema, /PARTNER_GATEWAY/);
   assert.match(schema, /enum PartnerEsimPurchaseStatus/);
+  assert.match(schema, /AWAITING_GATEWAY_PAYMENT/);
   assert.match(schema, /model PartnerEsimPurchase/);
+  assert.match(schema, /model PartnerEsimPurchasePaymentAttempt/);
   assert.match(schema, /retailPriceCents/);
   assert.match(schema, /partnerChargeCents/);
+  assert.match(schema, /walletAppliedCents/);
+  assert.match(schema, /gatewayAmountCents/);
   assert.match(schema, /PARTNER_WALLET_PURCHASES/);
-  const pepIdx = schema.indexOf("model PartnerEsimPurchase");
+  const pepIdx = schema.indexOf("model PartnerEsimPurchase {");
   assert.ok(pepIdx >= 0);
-  const pepBody = schema.slice(pepIdx, pepIdx + 4000);
+  const pepClose = schema.indexOf("\n}", pepIdx);
+  const pepBody = schema.slice(pepIdx, pepClose > 0 ? pepClose + 2 : pepIdx + 5000);
+  assert.match(pepBody, /useWallet/);
   assert.doesNotMatch(pepBody, /customerUserId/);
   assert.doesNotMatch(pepBody, /\bWalletAccount\b/);
-  assert.doesNotMatch(pepBody, /WalletEsimPurchase/);
+  assert.doesNotMatch(pepBody, /\bWalletEsimPurchase\b/);
   console.log("PASS schema_partner_phase1");
 
   const migration = read(
