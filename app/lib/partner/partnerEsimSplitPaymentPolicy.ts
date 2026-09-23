@@ -15,7 +15,7 @@ export const PARTNER_ESIM_SPLIT_PAYMENT_ENABLED_ENV =
  * Hard flag true always enables (for future cutover).
  */
 export function isPartnerEsimSplitPaymentEnabled(
-  env: NodeJS.ProcessEnv = process.env
+  env: Record<string, string | undefined> = process.env
 ): boolean {
   if (PARTNER_ESIM_SPLIT_PAYMENT_HARD_ENABLED) return true;
   return env[PARTNER_ESIM_SPLIT_PAYMENT_ENABLED_ENV] === "true";
