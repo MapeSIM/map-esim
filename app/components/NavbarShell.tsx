@@ -64,7 +64,9 @@ function shouldSyncOnPathnameChange(options: {
  * - next-auth BroadcastChannel (always — cross-tab login/logout)
  * - Sign out form submit (same-path soft redirect)
  *
- * user.id → always apply Account. Logged-out applies only for the latest request.
+ * Logout barrier: Sign out immediately shows logged-out UI and ignores
+ * in-flight / pre-clear authenticated session responses until an empty
+ * session confirms logout (then normal sync resumes).
  */
 export default function NavbarShell() {
   const pathname = usePathname() || "/";
@@ -79,6 +81,8 @@ export default function NavbarShell() {
   const mountedRef = useRef(true);
   const knownAuthenticatedRef = useRef(false);
   const previousPathnameRef = useRef<string | null>(null);
+  /** True from Sign out submit until a logged-out session response is applied. */
+  const logoutBarrierRef = useRef(false);
 
   const applyLoggedOut = useCallback(() => {
     knownAuthenticatedRef.current = false;
@@ -155,22 +159,33 @@ export default function NavbarShell() {
 
       const session = (await res.json()) as SessionPayload;
       if (!mountedRef.current) return;
+      // Stale after abort / newer sync / logout invalidation.
+      if (requestId !== requestIdRef.current) return;
 
       const userId = String(session?.user?.id || "").trim();
       if (userId && session?.user) {
-        // Authenticated: always apply — never drop for a newer in-flight request.
+        // During logout, ignore authenticated bodies (cookie may not be cleared yet
+        // or an older in-flight response may arrive after UI already logged out).
+        if (logoutBarrierRef.current) return;
         applyAuthenticated({ ...session.user, id: userId });
         return;
       }
 
-      // Logged-out: ignore stale responses superseded by a newer sync.
-      if (requestId !== requestIdRef.current) return;
+      logoutBarrierRef.current = false;
       applyLoggedOut();
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       // Keep last known UI on transient errors.
     }
   }, [applyAuthenticated, applyLoggedOut]);
+
+  /** Immediate logged-out shell; invalidate in-flight session syncs. */
+  const beginLogoutUi = useCallback(() => {
+    logoutBarrierRef.current = true;
+    abortRef.current?.abort();
+    requestIdRef.current += 1;
+    applyLoggedOut();
+  }, [applyLoggedOut]);
 
   // Lifetime: mount once for listeners; sync on mount via pathname effect.
   useEffect(() => {
@@ -202,8 +217,15 @@ export default function NavbarShell() {
       if (!(form instanceof HTMLFormElement)) return;
       const label = (form.textContent || "").replace(/\s+/g, " ").trim();
       if (!/sign out/i.test(label)) return;
-      applyLoggedOut();
+      beginLogoutUi();
+      // Immediate attempt (may still see cookie — auth ignored while barrier set).
       void syncSession();
+      // Confirm after Auth.js Server Action has a chance to clear the session cookie.
+      window.setTimeout(() => {
+        if (!mountedRef.current) return;
+        if (!logoutBarrierRef.current) return;
+        void syncSession();
+      }, 400);
     }
 
     let channel: BroadcastChannel | null = null;
@@ -228,12 +250,16 @@ export default function NavbarShell() {
       document.removeEventListener("submit", onCaptureSubmit, true);
       channel?.close();
     };
-  }, [applyLoggedOut, syncSession]);
+  }, [beginLogoutUi, syncSession]);
 
   // Mount + selective path navigations (post-login / post-logout / authenticated).
   useEffect(() => {
     const previous = previousPathnameRef.current;
     previousPathnameRef.current = pathname;
+    // Leaving logout for sign-in/up must not keep ignoring authenticated sessions.
+    if (AUTH_FLOW_PATH.test(pathname)) {
+      logoutBarrierRef.current = false;
+    }
     if (
       !shouldSyncOnPathnameChange({
         previousPathname: previous,
