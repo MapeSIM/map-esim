@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useId, useMemo, useState } from "react";
 import { Earth, MapPinned, Search } from "lucide-react";
-import type { AdminDestinationOption } from "@/app/lib/esim/adminPackageAssignmentRead";
+import type { CustomerWalletBuyDestinationOption } from "@/app/lib/esim/customerWalletPurchaseCatalogRead";
 import { filterPlansDiscoveryDestinations } from "@/app/lib/plans/plansDiscovery";
 import { popularDestinationDisplayRank } from "@/app/lib/home/homeConversionSections";
 import {
@@ -17,10 +17,10 @@ import {
 } from "@/app/lib/vesim/destinations";
 
 type Props = {
-  destinations: AdminDestinationOption[];
+  destinations: CustomerWalletBuyDestinationOption[];
 };
 
-function toSearchDestination(d: AdminDestinationOption): VesimDestination {
+function toSearchDestination(d: CustomerWalletBuyDestinationOption): VesimDestination {
   const kind =
     d.kind === "regional" || d.kind === "global" || d.kind === "country"
       ? d.kind
@@ -37,7 +37,7 @@ function toSearchDestination(d: AdminDestinationOption): VesimDestination {
 }
 
 function toPathDestination(
-  d: AdminDestinationOption
+  d: CustomerWalletBuyDestinationOption
 ): Pick<VesimDestination, "code" | "name" | "slug" | "kind"> {
   const kind =
     d.kind === "regional" || d.kind === "global" || d.kind === "country"
@@ -110,7 +110,7 @@ function DestinationFlagMark({
 function DestinationNavCard({
   destination,
 }: {
-  destination: AdminDestinationOption;
+  destination: CustomerWalletBuyDestinationOption;
 }) {
   const kind =
     destination.kind === "regional" ||

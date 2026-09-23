@@ -14,6 +14,7 @@ import {
 import { redirect } from "next/navigation";
 import { prisma } from "@/app/lib/db";
 import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
+import { probeAdminDatabase } from "@/app/lib/admin/adminDatabaseProbe";
 import { requireRole } from "@/app/lib/auth/session";
 import { getEmailChannelsReadiness } from "@/app/lib/email/config";
 import { isIccidEncryptionConfigured } from "@/app/lib/orders/iccidCrypto";
@@ -246,26 +247,8 @@ async function probeDatabase(): Promise<{
   status: HealthStatus;
   latencyMs: number | null;
 }> {
-  const started = Date.now();
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    return {
-      status: mapDatabaseProbeToStatus({ ok: true }),
-      latencyMs: Math.max(0, Date.now() - started),
-    };
-  } catch (error) {
-    const code =
-      error && typeof error === "object" && "code" in error
-        ? String((error as { code?: unknown }).code ?? "")
-        : null;
-    return {
-      status: mapDatabaseProbeToStatus({
-        ok: false,
-        errorCode: code || "UNAVAILABLE",
-      }),
-      latencyMs: null,
-    };
-  }
+  const result = await probeAdminDatabase();
+  return { status: result.status, latencyMs: result.latencyMs };
 }
 
 type MetricCase = {

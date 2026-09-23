@@ -16,6 +16,7 @@ import {
 import { redirect } from "next/navigation";
 import { prisma } from "@/app/lib/db";
 import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
+import { probeAdminDatabase } from "@/app/lib/admin/adminDatabaseProbe";
 import { requireRole } from "@/app/lib/auth/session";
 import { loadConsentGateUser } from "@/app/lib/auth/legalConsentGate";
 import { getEmailChannelsReadiness } from "@/app/lib/email/config";
@@ -156,29 +157,7 @@ async function probeDatabase(): Promise<{
   // Latency is recorded for display only. Do not gate DEGRADED on a single
   // Date.now() sample — that flickered DATABASE_DEGRADED across refreshes.
   // Align status classification with Operations (mapDatabaseProbeToStatus).
-  const started = Date.now();
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    const latencyMs = Math.max(0, Date.now() - started);
-    return {
-      status: mapDatabaseProbeToStatus({ ok: true }),
-      latencyMs,
-      ok: true,
-    };
-  } catch (error) {
-    const code =
-      error && typeof error === "object" && "code" in error
-        ? String((error as { code?: unknown }).code ?? "")
-        : null;
-    return {
-      status: mapDatabaseProbeToStatus({
-        ok: false,
-        errorCode: code || "UNAVAILABLE",
-      }),
-      latencyMs: null,
-      ok: false,
-    };
-  }
+  return probeAdminDatabase();
 }
 
 async function readLatestMigration(): Promise<{

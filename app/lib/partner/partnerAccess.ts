@@ -3,6 +3,7 @@
  */
 import "server-only";
 
+import { cache } from "react";
 import {
   PartnerEsimPurchaseStatus,
   PartnerWalletTransactionType,
@@ -48,47 +49,48 @@ export type PartnerPortalSummary = {
 /**
  * Load an active partner actor for portal reads/mutations.
  * Requires role PARTNER, not deleted, profile exists, not disabled.
+ * Request-scoped cache: layout + page + summary share one actor lookup.
  */
-export async function requireActivePartnerActor(
-  userId: string
-): Promise<ActivePartnerActor | null> {
-  const id = (userId ?? "").trim();
-  if (!id || id.length > 64) return null;
+export const requireActivePartnerActor = cache(
+  async (userId: string): Promise<ActivePartnerActor | null> => {
+    const id = (userId ?? "").trim();
+    if (!id || id.length > 64) return null;
 
-  const user = await prisma.user.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      deletedAt: true,
-      partnerProfile: {
-        select: {
-          id: true,
-          disabledAt: true,
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        deletedAt: true,
+        partnerProfile: {
+          select: {
+            id: true,
+            disabledAt: true,
+          },
         },
       },
-    },
-  });
+    });
 
-  if (
-    !user ||
-    user.deletedAt ||
-    user.role !== Role.PARTNER ||
-    !user.partnerProfile ||
-    user.partnerProfile.disabledAt
-  ) {
-    return null;
+    if (
+      !user ||
+      user.deletedAt ||
+      user.role !== Role.PARTNER ||
+      !user.partnerProfile ||
+      user.partnerProfile.disabledAt
+    ) {
+      return null;
+    }
+
+    return {
+      userId: user.id,
+      partnerId: user.partnerProfile.id,
+      name: user.name,
+      email: user.email,
+    };
   }
-
-  return {
-    userId: user.id,
-    partnerId: user.partnerProfile.id,
-    name: user.name,
-    email: user.email,
-  };
-}
+);
 
 function partnerTxTypeLabel(type: PartnerWalletTransactionType): string {
   switch (type) {
@@ -122,9 +124,42 @@ function formatPartnerTxAmount(
   return `+${body}`;
 }
 
-export async function getPartnerPortalSummary(
+/**
+ * Balance label only — for catalog / buy chrome without full portal KPIs.
+ * Same actor gate as getPartnerPortalSummary.
+ */
+export async function getPartnerBalanceLabel(
   userId: string
-): Promise<PartnerPortalSummary | null> {
+): Promise<string | null> {
+  const actor = await requireActivePartnerActor(userId);
+  if (!actor) return null;
+
+  const wallet = await prisma.partnerWalletAccount.findUnique({
+    where: { partnerId: actor.partnerId },
+    select: { balanceCents: true },
+  });
+  return formatUsdCents(wallet?.balanceCents ?? 0);
+}
+
+/**
+ * Discount percent label only — for profile without full portal KPIs.
+ */
+export async function getPartnerDiscountPercentLabel(
+  userId: string
+): Promise<string | null> {
+  const actor = await requireActivePartnerActor(userId);
+  if (!actor) return null;
+
+  const profile = await prisma.partnerProfile.findUnique({
+    where: { id: actor.partnerId },
+    select: { discountBps: true },
+  });
+  if (!profile) return null;
+  return `${formatDiscountBpsAsPercent(profile.discountBps)}%`;
+}
+
+export const getPartnerPortalSummary = cache(
+  async (userId: string): Promise<PartnerPortalSummary | null> => {
   const actor = await requireActivePartnerActor(userId);
   if (!actor) return null;
 
@@ -247,4 +282,5 @@ export async function getPartnerPortalSummary(
       createdAtLabel: formatWalletDateTime(tx.createdAt),
     })),
   };
-}
+  }
+);

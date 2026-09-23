@@ -406,7 +406,12 @@ function main() {
   console.log("PASS automated_qa_no_real_provider_checkout");
 
   // Buy page is a destination launcher → existing /countries/[slug] plans.
-  const assignmentRead = read("app/lib/esim/adminPackageAssignmentRead.ts");
+  // Browse uses public cached catalog; prepare still live-verifies offers.
+  const customerCatalogRead = read(
+    "app/lib/esim/customerWalletPurchaseCatalogRead.ts"
+  );
+  assert.match(customerCatalogRead, /fetchPublicDestinationCatalog/);
+  assert.match(customerCatalogRead, /listCustomerWalletBuyDestinations/);
   assert.match(buyPage, /Where are you traveling\?/);
   assert.match(buyPage, /max-w-5xl/);
   assert.match(buyPage, /CUSTOMER_ACCOUNT_RESTRICTED_MESSAGE/);
@@ -415,7 +420,9 @@ function main() {
   assert.match(buyPage, /prepareWalletEsimPurchase/);
   assert.match(buyPage, /offerIdHint/);
   assert.match(buyPage, /if\s*\(\s*!offerIdHint\s*\)/);
-  assert.match(buyPage, /listAdminAssignmentDestinations/);
+  assert.match(buyPage, /listCustomerWalletBuyDestinations/);
+  assert.doesNotMatch(buyPage, /listAdminAssignmentDestinations/);
+  assert.doesNotMatch(buyPage, /adminPackageAssignmentRead/);
   assert.match(selectForm, /filterPlansDiscoveryDestinations/);
   assert.match(selectForm, /Popular Destinations/);
   assert.match(selectForm, /All Destinations/);
@@ -437,8 +444,9 @@ function main() {
     read("app/lib/plans/plan-utils.ts"),
     /\/account\/esim\/buy\?/
   );
+  // Admin assignment catalog still formats retail costLabel (unchanged).
   assert.match(
-    assignmentRead,
+    read("app/lib/esim/adminPackageAssignmentRead.ts"),
     /costLabel:\s*`\$\{formatUsdCents\(Math\.round\(verified\.priceUSD \* 100\)\)\} USD`/
   );
   assert.match(service, /priceCents = usdPriceToCents\(offer\.priceUSD\)/);

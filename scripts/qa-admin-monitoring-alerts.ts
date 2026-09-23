@@ -475,7 +475,11 @@ function main() {
     service,
     /latencyMs\s*>=\s*MONITORING_THRESHOLDS\.DATABASE_DEGRADED_LATENCY_MS/
   );
-  assert.match(service, /mapDatabaseProbeToStatus\(\{\s*ok:\s*true\s*\}\)/);
+  // Shared probe module owns SELECT 1 + mapDatabaseProbeToStatus (ops + alerts).
+  const dbProbe = read("app/lib/admin/adminDatabaseProbe.ts");
+  assert.match(dbProbe, /mapDatabaseProbeToStatus\(\{\s*ok:\s*true\s*\}\)/);
+  assert.match(service, /probeAdminDatabase/);
+  assert.match(dbProbe, /probeAdminDatabase/);
   assert.match(
     service,
     /One immutable checkedAt is used for every age\/threshold rule/

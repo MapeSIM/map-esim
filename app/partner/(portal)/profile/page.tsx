@@ -1,7 +1,7 @@
 import PartnerShareBrandingForm from "@/app/components/partner/PartnerShareBrandingForm";
 import { partnerCardClass, partnerSectionLabelClass } from "@/app/components/partner/partnerPortalUi";
 import { requireRole } from "@/app/lib/auth/session";
-import { getPartnerPortalSummary } from "@/app/lib/partner/partnerAccess";
+import { getPartnerDiscountPercentLabel } from "@/app/lib/partner/partnerAccess";
 import { getPartnerShareBranding } from "@/app/lib/partner/partnerShareBranding";
 
 export const dynamic = "force-dynamic";
@@ -10,8 +10,8 @@ export default async function PartnerProfilePage() {
   const user = await requireRole("PARTNER");
   let discountLabel = "—";
   try {
-    const summary = await getPartnerPortalSummary(user.id);
-    if (summary) discountLabel = summary.discountPercentLabel;
+    const label = await getPartnerDiscountPercentLabel(user.id);
+    if (label) discountLabel = label;
   } catch {
     discountLabel = "—";
   }

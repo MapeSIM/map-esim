@@ -8,7 +8,7 @@ import {
   CUSTOMER_ACCOUNT_RESTRICTED_MESSAGE,
   resolveCustomerAccountStatus,
 } from "@/app/lib/auth/customerAccountStatus";
-import { listAdminAssignmentDestinations } from "@/app/lib/esim/adminPackageAssignmentRead";
+import { listCustomerWalletBuyDestinations } from "@/app/lib/esim/customerWalletPurchaseCatalogRead";
 import {
   prepareWalletEsimPurchase,
   WalletEsimPurchaseError,
@@ -116,7 +116,7 @@ export default async function AccountWalletBuyPage({
   const gatewayReady = isPaymentGatewayConfigured();
 
   let destinations: Awaited<
-    ReturnType<typeof listAdminAssignmentDestinations>
+    ReturnType<typeof listCustomerWalletBuyDestinations>
   > = [];
   let hasWallet = false;
   let loadError = false;
@@ -139,9 +139,10 @@ export default async function AccountWalletBuyPage({
       }) === "BLOCKED";
     hasWallet = Boolean(account?.walletAccount);
     // Buy Now with offerId prepares/redirects without needing the destination
-    // catalog. Load live destinations only for the select/browse UI path.
+    // catalog. Browse uses the public cached catalog (not live VeSIM).
+    // Prepare/confirm still verify live via verifyOfferAuthoritative.
     if (!offerIdHint) {
-      destinations = await listAdminAssignmentDestinations();
+      destinations = await listCustomerWalletBuyDestinations();
     }
   } catch {
     loadError = true;
@@ -228,7 +229,7 @@ export default async function AccountWalletBuyPage({
   // Direct Buy Now failed or skipped — load catalog for the select UI path.
   if (!loadError && destinations.length === 0) {
     try {
-      destinations = await listAdminAssignmentDestinations();
+      destinations = await listCustomerWalletBuyDestinations();
     } catch {
       loadError = true;
     }

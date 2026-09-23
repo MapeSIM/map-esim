@@ -1,10 +1,7 @@
 import Link from "next/link";
 import { requireRole } from "@/app/lib/auth/session";
 import { prisma } from "@/app/lib/db";
-import {
-  getPartnerPortalSummary,
-  requireActivePartnerActor,
-} from "@/app/lib/partner/partnerAccess";
+import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
 import { listPartnerCatalogOffers } from "@/app/lib/partner/partnerCatalogRead";
 import { isPartnerEsimSplitPaymentEnabled } from "@/app/lib/partner/partnerEsimSplitPaymentPolicy";
 import PartnerStorefrontBuy from "@/app/components/partner/PartnerStorefrontBuy";
@@ -12,6 +9,7 @@ import {
   normalizeOfferId,
   sanitizeCountryHint,
 } from "@/app/lib/vesim/server";
+import { formatUsdCents } from "@/app/lib/wallet/display";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +55,7 @@ export default async function PartnerStorefrontBuyPage({
   }
 
   const splitPaymentEnabled = isPartnerEsimSplitPaymentEnabled();
-  const [profile, wallet, summary] = await Promise.all([
+  const [profile, wallet] = await Promise.all([
     prisma.partnerProfile.findUnique({
       where: { id: actor.partnerId },
       select: { discountBps: true },
@@ -66,7 +64,6 @@ export default async function PartnerStorefrontBuyPage({
       where: { partnerId: actor.partnerId },
       select: { balanceCents: true },
     }),
-    getPartnerPortalSummary(user.id),
   ]);
   const offers = await listPartnerCatalogOffers(country, {
     discountBps: profile?.discountBps ?? 0,
@@ -104,7 +101,7 @@ export default async function PartnerStorefrontBuyPage({
       <PartnerStorefrontBuy
         offer={offer}
         destinationCode={country}
-        balanceLabel={summary?.balanceLabel ?? "$0.00"}
+        balanceLabel={formatUsdCents(wallet?.balanceCents ?? 0)}
         splitPaymentEnabled={splitPaymentEnabled}
       />
     </div>

@@ -6,6 +6,7 @@
  */
 import "server-only";
 
+import { cache } from "react";
 import {
   OrderFundingSource,
   PartnerEsimPurchaseStatus,
@@ -215,6 +216,12 @@ function mapPackageRows(
 export async function getAdminBusinessInsights(
   now: Date = new Date()
 ): Promise<AdminBusinessInsightsData> {
+  return getAdminBusinessInsightsCached(now.getTime());
+}
+
+const getAdminBusinessInsightsCached = cache(
+  async (nowMs: number): Promise<AdminBusinessInsightsData> => {
+  const now = new Date(nowMs);
   const bounds = buildRevenuePeriodBounds(now);
   const last30 = bounds.last30Days;
   const allTime = bounds.allTime;
@@ -376,4 +383,5 @@ export async function getAdminBusinessInsights(
     topPackagesLast30Days: mapPackageRows(packagesLast30, packageLabels),
     topPackagesAllTime: mapPackageRows(packagesAllTime, packageLabels),
   };
-}
+  }
+);

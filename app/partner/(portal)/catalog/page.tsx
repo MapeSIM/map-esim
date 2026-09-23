@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireRole } from "@/app/lib/auth/session";
 import {
-  getPartnerPortalSummary,
+  getPartnerBalanceLabel,
   requireActivePartnerActor,
 } from "@/app/lib/partner/partnerAccess";
 import { listPartnerCatalogDestinations } from "@/app/lib/partner/partnerCatalogRead";
@@ -37,12 +37,12 @@ export default async function PartnerCatalogPage() {
   let loadError = false;
 
   try {
-    const [dest, summary] = await Promise.all([
+    const [dest, balance] = await Promise.all([
       listPartnerCatalogDestinations(),
-      getPartnerPortalSummary(user.id),
+      getPartnerBalanceLabel(user.id),
     ]);
     destinations = dest;
-    balanceLabel = summary?.balanceLabel ?? "$0.00";
+    balanceLabel = balance ?? "$0.00";
   } catch {
     loadError = true;
   }

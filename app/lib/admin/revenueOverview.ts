@@ -6,6 +6,7 @@
  */
 import "server-only";
 
+import { cache } from "react";
 import {
   OrderFundingSource,
   OrderStatus,
@@ -92,10 +93,17 @@ function formatGeneratedAt(date: Date): string {
  *
  * Uses Prisma batch `$transaction([...])` (not interactive, not Promise.all)
  * to avoid pool exhaustion on remote DB.
+ * Request-scoped cache keyed by nowMs — page parallel loads share one batch.
  */
 export async function getAdminRevenueOverview(
   now: Date = new Date()
 ): Promise<AdminRevenueOverviewData> {
+  return getAdminRevenueOverviewCached(now.getTime());
+}
+
+const getAdminRevenueOverviewCached = cache(
+  async (nowMs: number): Promise<AdminRevenueOverviewData> => {
+  const now = new Date(nowMs);
   const bounds = buildRevenuePeriodBounds(now);
 
   const ops = REVENUE_PERIOD_ORDER.flatMap((key) => {
@@ -174,4 +182,5 @@ export async function getAdminRevenueOverview(
     generatedAtLabel: formatGeneratedAt(now),
     periods,
   };
-}
+  }
+);

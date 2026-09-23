@@ -10,44 +10,57 @@ import {
 import Link from "next/link";
 import AccountActionRow from "@/app/components/account/AccountActionRow";
 import ReferralShareCard from "@/app/components/account/ReferralShareCard";
+import { loadConsentGateUser } from "@/app/lib/auth/legalConsentGate";
 import { requireSession } from "@/app/lib/auth/session";
-import { prisma } from "@/app/lib/db";
 import { getCustomerReferralSummary } from "@/app/lib/referrals/referralRead";
 import { getCustomerWalletSummary } from "@/app/lib/wallet/read";
 import { getCustomerRewardSummary } from "@/app/lib/rewards/rewardRead";
 
 export default async function AccountOverviewPage() {
   const user = await requireSession();
-  const dbUser = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: { emailVerifiedAt: true },
-  });
-  const emailVerified = Boolean(dbUser?.emailVerifiedAt);
+  // Dedupes with layout requireSession → validateSessionAndConsent.
+  const consentUserPromise = loadConsentGateUser(user.id);
 
   let walletBalanceLabel: string | null = null;
   let rewardsPointsLabel: string | null = null;
   let referralSummary: Awaited<
     ReturnType<typeof getCustomerReferralSummary>
   > = null;
+
+  let consentUser: Awaited<ReturnType<typeof loadConsentGateUser>>;
   if (user.role === "CUSTOMER") {
-    try {
-      const summary = await getCustomerWalletSummary(user.id);
-      walletBalanceLabel = summary?.balanceLabel ?? "$0.00";
-    } catch {
-      walletBalanceLabel = null;
-    }
-    try {
-      const rewards = await getCustomerRewardSummary(user.id);
-      rewardsPointsLabel = rewards ? `${rewards.pointsBalanceLabel} points` : "0 points";
-    } catch {
-      rewardsPointsLabel = null;
-    }
-    try {
-      referralSummary = await getCustomerReferralSummary(user.id);
-    } catch {
-      referralSummary = null;
-    }
+    const [consent, walletSettled, rewardsSettled, referralSettled] =
+      await Promise.all([
+        consentUserPromise,
+        getCustomerWalletSummary(user.id).then(
+          (value) => ({ ok: true as const, value }),
+          () => ({ ok: false as const })
+        ),
+        getCustomerRewardSummary(user.id).then(
+          (value) => ({ ok: true as const, value }),
+          () => ({ ok: false as const })
+        ),
+        getCustomerReferralSummary(user.id).then(
+          (value) => ({ ok: true as const, value }),
+          () => ({ ok: false as const })
+        ),
+      ]);
+    consentUser = consent;
+    // Preserve prior try/catch semantics (success → label; throw → null).
+    walletBalanceLabel = walletSettled.ok
+      ? (walletSettled.value?.balanceLabel ?? "$0.00")
+      : null;
+    rewardsPointsLabel = rewardsSettled.ok
+      ? rewardsSettled.value
+        ? `${rewardsSettled.value.pointsBalanceLabel} points`
+        : "0 points"
+      : null;
+    referralSummary = referralSettled.ok ? referralSettled.value : null;
+  } else {
+    consentUser = await consentUserPromise;
   }
+
+  const emailVerified = Boolean(consentUser?.emailVerifiedAt);
 
   return (
     <div className="space-y-6">
