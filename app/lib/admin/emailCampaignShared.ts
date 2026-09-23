@@ -81,6 +81,42 @@ export const EMAIL_CAMPAIGN_AUDIENCE_HELP: Record<
   ACTIVE_CUSTOMERS: "Verified customers who are not blocked.",
 };
 
+/**
+ * Parse a single controlled test inbox (EMAIL_TEST_RECIPIENT).
+ * Rejects lists, invalid shapes, and @example.com. Never logs the value.
+ */
+export function parseEmailCampaignTestRecipient(
+  raw: string | null | undefined
+): string | null {
+  const value = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+  if (!value || value.length > 254) return null;
+  if (value.includes(",") || value.includes(";") || /\s/.test(value)) {
+    return null;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return null;
+  const domain = value.split("@")[1] || "";
+  if (domain === "example.com" || domain.endsWith(".example")) return null;
+  return value;
+}
+
+/**
+ * Resolve campaign test-send destination.
+ * Prefer EMAIL_TEST_RECIPIENT when set; otherwise form value, then fallback.
+ */
+export function resolveEmailCampaignTestRecipient(options: {
+  envValue?: string | null;
+  formValue?: string | null;
+  fallbackEmail?: string | null;
+}): string | null {
+  return (
+    parseEmailCampaignTestRecipient(options.envValue) ??
+    parseEmailCampaignTestRecipient(options.formValue) ??
+    parseEmailCampaignTestRecipient(options.fallbackEmail)
+  );
+}
+
 export function emailCampaignAudienceLabel(
   audience: string | null | undefined
 ): string {

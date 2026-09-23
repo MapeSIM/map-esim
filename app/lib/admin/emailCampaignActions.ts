@@ -79,7 +79,8 @@ export async function sendEmailCampaignTestAction(
     await sendAdminEmailCampaignTest({
       adminUserId: admin.id,
       campaignId,
-      testEmail: String(formData.get("testEmail") ?? admin.email ?? ""),
+      testEmail: String(formData.get("testEmail") ?? ""),
+      fallbackEmail: admin.email ?? null,
     });
     revalidateCampaignPaths(campaignId);
     return { ok: true, message: "Test email sent." };

@@ -36,7 +36,9 @@ import {
   emailCampaignTemplateLabel,
   parseEmailCampaignAudience,
   parseEmailCampaignTemplateKey,
+  parseEmailCampaignTestRecipient,
   resolveEmailCampaignBatchDelayMs,
+  resolveEmailCampaignTestRecipient,
   sanitizeCampaignBody,
   sanitizeCampaignSubject,
 } from "../app/lib/admin/emailCampaignShared";
@@ -122,6 +124,91 @@ function main() {
   assert.equal(campaignConfirmPhraseMatches("SEND"), false);
   assert.equal(campaignResendFailedPhraseMatches("RESEND FAILED EMAILS"), true);
   assert.equal(campaignResendFailedPhraseMatches("resend failed emails"), false);
+  console.log("   ok");
+
+  console.log("1b) EMAIL_TEST_RECIPIENT resolution (env preferred, secrets not logged)");
+  assert.equal(parseEmailCampaignTestRecipient(undefined), null);
+  assert.equal(parseEmailCampaignTestRecipient(""), null);
+  assert.equal(parseEmailCampaignTestRecipient("not-an-email"), null);
+  assert.equal(parseEmailCampaignTestRecipient("a@b"), null);
+  assert.equal(parseEmailCampaignTestRecipient("list@map.esim,other@map.esim"), null);
+  assert.equal(parseEmailCampaignTestRecipient("test@example.com"), null);
+  assert.equal(parseEmailCampaignTestRecipient("qa@foo.example"), null);
+  assert.equal(
+    parseEmailCampaignTestRecipient(" QA.Inbox+campaign@Map-eSIM.test "),
+    "qa.inbox+campaign@map-esim.test"
+  );
+  assert.equal(
+    resolveEmailCampaignTestRecipient({
+      envValue: "env-inbox@map-esim.test",
+      formValue: "form-inbox@map-esim.test",
+    }),
+    "env-inbox@map-esim.test"
+  );
+  assert.equal(
+    resolveEmailCampaignTestRecipient({
+      envValue: "bad",
+      formValue: "form-inbox@map-esim.test",
+    }),
+    "form-inbox@map-esim.test"
+  );
+  assert.equal(
+    resolveEmailCampaignTestRecipient({
+      envValue: "placeholder@example.com",
+      formValue: "form-inbox@map-esim.test",
+    }),
+    "form-inbox@map-esim.test"
+  );
+  assert.equal(
+    resolveEmailCampaignTestRecipient({
+      envValue: undefined,
+      formValue: "form-inbox@map-esim.test",
+    }),
+    "form-inbox@map-esim.test"
+  );
+  assert.equal(
+    resolveEmailCampaignTestRecipient({
+      envValue: "  ",
+      formValue: "  ",
+      fallbackEmail: "fallback@map-esim.test",
+    }),
+    "fallback@map-esim.test"
+  );
+  assert.equal(
+    resolveEmailCampaignTestRecipient({
+      envValue: "  ",
+      formValue: "  ",
+    }),
+    null
+  );
+  assert.equal(shared.includes("EMAIL_TEST_RECIPIENT"), true);
+  assert.doesNotMatch(shared, /process\.env\.EMAIL_TEST_RECIPIENT/);
+  assert.match(service, /resolveEmailCampaignTestRecipient/);
+  assert.match(service, /process\.env\.EMAIL_TEST_RECIPIENT/);
+  assert.match(service, /sendAdminEmailCampaignTest/);
+  assert.match(detailPage, /parseEmailCampaignTestRecipient/);
+  assert.match(detailPage, /process\.env\.EMAIL_TEST_RECIPIENT/);
+  assert.match(detailPage, /lockedToEnvRecipient/);
+  assert.match(sendForms, /lockedToEnvRecipient/);
+  assert.match(sendForms, /readOnly=\{lockedToEnvRecipient\}/);
+  // Bulk send path must not redirect to the test recipient.
+  const bulkFnStart = service.indexOf(
+    "export async function sendAdminEmailCampaignBulk"
+  );
+  assert.ok(bulkFnStart >= 0, "sendAdminEmailCampaignBulk missing");
+  const bulkFnNext = service.indexOf("\nexport async function", bulkFnStart + 1);
+  const bulkFnSrc = service.slice(
+    bulkFnStart,
+    bulkFnNext > 0 ? bulkFnNext : undefined
+  );
+  assert.doesNotMatch(bulkFnSrc, /EMAIL_TEST_RECIPIENT/);
+  assert.doesNotMatch(bulkFnSrc, /resolveEmailCampaignTestRecipient/);
+  assert.doesNotMatch(actions, /console\.(log|info|debug|warn|error)\([^)]*EMAIL_TEST/);
+  assert.doesNotMatch(service, /console\.(log|info|debug|warn|error)\([^)]*EMAIL_TEST/);
+  assert.doesNotMatch(detailPage, /console\.(log|info|debug|warn|error)\([^)]*EMAIL_TEST/);
+  console.log("   ok");
+
+  console.log("1c) Bulk-send gates unchanged");
   assert.equal(campaignCanStartBulkSend("DRAFT"), true);
   assert.equal(campaignCanStartBulkSend("TEST_SENT"), true);
   assert.equal(campaignCanStartBulkSend("SENDING"), false);

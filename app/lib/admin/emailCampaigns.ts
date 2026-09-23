@@ -27,6 +27,7 @@ import {
   parseEmailCampaignAudience,
   parseEmailCampaignTemplateKey,
   resolveEmailCampaignBatchDelayMs,
+  resolveEmailCampaignTestRecipient,
   sanitizeCampaignBody,
   sanitizeCampaignSubject,
   type EmailCampaignAudienceId,
@@ -328,6 +329,8 @@ export async function sendAdminEmailCampaignTest(input: {
   adminUserId: string;
   campaignId: string;
   testEmail: string;
+  /** Optional admin email fallback when env + form are empty. */
+  fallbackEmail?: string | null;
 }): Promise<void> {
   const campaign = await prisma.emailCampaign.findUnique({
     where: { id: input.campaignId.trim() },
@@ -342,9 +345,16 @@ export async function sendAdminEmailCampaignTest(input: {
   if (!campaign) {
     throw new EmailCampaignError("Campaign not found.");
   }
-  const to = input.testEmail.trim().toLowerCase();
-  if (!isSendableCustomerEmail(to)) {
-    throw new EmailCampaignError("Enter a valid test email.", "testEmail");
+  const to = resolveEmailCampaignTestRecipient({
+    envValue: process.env.EMAIL_TEST_RECIPIENT,
+    formValue: input.testEmail,
+    fallbackEmail: input.fallbackEmail,
+  });
+  if (!to || !isSendableCustomerEmail(to)) {
+    throw new EmailCampaignError(
+      "Enter a valid test email, or set EMAIL_TEST_RECIPIENT.",
+      "testEmail"
+    );
   }
   const result = await sendCampaignMessage({
     to,

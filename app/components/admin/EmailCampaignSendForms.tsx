@@ -31,9 +31,12 @@ function ActionMessage({ state }: { state: EmailCampaignActionState }) {
 export function EmailCampaignTestForm({
   campaignId,
   defaultTestEmail,
+  lockedToEnvRecipient = false,
 }: {
   campaignId: string;
   defaultTestEmail: string;
+  /** When EMAIL_TEST_RECIPIENT is configured, keep the field read-only. */
+  lockedToEnvRecipient?: boolean;
 }) {
   const [state, action, pending] = useActionState<
     EmailCampaignActionState,
@@ -50,9 +53,15 @@ export function EmailCampaignTestForm({
           type="email"
           required
           defaultValue={defaultTestEmail}
-          className="mt-1 w-full rounded-[12px] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--heading)]"
+          readOnly={lockedToEnvRecipient}
+          className="mt-1 w-full rounded-[12px] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--heading)] read-only:opacity-80"
         />
       </label>
+      {lockedToEnvRecipient ? (
+        <p className="text-xs text-[var(--text-muted)]">
+          Locked to server EMAIL_TEST_RECIPIENT (safe pre-bulk test inbox).
+        </p>
+      ) : null}
       <button
         type="submit"
         disabled={pending}

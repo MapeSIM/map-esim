@@ -5,6 +5,7 @@ import {
   EmailCampaignResendFailedForm,
   EmailCampaignTestForm,
 } from "@/app/components/admin/EmailCampaignSendForms";
+import { parseEmailCampaignTestRecipient } from "@/app/lib/admin/emailCampaignShared";
 import { getAdminEmailCampaignDetail } from "@/app/lib/admin/emailCampaigns";
 import { requireRole } from "@/app/lib/auth/session";
 
@@ -30,6 +31,9 @@ export default async function AdminEmailCampaignDetailPage({
 }) {
   const admin = await requireRole("ADMIN");
   const { id } = await params;
+  const envTestRecipient = parseEmailCampaignTestRecipient(
+    process.env.EMAIL_TEST_RECIPIENT
+  );
 
   let detail: Awaited<ReturnType<typeof getAdminEmailCampaignDetail>>;
   try {
@@ -112,10 +116,14 @@ export default async function AdminEmailCampaignDetailPage({
         <p className="text-sm text-[var(--text-muted)]">
           Sends one copy through the support channel. Does not start the bulk
           send.
+          {envTestRecipient
+            ? " Uses EMAIL_TEST_RECIPIENT when set on the server."
+            : null}
         </p>
         <EmailCampaignTestForm
           campaignId={detail.id}
-          defaultTestEmail={admin.email}
+          defaultTestEmail={envTestRecipient ?? admin.email}
+          lockedToEnvRecipient={Boolean(envTestRecipient)}
         />
       </section>
 
