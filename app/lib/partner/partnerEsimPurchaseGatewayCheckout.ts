@@ -75,6 +75,11 @@ export type StartPartnerEsimPurchaseHostedCheckoutInput = {
   partnerUserId: string;
   purchaseId: string;
   countryHint?: string | null;
+  /**
+   * Server-resolved funding flag. When omitted, uses purchase.useWallet
+   * (after setPartnerPurchaseFundingChoice) or defaults to true.
+   */
+  useWallet?: boolean;
   walletOperatorId?: string;
   customerMsisdn?: string;
   /** Test seam only. */
@@ -475,6 +480,7 @@ export async function startPartnerEsimPurchaseHostedCheckout(
       discountBps: true,
       discountVersion: true,
       partnerChargeCents: true,
+      useWallet: true,
       walletAppliedCents: true,
       gatewayAmountCents: true,
       currency: true,
@@ -519,16 +525,21 @@ export async function startPartnerEsimPurchaseHostedCheckout(
     verified,
   });
 
+  const useWallet =
+    input.useWallet !== undefined
+      ? Boolean(input.useWallet)
+      : purchase.useWallet;
+
   // Fresh balance for READY; awaiting resumes use snapshotted funding.
   let funding = calculatePartnerPurchaseFunding({
     partnerChargeCents: purchase.partnerChargeCents,
     walletBalanceCents: partner.balanceCents,
-    useWallet: true,
+    useWallet,
   });
 
   if (purchase.status === PartnerEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT) {
     funding = {
-      useWallet: true,
+      useWallet: purchase.useWallet,
       walletAppliedCents: purchase.walletAppliedCents,
       gatewayAmountCents: purchase.gatewayAmountCents,
       partnerChargeCents: purchase.partnerChargeCents,

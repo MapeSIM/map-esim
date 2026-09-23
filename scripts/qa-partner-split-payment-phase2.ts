@@ -25,6 +25,12 @@ import {
   partnerEsimPurchasePaymentReturnPath,
 } from "../app/lib/partner/partnerEsimPurchaseCheckoutPaths";
 import { resolvePartnerPaymentReturnKind } from "../app/lib/partner/partnerEsimPurchasePaymentReturnState";
+import {
+  parsePartnerEsimPaymentMode,
+  resolvePartnerCheckoutUseWallet,
+  useWalletFromPartnerPaymentMode,
+} from "../app/lib/partner/partnerPurchaseValidation";
+import { resolvePartnerPaymentModeVisibility } from "../app/lib/partner/partnerPaymentModeUi";
 
 const root = join(__dirname, "..");
 
@@ -153,6 +159,7 @@ function main() {
   assert.match(buy, /checkout_redirect/);
   assert.match(buy, /reservePartnerEsimPurchase/);
   assert.match(buy, /executePartnerEsimProviderPurchase/);
+  assert.match(buy, /setPartnerPurchaseFundingChoice/);
   // Wallet-only path still present; gateway path must not call provider.
   assert.doesNotMatch(gateway, /executePartnerEsimProviderPurchase|executeCreditCheckout/);
   assert.match(gateway, /AWAITING_GATEWAY_PAYMENT/);
@@ -160,12 +167,17 @@ function main() {
   assert.match(gateway, /partnerEsimPurchasePaymentAttempt\.create/);
   assert.match(gateway, /purpose:\s*"PARTNER_ESIM_PURCHASE"/);
   assert.match(gateway, /browserReturnMustNotFundPartnerEsimPurchase/);
+  assert.match(gateway, /input\.useWallet/);
+  assert.match(gateway, /purchase\.useWallet/);
 
   assert.match(actions, /checkout_redirect/);
   assert.match(actions, /redirect\(result\.checkoutUrl\)/);
   assert.match(actions, /walletOperatorId/);
   assert.match(actions, /void formData\.get\("walletAppliedCents"\)/);
   assert.match(actions, /void formData\.get\("gatewayAmountCents"\)/);
+  assert.match(actions, /resolvePartnerCheckoutUseWallet/);
+  assert.match(actions, /setPartnerPurchaseFundingChoiceAction/);
+  assert.match(actions, /useWallet:\s*resolved\.useWallet/);
 
   assert.match(types, /PARTNER_ESIM_PURCHASE/);
   assert.match(adapter, /PARTNER_ESIM_PURCHASE/);
@@ -251,6 +263,129 @@ function main() {
     }),
     "completed"
   );
+  console.log("   ok");
+
+  console.log("7) Phase A payment mode + funding choice (no UI)");
+  assert.equal(useWalletFromPartnerPaymentMode("full_wallet"), true);
+  assert.equal(useWalletFromPartnerPaymentMode("wallet_and_mobile"), true);
+  assert.equal(useWalletFromPartnerPaymentMode("mobile_only"), false);
+  assert.equal(parsePartnerEsimPaymentMode("full_wallet").ok, true);
+  assert.equal(parsePartnerEsimPaymentMode("nope").ok, false);
+
+  const emptyFd = new FormData();
+  assert.equal(resolvePartnerCheckoutUseWallet(emptyFd).useWallet, true);
+  emptyFd.set("paymentMode", "mobile_only");
+  assert.equal(resolvePartnerCheckoutUseWallet(emptyFd).useWallet, false);
+  const walletFd = new FormData();
+  walletFd.set("paymentMode", "wallet_and_mobile");
+  assert.equal(resolvePartnerCheckoutUseWallet(walletFd).useWallet, true);
+
+  const full = calculatePartnerPurchaseFunding({
+    partnerChargeCents: 1000,
+    walletBalanceCents: 1000,
+    useWallet: true,
+  });
+  assert.equal(full.gatewayAmountCents, 0);
+  assert.equal(full.fundingKind, "wallet_only");
+
+  const partial = calculatePartnerPurchaseFunding({
+    partnerChargeCents: 1000,
+    walletBalanceCents: 250,
+    useWallet: true,
+  });
+  assert.equal(partial.walletAppliedCents, 250);
+  assert.equal(partial.gatewayAmountCents, 750);
+  assert.equal(partial.fundingKind, "split");
+
+  const zero = calculatePartnerPurchaseFunding({
+    partnerChargeCents: 1000,
+    walletBalanceCents: 0,
+    useWallet: true,
+  });
+  assert.equal(zero.walletAppliedCents, 0);
+  assert.equal(zero.gatewayAmountCents, 1000);
+  assert.equal(zero.fundingKind, "gateway_only");
+
+  const mobileOnly = calculatePartnerPurchaseFunding({
+    partnerChargeCents: 1000,
+    walletBalanceCents: 500,
+    useWallet: false,
+  });
+  assert.equal(mobileOnly.walletAppliedCents, 0);
+  assert.equal(mobileOnly.gatewayAmountCents, 1000);
+  assert.equal(mobileOnly.fundingKind, "gateway_only");
+
+  const pep = read("app/lib/partner/partnerEsimPurchase.ts");
+  assert.match(pep, /export async function setPartnerPurchaseFundingChoice/);
+  assert.match(pep, /OrderFundingSource\.PARTNER_BALANCE/);
+  assert.match(pep, /OrderFundingSource\.PARTNER_SPLIT/);
+  assert.match(pep, /OrderFundingSource\.PARTNER_GATEWAY/);
+  assert.match(
+    buy,
+    /full wallet coverage → fall through to wallet-only path/
+  );
+  assert.doesNotMatch(buy, /applyVerifiedPartnerEsimPurchasePaymentEvent/);
+  assert.doesNotMatch(gateway, /applyVerifiedPartnerEsimPurchasePaymentEvent/);
+  console.log("   ok");
+
+  console.log("8) Phase B partner payment UI visibility");
+  // Full wallet: Buy with Partner balance + Pay online; never wallet+online.
+  const fullVis = resolvePartnerPaymentModeVisibility({
+    payableCents: 1000,
+    balanceCents: 1000,
+    onlinePaymentsAllowed: true,
+  });
+  assert.equal(fullVis.showFullWalletOption, true);
+  assert.equal(fullVis.showWalletAndOnlineOption, false);
+  assert.equal(fullVis.showOnlinePaymentOption, true);
+  assert.equal(fullVis.defaultMode, "full_wallet");
+
+  const fullVisNoGateway = resolvePartnerPaymentModeVisibility({
+    payableCents: 1000,
+    balanceCents: 1000,
+    onlinePaymentsAllowed: false,
+  });
+  assert.equal(fullVisNoGateway.showFullWalletOption, true);
+  assert.equal(fullVisNoGateway.showWalletAndOnlineOption, false);
+  assert.equal(fullVisNoGateway.showOnlinePaymentOption, false);
+  assert.equal(fullVisNoGateway.defaultMode, "full_wallet");
+
+  const partialVis = resolvePartnerPaymentModeVisibility({
+    payableCents: 1000,
+    balanceCents: 250,
+    onlinePaymentsAllowed: true,
+  });
+  assert.equal(partialVis.showFullWalletOption, false);
+  assert.equal(partialVis.showWalletAndOnlineOption, true);
+  assert.equal(partialVis.showOnlinePaymentOption, true);
+  assert.equal(partialVis.defaultMode, "wallet_and_mobile");
+
+  const zeroVis = resolvePartnerPaymentModeVisibility({
+    payableCents: 1000,
+    balanceCents: 0,
+    onlinePaymentsAllowed: true,
+  });
+  assert.equal(zeroVis.showFullWalletOption, false);
+  assert.equal(zeroVis.showWalletAndOnlineOption, false);
+  assert.equal(zeroVis.showOnlinePaymentOption, true);
+  assert.equal(zeroVis.defaultMode, "mobile_only");
+
+  const catalogUi = read("app/components/partner/PartnerCatalogBuy.tsx");
+  const storefrontUi = read("app/components/partner/PartnerStorefrontBuy.tsx");
+  const paymentForm = read(
+    "app/components/partner/PartnerOfferPaymentForm.tsx"
+  );
+  const modeUi = read("app/lib/partner/partnerPaymentModeUi.ts");
+  assert.match(catalogUi, /PartnerOfferPaymentForm/);
+  assert.match(storefrontUi, /PartnerOfferPaymentForm/);
+  assert.match(paymentForm, /paymentMode/);
+  assert.match(paymentForm, /Buy with Partner balance/);
+  assert.match(paymentForm, /Pay online/);
+  assert.match(paymentForm, /Continue to payment/);
+  assert.match(modeUi, /Never show Wallet \+ online split/);
+  assert.doesNotMatch(catalogUi, /partnerChargeCents/);
+  assert.doesNotMatch(storefrontUi, /partnerChargeCents/);
+  assert.doesNotMatch(paymentForm, /partnerChargeCents/);
   console.log("   ok");
 
   console.log("ALL_QA_PASSED=partner-split-payment-phase2");

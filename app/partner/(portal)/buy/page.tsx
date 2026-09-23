@@ -5,6 +5,7 @@ import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
 import { listPartnerCatalogOffers } from "@/app/lib/partner/partnerCatalogRead";
 import { isPartnerEsimSplitPaymentEnabled } from "@/app/lib/partner/partnerEsimSplitPaymentPolicy";
 import PartnerStorefrontBuy from "@/app/components/partner/PartnerStorefrontBuy";
+import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
 import {
   normalizeOfferId,
   sanitizeCountryHint,
@@ -65,9 +66,10 @@ export default async function PartnerStorefrontBuyPage({
       select: { balanceCents: true },
     }),
   ]);
+  const balanceCents = wallet?.balanceCents ?? 0;
   const offers = await listPartnerCatalogOffers(country, {
     discountBps: profile?.discountBps ?? 0,
-    walletBalanceCents: wallet?.balanceCents ?? 0,
+    walletBalanceCents: balanceCents,
     splitPaymentEnabled,
   });
   const offer = offers.find((row) => row.offerId === offerId) ?? null;
@@ -101,8 +103,10 @@ export default async function PartnerStorefrontBuyPage({
       <PartnerStorefrontBuy
         offer={offer}
         destinationCode={country}
-        balanceLabel={formatUsdCents(wallet?.balanceCents ?? 0)}
+        balanceLabel={formatUsdCents(balanceCents)}
+        balanceCents={balanceCents}
         splitPaymentEnabled={splitPaymentEnabled}
+        paymentGatewayConfigured={isPaymentGatewayConfigured()}
       />
     </div>
   );

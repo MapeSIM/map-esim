@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireRole } from "@/app/lib/auth/session";
+import { prisma } from "@/app/lib/db";
 import {
   getPartnerBalanceLabel,
   requireActivePartnerActor,
@@ -7,6 +8,7 @@ import {
 import { listPartnerCatalogDestinations } from "@/app/lib/partner/partnerCatalogRead";
 import PartnerCatalogBuy from "@/app/components/partner/PartnerCatalogBuy";
 import { isPartnerEsimSplitPaymentEnabled } from "@/app/lib/partner/partnerEsimSplitPaymentPolicy";
+import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
 
 export const dynamic = "force-dynamic";
 
@@ -34,15 +36,21 @@ export default async function PartnerCatalogPage() {
     ReturnType<typeof listPartnerCatalogDestinations>
   > = [];
   let balanceLabel = "$0.00";
+  let balanceCents = 0;
   let loadError = false;
 
   try {
-    const [dest, balance] = await Promise.all([
+    const [dest, balance, wallet] = await Promise.all([
       listPartnerCatalogDestinations(),
       getPartnerBalanceLabel(user.id),
+      prisma.partnerWalletAccount.findUnique({
+        where: { partnerId: actor.partnerId },
+        select: { balanceCents: true },
+      }),
     ]);
     destinations = dest;
     balanceLabel = balance ?? "$0.00";
+    balanceCents = wallet?.balanceCents ?? 0;
   } catch {
     loadError = true;
   }
@@ -80,7 +88,9 @@ export default async function PartnerCatalogPage() {
       <PartnerCatalogBuy
         destinations={destinations}
         balanceLabel={balanceLabel}
+        balanceCents={balanceCents}
         splitPaymentEnabled={isPartnerEsimSplitPaymentEnabled()}
+        paymentGatewayConfigured={isPaymentGatewayConfigured()}
       />
     </div>
   );

@@ -22,6 +22,11 @@ import {
 } from "@/app/lib/partner/partnerPurchaseFormState";
 import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
 import {
+  setPartnerPurchaseFundingChoice,
+  PartnerEsimPurchaseError,
+} from "@/app/lib/partner/partnerEsimPurchase";
+import { resolvePartnerCheckoutUseWallet } from "@/app/lib/partner/partnerPurchaseValidation";
+import {
   extractCountryHintFromOfferId,
   normalizeOfferId,
   sanitizeCountryHint,
@@ -57,8 +62,63 @@ export async function loadPartnerCatalogOffersAction(
 }
 
 /**
- * Partner buy: prepare → reserve → provider.
- * Accepts only offerId + destination hint + idempotency key.
+ * Persist READY purchase funding choice. Accepts paymentMode / useWallet only —
+ * never client money. Does not reserve wallet or start gateway.
+ */
+export async function setPartnerPurchaseFundingChoiceAction(
+  _prev: PartnerPurchaseActionState,
+  formData: FormData
+): Promise<PartnerPurchaseActionState> {
+  const user = await requireRole("PARTNER");
+  const actor = await requireActivePartnerActor(user.id);
+  if (!actor) {
+    return mapPartnerPurchaseErrorCode("PARTNER_UNAVAILABLE");
+  }
+
+  const purchaseId = String(formData.get("purchaseId") ?? "").trim();
+  const resolved = resolvePartnerCheckoutUseWallet(formData);
+  if (resolved.error) {
+    return {
+      ok: false,
+      kind: "invalid",
+      message: resolved.error,
+      fieldErrors: { paymentMode: resolved.error },
+    };
+  }
+
+  void formData.get("walletAppliedCents");
+  void formData.get("gatewayAmountCents");
+  void formData.get("partnerChargeCents");
+  void formData.get("price");
+  void formData.get("retailPriceCents");
+
+  if (!purchaseId || purchaseId.length > 64) {
+    return {
+      ok: false,
+      kind: "invalid",
+      message: "This purchase is unavailable.",
+    };
+  }
+
+  try {
+    await setPartnerPurchaseFundingChoice({
+      partnerUserId: actor.userId,
+      purchaseId,
+      useWallet: resolved.useWallet,
+    });
+  } catch (error) {
+    if (error instanceof PartnerEsimPurchaseError) {
+      return mapPartnerPurchaseErrorCode(error.code, purchaseId);
+    }
+    return mapPartnerPurchaseErrorCode("UNAVAILABLE", purchaseId);
+  }
+
+  return { ok: true, kind: "idle" };
+}
+
+/**
+ * Partner buy: prepare → reserve → provider (or split checkout when enabled).
+ * Accepts offerId + destination hint + idempotency key + optional paymentMode.
  * Never trusts client price / discount / charge fields.
  */
 export async function buyPartnerEsimAction(
@@ -76,6 +136,15 @@ export async function buyPartnerEsimAction(
   const idempotencyParsed = parseWalletPurchaseIdempotencyKey(
     formData.get("idempotencyKey")
   );
+  const resolved = resolvePartnerCheckoutUseWallet(formData);
+  if (resolved.error) {
+    return {
+      ok: false,
+      kind: "invalid",
+      message: resolved.error,
+      fieldErrors: { paymentMode: resolved.error },
+    };
+  }
 
   // Never trust browser money / commercial fields.
   void formData.get("price");
@@ -91,6 +160,7 @@ export async function buyPartnerEsimAction(
   void formData.get("finalPriceCents");
   void formData.get("walletAppliedCents");
   void formData.get("gatewayAmountCents");
+  void formData.get("useWallet");
 
   const walletOperatorId = String(formData.get("walletOperatorId") ?? "").trim();
   const customerMsisdn = String(formData.get("customerMsisdn") ?? "").trim();
@@ -125,6 +195,7 @@ export async function buyPartnerEsimAction(
     offerId,
     countryHint,
     idempotencyKey: idempotencyParsed.value,
+    useWallet: resolved.useWallet,
     walletOperatorId: walletOperatorId || undefined,
     customerMsisdn: customerMsisdn || undefined,
   }).then((result) => {

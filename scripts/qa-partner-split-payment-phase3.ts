@@ -78,6 +78,14 @@ function main() {
   });
   assert.equal(gatewayOnly.fundingKind, "gateway_only");
   assert.equal(partnerPurchaseRequiresGateway(gatewayOnly), true);
+  const gatewayOnlyExplicit = calculatePartnerPurchaseFunding({
+    partnerChargeCents: 1000,
+    walletBalanceCents: 500,
+    useWallet: false,
+  });
+  assert.equal(gatewayOnlyExplicit.fundingKind, "gateway_only");
+  assert.equal(gatewayOnlyExplicit.walletAppliedCents, 0);
+  assert.equal(gatewayOnlyExplicit.gatewayAmountCents, 1000);
   console.log("   ok");
 
   const apply = read("app/lib/partner/partnerEsimPurchasePaymentApply.ts");

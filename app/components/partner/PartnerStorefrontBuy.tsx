@@ -5,7 +5,7 @@ import Link from "next/link";
 import { buyPartnerEsimAction } from "@/app/lib/partner/partnerPurchaseActions";
 import type { PartnerCatalogOffer } from "@/app/lib/partner/partnerCatalogRead";
 import { initialPartnerPurchaseActionState } from "@/app/lib/partner/partnerPurchaseFormState";
-import SimpaisaWalletFields from "@/app/components/account/SimpaisaWalletFields";
+import PartnerOfferPaymentForm from "@/app/components/partner/PartnerOfferPaymentForm";
 
 function newIdempotencyKey(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -18,18 +18,26 @@ export default function PartnerStorefrontBuy({
   offer,
   destinationCode,
   balanceLabel,
+  balanceCents,
   splitPaymentEnabled = false,
+  paymentGatewayConfigured = false,
 }: {
   offer: PartnerCatalogOffer;
   destinationCode: string;
   balanceLabel: string;
+  balanceCents: number;
   splitPaymentEnabled?: boolean;
+  paymentGatewayConfigured?: boolean;
 }) {
   const [buyState, buyAction, buyPending] = useActionState(
     buyPartnerEsimAction,
     initialPartnerPurchaseActionState
   );
   const idempotencyKey = useMemo(() => newIdempotencyKey(), []);
+  const payableCents =
+    splitPaymentEnabled && offer.fundingDisplay
+      ? offer.fundingDisplay.totalCents
+      : 0;
 
   const showResult =
     buyState.kind !== "idle" &&
@@ -48,6 +56,13 @@ export default function PartnerStorefrontBuy({
         <p className="mt-1 text-[var(--text-muted)]">
           The price below is your Partner price for this plan.
         </p>
+        {splitPaymentEnabled ? (
+          <p className="mt-2 text-xs text-[var(--text-muted)]">
+            Choose full Partner balance when it covers the plan. If balance is
+            short, apply wallet funds and pay the remainder online, or pay
+            online only.
+          </p>
+        ) : null}
       </div>
 
       {showResult ? (
@@ -91,64 +106,20 @@ export default function PartnerStorefrontBuy({
           <p className="mt-2 text-lg font-bold tabular-nums text-[var(--heading)]">
             {offer.partnerPriceLabel}
           </p>
-          {offer.fundingDisplay?.requiresGateway ? (
-            <dl className="mt-3 space-y-1 text-sm text-[var(--text-muted)]">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                <dt>Total amount</dt>
-                <dd className="font-semibold tabular-nums text-[var(--heading)]">
-                  {offer.fundingDisplay.totalLabel}
-                </dd>
-              </div>
-              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                <dt>Wallet applied</dt>
-                <dd className="font-semibold tabular-nums text-[var(--heading)]">
-                  {offer.fundingDisplay.walletAppliedLabel}
-                </dd>
-              </div>
-              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                <dt>Remaining to pay</dt>
-                <dd className="font-semibold tabular-nums text-[var(--heading)]">
-                  {offer.fundingDisplay.gatewayRemainingLabel}
-                </dd>
-              </div>
-            </dl>
-          ) : null}
-          <form action={buyAction} className="mt-5 space-y-3">
-            <input type="hidden" name="offerId" value={offer.offerId} />
-            <input
-              type="hidden"
-              name="destinationCode"
-              value={destinationCode}
+          <div className="mt-5">
+            <PartnerOfferPaymentForm
+              offerId={offer.offerId}
+              destinationCode={destinationCode}
+              idempotencyKey={idempotencyKey}
+              payableCents={payableCents}
+              balanceCents={balanceCents}
+              splitPaymentEnabled={splitPaymentEnabled}
+              paymentGatewayConfigured={paymentGatewayConfigured}
+              buyAction={buyAction}
+              buyPending={buyPending}
+              buyState={buyState}
             />
-            <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
-            {splitPaymentEnabled ? (
-              <SimpaisaWalletFields
-                usdCents={0}
-                disabled={buyPending}
-                operatorError={
-                  !buyState.ok && buyState.fieldErrors?.walletOperatorId
-                    ? buyState.fieldErrors.walletOperatorId
-                    : undefined
-                }
-                msisdnError={
-                  !buyState.ok && buyState.fieldErrors?.customerMsisdn
-                    ? buyState.fieldErrors.customerMsisdn
-                    : undefined
-                }
-              />
-            ) : null}
-            <button
-              type="submit"
-              disabled={buyPending}
-              className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] disabled:opacity-60 sm:w-auto"
-            >
-              {buyPending
-                ? "Purchasing…"
-                : offer.fundingDisplay?.requiresGateway
-                  ? "Continue to payment"
-                  : "Buy with Partner balance"}
-            </button>
-          </form>
+          </div>
         </div>
       )}
     </div>

@@ -136,19 +136,27 @@ function main() {
   console.log("   ok");
 
   console.log("5) Wallet-only prepare still writes PARTNER_BALANCE defaults");
+  const prepareFn = prepare.slice(
+    prepare.indexOf("export async function preparePartnerEsimPurchase"),
+    prepare.indexOf("export async function setPartnerPurchaseFundingChoice")
+  );
   assert.match(
-    prepare,
+    prepareFn,
     /walletAppliedCents:\s*snapshot\.partnerChargeCents/
   );
-  assert.match(prepare, /gatewayAmountCents:\s*0/);
-  assert.match(prepare, /useWallet:\s*true/);
-  assert.match(prepare, /fundingSource:\s*OrderFundingSource\.PARTNER_BALANCE/);
-  assert.doesNotMatch(prepare, /PARTNER_SPLIT|PARTNER_GATEWAY/);
-  assert.doesNotMatch(prepare, /AWAITING_GATEWAY_PAYMENT|PartnerEsimPurchasePaymentAttempt/);
+  assert.match(prepareFn, /gatewayAmountCents:\s*0/);
+  assert.match(prepareFn, /useWallet:\s*true/);
+  assert.match(prepareFn, /fundingSource:\s*OrderFundingSource\.PARTNER_BALANCE/);
+  assert.doesNotMatch(prepareFn, /PARTNER_SPLIT|PARTNER_GATEWAY/);
+  assert.doesNotMatch(prepareFn, /AWAITING_GATEWAY_PAYMENT|PartnerEsimPurchasePaymentAttempt/);
   // Buy may gate split behind flag; must still keep wallet-only reserve→provider path.
   assert.match(buy, /isPartnerEsimSplitPaymentEnabled/);
   assert.match(buy, /reservePartnerEsimPurchase/);
   assert.match(buy, /executePartnerEsimProviderPurchase/);
+  assert.match(buy, /setPartnerPurchaseFundingChoice/);
+  assert.match(prepare, /export async function setPartnerPurchaseFundingChoice/);
+  assert.match(prepare, /OrderFundingSource\.PARTNER_SPLIT/);
+  assert.match(prepare, /OrderFundingSource\.PARTNER_GATEWAY/);
   assert.match(pkg, /qa:partner-split-funding-schema/);
   console.log("   ok");
 

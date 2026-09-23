@@ -20,7 +20,7 @@ import type {
   PartnerCatalogOffer,
 } from "@/app/lib/partner/partnerCatalogRead";
 import { initialPartnerPurchaseActionState } from "@/app/lib/partner/partnerPurchaseFormState";
-import SimpaisaWalletFields from "@/app/components/account/SimpaisaWalletFields";
+import PartnerOfferPaymentForm from "@/app/components/partner/PartnerOfferPaymentForm";
 import { filterPlansDiscoveryDestinations } from "@/app/lib/plans/plansDiscovery";
 import {
   resolveDestinationFlagVisual,
@@ -31,8 +31,10 @@ import type { VesimDestination } from "@/app/lib/vesim/destinations";
 type Props = {
   destinations: PartnerCatalogDestination[];
   balanceLabel: string;
-  /** When true, show Simpaisa fields for gateway remainder (feature-flagged). */
+  balanceCents: number;
+  /** When true, show payment mode + gateway remainder (feature-flagged). */
   splitPaymentEnabled?: boolean;
+  paymentGatewayConfigured?: boolean;
 };
 
 function newIdempotencyKey(): string {
@@ -117,7 +119,9 @@ function DestinationFlagMark({
 export default function PartnerCatalogBuy({
   destinations,
   balanceLabel,
+  balanceCents,
   splitPaymentEnabled = false,
+  paymentGatewayConfigured = false,
 }: Props) {
   const searchFieldId = useId();
   const offersHeadingId = useId();
@@ -209,9 +213,9 @@ export default function PartnerCatalogBuy({
         </p>
         {splitPaymentEnabled ? (
           <p className="mt-2 text-xs text-[var(--text-muted)]">
-            If your Partner balance is short, the remainder can be paid with
-            JazzCash or Easypaisa. Full-balance purchases still use Partner
-            wallet only.
+            Choose full Partner balance when it covers the plan. If balance is
+            short, apply wallet funds and pay the remainder online, or pay
+            online only.
           </p>
         ) : null}
       </div>
@@ -369,88 +373,53 @@ export default function PartnerCatalogBuy({
           </p>
         ) : (
           <ul className="mt-4 space-y-3">
-            {offers.map((offer) => (
-              <li
-                key={offer.offerId}
-                className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5"
-              >
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0 space-y-1">
-                    <p className="text-base font-semibold text-[var(--heading)]">
-                      {offer.name}
-                    </p>
-                    <p className="text-sm text-[var(--text-muted)]">
-                      {offer.dataLabel}
-                      <span className="mx-1.5 text-[var(--text-soft)]">·</span>
-                      {offer.validityLabel}
-                    </p>
-                    <p className="text-lg font-bold tabular-nums text-[var(--heading)]">
-                      {offer.partnerPriceLabel}
-                    </p>
-                    {offer.fundingDisplay?.requiresGateway ? (
-                      <dl className="mt-2 space-y-1 text-sm text-[var(--text-muted)]">
-                        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                          <dt>Total amount</dt>
-                          <dd className="font-semibold tabular-nums text-[var(--heading)]">
-                            {offer.fundingDisplay.totalLabel}
-                          </dd>
-                        </div>
-                        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                          <dt>Wallet applied</dt>
-                          <dd className="font-semibold tabular-nums text-[var(--heading)]">
-                            {offer.fundingDisplay.walletAppliedLabel}
-                          </dd>
-                        </div>
-                        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                          <dt>Remaining to pay</dt>
-                          <dd className="font-semibold tabular-nums text-[var(--heading)]">
-                            {offer.fundingDisplay.gatewayRemainingLabel}
-                          </dd>
-                        </div>
-                      </dl>
-                    ) : null}
-                  </div>
-                  <form action={buyAction} className="shrink-0 space-y-3 sm:min-w-[220px]">
-                    <input type="hidden" name="offerId" value={offer.offerId} />
-                    <input
-                      type="hidden"
-                      name="destinationCode"
-                      value={selectedCode}
-                    />
-                    <input
-                      type="hidden"
-                      name="idempotencyKey"
-                      value={
-                        idempotencyByOffer[offer.offerId] || newIdempotencyKey()
-                      }
-                    />
-                    {splitPaymentEnabled ? (
-                      <SimpaisaWalletFields
-                        usdCents={0}
-                        disabled={buyPending}
-                        operatorError={
-                          !buyState.ok && buyState.fieldErrors?.walletOperatorId
-                            ? buyState.fieldErrors.walletOperatorId
-                            : undefined
+            {offers.map((offer) => {
+              const payableCents = offer.fundingDisplay?.totalCents ?? 0;
+              return (
+                <li
+                  key={offer.offerId}
+                  className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5"
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 space-y-1">
+                      <p className="text-base font-semibold text-[var(--heading)]">
+                        {offer.name}
+                      </p>
+                      <p className="text-sm text-[var(--text-muted)]">
+                        {offer.dataLabel}
+                        <span className="mx-1.5 text-[var(--text-soft)]">·</span>
+                        {offer.validityLabel}
+                      </p>
+                      <p className="text-lg font-bold tabular-nums text-[var(--heading)]">
+                        {offer.partnerPriceLabel}
+                      </p>
+                    </div>
+                    {selectedCode ? (
+                      <PartnerOfferPaymentForm
+                        compact
+                        offerId={offer.offerId}
+                        destinationCode={selectedCode}
+                        idempotencyKey={
+                          idempotencyByOffer[offer.offerId] ||
+                          newIdempotencyKey()
                         }
-                        msisdnError={
-                          !buyState.ok && buyState.fieldErrors?.customerMsisdn
-                            ? buyState.fieldErrors.customerMsisdn
-                            : undefined
+                        payableCents={
+                          splitPaymentEnabled && payableCents > 0
+                            ? payableCents
+                            : 0
                         }
+                        balanceCents={balanceCents}
+                        splitPaymentEnabled={splitPaymentEnabled}
+                        paymentGatewayConfigured={paymentGatewayConfigured}
+                        buyAction={buyAction}
+                        buyPending={buyPending}
+                        buyState={buyState}
                       />
                     ) : null}
-                    <button
-                      type="submit"
-                      disabled={buyPending}
-                      className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-                    >
-                      {buyPending ? "Purchasing…" : "Buy"}
-                    </button>
-                  </form>
-                </div>
-              </li>
-            ))}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

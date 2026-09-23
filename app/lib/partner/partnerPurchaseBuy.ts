@@ -9,11 +9,11 @@
 import "server-only";
 
 import { PartnerEsimPurchaseStatus, Prisma } from "@prisma/client";
-import { prisma } from "@/app/lib/db";
 import {
   PartnerEsimPurchaseError,
   preparePartnerEsimPurchase,
   reservePartnerEsimPurchase,
+  setPartnerPurchaseFundingChoice,
   type PartnerOfferVerifier,
 } from "@/app/lib/partner/partnerEsimPurchase";
 import {
@@ -25,10 +25,7 @@ import {
   startPartnerEsimPurchaseHostedCheckout,
 } from "@/app/lib/partner/partnerEsimPurchaseGatewayCheckout";
 import { isPartnerEsimSplitPaymentEnabled } from "@/app/lib/partner/partnerEsimSplitPaymentPolicy";
-import {
-  calculatePartnerPurchaseFunding,
-  partnerPurchaseRequiresGateway,
-} from "@/app/lib/partner/partnerPurchaseFunding";
+import { partnerPurchaseRequiresGateway } from "@/app/lib/partner/partnerPurchaseFunding";
 import {
   mapPartnerPurchaseErrorCode,
   type PartnerPurchaseActionState,
@@ -40,6 +37,11 @@ export type BuyPartnerEsimPurchaseInput = {
   offerId: string;
   idempotencyKey: string;
   countryHint?: string | null;
+  /**
+   * Server-resolved funding flag from paymentMode / useWallet.
+   * Defaults true (legacy Partner UI) when omitted.
+   */
+  useWallet?: boolean;
   walletOperatorId?: string;
   customerMsisdn?: string;
   /** Test seams only. */
@@ -118,6 +120,7 @@ export async function buyPartnerEsimPurchase(
     };
   }
 
+  const useWallet = input.useWallet !== false;
   let purchaseId: string | undefined;
 
   try {
@@ -162,37 +165,37 @@ export async function buyPartnerEsimPurchase(
         status === PartnerEsimPurchaseStatus.DRAFT ||
         status === PartnerEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT)
     ) {
-      const purchase = await prisma.partnerEsimPurchase.findUnique({
-        where: { id: prepared.purchaseId },
-        select: {
-          partnerChargeCents: true,
-          status: true,
-          gatewayAmountCents: true,
-        },
-      });
-      if (!purchase) {
-        return mapPartnerPurchaseErrorCode("INVALID_STATE", prepared.purchaseId);
+      let funding:
+        | Awaited<ReturnType<typeof setPartnerPurchaseFundingChoice>>
+        | null = null;
+      let tryGatewayResume = status === PartnerEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT;
+
+      if (status === PartnerEsimPurchaseStatus.READY) {
+        try {
+          funding = await setPartnerPurchaseFundingChoice({
+            partnerUserId: actor.userId,
+            purchaseId: prepared.purchaseId,
+            useWallet,
+          });
+        } catch (error) {
+          if (
+            error instanceof PartnerEsimPurchaseError &&
+            error.code === "INVALID_STATE"
+          ) {
+            // May already have left READY (race) — try gateway resume below.
+            funding = null;
+            tryGatewayResume = true;
+          } else if (error instanceof PartnerEsimPurchaseError) {
+            return mapPartnerPurchaseErrorCode(error.code, prepared.purchaseId);
+          } else {
+            throw error;
+          }
+        }
       }
 
-      let needsGateway =
-        purchase.status === PartnerEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT &&
-        purchase.gatewayAmountCents > 0;
-
-      if (
-        purchase.status === PartnerEsimPurchaseStatus.READY ||
-        purchase.status === PartnerEsimPurchaseStatus.DRAFT
-      ) {
-        const wallet = await prisma.partnerWalletAccount.findUnique({
-          where: { partnerId: actor.partnerId },
-          select: { balanceCents: true },
-        });
-        const funding = calculatePartnerPurchaseFunding({
-          partnerChargeCents: purchase.partnerChargeCents,
-          walletBalanceCents: wallet?.balanceCents ?? 0,
-          useWallet: true,
-        });
-        needsGateway = partnerPurchaseRequiresGateway(funding);
-      }
+      const needsGateway = funding
+        ? partnerPurchaseRequiresGateway(funding)
+        : tryGatewayResume;
 
       if (needsGateway) {
         try {
@@ -200,6 +203,7 @@ export async function buyPartnerEsimPurchase(
             partnerUserId: actor.userId,
             purchaseId: prepared.purchaseId,
             countryHint: input.countryHint,
+            useWallet,
             walletOperatorId: input.walletOperatorId,
             customerMsisdn: input.customerMsisdn,
             verifyOffer: input.verifyOffer,
@@ -213,9 +217,19 @@ export async function buyPartnerEsimPurchase(
           };
         } catch (error) {
           if (error instanceof PartnerEsimPurchaseGatewayCheckoutError) {
-            return mapGatewayCheckoutError(error, prepared.purchaseId);
+            // Full wallet after funding change while awaiting — fall through.
+            // else: full wallet coverage → fall through to wallet-only path
+            if (
+              !(
+                error.code === "INVALID_STATE" &&
+                error.message.includes("does not require card payment")
+              )
+            ) {
+              return mapGatewayCheckoutError(error, prepared.purchaseId);
+            }
+          } else {
+            throw error;
           }
-          throw error;
         }
       }
       // else: full wallet coverage → fall through to wallet-only path

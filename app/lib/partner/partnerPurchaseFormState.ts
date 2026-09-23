@@ -60,6 +60,7 @@ export type PartnerPurchaseActionState =
         offerId?: string;
         destination?: string;
         idempotencyKey?: string;
+        paymentMode?: string;
         walletOperatorId?: string;
         customerMsisdn?: string;
       };

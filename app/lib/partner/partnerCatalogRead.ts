@@ -39,6 +39,10 @@ export type PartnerCatalogFundingDisplay = {
   walletAppliedLabel: string;
   gatewayRemainingLabel: string;
   requiresGateway: boolean;
+  /** Final Partner payable after discount (integer USD cents). */
+  totalCents: number;
+  walletAppliedCents: number;
+  gatewayAmountCents: number;
 };
 
 /** Partner-facing offer card. No discount / provider / charge cents fields. */
@@ -116,6 +120,9 @@ function buildPartnerCatalogOfferDisplay(input: {
       walletAppliedLabel: `${formatUsdCents(funding.walletAppliedCents)} USD`,
       gatewayRemainingLabel: `${formatUsdCents(funding.gatewayAmountCents)} USD`,
       requiresGateway: partnerPurchaseRequiresGateway(funding),
+      totalCents: funding.partnerChargeCents,
+      walletAppliedCents: funding.walletAppliedCents,
+      gatewayAmountCents: funding.gatewayAmountCents,
     };
   }
 

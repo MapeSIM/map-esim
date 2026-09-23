@@ -23,6 +23,9 @@ import {
   PARTNER_PRICING_UNAVAILABLE_MESSAGE,
 } from "@/app/lib/partner/partnerPricing";
 import {
+  calculatePartnerPurchaseFunding,
+} from "@/app/lib/partner/partnerPurchaseFunding";
+import {
   PartnerPurchaseWalletError,
   reservePartnerPurchaseFundsInTx,
 } from "@/app/lib/partner/partnerPurchaseWallet";
@@ -66,6 +69,22 @@ export type ReservePartnerEsimPurchaseResult = {
   status: PartnerEsimPurchaseStatus;
   debitTransactionId: string | null;
   duplicate: boolean;
+};
+
+export type SetPartnerPurchaseFundingChoiceInput = {
+  partnerUserId: string;
+  purchaseId: string;
+  useWallet: boolean;
+};
+
+export type SetPartnerPurchaseFundingChoiceResult = {
+  purchaseId: string;
+  useWallet: boolean;
+  partnerChargeCents: number;
+  walletAppliedCents: number;
+  gatewayAmountCents: number;
+  balanceCents: number;
+  fundingSource: OrderFundingSource;
 };
 
 export class PartnerEsimPurchaseError extends Error {
@@ -430,6 +449,121 @@ export async function preparePartnerEsimPurchase(
     }
     throw error;
   }
+}
+
+/**
+ * Persist Partner funding choice on a READY purchase.
+ * Accepts only useWallet — charge and balance are re-read server-side.
+ * Does not reserve wallet funds, create gateway sessions, or change status.
+ */
+export async function setPartnerPurchaseFundingChoice(
+  input: SetPartnerPurchaseFundingChoiceInput
+): Promise<SetPartnerPurchaseFundingChoiceResult> {
+  const partnerUserId = input.partnerUserId.trim();
+  const purchaseId = input.purchaseId.trim();
+  const useWallet = Boolean(input.useWallet);
+
+  if (!partnerUserId || partnerUserId.length > 64) {
+    throw new PartnerEsimPurchaseError(
+      "PARTNER_UNAVAILABLE",
+      "Partner is unavailable."
+    );
+  }
+  if (!purchaseId || purchaseId.length > 64) {
+    throw new PartnerEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is unavailable."
+    );
+  }
+
+  const partner = await loadActivePartnerForPurchase(partnerUserId);
+  if (!partner.walletAccountId || partner.balanceCents == null) {
+    throw new PartnerEsimPurchaseError(
+      "WALLET_UNAVAILABLE",
+      "Partner wallet is unavailable."
+    );
+  }
+  await assertPartnerPurchaseInitiationAllowed();
+
+  const purchase = await prisma.partnerEsimPurchase.findUnique({
+    where: { id: purchaseId },
+    select: {
+      id: true,
+      partnerId: true,
+      partnerChargeCents: true,
+      status: true,
+      fundingSource: true,
+    },
+  });
+
+  if (!purchase || purchase.partnerId !== partner.partnerId) {
+    throw new PartnerEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is unavailable."
+    );
+  }
+
+  if (
+    purchase.fundingSource !== OrderFundingSource.PARTNER_BALANCE &&
+    purchase.fundingSource !== OrderFundingSource.PARTNER_SPLIT &&
+    purchase.fundingSource !== OrderFundingSource.PARTNER_GATEWAY
+  ) {
+    throw new PartnerEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is unavailable."
+    );
+  }
+
+  if (purchase.status !== PartnerEsimPurchaseStatus.READY) {
+    throw new PartnerEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is not ready for funding updates."
+    );
+  }
+
+  const funding = calculatePartnerPurchaseFunding({
+    partnerChargeCents: purchase.partnerChargeCents,
+    walletBalanceCents: partner.balanceCents,
+    useWallet,
+  });
+
+  const fundingSource =
+    funding.gatewayAmountCents <= 0
+      ? OrderFundingSource.PARTNER_BALANCE
+      : funding.walletAppliedCents > 0
+        ? OrderFundingSource.PARTNER_SPLIT
+        : OrderFundingSource.PARTNER_GATEWAY;
+
+  const updated = await prisma.partnerEsimPurchase.updateMany({
+    where: {
+      id: purchase.id,
+      partnerId: partner.partnerId,
+      status: PartnerEsimPurchaseStatus.READY,
+    },
+    data: {
+      useWallet: funding.useWallet,
+      walletAppliedCents: funding.walletAppliedCents,
+      gatewayAmountCents: funding.gatewayAmountCents,
+      fundingSource,
+    },
+  });
+
+  if (updated.count !== 1) {
+    throw new PartnerEsimPurchaseError(
+      "INVALID_STATE",
+      "This purchase is not ready for funding updates."
+    );
+  }
+
+  return {
+    purchaseId: purchase.id,
+    useWallet: funding.useWallet,
+    partnerChargeCents: purchase.partnerChargeCents,
+    walletAppliedCents: funding.walletAppliedCents,
+    gatewayAmountCents: funding.gatewayAmountCents,
+    balanceCents: partner.balanceCents,
+    fundingSource,
+  };
 }
 
 /**
