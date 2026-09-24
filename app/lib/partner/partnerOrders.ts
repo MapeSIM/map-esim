@@ -25,13 +25,8 @@ import {
   displayOrUnavailable,
   formatPartnerOrderDate,
   parsePartnerOrdersPage,
-  partnerAttentionKindFromStatus,
-  partnerAttentionMessage,
-  partnerAttentionTitle,
   partnerOrderStatusFromPurchase,
   shortPartnerOrderReference,
-  shortPartnerPurchaseReference,
-  type PartnerAttentionKind,
   type PartnerOrderStatusBadge,
 } from "@/app/lib/partner/partnerOrdersDisplay";
 import { formatUsdCents } from "@/app/lib/wallet/display";
@@ -77,23 +72,8 @@ export type PartnerOrderListRow = {
   addDataSourceOrderId: string | null;
 };
 
-export type PartnerAttentionRow = {
-  purchaseId: string;
-  shortReference: string;
-  destination: string;
-  planName: string;
-  retailPriceLabel: string;
-  partnerDebitLabel: string;
-  statusBadge: PartnerOrderStatusBadge;
-  kind: PartnerAttentionKind;
-  title: string;
-  message: string;
-  purchasedAtLabel: string;
-};
-
 export type PartnerOrdersPageData = {
   orders: PartnerOrderListRow[];
-  attention: PartnerAttentionRow[];
   page: number;
   pageSize: number;
   totalMatched: number;
@@ -154,7 +134,8 @@ const partnerPurchaseListSelect = {
 
 /**
  * Completed Partner Orders for the active Partner only (newest first, paginated).
- * Also returns non-order attention purchases (pending / under review / failed-refunded).
+ * My eSIMs shows COMPLETED purchases with a linked order only — no pending,
+ * reconciliation, failed-refunded, or other non-completed purchase states.
  * List pages skip public-catalog top-up lookups (detail still uses them).
  */
 export async function listPartnerOrdersPage(
@@ -182,33 +163,15 @@ export async function listPartnerOrdersPage(
     page = totalPages;
   }
 
-  const [completedPurchases, attentionPurchases] = await Promise.all([
-    prisma.partnerEsimPurchase.findMany({
-      where: completedWhere,
-      orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      select: partnerPurchaseListSelect,
-    }),
-    prisma.partnerEsimPurchase.findMany({
-      where: {
-        partnerId: actor.partnerId,
-        status: {
-          in: [
-            PartnerEsimPurchaseStatus.PROVIDER_PENDING,
-            PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED,
-            PartnerEsimPurchaseStatus.FAILED_REFUNDED,
-          ],
-        },
-      },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: PARTNER_ORDERS_PAGE_LIMIT,
-      select: partnerPurchaseListSelect,
-    }),
-  ]);
+  const completedPurchases = await prisma.partnerEsimPurchase.findMany({
+    where: completedWhere,
+    orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+    skip: (page - 1) * pageSize,
+    take: pageSize,
+    select: partnerPurchaseListSelect,
+  });
 
   const orders: PartnerOrderListRow[] = [];
-  const attention: PartnerAttentionRow[] = [];
 
   for (const row of completedPurchases) {
     if (!row.orderId || !row.order) continue;
@@ -273,36 +236,6 @@ export async function listPartnerOrdersPage(
     });
   }
 
-  for (const row of attentionPurchases) {
-    const kind = partnerAttentionKindFromStatus(row.status);
-    if (!kind) continue;
-
-    const destination = displayOrUnavailable(
-      row.order?.destination || row.destinationName || row.destinationCode
-    );
-    const planName = displayOrUnavailable(row.order?.planName || row.planName);
-    const retailPriceLabel = `${formatUsdCents(row.retailPriceCents)} USD`;
-    const partnerDebitLabel = `${formatUsdCents(row.partnerChargeCents)} USD`;
-    const statusBadge = partnerOrderStatusFromPurchase(row.status);
-    const purchasedAtLabel = formatPartnerOrderDate(
-      row.completedAt ?? row.createdAt
-    );
-
-    attention.push({
-      purchaseId: row.id,
-      shortReference: shortPartnerPurchaseReference(row.id),
-      destination,
-      planName,
-      retailPriceLabel,
-      partnerDebitLabel,
-      statusBadge,
-      kind,
-      title: partnerAttentionTitle(kind),
-      message: partnerAttentionMessage(kind),
-      purchasedAtLabel,
-    });
-  }
-
   if (orders.length > 0) {
     const activeShares = await prisma.partnerEsimShareToken.findMany({
       where: {
@@ -320,7 +253,6 @@ export async function listPartnerOrdersPage(
 
   return {
     orders,
-    attention,
     page,
     pageSize,
     totalMatched,

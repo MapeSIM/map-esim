@@ -23,11 +23,7 @@ import {
   getPartnerOwnedOrderDetail,
   listPartnerOrdersPage,
 } from "../app/lib/partner/partnerOrders";
-import {
-  assertNoPartnerOrderForbiddenKeys,
-  partnerAttentionMessage,
-  partnerAttentionTitle,
-} from "../app/lib/partner/partnerOrdersDisplay";
+import { assertNoPartnerOrderForbiddenKeys } from "../app/lib/partner/partnerOrdersDisplay";
 import { buyPartnerEsimPurchase } from "../app/lib/partner/partnerPurchaseBuy";
 import type { PartnerOfferVerifier } from "../app/lib/partner/partnerEsimPurchase";
 import type { PartnerProviderCheckoutExecutor } from "../app/lib/partner/partnerEsimPurchaseProvider";
@@ -353,7 +349,29 @@ async function main() {
     );
     console.log("PASS G_H_no_provider_cost_immutable_prices");
 
-    // I. reconciliation-required represented as under review
+    // I. non-completed purchases are excluded from My eSIMs (completed-only)
+    const pending = await prisma.partnerEsimPurchase.create({
+      data: {
+        partnerId: partnerAId,
+        offerId: offerState.offerId,
+        destinationCode: "PK",
+        destinationName: "Pakistan",
+        planName: "QA Pending Plan",
+        dataAllowance: "1 GB",
+        validity: "7 Days",
+        retailPriceCents: 1000,
+        discountBps: 1000,
+        discountVersion: 1,
+        partnerChargeCents: 900,
+        useWallet: true,
+        walletAppliedCents: 900,
+        gatewayAmountCents: 0,
+        providerCostCents: 800,
+        status: PartnerEsimPurchaseStatus.PROVIDER_PENDING,
+        idempotencyKey: idem("pend"),
+        fundingSource: OrderFundingSource.PARTNER_BALANCE,
+      },
+    });
     const recon = await prisma.partnerEsimPurchase.create({
       data: {
         partnerId: partnerAId,
@@ -377,26 +395,6 @@ async function main() {
         reconciliationState: "open",
       },
     });
-    const listRecon = await listPartnerOrdersPage(partnerAUserId);
-    assert.ok(listRecon);
-    const attentionRecon = listRecon!.attention.find(
-      (r) => r.purchaseId === recon.id
-    );
-    assert.ok(attentionRecon);
-    assert.equal(attentionRecon!.statusBadge, "Under review");
-    assert.equal(attentionRecon!.kind, "reconciliation_required");
-    assert.equal(
-      attentionRecon!.title,
-      partnerAttentionTitle("reconciliation_required")
-    );
-    assert.equal(
-      attentionRecon!.message,
-      partnerAttentionMessage("reconciliation_required")
-    );
-    assert.match(attentionRecon!.message, /Do not retry|Do not .*again/i);
-    console.log("PASS I_reconciliation_under_review");
-
-    // J. failed-refunded represented accurately
     const failed = await prisma.partnerEsimPurchase.create({
       data: {
         partnerId: partnerAId,
@@ -419,15 +417,35 @@ async function main() {
         fundingSource: OrderFundingSource.PARTNER_BALANCE,
       },
     });
-    const listFail = await listPartnerOrdersPage(partnerAUserId);
-    const attentionFail = listFail!.attention.find(
-      (r) => r.purchaseId === failed.id
+    const listNonCompleted = await listPartnerOrdersPage(partnerAUserId);
+    assert.ok(listNonCompleted);
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(listNonCompleted, "attention"),
+      false
     );
-    assert.ok(attentionFail);
-    assert.equal(attentionFail!.statusBadge, "Failed — balance returned");
-    assert.equal(attentionFail!.kind, "failed_refunded");
-    assert.match(attentionFail!.message, /returned to your Partner balance/i);
-    console.log("PASS J_failed_refunded_accurate");
+    assert.equal(
+      listNonCompleted!.orders.some((r) => r.purchaseId === pending.id),
+      false
+    );
+    assert.equal(
+      listNonCompleted!.orders.some((r) => r.purchaseId === recon.id),
+      false
+    );
+    assert.equal(
+      listNonCompleted!.orders.some((r) => r.purchaseId === failed.id),
+      false
+    );
+    assert.ok(
+      listNonCompleted!.orders.some((r) => r.orderId === orderAId),
+      "completed order must still appear"
+    );
+    assert.doesNotMatch(listPageSrc, /Purchases requiring attention|attention-heading/);
+    assert.doesNotMatch(ordersLibSrc, /PROVIDER_PENDING|FAILED_REFUNDED|RECONCILIATION_REQUIRED/);
+    console.log("PASS I_non_completed_excluded_from_my_esims");
+
+    // J. list source only queries COMPLETED purchases
+    assert.match(ordersLibSrc, /status:\s*PartnerEsimPurchaseStatus\.COMPLETED/);
+    console.log("PASS J_list_fetches_completed_only");
 
     // K. customer reveal pattern unaffected (non-owner → NOT_FOUND)
     const customerReveal = await revealIccidForCustomer(customer.id, orderAId);

@@ -1,18 +1,14 @@
 import Link from "next/link";
 import PartnerEsimOrderCard from "@/app/components/partner/PartnerEsimOrderCard";
-import PartnerRefundRequestControls, {
+import {
   type PartnerRefundRequestCardState,
 } from "@/app/components/partner/PartnerRefundRequestControls";
 import {
   partnerCardClass,
   partnerSectionLabelClass,
-  partnerStatusBadgeClass,
 } from "@/app/components/partner/partnerPortalUi";
 import { requireRole } from "@/app/lib/auth/session";
-import {
-  listPartnerOrdersPage,
-  type PartnerAttentionRow,
-} from "@/app/lib/partner/partnerOrders";
+import { listPartnerOrdersPage } from "@/app/lib/partner/partnerOrders";
 import {
   latestPartnerRefundSummary,
   listPartnerRefundRequestSummaries,
@@ -29,63 +25,6 @@ function buildPartnerOrdersHref(page: number): string {
   return `/partner/orders?page=${page}`;
 }
 
-function AttentionCard({
-  row,
-  refundRequest,
-}: {
-  row: PartnerAttentionRow;
-  refundRequest: PartnerRefundRequestCardState;
-}) {
-  return (
-    <li className={partnerCardClass}>
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <p className="text-sm font-semibold text-[var(--heading)]">{row.title}</p>
-        <span
-          className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${partnerStatusBadgeClass(row.statusBadge)}`}
-        >
-          {row.statusBadge}
-        </span>
-      </div>
-      <p className="mt-2 text-sm text-[var(--text-muted)]">{row.message}</p>
-      <dl className="mt-3 grid gap-1 text-xs text-[var(--text-muted)] sm:grid-cols-2">
-        <div className="min-w-0">
-          <dt className="inline text-[var(--text-soft)]">Destination </dt>
-          <dd className="inline text-[var(--heading)]">{row.destination}</dd>
-        </div>
-        <div className="min-w-0">
-          <dt className="inline text-[var(--text-soft)]">Plan </dt>
-          <dd className="inline text-[var(--heading)]">{row.planName}</dd>
-        </div>
-        <div className="min-w-0">
-          <dt className="inline text-[var(--text-soft)]">Ref </dt>
-          <dd className="inline font-mono text-[var(--heading)]">
-            {row.shortReference}
-          </dd>
-        </div>
-        <div className="min-w-0">
-          <dt className="inline text-[var(--text-soft)]">Amount Paid </dt>
-          <dd className="inline tabular-nums text-[var(--heading)]">
-            {row.partnerDebitLabel}
-          </dd>
-        </div>
-        <div className="min-w-0">
-          <dt className="inline text-[var(--text-soft)]">Started </dt>
-          <dd className="inline text-[var(--heading)]">{row.purchasedAtLabel}</dd>
-        </div>
-      </dl>
-      <div className="mt-3">
-        <PartnerRefundRequestControls
-          purchaseId={row.purchaseId}
-          partnerDebitLabel={row.partnerDebitLabel}
-          alreadyRefunded={row.statusBadge === "Failed — balance returned"}
-          existingRequest={refundRequest}
-          embedded
-        />
-      </div>
-    </li>
-  );
-}
-
 export default async function PartnerOrdersPage({
   searchParams,
 }: {
@@ -99,7 +38,7 @@ export default async function PartnerOrdersPage({
     data = await listPartnerOrdersPage(user.id, { page: params.page });
   } catch {
     return (
-        <div className={`${partnerCardClass} px-5 py-8`} role="status">
+      <div className={`${partnerCardClass} px-5 py-8`} role="status">
         <p className="text-sm font-medium text-[var(--heading)]">
           {PORTAL_UNAVAILABLE}
         </p>
@@ -107,12 +46,12 @@ export default async function PartnerOrdersPage({
     );
   }
 
-  let refundByPurchase = new Map<string, NonNullable<PartnerRefundRequestCardState>>();
+  let refundByPurchase = new Map<
+    string,
+    NonNullable<PartnerRefundRequestCardState>
+  >();
   if (data) {
-    const purchaseIds = [
-      ...data.orders.map((row) => row.purchaseId),
-      ...data.attention.map((row) => row.purchaseId),
-    ];
+    const purchaseIds = data.orders.map((row) => row.purchaseId);
     try {
       const summaries = await listPartnerRefundRequestSummaries({
         partnerUserId: user.id,
@@ -146,36 +85,12 @@ export default async function PartnerOrdersPage({
       <header>
         <h1 className="text-2xl font-bold tracking-tight">My eSIMs</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Your purchased Partner eSIMs. Open an eSIM to install, share, or check
-          usage.
+          Your purchased Partner eSIMs. Open an eSIM to install or check usage.
         </p>
       </header>
 
-      {data.attention.length > 0 ? (
-        <section className="min-w-0 space-y-3" aria-labelledby="attention-heading">
-          <h2
-            id="attention-heading"
-            className={partnerSectionLabelClass}
-          >
-            Purchases requiring attention
-          </h2>
-          <ul className="space-y-3">
-            {data.attention.map((row) => (
-              <AttentionCard
-                key={row.purchaseId}
-                row={row}
-                refundRequest={refundByPurchase.get(row.purchaseId) ?? null}
-              />
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
       <section className="min-w-0 space-y-3" aria-labelledby="orders-heading">
-        <h2
-          id="orders-heading"
-          className={partnerSectionLabelClass}
-        >
+        <h2 id="orders-heading" className={partnerSectionLabelClass}>
           Completed orders
         </h2>
         {data.orders.length === 0 ? (
