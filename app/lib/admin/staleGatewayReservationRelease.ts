@@ -8,6 +8,7 @@ import "server-only";
 import {
   EsimPurchasePaymentAttemptStatus,
   PartnerEsimPurchaseStatus,
+  Prisma,
   WalletEsimPurchaseStatus,
 } from "@prisma/client";
 import { assertSameOriginAdminRequest } from "@/app/lib/admin/reconciliationCaseManagement";
@@ -49,7 +50,7 @@ async function writeAudit(options: {
   action: string;
   targetType: string;
   targetId: string;
-  metadata: Record<string, unknown>;
+  metadata: Prisma.InputJsonValue;
 }): Promise<void> {
   await prisma.auditLog
     .create({
