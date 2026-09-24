@@ -68,8 +68,8 @@ function main() {
   assert.match(listSrc, /No local orders match the selected filters/);
   assert.match(listSrc, /Order data is temporarily unavailable/);
   assert.match(
-    listSrc,
-    /Provider fulfilment status is not\s+refreshed from this page/
+    readFileSync(join(root, "app/lib/admin/adminUxCopy.ts"), "utf8"),
+    /Provider fulfilment status is not refreshed from this page/
   );
   assert.ok(!/qrValue|activationCode|iccidEncrypted|access_token/i.test(listSrc));
   assert.ok(!/"use server"/.test(listSrc));

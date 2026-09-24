@@ -118,7 +118,7 @@ function main() {
   assert.doesNotMatch(reader, /\.update\(|\.delete\(|\.create\(/);
   assert.doesNotMatch(reader, /applyVerifiedPaymentEvent|fulfillFundedEsimPurchase/);
   assert.match(nav, /href: "\/admin\/payments\/webhooks"/);
-  assert.match(nav, /label: "Webhook Receipts"/);
+  assert.match(nav, /ADMIN_UX_NAV\.webhookReceipts|label: "Webhook Receipts"/);
   assert.match(pkg, /qa:admin-webhook-receipts/);
   console.log("PASS admin_inbox_readonly");
 

@@ -58,7 +58,7 @@ function main() {
   assert.match(page, /statusLabel/);
   assert.match(page, /failureReason/);
   assert.match(page, /occurredAtLabel/);
-  assert.match(page, /read-only/);
+  assert.match(page, /ADMIN_UX_PAGE\.failedPayments|Read-only|read-only/);
   assert.doesNotMatch(page, /verifyPendingGatewayPayment|applyVerifiedEsimPurchasePaymentEvent/);
   assert.doesNotMatch(page, /fulfillFundedEsimPurchase|PAYMENT_GATEWAY_ENABLED/);
   console.log("PASS failed_inbox_admin_readonly_ui");
@@ -76,7 +76,7 @@ function main() {
   console.log("PASS failed_reader_read_only");
 
   assert.match(nav, /href: "\/admin\/payments\/failed"/);
-  assert.match(nav, /label: "Failed Payments"/);
+  assert.match(nav, /ADMIN_UX_NAV\.failedPayments|label: "Failed Payments"/);
   assert.match(pendingPage, /\/admin\/payments\/failed/);
   assert.match(pkg, /qa:admin-failed-payments/);
   const pendingVerify = read("app/lib/admin/pendingPaymentVerify.ts");

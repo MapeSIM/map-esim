@@ -50,7 +50,7 @@ function main() {
 
   assert.match(page, /requireRole\("ADMIN"\)/);
   assert.match(nav, /href: "\/admin\/payments\/recovery"/);
-  assert.match(nav, /label: "Payment Recovery"/);
+  assert.match(nav, /label: ADMIN_UX_NAV\.staleUnpaidHolds|label: "Stale Unpaid Holds"/);
   assert.match(nav, /!pathname\.startsWith\("\/admin\/payments\/recovery"\)/);
   assert.match(pkg, /"qa:admin-payment-recovery"/);
   console.log("PASS route_nav_and_qa_script");
@@ -174,7 +174,7 @@ function main() {
   assert.match(page, /ownerKind/);
   console.log("PASS recovery_table_columns");
 
-  assert.match(hub, /Recovery candidates/);
+  assert.match(hub, /Stale unpaid holds/);
   assert.match(hub, /recoveryCandidateCount/);
   assert.match(hub, /\/admin\/payments\/recovery/);
   assert.match(dashboard, /recoveryCandidateCount/);

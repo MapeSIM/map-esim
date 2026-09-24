@@ -11,6 +11,7 @@ import {
   maskProviderOrderRef,
   sanitizeAuditMetadata,
 } from "../app/lib/admin/display";
+import { adminHumanStatusLabel } from "../app/lib/admin/adminUxCopy";
 
 const root = join(__dirname, "..");
 
@@ -88,6 +89,8 @@ function main() {
     pageSrc,
     /staging provider-wallet total, not live customer revenue/
   );
+  assert.match(pageSrc, /Needs attention/);
+  assert.match(pageSrc, /getAdminOverviewAttention/);
   assert.match(
     pageSrc,
     /Dashboard data is temporarily unavailable\. Please refresh shortly\./
@@ -95,6 +98,21 @@ function main() {
   assert.ok(!/\bRevenue\b/.test(pageSrc));
   assert.ok(!/qrValue|activationCode|iccid|LPA|access_token/i.test(pageSrc));
   console.log("PASS overview_page_safe_labels_and_fallback");
+
+  const uxCopy = readFileSync(
+    join(root, "app/lib/admin/adminUxCopy.ts"),
+    "utf8"
+  );
+  assert.match(uxCopy, /Stale Unpaid Holds/);
+  assert.match(uxCopy, /Stuck Cases/);
+  assert.match(uxCopy, /Verify Pending/);
+  assert.match(uxCopy, /adminHumanStatusLabel/);
+  assert.equal(
+    adminHumanStatusLabel("RECONCILIATION_REQUIRED"),
+    "Needs reconciliation"
+  );
+  assert.equal(adminHumanStatusLabel("COMPLETED"), "Completed");
+  console.log("PASS admin_ux_copy_labels");
 
   const layoutSrc = readFileSync(join(root, "app/admin/layout.tsx"), "utf8");
   assert.match(layoutSrc, /requireRole\("ADMIN"\)/);

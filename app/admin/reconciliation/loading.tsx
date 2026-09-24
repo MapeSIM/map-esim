@@ -6,7 +6,7 @@ export default function AdminReconciliationLoading() {
     <div className="min-w-0 space-y-8">
       <header className="min-w-0">
         <h1 className="text-2xl font-bold tracking-tight">
-          Problems & Recovery
+          Stuck cases
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
           Loading reconciliation cases…

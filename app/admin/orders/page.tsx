@@ -1,4 +1,5 @@
 import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBadge";
+import { adminHumanStatusLabel, ADMIN_UX_PAGE } from "@/app/lib/admin/adminUxCopy";
 import { getAdminOrdersPage } from "@/app/lib/admin/orders";
 import { AdminButton, AdminStatusPill } from "@/app/components/admin/ui";
 
@@ -86,10 +87,11 @@ export default async function AdminOrdersPage({
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {ADMIN_UX_PAGE.orders.title}
+        </h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Local order snapshots only. Provider fulfilment status is not
-          refreshed from this page.
+          {ADMIN_UX_PAGE.orders.description}
         </p>
       </header>
 
@@ -124,9 +126,9 @@ export default async function AdminOrdersPage({
             className="h-11 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-3 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
           >
             <option value="ALL">All statuses</option>
-            <option value="COMPLETED">COMPLETED</option>
-            <option value="PENDING">PENDING</option>
-            <option value="FAILED">FAILED</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="PENDING">Pending</option>
+            <option value="FAILED">Failed</option>
           </select>
         </label>
 
@@ -210,7 +212,7 @@ export default async function AdminOrdersPage({
                   </td>
                   <td className="px-3 py-3">
                     <AdminStatusPill value={order.localStatus}>
-                      {order.localStatus}
+                      {adminHumanStatusLabel(order.localStatus)}
                     </AdminStatusPill>
                   </td>
                   <td className="px-3 py-3">{order.fundingLabel}</td>

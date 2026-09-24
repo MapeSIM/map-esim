@@ -48,7 +48,7 @@ export default async function AdminPaymentWebhooksPage() {
             href="/admin/payments/pending"
             className="font-semibold text-[var(--accent-strong)]"
           >
-            Pending payments
+            Verify Pending
           </Link>
           <span className="text-[var(--text-soft)]"> · </span>
           <Link

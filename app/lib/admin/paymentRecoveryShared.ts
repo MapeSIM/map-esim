@@ -202,7 +202,7 @@ export function suggestPaymentRecoverySafeAction(
     return "Wait for authoritative webhook; escalate delivery — do not mark paid";
   }
   if ((PAYMENT_RECOVERY_FAILED_DECISIONS as readonly string[]).includes(d)) {
-    return "Open Pending payment tools for release if eligible — not recovery funding";
+    return "Open Verify Pending for release if eligible — not recovery funding";
   }
   if (
     (PAYMENT_RECOVERY_MISMATCH_DECISIONS as readonly string[]).includes(d)

@@ -1,4 +1,5 @@
 import { requireRole } from "@/app/lib/auth/session";
+import { ADMIN_UX_NAV, ADMIN_UX_PAGE } from "@/app/lib/admin/adminUxCopy";
 import { listFailedGatewayPaymentAttempts } from "@/app/lib/admin/failedPaymentAttempts";
 import { AdminButton, AdminStatusPill } from "@/app/components/admin/ui";
 
@@ -22,7 +23,9 @@ export default async function AdminFailedPaymentsPage() {
   } catch {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold tracking-tight">Failed payments</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {ADMIN_UX_PAGE.failedPayments.title}
+        </h1>
         <div
           className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
           role="status"
@@ -36,24 +39,25 @@ export default async function AdminFailedPaymentsPage() {
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Failed payments</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {ADMIN_UX_PAGE.failedPayments.title}
+        </h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Failed and cancelled gateway payment attempts. This list is
-          read-only and does not cancel, refund, or mark a purchase funded.
+          {ADMIN_UX_PAGE.failedPayments.description}
         </p>
         <p className="mt-2 flex flex-wrap gap-2 text-sm">
           <AdminButton href="/admin/payments" variant="ghost" size="sm">
-            Payments hub
+            {ADMIN_UX_NAV.payments}
           </AdminButton>
           <AdminButton href="/admin/payments/pending" variant="ghost" size="sm">
-            Pending payments
+            {ADMIN_UX_NAV.verifyPending}
           </AdminButton>
           <AdminButton
             href="/admin/payments/webhooks"
             variant="ghost"
             size="sm"
           >
-            Webhook receipts
+            {ADMIN_UX_NAV.webhookReceipts}
           </AdminButton>
         </p>
       </header>

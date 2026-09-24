@@ -72,7 +72,7 @@ export default async function AdminPaymentDetailPage({
             variant="ghost"
             size="sm"
           >
-            Pending payment tools
+            Verify Pending
           </AdminButton>
           {recovery?.isRecoveryCandidate ? (
             <AdminButton
@@ -80,7 +80,7 @@ export default async function AdminPaymentDetailPage({
               variant="ghost"
               size="sm"
             >
-              Payment recovery
+              Stale unpaid holds
             </AdminButton>
           ) : null}
           {showRecon ? (
@@ -91,7 +91,7 @@ export default async function AdminPaymentDetailPage({
               variant="ghost"
               size="sm"
             >
-              Reconciliation
+              Stuck cases
             </AdminButton>
           ) : null}
         </div>
@@ -339,7 +339,7 @@ export default async function AdminPaymentDetailPage({
               variant="secondary"
               size="sm"
             >
-              Open reconciliation
+              Open stuck case
             </AdminButton>
           ) : null}
           {detail.ownerKind === "customer" ? (
@@ -348,7 +348,7 @@ export default async function AdminPaymentDetailPage({
               variant="secondary"
               size="sm"
             >
-              Pending payment tools
+              Verify Pending
             </AdminButton>
           ) : null}
         </div>

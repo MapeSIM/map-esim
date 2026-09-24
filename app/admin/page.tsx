@@ -1,4 +1,11 @@
 import { getAdminOverview } from "@/app/lib/admin/overview";
+import { getAdminOverviewAttention } from "@/app/lib/admin/overviewAttention";
+import {
+  ADMIN_UX_PAGE,
+  adminHumanStatusLabel,
+} from "@/app/lib/admin/adminUxCopy";
+import { loadAdminAccess } from "@/app/lib/admin/adminPermissionAccess";
+import { requireRole } from "@/app/lib/auth/session";
 import { AdminKpiCard, AdminStatusPill } from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
@@ -25,10 +32,11 @@ function DashboardUnavailable() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Overview</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {ADMIN_UX_PAGE.overview.title}
+        </h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Read-only operations snapshot. No orders, refunds, or emails can be
-          changed from this page.
+          {ADMIN_UX_PAGE.overview.description}
         </p>
       </header>
       <div
@@ -48,6 +56,7 @@ export default async function AdminDashboardPage({
 }: {
   searchParams: Promise<{ forbidden?: string }>;
 }) {
+  const user = await requireRole("ADMIN");
   const params = await searchParams;
   const forbidden = params.forbidden === "1";
 
@@ -58,6 +67,11 @@ export default async function AdminDashboardPage({
     // Auth failures redirect from the layout — this is DB/query availability only.
     return <DashboardUnavailable />;
   }
+
+  const access = await loadAdminAccess(user.id);
+  const attention = access
+    ? await getAdminOverviewAttention(access.permissions)
+    : [];
 
   return (
     <div className="space-y-10">
@@ -70,12 +84,38 @@ export default async function AdminDashboardPage({
         </p>
       ) : null}
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Overview</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {ADMIN_UX_PAGE.overview.title}
+        </h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Read-only operations snapshot. No orders, refunds, or emails can be
-          changed from this page.
+          {ADMIN_UX_PAGE.overview.description}
         </p>
       </header>
+
+      {attention.length > 0 ? (
+        <section aria-labelledby="admin-needs-attention-heading">
+          <h2
+            id="admin-needs-attention-heading"
+            className="text-lg font-semibold tracking-tight"
+          >
+            Needs attention
+          </h2>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Open a queue to investigate. Counts are read-only summaries.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {attention.map((card) => (
+              <AdminKpiCard
+                key={card.id}
+                label={card.label}
+                value={card.value}
+                note={card.note}
+                href={card.href}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section aria-labelledby="admin-primary-kpi-heading">
         <h2
@@ -140,7 +180,11 @@ export default async function AdminDashboardPage({
                     </td>
                     <td className="px-3 py-3">{order.destination}</td>
                     <td className="px-3 py-3">{order.planPackage}</td>
-                    <td className="px-3 py-3">{order.localStatus}</td>
+                    <td className="px-3 py-3">
+                      <AdminStatusPill value={order.localStatus}>
+                        {adminHumanStatusLabel(order.localStatus)}
+                      </AdminStatusPill>
+                    </td>
                     <td className="whitespace-nowrap px-3 py-3">
                       {order.amountLabel}
                     </td>
@@ -181,25 +225,6 @@ export default async function AdminDashboardPage({
         </div>
       </section>
 
-      <section aria-labelledby="admin-staging-heading">
-        <h2
-          id="admin-staging-heading"
-          className="text-lg font-semibold tracking-tight"
-        >
-          Staging provider
-        </h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Non-revenue staging totals only.
-        </p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <AdminKpiCard
-            label="VeSIM staging checkout total (USD)"
-            value={data.stagingProviderTotalUsd}
-            note="This is a staging provider-wallet total, not live customer revenue."
-          />
-        </div>
-      </section>
-
       <section aria-labelledby="admin-system-status-heading">
         <h2
           id="admin-system-status-heading"
@@ -223,6 +248,25 @@ export default async function AdminDashboardPage({
           <StatusRow
             label="Database connection"
             status={data.systemStatus.database}
+          />
+        </div>
+      </section>
+
+      <section aria-labelledby="admin-staging-heading">
+        <h2
+          id="admin-staging-heading"
+          className="text-sm font-semibold tracking-tight text-[var(--text-soft)]"
+        >
+          Staging (non-revenue)
+        </h2>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          Staging provider-wallet total only — not live customer revenue.
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <AdminKpiCard
+            label="VeSIM staging checkout total (USD)"
+            value={data.stagingProviderTotalUsd}
+            note="This is a staging provider-wallet total, not live customer revenue."
           />
         </div>
       </section>

@@ -3,14 +3,8 @@
  * Presentation only — no payment, wallet, or status-machine side effects.
  */
 
+import { adminHumanStatusLabel } from "@/app/lib/admin/adminUxCopy";
 import { formatUsdCents } from "@/app/lib/wallet/display";
-
-/** Readable labels for the statuses admins see most often on reservation tooling. */
-const ADMIN_STATUS_LABELS: Record<string, string> = {
-  AWAITING_GATEWAY_PAYMENT: "Awaiting gateway payment",
-  FUNDS_RESERVED: "Funds reserved",
-  RECONCILIATION_REQUIRED: "Reconciliation required",
-};
 
 /**
  * Format a reserved wallet amount for admin UI.
@@ -58,22 +52,12 @@ export function formatAdminReservedWalletListFragment(
 
 /**
  * Replace technical enum display with readable admin labels.
- * Known reservation statuses get fixed copy; other SCREAMING_SNAKE values
- * are lightly humanized so pills stay consistent on the same surfaces.
+ * Delegates to shared admin UX humanizer (enums unchanged internally).
  */
 export function adminWalletReservationStatusLabel(
   status: string | null | undefined
 ): string {
-  const value = String(status ?? "").trim();
-  if (!value) return "Not available";
-  const known = ADMIN_STATUS_LABELS[value];
-  if (known) return known;
-  if (!/^[A-Z0-9_]+$/.test(value)) return value;
-  return value
-    .split("_")
-    .filter(Boolean)
-    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
-    .join(" ");
+  return adminHumanStatusLabel(status);
 }
 
 /** When a pending/payment row should deep-link into reconciliation. */

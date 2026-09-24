@@ -224,10 +224,10 @@ function main() {
 
   // --- UI / nav wiring ---
   assert.match(nav, /\/admin\/operations/);
-  assert.match(nav, /Operations Dashboard/);
-  assert.match(nav, /Problems & Recovery/);
-  assert.match(nav, /Wallet Holds/);
-  assert.match(nav, /System Alerts/);
+  assert.match(nav, /ADMIN_UX_NAV\.operationsDashboard|Operations Dashboard/);
+  assert.match(nav, /ADMIN_UX_NAV\.stuckCases|Stuck Cases/);
+  assert.match(nav, /ADMIN_UX_NAV\.walletHolds|Wallet Holds/);
+  assert.match(nav, /ADMIN_UX_NAV\.systemAlerts|System Alerts/);
   assert.match(page, /Operations health data is temporarily unavailable/);
   assert.match(page, /Operations Dashboard/);
   assert.match(page, /Issues needing attention/);
@@ -235,7 +235,7 @@ function main() {
   assert.match(page, /Pending items/);
   assert.match(page, /System warnings/);
   assert.match(page, /data-operations-simple-summary/);
-  assert.match(page, /Open Problems & Recovery/);
+  assert.match(page, /Open Stuck Cases/);
   assert.match(page, /Payment gateway readiness/);
   assert.match(page, /Security & production readiness/);
   assert.match(page, /getWalletReservationMonitorSummary/);

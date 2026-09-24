@@ -181,7 +181,7 @@ function main() {
   assert.match(page, /Stale holds/);
   assert.match(page, /Split payment holds/);
   assert.match(page, /Payment detail/);
-  assert.match(page, /Problems & Recovery/);
+  assert.match(page, /Stuck Cases/);
   // Phase 6 mobile polish: card list on small screens; table stays md+.
   assert.match(page, /data-wallet-reservations-mobile/);
   assert.match(page, /md:hidden/);
@@ -205,7 +205,7 @@ function main() {
   assert.match(service, /RECONCILIATION_REQUIRED/);
 
   assert.match(nav, /\/admin\/operations\/wallet-reservations/);
-  assert.match(nav, /Wallet Holds/);
+  assert.match(nav, /ADMIN_UX_NAV\.walletHolds|Wallet Holds/);
   assert.match(access, /\/admin\/operations\/wallet-reservations/);
   assert.match(opsPage, /\/admin\/operations\/wallet-reservations|ADMIN_WALLET_RESERVATIONS_HREF/);
   assert.match(opsPage, /getWalletReservationMonitorSummary/);

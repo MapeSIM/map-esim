@@ -304,9 +304,7 @@ export default async function AdminReconciliationPage({
   return (
     <div className="min-w-0 space-y-8">
       <header className="min-w-0">
-        <h1 className="text-2xl font-bold tracking-tight">
-          Problems & Recovery
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight">Stuck cases</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
           Review stuck purchases, uncertain provider results, and failed
           notifications. Open a case for controlled, evidence-gated recovery.

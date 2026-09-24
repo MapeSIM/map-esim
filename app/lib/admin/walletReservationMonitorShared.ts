@@ -22,7 +22,7 @@ export const WALLET_RESERVATION_MONITOR_STALE_MS =
   MONITORING_THRESHOLDS.STALE_PURCHASE_AGE_MS;
 
 export const WALLET_RESERVATION_MONITOR_POLICY_BLURB =
-  "Read-only inventory of open wallet holds. Does not release reservations, refund, fund, or mark paid. Use Pending payment tools or Reconciliation for gated actions.";
+  "Read-only inventory of open wallet holds. Does not release reservations, refund, fund, or mark paid. Use Verify Pending or Stuck Cases for gated actions.";
 
 /** Canonical Operations inventory path for open wallet holds. */
 export const ADMIN_WALLET_RESERVATIONS_HREF =

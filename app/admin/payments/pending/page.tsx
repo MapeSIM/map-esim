@@ -5,6 +5,7 @@ import {
   formatAdminReservedWalletListFragment,
   isAdminWalletReconciliationLinkApplicable,
 } from "@/app/lib/admin/adminWalletReservationDisplay";
+import { ADMIN_UX_NAV, ADMIN_UX_PAGE } from "@/app/lib/admin/adminUxCopy";
 import { listPendingGatewayPaymentAttempts } from "@/app/lib/admin/pendingPaymentVerify";
 import { formatUsdCents } from "@/app/lib/wallet/display";
 import { AdminButton, AdminStatusPill } from "@/app/components/admin/ui";
@@ -29,7 +30,9 @@ export default async function AdminPendingPaymentsPage() {
   } catch {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold tracking-tight">Pending payments</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {ADMIN_UX_PAGE.verifyPending.title}
+        </h1>
         <div
           className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
           role="status"
@@ -43,32 +46,32 @@ export default async function AdminPendingPaymentsPage() {
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Pending payments</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {ADMIN_UX_PAGE.verifyPending.title}
+        </h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Inspect gateway payment attempts with authenticated Safepay reporter
-          or Simpaisa Inquire checks. Successful evidence still requires an
-          authoritative webhook before funding. Admin never funds or marks paid.
+          {ADMIN_UX_PAGE.verifyPending.description}
         </p>
         <p className="mt-2 flex flex-wrap gap-2 text-sm">
           <AdminButton href="/admin/payments" variant="ghost" size="sm">
-            Payments hub
+            {ADMIN_UX_NAV.payments}
           </AdminButton>
           <AdminButton
             href="/admin/payments/recovery"
             variant="ghost"
             size="sm"
           >
-            Payment recovery
+            {ADMIN_UX_NAV.staleUnpaidHolds}
           </AdminButton>
           <AdminButton href="/admin/payments/failed" variant="ghost" size="sm">
-            Failed payments
+            {ADMIN_UX_NAV.failedPayments}
           </AdminButton>
           <AdminButton
             href="/admin/payments/webhooks"
             variant="ghost"
             size="sm"
           >
-            Webhook receipts
+            {ADMIN_UX_NAV.webhookReceipts}
           </AdminButton>
         </p>
       </header>
@@ -127,7 +130,7 @@ export default async function AdminPendingPaymentsPage() {
                         variant="secondary"
                         size="sm"
                       >
-                        Reconciliation
+                        {ADMIN_UX_NAV.stuckCases}
                       </AdminButton>
                     ) : null}
                     <AdminButton

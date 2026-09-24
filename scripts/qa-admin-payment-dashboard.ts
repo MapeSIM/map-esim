@@ -53,7 +53,7 @@ function main() {
   assert.match(hub, /requireRole\("ADMIN"\)/);
   assert.match(detail, /requireRole\("ADMIN"\)/);
   assert.match(nav, /href: "\/admin\/payments"/);
-  assert.match(nav, /label: "Payments"/);
+  assert.match(nav, /ADMIN_UX_NAV\.payments|label: "Payments"/);
   console.log("PASS admin_only_payments_hub_and_nav");
 
   assert.match(hub, /Pending/);
@@ -97,7 +97,7 @@ function main() {
   assert.doesNotMatch(service, /status:\s*WalletEsimPurchaseStatus\.FUNDED/);
   assert.doesNotMatch(hub, /Mark paid|mark paid|Mark Paid/i);
   assert.doesNotMatch(detail, /\bFund\b/);
-  assert.match(hub, /never marks a payment paid/i);
+  assert.match(read("app/lib/admin/adminUxCopy.ts"), /never marks a payment paid/i);
   assert.match(detail, /never fund or mark\s+paid/i);
   assert.doesNotMatch(service, /allowProduction:\s*true/);
   assert.match(simpaisaConfig, /allowProduction:\s*true/);

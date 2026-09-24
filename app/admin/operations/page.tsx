@@ -166,10 +166,9 @@ function OperationsPriorityView({
           Operations Dashboard
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          A simple view of system health and safe runtime pause switches. Health
-          cards are read-only. Operational controls pause new transaction
-          initiation only — they never cancel in-flight work, refund, email, or
-          mutate wallets, orders, ICCIDs, or reconciliation cases.
+          System health and safe runtime pause switches. Health cards are
+          read-only. Controls pause new work only — they never refund, email, or
+          mutate wallets, orders, ICCIDs, or stuck cases.
         </p>
         <p className="mt-2 text-xs text-[var(--text-soft)]">
           Generated {data.generatedAtLabel}
@@ -190,7 +189,7 @@ function OperationsPriorityView({
             variant="ghost"
             size="sm"
           >
-            Problems & Recovery (funds reserved)
+            Stuck cases (funds reserved)
           </AdminButton>
         </p>
       </header>
@@ -442,13 +441,13 @@ function OperationsDeferredView({
           />
           {recon.truncated ? (
             <p className="sm:col-span-2 text-xs text-[var(--text-muted)]">
-              Counts may be truncated for large workloads. Open Problems &
-              Recovery for the full filtered list.
+              Counts may be truncated for large workloads. Open Stuck Cases for
+              the full filtered list.
             </p>
           ) : null}
           <div className="sm:col-span-2">
             <AdminButton href="/admin/reconciliation" variant="primary" size="sm">
-              Open Problems & Recovery
+              Open Stuck Cases
             </AdminButton>
           </div>
         </HealthCard>

@@ -50,11 +50,11 @@ function main() {
   );
   assert.equal(
     adminWalletReservationStatusLabel("RECONCILIATION_REQUIRED"),
-    "Reconciliation required"
+    "Needs reconciliation"
   );
   assert.equal(
     adminWalletReservationStatusLabel("PAYMENT_PENDING"),
-    "Payment Pending"
+    "Payment pending"
   );
   console.log("PASS status_labels");
 
@@ -104,19 +104,18 @@ function main() {
   assert.match(pendingList, /formatAdminReservedWalletListFragment/);
   assert.match(pendingList, /adminWalletReservationStatusLabel/);
   assert.match(pendingList, /buildAdminWalletPurchaseReconciliationHref/);
-  assert.match(pendingList, /Payment recovery/);
+  assert.match(pendingList, /Stale Unpaid Holds|staleUnpaidHolds|Stale unpaid holds/);
   assert.doesNotMatch(pendingList, /wallet reserved \$\{row\.walletAppliedCents\}/);
   assert.doesNotMatch(pendingList, /wallet reserved \$\{.*walletAppliedCents\}/);
 
   assert.match(pendingDetail, /formatAdminReservedWalletAmount/);
-  assert.match(pendingDetail, /Open reconciliation/);
+  assert.match(pendingDetail, /Open stuck case/);
   assert.match(paymentDetail, /formatAdminReservedWalletAmount/);
-  assert.match(paymentDetail, /Pending payment tools/);
-  assert.match(paymentDetail, /Open reconciliation/);
+  assert.match(paymentDetail, /Verify Pending|ADMIN_UX_NAV\.verifyPending/);
+  assert.match(paymentDetail, /Open stuck case/);
   assert.doesNotMatch(paymentDetail, /\$\{detail\.walletAppliedCents\} cents/);
 
-  assert.match(recovery, /Pending payment tools/);
-  assert.match(recovery, /Pending tools/);
+  assert.match(recovery, /ADMIN_UX_NAV\.verifyPending|Verify Pending/);
   assert.match(recovery, /\/admin\/payments\/pending/);
 
   assert.match(simpaisaForm, /ADMIN_RELEASE_RESERVATION_BLURB/);
@@ -127,7 +126,7 @@ function main() {
 
   assert.match(
     recoveryShared,
-    /Open Pending payment tools for release if eligible/
+    /Open Verify Pending for release if eligible/
   );
   assert.match(shared, /formatAdminReservedWalletAmount/);
   assert.match(pkg, /"qa:admin-wallet-reservation-ux"/);

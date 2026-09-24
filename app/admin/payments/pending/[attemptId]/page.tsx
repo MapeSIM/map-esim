@@ -45,7 +45,7 @@ export default async function AdminPendingPaymentDetailPage({
             href="/admin/payments/pending"
             className="font-semibold text-[var(--accent-strong)]"
           >
-            Pending payments
+            Verify Pending
           </Link>
           {showRecon ? (
             <>
@@ -56,7 +56,7 @@ export default async function AdminPendingPaymentDetailPage({
                 )}
                 className="font-semibold text-[var(--accent-strong)]"
               >
-                Reconciliation
+                Stuck cases
               </Link>
             </>
           ) : null}
@@ -78,7 +78,7 @@ export default async function AdminPendingPaymentDetailPage({
               variant="secondary"
               size="sm"
             >
-              Open reconciliation
+              Open stuck case
             </AdminButton>
           </p>
         ) : null}

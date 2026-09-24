@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOutAction } from "@/app/lib/auth/actions";
 import { canAccessAdminPath } from "@/app/lib/admin/adminPageAccess";
+import { ADMIN_UX_NAV } from "@/app/lib/admin/adminUxCopy";
 
 type AdminNavLink = {
   href: string;
@@ -26,7 +27,7 @@ const navSections: readonly AdminNavSection[] = [
     id: "home",
     title: "Home",
     links: [
-      { href: "/admin", label: "Overview", exact: true },
+      { href: "/admin", label: ADMIN_UX_NAV.overview, exact: true },
       { href: "/admin/revenue", label: "Revenue", exact: false },
     ],
   },
@@ -45,17 +46,25 @@ const navSections: readonly AdminNavSection[] = [
     id: "payments",
     title: "Payments",
     links: [
-      { href: "/admin/payments", label: "Payments", exact: true },
-      { href: "/admin/payments/pending", label: "Pending Payments", exact: false },
-      { href: "/admin/payments/failed", label: "Failed Payments", exact: false },
+      { href: "/admin/payments", label: ADMIN_UX_NAV.payments, exact: true },
+      {
+        href: "/admin/payments/pending",
+        label: ADMIN_UX_NAV.verifyPending,
+        exact: false,
+      },
+      {
+        href: "/admin/payments/failed",
+        label: ADMIN_UX_NAV.failedPayments,
+        exact: false,
+      },
       {
         href: "/admin/payments/recovery",
-        label: "Payment Recovery",
+        label: ADMIN_UX_NAV.staleUnpaidHolds,
         exact: false,
       },
       {
         href: "/admin/payments/webhooks",
-        label: "Webhook Receipts",
+        label: ADMIN_UX_NAV.webhookReceipts,
         exact: false,
       },
       { href: "/admin/wallet-topups", label: "Wallet Top-ups", exact: false },
@@ -68,20 +77,20 @@ const navSections: readonly AdminNavSection[] = [
     links: [
       {
         href: "/admin/reconciliation",
-        label: "Problems & Recovery",
+        label: ADMIN_UX_NAV.stuckCases,
         exact: false,
       },
       {
         href: "/admin/operations",
-        label: "Operations Dashboard",
+        label: ADMIN_UX_NAV.operationsDashboard,
         exact: true,
       },
       {
         href: "/admin/operations/wallet-reservations",
-        label: "Wallet Holds",
+        label: ADMIN_UX_NAV.walletHolds,
         exact: false,
       },
-      { href: "/admin/alerts", label: "System Alerts", exact: false },
+      { href: "/admin/alerts", label: ADMIN_UX_NAV.systemAlerts, exact: false },
     ],
   },
   {

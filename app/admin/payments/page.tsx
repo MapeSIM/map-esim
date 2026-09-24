@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { requireRole } from "@/app/lib/auth/session";
+import {
+  ADMIN_UX_NAV,
+  ADMIN_UX_PAGE,
+  adminFilterStatusLabel,
+  adminHumanStatusLabel,
+} from "@/app/lib/admin/adminUxCopy";
 import { listAdminPayments } from "@/app/lib/admin/paymentDashboard";
 import { buildAdminPaymentsHref } from "@/app/lib/admin/paymentDashboardShared";
-import { AdminButton, AdminKpiCard } from "@/app/components/admin/ui";
+import { AdminButton, AdminKpiCard, AdminStatusPill } from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +41,9 @@ export default async function AdminPaymentsHubPage({
   } catch {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold tracking-tight">Payments</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {ADMIN_UX_PAGE.payments.title}
+        </h1>
         <div
           className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
           role="status"
@@ -56,39 +64,39 @@ export default async function AdminPaymentsHubPage({
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Payments</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {ADMIN_UX_PAGE.payments.title}
+        </h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Read-only eSIM gateway payment inbox. Funding remains
-          webhook-authoritative. Admin never marks a payment paid from this
-          page.
+          {ADMIN_UX_PAGE.payments.description}
         </p>
         <p className="mt-2 text-sm">
           <Link
             href="/admin/payments/pending"
             className="font-semibold text-[var(--accent-strong)]"
           >
-            Pending tools
+            {ADMIN_UX_NAV.verifyPending}
           </Link>
           <span className="text-[var(--text-soft)]"> · </span>
           <Link
             href="/admin/payments/recovery"
             className="font-semibold text-[var(--accent-strong)]"
           >
-            Payment recovery
+            {ADMIN_UX_NAV.staleUnpaidHolds}
           </Link>
           <span className="text-[var(--text-soft)]"> · </span>
           <Link
             href="/admin/payments/failed"
             className="font-semibold text-[var(--accent-strong)]"
           >
-            Failed payments
+            {ADMIN_UX_NAV.failedPayments}
           </Link>
           <span className="text-[var(--text-soft)]"> · </span>
           <Link
             href="/admin/payments/webhooks"
             className="font-semibold text-[var(--accent-strong)]"
           >
-            Webhook receipts
+            {ADMIN_UX_NAV.webhookReceipts}
           </Link>
         </p>
       </header>
@@ -97,18 +105,28 @@ export default async function AdminPaymentsHubPage({
         aria-label="Payment KPIs"
         className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
       >
-        <AdminKpiCard label="Pending" value={data.kpis.pendingCount} />
+        <AdminKpiCard
+          label="Pending"
+          value={data.kpis.pendingCount}
+          href={buildAdminPaymentsHref({ status: "PENDING" })}
+        />
         <AdminKpiCard
           label="Failed / cancelled (24h)"
           value={data.kpis.failedLast24hCount}
+          href="/admin/payments/failed"
         />
         <AdminKpiCard
           label="Webhook missing (pending)"
           value={data.kpis.webhookMissingAmongPendingCount}
+          href={buildAdminPaymentsHref({
+            status: "PENDING",
+            webhook: "MISSING",
+          })}
         />
         <AdminKpiCard
-          label="Recovery candidates"
+          label="Stale unpaid holds"
           value={data.kpis.recoveryCandidateCount}
+          href="/admin/payments/recovery"
         />
       </section>
 
@@ -139,12 +157,16 @@ export default async function AdminPaymentsHubPage({
             defaultValue={data.status}
             className="h-11 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-3 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
           >
-            <option value="PENDING">Pending</option>
-            <option value="FAILED">Failed</option>
-            <option value="CANCELLED">Cancelled</option>
-            <option value="CONFIRMED">Confirmed</option>
-            <option value="OTHER">Other</option>
-            <option value="ALL">All</option>
+            <option value="PENDING">{adminFilterStatusLabel("PENDING")}</option>
+            <option value="FAILED">{adminFilterStatusLabel("FAILED")}</option>
+            <option value="CANCELLED">
+              {adminFilterStatusLabel("CANCELLED")}
+            </option>
+            <option value="CONFIRMED">
+              {adminFilterStatusLabel("CONFIRMED")}
+            </option>
+            <option value="OTHER">{adminFilterStatusLabel("OTHER")}</option>
+            <option value="ALL">{adminFilterStatusLabel("ALL")}</option>
           </select>
         </label>
 
@@ -255,16 +277,18 @@ export default async function AdminPaymentsHubPage({
                     {row.providerLabel}
                   </td>
                   <td className="px-3 py-3 align-top">
-                    <p className="text-[var(--heading)]">{row.attemptStatus}</p>
-                    <p className="text-xs text-[var(--text-soft)]">
-                      purchase {row.purchaseStatus}
+                    <AdminStatusPill value={row.attemptStatus}>
+                      {adminHumanStatusLabel(row.attemptStatus)}
+                    </AdminStatusPill>
+                    <p className="mt-1 text-xs text-[var(--text-soft)]">
+                      purchase {adminHumanStatusLabel(row.purchaseStatus)}
                     </p>
                     <p className="text-xs text-[var(--text-soft)]">
                       inquiry {row.inquiryLabel}
                     </p>
                   </td>
                   <td className="px-3 py-3 align-top text-[var(--heading)]">
-                    {row.webhookLabel}
+                    {adminHumanStatusLabel(row.webhookLabel)}
                   </td>
                   <td className="px-3 py-3 align-top text-xs text-[var(--text-soft)]">
                     <p>{row.updatedAtLabel}</p>

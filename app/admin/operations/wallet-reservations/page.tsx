@@ -54,7 +54,7 @@ function ReservationActionLinks({
           variant="secondary"
           size="sm"
         >
-          Problems & Recovery
+          Stuck Cases
         </AdminButton>
       ) : null}
     </div>
@@ -105,14 +105,14 @@ export default async function AdminWalletReservationsMonitorPage() {
             variant="ghost"
             size="sm"
           >
-            Problems & Recovery (funds reserved)
+            Stuck Cases (funds reserved)
           </AdminButton>
           <AdminButton
             href="/admin/payments/pending"
             variant="ghost"
             size="sm"
           >
-            Pending payment tools
+            Verify Pending
           </AdminButton>
         </div>
         <div>

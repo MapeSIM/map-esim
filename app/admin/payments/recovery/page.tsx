@@ -1,16 +1,14 @@
 import Link from "next/link";
 import { requireRole } from "@/app/lib/auth/session";
+import { ADMIN_UX_NAV, ADMIN_UX_PAGE } from "@/app/lib/admin/adminUxCopy";
 import { listPaymentRecoveryCandidates } from "@/app/lib/admin/paymentRecovery";
-import {
-  PAYMENT_RECOVERY_POLICY_BLURB,
-  buildAdminPaymentRecoveryHref,
-} from "@/app/lib/admin/paymentRecoveryShared";
+import { buildAdminPaymentRecoveryHref } from "@/app/lib/admin/paymentRecoveryShared";
 import { AdminButton, AdminStatusPill } from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
 const UNAVAILABLE =
-  "Payment recovery data is temporarily unavailable. Please refresh shortly.";
+  "Stale unpaid holds data is temporarily unavailable. Please refresh shortly.";
 
 const EMPTY_CLASS =
   "rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]";
@@ -29,7 +27,9 @@ export default async function AdminPaymentRecoveryPage({
   } catch {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold tracking-tight">Payment recovery</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {ADMIN_UX_PAGE.staleUnpaidHolds.title}
+        </h1>
         <div
           className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
           role="status"
@@ -45,27 +45,26 @@ export default async function AdminPaymentRecoveryPage({
       <header>
         <p className="text-sm">
           <AdminButton href="/admin/payments" variant="ghost" size="sm">
-            ← Payments
+            ← {ADMIN_UX_NAV.payments}
           </AdminButton>
           <AdminButton
             href="/admin/payments/pending"
             variant="ghost"
             size="sm"
           >
-            Pending payment tools
+            {ADMIN_UX_NAV.verifyPending}
           </AdminButton>
         </p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight">
-          Payment recovery
+          {ADMIN_UX_PAGE.staleUnpaidHolds.title}
         </h1>
         <p className="mt-2 max-w-3xl text-sm text-[var(--text-muted)]">
-          {PAYMENT_RECOVERY_POLICY_BLURB}
+          {ADMIN_UX_PAGE.staleUnpaidHolds.description}
         </p>
         <p className="mt-2 text-xs text-[var(--text-soft)]">
-          Candidates: customer + partner · AWAITING_PAYMENT /
-          PAYMENT_PENDING / RECONCILIATION_REQUIRED · SIMPAISA / SAFEPAY ·
-          provider ref present · webhook missing · stale ≥ {data.staleMinutes}{" "}
-          minutes (updatedAt).
+          Candidates: customer + partner · awaiting payment / payment pending /
+          needs reconciliation · SIMPAISA / SAFEPAY · provider ref present ·
+          webhook missing · stale ≥ {data.staleMinutes} minutes.
         </p>
       </header>
 
@@ -156,7 +155,7 @@ export default async function AdminPaymentRecoveryPage({
                           variant="secondary"
                           size="sm"
                         >
-                          Pending tools
+                          {ADMIN_UX_NAV.verifyPending}
                         </AdminButton>
                       ) : null}
                     </div>
