@@ -4,6 +4,7 @@
  */
 
 import { ADMIN_SEARCH_MAX_LENGTH } from "@/app/lib/admin/display";
+import { simpaisaMajorAmountFromMinor } from "@/app/lib/payments/simpaisaPolicy";
 
 export const ADMIN_PAYMENTS_PAGE_SIZE = 25;
 export const ADMIN_PAYMENTS_PAGE_SIZE_MAX = 50;
@@ -154,6 +155,27 @@ export function paymentDashboardInquiryPlaceholder(): string {
 
 export function paymentDashboardMethodPlaceholder(): string {
   return "—";
+}
+
+/**
+ * Admin UI only: format gateway charge minor units (e.g. PKR paisa, USD cents)
+ * as major units. Example: 300 + "PKR" → "3.00 PKR".
+ * Uses the existing 2-decimal minor→major helper; does not convert FX.
+ */
+export function formatAdminPaymentChargeLabel(
+  chargeAmountMinor: number | null | undefined,
+  chargeCurrency: string | null | undefined
+): string | null {
+  if (
+    chargeAmountMinor == null ||
+    !Number.isInteger(chargeAmountMinor) ||
+    !(chargeCurrency ?? "").trim()
+  ) {
+    return null;
+  }
+  const major = simpaisaMajorAmountFromMinor(chargeAmountMinor);
+  if (!major) return null;
+  return `${major} ${chargeCurrency!.trim().toUpperCase()}`;
 }
 
 export function buildAdminPaymentsHref(options: {

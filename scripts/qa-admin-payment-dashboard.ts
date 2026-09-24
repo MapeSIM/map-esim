@@ -7,6 +7,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   buildAdminPaymentsHref,
+  formatAdminPaymentChargeLabel,
   isPaymentDashboardPendingAttemptStatus,
   parsePaymentDashboardProviderFilter,
   parsePaymentDashboardSearch,
@@ -81,6 +82,13 @@ function main() {
   assert.equal(isPaymentDashboardPendingAttemptStatus("FAILED"), false);
   assert.equal(paymentDashboardMethodPlaceholder(), "—");
   assert.match(paymentDashboardInquiryPlaceholder(), /Check on detail/i);
+  assert.equal(formatAdminPaymentChargeLabel(300, "PKR"), "3.00 PKR");
+  assert.equal(formatAdminPaymentChargeLabel(10000, "pkr"), "100.00 PKR");
+  assert.equal(formatAdminPaymentChargeLabel(null, "PKR"), null);
+  assert.equal(formatAdminPaymentChargeLabel(300, null), null);
+  assert.match(shared, /formatAdminPaymentChargeLabel/);
+  assert.match(service, /formatAdminPaymentChargeLabel/);
+  assert.match(pendingLegacy, /formatAdminPaymentChargeLabel/);
   assert.equal(buildAdminPaymentsHref({}), "/admin/payments");
   assert.match(
     buildAdminPaymentsHref({ status: "FAILED", provider: "SIMPAISA" }),

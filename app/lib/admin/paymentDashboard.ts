@@ -24,6 +24,7 @@ import {
   paymentDashboardInquiryPlaceholder,
   paymentDashboardMethodPlaceholder,
   paymentDashboardWebhookLabel,
+  formatAdminPaymentChargeLabel,
   type PaymentDashboardProviderFilter,
   type PaymentDashboardStatusFilter,
   type PaymentDashboardWebhookFilter,
@@ -120,14 +121,7 @@ function chargeLabelFrom(
   chargeAmountMinor: number | null | undefined,
   chargeCurrency: string | null | undefined
 ): string | null {
-  if (
-    chargeAmountMinor == null ||
-    !Number.isInteger(chargeAmountMinor) ||
-    !(chargeCurrency ?? "").trim()
-  ) {
-    return null;
-  }
-  return `${chargeAmountMinor} ${chargeCurrency!.trim().toUpperCase()}`;
+  return formatAdminPaymentChargeLabel(chargeAmountMinor, chargeCurrency);
 }
 
 function buildWhere(input: {

@@ -8,8 +8,10 @@ import {
   formatAdminReservedWalletAmount,
   isAdminWalletReconciliationLinkApplicable,
 } from "@/app/lib/admin/adminWalletReservationDisplay";
+import { formatAdminPaymentChargeLabel } from "@/app/lib/admin/paymentDashboardShared";
 import { getPendingGatewayPaymentAttemptDetail } from "@/app/lib/admin/pendingPaymentVerify";
 import { requireRole } from "@/app/lib/auth/session";
+import { formatUsdCents } from "@/app/lib/wallet/display";
 import { AdminButton, AdminStatusPill } from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
@@ -128,8 +130,11 @@ export default async function AdminPendingPaymentDetailPage({
               Expected charge
             </dt>
             <dd className="mt-1 text-[var(--heading)]">
-              {detail.chargeAmountMinor ?? detail.gatewayAmountCents}{" "}
-              {detail.chargeCurrency ?? detail.currency}
+              {formatAdminPaymentChargeLabel(
+                detail.chargeAmountMinor,
+                detail.chargeCurrency
+              ) ??
+                `${formatUsdCents(detail.gatewayAmountCents)} ${detail.currency}`}
             </dd>
           </div>
           <div>
