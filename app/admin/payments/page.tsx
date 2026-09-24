@@ -8,7 +8,22 @@ import {
 } from "@/app/lib/admin/adminUxCopy";
 import { listAdminPayments } from "@/app/lib/admin/paymentDashboard";
 import { buildAdminPaymentsHref } from "@/app/lib/admin/paymentDashboardShared";
-import { AdminButton, AdminKpiCard, AdminStatusPill } from "@/app/components/admin/ui";
+import {
+  AdminButton,
+  AdminEmptyState,
+  AdminFilterField,
+  AdminFilterPanel,
+  adminFilterControlClassName,
+  AdminKpiCard,
+  AdminPageHeader,
+  AdminStatusPill,
+  AdminTableBody,
+  AdminTableHead,
+  AdminTableShell,
+  ADMIN_KPI_GRID_CLASS,
+  ADMIN_PAGE_STACK_CLASS,
+  ADMIN_SOFT_COPY_CLASS,
+} from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -40,16 +55,11 @@ export default async function AdminPaymentsHubPage({
     });
   } catch {
     return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold tracking-tight">
-          {ADMIN_UX_PAGE.payments.title}
-        </h1>
-        <div
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-          role="status"
-        >
-          <p className="text-sm font-medium text-[var(--heading)]">{UNAVAILABLE}</p>
-        </div>
+      <div className={ADMIN_PAGE_STACK_CLASS}>
+        <AdminPageHeader title={ADMIN_UX_PAGE.payments.title} />
+        <AdminEmptyState title="Temporarily unavailable">
+          {UNAVAILABLE}
+        </AdminEmptyState>
       </div>
     );
   }
@@ -62,49 +72,44 @@ export default async function AdminPaymentsHubPage({
   };
 
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {ADMIN_UX_PAGE.payments.title}
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          {ADMIN_UX_PAGE.payments.description}
-        </p>
-        <p className="mt-2 text-sm">
-          <Link
-            href="/admin/payments/pending"
-            className="font-semibold text-[var(--accent-strong)]"
-          >
-            {ADMIN_UX_NAV.verifyPending}
-          </Link>
-          <span className="text-[var(--text-soft)]"> · </span>
-          <Link
-            href="/admin/payments/recovery"
-            className="font-semibold text-[var(--accent-strong)]"
-          >
-            {ADMIN_UX_NAV.staleUnpaidHolds}
-          </Link>
-          <span className="text-[var(--text-soft)]"> · </span>
-          <Link
-            href="/admin/payments/failed"
-            className="font-semibold text-[var(--accent-strong)]"
-          >
-            {ADMIN_UX_NAV.failedPayments}
-          </Link>
-          <span className="text-[var(--text-soft)]"> · </span>
-          <Link
-            href="/admin/payments/webhooks"
-            className="font-semibold text-[var(--accent-strong)]"
-          >
-            {ADMIN_UX_NAV.webhookReceipts}
-          </Link>
-        </p>
-      </header>
+    <div className={ADMIN_PAGE_STACK_CLASS}>
+      <AdminPageHeader
+        title={ADMIN_UX_PAGE.payments.title}
+        description={ADMIN_UX_PAGE.payments.description}
+        meta={
+          <span className="flex flex-wrap gap-x-2 gap-y-1 text-sm">
+            <Link
+              href="/admin/payments/pending"
+              className="font-semibold text-[var(--accent-strong)]"
+            >
+              {ADMIN_UX_NAV.verifyPending}
+            </Link>
+            <span className="text-[var(--text-soft)]">·</span>
+            <Link
+              href="/admin/payments/recovery"
+              className="font-semibold text-[var(--accent-strong)]"
+            >
+              {ADMIN_UX_NAV.staleUnpaidHolds}
+            </Link>
+            <span className="text-[var(--text-soft)]">·</span>
+            <Link
+              href="/admin/payments/failed"
+              className="font-semibold text-[var(--accent-strong)]"
+            >
+              {ADMIN_UX_NAV.failedPayments}
+            </Link>
+            <span className="text-[var(--text-soft)]">·</span>
+            <Link
+              href="/admin/payments/webhooks"
+              className="font-semibold text-[var(--accent-strong)]"
+            >
+              {ADMIN_UX_NAV.webhookReceipts}
+            </Link>
+          </span>
+        }
+      />
 
-      <section
-        aria-label="Payment KPIs"
-        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
-      >
+      <section aria-label="Payment KPIs" className={ADMIN_KPI_GRID_CLASS}>
         <AdminKpiCard
           label="Pending"
           value={data.kpis.pendingCount}
@@ -130,32 +135,23 @@ export default async function AdminPaymentsHubPage({
         />
       </section>
 
-      <form
-        method="get"
-        className="grid gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:grid-cols-2 lg:grid-cols-4"
-      >
-        <label className="block text-sm sm:col-span-2 lg:col-span-2">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Search
-          </span>
+      <AdminFilterPanel aria-label="Payment filters">
+        <AdminFilterField label="Search" className="sm:col-span-2 lg:col-span-2">
           <input
             type="search"
             name="q"
             defaultValue={data.search}
             maxLength={100}
             placeholder="Attempt, purchase, order id, or customer email"
-            className="h-11 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-3 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className={adminFilterControlClassName}
           />
-        </label>
+        </AdminFilterField>
 
-        <label className="block text-sm">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Status
-          </span>
+        <AdminFilterField label="Status">
           <select
             name="status"
             defaultValue={data.status}
-            className="h-11 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-3 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className={adminFilterControlClassName}
           >
             <option value="PENDING">{adminFilterStatusLabel("PENDING")}</option>
             <option value="FAILED">{adminFilterStatusLabel("FAILED")}</option>
@@ -168,40 +164,34 @@ export default async function AdminPaymentsHubPage({
             <option value="OTHER">{adminFilterStatusLabel("OTHER")}</option>
             <option value="ALL">{adminFilterStatusLabel("ALL")}</option>
           </select>
-        </label>
+        </AdminFilterField>
 
-        <label className="block text-sm">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Provider
-          </span>
+        <AdminFilterField label="Provider">
           <select
             name="provider"
             defaultValue={data.provider}
-            className="h-11 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-3 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className={adminFilterControlClassName}
           >
             <option value="ALL">All providers</option>
             <option value="SIMPAISA">SIMPAISA</option>
             <option value="SAFEPAY">SAFEPAY</option>
             <option value="UNKNOWN">Unknown</option>
           </select>
-        </label>
+        </AdminFilterField>
 
-        <label className="block text-sm">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Webhook
-          </span>
+        <AdminFilterField label="Webhook">
           <select
             name="webhook"
             defaultValue={data.webhook}
-            className="h-11 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-3 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className={adminFilterControlClassName}
           >
             <option value="ALL">All</option>
             <option value="MISSING">Missing</option>
             <option value="PRESENT">Present</option>
           </select>
-        </label>
+        </AdminFilterField>
 
-        <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
+        <div className="flex flex-wrap items-end gap-2 sm:col-span-2 lg:col-span-4">
           <AdminButton type="submit" variant="primary">
             Apply filters
           </AdminButton>
@@ -209,101 +199,104 @@ export default async function AdminPaymentsHubPage({
             Reset
           </AdminButton>
         </div>
-      </form>
+      </AdminFilterPanel>
 
-      <p className="text-xs text-[var(--text-soft)]">
+      <p className={ADMIN_SOFT_COPY_CLASS}>
         Showing {data.rows.length} of {data.totalCount} · page {data.page} /{" "}
         {data.totalPages}
       </p>
 
       {data.rows.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]">
-          No payment attempts match these filters.
-        </div>
+        <AdminEmptyState
+          title="No matching payments"
+          actionHref="/admin/payments"
+          actionLabel="Reset filters"
+        >
+          No payment attempts match these filters. Try clearing search or
+          opening Verify Pending / Stale Unpaid Holds.
+        </AdminEmptyState>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-[var(--border)]">
-          <table className="min-w-full divide-y divide-[var(--border)] text-left text-sm">
-            <thead className="bg-[var(--surface-2)] text-xs uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              <tr>
-                <th className="px-3 py-3 font-semibold">Payment</th>
-                <th className="px-3 py-3 font-semibold">Customer</th>
-                <th className="px-3 py-3 font-semibold">Amount</th>
-                <th className="px-3 py-3 font-semibold">Provider</th>
-                <th className="px-3 py-3 font-semibold">Status</th>
-                <th className="px-3 py-3 font-semibold">Webhook</th>
-                <th className="px-3 py-3 font-semibold">Updated</th>
-                <th className="px-3 py-3 font-semibold"> </th>
+        <AdminTableShell caption="Payment attempts" minWidthClassName="min-w-[900px]">
+          <AdminTableHead>
+            <tr>
+              <th className="px-3 py-3 font-semibold">Payment</th>
+              <th className="px-3 py-3 font-semibold">Customer</th>
+              <th className="px-3 py-3 font-semibold">Amount</th>
+              <th className="px-3 py-3 font-semibold">Provider</th>
+              <th className="px-3 py-3 font-semibold">Status</th>
+              <th className="px-3 py-3 font-semibold">Webhook</th>
+              <th className="px-3 py-3 font-semibold">Updated</th>
+              <th className="px-3 py-3 font-semibold"> </th>
+            </tr>
+          </AdminTableHead>
+          <AdminTableBody>
+            {data.rows.map((row) => (
+              <tr key={row.attemptId}>
+                <td className="px-3 py-3 align-top">
+                  <p className="break-all font-medium text-[var(--heading)]">
+                    {row.attemptId}
+                  </p>
+                  <p className="text-xs text-[var(--text-soft)]">
+                    purchase {row.purchaseId}
+                    {row.orderId ? ` · order ${row.orderId}` : ""}
+                  </p>
+                  <p className="text-xs text-[var(--text-soft)]">
+                    ref {row.providerRefMasked}
+                  </p>
+                </td>
+                <td className="px-3 py-3 align-top text-[var(--text-muted)]">
+                  {row.customerHref ? (
+                    <Link
+                      href={row.customerHref}
+                      className="font-medium text-[var(--accent-strong)]"
+                    >
+                      {row.customerLabel}
+                    </Link>
+                  ) : (
+                    row.customerLabel
+                  )}
+                </td>
+                <td className="px-3 py-3 align-top text-[var(--heading)]">
+                  <p>{row.amountLabel}</p>
+                  {row.chargeLabel ? (
+                    <p className="text-xs text-[var(--text-soft)]">
+                      charge {row.chargeLabel}
+                    </p>
+                  ) : null}
+                  <p className="text-xs text-[var(--text-soft)]">
+                    method {row.methodLabel}
+                  </p>
+                </td>
+                <td className="px-3 py-3 align-top text-[var(--heading)]">
+                  {row.providerLabel}
+                </td>
+                <td className="px-3 py-3 align-top">
+                  <AdminStatusPill value={row.attemptStatus}>
+                    {adminHumanStatusLabel(row.attemptStatus)}
+                  </AdminStatusPill>
+                  <p className="mt-1 text-xs text-[var(--text-soft)]">
+                    purchase {adminHumanStatusLabel(row.purchaseStatus)}
+                  </p>
+                  <p className="text-xs text-[var(--text-soft)]">
+                    inquiry {row.inquiryLabel}
+                  </p>
+                </td>
+                <td className="px-3 py-3 align-top text-[var(--heading)]">
+                  {adminHumanStatusLabel(row.webhookLabel)}
+                </td>
+                <td className="px-3 py-3 align-top text-xs text-[var(--text-soft)]">
+                  <p>{row.updatedAtLabel}</p>
+                  <p>created {row.createdAtLabel}</p>
+                </td>
+                <td className="px-3 py-3 align-top">
+                  <AdminButton href={row.href} variant="primary" size="sm">
+                    Open
+                  </AdminButton>
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border)] bg-[var(--surface)]">
-              {data.rows.map((row) => (
-                <tr key={row.attemptId}>
-                  <td className="px-3 py-3 align-top">
-                    <p className="font-medium text-[var(--heading)]">
-                      {row.attemptId}
-                    </p>
-                    <p className="text-xs text-[var(--text-soft)]">
-                      purchase {row.purchaseId}
-                      {row.orderId ? ` · order ${row.orderId}` : ""}
-                    </p>
-                    <p className="text-xs text-[var(--text-soft)]">
-                      ref {row.providerRefMasked}
-                    </p>
-                  </td>
-                  <td className="px-3 py-3 align-top text-[var(--text-muted)]">
-                    {row.customerHref ? (
-                      <Link
-                        href={row.customerHref}
-                        className="font-medium text-[var(--accent-strong)]"
-                      >
-                        {row.customerLabel}
-                      </Link>
-                    ) : (
-                      row.customerLabel
-                    )}
-                  </td>
-                  <td className="px-3 py-3 align-top text-[var(--heading)]">
-                    <p>{row.amountLabel}</p>
-                    {row.chargeLabel ? (
-                      <p className="text-xs text-[var(--text-soft)]">
-                        charge {row.chargeLabel}
-                      </p>
-                    ) : null}
-                    <p className="text-xs text-[var(--text-soft)]">
-                      method {row.methodLabel}
-                    </p>
-                  </td>
-                  <td className="px-3 py-3 align-top text-[var(--heading)]">
-                    {row.providerLabel}
-                  </td>
-                  <td className="px-3 py-3 align-top">
-                    <AdminStatusPill value={row.attemptStatus}>
-                      {adminHumanStatusLabel(row.attemptStatus)}
-                    </AdminStatusPill>
-                    <p className="mt-1 text-xs text-[var(--text-soft)]">
-                      purchase {adminHumanStatusLabel(row.purchaseStatus)}
-                    </p>
-                    <p className="text-xs text-[var(--text-soft)]">
-                      inquiry {row.inquiryLabel}
-                    </p>
-                  </td>
-                  <td className="px-3 py-3 align-top text-[var(--heading)]">
-                    {adminHumanStatusLabel(row.webhookLabel)}
-                  </td>
-                  <td className="px-3 py-3 align-top text-xs text-[var(--text-soft)]">
-                    <p>{row.updatedAtLabel}</p>
-                    <p>created {row.createdAtLabel}</p>
-                  </td>
-                  <td className="px-3 py-3 align-top">
-                    <AdminButton href={row.href} variant="primary" size="sm">
-                      Open
-                    </AdminButton>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </AdminTableBody>
+        </AdminTableShell>
       )}
 
       {data.totalPages > 1 ? (

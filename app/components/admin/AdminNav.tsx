@@ -154,14 +154,17 @@ export default function AdminNav({
     .filter((section) => section.links.length > 0);
 
   return (
-    <aside className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4">
+    <aside className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 sm:rounded-3xl sm:p-4">
       <p className="px-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
         MAP eSIM Admin
       </p>
       <p className="mt-2 truncate px-2 text-sm font-semibold text-[var(--heading)]">
         {adminName}
       </p>
-      <nav className="mt-4 flex flex-col gap-4" aria-label="Admin">
+      <nav
+        className="mt-4 flex max-h-[min(70vh,28rem)] flex-col gap-4 overflow-y-auto overscroll-contain lg:max-h-none lg:overflow-visible"
+        aria-label="Admin"
+      >
         {visibleSections.map((section) => (
           <div key={section.id}>
             <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">

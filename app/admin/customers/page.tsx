@@ -1,13 +1,22 @@
 import { getAdminCustomersPage } from "@/app/lib/admin/customers";
-import { AdminButton, AdminStatusPill } from "@/app/components/admin/ui";
+import {
+  AdminButton,
+  AdminEmptyState,
+  AdminFilterField,
+  AdminFilterPanel,
+  AdminPageHeader,
+  AdminStatusPill,
+  AdminTableBody,
+  AdminTableHead,
+  AdminTableShell,
+  ADMIN_PAGE_STACK_CLASS,
+  adminFilterControlClassName,
+} from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
 const CUSTOMERS_UNAVAILABLE =
   "Customer data is temporarily unavailable. Please refresh shortly.";
-
-const EMPTY_CLASS =
-  "rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]";
 
 function buildCustomersHref(options: {
   q: string;
@@ -56,18 +65,11 @@ export default async function AdminCustomersPage({
     });
   } catch {
     return (
-      <div className="space-y-6">
-        <header>
-          <h1 className="text-2xl font-bold tracking-tight">Customers</h1>
-        </header>
-        <div
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-          role="status"
-        >
-          <p className="text-sm font-medium text-[var(--heading)]">
-            {CUSTOMERS_UNAVAILABLE}
-          </p>
-        </div>
+      <div className={ADMIN_PAGE_STACK_CLASS}>
+        <AdminPageHeader title="Customers" />
+        <AdminEmptyState title="Temporarily unavailable">
+          {CUSTOMERS_UNAVAILABLE}
+        </AdminEmptyState>
       </div>
     );
   }
@@ -80,78 +82,63 @@ export default async function AdminCustomersPage({
   };
 
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight">Customers</h1>
-        <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Read-only CUSTOMER accounts. Password hashes, OAuth tokens, and
-          provider account identifiers are never displayed.
-        </p>
-      </header>
+    <div className={ADMIN_PAGE_STACK_CLASS}>
+      <AdminPageHeader
+        title="Customers"
+        description="Read-only CUSTOMER accounts. Password hashes, OAuth tokens, and provider account identifiers are never displayed."
+      />
 
-      <form
-        method="get"
-        className="grid gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:grid-cols-2 lg:grid-cols-4"
-      >
-        <label className="block text-sm sm:col-span-2 lg:col-span-2">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Search
-          </span>
+      <AdminFilterPanel aria-label="Customer filters">
+        <AdminFilterField
+          label="Search"
+          className="sm:col-span-2 lg:col-span-2"
+        >
           <input
             type="search"
             name="q"
             defaultValue={data.search}
             maxLength={100}
             placeholder="Name, email, or local customer ID"
-            className="h-11 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-3 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className={adminFilterControlClassName}
           />
-        </label>
+        </AdminFilterField>
 
-        <label className="block text-sm">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Verification
-          </span>
+        <AdminFilterField label="Verification">
           <select
             name="verification"
             defaultValue={data.verification}
-            className="h-11 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-3 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className={adminFilterControlClassName}
           >
             <option value="ALL">All</option>
             <option value="VERIFIED">Verified</option>
             <option value="UNVERIFIED">Unverified</option>
           </select>
-        </label>
+        </AdminFilterField>
 
-        <label className="block text-sm">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Authentication
-          </span>
+        <AdminFilterField label="Authentication">
           <select
             name="auth"
             defaultValue={data.auth}
-            className="h-11 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-3 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className={adminFilterControlClassName}
           >
             <option value="ALL">All methods</option>
             <option value="GOOGLE">Google</option>
             <option value="CREDENTIALS">Credentials</option>
           </select>
-        </label>
+        </AdminFilterField>
 
-        <label className="block text-sm">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Account
-          </span>
+        <AdminFilterField label="Account">
           <select
             name="account"
             defaultValue={data.account}
-            className="h-11 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-3 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className={adminFilterControlClassName}
           >
             <option value="ALL">All accounts</option>
             <option value="ACTIVE">Active</option>
             <option value="BLOCKED">Blocked</option>
             <option value="DELETED">Deleted</option>
           </select>
-        </label>
+        </AdminFilterField>
 
         <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
           <AdminButton type="submit" variant="primary">
@@ -161,66 +148,73 @@ export default async function AdminCustomersPage({
             Clear
           </AdminButton>
         </div>
-      </form>
+      </AdminFilterPanel>
 
       {data.rows.length === 0 ? (
-        <div className={EMPTY_CLASS}>
-          No customers match the selected filters.
-        </div>
+        <AdminEmptyState
+          title="No matching customers"
+          actionHref="/admin/customers"
+          actionLabel="Clear filters"
+        >
+          No customers match the selected filters. Try clearing search or
+          widening verification / auth / account filters.
+        </AdminEmptyState>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-[var(--border)]">
-          <table className="min-w-[960px] w-full border-collapse text-left text-sm">
-            <thead className="bg-[var(--surface-2)] text-xs uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              <tr>
-                <th className="px-3 py-3 font-semibold">Created</th>
-                <th className="px-3 py-3 font-semibold">Name</th>
-                <th className="px-3 py-3 font-semibold">Email</th>
-                <th className="px-3 py-3 font-semibold">Auth</th>
-                <th className="px-3 py-3 font-semibold">Verified</th>
-                <th className="px-3 py-3 font-semibold">Status</th>
-                <th className="px-3 py-3 font-semibold">Orders</th>
-                <th className="px-3 py-3 font-semibold">Details</th>
+        <AdminTableShell
+          caption="Customers"
+          minWidthClassName="min-w-[960px]"
+        >
+          <AdminTableHead>
+            <tr>
+              <th className="px-3 py-3 font-semibold">Created</th>
+              <th className="px-3 py-3 font-semibold">Name</th>
+              <th className="px-3 py-3 font-semibold">Email</th>
+              <th className="px-3 py-3 font-semibold">Auth</th>
+              <th className="px-3 py-3 font-semibold">Verified</th>
+              <th className="px-3 py-3 font-semibold">Status</th>
+              <th className="px-3 py-3 font-semibold">Orders</th>
+              <th className="px-3 py-3 font-semibold">Details</th>
+            </tr>
+          </AdminTableHead>
+          <AdminTableBody>
+            {data.rows.map((customer) => (
+              <tr key={customer.id}>
+                <td className="whitespace-nowrap px-3 py-3 text-[var(--text)]">
+                  {customer.createdAtLabel}
+                </td>
+                <td className="px-3 py-3 text-[var(--text)]">{customer.name}</td>
+                <td className="break-all px-3 py-3 font-mono text-xs text-[var(--text)]">
+                  {customer.emailMasked}
+                </td>
+                <td className="px-3 py-3 text-[var(--text)]">
+                  {customer.authMethodLabel}
+                </td>
+                <td className="px-3 py-3">
+                  <AdminStatusPill value={customer.emailVerifiedLabel}>
+                    {customer.emailVerifiedLabel}
+                  </AdminStatusPill>
+                </td>
+                <td className="px-3 py-3">
+                  <AdminStatusPill value={customer.accountStatusLabel}>
+                    {customer.accountStatusLabel}
+                  </AdminStatusPill>
+                </td>
+                <td className="px-3 py-3 text-[var(--text)]">
+                  {customer.localOrderCount}
+                </td>
+                <td className="px-3 py-3">
+                  <AdminButton
+                    href={`/admin/customers/${customer.id}`}
+                    variant="ghost"
+                    size="sm"
+                  >
+                    View
+                  </AdminButton>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {data.rows.map((customer) => (
-                <tr
-                  key={customer.id}
-                  className="border-t border-[var(--border)] text-[var(--text)]"
-                >
-                  <td className="whitespace-nowrap px-3 py-3">
-                    {customer.createdAtLabel}
-                  </td>
-                  <td className="px-3 py-3">{customer.name}</td>
-                  <td className="px-3 py-3 font-mono text-xs">
-                    {customer.emailMasked}
-                  </td>
-                  <td className="px-3 py-3">{customer.authMethodLabel}</td>
-                  <td className="px-3 py-3">
-                    <AdminStatusPill value={customer.emailVerifiedLabel}>
-                      {customer.emailVerifiedLabel}
-                    </AdminStatusPill>
-                  </td>
-                  <td className="px-3 py-3">
-                    <AdminStatusPill value={customer.accountStatusLabel}>
-                      {customer.accountStatusLabel}
-                    </AdminStatusPill>
-                  </td>
-                  <td className="px-3 py-3">{customer.localOrderCount}</td>
-                  <td className="px-3 py-3">
-                    <AdminButton
-                      href={`/admin/customers/${customer.id}`}
-                      variant="ghost"
-                      size="sm"
-                    >
-                      View
-                    </AdminButton>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </AdminTableBody>
+        </AdminTableShell>
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--text-muted)]">

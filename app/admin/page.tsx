@@ -6,7 +6,19 @@ import {
 } from "@/app/lib/admin/adminUxCopy";
 import { loadAdminAccess } from "@/app/lib/admin/adminPermissionAccess";
 import { requireRole } from "@/app/lib/auth/session";
-import { AdminKpiCard, AdminStatusPill } from "@/app/components/admin/ui";
+import {
+  AdminEmptyState,
+  AdminKpiCard,
+  AdminPageHeader,
+  AdminStatusPill,
+  AdminTableBody,
+  AdminTableHead,
+  AdminTableShell,
+  ADMIN_CARD_CLASS,
+  ADMIN_PAGE_STACK_CLASS,
+  ADMIN_SECTION_TITLE_CLASS,
+  ADMIN_MUTED_COPY_CLASS,
+} from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +34,9 @@ function StatusRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] py-3 last:border-b-0">
-      <span className="text-sm text-[var(--text)]">{label}</span>
+      <span className="min-w-0 break-words text-sm text-[var(--text)]">
+        {label}
+      </span>
       <AdminStatusPill value={status}>{status}</AdminStatusPill>
     </div>
   );
@@ -30,23 +44,14 @@ function StatusRow({
 
 function DashboardUnavailable() {
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {ADMIN_UX_PAGE.overview.title}
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          {ADMIN_UX_PAGE.overview.description}
-        </p>
-      </header>
-      <div
-        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-        role="status"
-      >
-        <p className="text-sm font-medium text-[var(--heading)]">
-          {DASHBOARD_UNAVAILABLE}
-        </p>
-      </div>
+    <div className={ADMIN_PAGE_STACK_CLASS}>
+      <AdminPageHeader
+        title={ADMIN_UX_PAGE.overview.title}
+        description={ADMIN_UX_PAGE.overview.description}
+      />
+      <AdminEmptyState title="Temporarily unavailable">
+        {DASHBOARD_UNAVAILABLE}
+      </AdminEmptyState>
     </div>
   );
 }
@@ -74,7 +79,7 @@ export default async function AdminDashboardPage({
     : [];
 
   return (
-    <div className="space-y-10">
+    <div className={ADMIN_PAGE_STACK_CLASS}>
       {forbidden ? (
         <p
           className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200"
@@ -83,24 +88,20 @@ export default async function AdminDashboardPage({
           You do not have permission to open that admin page.
         </p>
       ) : null}
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {ADMIN_UX_PAGE.overview.title}
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          {ADMIN_UX_PAGE.overview.description}
-        </p>
-      </header>
+      <AdminPageHeader
+        title={ADMIN_UX_PAGE.overview.title}
+        description={ADMIN_UX_PAGE.overview.description}
+      />
 
       {attention.length > 0 ? (
         <section aria-labelledby="admin-needs-attention-heading">
           <h2
             id="admin-needs-attention-heading"
-            className="text-lg font-semibold tracking-tight"
+            className={ADMIN_SECTION_TITLE_CLASS}
           >
             Needs attention
           </h2>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
+          <p className={`mt-1 ${ADMIN_MUTED_COPY_CLASS}`}>
             Open a queue to investigate. Counts are read-only summaries.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -120,11 +121,11 @@ export default async function AdminDashboardPage({
       <section aria-labelledby="admin-primary-kpi-heading">
         <h2
           id="admin-primary-kpi-heading"
-          className="text-lg font-semibold tracking-tight"
+          className={ADMIN_SECTION_TITLE_CLASS}
         >
           Key metrics
         </h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
+        <p className={`mt-1 ${ADMIN_MUTED_COPY_CLASS}`}>
           Orders and active customers at a glance.
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -143,23 +144,30 @@ export default async function AdminDashboardPage({
       <section aria-labelledby="admin-recent-orders-heading">
         <h2
           id="admin-recent-orders-heading"
-          className="text-lg font-semibold tracking-tight"
+          className={ADMIN_SECTION_TITLE_CLASS}
         >
           Recent orders
         </h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
+        <p className={`mt-1 ${ADMIN_MUTED_COPY_CLASS}`}>
           Latest local snapshots only. Installation credentials are never shown
           here.
         </p>
 
         {data.recentOrders.length === 0 ? (
-          <p className="mt-4 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-4 py-6 text-sm text-[var(--text-soft)]">
-            No local orders yet.
-          </p>
+          <div className="mt-4">
+            <AdminEmptyState
+              title="No local orders yet"
+              actionHref="/admin/orders"
+              actionLabel="Open Orders"
+            >
+              Orders will appear here after the first local purchase snapshot is
+              recorded.
+            </AdminEmptyState>
+          </div>
         ) : (
-          <div className="mt-4 overflow-x-auto rounded-2xl border border-[var(--border)]">
-            <table className="min-w-[720px] w-full border-collapse text-left text-sm">
-              <thead className="bg-[var(--surface-2)] text-xs uppercase tracking-[0.08em] text-[var(--text-soft)]">
+          <div className="mt-4">
+            <AdminTableShell caption="Recent orders">
+              <AdminTableHead>
                 <tr>
                   <th className="px-3 py-3 font-semibold">Created</th>
                   <th className="px-3 py-3 font-semibold">Destination</th>
@@ -168,33 +176,34 @@ export default async function AdminDashboardPage({
                   <th className="px-3 py-3 font-semibold">Amount</th>
                   <th className="px-3 py-3 font-semibold">Provider ref</th>
                 </tr>
-              </thead>
-              <tbody>
+              </AdminTableHead>
+              <AdminTableBody>
                 {data.recentOrders.map((order, index) => (
-                  <tr
-                    key={`${order.providerRefMasked}-${index}`}
-                    className="border-t border-[var(--border)] text-[var(--text)]"
-                  >
-                    <td className="whitespace-nowrap px-3 py-3">
+                  <tr key={`${order.providerRefMasked}-${index}`}>
+                    <td className="whitespace-nowrap px-3 py-3 text-[var(--text)]">
                       {order.createdAtLabel}
                     </td>
-                    <td className="px-3 py-3">{order.destination}</td>
-                    <td className="px-3 py-3">{order.planPackage}</td>
+                    <td className="px-3 py-3 text-[var(--text)]">
+                      {order.destination}
+                    </td>
+                    <td className="px-3 py-3 text-[var(--text)]">
+                      {order.planPackage}
+                    </td>
                     <td className="px-3 py-3">
                       <AdminStatusPill value={order.localStatus}>
                         {adminHumanStatusLabel(order.localStatus)}
                       </AdminStatusPill>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-3">
+                    <td className="whitespace-nowrap px-3 py-3 text-[var(--text)]">
                       {order.amountLabel}
                     </td>
-                    <td className="font-mono text-xs px-3 py-3">
+                    <td className="break-all px-3 py-3 font-mono text-xs text-[var(--text)]">
                       {order.providerRefMasked}
                     </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
+              </AdminTableBody>
+            </AdminTableShell>
           </div>
         )}
       </section>
@@ -202,11 +211,11 @@ export default async function AdminDashboardPage({
       <section aria-labelledby="admin-customer-mix-heading">
         <h2
           id="admin-customer-mix-heading"
-          className="text-lg font-semibold tracking-tight"
+          className={ADMIN_SECTION_TITLE_CLASS}
         >
           Customer breakdown
         </h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
+        <p className={`mt-1 ${ADMIN_MUTED_COPY_CLASS}`}>
           Sign-in mix among active customers. Secondary to order metrics.
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -228,14 +237,14 @@ export default async function AdminDashboardPage({
       <section aria-labelledby="admin-system-status-heading">
         <h2
           id="admin-system-status-heading"
-          className="text-lg font-semibold tracking-tight"
+          className={ADMIN_SECTION_TITLE_CLASS}
         >
           System status
         </h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
+        <p className={`mt-1 ${ADMIN_MUTED_COPY_CLASS}`}>
           Configuration presence only. Secret values are never displayed.
         </p>
-        <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4">
+        <div className={`mt-4 ${ADMIN_CARD_CLASS} !p-0 px-4`}>
           <StatusRow
             label="Google OAuth"
             status={data.systemStatus.googleOAuth}

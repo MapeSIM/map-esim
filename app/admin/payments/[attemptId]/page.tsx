@@ -25,17 +25,15 @@ import {
 import { requireRole } from "@/app/lib/auth/session";
 import {
   AdminButton,
+  AdminEmptyState,
   AdminKpiCard,
+  AdminPageHeader,
   AdminStatusPill,
+  ADMIN_CARD_CLASS,
+  ADMIN_PAGE_STACK_CLASS,
 } from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
-
-const CARD_CLASS =
-  "min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm sm:p-5";
-
-const EMPTY_CLASS =
-  "rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]";
 
 export default async function AdminPaymentDetailPage({
   params,
@@ -143,71 +141,69 @@ export default async function AdminPaymentDetailPage({
       : null;
 
   return (
-    <div className="min-w-0 space-y-8">
-      <header className="min-w-0 space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <AdminButton href="/admin/payments" variant="ghost" size="sm">
-            ← Payments
-          </AdminButton>
-          <AdminButton
-            href="/admin/payments/pending"
-            variant="ghost"
-            size="sm"
-          >
-            Verify Pending
-          </AdminButton>
-          {recovery?.isRecoveryCandidate ? (
-            <AdminButton
-              href="/admin/payments/recovery"
-              variant="ghost"
-              size="sm"
-            >
-              Stale unpaid holds
-            </AdminButton>
-          ) : null}
-          {showRecon ? (
-            <AdminButton
-              href={buildAdminWalletPurchaseReconciliationHref(
-                detail.purchaseId
-              )}
-              variant="ghost"
-              size="sm"
-            >
-              Stuck cases
-            </AdminButton>
-          ) : null}
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {PAYMENT_DETAIL_WORKBENCH_TITLE}
-          </h1>
-          <p className="mt-2 text-sm text-[var(--text-muted)]">
-            {PAYMENT_DETAIL_WORKBENCH_DESCRIPTION}
-          </p>
-          <p className="mt-1 text-xs text-[var(--text-soft)]">
+    <div className={ADMIN_PAGE_STACK_CLASS}>
+      <AdminPageHeader
+        title={PAYMENT_DETAIL_WORKBENCH_TITLE}
+        description={PAYMENT_DETAIL_WORKBENCH_DESCRIPTION}
+        meta={
+          <>
             {detail.ownerKind === "partner" ? "Partner" : "Customer"} ·{" "}
             {paymentDetailStatusSummary({
               attemptStatus: detail.attemptStatus,
               purchaseStatus: detail.purchaseStatus,
               webhookLabel: detail.webhookLabel,
             })}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <AdminStatusPill value={detail.ownerKind}>
-            {detail.ownerKind === "partner" ? "Partner" : "Customer"}
-          </AdminStatusPill>
-          <AdminStatusPill value={detail.attemptStatus}>
-            {adminHumanStatusLabel(detail.attemptStatus)}
-          </AdminStatusPill>
-          <AdminStatusPill value={detail.purchaseStatus}>
-            {adminHumanStatusLabel(detail.purchaseStatus)}
-          </AdminStatusPill>
-          <AdminStatusPill value={detail.webhookLabel}>
-            Webhook {adminHumanStatusLabel(detail.webhookLabel)}
-          </AdminStatusPill>
-        </div>
-      </header>
+          </>
+        }
+        actions={
+          <>
+            <AdminButton href="/admin/payments" variant="ghost" size="sm">
+              ← Payments
+            </AdminButton>
+            <AdminButton
+              href="/admin/payments/pending"
+              variant="ghost"
+              size="sm"
+            >
+              Verify Pending
+            </AdminButton>
+            {recovery?.isRecoveryCandidate ? (
+              <AdminButton
+                href="/admin/payments/recovery"
+                variant="ghost"
+                size="sm"
+              >
+                Stale unpaid holds
+              </AdminButton>
+            ) : null}
+            {showRecon ? (
+              <AdminButton
+                href={buildAdminWalletPurchaseReconciliationHref(
+                  detail.purchaseId
+                )}
+                variant="ghost"
+                size="sm"
+              >
+                Stuck cases
+              </AdminButton>
+            ) : null}
+          </>
+        }
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <AdminStatusPill value={detail.ownerKind}>
+          {detail.ownerKind === "partner" ? "Partner" : "Customer"}
+        </AdminStatusPill>
+        <AdminStatusPill value={detail.attemptStatus}>
+          {adminHumanStatusLabel(detail.attemptStatus)}
+        </AdminStatusPill>
+        <AdminStatusPill value={detail.purchaseStatus}>
+          {adminHumanStatusLabel(detail.purchaseStatus)}
+        </AdminStatusPill>
+        <AdminStatusPill value={detail.webhookLabel}>
+          Webhook {adminHumanStatusLabel(detail.webhookLabel)}
+        </AdminStatusPill>
+      </div>
 
       <section
         className="rounded-2xl border border-[var(--accent-strong)]/30 bg-[var(--accent-strong)]/8 p-4 text-sm sm:p-5"
@@ -275,7 +271,7 @@ export default async function AdminPaymentDetailPage({
         </section>
       ) : null}
 
-      <section className={CARD_CLASS} aria-labelledby="related-records-heading">
+      <section className={ADMIN_CARD_CLASS} aria-labelledby="related-records-heading">
         <h2
           id="related-records-heading"
           className="text-base font-semibold tracking-tight text-[var(--heading)]"
@@ -341,7 +337,7 @@ export default async function AdminPaymentDetailPage({
         </div>
       </section>
 
-      <section className={CARD_CLASS} aria-labelledby="payment-timeline-heading">
+      <section className={ADMIN_CARD_CLASS} aria-labelledby="payment-timeline-heading">
         <h2
           id="payment-timeline-heading"
           className="text-base font-semibold tracking-tight text-[var(--heading)]"
@@ -352,8 +348,10 @@ export default async function AdminPaymentDetailPage({
           Read-only history from attempt timestamps and webhook receipts.
         </p>
         {timeline.length === 0 ? (
-          <div className={`${EMPTY_CLASS} mt-3`}>
-            No timeline events available for this attempt.
+          <div className="mt-3">
+            <AdminEmptyState title="No timeline events">
+              No timeline events available for this attempt.
+            </AdminEmptyState>
           </div>
         ) : (
           <ol className="mt-4 space-y-3">
@@ -377,7 +375,7 @@ export default async function AdminPaymentDetailPage({
         )}
       </section>
 
-      <section className={CARD_CLASS}>
+      <section className={ADMIN_CARD_CLASS}>
         <h2 className="text-base font-semibold tracking-tight text-[var(--heading)]">
           Webhook receipts for this attempt
         </h2>
@@ -386,8 +384,10 @@ export default async function AdminPaymentDetailPage({
           webhook replay.
         </p>
         {!recovery || recovery.receipts.length === 0 ? (
-          <div className={`${EMPTY_CLASS} mt-3`}>
-            No webhook receipts claimed for this attempt id.
+          <div className="mt-3">
+            <AdminEmptyState title="No receipts for this attempt">
+              No webhook receipts claimed for this attempt id.
+            </AdminEmptyState>
           </div>
         ) : (
           <ul className="mt-3 space-y-2">
@@ -418,7 +418,7 @@ export default async function AdminPaymentDetailPage({
         </div>
       </section>
 
-      <details className={CARD_CLASS}>
+      <details className={ADMIN_CARD_CLASS}>
         <summary className="cursor-pointer text-base font-semibold tracking-tight text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]">
           Advanced technical details
         </summary>
@@ -554,11 +554,11 @@ export default async function AdminPaymentDetailPage({
           />
         )
       ) : detail.ownerKind === "customer" ? (
-        <section className={EMPTY_CLASS}>
+        <AdminEmptyState title="Investigation tools not available">
           Investigation tools are available when the attempt is awaiting
           gateway payment, payment pending, or reconciliation required. This
           page never funds or marks paid.
-        </section>
+        </AdminEmptyState>
       ) : null}
 
       <p className="text-xs text-[var(--text-soft)]">

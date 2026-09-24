@@ -1,15 +1,27 @@
 import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBadge";
-import { adminHumanStatusLabel, ADMIN_UX_PAGE } from "@/app/lib/admin/adminUxCopy";
+import {
+  adminHumanStatusLabel,
+  ADMIN_UX_PAGE,
+} from "@/app/lib/admin/adminUxCopy";
 import { getAdminOrdersPage } from "@/app/lib/admin/orders";
-import { AdminButton, AdminStatusPill } from "@/app/components/admin/ui";
+import {
+  AdminButton,
+  AdminEmptyState,
+  AdminFilterField,
+  AdminFilterPanel,
+  adminFilterControlClassName,
+  AdminPageHeader,
+  AdminStatusPill,
+  AdminTableBody,
+  AdminTableHead,
+  AdminTableShell,
+  ADMIN_PAGE_STACK_CLASS,
+} from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
 const ORDERS_UNAVAILABLE =
   "Order data is temporarily unavailable. Please refresh shortly.";
-
-const EMPTY_CLASS =
-  "rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]";
 
 function buildOrdersHref(options: {
   q: string;
@@ -60,18 +72,11 @@ export default async function AdminOrdersPage({
     });
   } catch {
     return (
-      <div className="space-y-6">
-        <header>
-          <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
-        </header>
-        <div
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-          role="status"
-        >
-          <p className="text-sm font-medium text-[var(--heading)]">
-            {ORDERS_UNAVAILABLE}
-          </p>
-        </div>
+      <div className={ADMIN_PAGE_STACK_CLASS}>
+        <AdminPageHeader title={ADMIN_UX_PAGE.orders.title} />
+        <AdminEmptyState title="Temporarily unavailable">
+          {ORDERS_UNAVAILABLE}
+        </AdminEmptyState>
       </div>
     );
   }
@@ -85,83 +90,67 @@ export default async function AdminOrdersPage({
   };
 
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {ADMIN_UX_PAGE.orders.title}
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          {ADMIN_UX_PAGE.orders.description}
-        </p>
-      </header>
+    <div className={ADMIN_PAGE_STACK_CLASS}>
+      <AdminPageHeader
+        title={ADMIN_UX_PAGE.orders.title}
+        description={ADMIN_UX_PAGE.orders.description}
+      />
 
-      <form
-        method="get"
-        className="grid gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:grid-cols-2 lg:grid-cols-4"
-      >
+      <AdminFilterPanel aria-label="Order filters">
         {data.userId ? (
           <input type="hidden" name="userId" value={data.userId} />
         ) : null}
-        <label className="block text-sm sm:col-span-2 lg:col-span-2">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Search
-          </span>
+        <AdminFilterField
+          label="Search"
+          className="sm:col-span-2 lg:col-span-2"
+        >
           <input
             type="search"
             name="q"
             defaultValue={data.search}
             maxLength={100}
             placeholder="Destination, plan, local ID, provider ref"
-            className="h-11 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-3 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className={adminFilterControlClassName}
           />
-        </label>
+        </AdminFilterField>
 
-        <label className="block text-sm">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Status
-          </span>
+        <AdminFilterField label="Status">
           <select
             name="status"
             defaultValue={data.status}
-            className="h-11 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-3 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className={adminFilterControlClassName}
           >
             <option value="ALL">All statuses</option>
             <option value="COMPLETED">Completed</option>
             <option value="PENDING">Pending</option>
             <option value="FAILED">Failed</option>
           </select>
-        </label>
+        </AdminFilterField>
 
-        <label className="block text-sm">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Association
-          </span>
+        <AdminFilterField label="Association">
           <select
             name="association"
             defaultValue={data.association}
-            className="h-11 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-3 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className={adminFilterControlClassName}
           >
             <option value="ALL">All orders</option>
             <option value="LINKED">Linked customer</option>
             <option value="GUEST">Guest order</option>
           </select>
-        </label>
+        </AdminFilterField>
 
-        <label className="block text-sm">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Currency
-          </span>
+        <AdminFilterField label="Currency">
           <select
             name="currency"
             defaultValue={data.currency || "ALL"}
-            className="h-11 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-3 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className={adminFilterControlClassName}
           >
             <option value="ALL">All currencies</option>
             <option value="USD">USD</option>
           </select>
-        </label>
+        </AdminFilterField>
 
-        <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
+        <div className="flex flex-wrap items-end gap-2 sm:col-span-2 lg:col-span-4">
           <AdminButton type="submit" variant="primary">
             Apply filters
           </AdminButton>
@@ -169,81 +158,83 @@ export default async function AdminOrdersPage({
             Clear
           </AdminButton>
         </div>
-      </form>
+      </AdminFilterPanel>
 
       {data.rows.length === 0 ? (
-        <div className={EMPTY_CLASS}>
+        <AdminEmptyState
+          title="No matching orders"
+          actionHref="/admin/orders"
+          actionLabel="Clear filters"
+        >
           No local orders match the selected filters.
-        </div>
+        </AdminEmptyState>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-[var(--border)]">
-          <table className="min-w-[900px] w-full border-collapse text-left text-sm">
-            <thead className="bg-[var(--surface-2)] text-xs uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              <tr>
-                <th className="px-3 py-3 font-semibold">Created</th>
-                <th className="px-3 py-3 font-semibold">Destination</th>
-                <th className="px-3 py-3 font-semibold">Plan / data</th>
-                <th className="px-3 py-3 font-semibold">Status</th>
-                <th className="px-3 py-3 font-semibold">Funding</th>
-                <th className="px-3 py-3 font-semibold">Amount</th>
-                <th className="px-3 py-3 font-semibold">Provider ref</th>
-                <th className="px-3 py-3 font-semibold">ICCID</th>
-                <th className="px-3 py-3 font-semibold">Association</th>
-                <th className="px-3 py-3 font-semibold">Details</th>
+        <AdminTableShell
+          caption="Local orders"
+          minWidthClassName="min-w-[900px]"
+        >
+          <AdminTableHead>
+            <tr>
+              <th className="px-3 py-3 font-semibold">Created</th>
+              <th className="px-3 py-3 font-semibold">Destination</th>
+              <th className="px-3 py-3 font-semibold">Plan / data</th>
+              <th className="px-3 py-3 font-semibold">Status</th>
+              <th className="px-3 py-3 font-semibold">Funding</th>
+              <th className="px-3 py-3 font-semibold">Amount</th>
+              <th className="px-3 py-3 font-semibold">Provider ref</th>
+              <th className="px-3 py-3 font-semibold">ICCID</th>
+              <th className="px-3 py-3 font-semibold">Association</th>
+              <th className="px-3 py-3 font-semibold">Details</th>
+            </tr>
+          </AdminTableHead>
+          <AdminTableBody>
+            {data.rows.map((order) => (
+              <tr key={order.id} className="text-[var(--text)]">
+                <td className="whitespace-nowrap px-3 py-3">
+                  {order.createdAtLabel}
+                </td>
+                <td className="px-3 py-3">{order.destination}</td>
+                <td className="px-3 py-3">
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <span>{order.planPackage}</span>
+                    <AddDataPurchaseBadge
+                      isAddDataPurchase={order.isAddDataPurchase}
+                    />
+                  </div>
+                </td>
+                <td className="px-3 py-3">
+                  <AdminStatusPill value={order.localStatus}>
+                    {adminHumanStatusLabel(order.localStatus)}
+                  </AdminStatusPill>
+                </td>
+                <td className="px-3 py-3">{order.fundingLabel}</td>
+                <td className="whitespace-nowrap px-3 py-3">
+                  {order.amountLabel}
+                </td>
+                <td className="px-3 py-3 font-mono text-xs">
+                  {order.providerRefMasked}
+                </td>
+                <td className="px-3 py-3 font-mono text-xs">
+                  {order.iccidMasked}
+                </td>
+                <td className="px-3 py-3">
+                  <AdminStatusPill value={order.associationLabel}>
+                    {order.associationLabel}
+                  </AdminStatusPill>
+                </td>
+                <td className="px-3 py-3">
+                  <AdminButton
+                    href={`/admin/orders/${order.id}`}
+                    variant="ghost"
+                    size="sm"
+                  >
+                    View
+                  </AdminButton>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {data.rows.map((order) => (
-                <tr
-                  key={order.id}
-                  className="border-t border-[var(--border)] text-[var(--text)]"
-                >
-                  <td className="whitespace-nowrap px-3 py-3">
-                    {order.createdAtLabel}
-                  </td>
-                  <td className="px-3 py-3">{order.destination}</td>
-                  <td className="px-3 py-3">
-                    <div className="flex min-w-0 flex-col gap-1.5">
-                      <span>{order.planPackage}</span>
-                      <AddDataPurchaseBadge
-                        isAddDataPurchase={order.isAddDataPurchase}
-                      />
-                    </div>
-                  </td>
-                  <td className="px-3 py-3">
-                    <AdminStatusPill value={order.localStatus}>
-                      {adminHumanStatusLabel(order.localStatus)}
-                    </AdminStatusPill>
-                  </td>
-                  <td className="px-3 py-3">{order.fundingLabel}</td>
-                  <td className="whitespace-nowrap px-3 py-3">
-                    {order.amountLabel}
-                  </td>
-                  <td className="px-3 py-3 font-mono text-xs">
-                    {order.providerRefMasked}
-                  </td>
-                  <td className="px-3 py-3 font-mono text-xs">
-                    {order.iccidMasked}
-                  </td>
-                  <td className="px-3 py-3">
-                    <AdminStatusPill value={order.associationLabel}>
-                      {order.associationLabel}
-                    </AdminStatusPill>
-                  </td>
-                  <td className="px-3 py-3">
-                    <AdminButton
-                      href={`/admin/orders/${order.id}`}
-                      variant="ghost"
-                      size="sm"
-                    >
-                      View
-                    </AdminButton>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </AdminTableBody>
+        </AdminTableShell>
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--text-muted)]">

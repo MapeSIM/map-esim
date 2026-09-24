@@ -39,15 +39,15 @@ export default async function AdminLayout({
   }
 
   return (
-    <main className="min-h-screen bg-[var(--page-bg)] px-4 py-8 text-[var(--heading)] sm:px-6 sm:py-10">
-      <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[240px_1fr]">
-        <div className="lg:sticky lg:top-6 lg:self-start">
+    <main className="min-h-screen bg-[var(--page-bg)] px-3 py-6 text-[var(--heading)] sm:px-6 sm:py-10">
+      <div className="mx-auto grid max-w-6xl gap-4 sm:gap-6 lg:grid-cols-[240px_1fr]">
+        <div className="min-w-0 lg:sticky lg:top-6 lg:self-start">
           <AdminNav
             adminName={user.name || "Administrator"}
             permissions={[...access.permissions]}
           />
         </div>
-        <section className="min-w-0 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-8">
+        <section className="min-w-0 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6 lg:p-8">
           {children}
         </section>
       </div>

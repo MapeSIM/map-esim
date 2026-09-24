@@ -1,18 +1,19 @@
 import { requireRole } from "@/app/lib/auth/session";
 import { ADMIN_UX_NAV, ADMIN_UX_PAGE } from "@/app/lib/admin/adminUxCopy";
 import { listFailedGatewayPaymentAttempts } from "@/app/lib/admin/failedPaymentAttempts";
-import { AdminButton, AdminStatusPill } from "@/app/components/admin/ui";
+import {
+  AdminButton,
+  AdminEmptyState,
+  AdminPageHeader,
+  AdminStatusPill,
+  ADMIN_LIST_CARD_CLASS,
+  ADMIN_PAGE_STACK_CLASS,
+} from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
 const UNAVAILABLE =
   "Failed payment data is temporarily unavailable. Please refresh shortly.";
-
-const EMPTY_CLASS =
-  "rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]";
-
-const CARD_CLASS =
-  "rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm";
 
 export default async function AdminFailedPaymentsPage() {
   await requireRole("ADMIN");
@@ -22,54 +23,55 @@ export default async function AdminFailedPaymentsPage() {
     rows = await listFailedGatewayPaymentAttempts(40);
   } catch {
     return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold tracking-tight">
-          {ADMIN_UX_PAGE.failedPayments.title}
-        </h1>
-        <div
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-          role="status"
-        >
-          <p className="text-sm font-medium text-[var(--heading)]">{UNAVAILABLE}</p>
-        </div>
+      <div className={ADMIN_PAGE_STACK_CLASS}>
+        <AdminPageHeader title={ADMIN_UX_PAGE.failedPayments.title} />
+        <AdminEmptyState title="Temporarily unavailable">
+          {UNAVAILABLE}
+        </AdminEmptyState>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {ADMIN_UX_PAGE.failedPayments.title}
-        </h1>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
-          {ADMIN_UX_PAGE.failedPayments.description}
-        </p>
-        <p className="mt-2 flex flex-wrap gap-2 text-sm">
-          <AdminButton href="/admin/payments" variant="ghost" size="sm">
-            {ADMIN_UX_NAV.payments}
-          </AdminButton>
-          <AdminButton href="/admin/payments/pending" variant="ghost" size="sm">
-            {ADMIN_UX_NAV.verifyPending}
-          </AdminButton>
-          <AdminButton
-            href="/admin/payments/webhooks"
-            variant="ghost"
-            size="sm"
-          >
-            {ADMIN_UX_NAV.webhookReceipts}
-          </AdminButton>
-        </p>
-      </header>
+    <div className={ADMIN_PAGE_STACK_CLASS}>
+      <AdminPageHeader
+        title={ADMIN_UX_PAGE.failedPayments.title}
+        description={ADMIN_UX_PAGE.failedPayments.description}
+        actions={
+          <>
+            <AdminButton href="/admin/payments" variant="ghost" size="sm">
+              {ADMIN_UX_NAV.payments}
+            </AdminButton>
+            <AdminButton
+              href="/admin/payments/pending"
+              variant="ghost"
+              size="sm"
+            >
+              {ADMIN_UX_NAV.verifyPending}
+            </AdminButton>
+            <AdminButton
+              href="/admin/payments/webhooks"
+              variant="ghost"
+              size="sm"
+            >
+              {ADMIN_UX_NAV.webhookReceipts}
+            </AdminButton>
+          </>
+        }
+      />
 
       {rows.length === 0 ? (
-        <div className={EMPTY_CLASS}>
-          No failed or cancelled gateway payment attempts right now.
-        </div>
+        <AdminEmptyState
+          title="No failed or cancelled payments"
+          actionHref="/admin/payments"
+          actionLabel="Open Payments inbox"
+        >
+          There are no recent failed or cancelled gateway attempts to review.
+        </AdminEmptyState>
       ) : (
         <ul className="space-y-3">
           {rows.map((row) => (
-            <li key={row.attemptId} className={CARD_CLASS}>
+            <li key={row.attemptId} className={ADMIN_LIST_CARD_CLASS}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
@@ -89,7 +91,7 @@ export default async function AdminFailedPaymentsPage() {
                   <p className="text-[var(--text-muted)]">
                     Reason {row.failureReason}
                   </p>
-                  <p className="text-xs text-[var(--text-soft)]">
+                  <p className="break-all text-xs text-[var(--text-soft)]">
                     {row.occurredAtLabel} · attempt {row.attemptId} · purchase{" "}
                     {row.purchaseId}
                   </p>

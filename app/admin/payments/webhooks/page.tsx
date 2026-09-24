@@ -1,6 +1,13 @@
-import Link from "next/link";
 import { requireRole } from "@/app/lib/auth/session";
+import { ADMIN_UX_NAV, ADMIN_UX_PAGE } from "@/app/lib/admin/adminUxCopy";
 import { listPaymentWebhookReceipts } from "@/app/lib/admin/paymentWebhookReceipts";
+import {
+  AdminButton,
+  AdminEmptyState,
+  AdminPageHeader,
+  ADMIN_LIST_CARD_CLASS,
+  ADMIN_PAGE_STACK_CLASS,
+} from "@/app/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -15,62 +22,63 @@ export default async function AdminPaymentWebhooksPage() {
     rows = await listPaymentWebhookReceipts(40);
   } catch {
     return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold tracking-tight">Webhook receipts</h1>
-        <div
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-          role="status"
-        >
-          <p className="text-sm font-medium text-[var(--heading)]">{UNAVAILABLE}</p>
-        </div>
+      <div className={ADMIN_PAGE_STACK_CLASS}>
+        <AdminPageHeader title={ADMIN_UX_PAGE.webhookReceipts.title} />
+        <AdminEmptyState title="Temporarily unavailable">
+          {UNAVAILABLE}
+        </AdminEmptyState>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight">Webhook receipts</h1>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Delivery observability for payment gateway webhooks and rejected
-          posts. This list is read-only. It does not replay events, fund a
-          purchase, or enable the payment gateway.
-        </p>
-        <p className="mt-2 text-sm">
-          <Link
-            href="/admin/payments"
-            className="font-semibold text-[var(--accent-strong)]"
-          >
-            Payments hub
-          </Link>
-          <span className="text-[var(--text-soft)]"> · </span>
-          <Link
-            href="/admin/payments/pending"
-            className="font-semibold text-[var(--accent-strong)]"
-          >
-            Verify Pending
-          </Link>
-          <span className="text-[var(--text-soft)]"> · </span>
-          <Link
-            href="/admin/payments/failed"
-            className="font-semibold text-[var(--accent-strong)]"
-          >
-            Failed payments
-          </Link>
-        </p>
-      </header>
+    <div className={ADMIN_PAGE_STACK_CLASS}>
+      <AdminPageHeader
+        title={ADMIN_UX_PAGE.webhookReceipts.title}
+        description={ADMIN_UX_PAGE.webhookReceipts.description}
+        meta={
+          <>
+            Delivery observability for payment gateway webhooks and rejected
+            posts. This list is read-only. It does not replay events, fund a
+            purchase, or enable the payment gateway.
+          </>
+        }
+        actions={
+          <>
+            <AdminButton href="/admin/payments" variant="ghost" size="sm">
+              ← {ADMIN_UX_NAV.payments}
+            </AdminButton>
+            <AdminButton
+              href="/admin/payments/pending"
+              variant="ghost"
+              size="sm"
+            >
+              {ADMIN_UX_NAV.verifyPending}
+            </AdminButton>
+            <AdminButton
+              href="/admin/payments/failed"
+              variant="ghost"
+              size="sm"
+            >
+              {ADMIN_UX_NAV.failedPayments}
+            </AdminButton>
+          </>
+        }
+      />
 
       {rows.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]">
-          No webhook receipts recorded yet.
-        </div>
+        <AdminEmptyState
+          title="No webhook receipts yet"
+          actionHref="/admin/payments"
+          actionLabel="Open Payments inbox"
+        >
+          No gateway webhook receipts have been recorded yet. Receipts appear
+          here after the gateway posts to the webhook endpoint.
+        </AdminEmptyState>
       ) : (
         <ul className="space-y-3">
           {rows.map((row) => (
-            <li
-              key={row.id}
-              className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm"
-            >
+            <li key={row.id} className={ADMIN_LIST_CARD_CLASS}>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 space-y-1">
                   <p className="font-semibold text-[var(--heading)]">
@@ -95,20 +103,14 @@ export default async function AdminPaymentWebhooksPage() {
                 </div>
                 <div className="flex flex-col gap-2 sm:items-end">
                   {row.attemptHref ? (
-                    <Link
-                      href={row.attemptHref}
-                      className="inline-flex h-10 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)]"
-                    >
+                    <AdminButton href={row.attemptHref} variant="secondary">
                       View attempt
-                    </Link>
+                    </AdminButton>
                   ) : null}
                   {row.topupHref ? (
-                    <Link
-                      href={row.topupHref}
-                      className="inline-flex h-10 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)]"
-                    >
+                    <AdminButton href={row.topupHref} variant="secondary">
                       View top-up
-                    </Link>
+                    </AdminButton>
                   ) : null}
                 </div>
               </div>
