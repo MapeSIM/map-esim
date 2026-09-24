@@ -261,10 +261,10 @@ export default function PartnerCatalogBuy({
               type="button"
               className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--surface)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
               onClick={() => {
-                window.location.href = "/partner/catalog";
+                window.location.href = "/countries";
               }}
             >
-              Browse catalog again
+              Browse destinations again
             </button>
           </div>
         </div>

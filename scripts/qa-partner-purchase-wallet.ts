@@ -80,6 +80,8 @@ async function main() {
     });
     const partnerId = partnerUser.partnerProfile!.id;
     const pepA = purchaseId("a");
+    // Same explicit key exercises exact-once already_applied (allocator would mint :2).
+    const debitKeyA = `partner_esim_debit_${pepA}:1`;
 
     // A. debit $9.50 from $100
     const debit1 = await prisma.$transaction((tx) =>
@@ -87,6 +89,7 @@ async function main() {
         partnerId,
         partnerEsimPurchaseId: pepA,
         amountCents: 950,
+        idempotencyKey: debitKeyA,
       })
     );
     assert.equal(debit1.outcome, "created");
@@ -113,6 +116,7 @@ async function main() {
         partnerId,
         partnerEsimPurchaseId: pepA,
         amountCents: 950,
+        idempotencyKey: debitKeyA,
       })
     );
     assert.equal(debit2.outcome, "already_applied");
@@ -219,7 +223,7 @@ async function main() {
     );
     console.log("PASS E_repeat_refund_idempotent");
 
-    // F. conflicting debit key / amount
+    // F. conflicting debit key / amount (same key, different amount)
     let conflictDebit: unknown = null;
     try {
       await prisma.$transaction((tx) =>
@@ -227,6 +231,7 @@ async function main() {
           partnerId,
           partnerEsimPurchaseId: pepA,
           amountCents: 1_000,
+          idempotencyKey: debitKeyA,
         })
       );
     } catch (e) {

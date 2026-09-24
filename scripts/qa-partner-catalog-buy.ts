@@ -579,11 +579,43 @@ async function main() {
       "utf8"
     );
     assert.ok(layoutSrc.includes('href: "/countries"'));
-    assert.ok(layoutSrc.includes('label: "Catalog"'));
+    assert.ok(layoutSrc.includes('label: "Destinations"'));
+    assert.ok(!layoutSrc.includes('label: "Catalog"'));
     assert.ok(!layoutSrc.includes('href: "/partner/catalog"'));
     assert.ok(layoutSrc.includes('href: "/partner/orders"'));
     assert.equal(layoutSrc.includes('label: "Orders", disabled: true'), false);
     console.log("PASS nav_catalog_and_orders_enabled");
+
+    const catalogPageSrc = readFileSync(
+      path.join(root, "app/partner/(portal)/catalog/page.tsx"),
+      "utf8"
+    );
+    assert.ok(catalogPageSrc.includes('redirect("/countries")'));
+    assert.ok(!catalogPageSrc.includes("PartnerCatalogBuy"));
+    console.log("PASS catalog_page_redirects_to_countries");
+
+    const cancelSrc = readFileSync(
+      path.join(
+        root,
+        "app/partner/(portal)/catalog/payment/cancel/[attemptId]/page.tsx"
+      ),
+      "utf8"
+    );
+    assert.ok(cancelSrc.includes('href="/countries"'));
+    assert.ok(cancelSrc.includes("Back to destinations"));
+    assert.ok(!cancelSrc.includes("Back to catalog"));
+    console.log("PASS payment_cancel_back_to_destinations");
+
+    const returnHrefSrc = readFileSync(
+      path.join(
+        root,
+        "app/lib/partner/partnerEsimPurchasePaymentReturnState.ts"
+      ),
+      "utf8"
+    );
+    assert.ok(returnHrefSrc.includes('return "/countries"'));
+    assert.ok(!returnHrefSrc.includes('return "/partner/catalog"'));
+    console.log("PASS payment_return_destinations_href");
 
     console.log("ALL PASS qa-partner-catalog-buy");
   } finally {

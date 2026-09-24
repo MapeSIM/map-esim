@@ -119,7 +119,7 @@ export default async function PartnerDashboardPage() {
         <div className="grid gap-3">
           <AccountActionRow
             href="/countries"
-            title="Buy eSIM"
+            title="Destinations"
             subtitle="Browse the same destinations and plans as customers"
             icon={<CreditCard className="h-5 w-5" aria-hidden="true" />}
             emphasize

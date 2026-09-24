@@ -39,11 +39,11 @@ export function PartnerEsimPurchasePaymentReturnView({
           partner account. No payment was confirmed from this page.
         </p>
         <StatusCard>
-          Return to the catalog to start a new purchase, or check orders if you
+          Return to destinations to start a new purchase, or check orders if you
           already completed payment.
         </StatusCard>
         <ActionRow>
-          <PrimaryLink href={catalogHref}>Back to catalog</PrimaryLink>
+          <PrimaryLink href={catalogHref}>Back to destinations</PrimaryLink>
           <SecondaryLink href={ordersHref}>View orders</SecondaryLink>
         </ActionRow>
       </ReturnShell>
@@ -68,7 +68,7 @@ export function PartnerEsimPurchasePaymentReturnView({
             <PrimaryLink href={refreshHref}>Refresh status</PrimaryLink>
           ) : null}
           <SecondaryLink href={ordersHref}>View orders</SecondaryLink>
-          <SecondaryLink href={catalogHref}>Back to catalog</SecondaryLink>
+          <SecondaryLink href={catalogHref}>Back to destinations</SecondaryLink>
         </ActionRow>
       </ReturnShell>
     );
@@ -85,11 +85,11 @@ export function PartnerEsimPurchasePaymentReturnView({
         </p>
         <StatusCard>
           {isSimpaisa
-            ? "You can return to the catalog and try again when you are ready. This page does not charge your wallet or complete mobile payment."
-            : "You can return to the catalog and try again when you are ready. This page does not charge your wallet or complete online payment."}
+            ? "You can return to destinations and try again when you are ready. This page does not charge your wallet or complete mobile payment."
+            : "You can return to destinations and try again when you are ready. This page does not charge your wallet or complete online payment."}
         </StatusCard>
         <ActionRow>
-          <PrimaryLink href={catalogHref}>Back to catalog</PrimaryLink>
+          <PrimaryLink href={catalogHref}>Back to destinations</PrimaryLink>
           <SecondaryLink href={ordersHref}>View orders</SecondaryLink>
         </ActionRow>
       </ReturnShell>
@@ -142,7 +142,7 @@ export function PartnerEsimPurchasePaymentReturnView({
         {refreshHref ? (
           <PrimaryLink href={refreshHref}>Refresh status</PrimaryLink>
         ) : null}
-        <SecondaryLink href={catalogHref}>Back to catalog</SecondaryLink>
+        <SecondaryLink href={catalogHref}>Back to destinations</SecondaryLink>
         {cancelHref ? (
           <SecondaryLink href={cancelHref}>
             Cancel payment & unlock wallet
