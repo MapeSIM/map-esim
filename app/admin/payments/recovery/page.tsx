@@ -62,9 +62,10 @@ export default async function AdminPaymentRecoveryPage({
           {PAYMENT_RECOVERY_POLICY_BLURB}
         </p>
         <p className="mt-2 text-xs text-[var(--text-soft)]">
-          Candidates: PAYMENT_PENDING or RECONCILIATION_REQUIRED · SIMPAISA /
-          SAFEPAY · provider ref present · webhook missing · stale ≥{" "}
-          {data.staleMinutes} minutes (updatedAt).
+          Candidates: customer + partner · AWAITING_PAYMENT /
+          PAYMENT_PENDING / RECONCILIATION_REQUIRED · SIMPAISA / SAFEPAY ·
+          provider ref present · webhook missing · stale ≥ {data.staleMinutes}{" "}
+          minutes (updatedAt).
         </p>
       </header>
 
@@ -83,7 +84,7 @@ export default async function AdminPaymentRecoveryPage({
             <thead className="bg-[var(--surface-2)] text-xs uppercase tracking-[0.08em] text-[var(--text-soft)]">
               <tr>
                 <th className="px-3 py-3 font-semibold">Attempt ID</th>
-                <th className="px-3 py-3 font-semibold">Customer</th>
+                <th className="px-3 py-3 font-semibold">Owner</th>
                 <th className="px-3 py-3 font-semibold">Provider</th>
                 <th className="px-3 py-3 font-semibold">Amount</th>
                 <th className="px-3 py-3 font-semibold">Age</th>
@@ -97,25 +98,26 @@ export default async function AdminPaymentRecoveryPage({
             </thead>
             <tbody className="divide-y divide-[var(--border)] bg-[var(--surface)]">
               {data.rows.map((row) => (
-                <tr key={row.attemptId}>
+                <tr key={`${row.ownerKind}-${row.attemptId}`}>
                   <td className="px-3 py-3 align-top">
                     <p className="font-medium text-[var(--heading)]">
                       {row.attemptId}
                     </p>
                     <p className="mt-1 text-xs text-[var(--text-soft)]">
+                      {row.ownerKind === "partner" ? "Partner" : "Customer"} ·
                       purchase {row.purchaseId}
                     </p>
                   </td>
                   <td className="px-3 py-3 align-top text-[var(--text-muted)]">
-                    {row.customerHref ? (
+                    {row.ownerHref ? (
                       <Link
-                        href={row.customerHref}
+                        href={row.ownerHref}
                         className="font-medium text-[var(--accent-strong)] outline-none hover:underline focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
                       >
-                        {row.customerLabel}
+                        {row.ownerLabel}
                       </Link>
                     ) : (
-                      row.customerLabel
+                      row.ownerLabel
                     )}
                   </td>
                   <td className="px-3 py-3 align-top text-[var(--heading)]">
@@ -148,13 +150,15 @@ export default async function AdminPaymentRecoveryPage({
                       <AdminButton href={row.href} variant="primary" size="sm">
                         Open
                       </AdminButton>
-                      <AdminButton
-                        href={`/admin/payments/pending/${encodeURIComponent(row.attemptId)}`}
-                        variant="secondary"
-                        size="sm"
-                      >
-                        Pending tools
-                      </AdminButton>
+                      {row.ownerKind === "customer" ? (
+                        <AdminButton
+                          href={`/admin/payments/pending/${encodeURIComponent(row.attemptId)}`}
+                          variant="secondary"
+                          size="sm"
+                        >
+                          Pending tools
+                        </AdminButton>
+                      ) : null}
                     </div>
                   </td>
                 </tr>

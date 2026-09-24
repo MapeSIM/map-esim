@@ -14,6 +14,7 @@ export const PAYMENT_RECOVERY_STALE_MS_MAX = 30 * 60 * 1000;
 export const ADMIN_PAYMENT_RECOVERY_PAGE_SIZE = 25;
 
 export const PAYMENT_RECOVERY_ATTEMPT_STATUSES = [
+  "AWAITING_PAYMENT",
   "PAYMENT_PENDING",
   "RECONCILIATION_REQUIRED",
 ] as const;
@@ -50,9 +51,16 @@ export const PAYMENT_RECOVERY_MISMATCH_DECISIONS = [
 ] as const;
 
 export const PAYMENT_RECOVERY_POLICY_BLURB =
-  "Read/investigate only. Funding remains webhook-authoritative. Admin never marks paid, funds, or replays webhooks from this queue.";
+  "Investigate and release unpaid wallet holds only. Funding remains webhook-authoritative. Admin never marks paid, funds, or replays webhooks from this queue.";
 
 export const PAYMENT_RECOVERY_BANNER_TITLE = "Recovery candidate";
+
+export type PaymentRecoveryOwnerKind = "customer" | "partner";
+
+export const PAYMENT_RECOVERY_STALE_RELEASE_AUDIT =
+  "payment.recovery_stale_reservation_released";
+export const PAYMENT_RECOVERY_STALE_RELEASE_BLOCKED_AUDIT =
+  "payment.recovery_stale_reservation_release_blocked";
 
 /**
  * Resolve stale threshold in ms. Clamps to 15–30 minutes.
@@ -178,11 +186,15 @@ export function paymentRecoveryDecisionLabel(
  * Suggested safe next action — never mark paid / fund / replay webhook.
  */
 export function suggestPaymentRecoverySafeAction(
-  decision: string | null | undefined
+  decision: string | null | undefined,
+  options?: { ownerKind?: PaymentRecoveryOwnerKind }
 ): string {
   const d = normalizePaymentRecoveryDecision(decision);
+  const owner = options?.ownerKind ?? "customer";
   if (!d) {
-    return "Run provider Check Status / Verify";
+    return owner === "partner"
+      ? "Release stale Partner wallet reservation if still unpaid — do not mark paid"
+      : "Run provider Check Status / Verify, or release stale reservation if unpaid";
   }
   if (
     (PAYMENT_RECOVERY_SUCCESS_DECISIONS as readonly string[]).includes(d)

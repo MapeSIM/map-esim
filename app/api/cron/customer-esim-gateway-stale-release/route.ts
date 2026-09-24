@@ -1,19 +1,15 @@
 /**
- * Vercel Cron / secured HTTP trigger for customer eSIM lifecycle emails.
+ * Secured HTTP trigger for customer eSIM gateway stale/expired reservation release.
  * Auth: Authorization Bearer CRON_SECRET (or x-cron-secret header).
- * Never invents expiry — runner polls VeSIM usage only.
  *
- * Schedule: daily UTC via vercel.json (`0 6 * * *`) for Vercel Hobby
- * (max 1 cron run/day). Runner stays reusable for hourly later via plan
- * upgrade or an approved external scheduler hitting this same endpoint.
+ * Prefer the combined `/api/cron/gateway-stale-reservation-release` endpoint.
+ * Not registered alone in vercel.json (Hobby = 1 cron/day).
  */
 import { NextResponse } from "next/server";
-import { runEsimLifecycleNotifications } from "@/app/lib/esim/esimLifecycleNotificationRunner";
-import { runGatewayStaleReservationRecovery } from "@/app/lib/payments/gatewayStaleReservationRecovery";
+import { runCustomerGatewayStaleReservationRecovery } from "@/app/lib/esim/esimPurchaseGatewayStaleRunner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-/** Allow enough time for lifecycle batch + best-effort stale wallet release. */
 export const maxDuration = 60;
 
 function readConfiguredCronSecret(): string | null {
@@ -54,33 +50,15 @@ async function handle(request: Request): Promise<Response> {
     new URL(request.url).searchParams.get("dryRun") === "1" ||
     request.headers.get("x-cron-dry-run") === "1";
 
-  const result = await runEsimLifecycleNotifications({ dryRun });
-
-  // Hobby allows one Vercel cron/day — piggyback unpaid gateway hold release.
-  // Failures here must not fail lifecycle delivery status.
-  let staleRelease: Awaited<
-    ReturnType<typeof runGatewayStaleReservationRecovery>
-  > | null = null;
-  try {
-    staleRelease = await runGatewayStaleReservationRecovery({ dryRun });
-  } catch {
-    staleRelease = null;
-  }
-
-  const status = result.ok ? 200 : result.errorCode === "runner_busy" ? 409 : 500;
+  const result = await runCustomerGatewayStaleReservationRecovery({ dryRun });
+  const status = result.ok ? 200 : 500;
   return NextResponse.json(
     {
       ok: result.ok,
-      runnerClaimed: result.runnerClaimed,
       counts: result.counts,
+      idleMs: result.idleMs,
+      maxAgeMs: result.maxAgeMs,
       errorCode: result.errorCode ?? null,
-      staleRelease: staleRelease
-        ? {
-            ok: staleRelease.ok,
-            customer: staleRelease.customer.counts,
-            partner: staleRelease.partner.counts,
-          }
-        : { ok: false, errorCode: "stale_release_failed" },
       dryRun,
     },
     { status }

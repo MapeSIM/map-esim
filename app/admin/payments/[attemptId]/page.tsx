@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import PendingPaymentVerifyForm from "@/app/components/admin/PendingPaymentVerifyForm";
 import PendingSimpaisaInvestigateForm from "@/app/components/admin/PendingSimpaisaInvestigateForm";
+import StaleGatewayReservationReleaseForm from "@/app/components/admin/StaleGatewayReservationReleaseForm";
 import {
   adminWalletReservationStatusLabel,
   buildAdminWalletPurchaseReconciliationHref,
@@ -31,19 +32,33 @@ const EMPTY_CLASS =
 
 export default async function AdminPaymentDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ attemptId: string }>;
+  searchParams: Promise<{ kind?: string }>;
 }) {
   await requireRole("ADMIN");
   const { attemptId: raw } = await params;
-  const detail = await getAdminPaymentDetail(raw);
+  const query = await searchParams;
+  const kindHint =
+    query.kind === "partner"
+      ? ("partner" as const)
+      : query.kind === "customer"
+        ? ("customer" as const)
+        : null;
+  const detail = await getAdminPaymentDetail(raw, kindHint);
   if (!detail) notFound();
 
-  const recovery = await getAdminPaymentRecoveryDetailExtras(detail.attemptId);
-  const showRecon = isAdminWalletReconciliationLinkApplicable({
-    purchaseStatus: detail.purchaseStatus,
-    attemptStatus: detail.attemptStatus,
-  });
+  const recovery = await getAdminPaymentRecoveryDetailExtras(
+    detail.attemptId,
+    detail.ownerKind
+  );
+  const showRecon =
+    detail.ownerKind === "customer" &&
+    isAdminWalletReconciliationLinkApplicable({
+      purchaseStatus: detail.purchaseStatus,
+      attemptStatus: detail.attemptStatus,
+    });
 
   return (
     <div className="min-w-0 space-y-8">
@@ -83,11 +98,15 @@ export default async function AdminPaymentDetailPage({
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Payment detail</h1>
           <p className="mt-2 text-sm text-[var(--text-muted)]">
-            Canonical payment attempt view. Investigation tools never fund or mark
-            paid. Funding remains webhook-authoritative.
+            {detail.ownerKind === "partner" ? "Partner" : "Customer"} payment
+            attempt. Investigation / release tools never fund or mark paid.
+            Funding remains webhook-authoritative.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <AdminStatusPill value={detail.ownerKind}>
+            {detail.ownerKind === "partner" ? "Partner" : "Customer"}
+          </AdminStatusPill>
           <AdminStatusPill value={detail.attemptStatus}>
             {adminWalletReservationStatusLabel(detail.attemptStatus)}
           </AdminStatusPill>
@@ -162,7 +181,7 @@ export default async function AdminPaymentDetailPage({
           </div>
           <div>
             <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              Customer
+              {detail.ownerKind === "partner" ? "Partner" : "Customer"}
             </dt>
             <dd className="mt-1 text-[var(--heading)]">
               {detail.customerHref ? (
@@ -294,13 +313,22 @@ export default async function AdminPaymentDetailPage({
         </dl>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          {detail.customerHref ? (
+          {detail.ownerKind === "customer" && detail.customerHref ? (
             <AdminButton
               href={`${detail.customerHref}/timeline`}
               variant="secondary"
               size="sm"
             >
               Customer timeline
+            </AdminButton>
+          ) : null}
+          {detail.ownerKind === "partner" && detail.customerHref ? (
+            <AdminButton
+              href={detail.customerHref}
+              variant="secondary"
+              size="sm"
+            >
+              Partner profile
             </AdminButton>
           ) : null}
           {showRecon ? (
@@ -314,13 +342,15 @@ export default async function AdminPaymentDetailPage({
               Open reconciliation
             </AdminButton>
           ) : null}
-          <AdminButton
-            href={`/admin/payments/pending/${encodeURIComponent(detail.attemptId)}`}
-            variant="secondary"
-            size="sm"
-          >
-            Pending payment tools
-          </AdminButton>
+          {detail.ownerKind === "customer" ? (
+            <AdminButton
+              href={`/admin/payments/pending/${encodeURIComponent(detail.attemptId)}`}
+              variant="secondary"
+              size="sm"
+            >
+              Pending payment tools
+            </AdminButton>
+          ) : null}
         </div>
       </section>
 
@@ -365,6 +395,16 @@ export default async function AdminPaymentDetailPage({
         </div>
       </section>
 
+      {recovery?.staleReleaseEligible ? (
+        <StaleGatewayReservationReleaseForm
+          paymentAttemptId={detail.attemptId}
+          ownerKind={detail.ownerKind}
+          walletAppliedCents={
+            recovery.walletAppliedCents ?? detail.walletAppliedCents
+          }
+        />
+      ) : null}
+
       {detail.investigationAvailable ? (
         detail.isSimpaisa ? (
           <PendingSimpaisaInvestigateForm
@@ -378,13 +418,19 @@ export default async function AdminPaymentDetailPage({
             trackerRefMasked={detail.providerRefMasked}
           />
         )
-      ) : (
+      ) : detail.ownerKind === "customer" ? (
         <section className={EMPTY_CLASS}>
           Investigation tools are available when the attempt is awaiting
           gateway payment, payment pending, or reconciliation required. This
           page never funds or marks paid.
         </section>
-      )}
+      ) : null}
+
+      <p className="text-xs text-[var(--text-soft)]">
+        Reserved wallet display:{" "}
+        {formatAdminReservedWalletAmount(detail.walletAppliedCents)}. This
+        page never funds or marks paid.
+      </p>
     </div>
   );
 }

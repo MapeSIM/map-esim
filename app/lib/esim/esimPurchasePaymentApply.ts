@@ -1349,6 +1349,8 @@ export async function maybeReleasePendingGatewayReservation(options: {
   customerUserId: string;
   purchaseId: string;
   attemptId: string;
+  /** When set, marks the open attempt CANCELLED / EXPIRED after a clean READY release. */
+  attemptTerminalStatus?: "CANCELLED" | "EXPIRED";
 }): Promise<{ released: boolean }> {
   const customerUserId = options.customerUserId.trim();
   const purchaseId = options.purchaseId.trim();
@@ -1421,10 +1423,7 @@ export async function maybeReleasePendingGatewayReservation(options: {
       } else if (release.outcome === "linked_existing") {
         released = true;
       }
-      return;
-    }
-
-    if (attempt.purchase.walletAppliedCents <= 0) {
+    } else if (attempt.purchase.walletAppliedCents <= 0) {
       await releasePromoRedemptionInTx(tx, purchaseId);
       await releaseRewardRedemptionInTx(tx, purchaseId);
       await tx.walletEsimPurchase.updateMany({
@@ -1440,12 +1439,96 @@ export async function maybeReleasePendingGatewayReservation(options: {
       });
       released = true;
     }
+
+    const purchaseAfter = await tx.walletEsimPurchase.findUnique({
+      where: { id: purchaseId },
+      select: { status: true, debitTransactionId: true },
+    });
+    const purchaseReadyClean =
+      purchaseAfter?.status === WalletEsimPurchaseStatus.READY &&
+      !purchaseAfter.debitTransactionId;
+
+    const terminal = options.attemptTerminalStatus;
+    if (
+      purchaseReadyClean &&
+      (terminal === "CANCELLED" || terminal === "EXPIRED")
+    ) {
+      const attemptData =
+        terminal === "CANCELLED"
+          ? {
+              status: EsimPurchasePaymentAttemptStatus.CANCELLED,
+              cancelledAt: new Date(),
+              failureCategory: "checkout_cancelled",
+              failureCode: "cancelled",
+            }
+          : {
+              status: EsimPurchasePaymentAttemptStatus.EXPIRED,
+              failureCategory: "checkout_expired",
+              failureCode: "expired",
+            };
+      const marked = await tx.esimPurchasePaymentAttempt.updateMany({
+        where: {
+          id: attemptId,
+          webhookEventId: null,
+          status: {
+            in: [
+              EsimPurchasePaymentAttemptStatus.DRAFT,
+              EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
+              EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING,
+            ],
+          },
+        },
+        data: attemptData,
+      });
+      if (marked.count === 1) {
+        released = true;
+      }
+    }
   });
 
   if (releasedRefundId) {
     scheduleWalletTransactionNotification(releasedRefundId);
   }
   return { released };
+}
+
+/**
+ * Expire/stale recovery for one customer payment attempt.
+ * Releases reserved wallet and restores purchase READY. Never funds.
+ */
+export async function expireStaleCustomerGatewayPaymentAttempt(options: {
+  attemptId: string;
+}): Promise<{ released: boolean; purchaseId: string | null }> {
+  const attemptId = options.attemptId.trim();
+  if (!attemptId || attemptId.length > 64) {
+    return { released: false, purchaseId: null };
+  }
+
+  const row = await prisma.esimPurchasePaymentAttempt.findUnique({
+    where: { id: attemptId },
+    select: {
+      id: true,
+      purchase: {
+        select: {
+          id: true,
+          customerUserId: true,
+        },
+      },
+    },
+  });
+
+  if (!row) {
+    return { released: false, purchaseId: null };
+  }
+
+  const result = await maybeReleasePendingGatewayReservation({
+    customerUserId: row.purchase.customerUserId,
+    purchaseId: row.purchase.id,
+    attemptId: row.id,
+    attemptTerminalStatus: "EXPIRED",
+  });
+
+  return { released: result.released, purchaseId: row.purchase.id };
 }
 
 /**

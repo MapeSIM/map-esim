@@ -56,6 +56,7 @@ function main() {
   console.log("PASS route_nav_and_qa_script");
 
   assert.deepEqual([...PAYMENT_RECOVERY_ATTEMPT_STATUSES], [
+    "AWAITING_PAYMENT",
     "PAYMENT_PENDING",
     "RECONCILIATION_REQUIRED",
   ]);
@@ -66,6 +67,7 @@ function main() {
   assert.equal(parsePaymentRecoveryStaleMs("10"), PAYMENT_RECOVERY_STALE_MS_MIN);
   assert.equal(parsePaymentRecoveryStaleMs("45"), PAYMENT_RECOVERY_STALE_MS_MAX);
   assert.equal(parsePaymentRecoveryStaleMs("20"), PAYMENT_RECOVERY_STALE_MS_DEFAULT);
+  assert.match(service, /AWAITING_PAYMENT/);
   assert.match(service, /PAYMENT_PENDING/);
   assert.match(service, /RECONCILIATION_REQUIRED/);
   assert.match(service, /SIMPAISA/);
@@ -73,6 +75,8 @@ function main() {
   assert.match(service, /webhookEventId:\s*null/);
   assert.match(service, /gatewayPaymentRef/);
   assert.match(service, /parsePaymentRecoveryStaleMs/);
+  assert.match(service, /partnerEsimPurchasePaymentAttempt/);
+  assert.match(service, /ownerKind/);
   console.log("PASS candidate_filter_contract");
 
   const now = Date.UTC(2026, 8, 8, 12, 0, 0);
@@ -93,6 +97,18 @@ function main() {
   assert.equal(
     isPaymentRecoveryCandidate({
       status: "AWAITING_PAYMENT",
+      gatewayProvider: "SIMPAISA",
+      gatewayPaymentRef: "txn-1",
+      webhookEventId: null,
+      updatedAt: staleOk,
+      nowMs: now,
+      staleMs: PAYMENT_RECOVERY_STALE_MS_DEFAULT,
+    }),
+    true
+  );
+  assert.equal(
+    isPaymentRecoveryCandidate({
+      status: "DRAFT",
       gatewayProvider: "SIMPAISA",
       gatewayPaymentRef: "txn-1",
       webhookEventId: null,
@@ -147,7 +163,7 @@ function main() {
   console.log("PASS safe_action_and_labels");
 
   assert.match(page, /Attempt ID/);
-  assert.match(page, /Customer/);
+  assert.match(page, /Owner/);
   assert.match(page, /Provider/);
   assert.match(page, /Amount/);
   assert.match(page, /Age/);
@@ -155,6 +171,7 @@ function main() {
   assert.match(page, /Last investigation decision/);
   assert.match(page, /Suggested safe action/);
   assert.match(page, /lastDecisionAtLabel/);
+  assert.match(page, /ownerKind/);
   console.log("PASS recovery_table_columns");
 
   assert.match(hub, /Recovery candidates/);
@@ -169,15 +186,42 @@ function main() {
   assert.match(detail, /isRecoveryCandidate/);
   assert.match(detail, /PendingSimpaisaInvestigateForm/);
   assert.match(detail, /PendingPaymentVerifyForm/);
+  assert.match(detail, /StaleGatewayReservationReleaseForm/);
   assert.match(detail, /Webhook receipts for this attempt/);
   assert.match(detail, /lastDecisionAtLabel/);
   assert.doesNotMatch(
     detail,
-    /from=recovery[\s\S]{0,80}isRecoveryCandidate|searchParams[\s\S]{0,120}recovery/
+    /from=recovery[\s\S]{0,80}isRecoveryCandidate|searchParams[\s\S]{0,120}from=recovery/
   );
   assert.match(service, /isPaymentRecoveryCandidate/);
   assert.match(receipts, /listPaymentWebhookReceiptsForAttempt/);
   console.log("PASS detail_banner_server_eligibility_and_receipts");
+
+  const release = read("app/lib/admin/staleGatewayReservationRelease.ts");
+  const releaseActions = read(
+    "app/lib/admin/staleGatewayReservationReleaseActions.ts"
+  );
+  const customerStale = read("app/lib/esim/esimPurchaseGatewayStaleRunner.ts");
+  const partnerStale = read(
+    "app/lib/partner/partnerEsimPurchaseGatewayStaleRunner.ts"
+  );
+  const combined = read("app/lib/payments/gatewayStaleReservationRecovery.ts");
+  const lifecycleCron = read(
+    "app/api/cron/esim-lifecycle-notifications/route.ts"
+  );
+  assert.match(release, /releaseStaleGatewayReservation/);
+  assert.match(release, /maybeReleasePendingPartnerGatewayReservation/);
+  assert.match(release, /maybeReleasePendingGatewayReservation/);
+  assert.match(release, /PAYMENT_RECOVERY_STALE_RELEASE_AUDIT/);
+  assert.doesNotMatch(release, /applyVerified|markPaid|PAYMENT_CONFIRMED/);
+  assert.match(releaseActions, /assertAdminPermission/);
+  assert.match(releaseActions, /PAYMENTS_MANAGE/);
+  assert.match(customerStale, /expireStaleCustomerGatewayPaymentAttempt/);
+  assert.match(partnerStale, /expireStalePartnerGatewayPaymentAttempt/);
+  assert.match(combined, /runCustomerGatewayStaleReservationRecovery/);
+  assert.match(combined, /runPartnerGatewayStaleReservationRecovery/);
+  assert.match(lifecycleCron, /runGatewayStaleReservationRecovery/);
+  console.log("PASS stale_release_and_auto_recovery");
 
   assert.doesNotMatch(service, /applyVerifiedEsimPurchasePaymentEvent/);
   assert.doesNotMatch(page, /applyVerifiedEsimPurchasePaymentEvent/);
