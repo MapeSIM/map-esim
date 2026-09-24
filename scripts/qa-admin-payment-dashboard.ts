@@ -16,6 +16,10 @@ import {
   paymentDashboardInquiryPlaceholder,
   paymentDashboardMethodPlaceholder,
 } from "../app/lib/admin/paymentDashboardShared";
+import {
+  buildPaymentDetailTimeline,
+  suggestPaymentDetailNextSafeAction,
+} from "../app/lib/admin/paymentDetailWorkbenchShared";
 
 const root = join(__dirname, "..");
 
@@ -88,7 +92,44 @@ function main() {
   assert.match(detail, /PendingPaymentVerifyForm/);
   assert.match(detail, /isSimpaisa/);
   assert.match(detail, /investigationAvailable/);
+  assert.match(detail, /Next safe action/);
+  assert.match(detail, /Payment timeline/);
+  assert.match(detail, /Advanced technical details/);
+  assert.match(detail, /Related records/);
+  assert.match(detail, /suggestPaymentDetailNextSafeAction/);
   assert.match(pendingLegacy, /PendingSimpaisaInvestigateForm|PendingPaymentVerifyForm/);
+
+  assert.match(
+    suggestPaymentDetailNextSafeAction({
+      ownerKind: "customer",
+      attemptStatus: "FAILED",
+      purchaseStatus: "FAILED_REFUNDED",
+      webhookPresent: false,
+      investigationAvailable: false,
+      isRecoveryCandidate: false,
+      staleReleaseEligible: false,
+      showStuckCaseLink: false,
+      recoverySuggestedSafeAction: null,
+    }),
+    /retry|Do not mark paid/i
+  );
+  assert.equal(
+    buildPaymentDetailTimeline([
+      {
+        id: "b",
+        at: new Date("2026-01-02T00:00:00Z"),
+        atLabel: "b",
+        title: "Second",
+      },
+      {
+        id: "a",
+        at: new Date("2026-01-01T00:00:00Z"),
+        atLabel: "a",
+        title: "First",
+      },
+    ]).map((e) => e.id).join(","),
+    "b,a"
+  );
   console.log("PASS reuses_existing_investigation_forms");
 
   assert.doesNotMatch(service, /applyVerifiedEsimPurchasePaymentEvent/);
@@ -98,7 +139,11 @@ function main() {
   assert.doesNotMatch(hub, /Mark paid|mark paid|Mark Paid/i);
   assert.doesNotMatch(detail, /\bFund\b/);
   assert.match(read("app/lib/admin/adminUxCopy.ts"), /never marks a payment paid/i);
-  assert.match(detail, /never fund or mark\s+paid/i);
+  assert.match(
+    read("app/lib/admin/paymentDetailWorkbenchShared.ts"),
+    /never fund or mark paid/i
+  );
+  assert.match(detail, /never fund or mark paid|PAYMENT_DETAIL_WORKBENCH_DESCRIPTION/i);
   assert.doesNotMatch(service, /allowProduction:\s*true/);
   assert.match(simpaisaConfig, /allowProduction:\s*true/);
   assert.doesNotMatch(simpaisaConfig, /allowProduction:\s*false/);

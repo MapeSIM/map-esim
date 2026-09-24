@@ -15,6 +15,7 @@ import {
 
 export type AdminPaymentWebhookReceiptRow = {
   id: string;
+  receivedAt: Date;
   receivedAtLabel: string;
   providerLabel: string;
   eventIdLabel: string;
@@ -51,6 +52,7 @@ function mapWebhookReceiptRow(row: {
   const topupId = (row.topupId ?? "").trim() || null;
   return {
     id: row.id,
+    receivedAt: row.receivedAt,
     receivedAtLabel: formatUtcTimestamp(row.receivedAt),
     providerLabel: row.provider,
     eventIdLabel: (row.eventId ?? "").trim() || "Not available",

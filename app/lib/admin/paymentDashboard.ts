@@ -91,6 +91,10 @@ export type AdminPaymentDetail = {
   updatedAtLabel: string;
   createdAt: Date;
   updatedAt: Date;
+  failedAt: Date | null;
+  cancelledAt: Date | null;
+  failedAtLabel: string | null;
+  cancelledAtLabel: string | null;
   investigationAvailable: boolean;
   isSimpaisa: boolean;
 };
@@ -383,6 +387,8 @@ export async function getAdminPaymentDetail(
         failureCode: true,
         createdAt: true,
         updatedAt: true,
+        failedAt: true,
+        cancelledAt: true,
         purchase: {
           select: {
             status: true,
@@ -440,6 +446,12 @@ export async function getAdminPaymentDetail(
       updatedAtLabel: formatUtcTimestamp(row.updatedAt),
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+      failedAt: row.failedAt,
+      cancelledAt: row.cancelledAt,
+      failedAtLabel: row.failedAt ? formatUtcTimestamp(row.failedAt) : null,
+      cancelledAtLabel: row.cancelledAt
+        ? formatUtcTimestamp(row.cancelledAt)
+        : null,
       investigationAvailable: isPaymentDashboardPendingAttemptStatus(row.status),
       isSimpaisa,
     };
@@ -463,6 +475,8 @@ export async function getAdminPaymentDetail(
         failureCode: true,
         createdAt: true,
         updatedAt: true,
+        failedAt: true,
+        cancelledAt: true,
         purchase: {
           select: {
             status: true,
@@ -521,6 +535,12 @@ export async function getAdminPaymentDetail(
       updatedAtLabel: formatUtcTimestamp(row.updatedAt),
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+      failedAt: row.failedAt,
+      cancelledAt: row.cancelledAt,
+      failedAtLabel: row.failedAt ? formatUtcTimestamp(row.failedAt) : null,
+      cancelledAtLabel: row.cancelledAt
+        ? formatUtcTimestamp(row.cancelledAt)
+        : null,
       // Partner pending investigate UI is customer-attempt scoped today.
       investigationAvailable: false,
       isSimpaisa,

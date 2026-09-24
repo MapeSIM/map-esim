@@ -53,6 +53,7 @@ export type AdminPaymentRecoveryDetailExtras = {
   ownerKind: PaymentRecoveryOwnerKind;
   lastDecisionLabel: string;
   lastDecisionAtLabel: string | null;
+  lastDecisionAt: Date | null;
   suggestedSafeAction: string;
   receipts: AdminPaymentWebhookReceiptRow[];
   staleReleaseEligible: boolean;
@@ -438,6 +439,7 @@ export async function getAdminPaymentRecoveryDetailExtras(
       ownerKind: "customer",
       lastDecisionLabel: paymentRecoveryDecisionLabel(decision),
       lastDecisionAtLabel: audit?.at ? formatUtcTimestamp(audit.at) : null,
+      lastDecisionAt: audit?.at ?? null,
       suggestedSafeAction: suggestPaymentRecoverySafeAction(decision, {
         ownerKind: "customer",
       }),
@@ -498,6 +500,7 @@ export async function getAdminPaymentRecoveryDetailExtras(
       ownerKind: "partner",
       lastDecisionLabel: paymentRecoveryDecisionLabel(decision),
       lastDecisionAtLabel: audit?.at ? formatUtcTimestamp(audit.at) : null,
+      lastDecisionAt: audit?.at ?? null,
       suggestedSafeAction: suggestPaymentRecoverySafeAction(decision, {
         ownerKind: "partner",
       }),
