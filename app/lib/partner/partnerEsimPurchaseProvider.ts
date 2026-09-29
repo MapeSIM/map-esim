@@ -45,6 +45,12 @@ export const PARTNER_ESIM_PURCHASE_FAILED_REFUNDED_AUDIT =
 export const PARTNER_ESIM_PURCHASE_RECONCILIATION_AUDIT =
   "partner.esim_purchase_reconciliation_required";
 
+/** Interactive tx bounds for local finalize/refund (DB-only; provider stays outside). */
+const PARTNER_PURCHASE_CRITICAL_TX = {
+  maxWait: 10_000,
+  timeout: 15_000,
+} as const;
+
 export type PartnerProviderCheckoutExecutor = (options: {
   offerId: string;
   customerEmail?: string;
@@ -337,6 +343,12 @@ async function refundConfirmedProviderFailure(options: {
   };
   afterRefundInTx?: (tx: Prisma.TransactionClient) => Promise<void>;
 }): Promise<string> {
+  await persistPartnerPurchaseProviderObservation(options.purchaseId, {
+    providerOrderId: options.providerObservation.providerOrderId,
+    providerResultKind: options.providerObservation.providerResultKind,
+    safeProviderStatusCode: options.providerObservation.safeProviderStatusCode,
+  });
+
   try {
     const refundTransactionId = await prisma.$transaction(async (tx) => {
       const current = await tx.partnerEsimPurchase.findUnique({
@@ -402,17 +414,6 @@ async function refundConfirmedProviderFailure(options: {
         await options.afterRefundInTx(tx);
       }
 
-      await persistPartnerPurchaseProviderObservation(
-        options.purchaseId,
-        {
-          providerOrderId: options.providerObservation.providerOrderId,
-          providerResultKind: options.providerObservation.providerResultKind,
-          safeProviderStatusCode:
-            options.providerObservation.safeProviderStatusCode,
-        },
-        tx
-      );
-
       await tx.partnerEsimPurchase.update({
         where: { id: options.purchaseId },
         data: {
@@ -442,7 +443,7 @@ async function refundConfirmedProviderFailure(options: {
       });
 
       return refundTransactionId ?? `gateway_only_nofund_${options.purchaseId}`;
-    });
+    }, PARTNER_PURCHASE_CRITICAL_TX);
     return refundTransactionId;
   } catch (error) {
     if (error instanceof PartnerEsimPurchaseError) throw error;
@@ -673,6 +674,23 @@ export async function executePartnerEsimProviderPurchase(
   >;
   const verifiedOffer = verifiedOfferFromPartnerPurchase(purchase);
 
+  // Durable provider-success evidence before local order/purchase finalization.
+  try {
+    await persistPartnerPurchaseProviderObservation(purchase.id, {
+      providerOrderId: successCheckout.providerOrderId,
+      providerResultKind: "success",
+      safeProviderStatusCode: "completed",
+    });
+  } catch (error) {
+    console.error("PARTNER_PROVIDER_SUCCESS_OBSERVATION_PERSIST_FAILED", {
+      purchaseId: purchase.id,
+      code:
+        error instanceof Error
+          ? error.name.slice(0, 64)
+          : "unknown_error",
+    });
+  }
+
   let orderId: string | null = null;
   try {
     const finalized = await prisma.$transaction(async (tx) => {
@@ -712,16 +730,6 @@ export async function executePartnerEsimProviderPurchase(
         await input.afterOrderPersistInTx(tx);
       }
 
-      await persistPartnerPurchaseProviderObservation(
-        purchase.id,
-        {
-          providerOrderId: order.providerOrderId,
-          providerResultKind: "success",
-          safeProviderStatusCode: "completed",
-        },
-        tx
-      );
-
       await tx.partnerEsimPurchase.update({
         where: { id: purchase.id },
         data: {
@@ -755,7 +763,7 @@ export async function executePartnerEsimProviderPurchase(
       });
 
       return order;
-    });
+    }, PARTNER_PURCHASE_CRITICAL_TX);
     orderId = finalized.id;
   } catch (error) {
     if (error instanceof PartnerEsimPurchaseError) throw error;

@@ -4,7 +4,9 @@
  * No live VeSIM — injected providerCheckout mock.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
+import { join } from "node:path";
 import {
   OperationalControlKey,
   OrderFundingSource,
@@ -97,6 +99,38 @@ async function main() {
   };
 
   try {
+    const providerService = readFileSync(
+      join(process.cwd(), "app/lib/partner/partnerEsimPurchaseProvider.ts"),
+      "utf8"
+    );
+    const successFinalize = providerService.slice(
+      providerService.indexOf('kind: "success"')
+    );
+    const criticalTx = successFinalize.slice(
+      0,
+      successFinalize.indexOf("orderId = finalized.id")
+    );
+    assert.match(
+      criticalTx,
+      /persistPartnerPurchaseProviderObservation[\s\S]*providerResultKind:\s*"success"[\s\S]*prisma\.\$transaction/
+    );
+    assert.doesNotMatch(
+      criticalTx,
+      /persistPartnerPurchaseProviderObservation[\s\S]*,\s*tx\s*\)/
+    );
+    assert.match(
+      providerService,
+      /PARTNER_PURCHASE_CRITICAL_TX\s*=\s*\{[\s\S]*?timeout:\s*15_000/
+    );
+    assert.match(criticalTx, /PARTNER_PURCHASE_CRITICAL_TX/);
+    assert.doesNotMatch(
+      providerService.slice(
+        providerService.indexOf("async function refundConfirmedProviderFailure")
+      ),
+      /persistPartnerPurchaseProviderObservation[\s\S]*,\s*tx\s*\)/
+    );
+    console.log("PASS provider_success_local_finalize_shrink");
+
     await prisma.operationalControl.upsert({
       where: { key: OperationalControlKey.PARTNER_WALLET_PURCHASES },
       create: {
