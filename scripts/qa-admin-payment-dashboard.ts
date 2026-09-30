@@ -105,6 +105,11 @@ function main() {
   assert.match(detail, /Advanced technical details/);
   assert.match(detail, /Related records/);
   assert.match(detail, /suggestPaymentDetailNextSafeAction/);
+  assert.match(detail, /kindHint/);
+  assert.match(detail, /recovery extras load failed|getAdminPaymentDetail/);
+  assert.match(service, /partner attempt load failed/);
+  assert.match(service, /Partner unavailable/);
+  assert.match(service, /purchase\.partner \?\? null|partner\?\.user|partner \?\? null/);
   assert.match(pendingLegacy, /PendingSimpaisaInvestigateForm|PendingPaymentVerifyForm/);
 
   assert.match(

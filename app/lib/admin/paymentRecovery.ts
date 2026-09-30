@@ -268,36 +268,43 @@ export async function listPaymentRecoveryCandidates(input?: {
     ]);
 
   const merged: MergedCandidate[] = [
-    ...customerRows.map((row) => ({
-      ownerKind: "customer" as const,
-      attemptId: row.id,
-      purchaseId: row.purchaseId,
-      status: row.status,
-      gatewayProvider: row.gatewayProvider,
-      gatewayPaymentRef: row.gatewayPaymentRef,
-      webhookEventId: row.webhookEventId,
-      gatewayAmountCents: row.gatewayAmountCents,
-      currency: row.currency,
-      updatedAt: row.updatedAt,
-      ownerUser: row.purchase.customer,
-      ownerProfileId: row.purchase.customer?.id ?? null,
-      walletAppliedCents: row.purchase.walletAppliedCents,
-    })),
-    ...partnerRows.map((row) => ({
-      ownerKind: "partner" as const,
-      attemptId: row.id,
-      purchaseId: row.purchaseId,
-      status: row.status,
-      gatewayProvider: row.gatewayProvider,
-      gatewayPaymentRef: row.gatewayPaymentRef,
-      webhookEventId: row.webhookEventId,
-      gatewayAmountCents: row.gatewayAmountCents,
-      currency: row.currency,
-      updatedAt: row.updatedAt,
-      ownerUser: row.purchase.partner.user,
-      ownerProfileId: row.purchase.partner.id,
-      walletAppliedCents: row.purchase.walletAppliedCents,
-    })),
+    ...customerRows.map((row) => {
+      const purchase = row.purchase ?? null;
+      return {
+        ownerKind: "customer" as const,
+        attemptId: row.id,
+        purchaseId: row.purchaseId,
+        status: row.status,
+        gatewayProvider: row.gatewayProvider,
+        gatewayPaymentRef: row.gatewayPaymentRef,
+        webhookEventId: row.webhookEventId,
+        gatewayAmountCents: row.gatewayAmountCents,
+        currency: row.currency,
+        updatedAt: row.updatedAt,
+        ownerUser: purchase?.customer ?? null,
+        ownerProfileId: purchase?.customer?.id ?? null,
+        walletAppliedCents: purchase?.walletAppliedCents ?? 0,
+      };
+    }),
+    ...partnerRows.map((row) => {
+      // Null-safe: orphaned partner attempts must not crash the recovery inbox.
+      const partner = row.purchase?.partner ?? null;
+      return {
+        ownerKind: "partner" as const,
+        attemptId: row.id,
+        purchaseId: row.purchaseId,
+        status: row.status,
+        gatewayProvider: row.gatewayProvider,
+        gatewayPaymentRef: row.gatewayPaymentRef,
+        webhookEventId: row.webhookEventId,
+        gatewayAmountCents: row.gatewayAmountCents,
+        currency: row.currency,
+        updatedAt: row.updatedAt,
+        ownerUser: partner?.user ?? null,
+        ownerProfileId: partner?.id ?? null,
+        walletAppliedCents: row.purchase?.walletAppliedCents ?? 0,
+      };
+    }),
   ]
     .filter((row) =>
       isPaymentRecoveryCandidate({
@@ -389,125 +396,145 @@ export async function getAdminPaymentRecoveryDetailExtras(
   const staleMs = parsePaymentRecoveryStaleMs();
 
   async function fromCustomer(): Promise<AdminPaymentRecoveryDetailExtras | null> {
-    const row = await prisma.esimPurchasePaymentAttempt.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        status: true,
-        gatewayProvider: true,
-        gatewayPaymentRef: true,
-        webhookEventId: true,
-        expiresAt: true,
-        updatedAt: true,
-        purchase: {
-          select: {
-            status: true,
-            walletAppliedCents: true,
+    try {
+      const row = await prisma.esimPurchasePaymentAttempt.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          status: true,
+          gatewayProvider: true,
+          gatewayPaymentRef: true,
+          webhookEventId: true,
+          expiresAt: true,
+          updatedAt: true,
+          purchase: {
+            select: {
+              status: true,
+              walletAppliedCents: true,
+            },
           },
         },
-      },
-    });
-    if (!row) return null;
+      });
+      if (!row) return null;
+      const purchase = row.purchase ?? null;
+      if (!purchase) return null;
 
-    const isCandidate = isPaymentRecoveryCandidate({
-      status: row.status,
-      gatewayProvider: row.gatewayProvider,
-      gatewayPaymentRef: row.gatewayPaymentRef,
-      webhookEventId: row.webhookEventId,
-      updatedAt: row.updatedAt,
-      nowMs,
-      staleMs,
-    });
-    const decisions = await loadLatestInvestigateDecisions(
-      [row.id],
-      "EsimPurchasePaymentAttempt"
-    );
-    const audit = decisions.get(row.id);
-    const decision = audit?.decision ?? null;
-    const receipts = await listPaymentWebhookReceiptsForAttempt(row.id);
-    const staleReleaseEligible =
-      !row.webhookEventId &&
-      (row.status === EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT ||
-        row.status === EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING ||
-        row.status === EsimPurchasePaymentAttemptStatus.DRAFT) &&
-      row.purchase.status === "AWAITING_GATEWAY_PAYMENT" &&
-      (Boolean(row.expiresAt && row.expiresAt.getTime() <= nowMs) ||
-        row.updatedAt.getTime() <= nowMs - staleMs);
+      const isCandidate = isPaymentRecoveryCandidate({
+        status: row.status,
+        gatewayProvider: row.gatewayProvider,
+        gatewayPaymentRef: row.gatewayPaymentRef,
+        webhookEventId: row.webhookEventId,
+        updatedAt: row.updatedAt,
+        nowMs,
+        staleMs,
+      });
+      const decisions = await loadLatestInvestigateDecisions(
+        [row.id],
+        "EsimPurchasePaymentAttempt"
+      );
+      const audit = decisions.get(row.id);
+      const decision = audit?.decision ?? null;
+      const receipts = await listPaymentWebhookReceiptsForAttempt(row.id);
+      const staleReleaseEligible =
+        !row.webhookEventId &&
+        (row.status === EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT ||
+          row.status === EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING ||
+          row.status === EsimPurchasePaymentAttemptStatus.DRAFT) &&
+        purchase.status === "AWAITING_GATEWAY_PAYMENT" &&
+        (Boolean(row.expiresAt && row.expiresAt.getTime() <= nowMs) ||
+          row.updatedAt.getTime() <= nowMs - staleMs);
 
-    return {
-      isRecoveryCandidate: isCandidate,
-      ownerKind: "customer",
-      lastDecisionLabel: paymentRecoveryDecisionLabel(decision),
-      lastDecisionAtLabel: audit?.at ? formatUtcTimestamp(audit.at) : null,
-      lastDecisionAt: audit?.at ?? null,
-      suggestedSafeAction: suggestPaymentRecoverySafeAction(decision, {
+      return {
+        isRecoveryCandidate: isCandidate,
         ownerKind: "customer",
-      }),
-      receipts,
-      staleReleaseEligible,
-      walletAppliedCents: row.purchase.walletAppliedCents,
-    };
+        lastDecisionLabel: paymentRecoveryDecisionLabel(decision),
+        lastDecisionAtLabel: audit?.at ? formatUtcTimestamp(audit.at) : null,
+        lastDecisionAt: audit?.at ?? null,
+        suggestedSafeAction: suggestPaymentRecoverySafeAction(decision, {
+          ownerKind: "customer",
+        }),
+        receipts,
+        staleReleaseEligible,
+        walletAppliedCents: purchase.walletAppliedCents ?? 0,
+      };
+    } catch (error) {
+      console.error("[admin.payments.recovery] customer extras load failed", {
+        attemptId: id,
+        errorName: error instanceof Error ? error.name : "unknown",
+      });
+      return null;
+    }
   }
 
   async function fromPartner(): Promise<AdminPaymentRecoveryDetailExtras | null> {
-    const row = await prisma.partnerEsimPurchasePaymentAttempt.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        status: true,
-        gatewayProvider: true,
-        gatewayPaymentRef: true,
-        webhookEventId: true,
-        expiresAt: true,
-        updatedAt: true,
-        purchase: {
-          select: {
-            status: true,
-            walletAppliedCents: true,
+    try {
+      const row = await prisma.partnerEsimPurchasePaymentAttempt.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          status: true,
+          gatewayProvider: true,
+          gatewayPaymentRef: true,
+          webhookEventId: true,
+          expiresAt: true,
+          updatedAt: true,
+          purchase: {
+            select: {
+              status: true,
+              walletAppliedCents: true,
+            },
           },
         },
-      },
-    });
-    if (!row) return null;
+      });
+      if (!row) return null;
+      const purchase = row.purchase ?? null;
+      if (!purchase) return null;
 
-    const isCandidate = isPaymentRecoveryCandidate({
-      status: row.status,
-      gatewayProvider: row.gatewayProvider,
-      gatewayPaymentRef: row.gatewayPaymentRef,
-      webhookEventId: row.webhookEventId,
-      updatedAt: row.updatedAt,
-      nowMs,
-      staleMs,
-    });
-    const decisions = await loadLatestInvestigateDecisions(
-      [row.id],
-      "PartnerEsimPurchasePaymentAttempt"
-    );
-    const audit = decisions.get(row.id);
-    const decision = audit?.decision ?? null;
-    const receipts = await listPaymentWebhookReceiptsForAttempt(row.id);
-    const staleReleaseEligible =
-      !row.webhookEventId &&
-      (row.status === EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT ||
-        row.status === EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING ||
-        row.status === EsimPurchasePaymentAttemptStatus.DRAFT) &&
-      row.purchase.status === "AWAITING_GATEWAY_PAYMENT" &&
-      (Boolean(row.expiresAt && row.expiresAt.getTime() <= nowMs) ||
-        row.updatedAt.getTime() <= nowMs - staleMs);
+      const isCandidate = isPaymentRecoveryCandidate({
+        status: row.status,
+        gatewayProvider: row.gatewayProvider,
+        gatewayPaymentRef: row.gatewayPaymentRef,
+        webhookEventId: row.webhookEventId,
+        updatedAt: row.updatedAt,
+        nowMs,
+        staleMs,
+      });
+      const decisions = await loadLatestInvestigateDecisions(
+        [row.id],
+        "PartnerEsimPurchasePaymentAttempt"
+      );
+      const audit = decisions.get(row.id);
+      const decision = audit?.decision ?? null;
+      const receipts = await listPaymentWebhookReceiptsForAttempt(row.id);
+      const staleReleaseEligible =
+        !row.webhookEventId &&
+        (row.status === EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT ||
+          row.status === EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING ||
+          row.status === EsimPurchasePaymentAttemptStatus.DRAFT) &&
+        purchase.status === "AWAITING_GATEWAY_PAYMENT" &&
+        (Boolean(row.expiresAt && row.expiresAt.getTime() <= nowMs) ||
+          row.updatedAt.getTime() <= nowMs - staleMs);
 
-    return {
-      isRecoveryCandidate: isCandidate,
-      ownerKind: "partner",
-      lastDecisionLabel: paymentRecoveryDecisionLabel(decision),
-      lastDecisionAtLabel: audit?.at ? formatUtcTimestamp(audit.at) : null,
-      lastDecisionAt: audit?.at ?? null,
-      suggestedSafeAction: suggestPaymentRecoverySafeAction(decision, {
+      return {
+        isRecoveryCandidate: isCandidate,
         ownerKind: "partner",
-      }),
-      receipts,
-      staleReleaseEligible,
-      walletAppliedCents: row.purchase.walletAppliedCents,
-    };
+        lastDecisionLabel: paymentRecoveryDecisionLabel(decision),
+        lastDecisionAtLabel: audit?.at ? formatUtcTimestamp(audit.at) : null,
+        lastDecisionAt: audit?.at ?? null,
+        suggestedSafeAction: suggestPaymentRecoverySafeAction(decision, {
+          ownerKind: "partner",
+        }),
+        receipts,
+        staleReleaseEligible,
+        walletAppliedCents: purchase.walletAppliedCents ?? 0,
+      };
+    } catch (error) {
+      console.error("[admin.payments.recovery] partner extras load failed", {
+        attemptId: id,
+        errorName: error instanceof Error ? error.name : "unknown",
+      });
+      return null;
+    }
   }
 
   if (ownerKindHint === "partner") {

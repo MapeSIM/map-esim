@@ -51,13 +51,36 @@ export default async function AdminPaymentDetailPage({
       : query.kind === "customer"
         ? ("customer" as const)
         : null;
-  const detail = await getAdminPaymentDetail(raw, kindHint);
+
+  let detail: Awaited<ReturnType<typeof getAdminPaymentDetail>> = null;
+  try {
+    detail = await getAdminPaymentDetail(raw, kindHint);
+  } catch (error) {
+    console.error("[admin.payments.detail] load failed", {
+      attemptId: (raw ?? "").trim().slice(0, 64),
+      kindHint,
+      errorName: error instanceof Error ? error.name : "unknown",
+    });
+    detail = null;
+  }
   if (!detail) notFound();
 
-  const recovery = await getAdminPaymentRecoveryDetailExtras(
-    detail.attemptId,
-    detail.ownerKind
-  );
+  let recovery: Awaited<
+    ReturnType<typeof getAdminPaymentRecoveryDetailExtras>
+  > = null;
+  try {
+    recovery = await getAdminPaymentRecoveryDetailExtras(
+      detail.attemptId,
+      detail.ownerKind
+    );
+  } catch (error) {
+    console.error("[admin.payments.detail] recovery extras load failed", {
+      attemptId: detail.attemptId,
+      ownerKind: detail.ownerKind,
+      errorName: error instanceof Error ? error.name : "unknown",
+    });
+    recovery = null;
+  }
   const showRecon =
     detail.ownerKind === "customer" &&
     isAdminWalletReconciliationLinkApplicable({

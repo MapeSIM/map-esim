@@ -189,6 +189,10 @@ function main() {
   assert.match(detail, /StaleGatewayReservationReleaseForm/);
   assert.match(detail, /Webhook receipts for this attempt/);
   assert.match(detail, /lastDecisionAtLabel/);
+  assert.match(detail, /recovery extras load failed|getAdminPaymentRecoveryDetailExtras/);
+  assert.match(service, /purchase\?\.partner|partner\?\.user/);
+  assert.match(service, /Partner unavailable|ownerUser: partner\?\.user/);
+  assert.match(service, /partner extras load failed/);
   assert.doesNotMatch(
     detail,
     /from=recovery[\s\S]{0,80}isRecoveryCandidate|searchParams[\s\S]{0,120}from=recovery/

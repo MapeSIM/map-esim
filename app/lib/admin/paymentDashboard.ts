@@ -364,181 +364,204 @@ export async function getAdminPaymentDetail(
   }
 
   async function loadCustomer(): Promise<AdminPaymentDetail | null> {
-    const row = await prisma.esimPurchasePaymentAttempt.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        purchaseId: true,
-        status: true,
-        gatewayProvider: true,
-        gatewayAmountCents: true,
-        currency: true,
-        chargeAmountMinor: true,
-        chargeCurrency: true,
-        gatewayPaymentRef: true,
-        webhookEventId: true,
-        failureCategory: true,
-        failureCode: true,
-        createdAt: true,
-        updatedAt: true,
-        failedAt: true,
-        cancelledAt: true,
-        purchase: {
-          select: {
-            status: true,
-            orderId: true,
-            walletAppliedCents: true,
-            customerUserId: true,
-            customer: {
-              select: { id: true, name: true, email: true },
-            },
-          },
-        },
-      },
-    });
-
-    if (!row) return null;
-
-    const customerId = (
-      row.purchase.customer?.id ??
-      row.purchase.customerUserId ??
-      ""
-    ).trim();
-    const webhookEventIdPresent = Boolean(row.webhookEventId);
-    const isSimpaisa = row.gatewayProvider === PaymentGatewayProvider.SIMPAISA;
-
-    return {
-      attemptId: row.id,
-      purchaseId: row.purchaseId,
-      orderId: (row.purchase.orderId ?? "").trim() || null,
-      ownerKind: "customer",
-      customerUserId: customerId || null,
-      customerLabel: customerLabelFrom(row.purchase.customer),
-      customerHref:
-        customerId && customerId.length <= 64
-          ? `/admin/customers/${encodeURIComponent(customerId)}`
-          : null,
-      gatewayProvider: row.gatewayProvider,
-      providerLabel: providerLabelFrom(row.gatewayProvider),
-      methodLabel: paymentDashboardMethodPlaceholder(),
-      attemptStatus: row.status,
-      purchaseStatus: row.purchase.status,
-      gatewayAmountCents: row.gatewayAmountCents,
-      currency: row.currency,
-      chargeAmountMinor: row.chargeAmountMinor,
-      chargeCurrency: row.chargeCurrency,
-      amountLabel: `${formatUsdCents(row.gatewayAmountCents)} ${row.currency}`,
-      chargeLabel: chargeLabelFrom(row.chargeAmountMinor, row.chargeCurrency),
-      providerRefMasked: maskSafepayTrackerRef(row.gatewayPaymentRef),
-      webhookEventIdPresent,
-      webhookLabel: paymentDashboardWebhookLabel(webhookEventIdPresent),
-      inquiryLabel: paymentDashboardInquiryPlaceholder(),
-      walletAppliedCents: row.purchase.walletAppliedCents,
-      failureCategory: row.failureCategory,
-      failureCode: row.failureCode,
-      createdAtLabel: formatUtcTimestamp(row.createdAt),
-      updatedAtLabel: formatUtcTimestamp(row.updatedAt),
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      failedAt: row.failedAt,
-      cancelledAt: row.cancelledAt,
-      failedAtLabel: row.failedAt ? formatUtcTimestamp(row.failedAt) : null,
-      cancelledAtLabel: row.cancelledAt
-        ? formatUtcTimestamp(row.cancelledAt)
-        : null,
-      investigationAvailable: isPaymentDashboardPendingAttemptStatus(row.status),
-      isSimpaisa,
-    };
-  }
-
-  async function loadPartner(): Promise<AdminPaymentDetail | null> {
-    const row = await prisma.partnerEsimPurchasePaymentAttempt.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        purchaseId: true,
-        status: true,
-        gatewayProvider: true,
-        gatewayAmountCents: true,
-        currency: true,
-        chargeAmountMinor: true,
-        chargeCurrency: true,
-        gatewayPaymentRef: true,
-        webhookEventId: true,
-        failureCategory: true,
-        failureCode: true,
-        createdAt: true,
-        updatedAt: true,
-        failedAt: true,
-        cancelledAt: true,
-        purchase: {
-          select: {
-            status: true,
-            orderId: true,
-            walletAppliedCents: true,
-            partner: {
-              select: {
-                id: true,
-                user: { select: { id: true, name: true, email: true } },
+    try {
+      const row = await prisma.esimPurchasePaymentAttempt.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          purchaseId: true,
+          status: true,
+          gatewayProvider: true,
+          gatewayAmountCents: true,
+          currency: true,
+          chargeAmountMinor: true,
+          chargeCurrency: true,
+          gatewayPaymentRef: true,
+          webhookEventId: true,
+          failureCategory: true,
+          failureCode: true,
+          createdAt: true,
+          updatedAt: true,
+          failedAt: true,
+          cancelledAt: true,
+          purchase: {
+            select: {
+              status: true,
+              orderId: true,
+              walletAppliedCents: true,
+              customerUserId: true,
+              customer: {
+                select: { id: true, name: true, email: true },
               },
             },
           },
         },
-      },
-    });
+      });
 
-    if (!row) return null;
+      if (!row) return null;
 
-    const partnerId = (row.purchase.partner.id ?? "").trim();
-    const webhookEventIdPresent = Boolean(row.webhookEventId);
-    const isSimpaisa = row.gatewayProvider === PaymentGatewayProvider.SIMPAISA;
-    const partnerUser = row.purchase.partner.user;
+      const purchase = row.purchase ?? null;
+      if (!purchase) return null;
 
-    return {
-      attemptId: row.id,
-      purchaseId: row.purchaseId,
-      orderId: (row.purchase.orderId ?? "").trim() || null,
-      ownerKind: "partner",
-      customerUserId: (partnerUser?.id ?? "").trim() || null,
-      customerLabel: partnerUser
-        ? `${(partnerUser.name ?? "").trim() || "Partner"} · ${maskAdminEmail(partnerUser.email)}`
-        : "Partner unavailable",
-      customerHref:
-        partnerId && partnerId.length <= 64
-          ? `/admin/partners/${encodeURIComponent(partnerId)}`
+      const customerId = (
+        purchase.customer?.id ??
+        purchase.customerUserId ??
+        ""
+      ).trim();
+      const webhookEventIdPresent = Boolean(row.webhookEventId);
+      const isSimpaisa = row.gatewayProvider === PaymentGatewayProvider.SIMPAISA;
+
+      return {
+        attemptId: row.id,
+        purchaseId: row.purchaseId,
+        orderId: (purchase.orderId ?? "").trim() || null,
+        ownerKind: "customer",
+        customerUserId: customerId || null,
+        customerLabel: customerLabelFrom(purchase.customer),
+        customerHref:
+          customerId && customerId.length <= 64
+            ? `/admin/customers/${encodeURIComponent(customerId)}`
+            : null,
+        gatewayProvider: row.gatewayProvider,
+        providerLabel: providerLabelFrom(row.gatewayProvider),
+        methodLabel: paymentDashboardMethodPlaceholder(),
+        attemptStatus: row.status,
+        purchaseStatus: purchase.status,
+        gatewayAmountCents: row.gatewayAmountCents,
+        currency: row.currency,
+        chargeAmountMinor: row.chargeAmountMinor,
+        chargeCurrency: row.chargeCurrency,
+        amountLabel: `${formatUsdCents(row.gatewayAmountCents)} ${row.currency}`,
+        chargeLabel: chargeLabelFrom(row.chargeAmountMinor, row.chargeCurrency),
+        providerRefMasked: maskSafepayTrackerRef(row.gatewayPaymentRef),
+        webhookEventIdPresent,
+        webhookLabel: paymentDashboardWebhookLabel(webhookEventIdPresent),
+        inquiryLabel: paymentDashboardInquiryPlaceholder(),
+        walletAppliedCents: purchase.walletAppliedCents ?? 0,
+        failureCategory: row.failureCategory,
+        failureCode: row.failureCode,
+        createdAtLabel: formatUtcTimestamp(row.createdAt),
+        updatedAtLabel: formatUtcTimestamp(row.updatedAt),
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        failedAt: row.failedAt,
+        cancelledAt: row.cancelledAt,
+        failedAtLabel: row.failedAt ? formatUtcTimestamp(row.failedAt) : null,
+        cancelledAtLabel: row.cancelledAt
+          ? formatUtcTimestamp(row.cancelledAt)
           : null,
-      gatewayProvider: row.gatewayProvider,
-      providerLabel: providerLabelFrom(row.gatewayProvider),
-      methodLabel: paymentDashboardMethodPlaceholder(),
-      attemptStatus: row.status,
-      purchaseStatus: row.purchase.status,
-      gatewayAmountCents: row.gatewayAmountCents,
-      currency: row.currency,
-      chargeAmountMinor: row.chargeAmountMinor,
-      chargeCurrency: row.chargeCurrency,
-      amountLabel: `${formatUsdCents(row.gatewayAmountCents)} ${row.currency}`,
-      chargeLabel: chargeLabelFrom(row.chargeAmountMinor, row.chargeCurrency),
-      providerRefMasked: maskSafepayTrackerRef(row.gatewayPaymentRef),
-      webhookEventIdPresent,
-      webhookLabel: paymentDashboardWebhookLabel(webhookEventIdPresent),
-      inquiryLabel: paymentDashboardInquiryPlaceholder(),
-      walletAppliedCents: row.purchase.walletAppliedCents,
-      failureCategory: row.failureCategory,
-      failureCode: row.failureCode,
-      createdAtLabel: formatUtcTimestamp(row.createdAt),
-      updatedAtLabel: formatUtcTimestamp(row.updatedAt),
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      failedAt: row.failedAt,
-      cancelledAt: row.cancelledAt,
-      failedAtLabel: row.failedAt ? formatUtcTimestamp(row.failedAt) : null,
-      cancelledAtLabel: row.cancelledAt
-        ? formatUtcTimestamp(row.cancelledAt)
-        : null,
-      // Partner pending investigate UI is customer-attempt scoped today.
-      investigationAvailable: false,
-      isSimpaisa,
-    };
+        investigationAvailable: isPaymentDashboardPendingAttemptStatus(row.status),
+        isSimpaisa,
+      };
+    } catch (error) {
+      console.error("[admin.payments.detail] customer attempt load failed", {
+        attemptId: id,
+        errorName: error instanceof Error ? error.name : "unknown",
+      });
+      return null;
+    }
+  }
+
+  async function loadPartner(): Promise<AdminPaymentDetail | null> {
+    try {
+      const row = await prisma.partnerEsimPurchasePaymentAttempt.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          purchaseId: true,
+          status: true,
+          gatewayProvider: true,
+          gatewayAmountCents: true,
+          currency: true,
+          chargeAmountMinor: true,
+          chargeCurrency: true,
+          gatewayPaymentRef: true,
+          webhookEventId: true,
+          failureCategory: true,
+          failureCode: true,
+          createdAt: true,
+          updatedAt: true,
+          failedAt: true,
+          cancelledAt: true,
+          purchase: {
+            select: {
+              status: true,
+              orderId: true,
+              walletAppliedCents: true,
+              partner: {
+                select: {
+                  id: true,
+                  user: { select: { id: true, name: true, email: true } },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!row) return null;
+
+      // Purchase / partner / user may be missing on orphaned or partially deleted rows.
+      const purchase = row.purchase ?? null;
+      if (!purchase) return null;
+      const partner = purchase.partner ?? null;
+      const partnerId = (partner?.id ?? "").trim();
+      const partnerUser = partner?.user ?? null;
+      const webhookEventIdPresent = Boolean(row.webhookEventId);
+      const isSimpaisa = row.gatewayProvider === PaymentGatewayProvider.SIMPAISA;
+
+      return {
+        attemptId: row.id,
+        purchaseId: row.purchaseId,
+        orderId: (purchase.orderId ?? "").trim() || null,
+        ownerKind: "partner",
+        customerUserId: (partnerUser?.id ?? "").trim() || null,
+        customerLabel: partnerUser
+          ? `${(partnerUser.name ?? "").trim() || "Partner"} · ${maskAdminEmail(partnerUser.email)}`
+          : "Partner unavailable",
+        customerHref:
+          partnerId && partnerId.length <= 64
+            ? `/admin/partners/${encodeURIComponent(partnerId)}`
+            : null,
+        gatewayProvider: row.gatewayProvider,
+        providerLabel: providerLabelFrom(row.gatewayProvider),
+        methodLabel: paymentDashboardMethodPlaceholder(),
+        attemptStatus: row.status,
+        purchaseStatus: purchase.status,
+        gatewayAmountCents: row.gatewayAmountCents,
+        currency: row.currency,
+        chargeAmountMinor: row.chargeAmountMinor,
+        chargeCurrency: row.chargeCurrency,
+        amountLabel: `${formatUsdCents(row.gatewayAmountCents)} ${row.currency}`,
+        chargeLabel: chargeLabelFrom(row.chargeAmountMinor, row.chargeCurrency),
+        providerRefMasked: maskSafepayTrackerRef(row.gatewayPaymentRef),
+        webhookEventIdPresent,
+        webhookLabel: paymentDashboardWebhookLabel(webhookEventIdPresent),
+        inquiryLabel: paymentDashboardInquiryPlaceholder(),
+        walletAppliedCents: purchase.walletAppliedCents ?? 0,
+        failureCategory: row.failureCategory,
+        failureCode: row.failureCode,
+        createdAtLabel: formatUtcTimestamp(row.createdAt),
+        updatedAtLabel: formatUtcTimestamp(row.updatedAt),
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        failedAt: row.failedAt,
+        cancelledAt: row.cancelledAt,
+        failedAtLabel: row.failedAt ? formatUtcTimestamp(row.failedAt) : null,
+        cancelledAtLabel: row.cancelledAt
+          ? formatUtcTimestamp(row.cancelledAt)
+          : null,
+        // Partner pending investigate UI is customer-attempt scoped today.
+        investigationAvailable: false,
+        isSimpaisa,
+      };
+    } catch (error) {
+      console.error("[admin.payments.detail] partner attempt load failed", {
+        attemptId: id,
+        errorName: error instanceof Error ? error.name : "unknown",
+      });
+      return null;
+    }
   }
 
   if (ownerKindHint === "partner") {
