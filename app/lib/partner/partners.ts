@@ -4,6 +4,7 @@
 import "server-only";
 
 import {
+  PartnerEsimPurchaseStatus,
   PartnerWalletTransactionType,
   Prisma,
   Role,
@@ -31,11 +32,15 @@ export const PARTNER_DISCOUNT_CHANGED_AUDIT = "partner.discount_changed";
 export const PARTNER_DISABLED_AUDIT = "partner.disabled";
 export const PARTNER_REACTIVATED_AUDIT = "partner.reactivated";
 export const PARTNER_INVITATION_RESENT_AUDIT = "partner.invitation_resent";
+export const PARTNER_DISPLAY_NAME_CHANGED_AUDIT =
+  "partner.display_name_changed";
 export const PARTNER_MANAGEMENT_BLOCKED_AUDIT = "partner.management_action_blocked";
 export const PARTNER_PASSWORD_SETUP_COMPLETED_AUDIT =
   "partner.password_setup_completed";
 
 const PARTNERS_PAGE_SIZE = 20;
+const PARTNER_DETAIL_ORDERS_PAGE_SIZE = 10;
+const PARTNER_DETAIL_PAYMENTS_PAGE_SIZE = 10;
 const NAME_MIN = 1;
 const NAME_MAX = 120;
 
@@ -48,12 +53,29 @@ export type PartnerListRow = {
   name: string;
   emailMasked: string;
   discountPercentLabel: string;
+  /** Lifetime retail − partner charge on COMPLETED purchases only (snapshot; read-only). */
+  discountSavingsLabel: string;
   balanceLabel: string;
   statusLabel: PartnerStatusLabel;
+  /** CAS token for existing disable / enable actions (read-only list field). */
+  statusVersion: number;
+  /** COMPLETED PartnerEsimPurchase count only. */
+  totalOrders: number;
+  totalOrdersLabel: string;
+  /** Sum of partnerChargeCents on COMPLETED purchases only. */
+  revenueLabel: string;
+};
+
+export type PartnerListKpis = {
+  totalCount: number;
+  activeCount: number;
+  invitedCount: number;
+  disabledCount: number;
 };
 
 export type PartnersPageResult = {
   rows: PartnerListRow[];
+  kpis: PartnerListKpis;
   page: number;
   pageSize: number;
   totalCount: number;
@@ -74,6 +96,25 @@ export type PartnerWalletTxRow = {
   referenceLabel: string | null;
   createdAtLabel: string;
   createdByAdminLabel: string;
+};
+
+export type PartnerDetailPurchaseRow = {
+  id: string;
+  planLabel: string;
+  amountLabel: string;
+  status: string;
+  statusLabel: string;
+  createdAtLabel: string;
+};
+
+export type PartnerDetailPaymentRow = {
+  id: string;
+  amountLabel: string;
+  status: string;
+  statusLabel: string;
+  methodLabel: string;
+  createdAtLabel: string;
+  href: string;
 };
 
 export type PartnerDetail = {
@@ -97,6 +138,21 @@ export type PartnerDetail = {
   totalAddedLabel: string;
   totalDeductedLabel: string;
   transactions: PartnerWalletTxRow[];
+  /** COMPLETED purchases only (read-only). */
+  totalOrders: number;
+  totalOrdersLabel: string;
+  revenueLabel: string;
+  discountSavingsLabel: string;
+  purchases: PartnerDetailPurchaseRow[];
+  purchasesPage: number;
+  purchasesPageSize: number;
+  purchasesTotalCount: number;
+  purchasesTotalPages: number;
+  payments: PartnerDetailPaymentRow[];
+  paymentsPage: number;
+  paymentsPageSize: number;
+  paymentsTotalCount: number;
+  paymentsTotalPages: number;
 };
 
 export type PartnersMutationResult =
@@ -279,22 +335,45 @@ export async function listPartnersPage(options: {
   const status = parsePartnerStatusFilter(options.status);
   const page = parsePartnersPage(options.page);
 
+  const searchWhere: Prisma.PartnerProfileWhereInput | undefined = search
+    ? {
+        OR: [
+          { user: { name: { contains: search, mode: "insensitive" } } },
+          { user: { email: { contains: search, mode: "insensitive" } } },
+          { id: search },
+          { userId: search },
+        ],
+      }
+    : undefined;
+
   const where: Prisma.PartnerProfileWhereInput = {
     ...buildStatusWhere(status),
-    ...(search
-      ? {
-          OR: [
-            { user: { name: { contains: search, mode: "insensitive" } } },
-            { user: { email: { contains: search, mode: "insensitive" } } },
-            { id: search },
-            { userId: search },
-          ],
-        }
-      : {}),
+    ...(searchWhere ?? {}),
   };
 
-  const totalCount = await prisma.partnerProfile.count({ where });
-  const totalPages = totalCount === 0 ? 1 : Math.ceil(totalCount / PARTNERS_PAGE_SIZE);
+  const [
+    totalCount,
+    activeCount,
+    invitedCount,
+    disabledCount,
+  ] = await Promise.all([
+    prisma.partnerProfile.count({ where: searchWhere ?? {} }),
+    prisma.partnerProfile.count({
+      where: { ...buildStatusWhere("ACTIVE"), ...(searchWhere ?? {}) },
+    }),
+    prisma.partnerProfile.count({
+      where: { ...buildStatusWhere("INVITED"), ...(searchWhere ?? {}) },
+    }),
+    prisma.partnerProfile.count({
+      where: { ...buildStatusWhere("DISABLED"), ...(searchWhere ?? {}) },
+    }),
+  ]);
+
+  const filteredTotalCount = await prisma.partnerProfile.count({ where });
+  const totalPages =
+    filteredTotalCount === 0
+      ? 1
+      : Math.ceil(filteredTotalCount / PARTNERS_PAGE_SIZE);
   const safePage = page > totalPages ? totalPages : page;
   const skip = (safePage - 1) * PARTNERS_PAGE_SIZE;
 
@@ -307,6 +386,7 @@ export async function listPartnersPage(options: {
       id: true,
       userId: true,
       discountBps: true,
+      statusVersion: true,
       disabledAt: true,
       createdAt: true,
       user: {
@@ -323,35 +403,114 @@ export async function listPartnersPage(options: {
     },
   });
 
+  const partnerIds = rows.map((row) => row.id);
+  const completedAgg =
+    partnerIds.length === 0
+      ? []
+      : await prisma.partnerEsimPurchase.groupBy({
+          by: ["partnerId"],
+          where: {
+            partnerId: { in: partnerIds },
+            status: PartnerEsimPurchaseStatus.COMPLETED,
+          },
+          _count: { _all: true },
+          _sum: {
+            partnerChargeCents: true,
+            retailPriceCents: true,
+          },
+        });
+
+  const aggByPartner = new Map(
+    completedAgg.map((row) => [
+      row.partnerId,
+      {
+        orders: row._count._all,
+        revenueCents: row._sum.partnerChargeCents ?? 0,
+        retailCents: row._sum.retailPriceCents ?? 0,
+      },
+    ])
+  );
+
   return {
-    rows: rows.map((row) => ({
-      id: row.id,
-      userId: row.userId,
-      createdAtLabel: formatDateTime(row.createdAt),
-      name: row.user.name,
-      emailMasked: maskAdminEmail(row.user.email),
-      discountPercentLabel: `${formatDiscountBpsAsPercent(row.discountBps)}%`,
-      balanceLabel: formatUsdCents(row.walletAccount?.balanceCents ?? 0),
-      statusLabel: resolvePartnerStatus({
-        deletedAt: row.user.deletedAt,
-        disabledAt: row.disabledAt,
-        passwordHash: row.user.passwordHash,
-      }),
-    })),
+    rows: rows.map((row) => {
+      const agg = aggByPartner.get(row.id) ?? {
+        orders: 0,
+        revenueCents: 0,
+        retailCents: 0,
+      };
+      const savingsCents = Math.max(0, agg.retailCents - agg.revenueCents);
+      return {
+        id: row.id,
+        userId: row.userId,
+        createdAtLabel: formatDateTime(row.createdAt),
+        name: row.user.name,
+        emailMasked: maskAdminEmail(row.user.email),
+        discountPercentLabel: `${formatDiscountBpsAsPercent(row.discountBps)}%`,
+        discountSavingsLabel: formatUsdCents(savingsCents),
+        balanceLabel: formatUsdCents(row.walletAccount?.balanceCents ?? 0),
+        statusLabel: resolvePartnerStatus({
+          deletedAt: row.user.deletedAt,
+          disabledAt: row.disabledAt,
+          passwordHash: row.user.passwordHash,
+        }),
+        statusVersion: row.statusVersion,
+        totalOrders: agg.orders,
+        totalOrdersLabel: String(agg.orders),
+        revenueLabel: formatUsdCents(agg.revenueCents),
+      };
+    }),
+    kpis: {
+      totalCount,
+      activeCount,
+      invitedCount,
+      disabledCount,
+    },
     page: safePage,
     pageSize: PARTNERS_PAGE_SIZE,
-    totalCount,
+    totalCount: filteredTotalCount,
     totalPages,
     search,
     status,
   };
 }
 
+function partnerPurchasePlanLabel(row: {
+  destinationName: string | null;
+  planName: string | null;
+  dataAllowance: string | null;
+  validity: string | null;
+  offerId: string;
+}): string {
+  const parts = [
+    (row.destinationName ?? "").trim(),
+    (row.planName ?? "").trim(),
+    (row.dataAllowance ?? "").trim(),
+    (row.validity ?? "").trim(),
+  ].filter(Boolean);
+  if (parts.length > 0) return parts.join(" · ");
+  const offer = (row.offerId ?? "").trim();
+  return offer || "Plan not available";
+}
+
+function partnerPaymentMethodLabel(
+  provider: string | null | undefined
+): string {
+  const value = (provider ?? "").trim();
+  return value || "—";
+}
+
 export async function getPartnerDetail(
-  partnerId: string
+  partnerId: string,
+  options?: {
+    ordersPage?: string | null;
+    paymentsPage?: string | null;
+  }
 ): Promise<PartnerDetail | null> {
   const id = (partnerId ?? "").trim();
   if (!id || id.length > 64) return null;
+
+  const ordersPage = parsePartnersPage(options?.ordersPage ?? undefined);
+  const paymentsPage = parsePartnersPage(options?.paymentsPage ?? undefined);
 
   const row = await prisma.partnerProfile.findUnique({
     where: { id },
@@ -400,7 +559,18 @@ export async function getPartnerDetail(
 
   if (!row) return null;
 
-  const [creditAgg, debitAgg] = await Promise.all([
+  const completedWhere = {
+    partnerId: row.id,
+    status: PartnerEsimPurchaseStatus.COMPLETED,
+  } as const;
+
+  const [
+    creditAgg,
+    debitAgg,
+    completedAgg,
+    purchasesTotalCount,
+    paymentsTotalCount,
+  ] = await Promise.all([
     prisma.partnerWalletTransaction.aggregate({
       where: {
         type: PartnerWalletTransactionType.ADMIN_CREDIT,
@@ -415,9 +585,73 @@ export async function getPartnerDetail(
       },
       _sum: { amountCents: true },
     }),
+    prisma.partnerEsimPurchase.aggregate({
+      where: completedWhere,
+      _count: { _all: true },
+      _sum: {
+        partnerChargeCents: true,
+        retailPriceCents: true,
+      },
+    }),
+    prisma.partnerEsimPurchase.count({ where: completedWhere }),
+    prisma.partnerEsimPurchasePaymentAttempt.count({
+      where: { purchase: { partnerId: row.id } },
+    }),
+  ]);
+
+  const purchasesTotalPages = Math.max(
+    1,
+    Math.ceil(purchasesTotalCount / PARTNER_DETAIL_ORDERS_PAGE_SIZE)
+  );
+  const safeOrdersPage =
+    ordersPage > purchasesTotalPages ? purchasesTotalPages : ordersPage;
+  const paymentsTotalPages = Math.max(
+    1,
+    Math.ceil(paymentsTotalCount / PARTNER_DETAIL_PAYMENTS_PAGE_SIZE)
+  );
+  const safePaymentsPage =
+    paymentsPage > paymentsTotalPages ? paymentsTotalPages : paymentsPage;
+
+  const [purchases, payments] = await Promise.all([
+    prisma.partnerEsimPurchase.findMany({
+      where: completedWhere,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: (safeOrdersPage - 1) * PARTNER_DETAIL_ORDERS_PAGE_SIZE,
+      take: PARTNER_DETAIL_ORDERS_PAGE_SIZE,
+      select: {
+        id: true,
+        offerId: true,
+        destinationName: true,
+        planName: true,
+        dataAllowance: true,
+        validity: true,
+        partnerChargeCents: true,
+        currency: true,
+        status: true,
+        createdAt: true,
+      },
+    }),
+    prisma.partnerEsimPurchasePaymentAttempt.findMany({
+      where: { purchase: { partnerId: row.id } },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: (safePaymentsPage - 1) * PARTNER_DETAIL_PAYMENTS_PAGE_SIZE,
+      take: PARTNER_DETAIL_PAYMENTS_PAGE_SIZE,
+      select: {
+        id: true,
+        gatewayAmountCents: true,
+        currency: true,
+        status: true,
+        gatewayProvider: true,
+        createdAt: true,
+      },
+    }),
   ]);
 
   const balanceCents = row.walletAccount?.balanceCents ?? 0;
+  const revenueCents = completedAgg._sum.partnerChargeCents ?? 0;
+  const retailCents = completedAgg._sum.retailPriceCents ?? 0;
+  const savingsCents = Math.max(0, retailCents - revenueCents);
+  const totalOrders = completedAgg._count._all;
 
   return {
     id: row.id,
@@ -459,6 +693,35 @@ export async function getPartnerDetail(
         ? tx.createdByAdmin.name || tx.createdByAdmin.email
         : "Not available",
     })),
+    totalOrders,
+    totalOrdersLabel: String(totalOrders),
+    revenueLabel: formatUsdCents(revenueCents),
+    discountSavingsLabel: formatUsdCents(savingsCents),
+    purchases: purchases.map((purchase) => ({
+      id: purchase.id,
+      planLabel: partnerPurchasePlanLabel(purchase),
+      amountLabel: `${formatUsdCents(purchase.partnerChargeCents)} ${purchase.currency || "USD"}`,
+      status: purchase.status,
+      statusLabel: purchase.status.replace(/_/g, " "),
+      createdAtLabel: formatDateTime(purchase.createdAt),
+    })),
+    purchasesPage: safeOrdersPage,
+    purchasesPageSize: PARTNER_DETAIL_ORDERS_PAGE_SIZE,
+    purchasesTotalCount,
+    purchasesTotalPages,
+    payments: payments.map((payment) => ({
+      id: payment.id,
+      amountLabel: `${formatUsdCents(payment.gatewayAmountCents)} ${payment.currency || "USD"}`,
+      status: payment.status,
+      statusLabel: payment.status.replace(/_/g, " "),
+      methodLabel: partnerPaymentMethodLabel(payment.gatewayProvider),
+      createdAtLabel: formatDateTime(payment.createdAt),
+      href: `/admin/payments/${encodeURIComponent(payment.id)}?kind=partner`,
+    })),
+    paymentsPage: safePaymentsPage,
+    paymentsPageSize: PARTNER_DETAIL_PAYMENTS_PAGE_SIZE,
+    paymentsTotalCount,
+    paymentsTotalPages,
   };
 }
 
@@ -1168,5 +1431,108 @@ export async function reactivatePartner(options: {
     ok: true,
     message: "Partner reactivated.",
     statusVersion: nextVersion,
+  };
+}
+
+/**
+ * Safe admin profile edit: updates User.name only for a PARTNER account.
+ * Does not change email, discount, wallet, status, or password.
+ */
+export async function updatePartnerDisplayName(options: {
+  adminUserId: string;
+  partnerId: string;
+  name: FormDataEntryValue | string | null;
+}): Promise<PartnersMutationResult> {
+  const sameOrigin = await assertSameOriginAdminRequest();
+  if (!sameOrigin) {
+    await auditBlocked({
+      actorUserId: options.adminUserId,
+      targetId: options.partnerId,
+      failureCode: "same_origin",
+    });
+    return { ok: false, error: "Request could not be verified. Please try again." };
+  }
+
+  const actor = await findActiveAdminActor(options.adminUserId);
+  if (!actor) {
+    return { ok: false, error: "Not authorized." };
+  }
+
+  const partnerId = (options.partnerId ?? "").trim();
+  if (!partnerId || partnerId.length > 64) {
+    return { ok: false, error: "Partner not found." };
+  }
+
+  const nameParsed = parseName(options.name);
+  if (!nameParsed.ok) {
+    return {
+      ok: false,
+      error: nameParsed.error,
+      fieldErrors: { name: nameParsed.error },
+    };
+  }
+
+  const profile = await prisma.partnerProfile.findUnique({
+    where: { id: partnerId },
+    select: {
+      id: true,
+      userId: true,
+      user: {
+        select: {
+          name: true,
+          role: true,
+          deletedAt: true,
+        },
+      },
+    },
+  });
+
+  if (!profile || profile.user.role !== Role.PARTNER) {
+    await auditBlocked({
+      actorUserId: actor.id,
+      targetId: partnerId,
+      failureCode: "partner_unavailable",
+    });
+    return { ok: false, error: "Partner not found." };
+  }
+
+  if (profile.user.deletedAt) {
+    await auditBlocked({
+      actorUserId: actor.id,
+      targetId: partnerId,
+      failureCode: "partner_deleted",
+    });
+    return { ok: false, error: "Deleted partners cannot be edited." };
+  }
+
+  const previousName = profile.user.name;
+  if (previousName === nameParsed.name) {
+    return { ok: true, message: "No name changes to save." };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: profile.userId },
+      data: { name: nameParsed.name },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorUserId: actor.id,
+        action: PARTNER_DISPLAY_NAME_CHANGED_AUDIT,
+        targetType: "PartnerProfile",
+        targetId: partnerId,
+        metadata: {
+          previousName,
+          nextName: nameParsed.name,
+        },
+      },
+    });
+  });
+
+  return {
+    ok: true,
+    message: "Partner name updated.",
+    partnerId,
   };
 }

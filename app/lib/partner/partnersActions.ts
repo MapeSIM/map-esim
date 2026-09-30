@@ -10,6 +10,7 @@ import {
   disablePartner,
   reactivatePartner,
   resendPartnerInvitation,
+  updatePartnerDisplayName,
 } from "@/app/lib/partner/partners";
 import type {
   PartnerWalletActionState,
@@ -108,6 +109,24 @@ export async function reactivatePartnerAction(
     partnerId,
     expectedVersion: formData.get("expectedVersion"),
     reason: formData.get("reason"),
+  });
+  if (result.ok && partnerId) {
+    revalidatePartnerPaths(partnerId);
+  }
+  return result;
+}
+
+export async function updatePartnerDisplayNameAction(
+  _prev: PartnersFormState,
+  formData: FormData
+): Promise<PartnersFormState> {
+  const admin = await requireRole("ADMIN");
+  await assertAdminPermission(admin.id, "PARTNERS_MANAGE");
+  const partnerId = String(formData.get("partnerId") ?? "").trim();
+  const result = await updatePartnerDisplayName({
+    adminUserId: admin.id,
+    partnerId,
+    name: formData.get("name"),
   });
   if (result.ok && partnerId) {
     revalidatePartnerPaths(partnerId);

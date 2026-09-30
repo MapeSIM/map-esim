@@ -122,10 +122,12 @@ async function main() {
   assert.match(partners, /partner\.discount_changed/);
   assert.match(partners, /partner\.disabled/);
   assert.match(partners, /partner\.reactivated/);
+  assert.match(partners, /partner\.display_name_changed/);
   assert.match(partners, /partner\.management_action_blocked/);
   assert.match(partners, /Role\.PARTNER/);
   assert.match(partners, /mintPartnerInviteToken|sendPartnerInviteEmail/);
   assert.match(partners, /opaque_setup_link/);
+  assert.match(partners, /updatePartnerDisplayName/);
   assert.doesNotMatch(partners, /kind:\s*["']partner_invite["']/);
   assert.doesNotMatch(partners, /OtpPurpose\.PASSWORD_RESET/);
   assert.match(partners, /session\.deleteMany/);
@@ -312,6 +314,7 @@ async function main() {
   assert.match(actions, /requireRole\(["']ADMIN["']\)/);
   assert.match(actions, /createPartnerAction/);
   assert.match(actions, /changePartnerDiscountAction/);
+  assert.match(actions, /updatePartnerDisplayNameAction/);
   assert.match(actions, /creditPartner|debitPartner/);
   assert.match(actions, /^["']use server["']/m);
   // Next.js module "use server": only async Server Functions may be exported.
@@ -345,12 +348,55 @@ async function main() {
 
   const adminList = read("app/admin/partners/page.tsx");
   const adminDetail = read("app/admin/partners/[id]/page.tsx");
+  const listActions = read("app/components/admin/PartnerListRowActions.tsx");
+  const namePanel = read("app/components/admin/PartnerNameEditPanel.tsx");
+  const statusPanel = read("app/components/admin/PartnerStatusPanel.tsx");
   assert.match(adminList, /PartnerCreateForm/);
+  assert.match(adminList, /PartnerListRowActions/);
+  assert.match(adminList, /AdminKpiCard/);
+  assert.match(adminList, /Total partners|totalCount/);
+  assert.match(adminList, /Total orders|totalOrders/);
+  assert.match(adminList, /Revenue|revenueLabel/);
+  assert.match(adminList, /Discount \/ savings|discountSavingsLabel/);
+  assert.match(adminList, /AdminStatusPill/);
+  assert.match(adminList, /AdminTableShell/);
+  assert.match(listActions, /View Partner/);
+  assert.match(listActions, /Disable Partner/);
+  assert.match(listActions, /Enable Partner/);
+  assert.match(listActions, /disablePartnerAction/);
+  assert.match(listActions, /reactivatePartnerAction/);
+  assert.match(namePanel, /updatePartnerDisplayNameAction/);
+  assert.match(namePanel, /Edit partner name/);
+  assert.match(statusPanel, /Disable Partner/);
+  assert.match(statusPanel, /Enable Partner/);
   assert.match(adminDetail, /PartnerDiscountPanel/);
   assert.match(adminDetail, /PartnerWalletPanel/);
   assert.match(adminDetail, /PartnerStatusPanel/);
   assert.match(adminDetail, /PartnerInviteResendPanel/);
+  assert.match(adminDetail, /PartnerNameEditPanel/);
+  assert.match(adminDetail, /Orders history/);
+  assert.match(adminDetail, /Payment history/);
+  assert.match(adminDetail, /Discount overview/);
+  assert.match(adminDetail, /payment\.href/);
+  assert.match(adminDetail, /AdminKpiCard/);
+  assert.match(adminDetail, /purchasesPage|ordersPage/);
   console.log("PASS admin_partners_ui");
+
+  const partnersLib = read("app/lib/partner/partners.ts");
+  assert.match(partnersLib, /PartnerEsimPurchaseStatus\.COMPLETED/);
+  assert.match(partnersLib, /partnerChargeCents/);
+  assert.match(partnersLib, /retailPriceCents/);
+  assert.match(partnersLib, /activeCount/);
+  assert.match(partnersLib, /invitedCount/);
+  assert.match(partnersLib, /disabledCount/);
+  assert.match(partnersLib, /groupBy:\s*\[\s*"partnerId"\s*\]|groupBy\(\{\s*by:\s*\["partnerId"\]/);
+  assert.match(partnersLib, /listPartnersPage/);
+  assert.match(partnersLib, /partnerEsimPurchasePaymentAttempt/);
+  assert.match(partnersLib, /PARTNER_DETAIL_ORDERS_PAGE_SIZE|purchasesTotalPages/);
+  assert.match(partnersLib, /\?kind=partner/);
+  assert.match(partnersLib, /statusVersion/);
+  assert.match(partnersLib, /updatePartnerDisplayName/);
+  console.log("PASS admin_partners_list_aggregates_readonly");
 
   const partnerLayout = read("app/partner/(portal)/layout.tsx");
   const partnerHome = read("app/partner/(portal)/page.tsx");

@@ -1,5 +1,21 @@
-import Link from "next/link";
 import { PartnerCreateForm } from "@/app/components/admin/PartnerCreateForm";
+import { PartnerListRowActions } from "@/app/components/admin/PartnerListRowActions";
+import {
+  AdminButton,
+  AdminEmptyState,
+  AdminFilterField,
+  AdminFilterPanel,
+  adminFilterControlClassName,
+  AdminKpiCard,
+  AdminPageHeader,
+  AdminStatusPill,
+  AdminTableBody,
+  AdminTableHead,
+  AdminTableShell,
+  ADMIN_KPI_GRID_CLASS,
+  ADMIN_PAGE_STACK_CLASS,
+  ADMIN_SOFT_COPY_CLASS,
+} from "@/app/components/admin/ui";
 import { listPartnersPage } from "@/app/lib/partner/partners";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +38,15 @@ function buildPartnersHref(options: {
   return qs ? `/admin/partners?${qs}` : "/admin/partners";
 }
 
+function partnerStatusPillValue(status: string): string {
+  const normalized = status.trim().toUpperCase();
+  if (normalized === "ACTIVE") return "ACTIVE";
+  if (normalized === "DISABLED") return "DISABLED";
+  if (normalized === "DELETED") return "DELETED";
+  if (normalized === "INVITED") return "PENDING";
+  return status;
+}
+
 export default async function AdminPartnersPage({
   searchParams,
 }: {
@@ -42,18 +67,11 @@ export default async function AdminPartnersPage({
     });
   } catch {
     return (
-      <div className="space-y-6">
-        <header>
-          <h1 className="text-2xl font-bold tracking-tight">Partners</h1>
-        </header>
-        <div
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-          role="status"
-        >
-          <p className="text-sm font-medium text-[var(--heading)]">
-            {PARTNERS_UNAVAILABLE}
-          </p>
-        </div>
+      <div className={ADMIN_PAGE_STACK_CLASS}>
+        <AdminPageHeader title="Partners" />
+        <AdminEmptyState title="Temporarily unavailable">
+          {PARTNERS_UNAVAILABLE}
+        </AdminEmptyState>
       </div>
     );
   }
@@ -61,43 +79,40 @@ export default async function AdminPartnersPage({
   const filterBase = { q: data.search, status: data.status };
 
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight">Partners</h1>
-        <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Manage reseller PARTNER accounts, discounts, and prepaid wallet
-          balances. Password hashes and OTP codes are never displayed.
-        </p>
-      </header>
+    <div className={ADMIN_PAGE_STACK_CLASS}>
+      <AdminPageHeader
+        title="Partners"
+        description="Manage reseller PARTNER accounts, discounts, and prepaid wallet balances. List metrics are read-only aggregates from completed purchases."
+      />
+
+      <section
+        className={ADMIN_KPI_GRID_CLASS}
+        aria-label="Partner status counts"
+      >
+        <AdminKpiCard label="Total partners" value={String(data.kpis.totalCount)} />
+        <AdminKpiCard label="Active" value={String(data.kpis.activeCount)} />
+        <AdminKpiCard label="Invited" value={String(data.kpis.invitedCount)} />
+        <AdminKpiCard label="Disabled" value={String(data.kpis.disabledCount)} />
+      </section>
 
       <PartnerCreateForm />
 
-      <form
-        method="get"
-        className="grid gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:grid-cols-2"
-      >
-        <label className="block text-sm sm:col-span-2">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Search
-          </span>
+      <AdminFilterPanel aria-label="Partner filters">
+        <AdminFilterField label="Search" className="sm:col-span-2">
           <input
             type="search"
             name="q"
             defaultValue={data.search}
             maxLength={100}
             placeholder="Name, email, or partner ID"
-            className="h-11 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-3 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className={adminFilterControlClassName}
           />
-        </label>
-
-        <label className="block text-sm">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-            Status
-          </span>
+        </AdminFilterField>
+        <AdminFilterField label="Status">
           <select
             name="status"
             defaultValue={data.status}
-            className="h-11 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-3 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className={adminFilterControlClassName}
           >
             <option value="ALL">All</option>
             <option value="ACTIVE">Active</option>
@@ -105,108 +120,113 @@ export default async function AdminPartnersPage({
             <option value="DISABLED">Disabled</option>
             <option value="DELETED">Deleted</option>
           </select>
-        </label>
-
-        <div className="flex items-end gap-2">
-          <button
-            type="submit"
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-          >
+        </AdminFilterField>
+        <div className="flex flex-wrap items-end gap-2 sm:col-span-2">
+          <AdminButton type="submit" variant="primary" size="sm">
             Apply filters
-          </button>
-          <Link
-            href="/admin/partners"
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-          >
+          </AdminButton>
+          <AdminButton href="/admin/partners" variant="secondary" size="sm">
             Clear
-          </Link>
+          </AdminButton>
         </div>
-      </form>
+      </AdminFilterPanel>
+
+      <p className={ADMIN_SOFT_COPY_CLASS}>
+        Showing {data.rows.length} of {data.totalCount} · page {data.page} /{" "}
+        {data.totalPages}
+      </p>
 
       {data.rows.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-4 py-6 text-sm text-[var(--text-soft)]">
+        <AdminEmptyState title="No partners match">
           No partners match the selected filters.
-        </p>
+        </AdminEmptyState>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-[var(--border)]">
-          <table className="min-w-[960px] w-full border-collapse text-left text-sm">
-            <thead className="bg-[var(--surface-2)] text-xs uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              <tr>
-                <th className="px-3 py-3 font-semibold">Created</th>
-                <th className="px-3 py-3 font-semibold">Name</th>
-                <th className="px-3 py-3 font-semibold">Email</th>
-                <th className="px-3 py-3 font-semibold">Discount</th>
-                <th className="px-3 py-3 font-semibold">Balance</th>
-                <th className="px-3 py-3 font-semibold">Status</th>
-                <th className="px-3 py-3 font-semibold">Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.rows.map((partner) => (
-                <tr
-                  key={partner.id}
-                  className="border-t border-[var(--border)] text-[var(--text)]"
-                >
-                  <td className="whitespace-nowrap px-3 py-3">
-                    {partner.createdAtLabel}
-                  </td>
-                  <td className="px-3 py-3">{partner.name}</td>
-                  <td className="px-3 py-3 font-mono text-xs">
-                    {partner.emailMasked}
-                  </td>
-                  <td className="px-3 py-3">{partner.discountPercentLabel}</td>
-                  <td className="px-3 py-3 tabular-nums">
-                    {partner.balanceLabel}
-                  </td>
-                  <td className="px-3 py-3">{partner.statusLabel}</td>
-                  <td className="px-3 py-3">
-                    <Link
-                      href={`/admin/partners/${partner.id}`}
-                      className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-                    >
-                      View
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <AdminTableShell caption="Partners" minWidthClassName="min-w-[1100px]">
+          <AdminTableHead>
+            <tr>
+              <th className="px-3 py-3 font-semibold">Partner name</th>
+              <th className="px-3 py-3 font-semibold">Email</th>
+              <th className="px-3 py-3 font-semibold">Status</th>
+              <th className="px-3 py-3 font-semibold">Wallet balance</th>
+              <th className="px-3 py-3 font-semibold">Total orders</th>
+              <th className="px-3 py-3 font-semibold">Revenue</th>
+              <th className="px-3 py-3 font-semibold">Discount / savings</th>
+              <th className="px-3 py-3 font-semibold">Created</th>
+              <th className="px-3 py-3 font-semibold">Actions</th>
+            </tr>
+          </AdminTableHead>
+          <AdminTableBody>
+            {data.rows.map((partner) => (
+              <tr key={partner.id}>
+                <td className="px-3 py-3 align-top font-medium text-[var(--heading)]">
+                  {partner.name}
+                </td>
+                <td className="px-3 py-3 align-top font-mono text-xs text-[var(--text-muted)]">
+                  {partner.emailMasked}
+                </td>
+                <td className="px-3 py-3 align-top">
+                  <AdminStatusPill value={partnerStatusPillValue(partner.statusLabel)}>
+                    {partner.statusLabel}
+                  </AdminStatusPill>
+                </td>
+                <td className="px-3 py-3 align-top tabular-nums text-[var(--heading)]">
+                  {partner.balanceLabel}
+                </td>
+                <td className="px-3 py-3 align-top tabular-nums text-[var(--heading)]">
+                  {partner.totalOrdersLabel}
+                </td>
+                <td className="px-3 py-3 align-top tabular-nums text-[var(--heading)]">
+                  {partner.revenueLabel}
+                </td>
+                <td className="px-3 py-3 align-top text-[var(--heading)]">
+                  <p className="tabular-nums">{partner.discountSavingsLabel}</p>
+                  <p className="mt-0.5 text-xs text-[var(--text-soft)]">
+                    Rate {partner.discountPercentLabel}
+                  </p>
+                </td>
+                <td className="whitespace-nowrap px-3 py-3 align-top text-[var(--text-muted)]">
+                  {partner.createdAtLabel}
+                </td>
+                <td className="px-3 py-3 align-top">
+                  <PartnerListRowActions
+                    partnerId={partner.id}
+                    statusLabel={partner.statusLabel}
+                    statusVersion={partner.statusVersion}
+                  />
+                </td>              </tr>
+            ))}
+          </AdminTableBody>
+        </AdminTableShell>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--text-muted)]">
-        <p>
-          Page {data.page} of {data.totalPages}
-          <span className="mx-2 text-[var(--border-strong)]">·</span>
-          {data.totalCount} partner{data.totalCount === 1 ? "" : "s"}
-        </p>
-        <div className="flex gap-2">
+      {data.totalPages > 1 ? (
+        <nav className="flex flex-wrap gap-2" aria-label="Partners pagination">
           {data.page > 1 ? (
-            <Link
+            <AdminButton
               href={buildPartnersHref({ ...filterBase, page: data.page - 1 })}
-              className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-3 font-semibold text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+              variant="secondary"
             >
               Previous
-            </Link>
+            </AdminButton>
           ) : (
-            <span className="inline-flex h-10 items-center rounded-xl border border-[var(--border)] px-3 opacity-50">
+            <AdminButton variant="secondary" disabled>
               Previous
-            </span>
+            </AdminButton>
           )}
           {data.page < data.totalPages ? (
-            <Link
+            <AdminButton
               href={buildPartnersHref({ ...filterBase, page: data.page + 1 })}
-              className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-3 font-semibold text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+              variant="secondary"
             >
               Next
-            </Link>
+            </AdminButton>
           ) : (
-            <span className="inline-flex h-10 items-center rounded-xl border border-[var(--border)] px-3 opacity-50">
+            <AdminButton variant="secondary" disabled>
               Next
-            </span>
+            </AdminButton>
           )}
-        </div>
-      </div>
+        </nav>
+      ) : null}
     </div>
   );
 }
