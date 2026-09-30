@@ -166,16 +166,21 @@ function chargeLabelFrom(
   return formatAdminPaymentChargeLabel(chargeAmountMinor, chargeCurrency);
 }
 
+/** Model-agnostic common filters — assignable to both attempt WhereInput types. */
+type SharedAttemptFilterFields = {
+  status?: { in: EsimPurchasePaymentAttemptStatus[] };
+  gatewayProvider?: PaymentGatewayProvider | null;
+  webhookEventId?: null | { not: null };
+  createdAt?: {
+    gte?: Date;
+    lte?: Date;
+  };
+};
+
 function commonAttemptFilterFields(
   input: AttemptFilterInput
-): Pick<
-  Prisma.EsimPurchasePaymentAttemptWhereInput,
-  "status" | "gatewayProvider" | "webhookEventId" | "createdAt"
-> {
-  const fields: Pick<
-    Prisma.EsimPurchasePaymentAttemptWhereInput,
-    "status" | "gatewayProvider" | "webhookEventId" | "createdAt"
-  > = {};
+): SharedAttemptFilterFields {
+  const fields: SharedAttemptFilterFields = {};
 
   const statuses = paymentAttemptStatusesForFilter(input.status);
   if (statuses) {
