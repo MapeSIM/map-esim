@@ -85,7 +85,7 @@ export async function listFailedGatewayPaymentAttempts(
       EsimPurchasePaymentAttemptStatus.FAILED,
       EsimPurchasePaymentAttemptStatus.CANCELLED,
     ],
-  } as const;
+  };
 
   const [customerRows, partnerRows] = await Promise.all([
     prisma.esimPurchasePaymentAttempt.findMany({
