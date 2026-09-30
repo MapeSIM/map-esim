@@ -82,17 +82,32 @@ export async function releaseStaleGatewayReservationAction(
 
     return result;
   } catch (error) {
+    const prismaCode =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code?: unknown }).code ?? "")
+        : "";
+    const prismaMeta =
+      error && typeof error === "object" && "meta" in error
+        ? (error as { meta?: unknown }).meta
+        : undefined;
     console.error("[admin.payments.stale_release] action failed", {
+      paymentAttemptId: String(formData.get("paymentAttemptId") ?? "")
+        .trim()
+        .slice(0, 64),
       errorName: error instanceof Error ? error.name : "unknown",
-      errorCode:
-        error && typeof error === "object" && "code" in error
-          ? String((error as { code?: unknown }).code ?? "")
-          : undefined,
+      errorMessage:
+        error instanceof Error
+          ? error.message.slice(0, 500)
+          : String(error).slice(0, 500),
+      errorCode: prismaCode || undefined,
+      prismaMeta: prismaMeta ?? undefined,
     });
     return {
       ok: false,
       error:
-        "Could not release this reservation right now. Refresh the page and try again shortly.",
+        prismaCode === "P2028"
+          ? "Reservation release timed out talking to the database. Please try again."
+          : "Could not release this reservation right now. Refresh the page and try again shortly.",
     };
   }
 }

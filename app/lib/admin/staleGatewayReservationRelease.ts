@@ -9,6 +9,7 @@ import {
   EsimPurchasePaymentAttemptStatus,
   PartnerEsimPurchaseStatus,
   Prisma,
+  Role,
   WalletEsimPurchaseStatus,
 } from "@prisma/client";
 import { assertSameOriginAdminRequest } from "@/app/lib/admin/reconciliationCaseManagement";
@@ -22,7 +23,8 @@ import { parsePendingPaymentVerifyReason } from "@/app/lib/admin/pendingSimpaisa
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
 import { prisma } from "@/app/lib/db";
 import { maybeReleasePendingGatewayReservation } from "@/app/lib/esim/esimPurchasePaymentApply";
-import { maybeReleasePendingPartnerGatewayReservation } from "@/app/lib/partner/partnerEsimPurchasePaymentApply";
+import { PARTNER_ESIM_PAYMENT_RESERVATION_RELEASED } from "@/app/lib/partner/partnerEsimPurchasePaymentConstants";
+import { releasePartnerGatewayReservationInTx } from "@/app/lib/partner/partnerPurchaseWallet";
 
 export type StaleGatewayReleaseResult =
   | {
@@ -44,6 +46,12 @@ const ATTEMPT_OPEN: EsimPurchasePaymentAttemptStatus[] = [
   EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
   EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING,
 ];
+
+/** Interactive tx budget for admin Partner release (prod P2028 at default 5s). */
+const ADMIN_PARTNER_RELEASE_TX = {
+  maxWait: 5_000,
+  timeout: 20_000,
+} as const;
 
 async function writeAudit(options: {
   actorUserId: string;
@@ -79,6 +87,203 @@ function isStaleEnough(input: {
     return true;
   }
   return input.updatedAt.getTime() <= input.nowMs - input.staleMs;
+}
+
+function releaseStaleTrace(
+  step: "enter_partner_tx" | "after_release_in_tx" | "partner_tx_failed",
+  data: Record<string, unknown>
+): void {
+  console.info("RELEASE_STALE_TRACE", { step, ...data });
+}
+
+function prismaErrorFields(error: unknown): {
+  prismaCode?: string;
+  prismaMeta?: unknown;
+  errorMessage?: string;
+} {
+  const prismaCode =
+    error && typeof error === "object" && "code" in error
+      ? String((error as { code?: unknown }).code ?? "")
+      : "";
+  const prismaMeta =
+    error && typeof error === "object" && "meta" in error
+      ? (error as { meta?: unknown }).meta
+      : undefined;
+  return {
+    prismaCode: prismaCode || undefined,
+    prismaMeta: prismaMeta ?? undefined,
+    errorMessage:
+      error instanceof Error
+        ? error.message.slice(0, 500)
+        : String(error).slice(0, 500),
+  };
+}
+
+/**
+ * Admin Partner path: same unpaid-hold release as webhook cancel/expire, but with
+ * a longer interactive-transaction timeout so serverless DB latency does not P2028.
+ * Reuses releasePartnerGatewayReservationInTx — never marks paid / never invents refunds.
+ */
+async function releasePartnerUnpaidHoldForAdmin(options: {
+  partnerUserId: string;
+  purchaseId: string;
+  attemptId: string;
+  /** Snapshot from outer admin eligibility load (trace only). */
+  attemptStatus: string;
+  purchaseStatus: string;
+  debitTransactionId: string | null;
+}): Promise<{ released: boolean }> {
+  const partnerUserId = options.partnerUserId.trim();
+  const purchaseId = options.purchaseId.trim();
+  const attemptId = options.attemptId.trim();
+  if (!partnerUserId || !purchaseId || !attemptId) {
+    return { released: false };
+  }
+
+  const traceBase = {
+    attemptId,
+    purchaseId,
+    debitTransactionId: options.debitTransactionId,
+    purchaseStatus: options.purchaseStatus,
+    attemptStatus: options.attemptStatus,
+  };
+
+  releaseStaleTrace("enter_partner_tx", traceBase);
+
+  let released = false;
+  let releaseOutcome: string | null = null;
+
+  try {
+    await prisma.$transaction(
+      async (tx) => {
+        const attempt = await tx.partnerEsimPurchasePaymentAttempt.findUnique({
+          where: { id: attemptId },
+          select: {
+            id: true,
+            status: true,
+            purchaseId: true,
+            purchase: {
+              select: {
+                id: true,
+                partnerId: true,
+                status: true,
+                walletAppliedCents: true,
+                debitTransactionId: true,
+                partner: {
+                  select: {
+                    userId: true,
+                    disabledAt: true,
+                    user: { select: { role: true, deletedAt: true } },
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (
+          !attempt ||
+          attempt.purchaseId !== purchaseId ||
+          !attempt.purchase?.partner ||
+          attempt.purchase.partner.userId !== partnerUserId ||
+          attempt.purchase.partner.user?.deletedAt ||
+          attempt.purchase.partner.user?.role !== Role.PARTNER
+        ) {
+          return;
+        }
+
+        if (
+          attempt.status === EsimPurchasePaymentAttemptStatus.PAYMENT_CONFIRMED ||
+          attempt.purchase.status === PartnerEsimPurchaseStatus.FUNDED ||
+          attempt.purchase.status === PartnerEsimPurchaseStatus.COMPLETED ||
+          attempt.purchase.status === PartnerEsimPurchaseStatus.PROVIDER_PENDING ||
+          attempt.purchase.status ===
+            PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED
+        ) {
+          return;
+        }
+
+        const canRelease =
+          attempt.purchase.status ===
+            PartnerEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT ||
+          attempt.purchase.status === PartnerEsimPurchaseStatus.FUNDS_RESERVED;
+
+        if (canRelease) {
+          const release = await releasePartnerGatewayReservationInTx(tx, {
+            partnerId: attempt.purchase.partnerId,
+            partnerEsimPurchaseId: purchaseId,
+            amountCents: Math.max(0, attempt.purchase.walletAppliedCents),
+          });
+          releaseOutcome = release.outcome;
+
+          if (
+            release.outcome === "created" ||
+            release.outcome === "linked_existing"
+          ) {
+            released = true;
+          }
+        }
+
+        const purchaseAfter = await tx.partnerEsimPurchase.findUnique({
+          where: { id: purchaseId },
+          select: { status: true, debitTransactionId: true },
+        });
+        const purchaseReadyClean =
+          purchaseAfter?.status === PartnerEsimPurchaseStatus.READY &&
+          !purchaseAfter.debitTransactionId;
+
+        if (purchaseReadyClean) {
+          const marked = await tx.partnerEsimPurchasePaymentAttempt.updateMany({
+            where: {
+              id: attemptId,
+              webhookEventId: null,
+              status: { in: ATTEMPT_OPEN },
+            },
+            data: {
+              status: EsimPurchasePaymentAttemptStatus.EXPIRED,
+              failureCategory: "checkout_expired",
+              failureCode: "expired",
+            },
+          });
+          if (marked.count === 1) {
+            released = true;
+          }
+        }
+
+        if (released) {
+          await tx.auditLog.create({
+            data: {
+              actorUserId: partnerUserId,
+              action: PARTNER_ESIM_PAYMENT_RESERVATION_RELEASED,
+              targetType: "PartnerEsimPurchasePaymentAttempt",
+              targetId: attemptId,
+              metadata: {
+                purchaseId,
+                walletAppliedCents: attempt.purchase.walletAppliedCents,
+                attemptTerminalStatus: "EXPIRED",
+                method: "admin_stale_release",
+              } satisfies Prisma.InputJsonValue,
+            },
+          });
+        }
+      },
+      ADMIN_PARTNER_RELEASE_TX
+    );
+
+    releaseStaleTrace("after_release_in_tx", {
+      ...traceBase,
+      released,
+      releaseOutcome,
+    });
+  } catch (error) {
+    releaseStaleTrace("partner_tx_failed", {
+      ...traceBase,
+      ...prismaErrorFields(error),
+    });
+    throw error;
+  }
+
+  return { released };
 }
 
 /**
@@ -286,6 +491,23 @@ export async function releaseStaleGatewayReservation(options: {
     return { ok: false, error: publicError };
   }
 
+  const partnerUserId = (partner.purchase?.partner?.userId ?? "").trim();
+  if (!partner.purchase || !partnerUserId) {
+    await writeAudit({
+      actorUserId: adminId,
+      action: PAYMENT_RECOVERY_STALE_RELEASE_BLOCKED_AUDIT,
+      targetType: "PartnerEsimPurchasePaymentAttempt",
+      targetId: partner.id,
+      metadata: {
+        method: "admin_stale_release",
+        ownerKind: "partner",
+        failureCode: "partner_unavailable",
+        reason: reasonParsed.reason.slice(0, 80),
+      },
+    });
+    return { ok: false, error: publicError };
+  }
+
   if (
     partner.webhookEventId ||
     !ATTEMPT_OPEN.includes(partner.status) ||
@@ -336,12 +558,26 @@ export async function releaseStaleGatewayReservation(options: {
     };
   }
 
-  const release = await maybeReleasePendingPartnerGatewayReservation({
-    partnerUserId: partner.purchase.partner.userId,
-    purchaseId: partner.purchase.id,
-    attemptId: partner.id,
-    attemptTerminalStatus: "EXPIRED",
-  });
+  let release: { released: boolean };
+  try {
+    release = await releasePartnerUnpaidHoldForAdmin({
+      partnerUserId,
+      purchaseId: partner.purchase.id,
+      attemptId: partner.id,
+      attemptStatus: partner.status,
+      purchaseStatus: partner.purchase.status,
+      debitTransactionId: partner.purchase.debitTransactionId ?? null,
+    });
+  } catch (error) {
+    const fields = prismaErrorFields(error);
+    return {
+      ok: false,
+      error:
+        fields.prismaCode === "P2028"
+          ? "Reservation release timed out talking to the database. Please try again."
+          : "Could not release this Partner reservation right now. Refresh and try again shortly.",
+    };
+  }
 
   await writeAudit({
     actorUserId: adminId,
@@ -365,7 +601,7 @@ export async function releaseStaleGatewayReservation(options: {
     purchaseId: partner.purchase.id,
     attemptId: partner.id,
     message: release.released
-      ? "Reserved Partner wallet amount released. Purchase restored to READY. Never marked paid."
+      ? "Reserved wallet amount released. Purchase restored to READY. Never marked paid."
       : "No releasable reservation remained (already clean or funded race).",
   };
 }

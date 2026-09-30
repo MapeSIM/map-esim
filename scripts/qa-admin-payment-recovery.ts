@@ -214,14 +214,24 @@ function main() {
     "app/api/cron/esim-lifecycle-notifications/route.ts"
   );
   assert.match(release, /releaseStaleGatewayReservation/);
-  assert.match(release, /maybeReleasePendingPartnerGatewayReservation/);
+  assert.match(release, /releasePartnerGatewayReservationInTx/);
+  assert.match(release, /timeout:\s*20_000|timeout:\s*20000/);
+  assert.match(release, /ADMIN_PARTNER_RELEASE_TX|releasePartnerUnpaidHoldForAdmin/);
+  assert.match(release, /RELEASE_STALE_TRACE/);
+  assert.match(release, /enter_partner_tx/);
+  assert.match(release, /after_release_in_tx/);
+  assert.match(release, /partner_tx_failed/);
+  assert.match(release, /debitTransactionId/);
   assert.match(release, /maybeReleasePendingGatewayReservation/);
   assert.match(release, /PAYMENT_RECOVERY_STALE_RELEASE_AUDIT/);
-  assert.doesNotMatch(release, /applyVerified|markPaid|PAYMENT_CONFIRMED/);
+  assert.doesNotMatch(release, /applyVerified|markPaid\b|Mark paid/);
+  assert.doesNotMatch(release, /status:\s*EsimPurchasePaymentAttemptStatus\.PAYMENT_CONFIRMED/);
+  assert.match(release, /PAYMENT_CONFIRMED/); // guard: skip if already confirmed
   assert.match(releaseActions, /assertAdminPermission/);
   assert.match(releaseActions, /PAYMENTS_MANAGE/);
-  assert.match(releaseActions, /action failed|Could not release this reservation/);
+  assert.match(releaseActions, /action failed|Could not release this reservation|timed out talking/);
   assert.match(releaseActions, /catch/);
+  assert.match(releaseActions, /prismaMeta|errorMessage/);
   assert.match(customerStale, /expireStaleCustomerGatewayPaymentAttempt/);
   assert.match(partnerStale, /expireStalePartnerGatewayPaymentAttempt/);
   assert.match(combined, /runCustomerGatewayStaleReservationRecovery/);
