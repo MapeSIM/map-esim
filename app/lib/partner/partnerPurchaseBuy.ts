@@ -122,8 +122,17 @@ export async function buyPartnerEsimPurchase(
 
   const useWallet = input.useWallet !== false;
   let purchaseId: string | undefined;
+  let partnerId: string | undefined;
+  let lastStep = "start";
 
   try {
+    lastStep = "prepare";
+    console.error("PARTNER_BUY_TRACE", {
+      step: "prepare_start",
+      partnerUserId: actor.userId,
+      offerId,
+      useWallet,
+    });
     const prepared = await preparePartnerEsimPurchase({
       partnerUserId: actor.userId,
       offerId,
@@ -132,6 +141,15 @@ export async function buyPartnerEsimPurchase(
       verifyOffer: input.verifyOffer,
     });
     purchaseId = prepared.purchaseId;
+    partnerId = prepared.partnerId;
+    console.error("PARTNER_BUY_TRACE", {
+      step: "prepare_done",
+      purchaseId,
+      partnerId,
+      offerId,
+      status: prepared.status,
+      duplicate: prepared.duplicate,
+    });
 
     if (prepared.status === PartnerEsimPurchaseStatus.COMPLETED) {
       return {
@@ -165,6 +183,7 @@ export async function buyPartnerEsimPurchase(
         status === PartnerEsimPurchaseStatus.DRAFT ||
         status === PartnerEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT)
     ) {
+      lastStep = "split_funding";
       let funding:
         | Awaited<ReturnType<typeof setPartnerPurchaseFundingChoice>>
         | null = null;
@@ -198,6 +217,7 @@ export async function buyPartnerEsimPurchase(
         : tryGatewayResume;
 
       if (needsGateway) {
+        lastStep = "gateway_checkout";
         try {
           const checkout = await startPartnerEsimPurchaseHostedCheckout({
             partnerUserId: actor.userId,
@@ -239,6 +259,14 @@ export async function buyPartnerEsimPurchase(
       status === PartnerEsimPurchaseStatus.READY ||
       status === PartnerEsimPurchaseStatus.DRAFT
     ) {
+      lastStep = "reserve";
+      console.error("PARTNER_BUY_TRACE", {
+        step: "reserve_start",
+        purchaseId: prepared.purchaseId,
+        partnerId,
+        offerId,
+        status,
+      });
       const reserved = await reservePartnerEsimPurchase({
         partnerUserId: actor.userId,
         purchaseId: prepared.purchaseId,
@@ -247,9 +275,25 @@ export async function buyPartnerEsimPurchase(
       });
       purchaseId = reserved.purchaseId;
       status = reserved.status;
+      console.error("PARTNER_BUY_TRACE", {
+        step: "reserve_done",
+        purchaseId,
+        partnerId: reserved.partnerId,
+        offerId,
+        status,
+        duplicate: reserved.duplicate,
+      });
     }
 
     if (status === PartnerEsimPurchaseStatus.PROVIDER_PENDING) {
+      lastStep = "provider";
+      console.error("PARTNER_BUY_TRACE", {
+        step: "provider_start",
+        purchaseId: purchaseId!,
+        partnerId,
+        offerId,
+        status,
+      });
       const executed = await executePartnerEsimProviderPurchase({
         partnerUserId: actor.userId,
         purchaseId: purchaseId!,
@@ -257,6 +301,14 @@ export async function buyPartnerEsimPurchase(
       });
 
       if (executed.status === PartnerEsimPurchaseStatus.COMPLETED) {
+        console.error("PARTNER_BUY_TRACE", {
+          step: "provider_done",
+          purchaseId: executed.purchaseId,
+          partnerId: executed.partnerId,
+          offerId,
+          status: executed.status,
+          duplicate: executed.duplicate,
+        });
         return {
           ok: true,
           kind: executed.duplicate ? "duplicate_success" : "success",
@@ -291,6 +343,27 @@ export async function buyPartnerEsimPurchase(
 
     return mapPartnerPurchaseErrorCode("INVALID_STATE", purchaseId);
   } catch (error) {
+    console.error("PARTNER_BUY_TRACE", {
+      step: "buy_failed",
+      lastStep,
+      purchaseId,
+      partnerId,
+      offerId,
+      partnerUserId: actor.userId,
+      name: error instanceof Error ? error.name : typeof error,
+      code:
+        error instanceof PartnerEsimPurchaseError
+          ? error.code
+          : error && typeof error === "object" && "code" in error
+            ? String((error as { code?: unknown }).code ?? "").slice(0, 64)
+            : undefined,
+      message:
+        error instanceof Error
+          ? error.message.slice(0, 500)
+          : String(error).slice(0, 500),
+      stack:
+        error instanceof Error ? error.stack?.slice(0, 2000) : undefined,
+    });
     if (error instanceof PartnerEsimPurchaseError) {
       return mapPartnerPurchaseErrorCode(error.code, purchaseId);
     }

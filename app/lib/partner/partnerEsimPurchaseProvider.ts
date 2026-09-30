@@ -47,7 +47,7 @@ export const PARTNER_ESIM_PURCHASE_RECONCILIATION_AUDIT =
 
 /** Interactive tx bounds for local finalize/refund (DB-only; provider stays outside). */
 const PARTNER_PURCHASE_CRITICAL_TX = {
-  maxWait: 10_000,
+  maxWait: 5_000,
   timeout: 15_000,
 } as const;
 
@@ -597,6 +597,15 @@ export async function executePartnerEsimProviderPurchase(
   // External provider write — outside Prisma transaction. Never blind-retry.
   // Add More Data only: bind VeSIM recharge from adddata_ idempotency key.
   // Normal Partner Buy eSIM never sets that prefix → no rechargeOrderId.
+  console.error("PARTNER_BUY_TRACE", {
+    step: "provider_pre_checkout",
+    purchaseId: purchase.id,
+    partnerId: partner.partnerId,
+    offerId: purchase.offerId,
+    status: purchase.status,
+    hasDebit: Boolean(purchase.debitTransactionId),
+  });
+
   let rechargeOrderId: string | null = null;
   const addDataSourceOrderId = parseAddDataSourceOrderId(
     purchase.idempotencyKey
@@ -692,6 +701,15 @@ export async function executePartnerEsimProviderPurchase(
   }
 
   let orderId: string | null = null;
+  const finalizeStartedAt = Date.now();
+  console.error("PARTNER_BUY_TRACE", {
+    step: "finalize_start",
+    purchaseId: purchase.id,
+    partnerId: partner.partnerId,
+    offerId: purchase.offerId,
+    status: PartnerEsimPurchaseStatus.PROVIDER_PENDING,
+    lastStep: "finalize",
+  });
   try {
     const finalized = await prisma.$transaction(async (tx) => {
       const current = await tx.partnerEsimPurchase.findUnique({
@@ -765,7 +783,39 @@ export async function executePartnerEsimProviderPurchase(
       return order;
     }, PARTNER_PURCHASE_CRITICAL_TX);
     orderId = finalized.id;
+    console.error("PARTNER_BUY_TRACE", {
+      step: "finalize_done",
+      purchaseId: purchase.id,
+      partnerId: partner.partnerId,
+      offerId: purchase.offerId,
+      status: PartnerEsimPurchaseStatus.COMPLETED,
+      lastStep: "finalize",
+      orderId,
+      ms: Date.now() - finalizeStartedAt,
+    });
   } catch (error) {
+    console.error("PARTNER_BUY_TRACE", {
+      step: "finalize_failed",
+      purchaseId: purchase.id,
+      partnerId: partner.partnerId,
+      offerId: purchase.offerId,
+      status: PartnerEsimPurchaseStatus.PROVIDER_PENDING,
+      lastStep: "finalize",
+      name: error instanceof Error ? error.name : typeof error,
+      code:
+        error instanceof PartnerEsimPurchaseError
+          ? error.code
+          : error && typeof error === "object" && "code" in error
+            ? String((error as { code?: unknown }).code ?? "").slice(0, 64)
+            : undefined,
+      message:
+        error instanceof Error
+          ? error.message.slice(0, 500)
+          : String(error).slice(0, 500),
+      stack:
+        error instanceof Error ? error.stack?.slice(0, 2000) : undefined,
+      ms: Date.now() - finalizeStartedAt,
+    });
     if (error instanceof PartnerEsimPurchaseError) throw error;
     const persistDiagnostic = classifyOrderPersistError(error);
     console.error(
