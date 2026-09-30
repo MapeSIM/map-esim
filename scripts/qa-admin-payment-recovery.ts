@@ -220,6 +220,8 @@ function main() {
   assert.doesNotMatch(release, /applyVerified|markPaid|PAYMENT_CONFIRMED/);
   assert.match(releaseActions, /assertAdminPermission/);
   assert.match(releaseActions, /PAYMENTS_MANAGE/);
+  assert.match(releaseActions, /action failed|Could not release this reservation/);
+  assert.match(releaseActions, /catch/);
   assert.match(customerStale, /expireStaleCustomerGatewayPaymentAttempt/);
   assert.match(partnerStale, /expireStalePartnerGatewayPaymentAttempt/);
   assert.match(combined, /runCustomerGatewayStaleReservationRecovery/);

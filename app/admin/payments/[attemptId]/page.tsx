@@ -556,9 +556,13 @@ export default async function AdminPaymentDetailPage({
       {recovery?.staleReleaseEligible ? (
         <StaleGatewayReservationReleaseForm
           paymentAttemptId={detail.attemptId}
-          ownerKind={detail.ownerKind}
+          ownerKind={detail.ownerKind === "partner" ? "partner" : "customer"}
           walletAppliedCents={
-            recovery.walletAppliedCents ?? detail.walletAppliedCents
+            typeof recovery.walletAppliedCents === "number"
+              ? recovery.walletAppliedCents
+              : typeof detail.walletAppliedCents === "number"
+                ? detail.walletAppliedCents
+                : 0
           }
         />
       ) : null}
