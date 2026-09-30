@@ -1,9 +1,7 @@
 import { requireRole } from "@/app/lib/auth/session";
 import {
   adminWalletReservationStatusLabel,
-  buildAdminWalletPurchaseReconciliationHref,
   formatAdminReservedWalletListFragment,
-  isAdminWalletReconciliationLinkApplicable,
 } from "@/app/lib/admin/adminWalletReservationDisplay";
 import { ADMIN_UX_NAV, ADMIN_UX_PAGE } from "@/app/lib/admin/adminUxCopy";
 import { listPendingGatewayPaymentAttempts } from "@/app/lib/admin/pendingPaymentVerify";
@@ -44,6 +42,14 @@ export default async function AdminPendingPaymentsPage() {
       <AdminPageHeader
         title={ADMIN_UX_PAGE.verifyPending.title}
         description={ADMIN_UX_PAGE.verifyPending.description}
+        meta={
+          <>
+            Customer and Partner awaiting gateway attempts. Partner rows are
+            read-only here — open detail for tools that already support that
+            owner. Verify/Investigate forms stay on customer-compatible detail
+            flows.
+          </>
+        }
         actions={
           <>
             <AdminButton href="/admin/payments" variant="ghost" size="sm">
@@ -81,7 +87,7 @@ export default async function AdminPendingPaymentsPage() {
           actionLabel="Open Payments inbox"
         >
           Nothing is waiting on gateway payment right now. Check Stale Unpaid
-          Holds if a customer reports a stuck checkout.
+          Holds if a customer or partner reports a stuck checkout.
         </AdminEmptyState>
       ) : (
         <ul className="space-y-3">
@@ -89,17 +95,22 @@ export default async function AdminPendingPaymentsPage() {
             const reservedFragment = formatAdminReservedWalletListFragment(
               row.walletAppliedCents
             );
-            const showRecon = isAdminWalletReconciliationLinkApplicable({
-              purchaseStatus: row.purchaseStatus,
-              attemptStatus: row.attemptStatus,
-            });
             return (
-              <li key={row.attemptId} className={ADMIN_LIST_CARD_CLASS}>
+              <li
+                key={`${row.ownerKind}-${row.attemptId}`}
+                className={ADMIN_LIST_CARD_CLASS}
+              >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 space-y-2">
-                    <p className="break-all font-semibold text-[var(--heading)]">
-                      Attempt {row.attemptId}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <AdminStatusPill value={row.ownerKind}>
+                        {row.ownerLabel}
+                      </AdminStatusPill>
+                      <p className="break-all font-semibold text-[var(--heading)]">
+                        Attempt {row.attemptId}
+                      </p>
+                    </div>
+                    <p className="text-[var(--text-muted)]">{row.partyLabel}</p>
                     <p className="text-[var(--text-muted)]">
                       Purchase {row.purchaseId}
                       {row.gatewayProvider
@@ -118,28 +129,24 @@ export default async function AdminPendingPaymentsPage() {
                       </span>
                     </div>
                     <p className="text-xs text-[var(--text-soft)]">
-                      Tracker {row.trackerRefMasked}
+                      Created {row.createdAtLabel} · Tracker{" "}
+                      {row.trackerRefMasked}
                       {reservedFragment
                         ? ` · ${reservedFragment}`
                         : " · gateway-only"}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {showRecon ? (
+                    {row.reconciliationHref ? (
                       <AdminButton
-                        href={buildAdminWalletPurchaseReconciliationHref(
-                          row.purchaseId
-                        )}
+                        href={row.reconciliationHref}
                         variant="secondary"
                         size="sm"
                       >
                         {ADMIN_UX_NAV.stuckCases}
                       </AdminButton>
                     ) : null}
-                    <AdminButton
-                      href={`/admin/payments/${encodeURIComponent(row.attemptId)}`}
-                      variant="primary"
-                    >
+                    <AdminButton href={row.detailHref} variant="primary">
                       Open
                     </AdminButton>
                   </div>

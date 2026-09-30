@@ -9,13 +9,18 @@ import {
   buildAdminPaymentsHref,
   formatAdminPaymentChargeLabel,
   isPaymentDashboardPendingAttemptStatus,
+  normalizePaymentDashboardDateRange,
+  parsePaymentDashboardDateBound,
+  parsePaymentDashboardOwnerFilter,
   parsePaymentDashboardProviderFilter,
   parsePaymentDashboardSearch,
   parsePaymentDashboardStatusFilter,
   parsePaymentDashboardWebhookFilter,
   paymentAttemptStatusesForFilter,
+  paymentDashboardAttemptHref,
   paymentDashboardInquiryPlaceholder,
   paymentDashboardMethodPlaceholder,
+  paymentDashboardOwnerLabel,
 } from "../app/lib/admin/paymentDashboardShared";
 import {
   buildPaymentDetailTimeline,
@@ -61,26 +66,50 @@ function main() {
   assert.match(nav, /ADMIN_UX_NAV\.payments|label: "Payments"/);
   console.log("PASS admin_only_payments_hub_and_nav");
 
+  assert.match(hub, /Total payments/);
   assert.match(hub, /Pending/);
-  assert.match(hub, /Failed \/ cancelled \(24h\)|failedLast24hCount/);
+  assert.match(hub, /Failed/);
+  assert.match(hub, /Completed/);
   assert.match(hub, /Webhook missing/);
+  assert.match(hub, /Stale unpaid holds/);
+  assert.match(hub, /totalCount/);
+  assert.match(hub, /failedCount/);
+  assert.match(hub, /completedCount/);
   assert.match(service, /getAdminPaymentDashboardKpis/);
   assert.match(service, /webhookMissingAmongPendingCount/);
+  assert.match(service, /partnerEsimPurchasePaymentAttempt/);
+  assert.match(service, /PAYMENT_CONFIRMED/);
   console.log("PASS kpi_strip_contracts");
 
   assert.equal(parsePaymentDashboardStatusFilter(undefined), "PENDING");
   assert.equal(parsePaymentDashboardStatusFilter("ALL"), "ALL");
   assert.equal(parsePaymentDashboardProviderFilter("simpaisa"), "SIMPAISA");
   assert.equal(parsePaymentDashboardWebhookFilter("missing"), "MISSING");
+  assert.equal(parsePaymentDashboardOwnerFilter(undefined), "ALL");
+  assert.equal(parsePaymentDashboardOwnerFilter("partner"), "PARTNER");
+  assert.equal(parsePaymentDashboardOwnerFilter("CUSTOMER"), "CUSTOMER");
   assert.equal(parsePaymentDashboardSearch("  ab  cd  ").includes("ab cd"), true);
   assert.deepEqual(paymentAttemptStatusesForFilter("PENDING"), [
     "AWAITING_PAYMENT",
     "PAYMENT_PENDING",
     "RECONCILIATION_REQUIRED",
   ]);
+  assert.deepEqual(paymentAttemptStatusesForFilter("CONFIRMED"), [
+    "PAYMENT_CONFIRMED",
+  ]);
   assert.equal(isPaymentDashboardPendingAttemptStatus("AWAITING_PAYMENT"), true);
   assert.equal(isPaymentDashboardPendingAttemptStatus("FAILED"), false);
   assert.equal(paymentDashboardMethodPlaceholder(), "—");
+  assert.equal(paymentDashboardOwnerLabel("customer"), "Customer");
+  assert.equal(paymentDashboardOwnerLabel("partner"), "Partner");
+  assert.equal(
+    paymentDashboardAttemptHref("abc", "customer"),
+    "/admin/payments/abc"
+  );
+  assert.equal(
+    paymentDashboardAttemptHref("abc", "partner"),
+    "/admin/payments/abc?kind=partner"
+  );
   assert.match(paymentDashboardInquiryPlaceholder(), /Check on detail/i);
   assert.equal(formatAdminPaymentChargeLabel(300, "PKR"), "3.00 PKR");
   assert.equal(formatAdminPaymentChargeLabel(10000, "pkr"), "100.00 PKR");
@@ -89,12 +118,93 @@ function main() {
   assert.match(shared, /formatAdminPaymentChargeLabel/);
   assert.match(service, /formatAdminPaymentChargeLabel/);
   assert.match(pendingLegacy, /formatAdminPaymentChargeLabel/);
+
+  const fromBound = parsePaymentDashboardDateBound("2026-09-01", "start");
+  const toBound = parsePaymentDashboardDateBound("2026-09-30", "end");
+  assert.ok(fromBound);
+  assert.ok(toBound);
+  assert.equal(fromBound!.toISOString(), "2026-09-01T00:00:00.000Z");
+  assert.equal(toBound!.toISOString(), "2026-09-30T23:59:59.999Z");
+  assert.equal(parsePaymentDashboardDateBound("bad", "start"), null);
+  const swapped = normalizePaymentDashboardDateRange("2026-09-30", "2026-09-01");
+  assert.equal(swapped.fromParam, "2026-09-01");
+  assert.equal(swapped.toParam, "2026-09-30");
+
   assert.equal(buildAdminPaymentsHref({}), "/admin/payments");
   assert.match(
     buildAdminPaymentsHref({ status: "FAILED", provider: "SIMPAISA" }),
     /status=FAILED/
   );
+  assert.match(
+    buildAdminPaymentsHref({ owner: "PARTNER", from: "2026-09-01" }),
+    /owner=PARTNER/
+  );
+  assert.match(
+    buildAdminPaymentsHref({ owner: "PARTNER", from: "2026-09-01" }),
+    /from=2026-09-01/
+  );
   console.log("PASS shared_filter_helpers");
+
+  assert.match(hub, /name="owner"/);
+  assert.match(hub, /name="from"/);
+  assert.match(hub, /name="to"/);
+  assert.match(hub, /Customer \/ Partner/);
+  assert.match(hub, /Payment ID/);
+  assert.match(hub, /ownerKind/);
+  assert.match(hub, /PaymentListRowActions/);
+  assert.match(hub, /View Details|detailHref/);
+  assert.match(service, /listAdminPayments/);
+  assert.match(service, /partnerEsimPurchasePaymentAttempt\.findMany/);
+  assert.match(service, /paymentDashboardAttemptHref/);
+  assert.match(service, /staleReleaseEligible/);
+  assert.match(service, /staleReleaseHref/);
+  assert.match(service, /reconciliationHref/);
+  assert.match(service, /isPaymentRecoveryStaleReleaseEligible/);
+  assert.match(service, /isAdminWalletReconciliationLinkApplicable/);
+  assert.match(service, /buildAdminWalletPurchaseReconciliationHref/);
+  assert.match(shared, /kind=partner/);
+  assert.match(
+    read("app/components/admin/PaymentListRowActions.tsx"),
+    /View Details/
+  );
+  assert.match(
+    read("app/components/admin/PaymentListRowActions.tsx"),
+    /Release stale reservation/
+  );
+  assert.match(
+    read("app/components/admin/PaymentListRowActions.tsx"),
+    /Reconciliation/
+  );
+  assert.match(
+    read("app/components/admin/StaleGatewayReservationReleaseForm.tsx"),
+    /id="stale-release"/
+  );
+  assert.match(
+    read("app/lib/admin/paymentRecoveryShared.ts"),
+    /isPaymentRecoveryStaleReleaseEligible/
+  );
+  assert.match(
+    read("app/lib/admin/failedPaymentAttempts.ts"),
+    /partnerEsimPurchasePaymentAttempt/
+  );
+  assert.match(
+    read("app/admin/payments/failed/page.tsx"),
+    /ownerKind/
+  );
+  assert.match(
+    read("app/lib/admin/pendingPaymentVerify.ts"),
+    /partnerEsimPurchasePaymentAttempt/
+  );
+  assert.match(
+    read("app/admin/payments/pending/page.tsx"),
+    /detailHref/
+  );
+  assert.doesNotMatch(hub, /Mark paid|Cancel payment|Replay webhook/i);
+  assert.doesNotMatch(
+    read("app/components/admin/PaymentListRowActions.tsx"),
+    /releaseStaleGatewayReservationAction|Mark paid|applyVerified/i
+  );
+  console.log("PASS unified_owner_filters_and_table");
 
   assert.match(detail, /PendingSimpaisaInvestigateForm/);
   assert.match(detail, /PendingPaymentVerifyForm/);
@@ -140,7 +250,9 @@ function main() {
         atLabel: "a",
         title: "First",
       },
-    ]).map((e) => e.id).join(","),
+    ])
+      .map((e) => e.id)
+      .join(","),
     "b,a"
   );
   console.log("PASS reuses_existing_investigation_forms");

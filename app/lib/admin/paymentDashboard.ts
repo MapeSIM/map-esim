@@ -10,33 +10,47 @@ import {
   Prisma,
 } from "@prisma/client";
 import { maskAdminEmail } from "@/app/lib/admin/display";
+import {
+  buildAdminWalletPurchaseReconciliationHref,
+  isAdminWalletReconciliationLinkApplicable,
+} from "@/app/lib/admin/adminWalletReservationDisplay";
 import { formatUtcTimestamp } from "@/app/lib/admin/operationsHealthShared";
 import {
   ADMIN_PAYMENTS_PAGE_SIZE,
   ADMIN_PAYMENTS_PAGE_SIZE_MAX,
   isPaymentDashboardPendingAttemptStatus,
+  normalizePaymentDashboardDateRange,
+  parsePaymentDashboardOwnerFilter,
   parsePaymentDashboardPage,
   parsePaymentDashboardProviderFilter,
   parsePaymentDashboardSearch,
   parsePaymentDashboardStatusFilter,
   parsePaymentDashboardWebhookFilter,
   paymentAttemptStatusesForFilter,
+  paymentDashboardAttemptHref,
   paymentDashboardInquiryPlaceholder,
-  paymentDashboardMethodPlaceholder,
+  paymentDashboardOwnerLabel,
   paymentDashboardWebhookLabel,
   formatAdminPaymentChargeLabel,
+  type PaymentDashboardOwnerFilter,
   type PaymentDashboardProviderFilter,
   type PaymentDashboardStatusFilter,
   type PaymentDashboardWebhookFilter,
 } from "@/app/lib/admin/paymentDashboardShared";
 import { countPaymentRecoveryCandidates } from "@/app/lib/admin/paymentRecovery";
+import {
+  isPaymentRecoveryStaleReleaseEligible,
+  parsePaymentRecoveryStaleMs,
+} from "@/app/lib/admin/paymentRecoveryShared";
 import { prisma } from "@/app/lib/db";
 import { formatUsdCents } from "@/app/lib/wallet/display";
 import { maskSafepayTrackerRef } from "@/app/lib/payments/safepayReporterParse";
 
 export type AdminPaymentDashboardKpis = {
+  totalCount: number;
   pendingCount: number;
-  failedLast24hCount: number;
+  failedCount: number;
+  completedCount: number;
   webhookMissingAmongPendingCount: number;
   recoveryCandidateCount: number;
 };
@@ -45,6 +59,8 @@ export type AdminPaymentListRow = {
   attemptId: string;
   purchaseId: string;
   orderId: string | null;
+  ownerKind: "customer" | "partner";
+  ownerLabel: string;
   customerLabel: string;
   customerHref: string | null;
   amountLabel: string;
@@ -59,7 +75,14 @@ export type AdminPaymentListRow = {
   inquiryLabel: string;
   createdAtLabel: string;
   updatedAtLabel: string;
+  createdAt: Date;
+  updatedAt: Date;
   href: string;
+  /** Existing detail release form — no new mutation. */
+  staleReleaseEligible: boolean;
+  staleReleaseHref: string | null;
+  /** Existing stuck-case page — customer only when status-gated. */
+  reconciliationHref: string | null;
 };
 
 export type AdminPaymentDetail = {
@@ -100,6 +123,15 @@ export type AdminPaymentDetail = {
   isSimpaisa: boolean;
 };
 
+type AttemptFilterInput = {
+  status: PaymentDashboardStatusFilter;
+  provider: PaymentDashboardProviderFilter;
+  webhook: PaymentDashboardWebhookFilter;
+  q: string;
+  createdFrom: Date | null;
+  createdTo: Date | null;
+};
+
 function customerLabelFrom(user: {
   id: string;
   name: string | null;
@@ -107,6 +139,16 @@ function customerLabelFrom(user: {
 } | null): string {
   if (!user) return "Not available";
   const name = (user.name ?? "").trim() || "Customer";
+  return `${name} · ${maskAdminEmail(user.email)}`;
+}
+
+function partnerLabelFrom(user: {
+  id: string;
+  name: string | null;
+  email: string | null;
+} | null): string {
+  if (!user) return "Partner unavailable";
+  const name = (user.name ?? "").trim() || "Partner";
   return `${name} · ${maskAdminEmail(user.email)}`;
 }
 
@@ -124,34 +166,54 @@ function chargeLabelFrom(
   return formatAdminPaymentChargeLabel(chargeAmountMinor, chargeCurrency);
 }
 
-function buildWhere(input: {
-  status: PaymentDashboardStatusFilter;
-  provider: PaymentDashboardProviderFilter;
-  webhook: PaymentDashboardWebhookFilter;
-  q: string;
-}): Prisma.EsimPurchasePaymentAttemptWhereInput {
-  const where: Prisma.EsimPurchasePaymentAttemptWhereInput = {};
+function commonAttemptFilterFields(
+  input: AttemptFilterInput
+): Pick<
+  Prisma.EsimPurchasePaymentAttemptWhereInput,
+  "status" | "gatewayProvider" | "webhookEventId" | "createdAt"
+> {
+  const fields: Pick<
+    Prisma.EsimPurchasePaymentAttemptWhereInput,
+    "status" | "gatewayProvider" | "webhookEventId" | "createdAt"
+  > = {};
 
   const statuses = paymentAttemptStatusesForFilter(input.status);
   if (statuses) {
-    where.status = {
+    fields.status = {
       in: statuses as EsimPurchasePaymentAttemptStatus[],
     };
   }
 
   if (input.provider === "SIMPAISA") {
-    where.gatewayProvider = PaymentGatewayProvider.SIMPAISA;
+    fields.gatewayProvider = PaymentGatewayProvider.SIMPAISA;
   } else if (input.provider === "SAFEPAY") {
-    where.gatewayProvider = PaymentGatewayProvider.SAFEPAY;
+    fields.gatewayProvider = PaymentGatewayProvider.SAFEPAY;
   } else if (input.provider === "UNKNOWN") {
-    where.gatewayProvider = null;
+    fields.gatewayProvider = null;
   }
 
   if (input.webhook === "MISSING") {
-    where.webhookEventId = null;
+    fields.webhookEventId = null;
   } else if (input.webhook === "PRESENT") {
-    where.webhookEventId = { not: null };
+    fields.webhookEventId = { not: null };
   }
+
+  if (input.createdFrom || input.createdTo) {
+    fields.createdAt = {
+      ...(input.createdFrom ? { gte: input.createdFrom } : {}),
+      ...(input.createdTo ? { lte: input.createdTo } : {}),
+    };
+  }
+
+  return fields;
+}
+
+function buildCustomerWhere(
+  input: AttemptFilterInput
+): Prisma.EsimPurchasePaymentAttemptWhereInput {
+  const where: Prisma.EsimPurchasePaymentAttemptWhereInput = {
+    ...commonAttemptFilterFields(input),
+  };
 
   const q = input.q;
   if (q) {
@@ -172,7 +234,6 @@ function buildWhere(input: {
         },
       },
     ];
-    // Soft contains for longer email-like / partial ids (still capped).
     if (q.length >= 3 && q.includes("@")) {
       or.push({
         purchase: {
@@ -191,47 +252,102 @@ function buildWhere(input: {
   return where;
 }
 
-export async function getAdminPaymentDashboardKpis(): Promise<AdminPaymentDashboardKpis> {
-  const pendingStatuses = [
-    EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
-    EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING,
-    EsimPurchasePaymentAttemptStatus.RECONCILIATION_REQUIRED,
-  ];
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+function buildPartnerWhere(
+  input: AttemptFilterInput
+): Prisma.PartnerEsimPurchasePaymentAttemptWhereInput {
+  const where: Prisma.PartnerEsimPurchasePaymentAttemptWhereInput = {
+    ...commonAttemptFilterFields(input),
+  };
+  const q = input.q;
+  if (q) {
+    const or: Prisma.PartnerEsimPurchasePaymentAttemptWhereInput[] = [
+      { id: { equals: q } },
+      { purchaseId: { equals: q } },
+      { gatewayPaymentRef: { equals: q } },
+      {
+        purchase: {
+          orderId: { equals: q },
+        },
+      },
+      {
+        purchase: {
+          partner: {
+            user: {
+              email: { equals: q, mode: "insensitive" },
+            },
+          },
+        },
+      },
+    ];
+    if (q.length >= 3 && q.includes("@")) {
+      or.push({
+        purchase: {
+          partner: {
+            user: {
+              email: { contains: q, mode: "insensitive" },
+            },
+          },
+        },
+      });
+    } else if (q.length >= 6) {
+      or.push({ id: { contains: q } });
+      or.push({ purchaseId: { contains: q } });
+    }
+    where.OR = or;
+  }
 
+  return where;
+}
+
+const PENDING_STATUSES: EsimPurchasePaymentAttemptStatus[] = [
+  EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
+  EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING,
+  EsimPurchasePaymentAttemptStatus.RECONCILIATION_REQUIRED,
+];
+
+export async function getAdminPaymentDashboardKpis(): Promise<AdminPaymentDashboardKpis> {
   const [
-    pendingCount,
-    failedLast24hCount,
-    webhookMissingAmongPendingCount,
+    customerTotal,
+    partnerTotal,
+    customerPending,
+    partnerPending,
+    customerFailed,
+    partnerFailed,
+    customerCompleted,
+    partnerCompleted,
+    customerWebhookMissing,
+    partnerWebhookMissing,
     recoveryCandidateCount,
   ] = await Promise.all([
+    prisma.esimPurchasePaymentAttempt.count(),
+    prisma.partnerEsimPurchasePaymentAttempt.count(),
     prisma.esimPurchasePaymentAttempt.count({
-      where: { status: { in: pendingStatuses } },
+      where: { status: { in: PENDING_STATUSES } },
+    }),
+    prisma.partnerEsimPurchasePaymentAttempt.count({
+      where: { status: { in: PENDING_STATUSES } },
+    }),
+    prisma.esimPurchasePaymentAttempt.count({
+      where: { status: EsimPurchasePaymentAttemptStatus.FAILED },
+    }),
+    prisma.partnerEsimPurchasePaymentAttempt.count({
+      where: { status: EsimPurchasePaymentAttemptStatus.FAILED },
+    }),
+    prisma.esimPurchasePaymentAttempt.count({
+      where: { status: EsimPurchasePaymentAttemptStatus.PAYMENT_CONFIRMED },
+    }),
+    prisma.partnerEsimPurchasePaymentAttempt.count({
+      where: { status: EsimPurchasePaymentAttemptStatus.PAYMENT_CONFIRMED },
     }),
     prisma.esimPurchasePaymentAttempt.count({
       where: {
-        status: {
-          in: [
-            EsimPurchasePaymentAttemptStatus.FAILED,
-            EsimPurchasePaymentAttemptStatus.CANCELLED,
-          ],
-        },
-        OR: [
-          { failedAt: { gte: since } },
-          { cancelledAt: { gte: since } },
-          {
-            AND: [
-              { failedAt: null },
-              { cancelledAt: null },
-              { updatedAt: { gte: since } },
-            ],
-          },
-        ],
+        status: { in: PENDING_STATUSES },
+        webhookEventId: null,
       },
     }),
-    prisma.esimPurchasePaymentAttempt.count({
+    prisma.partnerEsimPurchasePaymentAttempt.count({
       where: {
-        status: { in: pendingStatuses },
+        status: { in: PENDING_STATUSES },
         webhookEventId: null,
       },
     }),
@@ -239,18 +355,45 @@ export async function getAdminPaymentDashboardKpis(): Promise<AdminPaymentDashbo
   ]);
 
   return {
-    pendingCount,
-    failedLast24hCount,
-    webhookMissingAmongPendingCount,
+    totalCount: customerTotal + partnerTotal,
+    pendingCount: customerPending + partnerPending,
+    failedCount: customerFailed + partnerFailed,
+    completedCount: customerCompleted + partnerCompleted,
+    webhookMissingAmongPendingCount:
+      customerWebhookMissing + partnerWebhookMissing,
     recoveryCandidateCount,
   };
 }
+
+type MergedListRow = {
+  ownerKind: "customer" | "partner";
+  attemptId: string;
+  purchaseId: string;
+  orderId: string | null;
+  status: string;
+  purchaseStatus: string;
+  gatewayProvider: PaymentGatewayProvider | null;
+  gatewayAmountCents: number;
+  currency: string;
+  chargeAmountMinor: number | null;
+  chargeCurrency: string | null;
+  gatewayPaymentRef: string | null;
+  webhookEventId: string | null;
+  expiresAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  ownerUser: { id: string; name: string | null; email: string | null } | null;
+  ownerProfileId: string | null;
+};
 
 export async function listAdminPayments(input: {
   q?: string | null;
   status?: string | null;
   provider?: string | null;
   webhook?: string | null;
+  owner?: string | null;
+  from?: string | null;
+  to?: string | null;
   page?: string | null;
 }): Promise<{
   rows: AdminPaymentListRow[];
@@ -259,6 +402,9 @@ export async function listAdminPayments(input: {
   status: PaymentDashboardStatusFilter;
   provider: PaymentDashboardProviderFilter;
   webhook: PaymentDashboardWebhookFilter;
+  owner: PaymentDashboardOwnerFilter;
+  from: string;
+  to: string;
   page: number;
   pageSize: number;
   totalCount: number;
@@ -268,78 +414,231 @@ export async function listAdminPayments(input: {
   const status = parsePaymentDashboardStatusFilter(input.status);
   const provider = parsePaymentDashboardProviderFilter(input.provider);
   const webhook = parsePaymentDashboardWebhookFilter(input.webhook);
+  const owner = parsePaymentDashboardOwnerFilter(input.owner);
+  const range = normalizePaymentDashboardDateRange(input.from, input.to);
   const page = parsePaymentDashboardPage(input.page);
   const pageSize = ADMIN_PAYMENTS_PAGE_SIZE;
   const take = Math.min(pageSize, ADMIN_PAYMENTS_PAGE_SIZE_MAX);
   const skip = (page - 1) * take;
 
-  const where = buildWhere({ status, provider, webhook, q: search });
+  const filterInput: AttemptFilterInput = {
+    status,
+    provider,
+    webhook,
+    q: search,
+    createdFrom: range.from,
+    createdTo: range.to,
+  };
 
-  const [totalCount, rows, kpis] = await Promise.all([
-    prisma.esimPurchasePaymentAttempt.count({ where }),
-    prisma.esimPurchasePaymentAttempt.findMany({
-      where,
-      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
-      skip,
-      take,
-      select: {
-        id: true,
-        purchaseId: true,
-        status: true,
-        gatewayProvider: true,
-        gatewayAmountCents: true,
-        currency: true,
-        chargeAmountMinor: true,
-        chargeCurrency: true,
-        gatewayPaymentRef: true,
-        webhookEventId: true,
-        createdAt: true,
-        updatedAt: true,
-        purchase: {
+  const includeCustomer = owner === "ALL" || owner === "CUSTOMER";
+  const includePartner = owner === "ALL" || owner === "PARTNER";
+  const customerWhere = buildCustomerWhere(filterInput);
+  const partnerWhere = buildPartnerWhere(filterInput);
+  const overFetch = skip + take;
+  const nowMs = Date.now();
+  const staleMs = parsePaymentRecoveryStaleMs();
+
+  const [
+    customerCount,
+    partnerCount,
+    customerRows,
+    partnerRows,
+    kpis,
+  ] = await Promise.all([
+    includeCustomer
+      ? prisma.esimPurchasePaymentAttempt.count({ where: customerWhere })
+      : Promise.resolve(0),
+    includePartner
+      ? prisma.partnerEsimPurchasePaymentAttempt.count({ where: partnerWhere })
+      : Promise.resolve(0),
+    includeCustomer
+      ? prisma.esimPurchasePaymentAttempt.findMany({
+          where: customerWhere,
+          orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+          take: overFetch,
           select: {
+            id: true,
+            purchaseId: true,
             status: true,
-            orderId: true,
-            customer: {
-              select: { id: true, name: true, email: true },
+            gatewayProvider: true,
+            gatewayAmountCents: true,
+            currency: true,
+            chargeAmountMinor: true,
+            chargeCurrency: true,
+            gatewayPaymentRef: true,
+            webhookEventId: true,
+            expiresAt: true,
+            createdAt: true,
+            updatedAt: true,
+            purchase: {
+              select: {
+                status: true,
+                orderId: true,
+                customer: {
+                  select: { id: true, name: true, email: true },
+                },
+              },
             },
           },
-        },
-      },
-    }),
+        })
+      : Promise.resolve([]),
+    includePartner
+      ? prisma.partnerEsimPurchasePaymentAttempt.findMany({
+          where: partnerWhere,
+          orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+          take: overFetch,
+          select: {
+            id: true,
+            purchaseId: true,
+            status: true,
+            gatewayProvider: true,
+            gatewayAmountCents: true,
+            currency: true,
+            chargeAmountMinor: true,
+            chargeCurrency: true,
+            gatewayPaymentRef: true,
+            webhookEventId: true,
+            expiresAt: true,
+            createdAt: true,
+            updatedAt: true,
+            purchase: {
+              select: {
+                status: true,
+                orderId: true,
+                partner: {
+                  select: {
+                    id: true,
+                    user: { select: { id: true, name: true, email: true } },
+                  },
+                },
+              },
+            },
+          },
+        })
+      : Promise.resolve([]),
     getAdminPaymentDashboardKpis(),
   ]);
 
+  const merged: MergedListRow[] = [
+    ...customerRows.map((row) => {
+      const purchase = row.purchase ?? null;
+      return {
+        ownerKind: "customer" as const,
+        attemptId: row.id,
+        purchaseId: row.purchaseId,
+        orderId: (purchase?.orderId ?? "").trim() || null,
+        status: row.status,
+        purchaseStatus: purchase?.status ?? "UNKNOWN",
+        gatewayProvider: row.gatewayProvider,
+        gatewayAmountCents: row.gatewayAmountCents,
+        currency: row.currency,
+        chargeAmountMinor: row.chargeAmountMinor,
+        chargeCurrency: row.chargeCurrency,
+        gatewayPaymentRef: row.gatewayPaymentRef,
+        webhookEventId: row.webhookEventId,
+        expiresAt: row.expiresAt,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        ownerUser: purchase?.customer ?? null,
+        ownerProfileId: purchase?.customer?.id ?? null,
+      };
+    }),
+    ...partnerRows.map((row) => {
+      const purchase = row.purchase ?? null;
+      const partner = purchase?.partner ?? null;
+      return {
+        ownerKind: "partner" as const,
+        attemptId: row.id,
+        purchaseId: row.purchaseId,
+        orderId: (purchase?.orderId ?? "").trim() || null,
+        status: row.status,
+        purchaseStatus: purchase?.status ?? "UNKNOWN",
+        gatewayProvider: row.gatewayProvider,
+        gatewayAmountCents: row.gatewayAmountCents,
+        currency: row.currency,
+        chargeAmountMinor: row.chargeAmountMinor,
+        chargeCurrency: row.chargeCurrency,
+        gatewayPaymentRef: row.gatewayPaymentRef,
+        webhookEventId: row.webhookEventId,
+        expiresAt: row.expiresAt,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        ownerUser: partner?.user ?? null,
+        ownerProfileId: partner?.id ?? null,
+      };
+    }),
+  ].sort((a, b) => {
+    const byUpdated = b.updatedAt.getTime() - a.updatedAt.getTime();
+    if (byUpdated !== 0) return byUpdated;
+    return b.attemptId.localeCompare(a.attemptId);
+  });
+
+  const totalCount = customerCount + partnerCount;
+  const pageSlice = merged.slice(skip, skip + take);
   const totalPages = Math.max(1, Math.ceil(totalCount / take));
 
   return {
-    rows: rows.map((row) => {
-      const customerId = (row.purchase.customer?.id ?? "").trim();
+    rows: pageSlice.map((row) => {
+      const profileId = (row.ownerProfileId ?? "").trim();
       const webhookEventIdPresent = Boolean(row.webhookEventId);
+      const providerLabel = providerLabelFrom(row.gatewayProvider);
+      const href = paymentDashboardAttemptHref(row.attemptId, row.ownerKind);
+      const staleReleaseEligible = isPaymentRecoveryStaleReleaseEligible({
+        status: row.status,
+        purchaseStatus: row.purchaseStatus,
+        webhookEventId: row.webhookEventId,
+        updatedAt: row.updatedAt,
+        expiresAt: row.expiresAt,
+        nowMs,
+        staleMs,
+      });
+      const showRecon =
+        row.ownerKind === "customer" &&
+        isAdminWalletReconciliationLinkApplicable({
+          purchaseStatus: row.purchaseStatus,
+          attemptStatus: row.status,
+        });
       return {
-        attemptId: row.id,
+        attemptId: row.attemptId,
         purchaseId: row.purchaseId,
-        orderId: (row.purchase.orderId ?? "").trim() || null,
-        customerLabel: customerLabelFrom(row.purchase.customer),
+        orderId: row.orderId,
+        ownerKind: row.ownerKind,
+        ownerLabel: paymentDashboardOwnerLabel(row.ownerKind),
+        customerLabel:
+          row.ownerKind === "partner"
+            ? partnerLabelFrom(row.ownerUser)
+            : customerLabelFrom(row.ownerUser),
         customerHref:
-          customerId && customerId.length <= 64
-            ? `/admin/customers/${encodeURIComponent(customerId)}`
+          profileId && profileId.length <= 64
+            ? row.ownerKind === "partner"
+              ? `/admin/partners/${encodeURIComponent(profileId)}`
+              : `/admin/customers/${encodeURIComponent(profileId)}`
             : null,
         amountLabel: `${formatUsdCents(row.gatewayAmountCents)} ${row.currency}`,
         chargeLabel: chargeLabelFrom(
           row.chargeAmountMinor,
           row.chargeCurrency
         ),
-        providerLabel: providerLabelFrom(row.gatewayProvider),
-        methodLabel: paymentDashboardMethodPlaceholder(),
+        providerLabel,
+        methodLabel: providerLabel,
         attemptStatus: row.status,
-        purchaseStatus: row.purchase.status,
+        purchaseStatus: row.purchaseStatus,
         providerRefMasked: maskSafepayTrackerRef(row.gatewayPaymentRef),
         webhookLabel: paymentDashboardWebhookLabel(webhookEventIdPresent),
         webhookEventIdPresent,
         inquiryLabel: paymentDashboardInquiryPlaceholder(),
         createdAtLabel: formatUtcTimestamp(row.createdAt),
         updatedAtLabel: formatUtcTimestamp(row.updatedAt),
-        href: `/admin/payments/${encodeURIComponent(row.id)}`,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        href,
+        staleReleaseEligible,
+        staleReleaseHref: staleReleaseEligible
+          ? `${href}#stale-release`
+          : null,
+        reconciliationHref: showRecon
+          ? buildAdminWalletPurchaseReconciliationHref(row.purchaseId)
+          : null,
       };
     }),
     kpis,
@@ -347,6 +646,9 @@ export async function listAdminPayments(input: {
     status,
     provider,
     webhook,
+    owner,
+    from: range.fromParam,
+    to: range.toParam,
     page,
     pageSize: take,
     totalCount,
@@ -410,6 +712,7 @@ export async function getAdminPaymentDetail(
       ).trim();
       const webhookEventIdPresent = Boolean(row.webhookEventId);
       const isSimpaisa = row.gatewayProvider === PaymentGatewayProvider.SIMPAISA;
+      const providerLabel = providerLabelFrom(row.gatewayProvider);
 
       return {
         attemptId: row.id,
@@ -423,8 +726,8 @@ export async function getAdminPaymentDetail(
             ? `/admin/customers/${encodeURIComponent(customerId)}`
             : null,
         gatewayProvider: row.gatewayProvider,
-        providerLabel: providerLabelFrom(row.gatewayProvider),
-        methodLabel: paymentDashboardMethodPlaceholder(),
+        providerLabel,
+        methodLabel: providerLabel,
         attemptStatus: row.status,
         purchaseStatus: purchase.status,
         gatewayAmountCents: row.gatewayAmountCents,
@@ -509,6 +812,7 @@ export async function getAdminPaymentDetail(
       const partnerUser = partner?.user ?? null;
       const webhookEventIdPresent = Boolean(row.webhookEventId);
       const isSimpaisa = row.gatewayProvider === PaymentGatewayProvider.SIMPAISA;
+      const providerLabel = providerLabelFrom(row.gatewayProvider);
 
       return {
         attemptId: row.id,
@@ -516,16 +820,14 @@ export async function getAdminPaymentDetail(
         orderId: (purchase.orderId ?? "").trim() || null,
         ownerKind: "partner",
         customerUserId: (partnerUser?.id ?? "").trim() || null,
-        customerLabel: partnerUser
-          ? `${(partnerUser.name ?? "").trim() || "Partner"} · ${maskAdminEmail(partnerUser.email)}`
-          : "Partner unavailable",
+        customerLabel: partnerLabelFrom(partnerUser),
         customerHref:
           partnerId && partnerId.length <= 64
             ? `/admin/partners/${encodeURIComponent(partnerId)}`
             : null,
         gatewayProvider: row.gatewayProvider,
-        providerLabel: providerLabelFrom(row.gatewayProvider),
-        methodLabel: paymentDashboardMethodPlaceholder(),
+        providerLabel,
+        methodLabel: providerLabel,
         attemptStatus: row.status,
         purchaseStatus: purchase.status,
         gatewayAmountCents: row.gatewayAmountCents,

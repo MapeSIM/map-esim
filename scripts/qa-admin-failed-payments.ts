@@ -1,5 +1,5 @@
 /**
- * Offline QA: admin failed/cancelled payment-attempt inbox (Phase 2B Fix #1).
+ * Offline QA: admin failed/cancelled payment-attempt inbox (Phase 2B Fix #1 + Phase 3 partner parity).
  * Display mapping and source checks only — no payment apply, VeSIM, or DB writes.
  */
 import assert from "node:assert/strict";
@@ -52,12 +52,15 @@ function main() {
 
   assert.match(page, /requireRole\("ADMIN"\)/);
   assert.match(page, /listFailedGatewayPaymentAttempts/);
-  assert.match(page, /customerLabel/);
+  assert.match(page, /partyLabel|customerLabel/);
   assert.match(page, /planLabel/);
   assert.match(page, /amountLabel/);
   assert.match(page, /statusLabel/);
   assert.match(page, /failureReason/);
-  assert.match(page, /occurredAtLabel/);
+  assert.match(page, /occurredAtLabel|createdAtLabel/);
+  assert.match(page, /ownerKind/);
+  assert.match(page, /providerLabel/);
+  assert.match(page, /detailHref/);
   assert.match(page, /ADMIN_UX_PAGE\.failedPayments|Read-only|read-only/);
   assert.doesNotMatch(page, /verifyPendingGatewayPayment|applyVerifiedEsimPurchasePaymentEvent/);
   assert.doesNotMatch(page, /fulfillFundedEsimPurchase|PAYMENT_GATEWAY_ENABLED/);
@@ -65,9 +68,12 @@ function main() {
 
   assert.match(reader, /EsimPurchasePaymentAttemptStatus\.FAILED/);
   assert.match(reader, /EsimPurchasePaymentAttemptStatus\.CANCELLED/);
-  assert.match(reader, /customerLabelFrom/);
+  assert.match(reader, /partyLabelFrom|customerLabelFrom/);
   assert.match(reader, /formatFailedPaymentReason/);
   assert.match(reader, /maskAdminEmail/);
+  assert.match(reader, /partnerEsimPurchasePaymentAttempt/);
+  assert.match(reader, /ownerKind/);
+  assert.match(reader, /kind=partner|paymentDashboardAttemptHref/);
   assert.doesNotMatch(reader, /EXPIRED/);
   assert.doesNotMatch(reader, /\.update\(|\.delete\(|deleteMany/);
   assert.doesNotMatch(reader, /applyVerifiedEsimPurchasePaymentEvent|fulfillFundedEsimPurchase/);
@@ -78,17 +84,23 @@ function main() {
   assert.match(nav, /href: "\/admin\/payments\/failed"/);
   assert.match(nav, /ADMIN_UX_NAV\.failedPayments|label: "Failed Payments"/);
   assert.match(pendingPage, /\/admin\/payments\/failed/);
+  assert.match(pendingPage, /ownerKind/);
+  assert.match(pendingPage, /detailHref/);
+  assert.match(pendingPage, /partner|Partner/);
   assert.match(pkg, /qa:admin-failed-payments/);
   const pendingVerify = read("app/lib/admin/pendingPaymentVerify.ts");
   const listPending = pendingVerify.slice(
     pendingVerify.indexOf("export async function listPendingGatewayPaymentAttempts")
   );
   assert.match(listPending, /AWAITING_PAYMENT/);
+  assert.match(listPending, /partnerEsimPurchasePaymentAttempt/);
+  assert.match(listPending, /ownerKind/);
+  assert.match(listPending, /kind=partner|paymentDashboardAttemptHref/);
   assert.doesNotMatch(
     listPending.slice(0, listPending.indexOf("export async function getPendingGatewayPaymentAttemptDetail")),
     /FAILED|CANCELLED/
   );
-  console.log("PASS pending_list_unchanged");
+  console.log("PASS pending_list_partner_parity_readonly");
 
   console.log("ALL_QA_PASSED=admin-failed-payments");
 }

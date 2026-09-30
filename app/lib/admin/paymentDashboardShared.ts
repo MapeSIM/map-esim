@@ -40,6 +40,15 @@ export const PAYMENT_DASHBOARD_WEBHOOK_FILTERS = [
 export type PaymentDashboardWebhookFilter =
   (typeof PAYMENT_DASHBOARD_WEBHOOK_FILTERS)[number];
 
+export const PAYMENT_DASHBOARD_OWNER_FILTERS = [
+  "ALL",
+  "CUSTOMER",
+  "PARTNER",
+] as const;
+
+export type PaymentDashboardOwnerFilter =
+  (typeof PAYMENT_DASHBOARD_OWNER_FILTERS)[number];
+
 /** Attempt statuses treated as in-flight / pending for hub default + KPIs. */
 export const PAYMENT_DASHBOARD_PENDING_ATTEMPT_STATUSES = [
   "AWAITING_PAYMENT",
@@ -98,6 +107,18 @@ export function parsePaymentDashboardWebhookFilter(
   return "ALL";
 }
 
+export function parsePaymentDashboardOwnerFilter(
+  raw: string | null | undefined
+): PaymentDashboardOwnerFilter {
+  const value = String(raw ?? "")
+    .trim()
+    .toUpperCase();
+  if ((PAYMENT_DASHBOARD_OWNER_FILTERS as readonly string[]).includes(value)) {
+    return value as PaymentDashboardOwnerFilter;
+  }
+  return "ALL";
+}
+
 export function parsePaymentDashboardSearch(
   raw: string | null | undefined
 ): string {
@@ -113,6 +134,63 @@ export function parsePaymentDashboardPage(
   const n = Number.parseInt(String(raw ?? "1"), 10);
   if (!Number.isFinite(n) || n < 1) return 1;
   return Math.min(n, 1000);
+}
+
+/**
+ * Parse HTML date input (YYYY-MM-DD) into a UTC day bound.
+ * `bound: "start"` → 00:00:00.000Z; `bound: "end"` → 23:59:59.999Z.
+ */
+export function parsePaymentDashboardDateBound(
+  raw: string | null | undefined,
+  bound: "start" | "end"
+): Date | null {
+  const value = String(raw ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [y, m, d] = value.split("-").map((part) => Number.parseInt(part, 10));
+  if (
+    !Number.isFinite(y) ||
+    !Number.isFinite(m) ||
+    !Number.isFinite(d) ||
+    m < 1 ||
+    m > 12 ||
+    d < 1 ||
+    d > 31
+  ) {
+    return null;
+  }
+  if (bound === "start") {
+    return new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
+  }
+  return new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999));
+}
+
+/** Normalize from/to so an inverted range still produces a valid window. */
+export function normalizePaymentDashboardDateRange(
+  fromRaw: string | null | undefined,
+  toRaw: string | null | undefined
+): { from: Date | null; to: Date | null; fromParam: string; toParam: string } {
+  const fromParam = String(fromRaw ?? "").trim().slice(0, 10);
+  const toParam = String(toRaw ?? "").trim().slice(0, 10);
+  let from = parsePaymentDashboardDateBound(fromParam, "start");
+  let to = parsePaymentDashboardDateBound(toParam, "end");
+  if (from && to && from.getTime() > to.getTime()) {
+    const swappedFrom = parsePaymentDashboardDateBound(toParam, "start");
+    const swappedTo = parsePaymentDashboardDateBound(fromParam, "end");
+    from = swappedFrom;
+    to = swappedTo;
+    return {
+      from,
+      to,
+      fromParam: toParam,
+      toParam: fromParam,
+    };
+  }
+  return {
+    from,
+    to,
+    fromParam: from ? fromParam : "",
+    toParam: to ? toParam : "",
+  };
 }
 
 export function paymentAttemptStatusesForFilter(
@@ -157,6 +235,22 @@ export function paymentDashboardMethodPlaceholder(): string {
   return "—";
 }
 
+export function paymentDashboardOwnerLabel(
+  ownerKind: "customer" | "partner"
+): string {
+  return ownerKind === "partner" ? "Partner" : "Customer";
+}
+
+export function paymentDashboardAttemptHref(
+  attemptId: string,
+  ownerKind: "customer" | "partner"
+): string {
+  const id = encodeURIComponent(attemptId);
+  return ownerKind === "partner"
+    ? `/admin/payments/${id}?kind=partner`
+    : `/admin/payments/${id}`;
+}
+
 /**
  * Admin UI only: format gateway charge minor units (e.g. PKR paisa, USD cents)
  * as major units. Example: 300 + "PKR" → "3.00 PKR".
@@ -183,6 +277,9 @@ export function buildAdminPaymentsHref(options: {
   status?: string;
   provider?: string;
   webhook?: string;
+  owner?: string;
+  from?: string;
+  to?: string;
   page?: number;
 }): string {
   const params = new URLSearchParams();
@@ -190,6 +287,8 @@ export function buildAdminPaymentsHref(options: {
   const status = parsePaymentDashboardStatusFilter(options.status);
   const provider = parsePaymentDashboardProviderFilter(options.provider);
   const webhook = parsePaymentDashboardWebhookFilter(options.webhook);
+  const owner = parsePaymentDashboardOwnerFilter(options.owner);
+  const range = normalizePaymentDashboardDateRange(options.from, options.to);
   const page =
     typeof options.page === "number" && Number.isFinite(options.page)
       ? Math.max(1, Math.floor(options.page))
@@ -200,6 +299,9 @@ export function buildAdminPaymentsHref(options: {
   if (status !== "PENDING") params.set("status", status);
   if (provider !== "ALL") params.set("provider", provider);
   if (webhook !== "ALL") params.set("webhook", webhook);
+  if (owner !== "ALL") params.set("owner", owner);
+  if (range.fromParam) params.set("from", range.fromParam);
+  if (range.toParam) params.set("to", range.toParam);
   if (page > 1) params.set("page", String(page));
 
   const qs = params.toString();

@@ -15,6 +15,7 @@ import {
   buildAdminPaymentRecoveryHref,
   formatPaymentRecoveryAge,
   isPaymentRecoveryCandidate,
+  isPaymentRecoveryStaleReleaseEligible,
   parsePaymentRecoveryStaleMs,
   paymentRecoveryDecisionLabel,
   suggestPaymentRecoverySafeAction,
@@ -137,6 +138,39 @@ function main() {
       gatewayPaymentRef: "txn-1",
       webhookEventId: null,
       updatedAt: fresh,
+      nowMs: now,
+      staleMs: PAYMENT_RECOVERY_STALE_MS_DEFAULT,
+    }),
+    false
+  );
+  assert.equal(
+    isPaymentRecoveryStaleReleaseEligible({
+      status: "PAYMENT_PENDING",
+      purchaseStatus: "AWAITING_GATEWAY_PAYMENT",
+      webhookEventId: null,
+      updatedAt: staleOk,
+      nowMs: now,
+      staleMs: PAYMENT_RECOVERY_STALE_MS_DEFAULT,
+    }),
+    true
+  );
+  assert.equal(
+    isPaymentRecoveryStaleReleaseEligible({
+      status: "PAYMENT_PENDING",
+      purchaseStatus: "AWAITING_GATEWAY_PAYMENT",
+      webhookEventId: "evt-1",
+      updatedAt: staleOk,
+      nowMs: now,
+      staleMs: PAYMENT_RECOVERY_STALE_MS_DEFAULT,
+    }),
+    false
+  );
+  assert.equal(
+    isPaymentRecoveryStaleReleaseEligible({
+      status: "PAYMENT_CONFIRMED",
+      purchaseStatus: "AWAITING_GATEWAY_PAYMENT",
+      webhookEventId: null,
+      updatedAt: staleOk,
       nowMs: now,
       staleMs: PAYMENT_RECOVERY_STALE_MS_DEFAULT,
     }),

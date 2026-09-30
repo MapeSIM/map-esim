@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PaymentListRowActions } from "@/app/components/admin/PaymentListRowActions";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   ADMIN_UX_NAV,
@@ -38,6 +39,9 @@ export default async function AdminPaymentsHubPage({
     status?: string;
     provider?: string;
     webhook?: string;
+    owner?: string;
+    from?: string;
+    to?: string;
     page?: string;
   }>;
 }) {
@@ -51,6 +55,9 @@ export default async function AdminPaymentsHubPage({
       status: params.status,
       provider: params.provider,
       webhook: params.webhook,
+      owner: params.owner,
+      from: params.from,
+      to: params.to,
       page: params.page,
     });
   } catch {
@@ -69,6 +76,9 @@ export default async function AdminPaymentsHubPage({
     status: data.status,
     provider: data.provider,
     webhook: data.webhook,
+    owner: data.owner,
+    from: data.from,
+    to: data.to,
   };
 
   return (
@@ -111,14 +121,24 @@ export default async function AdminPaymentsHubPage({
 
       <section aria-label="Payment KPIs" className={ADMIN_KPI_GRID_CLASS}>
         <AdminKpiCard
+          label="Total payments"
+          value={data.kpis.totalCount}
+          href={buildAdminPaymentsHref({ status: "ALL" })}
+        />
+        <AdminKpiCard
           label="Pending"
           value={data.kpis.pendingCount}
           href={buildAdminPaymentsHref({ status: "PENDING" })}
         />
         <AdminKpiCard
-          label="Failed / cancelled (24h)"
-          value={data.kpis.failedLast24hCount}
-          href="/admin/payments/failed"
+          label="Failed"
+          value={data.kpis.failedCount}
+          href={buildAdminPaymentsHref({ status: "FAILED" })}
+        />
+        <AdminKpiCard
+          label="Completed"
+          value={data.kpis.completedCount}
+          href={buildAdminPaymentsHref({ status: "CONFIRMED" })}
         />
         <AdminKpiCard
           label="Webhook missing (pending)"
@@ -142,7 +162,7 @@ export default async function AdminPaymentsHubPage({
             name="q"
             defaultValue={data.search}
             maxLength={100}
-            placeholder="Attempt, purchase, order id, or customer email"
+            placeholder="Attempt, purchase, order id, or email"
             className={adminFilterControlClassName}
           />
         </AdminFilterField>
@@ -163,6 +183,18 @@ export default async function AdminPaymentsHubPage({
             </option>
             <option value="OTHER">{adminFilterStatusLabel("OTHER")}</option>
             <option value="ALL">{adminFilterStatusLabel("ALL")}</option>
+          </select>
+        </AdminFilterField>
+
+        <AdminFilterField label="Owner">
+          <select
+            name="owner"
+            defaultValue={data.owner}
+            className={adminFilterControlClassName}
+          >
+            <option value="ALL">All owners</option>
+            <option value="CUSTOMER">Customer</option>
+            <option value="PARTNER">Partner</option>
           </select>
         </AdminFilterField>
 
@@ -191,6 +223,24 @@ export default async function AdminPaymentsHubPage({
           </select>
         </AdminFilterField>
 
+        <AdminFilterField label="From date">
+          <input
+            type="date"
+            name="from"
+            defaultValue={data.from}
+            className={adminFilterControlClassName}
+          />
+        </AdminFilterField>
+
+        <AdminFilterField label="To date">
+          <input
+            type="date"
+            name="to"
+            defaultValue={data.to}
+            className={adminFilterControlClassName}
+          />
+        </AdminFilterField>
+
         <div className="flex flex-wrap items-end gap-2 sm:col-span-2 lg:col-span-4">
           <AdminButton type="submit" variant="primary">
             Apply filters
@@ -203,7 +253,7 @@ export default async function AdminPaymentsHubPage({
 
       <p className={ADMIN_SOFT_COPY_CLASS}>
         Showing {data.rows.length} of {data.totalCount} · page {data.page} /{" "}
-        {data.totalPages}
+        {data.totalPages} · customer + partner gateway attempts
       </p>
 
       {data.rows.length === 0 ? (
@@ -216,22 +266,26 @@ export default async function AdminPaymentsHubPage({
           opening Verify Pending / Stale Unpaid Holds.
         </AdminEmptyState>
       ) : (
-        <AdminTableShell caption="Payment attempts" minWidthClassName="min-w-[900px]">
+        <AdminTableShell
+          caption="Payment attempts"
+          minWidthClassName="min-w-[1040px]"
+        >
           <AdminTableHead>
             <tr>
-              <th className="px-3 py-3 font-semibold">Payment</th>
-              <th className="px-3 py-3 font-semibold">Customer</th>
+              <th className="px-3 py-3 font-semibold">Payment ID</th>
+              <th className="px-3 py-3 font-semibold">Owner</th>
+              <th className="px-3 py-3 font-semibold">Customer / Partner</th>
               <th className="px-3 py-3 font-semibold">Amount</th>
               <th className="px-3 py-3 font-semibold">Provider</th>
               <th className="px-3 py-3 font-semibold">Status</th>
-              <th className="px-3 py-3 font-semibold">Webhook</th>
+              <th className="px-3 py-3 font-semibold">Created</th>
               <th className="px-3 py-3 font-semibold">Updated</th>
-              <th className="px-3 py-3 font-semibold"> </th>
+              <th className="px-3 py-3 font-semibold">Action</th>
             </tr>
           </AdminTableHead>
           <AdminTableBody>
             {data.rows.map((row) => (
-              <tr key={row.attemptId}>
+              <tr key={`${row.ownerKind}-${row.attemptId}`}>
                 <td className="px-3 py-3 align-top">
                   <p className="break-all font-medium text-[var(--heading)]">
                     {row.attemptId}
@@ -240,9 +294,11 @@ export default async function AdminPaymentsHubPage({
                     purchase {row.purchaseId}
                     {row.orderId ? ` · order ${row.orderId}` : ""}
                   </p>
-                  <p className="text-xs text-[var(--text-soft)]">
-                    ref {row.providerRefMasked}
-                  </p>
+                </td>
+                <td className="px-3 py-3 align-top">
+                  <AdminStatusPill value={row.ownerKind}>
+                    {row.ownerLabel}
+                  </AdminStatusPill>
                 </td>
                 <td className="px-3 py-3 align-top text-[var(--text-muted)]">
                   {row.customerHref ? (
@@ -263,9 +319,6 @@ export default async function AdminPaymentsHubPage({
                       charge {row.chargeLabel}
                     </p>
                   ) : null}
-                  <p className="text-xs text-[var(--text-soft)]">
-                    method {row.methodLabel}
-                  </p>
                 </td>
                 <td className="px-3 py-3 align-top text-[var(--heading)]">
                   {row.providerLabel}
@@ -277,23 +330,20 @@ export default async function AdminPaymentsHubPage({
                   <p className="mt-1 text-xs text-[var(--text-soft)]">
                     purchase {adminHumanStatusLabel(row.purchaseStatus)}
                   </p>
-                  <p className="text-xs text-[var(--text-soft)]">
-                    inquiry {row.inquiryLabel}
-                  </p>
                 </td>
-                <td className="px-3 py-3 align-top text-[var(--heading)]">
-                  {adminHumanStatusLabel(row.webhookLabel)}
+                <td className="whitespace-nowrap px-3 py-3 align-top text-xs text-[var(--text-soft)]">
+                  {row.createdAtLabel}
                 </td>
-                <td className="px-3 py-3 align-top text-xs text-[var(--text-soft)]">
-                  <p>{row.updatedAtLabel}</p>
-                  <p>created {row.createdAtLabel}</p>
+                <td className="whitespace-nowrap px-3 py-3 align-top text-xs text-[var(--text-soft)]">
+                  {row.updatedAtLabel}
                 </td>
                 <td className="px-3 py-3 align-top">
-                  <AdminButton href={row.href} variant="primary" size="sm">
-                    Open
-                  </AdminButton>
-                </td>
-              </tr>
+                  <PaymentListRowActions
+                    detailHref={row.href}
+                    staleReleaseHref={row.staleReleaseHref}
+                    reconciliationHref={row.reconciliationHref}
+                  />
+                </td>              </tr>
             ))}
           </AdminTableBody>
         </AdminTableShell>

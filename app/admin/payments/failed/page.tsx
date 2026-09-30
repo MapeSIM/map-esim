@@ -37,6 +37,12 @@ export default async function AdminFailedPaymentsPage() {
       <AdminPageHeader
         title={ADMIN_UX_PAGE.failedPayments.title}
         description={ADMIN_UX_PAGE.failedPayments.description}
+        meta={
+          <>
+            Customer and Partner gateway attempts · read-only — does not cancel,
+            refund, or mark a purchase funded.
+          </>
+        }
         actions={
           <>
             <AdminButton href="/admin/payments" variant="ghost" size="sm">
@@ -71,19 +77,28 @@ export default async function AdminFailedPaymentsPage() {
       ) : (
         <ul className="space-y-3">
           {rows.map((row) => (
-            <li key={row.attemptId} className={ADMIN_LIST_CARD_CLASS}>
+            <li
+              key={`${row.ownerKind}-${row.attemptId}`}
+              className={ADMIN_LIST_CARD_CLASS}
+            >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
+                    <AdminStatusPill value={row.ownerKind}>
+                      {row.ownerLabel}
+                    </AdminStatusPill>
                     <AdminStatusPill value={row.statusLabel}>
                       {row.statusLabel}
                     </AdminStatusPill>
                     <span className="font-semibold text-[var(--heading)]">
                       {row.amountLabel}
                     </span>
+                    <span className="text-xs text-[var(--text-soft)]">
+                      {row.providerLabel}
+                    </span>
                   </div>
                   <p className="break-words text-[var(--text-muted)]">
-                    {row.customerLabel}
+                    {row.partyLabel}
                   </p>
                   <p className="break-words text-[var(--text-muted)]">
                     {row.planLabel}
@@ -92,20 +107,20 @@ export default async function AdminFailedPaymentsPage() {
                     Reason {row.failureReason}
                   </p>
                   <p className="break-all text-xs text-[var(--text-soft)]">
+                    Created {row.createdAtLabel} · occurred{" "}
                     {row.occurredAtLabel} · attempt {row.attemptId} · purchase{" "}
                     {row.purchaseId}
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 sm:items-end">
-                  <AdminButton
-                    href={`/admin/payments/${encodeURIComponent(row.attemptId)}`}
-                    variant="primary"
-                  >
+                  <AdminButton href={row.detailHref} variant="primary">
                     Open payment
                   </AdminButton>
-                  {row.customerHref ? (
-                    <AdminButton href={row.customerHref} variant="secondary">
-                      View customer
+                  {row.partyHref ? (
+                    <AdminButton href={row.partyHref} variant="secondary">
+                      {row.ownerKind === "partner"
+                        ? "View partner"
+                        : "View customer"}
                     </AdminButton>
                   ) : null}
                 </div>

@@ -26,7 +26,10 @@ export default function StaleGatewayReservationReleaseForm(props: {
   );
 
   return (
-    <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm sm:p-5">
+    <section
+      id="stale-release"
+      className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm sm:p-5"
+    >
       <h2 className="text-base font-semibold text-[var(--heading)]">
         Release stale wallet reservation
       </h2>

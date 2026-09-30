@@ -17,6 +17,7 @@ import {
   buildAdminPaymentRecoveryHref,
   formatPaymentRecoveryAge,
   isPaymentRecoveryCandidate,
+  isPaymentRecoveryStaleReleaseEligible,
   normalizePaymentRecoveryDecision,
   parsePaymentRecoveryPage,
   parsePaymentRecoveryStaleMs,
@@ -435,14 +436,15 @@ export async function getAdminPaymentRecoveryDetailExtras(
       const audit = decisions.get(row.id);
       const decision = audit?.decision ?? null;
       const receipts = await listPaymentWebhookReceiptsForAttempt(row.id);
-      const staleReleaseEligible =
-        !row.webhookEventId &&
-        (row.status === EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT ||
-          row.status === EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING ||
-          row.status === EsimPurchasePaymentAttemptStatus.DRAFT) &&
-        purchase.status === "AWAITING_GATEWAY_PAYMENT" &&
-        (Boolean(row.expiresAt && row.expiresAt.getTime() <= nowMs) ||
-          row.updatedAt.getTime() <= nowMs - staleMs);
+      const staleReleaseEligible = isPaymentRecoveryStaleReleaseEligible({
+        status: row.status,
+        purchaseStatus: purchase.status,
+        webhookEventId: row.webhookEventId,
+        updatedAt: row.updatedAt,
+        expiresAt: row.expiresAt,
+        nowMs,
+        staleMs,
+      });
 
       return {
         isRecoveryCandidate: isCandidate,
@@ -506,14 +508,15 @@ export async function getAdminPaymentRecoveryDetailExtras(
       const audit = decisions.get(row.id);
       const decision = audit?.decision ?? null;
       const receipts = await listPaymentWebhookReceiptsForAttempt(row.id);
-      const staleReleaseEligible =
-        !row.webhookEventId &&
-        (row.status === EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT ||
-          row.status === EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING ||
-          row.status === EsimPurchasePaymentAttemptStatus.DRAFT) &&
-        purchase.status === "AWAITING_GATEWAY_PAYMENT" &&
-        (Boolean(row.expiresAt && row.expiresAt.getTime() <= nowMs) ||
-          row.updatedAt.getTime() <= nowMs - staleMs);
+      const staleReleaseEligible = isPaymentRecoveryStaleReleaseEligible({
+        status: row.status,
+        purchaseStatus: purchase.status,
+        webhookEventId: row.webhookEventId,
+        updatedAt: row.updatedAt,
+        expiresAt: row.expiresAt,
+        nowMs,
+        staleMs,
+      });
 
       return {
         isRecoveryCandidate: isCandidate,

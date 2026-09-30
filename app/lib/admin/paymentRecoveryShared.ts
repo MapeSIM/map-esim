@@ -142,6 +142,57 @@ export function isPaymentRecoveryCandidate(input: {
   return updatedAtMs <= nowMs - staleMs;
 }
 
+/**
+ * Display/eligibility helper matching existing detail extras (no new release rules).
+ * Same conditions used by getAdminPaymentRecoveryDetailExtras for both owners.
+ */
+export function isPaymentRecoveryStaleReleaseEligible(input: {
+  status: string | null | undefined;
+  purchaseStatus: string | null | undefined;
+  webhookEventId: string | null | undefined;
+  updatedAt: Date | string | null | undefined;
+  expiresAt?: Date | string | null | undefined;
+  nowMs?: number;
+  staleMs?: number;
+}): boolean {
+  if (String(input.webhookEventId ?? "").trim()) return false;
+  const status = String(input.status ?? "").trim();
+  if (
+    status !== "AWAITING_PAYMENT" &&
+    status !== "PAYMENT_PENDING" &&
+    status !== "DRAFT"
+  ) {
+    return false;
+  }
+  if (String(input.purchaseStatus ?? "").trim() !== "AWAITING_GATEWAY_PAYMENT") {
+    return false;
+  }
+  if (!input.updatedAt) return false;
+  const updatedAtMs =
+    input.updatedAt instanceof Date
+      ? input.updatedAt.getTime()
+      : new Date(input.updatedAt).getTime();
+  if (!Number.isFinite(updatedAtMs)) return false;
+  const nowMs =
+    typeof input.nowMs === "number" && Number.isFinite(input.nowMs)
+      ? input.nowMs
+      : Date.now();
+  const staleMs =
+    typeof input.staleMs === "number" && Number.isFinite(input.staleMs)
+      ? input.staleMs
+      : parsePaymentRecoveryStaleMs();
+  if (input.expiresAt) {
+    const expiresAtMs =
+      input.expiresAt instanceof Date
+        ? input.expiresAt.getTime()
+        : new Date(input.expiresAt).getTime();
+    if (Number.isFinite(expiresAtMs) && expiresAtMs <= nowMs) {
+      return true;
+    }
+  }
+  return updatedAtMs <= nowMs - staleMs;
+}
+
 export function formatPaymentRecoveryAge(
   updatedAt: Date | string,
   nowMs: number = Date.now()

@@ -2,6 +2,13 @@ import "server-only";
 
 import { EsimPurchasePaymentAttemptStatus, Role } from "@prisma/client";
 import {
+  buildAdminWalletPurchaseReconciliationHref,
+  isAdminWalletReconciliationLinkApplicable,
+} from "@/app/lib/admin/adminWalletReservationDisplay";
+import { maskAdminEmail } from "@/app/lib/admin/display";
+import { formatUtcTimestamp } from "@/app/lib/admin/operationsHealthShared";
+import { paymentDashboardAttemptHref } from "@/app/lib/admin/paymentDashboardShared";
+import {
   buildPendingPaymentEvidenceView,
   decidePendingPaymentVerify,
   parsePendingPaymentVerifyReason,
@@ -359,9 +366,93 @@ export async function verifyPendingGatewayPayment(options: {
   return { ok: true, evidence: view };
 }
 
-/** List recent awaiting gateway payment attempts for admin inspection. */
+/** List recent awaiting gateway payment attempts for admin inspection (customer + partner). */
 export async function listPendingGatewayPaymentAttempts(limit = 30): Promise<
   Array<{
+    attemptId: string;
+    purchaseId: string;
+    ownerKind: "customer" | "partner";
+    ownerLabel: string;
+    partyLabel: string;
+    attemptStatus: string;
+    purchaseStatus: string;
+    gatewayProvider: string | null;
+    gatewayAmountCents: number;
+    currency: string;
+    walletAppliedCents: number;
+    createdAt: Date;
+    createdAtLabel: string;
+    trackerRefMasked: string;
+    detailHref: string;
+    /** Stuck-case link only for customer rows with existing eligibility. */
+    reconciliationHref: string | null;
+  }>
+> {
+  const take = Math.min(Math.max(limit, 1), 50);
+  const statusFilter = {
+    in: [
+      EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
+      EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING,
+      EsimPurchasePaymentAttemptStatus.RECONCILIATION_REQUIRED,
+    ],
+  } as const;
+
+  const [customerRows, partnerRows] = await Promise.all([
+    prisma.esimPurchasePaymentAttempt.findMany({
+      where: { status: statusFilter },
+      orderBy: { createdAt: "desc" },
+      take,
+      select: {
+        id: true,
+        status: true,
+        gatewayProvider: true,
+        gatewayAmountCents: true,
+        currency: true,
+        gatewayPaymentRef: true,
+        createdAt: true,
+        purchaseId: true,
+        purchase: {
+          select: {
+            status: true,
+            walletAppliedCents: true,
+            customer: {
+              select: { id: true, name: true, email: true },
+            },
+          },
+        },
+      },
+    }),
+    prisma.partnerEsimPurchasePaymentAttempt.findMany({
+      where: { status: statusFilter },
+      orderBy: { createdAt: "desc" },
+      take,
+      select: {
+        id: true,
+        status: true,
+        gatewayProvider: true,
+        gatewayAmountCents: true,
+        currency: true,
+        gatewayPaymentRef: true,
+        createdAt: true,
+        purchaseId: true,
+        purchase: {
+          select: {
+            status: true,
+            walletAppliedCents: true,
+            partner: {
+              select: {
+                id: true,
+                user: { select: { id: true, name: true, email: true } },
+              },
+            },
+          },
+        },
+      },
+    }),
+  ]);
+
+  type Merged = {
+    ownerKind: "customer" | "partner";
     attemptId: string;
     purchaseId: string;
     attemptStatus: string;
@@ -372,51 +463,90 @@ export async function listPendingGatewayPaymentAttempts(limit = 30): Promise<
     walletAppliedCents: number;
     createdAt: Date;
     trackerRefMasked: string;
-  }>
-> {
-  const take = Math.min(Math.max(limit, 1), 50);
-  const rows = await prisma.esimPurchasePaymentAttempt.findMany({
-    where: {
-      status: {
-        in: [
-          EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
-          EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING,
-          EsimPurchasePaymentAttemptStatus.RECONCILIATION_REQUIRED,
-        ],
-      },
-    },
-    orderBy: { createdAt: "desc" },
-    take,
-    select: {
-      id: true,
-      status: true,
-      gatewayProvider: true,
-      gatewayAmountCents: true,
-      currency: true,
-      gatewayPaymentRef: true,
-      createdAt: true,
-      purchaseId: true,
-      purchase: {
-        select: {
-          status: true,
-          walletAppliedCents: true,
-        },
-      },
-    },
-  });
+    partyUser: { id: string; name: string | null; email: string | null } | null;
+  };
 
-  return rows.map((row) => ({
-    attemptId: row.id,
-    purchaseId: row.purchaseId,
-    attemptStatus: row.status,
-    purchaseStatus: row.purchase.status,
-    gatewayProvider: row.gatewayProvider,
-    gatewayAmountCents: row.gatewayAmountCents,
-    currency: row.currency,
-    walletAppliedCents: row.purchase.walletAppliedCents,
-    createdAt: row.createdAt,
-    trackerRefMasked: maskSafepayTrackerRef(row.gatewayPaymentRef),
-  }));
+  const merged: Merged[] = [
+    ...customerRows.map((row) => {
+      const purchase = row.purchase ?? null;
+      return {
+        ownerKind: "customer" as const,
+        attemptId: row.id,
+        purchaseId: row.purchaseId,
+        attemptStatus: row.status,
+        purchaseStatus: purchase?.status ?? "UNKNOWN",
+        gatewayProvider: row.gatewayProvider,
+        gatewayAmountCents: row.gatewayAmountCents,
+        currency: row.currency,
+        walletAppliedCents: purchase?.walletAppliedCents ?? 0,
+        createdAt: row.createdAt,
+        trackerRefMasked: maskSafepayTrackerRef(row.gatewayPaymentRef),
+        partyUser: purchase?.customer ?? null,
+      };
+    }),
+    ...partnerRows.map((row) => {
+      const partner = row.purchase?.partner ?? null;
+      return {
+        ownerKind: "partner" as const,
+        attemptId: row.id,
+        purchaseId: row.purchaseId,
+        attemptStatus: row.status,
+        purchaseStatus: row.purchase?.status ?? "UNKNOWN",
+        gatewayProvider: row.gatewayProvider,
+        gatewayAmountCents: row.gatewayAmountCents,
+        currency: row.currency,
+        walletAppliedCents: row.purchase?.walletAppliedCents ?? 0,
+        createdAt: row.createdAt,
+        trackerRefMasked: maskSafepayTrackerRef(row.gatewayPaymentRef),
+        partyUser: partner?.user ?? null,
+      };
+    }),
+  ]
+    .sort((a, b) => {
+      const byCreated = b.createdAt.getTime() - a.createdAt.getTime();
+      if (byCreated !== 0) return byCreated;
+      return b.attemptId.localeCompare(a.attemptId);
+    })
+    .slice(0, take);
+
+  return merged.map((row) => {
+    const showRecon =
+      row.ownerKind === "customer" &&
+      isAdminWalletReconciliationLinkApplicable({
+        purchaseStatus: row.purchaseStatus,
+        attemptStatus: row.attemptStatus,
+      });
+    const name =
+      (row.partyUser?.name ?? "").trim() ||
+      (row.ownerKind === "partner" ? "Partner" : "Customer");
+    const email = row.partyUser?.email ?? null;
+    const partyLabel = row.partyUser
+      ? `${name} · ${maskAdminEmail(email)}`
+      : row.ownerKind === "partner"
+        ? "Partner unavailable"
+        : "Not available";
+
+    return {
+      attemptId: row.attemptId,
+      purchaseId: row.purchaseId,
+      ownerKind: row.ownerKind,
+      ownerLabel: row.ownerKind === "partner" ? "Partner" : "Customer",
+      partyLabel,
+      attemptStatus: row.attemptStatus,
+      purchaseStatus: row.purchaseStatus,
+      gatewayProvider: row.gatewayProvider,
+      gatewayAmountCents: row.gatewayAmountCents,
+      currency: row.currency,
+      walletAppliedCents: row.walletAppliedCents,
+      createdAt: row.createdAt,
+      createdAtLabel: formatUtcTimestamp(row.createdAt),
+      trackerRefMasked: row.trackerRefMasked,
+      detailHref: paymentDashboardAttemptHref(row.attemptId, row.ownerKind),
+      reconciliationHref: showRecon
+        ? buildAdminWalletPurchaseReconciliationHref(row.purchaseId)
+        : null,
+    };
+  });
 }
 
 export async function getPendingGatewayPaymentAttemptDetail(
