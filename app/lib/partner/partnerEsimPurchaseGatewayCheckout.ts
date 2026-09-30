@@ -495,6 +495,73 @@ export async function startPartnerEsimPurchaseHostedCheckout(
     );
   }
 
+  console.error("PARTNER_BUY_TRACE", {
+    step: "gateway_start",
+    purchaseId: purchase.id,
+    partnerId: partner.partnerId,
+    offerId: purchase.offerId,
+    status: purchase.status,
+  });
+
+  try {
+    return await runPartnerEsimHostedCheckoutAfterLoad({
+      input,
+      partner,
+      purchase,
+      countryHint,
+      verifyOffer,
+    });
+  } catch (error) {
+    console.error("PARTNER_BUY_TRACE", {
+      step: "gateway_failed",
+      purchaseId: purchase.id,
+      partnerId: partner.partnerId,
+      offerId: purchase.offerId,
+      status: purchase.status,
+      name: error instanceof Error ? error.name : typeof error,
+      code:
+        error instanceof PartnerEsimPurchaseGatewayCheckoutError
+          ? error.code
+          : error && typeof error === "object" && "code" in error
+            ? String((error as { code?: unknown }).code ?? "").slice(0, 64)
+            : undefined,
+      message:
+        error instanceof Error
+          ? error.message.slice(0, 500)
+          : String(error).slice(0, 500),
+      stack:
+        error instanceof Error ? error.stack?.slice(0, 2000) : undefined,
+    });
+    throw error;
+  }
+}
+
+async function runPartnerEsimHostedCheckoutAfterLoad(options: {
+  input: StartPartnerEsimPurchaseHostedCheckoutInput;
+  partner: Awaited<ReturnType<typeof loadActivePartner>>;
+  purchase: {
+    id: string;
+    partnerId: string;
+    offerId: string;
+    status: PartnerEsimPurchaseStatus;
+    retailPriceCents: number;
+    providerCostCents: number;
+    discountBps: number;
+    discountVersion: number;
+    partnerChargeCents: number;
+    useWallet: boolean;
+    walletAppliedCents: number;
+    gatewayAmountCents: number;
+    currency: string;
+    idempotencyKey: string;
+    debitTransactionId: string | null;
+    destinationCode: string | null;
+  };
+  countryHint: string | null;
+  verifyOffer: NonNullable<StartPartnerEsimPurchaseHostedCheckoutInput["verifyOffer"]>;
+}): Promise<StartPartnerEsimPurchaseHostedCheckoutResult> {
+  const { input, partner, purchase, countryHint, verifyOffer } = options;
+
   const verified = await verifyOffer({
     offerId: purchase.offerId,
     countryHint: countryHint ?? purchase.destinationCode,
@@ -702,6 +769,14 @@ export async function startPartnerEsimPurchaseHostedCheckout(
         resumed.message
       );
     }
+    console.error("PARTNER_BUY_TRACE", {
+      step: "gateway_done",
+      purchaseId: purchase.id,
+      partnerId: partner.partnerId,
+      offerId: purchase.offerId,
+      paymentAttemptId: attempt.id,
+      reusedTracker: true,
+    });
     return {
       purchaseId: purchase.id,
       paymentAttemptId: attempt.id,
@@ -755,6 +830,15 @@ export async function startPartnerEsimPurchaseHostedCheckout(
     throw error;
   }
 
+  console.error("PARTNER_BUY_TRACE", {
+    step: "gateway_external_done",
+    purchaseId: purchase.id,
+    partnerId: partner.partnerId,
+    offerId: purchase.offerId,
+    paymentAttemptId: attempt.id,
+    sessionOk: session.ok,
+  });
+
   if (!session.ok) {
     await restoreSplitWalletBestEffort({
       partnerId: partner.partnerId,
@@ -792,53 +876,68 @@ export async function startPartnerEsimPurchaseHostedCheckout(
 
   const masked = maskSimpaisaMsisdn(walletFields.customerMsisdn);
 
-  await prisma.$transaction(async (tx) => {
-    const updated = await tx.partnerEsimPurchasePaymentAttempt.updateMany({
-      where: {
-        id: attempt!.id,
-        purchaseId: purchase.id,
-        status: {
-          in: [
-            EsimPurchasePaymentAttemptStatus.DRAFT,
-            EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
-            EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING,
-          ],
-        },
-      },
-      data: {
-        status: EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
-        gatewayProvider: PaymentGatewayProvider.SIMPAISA,
-        gatewayPaymentRef: providerRef,
-        chargeCurrency,
-        chargeAmountMinor,
-        fxRateSnapshot: session.fxRateSnapshot ?? quote.fxRateSnapshot,
-        expiresAt: session.expiresAt,
-        failureCategory: null,
-        failureCode: null,
-      },
-    });
-    if (updated.count !== 1) {
-      throw new PartnerEsimPurchaseGatewayCheckoutError(
-        "INVALID_STATE",
-        "This payment cannot start checkout in its current state."
-      );
-    }
+  console.error("PARTNER_BUY_TRACE", {
+    step: "gateway_db_update_start",
+    purchaseId: purchase.id,
+    partnerId: partner.partnerId,
+    offerId: purchase.offerId,
+    paymentAttemptId: attempt.id,
+  });
 
-    await tx.partnerEsimPurchase.updateMany({
-      where: {
-        id: purchase.id,
-        partnerId: partner.partnerId,
-        status: PartnerEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+  // Fresh Prisma queries after external gateway I/O — never reuse an interactive
+  // transaction that spanned createCheckoutSession (P2028 on Neon/serverless).
+  const updated = await prisma.partnerEsimPurchasePaymentAttempt.updateMany({
+    where: {
+      id: attempt.id,
+      purchaseId: purchase.id,
+      status: {
+        in: [
+          EsimPurchasePaymentAttemptStatus.DRAFT,
+          EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
+          EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING,
+        ],
       },
-      data: {
-        useWallet: funding.useWallet,
-        walletAppliedCents: funding.walletAppliedCents,
-        gatewayAmountCents: funding.gatewayAmountCents,
-        fundingSource,
-      },
+    },
+    data: {
+      status: EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
+      gatewayProvider: PaymentGatewayProvider.SIMPAISA,
+      gatewayPaymentRef: providerRef,
+      chargeCurrency,
+      chargeAmountMinor,
+      fxRateSnapshot: session.fxRateSnapshot ?? quote.fxRateSnapshot,
+      expiresAt: session.expiresAt,
+      failureCategory: null,
+      failureCode: null,
+    },
+  });
+  if (updated.count !== 1) {
+    await restoreSplitWalletBestEffort({
+      partnerId: partner.partnerId,
+      purchaseId: purchase.id,
+      walletAppliedCents: funding.walletAppliedCents,
     });
+    throw new PartnerEsimPurchaseGatewayCheckoutError(
+      "INVALID_STATE",
+      "This payment cannot start checkout in its current state."
+    );
+  }
 
-    await tx.auditLog.create({
+  await prisma.partnerEsimPurchase.updateMany({
+    where: {
+      id: purchase.id,
+      partnerId: partner.partnerId,
+      status: PartnerEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+    },
+    data: {
+      useWallet: funding.useWallet,
+      walletAppliedCents: funding.walletAppliedCents,
+      gatewayAmountCents: funding.gatewayAmountCents,
+      fundingSource,
+    },
+  });
+
+  try {
+    await prisma.auditLog.create({
       data: {
         actorUserId: partner.partnerUserId,
         action: PARTNER_ESIM_PURCHASE_CHECKOUT_CREATED,
@@ -846,7 +945,7 @@ export async function startPartnerEsimPurchaseHostedCheckout(
         targetId: purchase.id,
         metadata: {
           purchaseId: purchase.id,
-          paymentAttemptId: attempt!.id,
+          paymentAttemptId: attempt.id,
           gatewayAmountCents: funding.gatewayAmountCents,
           walletAppliedCents: funding.walletAppliedCents,
           fundingSource,
@@ -855,6 +954,27 @@ export async function startPartnerEsimPurchaseHostedCheckout(
         } satisfies Prisma.InputJsonValue,
       },
     });
+  } catch (auditError) {
+    console.error("PARTNER_BUY_TRACE", {
+      step: "gateway_audit_failed",
+      purchaseId: purchase.id,
+      partnerId: partner.partnerId,
+      offerId: purchase.offerId,
+      message:
+        auditError instanceof Error
+          ? auditError.message.slice(0, 500)
+          : String(auditError).slice(0, 500),
+    });
+  }
+
+  console.error("PARTNER_BUY_TRACE", {
+    step: "gateway_done",
+    purchaseId: purchase.id,
+    partnerId: partner.partnerId,
+    offerId: purchase.offerId,
+    paymentAttemptId: attempt.id,
+    gatewayAmountCents: funding.gatewayAmountCents,
+    walletAppliedCents: funding.walletAppliedCents,
   });
 
   return {

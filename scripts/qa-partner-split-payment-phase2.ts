@@ -169,6 +169,22 @@ function main() {
   assert.match(gateway, /browserReturnMustNotFundPartnerEsimPurchase/);
   assert.match(gateway, /input\.useWallet/);
   assert.match(gateway, /purchase\.useWallet/);
+  // External gateway session must not sit inside an interactive $transaction.
+  assert.match(gateway, /gateway_start/);
+  assert.match(gateway, /gateway_external_done/);
+  assert.match(gateway, /gateway_db_update_start/);
+  assert.match(gateway, /gateway_done/);
+  const sessionIdx = gateway.indexOf("adapter.createCheckoutSession");
+  assert.ok(sessionIdx > 0, "createCheckoutSession present");
+  const afterSession = gateway.slice(sessionIdx);
+  const postSessionInteractive = afterSession.match(
+    /prisma\.\$transaction\(\s*async\s*\(/
+  );
+  assert.equal(
+    postSessionInteractive,
+    null,
+    "no interactive $transaction after createCheckoutSession"
+  );
 
   assert.match(actions, /checkout_redirect/);
   assert.match(actions, /redirect\(result\.checkoutUrl\)/);
