@@ -395,7 +395,7 @@ export async function listPendingGatewayPaymentAttempts(limit = 30): Promise<
       EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING,
       EsimPurchasePaymentAttemptStatus.RECONCILIATION_REQUIRED,
     ],
-  } as const;
+  };
 
   const [customerRows, partnerRows] = await Promise.all([
     prisma.esimPurchasePaymentAttempt.findMany({
