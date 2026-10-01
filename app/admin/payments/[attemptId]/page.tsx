@@ -573,25 +573,35 @@ export default async function AdminPaymentDetailPage({
             paymentAttemptId={detail.attemptId}
             transactionRefMasked={detail.providerRefMasked}
             walletAppliedCents={detail.walletAppliedCents}
+            ownerKind={detail.ownerKind === "partner" ? "partner" : "customer"}
           />
-        ) : (
+        ) : detail.ownerKind === "customer" ? (
           <PendingPaymentVerifyForm
             paymentAttemptId={detail.attemptId}
             trackerRefMasked={detail.providerRefMasked}
           />
+        ) : (
+          <AdminEmptyState title="Investigation tools not available">
+            Partner pending investigation currently supports Simpaisa attempts
+            only. Use Stuck Cases / reconciliation tools when applicable.
+          </AdminEmptyState>
         )
-      ) : detail.ownerKind === "customer" ? (
+      ) : (
         <AdminEmptyState title="Investigation tools not available">
           Investigation tools are available when the attempt is awaiting
-          gateway payment, payment pending, or reconciliation required. This
-          page never funds or marks paid.
+          gateway payment, payment pending
+          {detail.ownerKind === "customer"
+            ? ", or reconciliation required"
+            : ""}
+          . Customer checks never mark paid without the webhook path; partner
+          confirmed Inquire uses the existing partner apply path only.
         </AdminEmptyState>
-      ) : null}
+      )}
 
       <p className="text-xs text-[var(--text-soft)]">
         Reserved wallet display:{" "}
         {formatAdminReservedWalletAmount(detail.walletAppliedCents)}. This
-        page never funds or marks paid.
+        page does not invent generic mark-paid shortcuts.
       </p>
     </div>
   );

@@ -858,8 +858,10 @@ export async function getAdminPaymentDetail(
         cancelledAtLabel: row.cancelledAt
           ? formatUtcTimestamp(row.cancelledAt)
           : null,
-        // Partner pending investigate UI is customer-attempt scoped today.
-        investigationAvailable: false,
+        // Partner Simpaisa pending attempts use the shared Investigate form
+        // (Inquire + existing partner apply on confirmed; never generic mark-paid).
+        investigationAvailable:
+          isSimpaisa && isPaymentDashboardPendingAttemptStatus(row.status),
         isSimpaisa,
       };
     } catch (error) {

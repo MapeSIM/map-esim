@@ -44,10 +44,10 @@ export default async function AdminPendingPaymentsPage() {
         description={ADMIN_UX_PAGE.verifyPending.description}
         meta={
           <>
-            Customer and Partner awaiting gateway attempts. Partner rows are
-            read-only here — open detail for tools that already support that
-            owner. Verify/Investigate forms stay on customer-compatible detail
-            flows.
+            Customer and Partner awaiting gateway attempts. Open payment detail
+            for Simpaisa Check Status / Investigate tools (customer never
+            mark-paid; partner confirmed Inquire uses the existing partner apply
+            path).
           </>
         }
         actions={

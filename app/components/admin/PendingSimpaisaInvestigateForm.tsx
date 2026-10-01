@@ -9,6 +9,7 @@ import {
 } from "@/app/lib/admin/pendingSimpaisaPaymentInvestigateActions";
 import {
   PENDING_PAYMENT_VERIFY_REASON_MAX,
+  SIMPAISA_PARTNER_SUCCESS_APPLIED_MESSAGE,
   SIMPAISA_SUCCESS_WEBHOOK_REQUIRED_MESSAGE,
 } from "@/app/lib/admin/pendingSimpaisaPaymentInvestigateShared";
 import { ADMIN_RELEASE_RESERVATION_BLURB } from "@/app/lib/admin/adminWalletReservationDisplay";
@@ -36,7 +37,16 @@ function EvidencePanel(props: {
           {SIMPAISA_SUCCESS_WEBHOOK_REQUIRED_MESSAGE}
         </p>
       ) : null}
+      {evidence.decision === "CONFIRMED_SUCCESS_APPLIED" ? (
+        <p className="text-[var(--text-muted)]">
+          {SIMPAISA_PARTNER_SUCCESS_APPLIED_MESSAGE}
+        </p>
+      ) : null}
       <dl className="grid grid-cols-1 gap-1 text-xs text-[var(--text-muted)] sm:grid-cols-2">
+        <div>
+          <dt className="font-semibold">Owner</dt>
+          <dd>{evidence.ownerKind === "partner" ? "Partner" : "Customer"}</dd>
+        </div>
         <div>
           <dt className="font-semibold">Local amount</dt>
           <dd>
@@ -92,7 +102,7 @@ function EvidencePanel(props: {
         </div>
         <div>
           <dt className="font-semibold">Funding applied</dt>
-          <dd>no</dd>
+          <dd>{evidence.fundingApplied ? "yes" : "no"}</dd>
         </div>
       </dl>
     </div>
@@ -103,7 +113,9 @@ export default function PendingSimpaisaInvestigateForm(props: {
   paymentAttemptId: string;
   transactionRefMasked: string;
   walletAppliedCents: number;
+  ownerKind?: "customer" | "partner";
 }) {
+  const ownerKind = props.ownerKind === "partner" ? "partner" : "customer";
   const [checkState, checkAction, checkPending] = useActionState(
     checkSimpaisaPendingPaymentStatusAction,
     initialCheckState
@@ -119,7 +131,8 @@ export default function PendingSimpaisaInvestigateForm(props: {
   const showRelease =
     Boolean(checkOk?.releaseEligible) &&
     props.walletAppliedCents > 0 &&
-    !releaseOk?.reservationReleased;
+    !releaseOk?.reservationReleased &&
+    !checkOk?.fundingApplied;
 
   return (
     <section className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
@@ -129,8 +142,10 @@ export default function PendingSimpaisaInvestigateForm(props: {
         </h2>
         <p className="text-sm text-[var(--text-muted)]">
           Calls authenticated Simpaisa Inquire for this attempt. Browser return
-          data is ignored. This never marks a purchase funded, never creates an
-          eSIM order, and never releases a wallet reservation by itself.
+          data is ignored. This never invents a generic mark-paid action.
+          {ownerKind === "partner"
+            ? " For partner attempts, a validated Inquire confirmation applies funding only through the existing partner payment apply path (idempotent)."
+            : " For customer attempts this never marks a purchase funded, never creates an eSIM order, and never releases a wallet reservation by itself."}
         </p>
         <p className="text-xs text-[var(--text-soft)]">
           Stored transaction: {props.transactionRefMasked}
@@ -143,6 +158,7 @@ export default function PendingSimpaisaInvestigateForm(props: {
           name="paymentAttemptId"
           value={props.paymentAttemptId}
         />
+        <input type="hidden" name="ownerKind" value={ownerKind} />
         <div>
           <label
             htmlFor="pending-simpaisa-check-reason"
@@ -206,6 +222,7 @@ export default function PendingSimpaisaInvestigateForm(props: {
               name="paymentAttemptId"
               value={props.paymentAttemptId}
             />
+            <input type="hidden" name="ownerKind" value={ownerKind} />
             <div>
               <label
                 htmlFor="pending-simpaisa-release-reason"

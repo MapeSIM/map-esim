@@ -65,9 +65,10 @@ function main() {
   );
   assert.match(
     service,
-    /userKey:\s*attempt\.id[\s\S]*transactionId:\s*attempt\.gatewayPaymentRef/
+    /userKey:\s*attempt\.inquireUserKey[\s\S]*transactionId:\s*attempt\.gatewayPaymentRef/
   );
   assert.match(shared, /userKey = EsimPurchasePaymentAttempt\.id/);
+  assert.match(service, /inquireUserKey:\s*customer\.id/);
   console.log("PASS inquire_identity_mapping_matches_checkout_webhook");
 
   assert.match(actions, /requireRole\("ADMIN"\)/);
@@ -85,12 +86,18 @@ function main() {
   assert.doesNotMatch(actions, /applyVerifiedEsimPurchasePaymentEvent/);
   assert.doesNotMatch(form, /applyVerifiedEsimPurchasePaymentEvent/);
   assert.doesNotMatch(service, /status:\s*WalletEsimPurchaseStatus\.FUNDED/);
-  assert.doesNotMatch(service, /PAYMENT_CONFIRMED/);
   assert.doesNotMatch(service, /fulfillFundedEsimPurchase/);
-  assert.match(shared, /fundingApplied:\s*false/);
-  assert.match(service, /fundingApplied:\s*false/);
+  // Customer path must still force fundingApplied false after Inquire.
+  assert.match(service, /ownerKind === "customer"[\s\S]{0,120}fundingApplied = false/);
   assert.match(form, /never marks a purchase funded/i);
-  console.log("PASS check_never_funds_or_marks_paid");
+  console.log("PASS customer_check_never_funds_or_marks_paid");
+
+  // Partner parity wires existing apply path only (not customer apply).
+  assert.match(service, /applyVerifiedPartnerEsimPurchasePaymentEvent/);
+  assert.match(service, /partnerEsimPurchaseMerchantUserKey|pesim_/);
+  assert.match(service, /maybeReleasePendingPartnerGatewayReservation/);
+  assert.match(shared, /CONFIRMED_SUCCESS_APPLIED/);
+  console.log("PASS partner_parity_hooks_present");
 
   // Safepay path must remain intact and separate.
   assert.match(safepayActions, /verifyPendingGatewayPaymentAction/);

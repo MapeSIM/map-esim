@@ -3,7 +3,8 @@
  * QA-safe: no Prisma / network.
  *
  * Identity mapping (from checkout + webhook):
- * - userKey = EsimPurchasePaymentAttempt.id
+ * - Customer userKey = EsimPurchasePaymentAttempt.id
+ * - Partner userKey = pesim_<PartnerEsimPurchasePaymentAttempt.id>
  * - transactionId = attempt.gatewayPaymentRef (Simpaisa provider txn id)
  * - operatorId is not stored on eSIM attempts; Inquire may omit it
  */
@@ -29,8 +30,12 @@ export const SIMPAISA_PENDING_RELEASE_BLOCKED_AUDIT =
 export const SIMPAISA_SUCCESS_WEBHOOK_REQUIRED_MESSAGE =
   "Simpaisa Inquire confirms payment, but the authoritative payment webhook is still required. Admin must not fund or mark paid.";
 
+export const SIMPAISA_PARTNER_SUCCESS_APPLIED_MESSAGE =
+  "Simpaisa Inquire confirmed payment. Funding was applied through the existing partner payment path (idempotent). Provider fulfillment runs outside the payment transaction.";
+
 export const SIMPAISA_PENDING_INVESTIGATE_DECISIONS = [
   "CONFIRMED_SUCCESS_WEBHOOK_REQUIRED",
+  "CONFIRMED_SUCCESS_APPLIED",
   "VERIFIED_FAILED",
   "PENDING",
   "AMOUNT_MISMATCH",
@@ -44,9 +49,12 @@ export const SIMPAISA_PENDING_INVESTIGATE_DECISIONS = [
 export type SimpaisaPendingInvestigateDecision =
   (typeof SIMPAISA_PENDING_INVESTIGATE_DECISIONS)[number];
 
+export type SimpaisaPendingInvestigateOwnerKind = "customer" | "partner";
+
 export type SimpaisaPendingInvestigateEvidenceView = {
   attemptId: string;
   purchaseId: string;
+  ownerKind: SimpaisaPendingInvestigateOwnerKind;
   gatewayProvider: "SIMPAISA";
   localAttemptStatus: string;
   localPurchaseStatus: string;
@@ -66,9 +74,12 @@ export type SimpaisaPendingInvestigateEvidenceView = {
   /** True when UI may offer step-2 release (server still re-inquires). */
   releaseEligible: boolean;
   reservationReleased: boolean;
-  /** Always false — investigation never funds. */
-  fundingApplied: false;
-  vesimOrderCreated: false;
+  /**
+   * Customer investigate never funds (always false).
+   * Partner investigate may set true only after existing apply path succeeds.
+   */
+  fundingApplied: boolean;
+  vesimOrderCreated: boolean;
 };
 
 export function maskSimpaisaTransactionRef(
@@ -83,6 +94,8 @@ export function messageForSimpaisaInvestigateDecision(
   switch (decision) {
     case "CONFIRMED_SUCCESS_WEBHOOK_REQUIRED":
       return SIMPAISA_SUCCESS_WEBHOOK_REQUIRED_MESSAGE;
+    case "CONFIRMED_SUCCESS_APPLIED":
+      return SIMPAISA_PARTNER_SUCCESS_APPLIED_MESSAGE;
     case "VERIFIED_FAILED":
       return "Simpaisa Inquire reports a failed or terminal unpaid payment. Wallet reservation may be released in a separate step when reserved funds remain.";
     case "PENDING":
@@ -253,6 +266,7 @@ export function canOfferSimpaisaReservationRelease(input: {
 export function buildSimpaisaPendingInvestigateEvidenceView(input: {
   attemptId: string;
   purchaseId: string;
+  ownerKind?: SimpaisaPendingInvestigateOwnerKind;
   localAttemptStatus: string;
   localPurchaseStatus: string;
   localExpectedAmountMinor: number;
@@ -269,10 +283,13 @@ export function buildSimpaisaPendingInvestigateEvidenceView(input: {
   validatedConfirmed: boolean;
   validationReason: string | null;
   reservationReleased?: boolean;
+  fundingApplied?: boolean;
+  vesimOrderCreated?: boolean;
 }): SimpaisaPendingInvestigateEvidenceView {
   return {
     attemptId: input.attemptId,
     purchaseId: input.purchaseId,
+    ownerKind: input.ownerKind === "partner" ? "partner" : "customer",
     gatewayProvider: "SIMPAISA",
     localAttemptStatus: input.localAttemptStatus,
     localPurchaseStatus: input.localPurchaseStatus,
@@ -293,7 +310,7 @@ export function buildSimpaisaPendingInvestigateEvidenceView(input: {
     message: input.message,
     releaseEligible: input.releaseEligible,
     reservationReleased: Boolean(input.reservationReleased),
-    fundingApplied: false,
-    vesimOrderCreated: false,
+    fundingApplied: Boolean(input.fundingApplied),
+    vesimOrderCreated: Boolean(input.vesimOrderCreated),
   };
 }

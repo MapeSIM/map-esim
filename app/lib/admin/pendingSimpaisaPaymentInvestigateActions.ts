@@ -28,11 +28,15 @@ function ignoreForgedBrowserAuthority(formData: FormData) {
   void formData.get("transactionId");
   void formData.get("userKey");
   void formData.get("operatorId");
+  void formData.get("ownerKind");
+  void formData.get("markPaid");
+  void formData.get("fund");
 }
 
 /**
  * Step 1: Admin Inquire status check for an existing Simpaisa payment attempt.
- * Never funds purchases / never marks paid / never releases reservation.
+ * Customer: never funds / never marks paid / never releases reservation.
+ * Partner: validated Inquire confirmed may apply via existing partner payment path.
  */
 export async function checkSimpaisaPendingPaymentStatusAction(
   _prev: SimpaisaPendingInvestigateFormState,
@@ -44,6 +48,11 @@ export async function checkSimpaisaPendingPaymentStatusAction(
   const paymentAttemptId = String(
     formData.get("paymentAttemptId") ?? ""
   ).trim();
+  // Read before ignoreForgedBrowserAuthority — display/revalidation only.
+  const ownerKindHint =
+    String(formData.get("ownerKind") ?? "").trim() === "partner"
+      ? "partner"
+      : "customer";
   const reasonParsed = parsePendingPaymentVerifyReason(formData.get("reason"));
   ignoreForgedBrowserAuthority(formData);
 
@@ -66,6 +75,17 @@ export async function checkSimpaisaPendingPaymentStatusAction(
     revalidatePath(
       `/admin/payments/pending/${encodeURIComponent(paymentAttemptId)}`
     );
+    revalidatePath(
+      `/admin/payments/${encodeURIComponent(paymentAttemptId)}`
+    );
+    if (
+      ownerKindHint === "partner" ||
+      result.evidence.ownerKind === "partner"
+    ) {
+      revalidatePath(
+        `/admin/payments/${encodeURIComponent(paymentAttemptId)}?kind=partner`
+      );
+    }
   }
 
   return result;
@@ -87,6 +107,7 @@ export async function releaseSimpaisaPendingReservationAction(
   ).trim();
   const reasonParsed = parsePendingPaymentVerifyReason(formData.get("reason"));
   ignoreForgedBrowserAuthority(formData);
+  void formData.get("ownerKind");
 
   if (!reasonParsed.ok) {
     return {
@@ -107,6 +128,14 @@ export async function releaseSimpaisaPendingReservationAction(
     revalidatePath(
       `/admin/payments/pending/${encodeURIComponent(paymentAttemptId)}`
     );
+    revalidatePath(
+      `/admin/payments/${encodeURIComponent(paymentAttemptId)}`
+    );
+    if (result.evidence.ownerKind === "partner") {
+      revalidatePath(
+        `/admin/payments/${encodeURIComponent(paymentAttemptId)}?kind=partner`
+      );
+    }
   }
 
   return result;

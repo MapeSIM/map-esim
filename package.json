@@ -79,6 +79,7 @@
     "qa:esim-purchase-pg4-funding": "tsx scripts/qa-esim-purchase-pg4-funding.ts",
     "qa:admin-pending-payment-verify": "tsx scripts/qa-admin-pending-payment-verify.ts",
     "qa:admin-pending-simpaisa-investigate": "tsx scripts/qa-admin-pending-simpaisa-investigate.ts",
+    "qa:admin-partner-pending-simpaisa-investigate": "tsx scripts/qa-admin-partner-pending-simpaisa-investigate.ts",
     "qa:admin-payment-dashboard": "tsx scripts/qa-admin-payment-dashboard.ts",
     "qa:admin-ui-consistency": "tsx scripts/qa-admin-ui-consistency.ts",
     "qa:admin-payment-recovery": "tsx scripts/qa-admin-payment-recovery.ts",
