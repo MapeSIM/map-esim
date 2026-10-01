@@ -2,9 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
+import { assertSameOriginAdminRequest } from "@/app/lib/admin/reconciliationCaseManagement";
+import { writeAuditLog } from "@/app/lib/auth/audit";
+import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
 import { requireRole } from "@/app/lib/auth/session";
 import { prisma } from "@/app/lib/db";
 import {
+  PARTNER_MANAGEMENT_BLOCKED_AUDIT,
   changePartnerDiscount,
   createPartner,
   disablePartner,
@@ -33,9 +37,74 @@ import {
   parseAdminDebitReason,
 } from "@/app/lib/wallet/amount";
 
+/**
+ * Request-security limits for admin partner wallet credit/debit.
+ * Precedent: app/lib/esim/adminWalletPurchaseActions.ts
+ * enforceAssistedRateLimits (admin wallet money mutation).
+ * - per-admin: 20 / 10 minutes
+ * - per-target: 8 / 10 minutes
+ */
+const PARTNER_WALLET_ADJUST_ADMIN_LIMIT = 20;
+const PARTNER_WALLET_ADJUST_PARTNER_LIMIT = 8;
+const PARTNER_WALLET_ADJUST_WINDOW_MS = 10 * 60 * 1000;
+
 function revalidatePartnerPaths(partnerId: string): void {
   revalidatePath("/admin/partners");
   revalidatePath(`/admin/partners/${partnerId}`);
+}
+
+async function enforcePartnerWalletAdjustRateLimits(options: {
+  adminUserId: string;
+  partnerId: string;
+  method: "partner_wallet_credit" | "partner_wallet_debit";
+}): Promise<PartnerWalletActionState | null> {
+  const adminRate = consumeRateLimit({
+    key: `partner-wallet-adjust:admin:${options.adminUserId}`,
+    limit: PARTNER_WALLET_ADJUST_ADMIN_LIMIT,
+    windowMs: PARTNER_WALLET_ADJUST_WINDOW_MS,
+  });
+  if (!adminRate.ok) {
+    await writeAuditLog({
+      actorUserId: options.adminUserId,
+      action: PARTNER_MANAGEMENT_BLOCKED_AUDIT,
+      targetType: "PartnerProfile",
+      targetId: options.partnerId,
+      metadata: {
+        method: options.method,
+        failureCode: "rate_limited",
+      },
+    });
+    return {
+      ok: false,
+      error:
+        "Too many partner wallet adjustments. Please wait and try again.",
+    };
+  }
+
+  const partnerRate = consumeRateLimit({
+    key: `partner-wallet-adjust:partner:${options.partnerId}`,
+    limit: PARTNER_WALLET_ADJUST_PARTNER_LIMIT,
+    windowMs: PARTNER_WALLET_ADJUST_WINDOW_MS,
+  });
+  if (!partnerRate.ok) {
+    await writeAuditLog({
+      actorUserId: options.adminUserId,
+      action: PARTNER_MANAGEMENT_BLOCKED_AUDIT,
+      targetType: "PartnerProfile",
+      targetId: options.partnerId,
+      metadata: {
+        method: options.method,
+        failureCode: "partner_rate_limited",
+      },
+    });
+    return {
+      ok: false,
+      error:
+        "Too many wallet adjustments for this partner. Please wait and try again.",
+    };
+  }
+
+  return null;
 }
 
 export async function createPartnerAction(
@@ -155,6 +224,13 @@ export async function creditPartnerWalletAction(
   _prev: PartnerWalletActionState,
   formData: FormData
 ): Promise<PartnerWalletActionState> {
+  if (!(await assertSameOriginAdminRequest())) {
+    return {
+      ok: false,
+      error: "Request could not be verified. Please try again.",
+    };
+  }
+
   const admin = await requireRole("ADMIN");
   await assertAdminPermission(admin.id, "PARTNERS_MANAGE");
 
@@ -168,6 +244,13 @@ export async function creditPartnerWalletAction(
   if (!partnerId || partnerId.length > 64) {
     return { ok: false, error: "Partner is unavailable." };
   }
+
+  const rateLimited = await enforcePartnerWalletAdjustRateLimits({
+    adminUserId: admin.id,
+    partnerId,
+    method: "partner_wallet_credit",
+  });
+  if (rateLimited) return rateLimited;
 
   if (!confirmed) {
     return {
@@ -247,6 +330,13 @@ export async function debitPartnerWalletAction(
   _prev: PartnerWalletActionState,
   formData: FormData
 ): Promise<PartnerWalletActionState> {
+  if (!(await assertSameOriginAdminRequest())) {
+    return {
+      ok: false,
+      error: "Request could not be verified. Please try again.",
+    };
+  }
+
   const admin = await requireRole("ADMIN");
   await assertAdminPermission(admin.id, "PARTNERS_MANAGE");
 
@@ -260,6 +350,13 @@ export async function debitPartnerWalletAction(
   if (!partnerId || partnerId.length > 64) {
     return { ok: false, error: "Partner is unavailable." };
   }
+
+  const rateLimited = await enforcePartnerWalletAdjustRateLimits({
+    adminUserId: admin.id,
+    partnerId,
+    method: "partner_wallet_debit",
+  });
+  if (rateLimited) return rateLimited;
 
   if (!confirmed) {
     return {

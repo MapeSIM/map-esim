@@ -56,6 +56,7 @@
     "qa:wallet-foundation": "tsx scripts/qa-wallet-foundation.ts",
     "qa:admin-wallet-credit": "tsx scripts/qa-admin-wallet-credit.ts",
     "qa:admin-wallet-debit": "tsx scripts/qa-admin-wallet-debit.ts",
+    "qa:admin-partner-wallet-security": "tsx scripts/qa-admin-partner-wallet-security.ts",
     "qa:admin-package-assignment": "tsx scripts/qa-admin-package-assignment.ts",
     "qa:admin-package-share-link": "tsx scripts/qa-admin-package-share-link.ts",
     "qa:admin-countries-package-share": "tsx scripts/qa-admin-countries-package-share.ts",
