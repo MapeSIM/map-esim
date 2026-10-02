@@ -374,7 +374,7 @@ async function main() {
   assert.match(adminDetail, /PartnerStatusPanel/);
   assert.match(adminDetail, /PartnerInviteResendPanel/);
   assert.match(adminDetail, /PartnerNameEditPanel/);
-  assert.match(adminDetail, /Orders history/);
+  assert.match(adminDetail, /Purchases|Orders history/);
   assert.match(adminDetail, /Payment history/);
   assert.match(adminDetail, /Discount overview/);
   assert.match(adminDetail, /payment\.href/);

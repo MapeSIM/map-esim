@@ -7,6 +7,9 @@ import { PartnerWalletPanel } from "@/app/components/admin/PartnerWalletPanel";
 import {
   AdminButton,
   AdminEmptyState,
+  AdminFilterField,
+  AdminFilterPanel,
+  adminFilterControlClassName,
   AdminKpiCard,
   AdminPageHeader,
   AdminStatusPill,
@@ -20,7 +23,10 @@ import {
   ADMIN_SOFT_COPY_CLASS,
 } from "@/app/components/admin/ui";
 import { adminHumanStatusLabel } from "@/app/lib/admin/adminUxCopy";
-import { getPartnerDetail } from "@/app/lib/partner/partners";
+import {
+  PARTNER_DETAIL_PURCHASE_STATUSES,
+  getPartnerDetail,
+} from "@/app/lib/partner/partners";
 
 export const dynamic = "force-dynamic";
 
@@ -40,11 +46,16 @@ function buildPartnerDetailHref(options: {
   partnerId: string;
   ordersPage: number;
   paymentsPage: number;
+  purchaseStatus?: string;
 }): string {
   const params = new URLSearchParams();
   if (options.ordersPage > 1) params.set("ordersPage", String(options.ordersPage));
   if (options.paymentsPage > 1) {
     params.set("paymentsPage", String(options.paymentsPage));
+  }
+  const status = (options.purchaseStatus ?? "ALL").trim().toUpperCase();
+  if (status && status !== "ALL") {
+    params.set("purchaseStatus", status);
   }
   const qs = params.toString();
   const base = `/admin/partners/${encodeURIComponent(options.partnerId)}`;
@@ -69,7 +80,11 @@ export default async function AdminPartnerDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ ordersPage?: string; paymentsPage?: string }>;
+  searchParams: Promise<{
+    ordersPage?: string;
+    paymentsPage?: string;
+    purchaseStatus?: string;
+  }>;
 }) {
   const { id } = await params;
   const query = await searchParams;
@@ -79,6 +94,7 @@ export default async function AdminPartnerDetailPage({
     detail = await getPartnerDetail(id, {
       ordersPage: query.ordersPage,
       paymentsPage: query.paymentsPage,
+      purchaseStatus: query.purchaseStatus,
     });
   } catch {
     return (
@@ -106,6 +122,7 @@ export default async function AdminPartnerDetailPage({
     detail.statusLabel !== "Disabled" && detail.statusLabel !== "Deleted";
   const discountDisabled =
     detail.statusLabel === "Disabled" || detail.statusLabel === "Deleted";
+  const purchaseStatusFilter = detail.purchasesStatusFilter;
 
   return (
     <div className={`${ADMIN_PAGE_STACK_CLASS} min-w-0 w-full max-w-full`}>
@@ -203,30 +220,68 @@ export default async function AdminPartnerDetailPage({
               id="partner-orders-heading"
               className={ADMIN_SECTION_TITLE_CLASS}
             >
-              Orders history
+              Purchases
             </h2>
             <p className={ADMIN_SOFT_COPY_CLASS}>
-              Completed partner purchases only · {detail.purchasesTotalCount}{" "}
-              total · page {detail.purchasesPage} / {detail.purchasesTotalPages}
+              All partner eSIM purchases (read-only) ·{" "}
+              {detail.purchasesTotalCount} matching · page {detail.purchasesPage}{" "}
+              / {detail.purchasesTotalPages}
             </p>
           </div>
         </div>
+
+        <AdminFilterPanel aria-label="Purchase status filter" className="mb-3">
+          {detail.paymentsPage > 1 ? (
+            <input
+              type="hidden"
+              name="paymentsPage"
+              value={String(detail.paymentsPage)}
+            />
+          ) : null}
+          <AdminFilterField label="Purchase status">
+            <select
+              name="purchaseStatus"
+              defaultValue={purchaseStatusFilter}
+              className={adminFilterControlClassName}
+            >
+              <option value="ALL">All statuses</option>
+              {PARTNER_DETAIL_PURCHASE_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {adminHumanStatusLabel(status)}
+                </option>
+              ))}
+            </select>
+          </AdminFilterField>
+          <div className="flex items-end">
+            <AdminButton type="submit" variant="secondary" size="sm">
+              Apply filter
+            </AdminButton>
+          </div>
+        </AdminFilterPanel>
+
         {detail.purchases.length === 0 ? (
-          <AdminEmptyState title="No completed orders">
-            This partner has no completed eSIM purchases yet.
+          <AdminEmptyState title="No purchases">
+            {purchaseStatusFilter === "ALL"
+              ? "This partner has no eSIM purchases yet."
+              : "No purchases match this status filter."}
           </AdminEmptyState>
         ) : (
           <AdminTableShell
-            caption="Partner completed orders"
-            minWidthClassName="min-w-[800px]"
+            caption="Partner purchases"
+            minWidthClassName="min-w-[1100px]"
           >
             <AdminTableHead>
               <tr>
                 <th className="px-3 py-3 font-semibold">Purchase ID</th>
-                <th className="px-3 py-3 font-semibold">eSIM / Plan</th>
-                <th className="px-3 py-3 font-semibold">Amount</th>
+                <th className="px-3 py-3 font-semibold">Created</th>
+                <th className="px-3 py-3 font-semibold">Plan</th>
+                <th className="px-3 py-3 font-semibold">Destination</th>
+                <th className="px-3 py-3 font-semibold">Data</th>
+                <th className="px-3 py-3 font-semibold">Validity</th>
                 <th className="px-3 py-3 font-semibold">Status</th>
-                <th className="px-3 py-3 font-semibold">Date</th>
+                <th className="px-3 py-3 font-semibold">Charge</th>
+                <th className="px-3 py-3 font-semibold">Funding</th>
+                <th className="px-3 py-3 font-semibold">Payment</th>
               </tr>
             </AdminTableHead>
             <AdminTableBody>
@@ -235,19 +290,49 @@ export default async function AdminPartnerDetailPage({
                   <td className="break-all px-3 py-3 font-mono text-xs text-[var(--heading)]">
                     {purchase.id}
                   </td>
+                  <td className="whitespace-nowrap px-3 py-3 text-[var(--text-muted)]">
+                    {purchase.createdAtLabel}
+                  </td>
                   <td className="px-3 py-3 text-[var(--heading)]">
                     {purchase.planLabel}
                   </td>
-                  <td className="px-3 py-3 tabular-nums text-[var(--heading)]">
-                    {purchase.amountLabel}
+                  <td className="px-3 py-3 text-[var(--heading)]">
+                    {purchase.destinationLabel}
+                  </td>
+                  <td className="px-3 py-3 text-[var(--heading)]">
+                    {purchase.dataAllowanceLabel}
+                  </td>
+                  <td className="px-3 py-3 text-[var(--heading)]">
+                    {purchase.validityLabel}
                   </td>
                   <td className="px-3 py-3">
                     <AdminStatusPill value={purchase.status}>
                       {adminHumanStatusLabel(purchase.status)}
                     </AdminStatusPill>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-3 text-[var(--text-muted)]">
-                    {purchase.createdAtLabel}
+                  <td className="whitespace-nowrap px-3 py-3 tabular-nums text-[var(--heading)]">
+                    {purchase.amountLabel} {purchase.currencyLabel}
+                  </td>
+                  <td className="px-3 py-3 text-[var(--heading)]">
+                    {purchase.fundingLabel}
+                  </td>
+                  <td className="px-3 py-3">
+                    {purchase.paymentHref && purchase.paymentAttemptStatus ? (
+                      <div className="flex flex-col gap-1">
+                        <AdminStatusPill value={purchase.paymentAttemptStatus}>
+                          {adminHumanStatusLabel(purchase.paymentAttemptStatus)}
+                        </AdminStatusPill>
+                        <AdminButton
+                          href={purchase.paymentHref}
+                          variant="secondary"
+                          size="sm"
+                        >
+                          Open payment
+                        </AdminButton>
+                      </div>
+                    ) : (
+                      <span className="text-[var(--text-muted)]">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -257,7 +342,7 @@ export default async function AdminPartnerDetailPage({
         {detail.purchasesTotalPages > 1 ? (
           <nav
             className="mt-3 flex flex-wrap gap-2"
-            aria-label="Orders pagination"
+            aria-label="Purchases pagination"
           >
             {detail.purchasesPage > 1 ? (
               <AdminButton
@@ -265,15 +350,16 @@ export default async function AdminPartnerDetailPage({
                   partnerId: detail.id,
                   ordersPage: detail.purchasesPage - 1,
                   paymentsPage: detail.paymentsPage,
+                  purchaseStatus: purchaseStatusFilter,
                 })}
                 variant="secondary"
                 size="sm"
               >
-                Previous orders
+                Previous purchases
               </AdminButton>
             ) : (
               <AdminButton variant="secondary" size="sm" disabled>
-                Previous orders
+                Previous purchases
               </AdminButton>
             )}
             {detail.purchasesPage < detail.purchasesTotalPages ? (
@@ -282,15 +368,16 @@ export default async function AdminPartnerDetailPage({
                   partnerId: detail.id,
                   ordersPage: detail.purchasesPage + 1,
                   paymentsPage: detail.paymentsPage,
+                  purchaseStatus: purchaseStatusFilter,
                 })}
                 variant="secondary"
                 size="sm"
               >
-                Next orders
+                Next purchases
               </AdminButton>
             ) : (
               <AdminButton variant="secondary" size="sm" disabled>
-                Next orders
+                Next purchases
               </AdminButton>
             )}
           </nav>
@@ -371,6 +458,7 @@ export default async function AdminPartnerDetailPage({
                   partnerId: detail.id,
                   ordersPage: detail.purchasesPage,
                   paymentsPage: detail.paymentsPage - 1,
+                  purchaseStatus: purchaseStatusFilter,
                 })}
                 variant="secondary"
                 size="sm"
@@ -388,6 +476,7 @@ export default async function AdminPartnerDetailPage({
                   partnerId: detail.id,
                   ordersPage: detail.purchasesPage,
                   paymentsPage: detail.paymentsPage + 1,
+                  purchaseStatus: purchaseStatusFilter,
                 })}
                 variant="secondary"
                 size="sm"

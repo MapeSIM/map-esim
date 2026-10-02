@@ -98,13 +98,39 @@ export type PartnerWalletTxRow = {
   createdByAdminLabel: string;
 };
 
+/** Exact PartnerEsimPurchaseStatus values from Prisma (read-only filter allowlist). */
+export const PARTNER_DETAIL_PURCHASE_STATUSES = [
+  PartnerEsimPurchaseStatus.DRAFT,
+  PartnerEsimPurchaseStatus.READY,
+  PartnerEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+  PartnerEsimPurchaseStatus.FUNDS_RESERVED,
+  PartnerEsimPurchaseStatus.FUNDED,
+  PartnerEsimPurchaseStatus.PROVIDER_PENDING,
+  PartnerEsimPurchaseStatus.COMPLETED,
+  PartnerEsimPurchaseStatus.FAILED_REFUNDED,
+  PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED,
+] as const;
+
+export type PartnerDetailPurchaseStatusFilter =
+  | "ALL"
+  | (typeof PARTNER_DETAIL_PURCHASE_STATUSES)[number];
+
 export type PartnerDetailPurchaseRow = {
   id: string;
   planLabel: string;
+  destinationLabel: string;
+  dataAllowanceLabel: string;
+  validityLabel: string;
   amountLabel: string;
+  currencyLabel: string;
+  fundingLabel: string;
   status: string;
   statusLabel: string;
   createdAtLabel: string;
+  paymentAttemptId: string | null;
+  paymentAttemptStatus: string | null;
+  paymentAttemptStatusLabel: string | null;
+  paymentHref: string | null;
 };
 
 export type PartnerDetailPaymentRow = {
@@ -138,16 +164,18 @@ export type PartnerDetail = {
   totalAddedLabel: string;
   totalDeductedLabel: string;
   transactions: PartnerWalletTxRow[];
-  /** COMPLETED purchases only (read-only). */
+  /** COMPLETED purchases only (read-only KPI). */
   totalOrders: number;
   totalOrdersLabel: string;
   revenueLabel: string;
   discountSavingsLabel: string;
+  /** All PartnerEsimPurchase rows for this partner (optional status filter). */
   purchases: PartnerDetailPurchaseRow[];
   purchasesPage: number;
   purchasesPageSize: number;
   purchasesTotalCount: number;
   purchasesTotalPages: number;
+  purchasesStatusFilter: PartnerDetailPurchaseStatusFilter;
   payments: PartnerDetailPaymentRow[];
   paymentsPage: number;
   paymentsPageSize: number;
@@ -492,6 +520,36 @@ function partnerPurchasePlanLabel(row: {
   return offer || "Plan not available";
 }
 
+function partnerPurchaseDestinationLabel(row: {
+  destinationName: string | null;
+  destinationCode: string | null;
+}): string {
+  const name = (row.destinationName ?? "").trim();
+  if (name) return name;
+  const code = (row.destinationCode ?? "").trim();
+  return code || "—";
+}
+
+function partnerPurchaseStoredLabel(raw: string | null | undefined): string {
+  const value = (raw ?? "").trim();
+  return value || "—";
+}
+
+function partnerFundingSourceLabel(fundingSource: string | null | undefined): string {
+  switch ((fundingSource ?? "").trim()) {
+    case "PARTNER_BALANCE":
+      return "Partner wallet";
+    case "PARTNER_SPLIT":
+      return "Wallet + gateway";
+    case "PARTNER_GATEWAY":
+      return "Gateway";
+    default: {
+      const value = (fundingSource ?? "").trim();
+      return value ? value.replace(/_/g, " ") : "—";
+    }
+  }
+}
+
 function partnerPaymentMethodLabel(
   provider: string | null | undefined
 ): string {
@@ -499,11 +557,35 @@ function partnerPaymentMethodLabel(
   return value || "—";
 }
 
+function parsePartnerDetailPurchaseStatusFilter(
+  raw: string | null | undefined
+): PartnerDetailPurchaseStatusFilter {
+  const value = String(raw ?? "ALL").trim().toUpperCase();
+  if (value === "ALL" || !value) return "ALL";
+  if (
+    (PARTNER_DETAIL_PURCHASE_STATUSES as readonly string[]).includes(value)
+  ) {
+    return value as PartnerDetailPurchaseStatusFilter;
+  }
+  return "ALL";
+}
+
+function partnerDetailPurchasesWhere(
+  partnerId: string,
+  statusFilter: PartnerDetailPurchaseStatusFilter
+): Prisma.PartnerEsimPurchaseWhereInput {
+  if (statusFilter === "ALL") {
+    return { partnerId };
+  }
+  return { partnerId, status: statusFilter };
+}
+
 export async function getPartnerDetail(
   partnerId: string,
   options?: {
     ordersPage?: string | null;
     paymentsPage?: string | null;
+    purchaseStatus?: string | null;
   }
 ): Promise<PartnerDetail | null> {
   const id = (partnerId ?? "").trim();
@@ -511,6 +593,9 @@ export async function getPartnerDetail(
 
   const ordersPage = parsePartnersPage(options?.ordersPage ?? undefined);
   const paymentsPage = parsePartnersPage(options?.paymentsPage ?? undefined);
+  const purchasesStatusFilter = parsePartnerDetailPurchaseStatusFilter(
+    options?.purchaseStatus
+  );
 
   const row = await prisma.partnerProfile.findUnique({
     where: { id },
@@ -559,10 +644,15 @@ export async function getPartnerDetail(
 
   if (!row) return null;
 
+  // KPI aggregates stay COMPLETED-only (unchanged commercial metrics).
   const completedWhere = {
     partnerId: row.id,
     status: PartnerEsimPurchaseStatus.COMPLETED,
   } as const;
+  const purchasesWhere = partnerDetailPurchasesWhere(
+    row.id,
+    purchasesStatusFilter
+  );
 
   const [
     creditAgg,
@@ -593,7 +683,7 @@ export async function getPartnerDetail(
         retailPriceCents: true,
       },
     }),
-    prisma.partnerEsimPurchase.count({ where: completedWhere }),
+    prisma.partnerEsimPurchase.count({ where: purchasesWhere }),
     prisma.partnerEsimPurchasePaymentAttempt.count({
       where: { purchase: { partnerId: row.id } },
     }),
@@ -614,21 +704,31 @@ export async function getPartnerDetail(
 
   const [purchases, payments] = await Promise.all([
     prisma.partnerEsimPurchase.findMany({
-      where: completedWhere,
+      where: purchasesWhere,
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       skip: (safeOrdersPage - 1) * PARTNER_DETAIL_ORDERS_PAGE_SIZE,
       take: PARTNER_DETAIL_ORDERS_PAGE_SIZE,
       select: {
         id: true,
         offerId: true,
+        destinationCode: true,
         destinationName: true,
         planName: true,
         dataAllowance: true,
         validity: true,
         partnerChargeCents: true,
         currency: true,
+        fundingSource: true,
         status: true,
         createdAt: true,
+        paymentAttempts: {
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+          },
+        },
       },
     }),
     prisma.partnerEsimPurchasePaymentAttempt.findMany({
@@ -697,18 +797,35 @@ export async function getPartnerDetail(
     totalOrdersLabel: String(totalOrders),
     revenueLabel: formatUsdCents(revenueCents),
     discountSavingsLabel: formatUsdCents(savingsCents),
-    purchases: purchases.map((purchase) => ({
-      id: purchase.id,
-      planLabel: partnerPurchasePlanLabel(purchase),
-      amountLabel: `${formatUsdCents(purchase.partnerChargeCents)} ${purchase.currency || "USD"}`,
-      status: purchase.status,
-      statusLabel: purchase.status.replace(/_/g, " "),
-      createdAtLabel: formatDateTime(purchase.createdAt),
-    })),
+    purchases: purchases.map((purchase) => {
+      const latestAttempt = purchase.paymentAttempts[0] ?? null;
+      return {
+        id: purchase.id,
+        planLabel: partnerPurchasePlanLabel(purchase),
+        destinationLabel: partnerPurchaseDestinationLabel(purchase),
+        dataAllowanceLabel: partnerPurchaseStoredLabel(purchase.dataAllowance),
+        validityLabel: partnerPurchaseStoredLabel(purchase.validity),
+        amountLabel: formatUsdCents(purchase.partnerChargeCents),
+        currencyLabel: (purchase.currency || "USD").trim() || "USD",
+        fundingLabel: partnerFundingSourceLabel(purchase.fundingSource),
+        status: purchase.status,
+        statusLabel: purchase.status.replace(/_/g, " "),
+        createdAtLabel: formatDateTime(purchase.createdAt),
+        paymentAttemptId: latestAttempt?.id ?? null,
+        paymentAttemptStatus: latestAttempt?.status ?? null,
+        paymentAttemptStatusLabel: latestAttempt
+          ? latestAttempt.status.replace(/_/g, " ")
+          : null,
+        paymentHref: latestAttempt
+          ? `/admin/payments/${encodeURIComponent(latestAttempt.id)}?kind=partner`
+          : null,
+      };
+    }),
     purchasesPage: safeOrdersPage,
     purchasesPageSize: PARTNER_DETAIL_ORDERS_PAGE_SIZE,
     purchasesTotalCount,
     purchasesTotalPages,
+    purchasesStatusFilter,
     payments: payments.map((payment) => ({
       id: payment.id,
       amountLabel: `${formatUsdCents(payment.gatewayAmountCents)} ${payment.currency || "USD"}`,
