@@ -1,13 +1,69 @@
 import Link from "next/link";
-import { ArrowRight, Earth, Globe2, MapPinned } from "lucide-react";
-import CurrencyPrice from "@/app/components/plans/CurrencyPrice";
-import DestinationFlagBadge from "@/app/components/countries/DestinationFlagBadge";
 import type { DestinationCard } from "@/app/lib/vesim/countriesListingModel";
+import { resolveDestinationFlagVisual } from "@/app/lib/vesim/destinationPresentation";
 
 /**
  * Presentational destination card — safe for Server Components.
- * Price uses CurrencyPrice island; flag uses a tiny client badge.
+ * Shared CSS classes keep /countries RSC flight small (no per-card Tailwind walls).
+ * Prices are static USD placeholders; DestinationGridPrices upgrades them once per grid.
  */
+function DestinationFlagMark({
+  destination,
+}: {
+  destination: DestinationCard;
+}) {
+  if (destination.kind !== "country") {
+    const label = destination.kind === "global" ? "G" : "R";
+    return (
+      <span className="map-dest-flag map-dest-flag--initials" aria-hidden="true">
+        {label}
+      </span>
+    );
+  }
+
+  const visual = resolveDestinationFlagVisual(destination);
+
+  if (visual.type === "image") {
+    return (
+      <span className="map-dest-flag map-dest-flag--image" aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element -- listing payload must stay tiny; SVG flags are static. */}
+        <img
+          className="map-dest-flag__img"
+          src={visual.src}
+          alt=""
+          width={45}
+          height={30}
+          loading="lazy"
+          decoding="async"
+        />
+      </span>
+    );
+  }
+
+  if (visual.type === "emoji") {
+    return (
+      <span className="map-dest-flag map-dest-flag--emoji" aria-hidden="true">
+        {visual.emoji}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="map-dest-flag map-dest-flag--initials"
+      aria-hidden="true"
+      title={destination.name}
+    >
+      {visual.initials}
+    </span>
+  );
+}
+
+function usdPlaceholder(amountUsd: number | null): string {
+  if (amountUsd == null || !Number.isFinite(amountUsd)) return "—";
+  return `$${amountUsd.toFixed(2)}`;
+}
+
 export default function CompactDestinationCard({
   destination,
   href,
@@ -15,60 +71,37 @@ export default function CompactDestinationCard({
   destination: DestinationCard;
   href: string;
 }) {
-  const Icon =
-    destination.kind === "global"
-      ? Earth
-      : destination.kind === "regional"
-        ? MapPinned
-        : Globe2;
+  const amountAttr =
+    destination.minPriceUsd != null && Number.isFinite(destination.minPriceUsd)
+      ? String(destination.minPriceUsd)
+      : "";
 
   return (
-    <Link
-      href={href}
-      className="
-        group flex h-full min-h-[84px] items-center justify-between gap-3
-        rounded-2xl border border-[var(--border)] bg-[var(--surface)]
-        px-4 py-3
-        shadow-[0_6px_16px_rgba(15,23,42,0.06)]
-        transition-all duration-200
-        hover:-translate-y-[2px]
-        hover:border-[var(--border-hover)]
-        hover:shadow-[0_12px_24px_rgba(15,23,42,0.1)]
-        focus-visible:outline-none focus-visible:ring-2
-        focus-visible:ring-[var(--accent-strong)]/55 focus-visible:ring-offset-2
-        focus-visible:ring-offset-[var(--page-bg)]
-      "
-    >
-      <div className="flex min-w-0 items-center gap-3">
-        <DestinationFlagBadge
-          destination={destination}
-          iconFallback={<Icon className="h-4 w-4" />}
-        />
+    <Link href={href} className="map-dest-card">
+      <div className="map-dest-card__main">
+        <DestinationFlagMark destination={destination} />
 
-        <div className="min-w-0 text-left">
-          <h3 className="truncate text-[15px] font-semibold text-[var(--heading)]">
-            {destination.name}
-          </h3>
-          <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+        <div className="map-dest-card__text">
+          <h3 className="map-dest-card__name">{destination.name}</h3>
+          <p className="map-dest-card__meta">
             {destination.plans} {destination.plans === 1 ? "plan" : "plans"}
           </p>
         </div>
       </div>
 
-      <div className="flex max-w-[42%] shrink-0 items-center gap-2 sm:max-w-none sm:gap-2.5">
-        <div className="min-w-0 text-right">
-          <p className="text-[11px] font-medium text-[var(--text-soft)]">From</p>
-          <p className="mt-0.5 truncate text-sm font-semibold text-[var(--accent-soft)]">
-            <CurrencyPrice amountUsd={destination.minPriceUsd} />
+      <div className="map-dest-card__price-wrap">
+        <div className="map-dest-card__price">
+          <p className="map-dest-card__from">From</p>
+          <p
+            className="map-dest-card__amount"
+            data-usd={amountAttr}
+          >
+            {usdPlaceholder(destination.minPriceUsd)}
           </p>
         </div>
-        <ArrowRight
-          className="
-            h-4 w-4 text-[var(--text-soft)] transition-transform
-            group-hover:translate-x-0.5 group-hover:text-[var(--heading)]
-          "
-          aria-hidden="true"
-        />
+        <span className="map-dest-card__arrow" aria-hidden="true">
+          →
+        </span>
       </div>
     </Link>
   );

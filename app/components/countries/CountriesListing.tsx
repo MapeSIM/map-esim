@@ -8,7 +8,7 @@ import {
   toDestinationCard,
   type DestinationCard,
 } from "@/app/lib/vesim/countriesListingModel";
-import CountriesDestinationGrid from "@/app/components/countries/CountriesDestinationGrid";
+import CountriesDefaultCountryGridHtml from "@/app/components/countries/CountriesDefaultCountryGridHtml";
 import CountriesListingClient from "@/app/components/countries/CountriesListingClient";
 
 export type CountriesListingProps = {
@@ -18,8 +18,8 @@ export type CountriesListingProps = {
 
 /**
  * Destinations listing shell (Server Component).
- * Default Country A–Z grid is RSC HTML; search/filters stay in a client island.
- * Client island receives slim DestinationCard[] only (not full catalog objects).
+ * Default Country A–Z grid is compact HTML (not 200× React card trees).
+ * Search/filters stay in a client island with slim DestinationCard[].
  */
 export default function CountriesListing({
   initialDestinations,
@@ -30,13 +30,10 @@ export default function CountriesListing({
   const defaultGroups = buildDefaultCountryLetterGroups(initialDestinations);
 
   const defaultGrid = (
-    <CountriesDestinationGrid
-      filter="Country"
-      search=""
+    <CountriesDefaultCountryGridHtml
+      alphabeticalGroups={defaultGroups}
       destinationsCount={cards.length}
       filteredCount={defaultFiltered.length}
-      alphabeticalGroups={defaultGroups}
-      gridItems={[]}
     />
   );
 
@@ -44,7 +41,8 @@ export default function CountriesListing({
     <CountriesListingClient
       initialCards={cards}
       initialSource={initialSource}
-      defaultGrid={defaultGrid}
-    />
+    >
+      {defaultGrid}
+    </CountriesListingClient>
   );
 }

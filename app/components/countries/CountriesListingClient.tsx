@@ -34,14 +34,17 @@ export type CountriesListingClientProps = {
   /** Slim cards only — full VesimDestination catalog stays on the server. */
   initialCards: DestinationCard[];
   initialSource: DestinationCatalogSource;
-  /** RSC default Country A–Z grid — shown until search/filter/catalog diverge. */
-  defaultGrid: ReactNode;
+  /**
+   * RSC default Country A–Z grid (children slot, not a named client prop)
+   * — shown until search/filter/catalog diverge.
+   */
+  children: ReactNode;
 };
 
 function CountriesListingClientInner({
   initialCards,
   initialSource,
-  defaultGrid,
+  children: defaultGrid,
 }: CountriesListingClientProps) {
   const router = useRouter();
   const pathname = usePathname();

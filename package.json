@@ -121,6 +121,7 @@
     "qa:destination-catalog-ssr": "tsx scripts/qa-destination-catalog-ssr.ts",
     "qa:destination-presentation": "tsx scripts/qa-destination-presentation.ts",
     "qa:destination-routing": "tsx scripts/qa-destination-routing.ts",
+    "qa:countries-default-grid-html": "tsx scripts/qa-countries-default-grid-html.ts",
     "qa:destination-seo-metadata": "tsx scripts/qa-destination-seo-metadata.ts",
     "qa:plans-discovery": "tsx scripts/qa-plans-discovery.ts",
     "qa:home-trust-section": "tsx scripts/qa-home-trust-section.ts",
