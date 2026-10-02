@@ -9,6 +9,7 @@
  * Releases reserved Partner wallet amounts only. Never funds purchases.
  */
 import { NextResponse } from "next/server";
+import { reportServerErrorAsync } from "@/app/lib/monitoring/serverErrorMonitoring";
 import { runPartnerGatewayStaleReservationRecovery } from "@/app/lib/partner/partnerEsimPurchaseGatewayStaleRunner";
 
 export const runtime = "nodejs";
@@ -54,19 +55,40 @@ async function handle(request: Request): Promise<Response> {
     new URL(request.url).searchParams.get("dryRun") === "1" ||
     request.headers.get("x-cron-dry-run") === "1";
 
-  const result = await runPartnerGatewayStaleReservationRecovery({ dryRun });
-  const status = result.ok ? 200 : 500;
-  return NextResponse.json(
-    {
-      ok: result.ok,
-      counts: result.counts,
-      idleMs: result.idleMs,
-      maxAgeMs: result.maxAgeMs,
-      errorCode: result.errorCode ?? null,
-      dryRun,
-    },
-    { status }
-  );
+  try {
+    const result = await runPartnerGatewayStaleReservationRecovery({ dryRun });
+    if (!result.ok) {
+      await reportServerErrorAsync(
+        new Error("partner_gateway_stale_recovery_failed"),
+        {
+          operation: "cron_partner_esim_gateway_stale_release",
+          cronJob: "partner-esim-gateway-stale-release",
+          purchaseType: "partner",
+          errorCode: result.errorCode ?? "recovery_failed",
+        }
+      );
+    }
+    const status = result.ok ? 200 : 500;
+    return NextResponse.json(
+      {
+        ok: result.ok,
+        counts: result.counts,
+        idleMs: result.idleMs,
+        maxAgeMs: result.maxAgeMs,
+        errorCode: result.errorCode ?? null,
+        dryRun,
+      },
+      { status }
+    );
+  } catch (error) {
+    await reportServerErrorAsync(error, {
+      operation: "cron_partner_esim_gateway_stale_release",
+      cronJob: "partner-esim-gateway-stale-release",
+      purchaseType: "partner",
+      errorCode: "unhandled",
+    });
+    return NextResponse.json({ ok: false, error: "internal" }, { status: 500 });
+  }
 }
 
 export async function GET(request: Request) {

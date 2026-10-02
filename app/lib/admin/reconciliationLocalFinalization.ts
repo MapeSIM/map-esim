@@ -19,6 +19,7 @@ import {
   WalletTransactionStatus,
 } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
+import { reportServerError } from "@/app/lib/monitoring/serverErrorMonitoring";
 import { writeAuditLog } from "@/app/lib/auth/audit";
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
 import {
@@ -1072,6 +1073,13 @@ export async function finalizeReconciliationLocalRecord(options: {
     };
   } catch (error) {
     console.error("LOCAL_FINALIZE_TRANSACTION_ERROR:", error);
+    reportServerError(error, {
+      operation: "reconciliation_local_finalize",
+      purchaseId: ids.recordId,
+      paymentAttemptId: ids.attemptId,
+      errorCode: "LOCAL_FINALIZE_TRANSACTION_ERROR",
+      extras: { sourceType: ids.sourceType },
+    });
 
     const errorMessage =
       error instanceof Error

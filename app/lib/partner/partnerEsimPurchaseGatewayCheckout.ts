@@ -14,6 +14,7 @@ import {
   Role,
 } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
+import { reportServerError } from "@/app/lib/monitoring/serverErrorMonitoring";
 import {
   partnerEsimPurchasePaymentCancelPath,
   partnerEsimPurchasePaymentReturnPath,
@@ -521,6 +522,19 @@ export async function startPartnerEsimPurchaseHostedCheckout(
         error instanceof Error
           ? error.message.slice(0, 500)
           : String(error).slice(0, 500),
+    });
+    reportServerError(error, {
+      operation: "partner_esim_gateway",
+      purchaseType: "partner",
+      purchaseId: purchase.id,
+      provider: "SIMPAISA",
+      errorCode:
+        error instanceof PartnerEsimPurchaseGatewayCheckoutError
+          ? error.code
+          : error && typeof error === "object" && "code" in error
+            ? String((error as { code?: unknown }).code ?? "").slice(0, 64)
+            : undefined,
+      extras: { offerId: purchase.offerId, status: purchase.status },
     });
     throw error;
   }

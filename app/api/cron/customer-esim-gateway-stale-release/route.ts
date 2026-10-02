@@ -7,6 +7,7 @@
  */
 import { NextResponse } from "next/server";
 import { runCustomerGatewayStaleReservationRecovery } from "@/app/lib/esim/esimPurchaseGatewayStaleRunner";
+import { reportServerErrorAsync } from "@/app/lib/monitoring/serverErrorMonitoring";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,19 +51,40 @@ async function handle(request: Request): Promise<Response> {
     new URL(request.url).searchParams.get("dryRun") === "1" ||
     request.headers.get("x-cron-dry-run") === "1";
 
-  const result = await runCustomerGatewayStaleReservationRecovery({ dryRun });
-  const status = result.ok ? 200 : 500;
-  return NextResponse.json(
-    {
-      ok: result.ok,
-      counts: result.counts,
-      idleMs: result.idleMs,
-      maxAgeMs: result.maxAgeMs,
-      errorCode: result.errorCode ?? null,
-      dryRun,
-    },
-    { status }
-  );
+  try {
+    const result = await runCustomerGatewayStaleReservationRecovery({ dryRun });
+    if (!result.ok) {
+      await reportServerErrorAsync(
+        new Error("customer_gateway_stale_recovery_failed"),
+        {
+          operation: "cron_customer_esim_gateway_stale_release",
+          cronJob: "customer-esim-gateway-stale-release",
+          purchaseType: "customer",
+          errorCode: result.errorCode ?? "recovery_failed",
+        }
+      );
+    }
+    const status = result.ok ? 200 : 500;
+    return NextResponse.json(
+      {
+        ok: result.ok,
+        counts: result.counts,
+        idleMs: result.idleMs,
+        maxAgeMs: result.maxAgeMs,
+        errorCode: result.errorCode ?? null,
+        dryRun,
+      },
+      { status }
+    );
+  } catch (error) {
+    await reportServerErrorAsync(error, {
+      operation: "cron_customer_esim_gateway_stale_release",
+      cronJob: "customer-esim-gateway-stale-release",
+      purchaseType: "customer",
+      errorCode: "unhandled",
+    });
+    return NextResponse.json({ ok: false, error: "internal" }, { status: 500 });
+  }
 }
 
 export async function GET(request: Request) {

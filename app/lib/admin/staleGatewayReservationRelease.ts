@@ -13,6 +13,7 @@ import {
   WalletEsimPurchaseStatus,
 } from "@prisma/client";
 import { assertSameOriginAdminRequest } from "@/app/lib/admin/reconciliationCaseManagement";
+import { reportServerError } from "@/app/lib/monitoring/serverErrorMonitoring";
 import {
   PAYMENT_RECOVERY_STALE_RELEASE_AUDIT,
   PAYMENT_RECOVERY_STALE_RELEASE_BLOCKED_AUDIT,
@@ -263,6 +264,13 @@ async function releasePartnerUnpaidHoldForAdmin(options: {
       step: "partner_tx_failed",
       ...failureContext,
       ...prismaErrorFields(error),
+    });
+    reportServerError(error, {
+      operation: "stale_gateway_release",
+      purchaseType: "partner",
+      purchaseId,
+      paymentAttemptId: attemptId,
+      errorCode: prismaErrorFields(error).prismaCode ?? "partner_tx_failed",
     });
     throw error;
   }

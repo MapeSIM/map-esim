@@ -25,6 +25,10 @@ import {
   type SimpaisaWalletOperatorId,
 } from "@/app/lib/payments/simpaisaPolicy";
 import type { PaymentCheckoutPurpose } from "@/app/lib/payments/types";
+import {
+  reportServerError,
+  reportServerFailure,
+} from "@/app/lib/monitoring/serverErrorMonitoring";
 
 export type SimpaisaVerifyInput = {
   chargeAmountMinor: number;
@@ -501,6 +505,12 @@ export class SimpaisaHttpClient {
               environment: this.config.environment,
               timeoutMs: SIMPAISA_HTTP_TIMEOUT_MS,
             });
+            reportServerFailure("Simpaisa verify timed out", {
+              operation: "simpaisa_http",
+              provider: "SIMPAISA",
+              errorCode: "VERIFY_TIMEOUT",
+              extras: { path },
+            });
           }
           throw new SimpaisaHttpError(
             "SIMPAISA_TIMEOUT",
@@ -512,6 +522,12 @@ export class SimpaisaHttpClient {
           continue;
         }
         console.error("simpaisa_http", "NETWORK_ERROR", method, path);
+        reportServerError(error, {
+          operation: "simpaisa_http",
+          provider: "SIMPAISA",
+          errorCode: "NETWORK_ERROR",
+          extras: { method, path },
+        });
         throw new SimpaisaHttpError(
           "UNAVAILABLE",
           "Payment provider unavailable."
@@ -534,6 +550,12 @@ export class SimpaisaHttpClient {
           path,
           response.status
         );
+        reportServerFailure("Simpaisa HTTP error", {
+          operation: "simpaisa_http",
+          provider: "SIMPAISA",
+          errorCode: "HTTP_ERROR",
+          extras: { method, path, status: response.status },
+        });
         throw new SimpaisaHttpError(
           "UNAVAILABLE",
           "Payment provider unavailable."
@@ -543,8 +565,14 @@ export class SimpaisaHttpClient {
       let json: unknown;
       try {
         json = await response.json();
-      } catch {
+      } catch (error) {
         console.error("simpaisa_http", "INVALID_JSON", method, path);
+        reportServerError(error, {
+          operation: "simpaisa_http",
+          provider: "SIMPAISA",
+          errorCode: "INVALID_JSON",
+          extras: { method, path },
+        });
         throw new SimpaisaHttpError(
           "UNAVAILABLE",
           "Payment provider unavailable."

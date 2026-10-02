@@ -18,6 +18,7 @@ import {
 import { OPERATIONAL_CONTROL_UNAVAILABLE_MESSAGE } from "@/app/lib/admin/operationalControlsShared";
 import { usdPriceToCents } from "@/app/lib/esim/assignmentValidation";
 import { prisma } from "@/app/lib/db";
+import { reportServerError } from "@/app/lib/monitoring/serverErrorMonitoring";
 import {
   calculatePartnerPurchasePricing,
   PARTNER_PRICING_UNAVAILABLE_MESSAGE,
@@ -782,6 +783,16 @@ export async function reservePartnerEsimPurchase(
         error instanceof Error
           ? error.message.slice(0, 500)
           : String(error).slice(0, 500),
+    });
+    reportServerError(error, {
+      operation: "partner_esim_reserve",
+      purchaseType: "partner",
+      purchaseId: purchase.id,
+      errorCode:
+        error && typeof error === "object" && "code" in error
+          ? String((error as { code?: unknown }).code ?? "").slice(0, 64)
+          : undefined,
+      extras: { offerId: purchase.offerId, status: purchase.status },
     });
     if (error instanceof PartnerEsimPurchaseError) throw error;
     mapWalletError(error);

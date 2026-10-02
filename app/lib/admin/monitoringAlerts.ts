@@ -6,6 +6,7 @@
  */
 import "server-only";
 
+import { isServerErrorMonitoringConfigured } from "@/app/lib/monitoring/serverErrorMonitoring";
 import { cache } from "react";
 import {
   Role,
@@ -203,6 +204,7 @@ function buildConfigAlerts(input: {
   googleOAuthConfigured: boolean;
   webhookSecretConfigured: boolean;
   deploymentVersion: string | null;
+  errorMonitoringConfigured: boolean;
   controls: Awaited<ReturnType<typeof getOperationalControlsHealthSnapshot>>;
   emailFailureCount: number;
   oldestEmailFailure: Date | null;
@@ -646,21 +648,23 @@ function buildConfigAlerts(input: {
       recommendedAction: "Track backup readiness outside Alerts until a verified source exists.",
     })
   );
-  pushUnique(
-    alerts,
-    makeAlert({
-      category: "SECURITY",
-      code: "SECURITY_ERROR_MONITORING_NOT_CONFIGURED",
-      severity: "INFO",
-      title: "Error monitoring not configured",
-      description: "External error monitoring is not configured for this phase.",
-      sourceAt: now,
-      now,
-      freshness: "NOT_AVAILABLE",
-      href: "/admin/operations",
-      recommendedAction: "Track error-monitoring readiness on Operations.",
-    })
-  );
+  if (!input.errorMonitoringConfigured) {
+    pushUnique(
+      alerts,
+      makeAlert({
+        category: "SECURITY",
+        code: "SECURITY_ERROR_MONITORING_NOT_CONFIGURED",
+        severity: "INFO",
+        title: "Error monitoring not configured",
+        description: "External error monitoring is not configured for this phase.",
+        sourceAt: now,
+        now,
+        freshness: "NOT_AVAILABLE",
+        href: "/admin/operations",
+        recommendedAction: "Track error-monitoring readiness on Operations.",
+      })
+    );
+  }
 
   return alerts;
 }
@@ -1733,6 +1737,7 @@ async function collectMonitoringAlertsImpl(options?: {
       APP_VERSION: process.env.APP_VERSION,
       VERCEL_GIT_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA,
     }),
+    errorMonitoringConfigured: isServerErrorMonitoringConfigured(),
     controls,
     emailFailureCount: recordPart.emailFailureCount,
     oldestEmailFailure: recordPart.oldestEmailFailure,

@@ -20,6 +20,7 @@ import {
   executePartnerEsimProviderPurchase,
   type PartnerProviderCheckoutExecutor,
 } from "@/app/lib/partner/partnerEsimPurchaseProvider";
+import { reportServerError } from "@/app/lib/monitoring/serverErrorMonitoring";
 import {
   PartnerEsimPurchaseGatewayCheckoutError,
   startPartnerEsimPurchaseHostedCheckout,
@@ -316,6 +317,18 @@ export async function buyPartnerEsimPurchase(
         error instanceof Error
           ? error.message.slice(0, 500)
           : String(error).slice(0, 500),
+    });
+    reportServerError(error, {
+      operation: "partner_buy",
+      purchaseType: "partner",
+      purchaseId,
+      errorCode:
+        error instanceof PartnerEsimPurchaseError
+          ? error.code
+          : error && typeof error === "object" && "code" in error
+            ? String((error as { code?: unknown }).code ?? "").slice(0, 64)
+            : undefined,
+      extras: { lastStep, offerId },
     });
     if (error instanceof PartnerEsimPurchaseError) {
       return mapPartnerPurchaseErrorCode(error.code, purchaseId);

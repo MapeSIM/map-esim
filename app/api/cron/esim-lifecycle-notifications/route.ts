@@ -9,6 +9,7 @@
  */
 import { NextResponse } from "next/server";
 import { runEsimLifecycleNotifications } from "@/app/lib/esim/esimLifecycleNotificationRunner";
+import { reportServerErrorAsync } from "@/app/lib/monitoring/serverErrorMonitoring";
 import { runGatewayStaleReservationRecovery } from "@/app/lib/payments/gatewayStaleReservationRecovery";
 
 export const runtime = "nodejs";
@@ -54,37 +55,74 @@ async function handle(request: Request): Promise<Response> {
     new URL(request.url).searchParams.get("dryRun") === "1" ||
     request.headers.get("x-cron-dry-run") === "1";
 
-  const result = await runEsimLifecycleNotifications({ dryRun });
-
-  // Hobby allows one Vercel cron/day — piggyback unpaid gateway hold release.
-  // Failures here must not fail lifecycle delivery status.
-  let staleRelease: Awaited<
-    ReturnType<typeof runGatewayStaleReservationRecovery>
-  > | null = null;
   try {
-    staleRelease = await runGatewayStaleReservationRecovery({ dryRun });
-  } catch {
-    staleRelease = null;
-  }
+    const result = await runEsimLifecycleNotifications({ dryRun });
+    if (!result.ok && result.errorCode !== "runner_busy") {
+      await reportServerErrorAsync(
+        new Error("esim_lifecycle_notifications_failed"),
+        {
+          operation: "cron_esim_lifecycle_notifications",
+          cronJob: "esim-lifecycle-notifications",
+          errorCode: result.errorCode ?? "lifecycle_failed",
+        }
+      );
+    }
 
-  const status = result.ok ? 200 : result.errorCode === "runner_busy" ? 409 : 500;
-  return NextResponse.json(
-    {
-      ok: result.ok,
-      runnerClaimed: result.runnerClaimed,
-      counts: result.counts,
-      errorCode: result.errorCode ?? null,
-      staleRelease: staleRelease
-        ? {
-            ok: staleRelease.ok,
-            customer: staleRelease.customer.counts,
-            partner: staleRelease.partner.counts,
+    // Hobby allows one Vercel cron/day — piggyback unpaid gateway hold release.
+    // Failures here must not fail lifecycle delivery status.
+    let staleRelease: Awaited<
+      ReturnType<typeof runGatewayStaleReservationRecovery>
+    > | null = null;
+    try {
+      staleRelease = await runGatewayStaleReservationRecovery({ dryRun });
+      if (staleRelease && !staleRelease.ok) {
+        await reportServerErrorAsync(
+          new Error("piggyback_stale_release_failed"),
+          {
+            operation: "cron_esim_lifecycle_stale_release",
+            cronJob: "esim-lifecycle-notifications",
+            errorCode:
+              staleRelease.customer.errorCode ??
+              staleRelease.partner.errorCode ??
+              "stale_release_failed",
           }
-        : { ok: false, errorCode: "stale_release_failed" },
-      dryRun,
-    },
-    { status }
-  );
+        );
+      }
+    } catch (error) {
+      await reportServerErrorAsync(error, {
+        operation: "cron_esim_lifecycle_stale_release",
+        cronJob: "esim-lifecycle-notifications",
+        errorCode: "stale_release_unhandled",
+      });
+      staleRelease = null;
+    }
+
+    const status = result.ok ? 200 : result.errorCode === "runner_busy" ? 409 : 500;
+    return NextResponse.json(
+      {
+        ok: result.ok,
+        runnerClaimed: result.runnerClaimed,
+        counts: result.counts,
+        errorCode: result.errorCode ?? null,
+        staleRelease: staleRelease
+          ? {
+              ok: staleRelease.ok,
+              customer: staleRelease.customer.counts,
+              partner: staleRelease.partner.counts,
+            }
+          : { ok: false, errorCode: "stale_release_failed" },
+        dryRun,
+      },
+      { status }
+    );
+  } catch (error) {
+    await reportServerErrorAsync(error, {
+      operation: "cron_esim_lifecycle_notifications",
+      cronJob: "esim-lifecycle-notifications",
+      errorCode: "unhandled",
+    });
+    return NextResponse.json({ ok: false, error: "internal" }, { status: 500 });
+  }
 }
 
 export async function GET(request: Request) {

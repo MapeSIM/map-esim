@@ -9,6 +9,7 @@
  * Never funds purchases and never calls VeSIM.
  */
 import { NextResponse } from "next/server";
+import { reportServerErrorAsync } from "@/app/lib/monitoring/serverErrorMonitoring";
 import { runGatewayStaleReservationRecovery } from "@/app/lib/payments/gatewayStaleReservationRecovery";
 
 export const runtime = "nodejs";
@@ -53,29 +54,51 @@ async function handle(request: Request): Promise<Response> {
     new URL(request.url).searchParams.get("dryRun") === "1" ||
     request.headers.get("x-cron-dry-run") === "1";
 
-  const result = await runGatewayStaleReservationRecovery({ dryRun });
-  const status = result.ok ? 200 : 500;
-  return NextResponse.json(
-    {
-      ok: result.ok,
-      customer: {
-        ok: result.customer.ok,
-        counts: result.customer.counts,
-        idleMs: result.customer.idleMs,
-        maxAgeMs: result.customer.maxAgeMs,
-        errorCode: result.customer.errorCode ?? null,
+  try {
+    const result = await runGatewayStaleReservationRecovery({ dryRun });
+    if (!result.ok) {
+      await reportServerErrorAsync(
+        new Error("gateway_stale_reservation_recovery_failed"),
+        {
+          operation: "cron_gateway_stale_reservation_release",
+          cronJob: "gateway-stale-reservation-release",
+          errorCode:
+            result.customer.errorCode ??
+            result.partner.errorCode ??
+            "recovery_failed",
+        }
+      );
+    }
+    const status = result.ok ? 200 : 500;
+    return NextResponse.json(
+      {
+        ok: result.ok,
+        customer: {
+          ok: result.customer.ok,
+          counts: result.customer.counts,
+          idleMs: result.customer.idleMs,
+          maxAgeMs: result.customer.maxAgeMs,
+          errorCode: result.customer.errorCode ?? null,
+        },
+        partner: {
+          ok: result.partner.ok,
+          counts: result.partner.counts,
+          idleMs: result.partner.idleMs,
+          maxAgeMs: result.partner.maxAgeMs,
+          errorCode: result.partner.errorCode ?? null,
+        },
+        dryRun,
       },
-      partner: {
-        ok: result.partner.ok,
-        counts: result.partner.counts,
-        idleMs: result.partner.idleMs,
-        maxAgeMs: result.partner.maxAgeMs,
-        errorCode: result.partner.errorCode ?? null,
-      },
-      dryRun,
-    },
-    { status }
-  );
+      { status }
+    );
+  } catch (error) {
+    await reportServerErrorAsync(error, {
+      operation: "cron_gateway_stale_reservation_release",
+      cronJob: "gateway-stale-reservation-release",
+      errorCode: "unhandled",
+    });
+    return NextResponse.json({ ok: false, error: "internal" }, { status: 500 });
+  }
 }
 
 export async function GET(request: Request) {

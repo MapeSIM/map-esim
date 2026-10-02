@@ -12,6 +12,7 @@ import {
   SimpaisaHttpClient,
   SimpaisaHttpError,
 } from "@/app/lib/payments/simpaisaHttp";
+import { reportServerError } from "@/app/lib/monitoring/serverErrorMonitoring";
 import {
   isSimpaisaWalletOperatorId,
   isSimpaisaWebhookSignatureContractAvailable,
@@ -198,6 +199,12 @@ function createSimpaisaAdapter(
             apiHost,
             code: error.code,
           });
+          reportServerError(error, {
+            operation: "simpaisa_verify",
+            provider: "SIMPAISA",
+            errorCode: error.code,
+            extras: { purpose: input.purpose },
+          });
           return {
             ok: false,
             code:
@@ -211,6 +218,12 @@ function createSimpaisaAdapter(
           purpose: input.purpose,
           environment: config.environment,
           apiHost,
+        });
+        reportServerError(error, {
+          operation: "simpaisa_create_checkout",
+          provider: "SIMPAISA",
+          errorCode: "CREATE_CHECKOUT_FAILED",
+          extras: { purpose: input.purpose },
         });
         return {
           ok: false,
@@ -257,8 +270,13 @@ function createSimpaisaAdapter(
           expectedConfig: config,
           signatureVerified: verified.ok,
         });
-      } catch {
+      } catch (error) {
         console.error("simpaisa_adapter", "PARSE_WEBHOOK_FAILED");
+        reportServerError(error, {
+          operation: "simpaisa_parse_webhook",
+          provider: "SIMPAISA",
+          errorCode: "PARSE_WEBHOOK_FAILED",
+        });
         return null;
       }
     },
@@ -295,12 +313,22 @@ function createSimpaisaAdapter(
         return { ok: true, providerRefundRef: result.providerRefundRef };
       } catch (error) {
         if (error instanceof SimpaisaHttpError) {
+          reportServerError(error, {
+            operation: "simpaisa_refund",
+            provider: "SIMPAISA",
+            errorCode: error.code,
+          });
           return {
             ok: false,
             code: error.code === "INVALID_REQUEST" ? "FAILED" : "FAILED",
           };
         }
         console.error("simpaisa_adapter", "REFUND_FAILED");
+        reportServerError(error, {
+          operation: "simpaisa_refund",
+          provider: "SIMPAISA",
+          errorCode: "REFUND_FAILED",
+        });
         return { ok: false, code: "FAILED" };
       }
     },

@@ -18,6 +18,7 @@ import {
 } from "@/app/lib/admin/operationalControlsPolicy";
 import { OPERATIONAL_CONTROL_UNAVAILABLE_MESSAGE } from "@/app/lib/admin/operationalControlsShared";
 import { prisma } from "@/app/lib/db";
+import { reportServerError } from "@/app/lib/monitoring/serverErrorMonitoring";
 import {
   persistPartnerPurchaseProviderObservation,
   type ProviderResultKind,
@@ -783,6 +784,19 @@ export async function executePartnerEsimProviderPurchase(
         error instanceof Error
           ? error.message.slice(0, 500)
           : String(error).slice(0, 500),
+    });
+    reportServerError(error, {
+      operation: "partner_esim_finalize",
+      purchaseType: "partner",
+      purchaseId: purchase.id,
+      provider: "VESIM",
+      errorCode:
+        error instanceof PartnerEsimPurchaseError
+          ? error.code
+          : error && typeof error === "object" && "code" in error
+            ? String((error as { code?: unknown }).code ?? "").slice(0, 64)
+            : undefined,
+      extras: { offerId: purchase.offerId },
     });
     if (error instanceof PartnerEsimPurchaseError) throw error;
     const persistDiagnostic = classifyOrderPersistError(error);
