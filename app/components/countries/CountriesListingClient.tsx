@@ -13,7 +13,6 @@ import {
   parsePublicDestinations,
   shouldAcceptPublicDestinationCatalog,
   type DestinationCatalogSource,
-  type VesimDestination,
 } from "@/app/lib/vesim/destinations";
 import {
   filterDestinationCards,
@@ -32,14 +31,15 @@ import CountriesListingControls, {
 } from "@/app/components/countries/CountriesListingControls";
 
 export type CountriesListingClientProps = {
-  initialDestinations: VesimDestination[];
+  /** Slim cards only — full VesimDestination catalog stays on the server. */
+  initialCards: DestinationCard[];
   initialSource: DestinationCatalogSource;
   /** RSC default Country A–Z grid — shown until search/filter/catalog diverge. */
   defaultGrid: ReactNode;
 };
 
 function CountriesListingClientInner({
-  initialDestinations,
+  initialCards,
   initialSource,
   defaultGrid,
 }: CountriesListingClientProps) {
@@ -49,8 +49,8 @@ function CountriesListingClientInner({
   const filter = parseCountryListingFilter(searchParams.get("filter"));
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [source, setSource] = useState<DestinationCatalogSource>(initialSource);
-  const [destinations, setDestinations] = useState<DestinationCard[]>(() =>
-    initialDestinations.map(toDestinationCard)
+  const [destinations, setDestinations] = useState<DestinationCard[]>(
+    () => initialCards
   );
   // Soft refresh only — never clear SSR/catalog cards while updating.
   const [updating, setUpdating] = useState(false);

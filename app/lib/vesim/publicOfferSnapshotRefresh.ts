@@ -44,7 +44,7 @@ export type PublicOfferLiveFetcher = (
  * background: return last-good snapshot immediately; refresh after the response
  * when possible (order soft-catalog reads — avoids up to 4s request wait).
  */
-export type PublicOfferRefreshMode = "blocking" | "background";
+export type PublicOfferRefreshMode = "blocking" | "background" | "snapshot-only";
 
 function schedulePublicOfferRefreshTask(task: () => Promise<void>): void {
   const run = () => task().catch(() => undefined);
@@ -278,6 +278,13 @@ export async function loadPublicOffersForCountry(options: {
   const stored = parseStoredPublicOffers(row);
   if (!row || !stored) {
     throw new PublicOfferSnapshotError(row ? "malformed" : "missing");
+  }
+
+  // Optional read-only mode (no lease / no VeSIM). Country HTML browse uses
+  // blocking refresh inside `unstable_cache` instead — regenerate only, not
+  // every request, and never `after()` on the HTML path.
+  if (refreshMode === "snapshot-only") {
+    return stored;
   }
 
   if (!isPublicOfferSnapshotStale(row, now, PUBLIC_OFFER_SNAPSHOT_STALE_MS)) {

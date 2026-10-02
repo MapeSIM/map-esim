@@ -29,6 +29,7 @@ import {
 import { prisma } from "@/app/lib/db";
 import {
   PUBLIC_OFFER_FLAG_OFF_REVALIDATE_SECONDS,
+  PUBLIC_OFFER_SNAPSHOT_STALE_SECONDS,
   PUBLIC_OFFER_REFRESH_TIMEOUT_MS,
   PublicOfferSnapshotError,
 } from "@/app/lib/vesim/publicOfferSnapshot";
@@ -457,6 +458,32 @@ export async function fetchPublicOffersForCountry(
     return withPakistan;
   }
   return applyAsiaPublicCatalog(key, withPakistan);
+}
+
+/**
+ * Next Data Cache wrapper for public country HTML (ISR / CDN).
+ *
+ * Normal requests: cache HIT → no Prisma / no VeSIM.
+ * On miss or ~300s revalidation: ONE blocking authoritative refresh via
+ * existing lease + refreshLeasedPublicOfferSnapshot (no `after()`).
+ * Refresh failure keeps last-good DB snapshot (see loadPublicOffersForCountry).
+ * Purchase/checkout must keep using verifyOfferAuthoritative (live) — never this.
+ */
+const loadCachedPublicOffersForCountryBrowse = unstable_cache(
+  async (countryKey: string): Promise<VesimOffer[]> =>
+    fetchPublicOffersForCountry(countryKey, { refreshMode: "blocking" }),
+  ["public-offers-country-browse-v3"],
+  { revalidate: PUBLIC_OFFER_SNAPSHOT_STALE_SECONDS }
+);
+
+export async function fetchCachedPublicOffersForCountry(
+  country: string
+): Promise<VesimOffer[]> {
+  const key = publicOffersCountryKey(country);
+  if (!key) {
+    throw new PublicOfferSnapshotError("invalid_country");
+  }
+  return loadCachedPublicOffersForCountryBrowse(key);
 }
 
 export async function verifyOfferAuthoritative(options: {

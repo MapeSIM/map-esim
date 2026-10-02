@@ -15,12 +15,17 @@ import {
 } from "@/app/lib/vesim/destinations";
 import {
   fetchPublicDestinationCatalog,
-  fetchPublicOffersForCountry,
+  // Cached browse loader (alias name keeps offline QA path checks stable).
+  fetchCachedPublicOffersForCountry as fetchPublicOffersForCountry,
 } from "@/app/lib/vesim/server";
 import { notFound, permanentRedirect } from "next/navigation";
 
 /** Align with public destination catalog cache; keep crawlers on fresh plan HTML. */
 export const revalidate = 300;
+/** Prefer static/ISR shell; offer reads go through Next Data Cache only. */
+export const dynamic = "force-static";
+/** Allow on-demand ISR for destination slugs not prerendered at build time. */
+export const dynamicParams = true;
 
 type CountryDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -70,11 +75,10 @@ async function loadPublicOffers(countryCode: string): Promise<{
   error: string;
 }> {
   try {
-    // Snapshot-first: return last-good immediately; leased VeSIM refresh runs
-    // after the response. Checkout still uses verifyOfferAuthoritative (live).
-    const raw = await fetchPublicOffersForCountry(countryCode, {
-      refreshMode: "background",
-    });
+    // Data-Cache browse path (ISR): HIT = no I/O; miss/revalidate may block
+    // once on lease + VeSIM via refreshMode "blocking" inside unstable_cache.
+    // Never uses `after()`. Checkout still uses verifyOfferAuthoritative (live).
+    const raw = await fetchPublicOffersForCountry(countryCode);
     return { offers: toPublicVesimOffers(raw), error: "" };
   } catch {
     return {
