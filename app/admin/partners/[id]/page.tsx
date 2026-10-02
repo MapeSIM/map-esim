@@ -213,6 +213,88 @@ export default async function AdminPartnerDetailPage({
         </dl>
       </section>
 
+      <section aria-labelledby="partner-active-holds-heading">
+        <div className="mb-3">
+          <h2
+            id="partner-active-holds-heading"
+            className={ADMIN_SECTION_TITLE_CLASS}
+          >
+            Active Wallet Holds
+          </h2>
+          <p className={ADMIN_SOFT_COPY_CLASS}>
+            Read-only open Partner wallet reservations for this partner ·{" "}
+            {detail.activeHolds.length} shown
+            {detail.activeHoldsTruncated ? " (list truncated)" : ""}
+          </p>
+        </div>
+        {detail.activeHolds.length === 0 ? (
+          <AdminEmptyState title="No active wallet holds">
+            This partner has no open wallet holds right now.
+          </AdminEmptyState>
+        ) : (
+          <AdminTableShell
+            caption="Partner active wallet holds"
+            minWidthClassName="min-w-[1000px]"
+          >
+            <AdminTableHead>
+              <tr>
+                <th className="px-3 py-3 font-semibold">Purchase ID</th>
+                <th className="px-3 py-3 font-semibold">Reserved</th>
+                <th className="px-3 py-3 font-semibold">Status</th>
+                <th className="px-3 py-3 font-semibold">Funding</th>
+                <th className="px-3 py-3 font-semibold">Payment</th>
+                <th className="px-3 py-3 font-semibold">Reserved at</th>
+                <th className="px-3 py-3 font-semibold">Age</th>
+              </tr>
+            </AdminTableHead>
+            <AdminTableBody>
+              {detail.activeHolds.map((hold) => (
+                <tr key={hold.purchaseId}>
+                  <td className="break-all px-3 py-3 font-mono text-xs text-[var(--heading)]">
+                    {hold.purchaseId}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 tabular-nums text-[var(--heading)]">
+                    {hold.reservedAmountLabel} {hold.currencyLabel}
+                  </td>
+                  <td className="px-3 py-3">
+                    <AdminStatusPill value={hold.status}>
+                      {adminHumanStatusLabel(hold.status)}
+                    </AdminStatusPill>
+                  </td>
+                  <td className="px-3 py-3 text-[var(--heading)]">
+                    {hold.fundingLabel}
+                  </td>
+                  <td className="px-3 py-3">
+                    {hold.paymentHref && hold.paymentAttemptStatus ? (
+                      <div className="flex flex-col gap-1">
+                        <AdminStatusPill value={hold.paymentAttemptStatus}>
+                          {adminHumanStatusLabel(hold.paymentAttemptStatus)}
+                        </AdminStatusPill>
+                        <AdminButton
+                          href={hold.paymentHref}
+                          variant="secondary"
+                          size="sm"
+                        >
+                          Open payment
+                        </AdminButton>
+                      </div>
+                    ) : (
+                      <span className="text-[var(--text-muted)]">—</span>
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 text-[var(--text-muted)]">
+                    {hold.reservedAtLabel}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 text-[var(--text-muted)]">
+                    {hold.ageLabel}
+                  </td>
+                </tr>
+              ))}
+            </AdminTableBody>
+          </AdminTableShell>
+        )}
+      </section>
+
       <section aria-labelledby="partner-orders-heading">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
           <div>

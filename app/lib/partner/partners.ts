@@ -22,6 +22,12 @@ import {
   parseDiscountPercentToBps,
 } from "@/app/lib/partner/discount";
 import {
+  PARTNER_DETAIL_ACTIVE_HOLDS_TAKE,
+  PARTNER_DETAIL_ACTIVE_HOLD_STATUS_STRINGS,
+  isPartnerActiveWalletHold,
+  partnerActiveHoldAgeLabel,
+} from "@/app/lib/partner/partnerDetailActiveHoldsShared";
+import {
   buildPartnerInviteSetupUrl,
   mintPartnerInviteToken,
 } from "@/app/lib/partner/partnerInvite";
@@ -143,6 +149,21 @@ export type PartnerDetailPaymentRow = {
   href: string;
 };
 
+export type PartnerDetailActiveHoldRow = {
+  purchaseId: string;
+  reservedAmountLabel: string;
+  currencyLabel: string;
+  status: string;
+  statusLabel: string;
+  fundingLabel: string;
+  paymentAttemptId: string | null;
+  paymentAttemptStatus: string | null;
+  paymentAttemptStatusLabel: string | null;
+  paymentHref: string | null;
+  reservedAtLabel: string;
+  ageLabel: string;
+};
+
 export type PartnerDetail = {
   id: string;
   userId: string;
@@ -176,6 +197,9 @@ export type PartnerDetail = {
   purchasesTotalCount: number;
   purchasesTotalPages: number;
   purchasesStatusFilter: PartnerDetailPurchaseStatusFilter;
+  /** Open wallet holds only (read-only; same classification as Ops monitor). */
+  activeHolds: PartnerDetailActiveHoldRow[];
+  activeHoldsTruncated: boolean;
   payments: PartnerDetailPaymentRow[];
   paymentsPage: number;
   paymentsPageSize: number;
@@ -702,7 +726,7 @@ export async function getPartnerDetail(
   const safePaymentsPage =
     paymentsPage > paymentsTotalPages ? paymentsTotalPages : paymentsPage;
 
-  const [purchases, payments] = await Promise.all([
+  const [purchases, payments, activeHoldRows] = await Promise.all([
     prisma.partnerEsimPurchase.findMany({
       where: purchasesWhere,
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -745,7 +769,67 @@ export async function getPartnerDetail(
         createdAt: true,
       },
     }),
+    prisma.partnerEsimPurchase.findMany({
+      where: {
+        partnerId: row.id,
+        refundTransactionId: null,
+        walletAppliedCents: { gt: 0 },
+        status: {
+          in: PARTNER_DETAIL_ACTIVE_HOLD_STATUS_STRINGS.map(
+            (status) => status as PartnerEsimPurchaseStatus
+          ),
+        },
+      },
+      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+      take: PARTNER_DETAIL_ACTIVE_HOLDS_TAKE,
+      select: {
+        id: true,
+        status: true,
+        walletAppliedCents: true,
+        currency: true,
+        fundingSource: true,
+        refundTransactionId: true,
+        createdAt: true,
+        updatedAt: true,
+        paymentAttempts: {
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 1,
+          select: { id: true, status: true },
+        },
+      },
+    }),
   ]);
+
+  const nowMs = Date.now();
+  const activeHolds = activeHoldRows
+    .filter((hold) =>
+      isPartnerActiveWalletHold({
+        status: hold.status,
+        walletAppliedCents: hold.walletAppliedCents,
+        refundTransactionId: hold.refundTransactionId,
+      })
+    )
+    .map((hold) => {
+      const latestAttempt = hold.paymentAttempts[0] ?? null;
+      return {
+        purchaseId: hold.id,
+        reservedAmountLabel: formatUsdCents(hold.walletAppliedCents),
+        currencyLabel: (hold.currency || "USD").trim() || "USD",
+        status: hold.status,
+        statusLabel: hold.status.replace(/_/g, " "),
+        fundingLabel: partnerFundingSourceLabel(hold.fundingSource),
+        paymentAttemptId: latestAttempt?.id ?? null,
+        paymentAttemptStatus: latestAttempt?.status ?? null,
+        paymentAttemptStatusLabel: latestAttempt
+          ? latestAttempt.status.replace(/_/g, " ")
+          : null,
+        paymentHref: latestAttempt
+          ? `/admin/payments/${encodeURIComponent(latestAttempt.id)}?kind=partner`
+          : null,
+        reservedAtLabel: formatDateTime(hold.createdAt),
+        ageLabel: partnerActiveHoldAgeLabel(hold.updatedAt, nowMs),
+      };
+    });
 
   const balanceCents = row.walletAccount?.balanceCents ?? 0;
   const revenueCents = completedAgg._sum.partnerChargeCents ?? 0;
@@ -826,6 +910,9 @@ export async function getPartnerDetail(
     purchasesTotalCount,
     purchasesTotalPages,
     purchasesStatusFilter,
+    activeHolds,
+    activeHoldsTruncated:
+      activeHoldRows.length >= PARTNER_DETAIL_ACTIVE_HOLDS_TAKE,
     payments: payments.map((payment) => ({
       id: payment.id,
       amountLabel: `${formatUsdCents(payment.gatewayAmountCents)} ${payment.currency || "USD"}`,
