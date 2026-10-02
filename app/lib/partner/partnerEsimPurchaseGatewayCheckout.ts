@@ -495,14 +495,6 @@ export async function startPartnerEsimPurchaseHostedCheckout(
     );
   }
 
-  console.error("PARTNER_BUY_TRACE", {
-    step: "gateway_start",
-    purchaseId: purchase.id,
-    partnerId: partner.partnerId,
-    offerId: purchase.offerId,
-    status: purchase.status,
-  });
-
   try {
     return await runPartnerEsimHostedCheckoutAfterLoad({
       input,
@@ -512,7 +504,7 @@ export async function startPartnerEsimPurchaseHostedCheckout(
       verifyOffer,
     });
   } catch (error) {
-    console.error("PARTNER_BUY_TRACE", {
+    console.error("partner_esim_gateway", {
       step: "gateway_failed",
       purchaseId: purchase.id,
       partnerId: partner.partnerId,
@@ -529,8 +521,6 @@ export async function startPartnerEsimPurchaseHostedCheckout(
         error instanceof Error
           ? error.message.slice(0, 500)
           : String(error).slice(0, 500),
-      stack:
-        error instanceof Error ? error.stack?.slice(0, 2000) : undefined,
     });
     throw error;
   }
@@ -769,14 +759,6 @@ async function runPartnerEsimHostedCheckoutAfterLoad(options: {
         resumed.message
       );
     }
-    console.error("PARTNER_BUY_TRACE", {
-      step: "gateway_done",
-      purchaseId: purchase.id,
-      partnerId: partner.partnerId,
-      offerId: purchase.offerId,
-      paymentAttemptId: attempt.id,
-      reusedTracker: true,
-    });
     return {
       purchaseId: purchase.id,
       paymentAttemptId: attempt.id,
@@ -830,15 +812,6 @@ async function runPartnerEsimHostedCheckoutAfterLoad(options: {
     throw error;
   }
 
-  console.error("PARTNER_BUY_TRACE", {
-    step: "gateway_external_done",
-    purchaseId: purchase.id,
-    partnerId: partner.partnerId,
-    offerId: purchase.offerId,
-    paymentAttemptId: attempt.id,
-    sessionOk: session.ok,
-  });
-
   if (!session.ok) {
     await restoreSplitWalletBestEffort({
       partnerId: partner.partnerId,
@@ -875,14 +848,6 @@ async function runPartnerEsimHostedCheckoutAfterLoad(options: {
   }
 
   const masked = maskSimpaisaMsisdn(walletFields.customerMsisdn);
-
-  console.error("PARTNER_BUY_TRACE", {
-    step: "gateway_db_update_start",
-    purchaseId: purchase.id,
-    partnerId: partner.partnerId,
-    offerId: purchase.offerId,
-    paymentAttemptId: attempt.id,
-  });
 
   // Fresh Prisma queries after external gateway I/O — never reuse an interactive
   // transaction that spanned createCheckoutSession (P2028 on Neon/serverless).
@@ -955,7 +920,7 @@ async function runPartnerEsimHostedCheckoutAfterLoad(options: {
       },
     });
   } catch (auditError) {
-    console.error("PARTNER_BUY_TRACE", {
+    console.error("partner_esim_gateway", {
       step: "gateway_audit_failed",
       purchaseId: purchase.id,
       partnerId: partner.partnerId,
@@ -966,16 +931,6 @@ async function runPartnerEsimHostedCheckoutAfterLoad(options: {
           : String(auditError).slice(0, 500),
     });
   }
-
-  console.error("PARTNER_BUY_TRACE", {
-    step: "gateway_done",
-    purchaseId: purchase.id,
-    partnerId: partner.partnerId,
-    offerId: purchase.offerId,
-    paymentAttemptId: attempt.id,
-    gatewayAmountCents: funding.gatewayAmountCents,
-    walletAppliedCents: funding.walletAppliedCents,
-  });
 
   return {
     purchaseId: purchase.id,

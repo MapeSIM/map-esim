@@ -86,6 +86,7 @@
     "qa:admin-payment-dashboard": "tsx scripts/qa-admin-payment-dashboard.ts",
     "qa:admin-ui-consistency": "tsx scripts/qa-admin-ui-consistency.ts",
     "qa:admin-payment-recovery": "tsx scripts/qa-admin-payment-recovery.ts",
+    "qa:payment-trace-cleanup": "tsx scripts/qa-payment-trace-cleanup.ts",
     "qa:admin-wallet-reservation-ux": "tsx scripts/qa-admin-wallet-reservation-ux.ts",
     "qa:admin-wallet-reservation-monitor": "tsx scripts/qa-admin-wallet-reservation-monitor.ts",
     "qa:admin-test-data-cleanup-preview": "tsx scripts/qa-admin-test-data-cleanup-preview.ts",

@@ -170,10 +170,10 @@ function main() {
   assert.match(gateway, /input\.useWallet/);
   assert.match(gateway, /purchase\.useWallet/);
   // External gateway session must not sit inside an interactive $transaction.
-  assert.match(gateway, /gateway_start/);
-  assert.match(gateway, /gateway_external_done/);
-  assert.match(gateway, /gateway_db_update_start/);
-  assert.match(gateway, /gateway_done/);
+  assert.match(gateway, /partner_esim_gateway/);
+  assert.match(gateway, /Fresh Prisma queries after external gateway I\/O/);
+  assert.match(gateway, /never reuse an interactive/);
+  assert.doesNotMatch(gateway, /PARTNER_BUY_TRACE/);
   const sessionIdx = gateway.indexOf("adapter.createCheckoutSession");
   assert.ok(sessionIdx > 0, "createCheckoutSession present");
   const afterSession = gateway.slice(sessionIdx);

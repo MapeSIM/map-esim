@@ -89,13 +89,6 @@ function isStaleEnough(input: {
   return input.updatedAt.getTime() <= input.nowMs - input.staleMs;
 }
 
-function releaseStaleTrace(
-  step: "enter_partner_tx" | "after_release_in_tx" | "partner_tx_failed",
-  data: Record<string, unknown>
-): void {
-  console.info("RELEASE_STALE_TRACE", { step, ...data });
-}
-
 function prismaErrorFields(error: unknown): {
   prismaCode?: string;
   prismaMeta?: unknown;
@@ -128,7 +121,7 @@ async function releasePartnerUnpaidHoldForAdmin(options: {
   partnerUserId: string;
   purchaseId: string;
   attemptId: string;
-  /** Snapshot from outer admin eligibility load (trace only). */
+  /** Snapshot from outer admin eligibility load (failure context only). */
   attemptStatus: string;
   purchaseStatus: string;
   debitTransactionId: string | null;
@@ -140,7 +133,7 @@ async function releasePartnerUnpaidHoldForAdmin(options: {
     return { released: false };
   }
 
-  const traceBase = {
+  const failureContext = {
     attemptId,
     purchaseId,
     debitTransactionId: options.debitTransactionId,
@@ -148,10 +141,7 @@ async function releasePartnerUnpaidHoldForAdmin(options: {
     attemptStatus: options.attemptStatus,
   };
 
-  releaseStaleTrace("enter_partner_tx", traceBase);
-
   let released = false;
-  let releaseOutcome: string | null = null;
 
   try {
     await prisma.$transaction(
@@ -214,7 +204,6 @@ async function releasePartnerUnpaidHoldForAdmin(options: {
             partnerEsimPurchaseId: purchaseId,
             amountCents: Math.max(0, attempt.purchase.walletAppliedCents),
           });
-          releaseOutcome = release.outcome;
 
           if (
             release.outcome === "created" ||
@@ -269,15 +258,10 @@ async function releasePartnerUnpaidHoldForAdmin(options: {
       },
       ADMIN_PARTNER_RELEASE_TX
     );
-
-    releaseStaleTrace("after_release_in_tx", {
-      ...traceBase,
-      released,
-      releaseOutcome,
-    });
   } catch (error) {
-    releaseStaleTrace("partner_tx_failed", {
-      ...traceBase,
+    console.error("stale_gateway_release", {
+      step: "partner_tx_failed",
+      ...failureContext,
       ...prismaErrorFields(error),
     });
     throw error;

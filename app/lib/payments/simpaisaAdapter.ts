@@ -165,12 +165,6 @@ function createSimpaisaAdapter(
       } catch {
         apiHost = null;
       }
-      console.info("simpaisa_adapter", "VERIFY_START", {
-        purpose: input.purpose,
-        environment: config.environment,
-        apiHost,
-        endpoint: "/v2/wallets/transaction/verify",
-      });
 
       try {
         // Non-OTP Verify is not final. Only 0037 is accepted-as-pending; never paid.
@@ -184,15 +178,6 @@ function createSimpaisaAdapter(
           productReference: productReference(input),
           walletOperatorId: input.walletOperatorId!.trim(),
           customerMsisdn: input.customerMsisdn!,
-        });
-
-        console.info("simpaisa_adapter", "VERIFY_OK", {
-          purpose: input.purpose,
-          environment: config.environment,
-          apiHost,
-          pending: verified.pending,
-          // response code only — never MSISDN, body, or secrets
-          responseCode: verified.responseCode,
         });
 
         return {
@@ -384,8 +369,5 @@ export function resumeSimpaisaWalletCheckout(input: {
   }
 
   // Relative path — absolute same-origin URLs break useActionState redirect UX.
-  console.info("simpaisa_adapter", "RESUME_WAITING_PAGE", {
-    environment: resolved.config.environment,
-  });
   return { ok: true, checkoutUrl: returnPath };
 }

@@ -665,16 +665,6 @@ export async function reservePartnerEsimPurchase(
     );
   }
 
-  const reserveTxStartedAt = Date.now();
-  console.error("PARTNER_BUY_TRACE", {
-    step: "reserve_tx_start",
-    purchaseId: purchase.id,
-    partnerId: partner.partnerId,
-    offerId: purchase.offerId,
-    status: purchase.status,
-    partnerChargeCents: purchase.partnerChargeCents,
-  });
-
   try {
     const reserved = await prisma.$transaction(async (tx) => {
       const profile = await tx.partnerProfile.findUnique({
@@ -769,16 +759,6 @@ export async function reservePartnerEsimPurchase(
       };
     });
 
-    console.error("PARTNER_BUY_TRACE", {
-      step: "reserve_tx_committed",
-      purchaseId: purchase.id,
-      partnerId: partner.partnerId,
-      offerId: purchase.offerId,
-      status: PartnerEsimPurchaseStatus.PROVIDER_PENDING,
-      duplicate: reserved.duplicate,
-      ms: Date.now() - reserveTxStartedAt,
-    });
-
     return {
       purchaseId: purchase.id,
       partnerId: partner.partnerId,
@@ -787,7 +767,7 @@ export async function reservePartnerEsimPurchase(
       duplicate: reserved.duplicate,
     };
   } catch (error) {
-    console.error("PARTNER_BUY_TRACE", {
+    console.error("partner_esim_reserve", {
       step: "reserve_failed",
       purchaseId: purchase.id,
       partnerId: partner.partnerId,
@@ -802,9 +782,6 @@ export async function reservePartnerEsimPurchase(
         error instanceof Error
           ? error.message.slice(0, 500)
           : String(error).slice(0, 500),
-      stack:
-        error instanceof Error ? error.stack?.slice(0, 2000) : undefined,
-      ms: Date.now() - reserveTxStartedAt,
     });
     if (error instanceof PartnerEsimPurchaseError) throw error;
     mapWalletError(error);

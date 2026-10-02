@@ -251,9 +251,8 @@ function main() {
   assert.match(release, /releasePartnerGatewayReservationInTx/);
   assert.match(release, /timeout:\s*20_000|timeout:\s*20000/);
   assert.match(release, /ADMIN_PARTNER_RELEASE_TX|releasePartnerUnpaidHoldForAdmin/);
-  assert.match(release, /RELEASE_STALE_TRACE/);
-  assert.match(release, /enter_partner_tx/);
-  assert.match(release, /after_release_in_tx/);
+  assert.doesNotMatch(release, /RELEASE_STALE_TRACE/);
+  assert.match(release, /stale_gateway_release/);
   assert.match(release, /partner_tx_failed/);
   assert.match(release, /debitTransactionId/);
   assert.match(release, /maybeReleasePendingGatewayReservation/);
