@@ -6,6 +6,11 @@ import {
   CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE,
   isCustomerPaymentCheckoutDisabled,
 } from "@/app/lib/payments/customerPaymentCheckoutPolicy";
+import {
+  isPaymentGatewayCheckoutPausedInMap,
+  loadOperationalControlPausedMapSoft,
+  PAYMENT_GATEWAY_CHECKOUT_PAUSED_MESSAGE,
+} from "@/app/lib/admin/operationalControlsPolicy";
 import WalletTopupForm from "@/app/components/account/WalletTopupForm";
 
 export const dynamic = "force-dynamic";
@@ -63,11 +68,19 @@ export default async function AccountWalletTopUpPage() {
   }
 
   const paymentsTemporarilyUnavailable = isCustomerPaymentCheckoutDisabled();
+  const controlsSoft = await loadOperationalControlPausedMapSoft();
+  const gatewayCheckoutPaused =
+    controlsSoft.ok &&
+    isPaymentGatewayCheckoutPausedInMap(controlsSoft.map);
   const gatewayReady =
-    isPaymentGatewayConfigured() && !paymentsTemporarilyUnavailable;
-  const unavailableMessage = paymentsTemporarilyUnavailable
-    ? CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE
-    : GATEWAY_UNAVAILABLE;
+    isPaymentGatewayConfigured() &&
+    !paymentsTemporarilyUnavailable &&
+    !gatewayCheckoutPaused;
+  const unavailableMessage = gatewayCheckoutPaused
+    ? PAYMENT_GATEWAY_CHECKOUT_PAUSED_MESSAGE
+    : paymentsTemporarilyUnavailable
+      ? CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE
+      : GATEWAY_UNAVAILABLE;
 
   return (
     <div className="space-y-8">
@@ -82,9 +95,11 @@ export default async function AccountWalletTopUpPage() {
         <p className="mt-2 text-sm text-[var(--text-muted)]">
           {gatewayReady
             ? "Choose how much USD credit to add to your MAP eSIM wallet."
-            : paymentsTemporarilyUnavailable
-              ? CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE
-              : "Self-serve wallet funding is paused until the payment provider is ready."}
+            : gatewayCheckoutPaused
+              ? PAYMENT_GATEWAY_CHECKOUT_PAUSED_MESSAGE
+              : paymentsTemporarilyUnavailable
+                ? CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE
+                : "Self-serve wallet funding is paused until the payment provider is ready."}
         </p>
       </header>
 

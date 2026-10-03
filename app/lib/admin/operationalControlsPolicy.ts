@@ -15,6 +15,7 @@ import {
   OPERATIONAL_CONTROL_KEYS,
   OPERATIONAL_CONTROL_MISSING_DEFAULT_PAUSED,
   OPERATIONAL_CONTROL_UNAVAILABLE_MESSAGE,
+  PAYMENT_GATEWAY_CHECKOUT_PAUSED_MESSAGE,
   controlStateLabel,
   evaluateFlowControls,
   overallTransactionsStatus,
@@ -26,6 +27,7 @@ import {
 import { formatUtcTimestamp } from "@/app/lib/admin/operationsHealthShared";
 
 export type { SanitizedOperationalControlView };
+export { PAYMENT_GATEWAY_CHECKOUT_PAUSED_MESSAGE };
 
 export class OperationalControlBlockedError extends Error {
   readonly code = "OPERATIONAL_CONTROL_PAUSED" as const;
@@ -110,6 +112,44 @@ export async function assertNewRiskyTransactionAllowed(
   const result = evaluateFlowControls(flow, map, options);
   if (result.blocked) {
     throw new OperationalControlBlockedError(result.blockingKeys);
+  }
+}
+
+/** Customer-facing error when hosted gateway checkout / top-up initiation is paused. */
+export class PaymentGatewayCheckoutPausedError extends Error {
+  readonly code = "PAYMENT_GATEWAY_CHECKOUT_PAUSED" as const;
+
+  constructor() {
+    super(PAYMENT_GATEWAY_CHECKOUT_PAUSED_MESSAGE);
+    this.name = "PaymentGatewayCheckoutPausedError";
+  }
+}
+
+/**
+ * Soft UI helper — true when customer hosted gateway checkout should show
+ * maintenance (TRANSACTION_MAINTENANCE or CUSTOMER_PAYMENT_GATEWAY_CHECKOUT).
+ */
+export function isPaymentGatewayCheckoutPausedInMap(
+  map: ControlPausedMap
+): boolean {
+  return evaluateFlowControls("customer_payment_gateway", map).blocked;
+}
+
+/**
+ * Assert customer hosted payment-gateway checkout / wallet top-up may start.
+ * Fail closed on DB read failure. Does not touch webhooks, refunds, or wallet balance purchases.
+ */
+export async function assertPaymentGatewayCheckoutAllowed(): Promise<void> {
+  try {
+    await assertNewRiskyTransactionAllowed("customer_payment_gateway");
+  } catch (error) {
+    if (
+      error instanceof OperationalControlBlockedError ||
+      error instanceof OperationalControlUnavailableError
+    ) {
+      throw new PaymentGatewayCheckoutPausedError();
+    }
+    throw error;
   }
 }
 

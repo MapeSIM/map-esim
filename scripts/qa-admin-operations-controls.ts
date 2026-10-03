@@ -54,10 +54,26 @@ function main() {
   assert.match(schema, /enum OperationalControlKey/);
   assert.match(schema, /model OperationalControl/);
   assert.match(schema, /TRANSACTION_MAINTENANCE/);
+  assert.match(schema, /CUSTOMER_PAYMENT_GATEWAY_CHECKOUT/);
   assert.doesNotMatch(schema, /OperationalControl[\s\S]{0,400}Json/);
   assert.match(migration, /CREATE TABLE "OperationalControl"/);
   assert.match(migration, /paused=false|paused.*false/i);
   assert.match(migration, /ON CONFLICT \("key"\) DO NOTHING/);
+  const gatewayEnumMigration = read(
+    "prisma/migrations/20261003120000_add_customer_payment_gateway_checkout_control_enum/migration.sql"
+  );
+  const gatewaySeedMigration = read(
+    "prisma/migrations/20261003120100_seed_customer_payment_gateway_checkout_control/migration.sql"
+  );
+  assert.match(
+    gatewayEnumMigration,
+    /ADD VALUE 'CUSTOMER_PAYMENT_GATEWAY_CHECKOUT'/
+  );
+  assert.match(
+    gatewaySeedMigration,
+    /CUSTOMER_PAYMENT_GATEWAY_CHECKOUT/
+  );
+  assert.match(gatewaySeedMigration, /ON CONFLICT \("key"\) DO NOTHING/);
   console.log("PASS schema_migration");
 
   // --- Allowlist + phrases ---
@@ -68,8 +84,17 @@ function main() {
     "COMPANY_ASSIGNMENTS",
     "PROVIDER_ORDER_CREATION",
     "PARTNER_WALLET_PURCHASES",
+    "CUSTOMER_PAYMENT_GATEWAY_CHECKOUT",
     "ALERT_NOTIFICATIONS",
   ]);
+  assert.equal(
+    CONTROL_CONFIRM_PHRASES.CUSTOMER_PAYMENT_GATEWAY_CHECKOUT.pause,
+    "PAUSE PAYMENT GATEWAY"
+  );
+  assert.equal(
+    CONTROL_CONFIRM_PHRASES.CUSTOMER_PAYMENT_GATEWAY_CHECKOUT.resume,
+    "RESUME PAYMENT GATEWAY"
+  );
   assert.equal(
     CONTROL_CONFIRM_PHRASES.ALERT_NOTIFICATIONS.pause,
     "PAUSE ALERT NOTIFICATIONS"
@@ -128,6 +153,22 @@ function main() {
   assert.deepEqual(
     requiredControlsForFlow("customer_wallet_purchase"),
     ["TRANSACTION_MAINTENANCE", "CUSTOMER_WALLET_PURCHASES"]
+  );
+  assert.deepEqual(
+    requiredControlsForFlow("customer_payment_gateway"),
+    ["TRANSACTION_MAINTENANCE", "CUSTOMER_PAYMENT_GATEWAY_CHECKOUT"]
+  );
+  assert.equal(
+    evaluateFlowControls("customer_payment_gateway", {
+      CUSTOMER_PAYMENT_GATEWAY_CHECKOUT: true,
+    }).blocked,
+    true
+  );
+  assert.equal(
+    evaluateFlowControls("customer_wallet_purchase", {
+      CUSTOMER_PAYMENT_GATEWAY_CHECKOUT: true,
+    }).blocked,
+    false
   );
   assert.deepEqual(
     requiredControlsForFlow("customer_wallet_purchase", {
@@ -270,6 +311,13 @@ function main() {
   // Checks before durable mutation
   assert.match(wallet, /assertWalletPurchaseInitiationAllowed/);
   assert.match(assignment, /assertAssignmentInitiationAllowed/);
+  const gatewayCheckout = read("app/lib/esim/esimPurchaseGatewayCheckout.ts");
+  const topupCore = read("app/lib/wallet/topup.ts");
+  assert.match(policy, /assertPaymentGatewayCheckoutAllowed/);
+  assert.match(policy, /customer_payment_gateway/);
+  assert.match(gatewayCheckout, /assertPaymentGatewayCheckoutAllowed/);
+  assert.match(topupCore, /assertPaymentGatewayCheckoutAllowed/);
+  assert.match(shared, /PAYMENT_GATEWAY_CHECKOUT_PAUSED_MESSAGE/);
   console.log("PASS purchase_assignment_integration");
 
   // --- Enablement safety ---

@@ -51,6 +51,10 @@ import {
   assertCustomerFinancialActivityAllowed,
   CustomerAccountRestrictedError,
 } from "@/app/lib/auth/customerAccountStatus";
+import {
+  assertPaymentGatewayCheckoutAllowed,
+  PaymentGatewayCheckoutPausedError,
+} from "@/app/lib/admin/operationalControlsPolicy";
 
 export class EsimPurchaseGatewayCheckoutError extends Error {
   readonly code:
@@ -191,6 +195,17 @@ export async function startEsimPurchaseHostedCheckout(
       "GATEWAY_UNAVAILABLE",
       CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE
     );
+  }
+  try {
+    await assertPaymentGatewayCheckoutAllowed();
+  } catch (error) {
+    if (error instanceof PaymentGatewayCheckoutPausedError) {
+      throw new EsimPurchaseGatewayCheckoutError(
+        "GATEWAY_UNAVAILABLE",
+        error.message
+      );
+    }
+    throw error;
   }
 
   const customer = await prisma.user.findUnique({

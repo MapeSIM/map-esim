@@ -27,6 +27,10 @@ import { isPurchaseDeliveryEmailLocked } from "@/app/lib/esim/esimDeliveryEmailS
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
 import { isCustomerPaymentCheckoutDisabled } from "@/app/lib/payments/customerPaymentCheckoutPolicy";
 import { resolveHostedCheckoutProvider } from "@/app/lib/payments/gatewaySelect";
+import {
+  isPaymentGatewayCheckoutPausedInMap,
+  loadOperationalControlPausedMapSoft,
+} from "@/app/lib/admin/operationalControlsPolicy";
 import { formatUsdCents } from "@/app/lib/wallet/display";
 import { pointsNeededToUnlockRewards } from "@/app/lib/rewards/rewardConstants";
 import { isRewardRedemptionEligible } from "@/app/lib/rewards/rewardPoints";
@@ -86,6 +90,8 @@ export type WalletPurchaseReview = {
   paymentGatewayConfigured: boolean;
   /** True when customer gateway initiation is temporarily kill-switched. */
   customerPaymentsTemporarilyUnavailable: boolean;
+  /** True when DB operational control pauses hosted gateway checkout (soft UI). */
+  customerPaymentGatewayCheckoutPaused: boolean;
   /** Active hosted-checkout provider when configured; drives Simpaisa wallet fields. */
   activePaymentProvider: "SAFEPAY" | "SIMPAISA" | null;
   idempotencyKey: string;
@@ -199,7 +205,19 @@ export async function getWalletPurchaseReview(
       ? Math.max(0, balanceCents - displayFunding.walletAppliedCents)
       : balanceCents;
 
-  const activePaymentProvider = resolveActivePaymentProviderLabel();
+  const controlsSoft = await loadOperationalControlPausedMapSoft();
+  const customerPaymentGatewayCheckoutPaused =
+    controlsSoft.ok &&
+    isPaymentGatewayCheckoutPausedInMap(controlsSoft.map);
+  const envPaymentsDisabled = isCustomerPaymentCheckoutDisabled();
+  const gatewayReadyForUi =
+    isPaymentGatewayConfigured() &&
+    !envPaymentsDisabled &&
+    !customerPaymentGatewayCheckoutPaused;
+
+  const activePaymentProvider = gatewayReadyForUi
+    ? resolveActivePaymentProviderLabel()
+    : null;
   const mobileLabels = activePaymentProvider === "SIMPAISA";
   let fundingLabel: WalletPurchaseReview["fundingLabel"] = "Wallet";
   if (displayFunding.gatewayAmountCents > 0 && displayFunding.walletAppliedCents > 0) {
@@ -268,9 +286,9 @@ export async function getWalletPurchaseReview(
     gatewayAmountCents: displayFunding.gatewayAmountCents,
     gatewayAmountLabel: formatUsdCents(displayFunding.gatewayAmountCents),
     fundingLabel,
-    paymentGatewayConfigured:
-      isPaymentGatewayConfigured() && !isCustomerPaymentCheckoutDisabled(),
-    customerPaymentsTemporarilyUnavailable: isCustomerPaymentCheckoutDisabled(),
+    paymentGatewayConfigured: gatewayReadyForUi,
+    customerPaymentsTemporarilyUnavailable: envPaymentsDisabled,
+    customerPaymentGatewayCheckoutPaused,
     activePaymentProvider,
     idempotencyKey: row.idempotencyKey,
     status: row.status,

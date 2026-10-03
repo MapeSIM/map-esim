@@ -26,6 +26,7 @@ import {
   type WalletPurchaseActionState,
 } from "@/app/lib/esim/walletPurchaseFormState";
 import { CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE } from "@/app/lib/payments/customerPaymentCheckoutPolicy";
+import { PAYMENT_GATEWAY_CHECKOUT_PAUSED_MESSAGE } from "@/app/lib/admin/operationalControlsShared";
 import {
   CUSTOMER_AWAITING_GATEWAY_ACTIVE_MESSAGE,
   CUSTOMER_AWAITING_GATEWAY_CANCEL_LABEL,
@@ -811,9 +812,11 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                     className="mt-1 text-sm font-medium text-[var(--heading)]"
                     role="status"
                   >
-                    {review.customerPaymentsTemporarilyUnavailable
-                      ? CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE
-                      : CARD_PAYMENT_UNAVAILABLE_MESSAGE}
+                    {review.customerPaymentGatewayCheckoutPaused
+                      ? PAYMENT_GATEWAY_CHECKOUT_PAUSED_MESSAGE
+                      : review.customerPaymentsTemporarilyUnavailable
+                        ? CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE
+                        : CARD_PAYMENT_UNAVAILABLE_MESSAGE}
                   </p>
                   <p className="mt-3 text-sm text-[var(--text-muted)]">
                     Remaining due:{" "}

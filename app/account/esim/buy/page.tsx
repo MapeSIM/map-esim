@@ -20,6 +20,10 @@ import {
 } from "@/app/lib/esim/addDataCheckout";
 import { prisma } from "@/app/lib/db";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
+import {
+  isPaymentGatewayCheckoutPausedInMap,
+  loadOperationalControlPausedMapSoft,
+} from "@/app/lib/admin/operationalControlsPolicy";
 import { resolveCheckoutBackHref } from "@/app/lib/plans/checkoutBackHref";
 import { normalizeCustomerBuyCountryHint } from "@/app/lib/plans/customerBuyCountryHint";
 import {
@@ -113,7 +117,12 @@ export default async function AccountWalletBuyPage({
   // Display names (e.g. country=Pakistan) normalize to ISO; invalid stay null.
   const countryHint = normalizeCustomerBuyCountryHint(query.country);
   const fromOrderId = normalizeAddDataFromOrderId(query.fromOrder);
-  const gatewayReady = isPaymentGatewayConfigured();
+  const controlsSoft = await loadOperationalControlPausedMapSoft();
+  const gatewayCheckoutPaused =
+    controlsSoft.ok &&
+    isPaymentGatewayCheckoutPausedInMap(controlsSoft.map);
+  const gatewayReady =
+    isPaymentGatewayConfigured() && !gatewayCheckoutPaused;
 
   let destinations: Awaited<
     ReturnType<typeof listCustomerWalletBuyDestinations>

@@ -167,7 +167,7 @@ async function main() {
     try {
       const snap = await getOperationalControlsHealthSnapshot();
       assert.equal(snap.readOk, true);
-      assert.equal(snap.controls.length, 6);
+      assert.equal(snap.controls.length, 8);
       assert.equal(snap.guestCheckoutStatus, "NOT_IMPLEMENTED / DISABLED");
       assert.equal(snap.overallTransactionsStatus, "ACTIVE");
       record(

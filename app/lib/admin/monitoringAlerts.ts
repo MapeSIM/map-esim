@@ -91,6 +91,7 @@ type MonitoringAlertCodeFromControl =
   | "CONTROL_COMPANY_ASSIGNMENTS_PAUSED"
   | "CONTROL_PROVIDER_ORDERS_PAUSED"
   | "CONTROL_PARTNER_PURCHASES_PAUSED"
+  | "CONTROL_PAYMENT_GATEWAY_CHECKOUT_PAUSED"
   | "CONTROL_ALERT_NOTIFICATIONS_PAUSED";
 
 export type MonitoringAlertsDashboard = {
@@ -473,6 +474,10 @@ function buildConfigAlerts(input: {
         PARTNER_WALLET_PURCHASES: {
           code: "CONTROL_PARTNER_PURCHASES_PAUSED",
           title: "Partner purchases paused",
+        },
+        CUSTOMER_PAYMENT_GATEWAY_CHECKOUT: {
+          code: "CONTROL_PAYMENT_GATEWAY_CHECKOUT_PAUSED",
+          title: "Customer payment gateway checkout paused",
         },
         // Dashboard-visible WARNING only — never email-eligible.
         ALERT_NOTIFICATIONS: {

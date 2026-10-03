@@ -629,7 +629,7 @@ async function main() {
         dashboard.operationalControls.guestCheckoutStatus,
         "NOT_IMPLEMENTED / DISABLED"
       );
-      assert.equal(dashboard.operationalControls.controls.length, 5);
+      assert.equal(dashboard.operationalControls.controls.length, 8);
       record(
         "payment reports NOT_IMPLEMENTED",
         "PASS",

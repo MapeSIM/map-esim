@@ -294,6 +294,8 @@ enum OperationalControlKey {
   PROVIDER_ORDER_CREATION
   /// Pauses new Partner wallet-funded eSIM purchases (enforcement in later Phase 2 slices).
   PARTNER_WALLET_PURCHASES
+  /// Pauses new customer hosted gateway checkout / wallet top-up initiation only.
+  CUSTOMER_PAYMENT_GATEWAY_CHECKOUT
   /// Pauses alert-notification email delivery only. Aggregation/dashboard stay live.
   ALERT_NOTIFICATIONS
 }

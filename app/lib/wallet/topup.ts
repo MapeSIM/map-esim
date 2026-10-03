@@ -48,6 +48,10 @@ import {
   assertCustomerFinancialActivityAllowed,
   CustomerAccountRestrictedError,
 } from "@/app/lib/auth/customerAccountStatus";
+import {
+  assertPaymentGatewayCheckoutAllowed,
+  PaymentGatewayCheckoutPausedError,
+} from "@/app/lib/admin/operationalControlsPolicy";
 
 export {
   TOPUP_CREDIT_REFERENCE_TYPE,
@@ -183,6 +187,14 @@ export async function createWalletTopupDraft(
       "GATEWAY_UNAVAILABLE",
       CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE
     );
+  }
+  try {
+    await assertPaymentGatewayCheckoutAllowed();
+  } catch (error) {
+    if (error instanceof PaymentGatewayCheckoutPausedError) {
+      throw new WalletTopupError("GATEWAY_UNAVAILABLE", error.message);
+    }
+    throw error;
   }
 
   const customerUserId = input.customerUserId.trim();
@@ -392,6 +404,14 @@ export async function startWalletTopupCheckout(options: {
       "GATEWAY_UNAVAILABLE",
       CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE
     );
+  }
+  try {
+    await assertPaymentGatewayCheckoutAllowed();
+  } catch (error) {
+    if (error instanceof PaymentGatewayCheckoutPausedError) {
+      throw new WalletTopupError("GATEWAY_UNAVAILABLE", error.message);
+    }
+    throw error;
   }
 
   const customerUserId = options.customerUserId.trim();

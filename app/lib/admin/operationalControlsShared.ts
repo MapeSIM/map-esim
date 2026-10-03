@@ -10,6 +10,7 @@ export const OPERATIONAL_CONTROL_KEYS = [
   "COMPANY_ASSIGNMENTS",
   "PROVIDER_ORDER_CREATION",
   "PARTNER_WALLET_PURCHASES",
+  "CUSTOMER_PAYMENT_GATEWAY_CHECKOUT",
   "ALERT_NOTIFICATIONS",
 ] as const;
 
@@ -24,6 +25,7 @@ export const TRANSACTION_OPERATIONAL_CONTROL_KEYS = [
   "COMPANY_ASSIGNMENTS",
   "PROVIDER_ORDER_CREATION",
   "PARTNER_WALLET_PURCHASES",
+  "CUSTOMER_PAYMENT_GATEWAY_CHECKOUT",
 ] as const satisfies readonly OperationalControlKeyName[];
 
 export const OPERATIONAL_CONTROL_REASON_MIN = 5;
@@ -38,6 +40,10 @@ export const OPERATIONAL_CONTROL_PUBLIC_ERROR =
 
 export const OPERATIONAL_CONTROL_UNAVAILABLE_MESSAGE =
   "This action is temporarily unavailable. Please try again shortly.";
+
+/** Customer-facing copy when hosted gateway checkout / top-up is paused. */
+export const PAYMENT_GATEWAY_CHECKOUT_PAUSED_MESSAGE =
+  "Online payment gateway is temporarily under maintenance. You can still purchase eSIMs using your existing wallet balance.";
 
 export const CONTROL_CONFIRM_PHRASES = {
   TRANSACTION_MAINTENANCE: {
@@ -63,6 +69,10 @@ export const CONTROL_CONFIRM_PHRASES = {
   PARTNER_WALLET_PURCHASES: {
     pause: "PAUSE PARTNER PURCHASES",
     resume: "RESUME PARTNER PURCHASES",
+  },
+  CUSTOMER_PAYMENT_GATEWAY_CHECKOUT: {
+    pause: "PAUSE PAYMENT GATEWAY",
+    resume: "RESUME PAYMENT GATEWAY",
   },
   ALERT_NOTIFICATIONS: {
     pause: "PAUSE ALERT NOTIFICATIONS",
@@ -101,6 +111,11 @@ export const CONTROL_DISPLAY = {
     scope:
       "Pauses new Partner prepaid-wallet eSIM purchases (prepare/reserve).",
   },
+  CUSTOMER_PAYMENT_GATEWAY_CHECKOUT: {
+    name: "Customer Payment Gateway Checkout",
+    scope:
+      "Pauses new hosted card/gateway payments and wallet top-ups (Simpaisa/Safepay). Existing customer wallet balances and admin tools remain fully functional.",
+  },
   ALERT_NOTIFICATIONS: {
     name: "Alert notification emails",
     scope:
@@ -116,7 +131,8 @@ export type TransactionFlow =
   | "admin_wallet_purchase"
   | "company_assignment"
   | "provider_order"
-  | "partner_wallet_purchase";
+  | "partner_wallet_purchase"
+  | "customer_payment_gateway";
 
 export function isOperationalControlKey(
   raw: string | null | undefined
@@ -195,6 +211,8 @@ export function requiredControlsForFlow(
     keys.push("PROVIDER_ORDER_CREATION");
   } else if (flow === "partner_wallet_purchase") {
     keys.push("PARTNER_WALLET_PURCHASES");
+  } else if (flow === "customer_payment_gateway") {
+    keys.push("CUSTOMER_PAYMENT_GATEWAY_CHECKOUT");
   }
   if (
     options?.includeProviderOrder &&
