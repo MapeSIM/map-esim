@@ -27,6 +27,7 @@ import {
   mapDatabaseProbeToStatus,
   paymentGatewayCardDefaults,
   paymentWebhookVerificationStatus,
+  safePaymentGatewayCardDefaults,
   pickDeploymentVersion,
   sanitizeDeploymentVersion,
   sanitizeHealthStatus,
@@ -142,24 +143,43 @@ function main() {
   assert.match(page, /ON_DEMAND|ProviderWalletPanel/);
   console.log("PASS provider_readiness_no_live_mutation");
 
-  // --- Payment: checkout still gated; webhook verification is implemented ---
-  const pay = paymentGatewayCardDefaults();
-  assert.equal(pay.integrationStatus, "NOT_IMPLEMENTED");
-  assert.equal(pay.webhookVerification, "NOT_CONFIGURED");
-  assert.equal(pay.paymentReconciliation, "NOT_IMPLEMENTED");
-  assert.equal(pay.guestCheckout, "NOT_IMPLEMENTED / DISABLED");
+  // --- Payment: dynamic Simpaisa readiness (env-derived flags only) ---
+  const payOff = paymentGatewayCardDefaults();
+  assert.equal(payOff.integrationStatus, "NOT_CONFIGURED");
+  assert.equal(payOff.productionCredentials, "NOT_CONFIGURED");
+  assert.equal(payOff.webhookVerification, "NOT_CONFIGURED");
+  assert.equal(payOff.paymentReconciliation, "NOT_CONFIGURED");
+  assert.equal(payOff.guestCheckout, "NOT_IMPLEMENTED / DISABLED");
+  const payOn = paymentGatewayCardDefaults({
+    gatewayEnabled: true,
+    provider: "SIMPAISA",
+    simpaisaCredentialsConfigured: true,
+    webhookSecretConfigured: true,
+    reconciliationHandlersPresent: true,
+  });
+  assert.equal(payOn.integrationStatus, "HEALTHY");
+  assert.equal(payOn.productionCredentials, "HEALTHY");
+  assert.equal(payOn.webhookVerification, "HEALTHY");
+  assert.equal(payOn.paymentReconciliation, "HEALTHY");
   assert.equal(paymentWebhookVerificationStatus(false), "NOT_CONFIGURED");
   assert.equal(paymentWebhookVerificationStatus(true), "HEALTHY");
-  assert.equal(
-    paymentGatewayCardDefaults({ webhookSecretConfigured: true })
-      .webhookVerification,
-    "HEALTHY"
-  );
+  const payCrash = safePaymentGatewayCardDefaults(() => {
+    throw new Error("simulated payment env failure");
+  });
+  assert.equal(payCrash.integrationStatus, "UNKNOWN");
+  assert.equal(payCrash.productionCredentials, "UNKNOWN");
+  assert.equal(payCrash.webhookVerification, "UNKNOWN");
+  assert.equal(payCrash.paymentReconciliation, "UNKNOWN");
+  assert.equal(payCrash.guestCheckout, "NOT_IMPLEMENTED / DISABLED");
   assert.match(page, /payment\.integrationStatus/);
-  assert.match(shared, /NOT_IMPLEMENTED/);
+  assert.match(shared, /NOT_IMPLEMENTED \/ DISABLED/);
+  assert.match(shared, /safePaymentGatewayCardDefaults/);
+  assert.match(service, /safePaymentGatewayCardDefaults/);
   assert.match(service, /isGuestVesimCheckoutEnabled/);
   assert.match(service, /SIMPAISA_WEBHOOK_SECRET/);
   assert.match(service, /SAFEPAY_WEBHOOK_SECRET/);
+  assert.match(service, /validateSimpaisaApiCredentials/);
+  assert.match(service, /PAYMENT_GATEWAY_ENABLED/);
   assert.doesNotMatch(service, /return process\.env\.SAFEPAY_WEBHOOK_SECRET/);
   assert.doesNotMatch(shared, /webhookVerification:\s*"NOT_IMPLEMENTED"/);
   console.log("PASS payment_checkout_gated_webhook_verification_status");
@@ -212,6 +232,7 @@ function main() {
     deploymentVersion: null,
     authSecretConfigured: false,
     iccidKeyConfigured: false,
+    paymentIntegrationStatus: "NOT_CONFIGURED",
   });
   const codes = new Set(warnings.map((w) => w.code));
   assert.ok(codes.has("DATABASE_UNHEALTHY"));
@@ -220,6 +241,26 @@ function main() {
   assert.ok(codes.has("GUEST_CHECKOUT_DISABLED"));
   assert.ok(codes.has("VESIM_LIVE_UNCONFIRMED"));
   assert.ok(!JSON.stringify(warnings).includes("DATABASE_URL"));
+  const warningsHealthyPay = buildOperationsWarnings({
+    databaseStatus: "HEALTHY",
+    criticalPriorityCount: 0,
+    highPriorityCount: 0,
+    providerUncertainCount: 0,
+    refundPendingCount: 0,
+    failedEmailCount: 0,
+    billingSmtpConfigured: true,
+    vesimConfigValid: true,
+    vesimMode: "staging",
+    vesimHostClass: "STAGING_APPROVED",
+    guestCheckoutEnabled: false,
+    deploymentVersion: "v1",
+    authSecretConfigured: true,
+    iccidKeyConfigured: true,
+    paymentIntegrationStatus: "HEALTHY",
+  });
+  assert.ok(
+    !warningsHealthyPay.some((w) => w.code === "PAYMENT_NOT_IMPLEMENTED")
+  );
   console.log("PASS warning_generation");
 
   // --- UI / nav wiring ---

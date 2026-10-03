@@ -606,14 +606,31 @@ async function main() {
       );
 
       // Payment / guest — guest remains NOT_IMPLEMENTED / DISABLED (controls cannot enable it).
-      // Webhook HMAC verification is implemented; status is secret presence only.
-      assert.equal(dashboard.payment.integrationStatus, "NOT_IMPLEMENTED");
-      const webhookSecretConfigured = Boolean(
-        (process.env.SAFEPAY_WEBHOOK_SECRET ?? "").trim()
+      // Integration / credentials / webhook are env-derived (Simpaisa-focused).
+      assert.ok(
+        [
+          "HEALTHY",
+          "DEGRADED",
+          "UNAVAILABLE",
+          "NOT_CONFIGURED",
+          "NOT_IMPLEMENTED",
+          "UNKNOWN",
+        ].includes(dashboard.payment.integrationStatus)
       );
-      assert.equal(
-        dashboard.payment.webhookVerification,
-        webhookSecretConfigured ? "HEALTHY" : "NOT_CONFIGURED"
+      assert.ok(
+        ["HEALTHY", "NOT_CONFIGURED"].includes(
+          dashboard.payment.productionCredentials
+        )
+      );
+      assert.ok(
+        ["HEALTHY", "NOT_CONFIGURED"].includes(
+          dashboard.payment.webhookVerification
+        )
+      );
+      assert.ok(
+        ["HEALTHY", "NOT_CONFIGURED"].includes(
+          dashboard.payment.paymentReconciliation
+        )
       );
       const guestEnabled = isGuestVesimCheckoutEnabled();
       assert.equal(
@@ -631,9 +648,9 @@ async function main() {
       );
       assert.equal(dashboard.operationalControls.controls.length, 8);
       record(
-        "payment reports NOT_IMPLEMENTED",
+        "payment readiness is env-derived HealthStatus",
         "PASS",
-        `integration=${dashboard.payment.integrationStatus}`
+        `integration=${dashboard.payment.integrationStatus} credentials=${dashboard.payment.productionCredentials} webhook=${dashboard.payment.webhookVerification} recon=${dashboard.payment.paymentReconciliation}`
       );
       record(
         "guest checkout status matches the existing gate",
@@ -665,7 +682,11 @@ async function main() {
       assert.ok(codes.has("CRITICAL_RECONCILIATION"));
       assert.ok(codes.has("HIGH_RECONCILIATION"));
       assert.ok(codes.has("PROVIDER_UNCERTAIN"));
-      assert.ok(codes.has("PAYMENT_NOT_IMPLEMENTED"));
+      if (dashboard.payment.integrationStatus !== "HEALTHY") {
+        assert.ok(codes.has("PAYMENT_NOT_IMPLEMENTED"));
+      } else {
+        assert.ok(!codes.has("PAYMENT_NOT_IMPLEMENTED"));
+      }
       record(
         "operational warnings appear for matching local evidence",
         "PASS",

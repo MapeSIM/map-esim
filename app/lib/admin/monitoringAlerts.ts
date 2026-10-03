@@ -38,10 +38,14 @@ import {
   classifyCspMode,
   formatUtcTimestamp,
   mapDatabaseProbeToStatus,
-  paymentGatewayCardDefaults,
   pickDeploymentVersion,
+  safePaymentGatewayCardDefaults,
   type HealthStatus,
+  type PaymentGatewayCardInput,
 } from "@/app/lib/admin/operationsHealthShared";
+import { isPaymentGatewayEnabledFlag } from "@/app/lib/payments/safepayPolicy";
+import { parsePaymentGatewayProvider } from "@/app/lib/payments/gatewaySelect";
+import { validateSimpaisaApiCredentials } from "@/app/lib/payments/simpaisaPolicy";
 import {
   classifyReconciliationCase,
   isFailedWalletNotification,
@@ -203,7 +207,7 @@ function buildConfigAlerts(input: {
   iccidKeyConfigured: boolean;
   authUrlSecure: "yes" | "no" | "unknown";
   googleOAuthConfigured: boolean;
-  webhookSecretConfigured: boolean;
+  paymentCardInput: PaymentGatewayCardInput;
   deploymentVersion: string | null;
   errorMonitoringConfigured: boolean;
   controls: Awaited<ReturnType<typeof getOperationalControlsHealthSnapshot>>;
@@ -373,25 +377,26 @@ function buildConfigAlerts(input: {
     }
   }
 
-  const pay = paymentGatewayCardDefaults({
-    webhookSecretConfigured: input.webhookSecretConfigured,
-  });
-  pushUnique(
-    alerts,
-    makeAlert({
-      category: "PAYMENT",
-      code: "PAYMENT_GATEWAY_NOT_IMPLEMENTED",
-      severity: "INFO",
-      title: "Payment gateway not implemented",
-      description: `Payment integration status is ${pay.integrationStatus}. This is expected readiness information, not an incident.`,
-      sourceAt: now,
-      now,
-      freshness: "CONFIGURATION_DERIVED",
-      href: "/admin/operations",
-      recommendedAction: "No payment action from Alerts. Track readiness on Operations.",
-    })
-  );
-  if (!input.webhookSecretConfigured) {
+  const pay = safePaymentGatewayCardDefaults(() => input.paymentCardInput);
+  if (pay.integrationStatus !== "HEALTHY") {
+    pushUnique(
+      alerts,
+      makeAlert({
+        category: "PAYMENT",
+        code: "PAYMENT_GATEWAY_NOT_IMPLEMENTED",
+        severity: "INFO",
+        title: "Payment gateway not fully enabled",
+        description: `Payment integration status is ${pay.integrationStatus}. This is expected readiness information, not an incident.`,
+        sourceAt: now,
+        now,
+        freshness: "CONFIGURATION_DERIVED",
+        href: "/admin/operations",
+        recommendedAction:
+          "No payment action from Alerts. Track readiness on Operations.",
+      })
+    );
+  }
+  if (pay.webhookVerification !== "HEALTHY") {
     pushUnique(
       alerts,
       makeAlert({
@@ -400,13 +405,13 @@ function buildConfigAlerts(input: {
         severity: "INFO",
         title: "Payment webhook secret not configured",
         description:
-          "Simpaisa payin webhook does not require HMAC. Webhook verification status is NOT_CONFIGURED when neither Simpaisa nor Safepay webhook secret is set. Safepay still requires SAFEPAY_WEBHOOK_SECRET. Wallet checkout remains gated until Simpaisa API credentials are configured.",
+          "Webhook verification is NOT_CONFIGURED when the active provider webhook secret is unset (SIMPAISA_WEBHOOK_SECRET for Simpaisa, SAFEPAY_WEBHOOK_SECRET for Safepay). Simpaisa payin still authorizes via Inquire; Safepay requires its webhook secret.",
         sourceAt: now,
         now,
         freshness: "CONFIGURATION_DERIVED",
         href: "/admin/operations",
         recommendedAction:
-          "Configure Simpaisa API credentials on Operations. Do not enable the gateway from Alerts.",
+          "Configure the active provider webhook secret on Operations. Do not enable the gateway from Alerts.",
       })
     );
   }
@@ -1714,6 +1719,49 @@ async function collectMonitoringAlertsImpl(options?: {
   }
 
   const authUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL || null;
+  // Crash-safe payment env inspection — never throw into alert aggregation.
+  const paymentCardInput: PaymentGatewayCardInput = (() => {
+    const input: PaymentGatewayCardInput = {};
+    try {
+      input.gatewayEnabled = isPaymentGatewayEnabledFlag(
+        process.env.PAYMENT_GATEWAY_ENABLED
+      );
+    } catch {
+      input.gatewayEnabled = false;
+    }
+    try {
+      input.provider = parsePaymentGatewayProvider(
+        process.env.PAYMENT_GATEWAY_PROVIDER
+      );
+    } catch {
+      input.provider = null;
+    }
+    try {
+      input.simpaisaCredentialsConfigured = validateSimpaisaApiCredentials({
+        environmentRaw: process.env.SIMPAISA_ENVIRONMENT,
+        apiBaseUrlRaw: process.env.SIMPAISA_API_BASE_URL,
+        merchantIdRaw: process.env.SIMPAISA_MERCHANT_ID,
+        allowProduction: true,
+      }).ok;
+    } catch {
+      input.simpaisaCredentialsConfigured = false;
+    }
+    try {
+      input.webhookSecretConfigured =
+        input.provider === "SAFEPAY"
+          ? Boolean((process.env.SAFEPAY_WEBHOOK_SECRET ?? "").trim())
+          : Boolean((process.env.SIMPAISA_WEBHOOK_SECRET ?? "").trim());
+    } catch {
+      input.webhookSecretConfigured = false;
+    }
+    try {
+      input.reconciliationHandlersPresent =
+        input.provider === "SIMPAISA" || input.provider === "SAFEPAY";
+    } catch {
+      input.reconciliationHandlersPresent = false;
+    }
+    return input;
+  })();
   const configAlerts = buildConfigAlerts({
     now,
     db,
@@ -1733,10 +1781,7 @@ async function collectMonitoringAlertsImpl(options?: {
       (process.env.AUTH_GOOGLE_ID ?? "").trim() &&
         (process.env.AUTH_GOOGLE_SECRET ?? "").trim()
     ),
-    webhookSecretConfigured: Boolean(
-      (process.env.SIMPAISA_WEBHOOK_SECRET ?? "").trim() ||
-        (process.env.SAFEPAY_WEBHOOK_SECRET ?? "").trim()
-    ),
+    paymentCardInput,
     deploymentVersion: pickDeploymentVersion({
       MAP_ESIM_DEPLOYMENT_VERSION: process.env.MAP_ESIM_DEPLOYMENT_VERSION,
       APP_VERSION: process.env.APP_VERSION,

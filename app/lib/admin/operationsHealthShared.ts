@@ -225,6 +225,8 @@ export type OpsWarningInput = {
   pausedOperationalControlCount?: number;
   /** True when TRANSACTION_MAINTENANCE is paused. */
   transactionsMaintenancePaused?: boolean;
+  /** Payment card integration status — drives PAYMENT_NOT_IMPLEMENTED warning. */
+  paymentIntegrationStatus?: HealthStatus;
 };
 
 export function buildOperationsWarnings(input: OpsWarningInput): OpsWarning[] {
@@ -316,11 +318,26 @@ export function buildOperationsWarnings(input: OpsWarningInput): OpsWarning[] {
     }
   }
 
-  warnings.push({
-    code: "PAYMENT_NOT_IMPLEMENTED",
-    severity: "info",
-    message: "Payment gateway is not implemented.",
-  });
+  const paymentIntegration =
+    input.paymentIntegrationStatus ?? "NOT_IMPLEMENTED";
+  if (paymentIntegration === "NOT_IMPLEMENTED") {
+    warnings.push({
+      code: "PAYMENT_NOT_IMPLEMENTED",
+      severity: "info",
+      message: "Payment gateway is not implemented.",
+    });
+  } else if (
+    paymentIntegration === "NOT_CONFIGURED" ||
+    paymentIntegration === "UNAVAILABLE" ||
+    paymentIntegration === "UNKNOWN"
+  ) {
+    warnings.push({
+      code: "PAYMENT_NOT_IMPLEMENTED",
+      severity: "info",
+      message:
+        "Payment gateway integration is not enabled or not fully configured.",
+    });
+  }
 
   if (!input.guestCheckoutEnabled) {
     warnings.push({
@@ -398,8 +415,8 @@ export function smtpChannelsReadinessStatus(
 }
 
 /**
- * Webhook HMAC verification is implemented. Status reflects secret presence
- * only — never enables checkout and never returns the secret value.
+ * Webhook verification readiness. Status reflects secret presence only —
+ * never enables checkout and never returns the secret value.
  */
 export function paymentWebhookVerificationStatus(
   webhookSecretConfigured: boolean
@@ -407,16 +424,84 @@ export function paymentWebhookVerificationStatus(
   return webhookSecretConfigured ? "HEALTHY" : "NOT_CONFIGURED";
 }
 
-export function paymentGatewayCardDefaults(input?: {
+export type PaymentGatewayCardInput = {
+  /** PAYMENT_GATEWAY_ENABLED exact "true". */
+  gatewayEnabled?: boolean;
+  /** Parsed PAYMENT_GATEWAY_PROVIDER (empty → SIMPAISA). */
+  provider?: "SIMPAISA" | "SAFEPAY" | null;
+  /** Simpaisa API credentials validate (env / merchant / base URL). */
+  simpaisaCredentialsConfigured?: boolean;
+  /** Active provider webhook secret present (Simpaisa or Safepay). */
   webhookSecretConfigured?: boolean;
-}) {
+  /**
+   * Webhook + inquiry reconciliation handlers available for the active
+   * provider (code-path presence; not a live probe).
+   */
+  reconciliationHandlersPresent?: boolean;
+};
+
+export type PaymentGatewayCardDefaults = {
+  integrationStatus: HealthStatus;
+  productionCredentials: HealthStatus;
+  webhookVerification: HealthStatus;
+  paymentReconciliation: HealthStatus;
+  guestCheckout: "NOT_IMPLEMENTED / DISABLED";
+};
+
+/**
+ * Payment gateway readiness card values (pure / offline-QA safe).
+ * Callers supply env-derived booleans — never secret values.
+ */
+export function paymentGatewayCardDefaults(
+  input?: PaymentGatewayCardInput
+): PaymentGatewayCardDefaults {
+  const enabled = Boolean(input?.gatewayEnabled);
+  const provider = input?.provider ?? null;
+  const credentialsOk = Boolean(input?.simpaisaCredentialsConfigured);
+  const webhookOk = Boolean(input?.webhookSecretConfigured);
+  const reconOk = Boolean(input?.reconciliationHandlersPresent);
+
+  let integrationStatus: HealthStatus = "NOT_CONFIGURED";
+  if (enabled && provider === "SIMPAISA") {
+    integrationStatus = "HEALTHY";
+  } else if (enabled && provider === "SAFEPAY") {
+    integrationStatus = "HEALTHY";
+  } else if (!enabled) {
+    integrationStatus = "NOT_CONFIGURED";
+  } else {
+    integrationStatus = "NOT_CONFIGURED";
+  }
+
   return {
-    integrationStatus: "NOT_IMPLEMENTED" as HealthStatus,
-    productionCredentials: "NOT_CONFIGURED" as HealthStatus,
-    webhookVerification: paymentWebhookVerificationStatus(
-      Boolean(input?.webhookSecretConfigured)
-    ),
-    paymentReconciliation: "NOT_IMPLEMENTED" as HealthStatus,
-    guestCheckout: "NOT_IMPLEMENTED / DISABLED" as const,
+    integrationStatus,
+    productionCredentials: credentialsOk ? "HEALTHY" : "NOT_CONFIGURED",
+    webhookVerification: paymentWebhookVerificationStatus(webhookOk),
+    paymentReconciliation: reconOk ? "HEALTHY" : "NOT_CONFIGURED",
+    guestCheckout: "NOT_IMPLEMENTED / DISABLED",
   };
+}
+
+/** Crash-safe card values when env inspection throws. */
+export function paymentGatewayCardUnknownFallback(): PaymentGatewayCardDefaults {
+  return {
+    integrationStatus: "UNKNOWN",
+    productionCredentials: "UNKNOWN",
+    webhookVerification: "UNKNOWN",
+    paymentReconciliation: "UNKNOWN",
+    guestCheckout: "NOT_IMPLEMENTED / DISABLED",
+  };
+}
+
+/**
+ * Build payment card defaults from a resolver. Never throws — returns UNKNOWN
+ * statuses if input resolution or mapping fails.
+ */
+export function safePaymentGatewayCardDefaults(
+  resolveInput?: () => PaymentGatewayCardInput
+): PaymentGatewayCardDefaults {
+  try {
+    return paymentGatewayCardDefaults(resolveInput?.());
+  } catch {
+    return paymentGatewayCardUnknownFallback();
+  }
 }

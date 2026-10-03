@@ -51,8 +51,8 @@ import {
   formatAgeMs,
   formatUtcTimestamp,
   mapDatabaseProbeToStatus,
-  paymentGatewayCardDefaults,
   pickDeploymentVersion,
+  safePaymentGatewayCardDefaults,
   sanitizeHealthStatus,
   smtpReadinessStatus,
   smtpChannelsReadinessStatus,
@@ -63,15 +63,79 @@ import {
   type HealthStatus,
   type HstsExpectation,
   type OpsWarning,
+  type PaymentGatewayCardInput,
   type ProviderModeLabel,
   type CspMode,
 } from "@/app/lib/admin/operationsHealthShared";
+import { isPaymentGatewayEnabledFlag } from "@/app/lib/payments/safepayPolicy";
+import { parsePaymentGatewayProvider } from "@/app/lib/payments/gatewaySelect";
+import { validateSimpaisaApiCredentials } from "@/app/lib/payments/simpaisaPolicy";
 import {
   getOperationalControlsHealthSnapshot,
   type OperationalControlsHealthSnapshot,
 } from "@/app/lib/admin/operationalControlsPolicy";
 
 const METRICS_TAKE = 120;
+
+/**
+ * Resolve payment-gateway readiness inputs from env. Each check is isolated so
+ * one missing/invalid env never throws out of the Operations health page.
+ */
+function resolvePaymentGatewayCardInputFromEnv(
+  env: NodeJS.ProcessEnv = process.env
+): PaymentGatewayCardInput {
+  let gatewayEnabled = false;
+  try {
+    gatewayEnabled = isPaymentGatewayEnabledFlag(env.PAYMENT_GATEWAY_ENABLED);
+  } catch {
+    gatewayEnabled = false;
+  }
+
+  let provider: PaymentGatewayCardInput["provider"] = null;
+  try {
+    provider = parsePaymentGatewayProvider(env.PAYMENT_GATEWAY_PROVIDER);
+  } catch {
+    provider = null;
+  }
+
+  let simpaisaCredentialsConfigured = false;
+  try {
+    simpaisaCredentialsConfigured = validateSimpaisaApiCredentials({
+      environmentRaw: env.SIMPAISA_ENVIRONMENT,
+      apiBaseUrlRaw: env.SIMPAISA_API_BASE_URL,
+      merchantIdRaw: env.SIMPAISA_MERCHANT_ID,
+      allowProduction: true,
+    }).ok;
+  } catch {
+    simpaisaCredentialsConfigured = false;
+  }
+
+  let webhookSecretConfigured = false;
+  try {
+    webhookSecretConfigured =
+      provider === "SAFEPAY"
+        ? Boolean((env.SAFEPAY_WEBHOOK_SECRET ?? "").trim())
+        : Boolean((env.SIMPAISA_WEBHOOK_SECRET ?? "").trim());
+  } catch {
+    webhookSecretConfigured = false;
+  }
+
+  let reconciliationHandlersPresent = false;
+  try {
+    reconciliationHandlersPresent =
+      provider === "SIMPAISA" || provider === "SAFEPAY";
+  } catch {
+    reconciliationHandlersPresent = false;
+  }
+
+  return {
+    gatewayEnabled,
+    provider,
+    simpaisaCredentialsConfigured,
+    webhookSecretConfigured,
+    reconciliationHandlersPresent,
+  };
+}
 
 export type HealthCardMeta = {
   checkedAtLabel: string;
@@ -1023,13 +1087,10 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
   };
 
   const guestEnabled = isGuestVesimCheckoutEnabled();
-  const webhookSecretConfigured = Boolean(
-    (process.env.SIMPAISA_WEBHOOK_SECRET ?? "").trim() ||
-      (process.env.SAFEPAY_WEBHOOK_SECRET ?? "").trim()
+  // Crash-safe: never let payment env/parsing failures 500 the Operations page.
+  const paymentDefaults = safePaymentGatewayCardDefaults(() =>
+    resolvePaymentGatewayCardInputFromEnv(process.env)
   );
-  const paymentDefaults = paymentGatewayCardDefaults({
-    webhookSecretConfigured,
-  });
   const payment: PaymentReadinessHealth = {
     checkedAtLabel: nowLabel(checkedAt),
     freshness: "CONFIGURATION_DERIVED",
@@ -1097,6 +1158,7 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
       operationalControls.pausedControlKeys.includes(
         "TRANSACTION_MAINTENANCE"
       ),
+    paymentIntegrationStatus: payment.integrationStatus,
   });
 
   return {
