@@ -539,14 +539,14 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               <div className="flex items-baseline justify-between gap-3 border-b border-[var(--border)] py-2.5">
                 <dt className="text-[var(--text-muted)]">Package total</dt>
                 <dd className="font-semibold text-[var(--heading)]">
-                  <CheckoutMoney cents={review.priceCents} />
+                  <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout} cents={review.priceCents} />
                 </dd>
               </div>
               {review.promoDiscountCents > 0 ? (
                 <div className="flex items-baseline justify-between gap-3 border-b border-[var(--border)] py-2.5">
                   <dt className="text-[var(--text-muted)]">Promo</dt>
                   <dd className="font-semibold text-[var(--heading)]">
-                    <CheckoutMoney cents={review.promoDiscountCents} signed />
+                    <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout} cents={review.promoDiscountCents} signed />
                   </dd>
                 </div>
               ) : null}
@@ -554,7 +554,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 <div className="flex items-baseline justify-between gap-3 border-b border-[var(--border)] py-2.5">
                   <dt className="text-[var(--text-muted)]">Rewards</dt>
                   <dd className="font-semibold text-[var(--heading)]">
-                    <CheckoutMoney cents={preview.rewardPointsRedeemed} signed />
+                    <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout} cents={preview.rewardPointsRedeemed} signed />
                   </dd>
                 </div>
               ) : null}
@@ -562,7 +562,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 <div className="flex items-baseline justify-between gap-3 border-b border-[var(--border)] py-2.5">
                   <dt className="text-[var(--text-muted)]">Wallet</dt>
                   <dd className="font-semibold text-[var(--heading)]">
-                    <CheckoutMoney
+                    <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout}
                       cents={preview.walletAppliedCents}
                       signed
                       variant="wallet-deduction"
@@ -574,7 +574,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 <dt className="font-semibold text-[var(--heading)]">{dueLabel}</dt>
                 <dd className="text-base font-semibold text-[var(--heading)]">
                   {dueOnline ? (
-                    <CheckoutMoney cents={preview.gatewayAmountCents} />
+                    <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout} cents={preview.gatewayAmountCents} />
                   ) : (
                     "Covered"
                   )}
@@ -615,6 +615,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
             discountCents={review.promoDiscountCents}
             totalCents={review.payableCents}
             disabled={busy}
+            exactSimpaisaPkrCharge={simpaisaCheckout}
           />
 
           {showRewardsSection ? (
@@ -627,7 +628,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               </h2>
               <p className="mt-2 text-sm text-[var(--text-muted)]">
                 {review.rewardPointsBalanceLabel} points available (
-                <CheckoutMoney cents={review.rewardPointsBalance} />)
+                <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout} cents={review.rewardPointsBalance} />)
               </p>
               <label
                 htmlFor={useRewardsId}
@@ -662,7 +663,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
             </h2>
             <p className="mt-2 text-sm text-[var(--text-muted)]">
               Wallet:{" "}
-              <CheckoutMoney
+              <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout}
                 cents={review.balanceCents}
                 variant="wallet-balance"
               />
@@ -771,12 +772,12 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 <>
                   <p className="mt-2 text-sm text-[var(--text-muted)]">
                     Due online:{" "}
-                    <CheckoutMoney cents={preview.gatewayAmountCents} />
+                    <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout} cents={preview.gatewayAmountCents} />
                     {preview.walletAppliedCents > 0 ? (
                       <>
                         {" "}
                         (wallet{" "}
-                        <CheckoutMoney
+                        <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout}
                           cents={preview.walletAppliedCents}
                           variant="wallet-deduction"
                         />
@@ -820,7 +821,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                   </p>
                   <p className="mt-3 text-sm text-[var(--text-muted)]">
                     Remaining due:{" "}
-                    <CheckoutMoney cents={preview.gatewayAmountCents} />.
+                    <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout} cents={preview.gatewayAmountCents} />.
                   </p>
                 </>
               ) : null}
@@ -847,7 +848,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                   Package total
                 </dt>
                 <dd className="font-semibold text-[var(--heading)]">
-                  <CheckoutMoney cents={review.priceCents} />
+                  <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout} cents={review.priceCents} />
                 </dd>
               </div>
               {review.promoDiscountCents > 0 ? (
@@ -856,7 +857,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                     Promo discount
                   </dt>
                   <dd className="font-semibold text-[var(--heading)]">
-                    <CheckoutMoney cents={review.promoDiscountCents} signed />
+                    <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout} cents={review.promoDiscountCents} signed />
                   </dd>
                 </div>
               ) : null}
@@ -866,7 +867,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                     Rewards applied
                   </dt>
                   <dd className="font-semibold text-[var(--heading)]">
-                    <CheckoutMoney cents={preview.rewardPointsRedeemed} signed />
+                    <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout} cents={preview.rewardPointsRedeemed} signed />
                   </dd>
                 </div>
               ) : null}
@@ -876,7 +877,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                     Wallet applied
                   </dt>
                   <dd className="font-semibold text-[var(--heading)]">
-                    <CheckoutMoney
+                    <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout}
                       cents={preview.walletAppliedCents}
                       signed
                       variant="wallet-deduction"
@@ -896,7 +897,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 </dt>
                 <dd className="font-semibold text-[var(--heading)]">
                   {dueOnline ? (
-                    <CheckoutMoney cents={preview.gatewayAmountCents} />
+                    <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout} cents={preview.gatewayAmountCents} />
                   ) : (
                     "Covered"
                   )}
@@ -908,7 +909,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                     Balance after purchase
                   </dt>
                   <dd className="font-semibold text-[var(--heading)]">
-                    <CheckoutMoney
+                    <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout}
                       cents={balanceAfterPreview}
                       variant="wallet-balance"
                     />
@@ -1080,7 +1081,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               </p>
               <p className="truncate text-sm font-semibold text-[var(--heading)]">
                 {dueOnline ? (
-                  <CheckoutMoney cents={preview.gatewayAmountCents} />
+                  <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout} cents={preview.gatewayAmountCents} />
                 ) : (
                   "Covered"
                 )}

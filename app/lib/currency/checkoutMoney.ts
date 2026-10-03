@@ -1,4 +1,8 @@
 import { DEFAULT_CURRENCY, type CurrencyCode } from "@/app/lib/currency/currencies";
+import {
+  formatSimpaisaPkrChargeLabel,
+  quoteSimpaisaPkrChargeFromUsdCents,
+} from "@/app/lib/payments/simpaisaPkrQuote";
 import { formatUsdCents } from "@/app/lib/wallet/display";
 
 export const CHECKOUT_NON_USD_DISPLAY_NOTE =
@@ -29,6 +33,24 @@ export function applyCheckoutDisplaySign(
   signed = false
 ): string {
   return signed ? `${CHECKOUT_DISPLAY_MINUS}${formattedAmount}` : formattedAmount;
+}
+
+/**
+ * PKR primary label matching the Simpaisa payment-intent quote
+ * (`SIMPAISA_PKR_USD_RATE` / FALLBACK 293). Null when quote cannot be built.
+ */
+export function formatCheckoutSimpaisaPkrPrimary(
+  cents: number,
+  signed = false
+): string | null {
+  const absCents = Math.abs(cents);
+  if (!Number.isInteger(absCents) || absCents <= 0) return null;
+  const quote = quoteSimpaisaPkrChargeFromUsdCents(absCents);
+  if (!quote) return null;
+  return applyCheckoutDisplaySign(
+    formatSimpaisaPkrChargeLabel(quote.pkrRupees),
+    signed
+  );
 }
 
 export function formatCheckoutEstimatedPrimary(

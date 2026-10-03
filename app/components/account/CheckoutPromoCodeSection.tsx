@@ -26,6 +26,8 @@ type Props = {
   discountCents: number;
   totalCents: number;
   disabled?: boolean;
+  /** Match Simpaisa PKR charge quote when mobile-wallet checkout is active. */
+  exactSimpaisaPkrCharge?: boolean;
 };
 
 export default function CheckoutPromoCodeSection({
@@ -36,6 +38,7 @@ export default function CheckoutPromoCodeSection({
   discountCents,
   totalCents,
   disabled = false,
+  exactSimpaisaPkrCharge = false,
 }: Props) {
   const router = useRouter();
   const headingId = useId();
@@ -104,19 +107,29 @@ export default function CheckoutPromoCodeSection({
             <div className="grid gap-1 py-1 sm:grid-cols-[140px_1fr]">
               <dt className="text-[var(--text-muted)]">Original</dt>
               <dd className="font-medium text-[var(--heading)]">
-                <CheckoutMoney cents={originalCents} />
+                <CheckoutMoney
+                  cents={originalCents}
+                  exactSimpaisaPkrCharge={exactSimpaisaPkrCharge}
+                />
               </dd>
             </div>
             <div className="grid gap-1 py-1 sm:grid-cols-[140px_1fr]">
               <dt className="text-[var(--text-muted)]">Discount</dt>
               <dd className="font-medium text-[var(--heading)]">
-                <CheckoutMoney cents={discountCents} signed />
+                <CheckoutMoney
+                  cents={discountCents}
+                  signed
+                  exactSimpaisaPkrCharge={exactSimpaisaPkrCharge}
+                />
               </dd>
             </div>
             <div className="grid gap-1 py-1 sm:grid-cols-[140px_1fr]">
               <dt className="text-[var(--text-muted)]">Package total</dt>
               <dd className="font-semibold text-[var(--heading)]">
-                <CheckoutMoney cents={totalCents} />
+                <CheckoutMoney
+                  cents={totalCents}
+                  exactSimpaisaPkrCharge={exactSimpaisaPkrCharge}
+                />
               </dd>
             </div>
           </dl>

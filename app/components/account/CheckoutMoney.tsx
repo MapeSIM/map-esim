@@ -5,6 +5,7 @@ import {
   CHECKOUT_NON_USD_DISPLAY_NOTE,
   applyCheckoutDisplaySign,
   formatCheckoutEstimatedPrimary,
+  formatCheckoutSimpaisaPkrPrimary,
   formatCheckoutUsdSecondaryLabel,
   isCheckoutDisplayUsd,
   usdCentsToCatalogAmount,
@@ -16,12 +17,18 @@ type CheckoutMoneyProps = {
   cents: number;
   signed?: boolean;
   variant?: CheckoutMoneyVariant;
+  /**
+   * When true and display currency is PKR, use the Simpaisa charge quote
+   * (fixed MAP 293 rate) so sticky/summary amounts match SimpaisaWalletFields.
+   */
+  exactSimpaisaPkrCharge?: boolean;
 };
 
 export function CheckoutMoney({
   cents,
   signed = false,
   variant = "base",
+  exactSimpaisaPkrCharge = false,
 }: CheckoutMoneyProps) {
   const { currency, formatPrice } = useCurrency();
   const usdLabel = applyCheckoutDisplaySign(formatUsdCents(cents), signed);
@@ -36,14 +43,20 @@ export function CheckoutMoney({
     );
   }
 
+  const simpaisaPkrPrimary =
+    exactSimpaisaPkrCharge && currency === "PKR"
+      ? formatCheckoutSimpaisaPkrPrimary(cents, signed)
+      : null;
+  const primaryLabel =
+    simpaisaPkrPrimary ??
+    formatCheckoutEstimatedPrimary(
+      formatPrice(usdCentsToCatalogAmount(cents)),
+      signed
+    );
+
   return (
     <span className="inline-flex flex-col items-start gap-0.5 align-top">
-      <span>
-        {formatCheckoutEstimatedPrimary(
-          formatPrice(usdCentsToCatalogAmount(cents)),
-          signed
-        )}
-      </span>
+      <span>{primaryLabel}</span>
       <span className="text-xs font-medium text-[var(--text-muted)]">
         {formatCheckoutUsdSecondaryLabel(cents, variant, signed)}
       </span>
