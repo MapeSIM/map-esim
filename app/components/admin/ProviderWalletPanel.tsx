@@ -221,21 +221,21 @@ export function ProviderWalletPanel() {
                   {state.transactions.map((tx, idx) => (
                     <li
                       key={`${tx.createdAt ?? "t"}-${idx}`}
-                      className="grid gap-1 px-3 py-2.5 text-sm sm:grid-cols-[100px_1fr_auto]"
+                      className="flex flex-col gap-2 px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:gap-3"
                     >
-                      <span className="font-semibold uppercase tracking-[0.04em] text-[var(--text-soft)]">
+                      <span className="inline-flex w-fit shrink-0 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-soft)] whitespace-nowrap">
                         {tx.type}
                       </span>
-                      <span className="min-w-0 text-[var(--heading)]">
+                      <span className="min-w-0 flex-1 text-[var(--heading)]">
                         <span className="block truncate">{tx.description}</span>
-                        <span className="block text-xs text-[var(--text-soft)]">
+                        <span className="block truncate text-xs text-[var(--text-soft)]">
                           {formatWhen(tx.createdAt)}
                           {tx.orderRefMasked
                             ? ` · ${tx.orderRefMasked}`
                             : ""}
                         </span>
                       </span>
-                      <span className="font-semibold tabular-nums text-[var(--heading)] sm:text-right">
+                      <span className="shrink-0 font-semibold tabular-nums text-[var(--heading)] sm:text-right">
                         {formatAmount(tx.amount, tx.currency)}
                       </span>
                     </li>
