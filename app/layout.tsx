@@ -24,11 +24,19 @@ import { defaultSocialShareImages } from "@/app/lib/seo/socialShareMeta";
 
 const { openGraphImages, twitterImages } = defaultSocialShareImages();
 
+const googleSiteVerification =
+  (process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ?? "").trim() ||
+  (process.env.GOOGLE_SITE_VERIFICATION ?? "").trim() ||
+  undefined;
+
 export const metadata: Metadata = {
   metadataBase: new URL(BRAND_SITE_URL),
   applicationName: BRAND_NAME,
   title: BRAND_NAME,
   description: BRAND_TAGLINE,
+  ...(googleSiteVerification
+    ? { verification: { google: googleSiteVerification } }
+    : {}),
   openGraph: {
     title: BRAND_NAME,
     description: BRAND_TAGLINE,
