@@ -209,6 +209,8 @@ function main() {
   assert.match(customerDetail, /canAdjustWallet/);
   assert.match(orderDetail, /canRevealIccid/);
   assert.match(orderDetail, /canFulfill && detail.addDataEligible/);
+  assert.match(orderDetail, /canResendInstallEmail/);
+  assert.match(orderDetail, /SUPPORT_EMAILS|ORDERS_MANAGE|INSTALL_ISSUES/);
   console.log("PASS mutation_guards_without_changing_purchase_engine");
 
   const pkg = read("package.json");

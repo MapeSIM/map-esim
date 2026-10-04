@@ -1,6 +1,7 @@
 import { isEmailConfigured } from "@/app/lib/email/config";
 import {
   claimEmailSend,
+  clearEmailDeliveryRecord,
   getEmailDeliveryRecord,
   markEmailDelivery,
   releaseEmailSendClaim,
@@ -62,10 +63,12 @@ function resolveHttpsQrImageSrc(payload: OrderEmailPayload): string | undefined 
  * CID is not used for the HTML <img> src.
  */
 export async function sendOrderEmail(
-  payload: OrderEmailPayload
+  payload: OrderEmailPayload,
+  options?: { forceResend?: boolean }
 ): Promise<SendOrderEmailResult> {
   const orderId = payload.orderId.trim();
   const customerEmail = payload.customerEmail.trim();
+  const forceResend = options?.forceResend === true;
 
   if (!orderId) {
     return { emailDelivery: "failed", detail: "missing_order_id" };
@@ -76,7 +79,9 @@ export async function sendOrderEmail(
     return { emailDelivery: "invalid_email" };
   }
 
-  if (wasEmailAlreadySent(orderId)) {
+  if (forceResend) {
+    clearEmailDeliveryRecord(orderId);
+  } else if (wasEmailAlreadySent(orderId)) {
     markEmailDelivery(orderId, "already_sent", customerEmail);
     return { emailDelivery: "already_sent" };
   }
@@ -122,6 +127,10 @@ export async function sendOrderEmail(
       : undefined;
 
     const destinationLabel = payload.destination.trim() || "eSIM";
+    const safeOrderToken = orderId.replace(/[^a-zA-Z0-9_-]/g, "");
+    const messageId = forceResend
+      ? `<order-${safeOrderToken}-r${Date.now()}@mapesim.com>`
+      : `<order-${safeOrderToken}@mapesim.com>`;
 
     const result = await sendChannelMail({
       channel: "orders",
@@ -139,8 +148,9 @@ export async function sendOrderEmail(
       headers: {
         "X-Entity-Ref-ID": orderId,
         "X-MAP-ESIM-Order-ID": orderId,
+        ...(forceResend ? { "X-MAP-ESIM-Admin-Resend": "1" } : {}),
       },
-      messageId: `<order-${orderId.replace(/[^a-zA-Z0-9_-]/g, "")}@mapesim.com>`,
+      messageId,
     });
 
     if (!result.ok) {

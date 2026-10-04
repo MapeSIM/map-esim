@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import AdminAddDataForm from "@/app/components/admin/AdminAddDataForm";
+import AdminOrderInstallEmailResendButton from "@/app/components/admin/AdminOrderInstallEmailResendButton";
 import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBadge";
 import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
 import AdminEsimUsagePanel from "@/app/components/orders/AdminEsimUsagePanel";
@@ -52,6 +53,10 @@ export default async function AdminOrderDetailPage({
     access?.permissions ?? [],
     "ESIM_FULFILLMENT"
   );
+  const canResendInstallEmail = hasAdminPermission(
+    access?.permissions ?? [],
+    ["SUPPORT_EMAILS", "ORDERS_MANAGE", "ESIM_FULFILLMENT", "INSTALL_ISSUES"]
+  );
   const { id } = await params;
 
   let detail: Awaited<ReturnType<typeof getAdminOrderDetail>>;
@@ -101,6 +106,23 @@ export default async function AdminOrderDetailPage({
           </AdminStatusPill>
           {detail.isAddDataPurchase ? <AddDataPurchaseBadge isAddDataPurchase /> : null}
         </div>
+        {canResendInstallEmail && detail.installEmailResendEligible ? (
+          <div className="rounded-2xl border border-[var(--accent-strong)]/35 bg-[var(--accent-strong)]/10 px-4 py-4 sm:px-5">
+            <p className="text-sm font-semibold text-[var(--heading)]">
+              Customer installation email
+            </p>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Resend the QR code and install instructions if the customer did
+              not receive them or needs another copy.
+            </p>
+            <div className="mt-3">
+              <AdminOrderInstallEmailResendButton
+                orderId={detail.id}
+                customerEmailLabel={detail.customerEmail}
+              />
+            </div>
+          </div>
+        ) : null}
       </header>
 
       <dl className={CARD_CLASS}>

@@ -82,10 +82,36 @@ function main() {
   assert.match(detailSrc, /Customer email/);
   assert.match(detailSrc, /notFound/);
   assert.match(detailSrc, /IccidRevealPanel/);
+  assert.match(detailSrc, /AdminOrderInstallEmailResendButton/);
+  assert.match(detailSrc, /canResendInstallEmail/);
+  assert.match(detailSrc, /Resend Installation Email \/ QR|installEmailResendEligible/);
   assert.ok(!/JSON\.stringify/.test(detailSrc));
   assert.ok(!/createOrderAccessToken|checkout\/credit/i.test(detailSrc));
   assert.ok(!/decryptIccid/.test(detailSrc));
   console.log("PASS detail_page_email_and_notfound");
+
+  const resendAction = readFileSync(
+    join(root, "app/lib/admin/orderInstallEmailResendActions.ts"),
+    "utf8"
+  );
+  const resendLib = readFileSync(
+    join(root, "app/lib/admin/reconciliationEmailResend.ts"),
+    "utf8"
+  );
+  const resendButton = readFileSync(
+    join(root, "app/components/admin/AdminOrderInstallEmailResendButton.tsx"),
+    "utf8"
+  );
+  assert.match(resendAction, /resendOrderInstallEmailAction/);
+  assert.match(resendAction, /SUPPORT_EMAILS/);
+  assert.match(resendAction, /ORDERS_MANAGE/);
+  assert.match(resendLib, /adminResendInstallEmailForLocalOrder/);
+  assert.match(resendLib, /order_install_email_resend/);
+  assert.match(resendButton, /Resend Installation Email \/ QR/);
+  assert.match(resendButton, /data-admin-toast/);
+  assert.match(ordersSrc, /installEmailResendEligible/);
+  assert.doesNotMatch(detailSrc, /Non-PTA|non-pta/i);
+  console.log("PASS order_install_email_resend");
 
   const authConfig = readFileSync(join(root, "auth.config.ts"), "utf8");
   assert.match(authConfig, /pathname === "\/admin"/);

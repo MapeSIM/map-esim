@@ -98,6 +98,11 @@ export type AdminOrderDetail = {
   isAddDataPurchase: boolean;
   /** Source MAP order id when isAddDataPurchase; never confuse with addDataEligible. */
   addDataSourceOrderId: string | null;
+  /**
+   * True when this completed order can receive an admin install/QR email resend
+   * (provider order present). Display/eligibility only — send path re-checks.
+   */
+  installEmailResendEligible: boolean;
 };
 
 function adminIccidDisplay(
@@ -468,6 +473,9 @@ export async function getAdminOrderDetail(
     destinationCode: (destinationCode ?? "").trim() || null,
     isAddDataPurchase: addDataPurchase.isAddDataPurchase,
     addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
+    installEmailResendEligible: Boolean(
+      installEligible && providerOrderId
+    ),
   };
 }
 

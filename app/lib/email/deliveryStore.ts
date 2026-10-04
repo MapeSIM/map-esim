@@ -80,3 +80,14 @@ export function wasEmailAlreadySent(orderId: string): boolean {
   const record = getEmailDeliveryRecord(orderId);
   return record?.status === "sent" || record?.status === "already_sent";
 }
+
+/**
+ * Clears the in-memory delivery record + in-flight claim so an authorized
+ * admin resend can deliver again. Does not touch Prisma or SMTP config.
+ */
+export function clearEmailDeliveryRecord(orderId: string): void {
+  const key = normalizeOrderId(orderId);
+  if (!key) return;
+  store.delete(key);
+  inFlight.delete(key);
+}

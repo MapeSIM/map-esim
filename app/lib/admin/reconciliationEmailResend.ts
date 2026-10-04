@@ -573,8 +573,8 @@ export async function resendReconciliationEmail(options: {
   }
 
   const sendResult = ids.orderEmailOnAssignment
-    ? await resendAssignmentOrderEmail(ids.recordId)
-    : await resendPurchaseOrderEmail(ids.recordId);
+    ? await resendAssignmentOrderEmail(ids.recordId, { force: false })
+    : await resendPurchaseOrderEmail(ids.recordId, { force: false });
 
   if (sendResult.ok) {
     await writeAuditLog({
@@ -621,20 +621,29 @@ export async function resendReconciliationEmail(options: {
 }
 
 async function resendPurchaseOrderEmail(
-  purchaseId: string
+  purchaseId: string,
+  options?: { force?: boolean }
 ): Promise<
   | { ok: true; deliveryStatus: string }
   | { ok: false; failureCode: string }
 > {
   const configBlock = ordersEmailNotConfiguredBlock();
   if (configBlock) return configBlock;
+  const force = options?.force === true;
 
   const claimed = await prisma.walletEsimPurchase.updateMany({
     where: {
       id: purchaseId,
       status: WalletEsimPurchaseStatus.COMPLETED,
-      reconciliationResolvedAt: null,
-      emailDeliveryStatus: { in: ["failed", "not_configured"] },
+      ...(force ? {} : { reconciliationResolvedAt: null }),
+      ...(force
+        ? {
+            OR: [
+              { emailDeliveryStatus: null },
+              { emailDeliveryStatus: { not: "sending" } },
+            ],
+          }
+        : { emailDeliveryStatus: { in: ["failed", "not_configured"] } }),
       orderId: { not: null },
       providerOrderId: { not: null },
     },
@@ -711,7 +720,7 @@ async function resendPurchaseOrderEmail(
     return { ok: false, failureCode: "payload_build_failed" };
   }
 
-  const result = await sendOrderEmail(emailPayload);
+  const result = await sendOrderEmail(emailPayload, { forceResend: force });
   await prisma.walletEsimPurchase.updateMany({
     where: { id: purchaseId, emailDeliveryStatus: "sending" },
     data: { emailDeliveryStatus: result.emailDelivery },
@@ -727,20 +736,29 @@ async function resendPurchaseOrderEmail(
 }
 
 async function resendAssignmentOrderEmail(
-  assignmentId: string
+  assignmentId: string,
+  options?: { force?: boolean }
 ): Promise<
   | { ok: true; deliveryStatus: string }
   | { ok: false; failureCode: string }
 > {
   const configBlock = ordersEmailNotConfiguredBlock();
   if (configBlock) return configBlock;
+  const force = options?.force === true;
 
   const claimed = await prisma.adminPackageAssignment.updateMany({
     where: {
       id: assignmentId,
       status: AdminPackageAssignmentStatus.COMPLETED,
-      reconciliationResolvedAt: null,
-      emailDeliveryStatus: { in: ["failed", "not_configured"] },
+      ...(force ? {} : { reconciliationResolvedAt: null }),
+      ...(force
+        ? {
+            OR: [
+              { emailDeliveryStatus: null },
+              { emailDeliveryStatus: { not: "sending" } },
+            ],
+          }
+        : { emailDeliveryStatus: { in: ["failed", "not_configured"] } }),
       orderId: { not: null },
       providerOrderId: { not: null },
     },
@@ -819,7 +837,7 @@ async function resendAssignmentOrderEmail(
     return { ok: false, failureCode: "payload_build_failed" };
   }
 
-  const result = await sendOrderEmail(emailPayload);
+  const result = await sendOrderEmail(emailPayload, { forceResend: force });
   await prisma.adminPackageAssignment.updateMany({
     where: { id: assignmentId, emailDeliveryStatus: "sending" },
     data: { emailDeliveryStatus: result.emailDelivery },
@@ -842,7 +860,7 @@ export async function adminRetryFailedPurchaseInstallEmail(
   | { ok: true; deliveryStatus: string }
   | { ok: false; failureCode: string }
 > {
-  return resendPurchaseOrderEmail(purchaseId);
+  return resendPurchaseOrderEmail(purchaseId, { force: false });
 }
 
 /**
@@ -855,5 +873,342 @@ export async function adminRetryFailedAssignmentInstallEmail(
   | { ok: true; deliveryStatus: string }
   | { ok: false; failureCode: string }
 > {
-  return resendAssignmentOrderEmail(assignmentId);
+  return resendAssignmentOrderEmail(assignmentId, { force: false });
+}
+
+async function resendStandaloneLocalOrderEmail(
+  localOrderId: string
+): Promise<
+  | { ok: true; deliveryStatus: string }
+  | { ok: false; failureCode: string }
+> {
+  const configBlock = ordersEmailNotConfiguredBlock();
+  if (configBlock) return configBlock;
+
+  const row = await prisma.order.findUnique({
+    where: { id: localOrderId },
+    select: {
+      id: true,
+      status: true,
+      providerOrderId: true,
+      offerId: true,
+      planName: true,
+      destination: true,
+      dataAllowance: true,
+      validity: true,
+      providerAmount: true,
+      providerCurrency: true,
+      customerEmail: true,
+      alternateDeliveryEmail: true,
+      partnerEsimPurchase: {
+        select: { id: true, emailDeliveryStatus: true },
+      },
+    },
+  });
+  if (!row || row.status !== OrderStatus.COMPLETED) {
+    return { ok: false, failureCode: "underlying_incomplete" };
+  }
+  const providerOrderId = (row.providerOrderId ?? "").trim();
+  if (!providerOrderId) {
+    return { ok: false, failureCode: "underlying_incomplete" };
+  }
+
+  const partnerId = row.partnerEsimPurchase?.id ?? null;
+  if (partnerId) {
+    if (row.partnerEsimPurchase?.emailDeliveryStatus === "sending") {
+      return { ok: false, failureCode: "duplicate_or_in_progress" };
+    }
+    await prisma.partnerEsimPurchase.updateMany({
+      where: {
+        id: partnerId,
+        OR: [
+          { emailDeliveryStatus: null },
+          { emailDeliveryStatus: { not: "sending" } },
+        ],
+      },
+      data: { emailDeliveryStatus: "sending" },
+    });
+  }
+
+  const customerEmail = resolveFrozenInstallDeliveryEmail(row);
+  const broker = await fetchBrokerOrderForEmailOnly(providerOrderId);
+  if (!broker || !hasInstallDetails(extractInstallDetails(broker))) {
+    if (partnerId) {
+      await prisma.partnerEsimPurchase.updateMany({
+        where: { id: partnerId, emailDeliveryStatus: "sending" },
+        data: { emailDeliveryStatus: "failed" },
+      });
+    }
+    return { ok: false, failureCode: "install_details_unavailable" };
+  }
+
+  const amountNumber =
+    row.providerAmount != null ? Number(row.providerAmount) : NaN;
+  const providerCostCents =
+    Number.isFinite(amountNumber) && amountNumber > 0
+      ? Math.round(amountNumber * 100)
+      : null;
+
+  const verifiedOffer = offerFromLocal({
+    offerId: row.offerId,
+    planName: row.planName,
+    destinationName: row.destination,
+    dataAllowance: row.dataAllowance,
+    validity: row.validity,
+    providerCostCents,
+    currency: row.providerCurrency,
+  });
+  const accessToken = createOrderAccessToken(providerOrderId);
+  const emailPayload = buildOrderEmailPayload({
+    customerEmail,
+    orderId: providerOrderId,
+    verifiedOffer,
+    orderPayload: broker,
+    orderAccessUrl: accessToken
+      ? getOrderAccessSuccessUrl(providerOrderId, accessToken)
+      : undefined,
+    accessToken: accessToken || undefined,
+  });
+  if (!emailPayload) {
+    if (partnerId) {
+      await prisma.partnerEsimPurchase.updateMany({
+        where: { id: partnerId, emailDeliveryStatus: "sending" },
+        data: { emailDeliveryStatus: "failed" },
+      });
+    }
+    return { ok: false, failureCode: "payload_build_failed" };
+  }
+
+  const result = await sendOrderEmail(emailPayload, { forceResend: true });
+  if (partnerId) {
+    await prisma.partnerEsimPurchase.updateMany({
+      where: { id: partnerId, emailDeliveryStatus: "sending" },
+      data: { emailDeliveryStatus: result.emailDelivery },
+    });
+  }
+
+  if (
+    result.emailDelivery === "sent" ||
+    result.emailDelivery === "already_sent"
+  ) {
+    return { ok: true, deliveryStatus: result.emailDelivery };
+  }
+  return { ok: false, failureCode: result.emailDelivery };
+}
+
+export type AdminOrderInstallEmailResendResult =
+  | {
+      ok: true;
+      message: string;
+      deliveryStatus: string;
+      source: "wallet_purchase" | "assignment" | "order";
+    }
+  | { ok: false; error: string };
+
+const ORDER_INSTALL_RESEND_PUBLIC_ERROR =
+  "Unable to resend the installation email right now.";
+
+/**
+ * Admin Order Detail: resend install/QR email for a completed local order.
+ * Reuses purchase/assignment install-email send paths when present; otherwise
+ * sends from the Order snapshot (guest/partner). Never retries checkout.
+ */
+export async function adminResendInstallEmailForLocalOrder(options: {
+  adminUserId: string;
+  orderId: string;
+}): Promise<AdminOrderInstallEmailResendResult> {
+  if (!(await assertSameOriginAdminRequest())) {
+    return { ok: false, error: ORDER_INSTALL_RESEND_PUBLIC_ERROR };
+  }
+  const admin = await assertActiveAdmin(options.adminUserId);
+  if (!admin) {
+    return { ok: false, error: ORDER_INSTALL_RESEND_PUBLIC_ERROR };
+  }
+
+  const orderId = (options.orderId ?? "").trim();
+  if (!orderId || orderId.length > 64 || !/^[A-Za-z0-9_-]+$/.test(orderId)) {
+    return { ok: false, error: "Invalid order." };
+  }
+
+  const adminRate = consumeRateLimit({
+    key: `admin-order-install-resend:admin:${admin.id}`,
+    limit: 15,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (!adminRate.ok) {
+    await writeAuditLog({
+      actorUserId: admin.id,
+      action: EMAIL_ACTION_BLOCKED,
+      targetType: "Order",
+      targetId: orderId,
+      metadata: {
+        action: "order_install_email_resend",
+        failureCode: "rate_limited",
+      },
+    });
+    return {
+      ok: false,
+      error: "Too many resend attempts. Please wait and try again.",
+    };
+  }
+
+  const orderRate = consumeRateLimit({
+    key: `admin-order-install-resend:order:${orderId}`,
+    limit: 3,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (!orderRate.ok) {
+    await writeAuditLog({
+      actorUserId: admin.id,
+      action: EMAIL_ACTION_BLOCKED,
+      targetType: "Order",
+      targetId: orderId,
+      metadata: {
+        action: "order_install_email_resend",
+        failureCode: "rate_limited_order",
+      },
+    });
+    return {
+      ok: false,
+      error: "This order was resent recently. Please wait and try again.",
+    };
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      id: true,
+      status: true,
+      providerOrderId: true,
+      walletEsimPurchase: {
+        select: { id: true, status: true },
+      },
+      adminPackageAssignment: {
+        select: { id: true, status: true },
+      },
+    },
+  });
+  if (!order || order.status !== OrderStatus.COMPLETED) {
+    await writeAuditLog({
+      actorUserId: admin.id,
+      action: EMAIL_ACTION_BLOCKED,
+      targetType: "Order",
+      targetId: orderId,
+      metadata: {
+        action: "order_install_email_resend",
+        failureCode: "order_not_completed",
+      },
+    });
+    return {
+      ok: false,
+      error: "Installation email can only be resent for completed orders.",
+    };
+  }
+  if (!(order.providerOrderId ?? "").trim()) {
+    await writeAuditLog({
+      actorUserId: admin.id,
+      action: EMAIL_ACTION_BLOCKED,
+      targetType: "Order",
+      targetId: orderId,
+      metadata: {
+        action: "order_install_email_resend",
+        failureCode: "missing_provider_order",
+      },
+    });
+    return {
+      ok: false,
+      error: "Provider order reference is missing for this order.",
+    };
+  }
+
+  let sendResult:
+    | { ok: true; deliveryStatus: string }
+    | { ok: false; failureCode: string };
+  let source: "wallet_purchase" | "assignment" | "order";
+  let targetType: string;
+  let targetId: string;
+
+  if (
+    order.walletEsimPurchase?.status === WalletEsimPurchaseStatus.COMPLETED
+  ) {
+    source = "wallet_purchase";
+    targetType = "WalletEsimPurchase";
+    targetId = order.walletEsimPurchase.id;
+    sendResult = await resendPurchaseOrderEmail(order.walletEsimPurchase.id, {
+      force: true,
+    });
+  } else if (
+    order.adminPackageAssignment?.status ===
+    AdminPackageAssignmentStatus.COMPLETED
+  ) {
+    source = "assignment";
+    targetType = "AdminPackageAssignment";
+    targetId = order.adminPackageAssignment.id;
+    sendResult = await resendAssignmentOrderEmail(
+      order.adminPackageAssignment.id,
+      { force: true }
+    );
+  } else {
+    source = "order";
+    targetType = "Order";
+    targetId = order.id;
+    sendResult = await resendStandaloneLocalOrderEmail(order.id);
+  }
+
+  if (sendResult.ok) {
+    await writeAuditLog({
+      actorUserId: admin.id,
+      action: EMAIL_RESENT,
+      targetType,
+      targetId,
+      metadata: {
+        action: "order_install_email_resend",
+        source,
+        localOrderId: orderId,
+        deliveryStatus: sendResult.deliveryStatus,
+        channel: "order_email",
+      },
+    });
+    return {
+      ok: true,
+      message: "Installation email (QR + instructions) resent to the customer.",
+      deliveryStatus: sendResult.deliveryStatus,
+      source,
+    };
+  }
+
+  const configBlocked = sendResult.failureCode === "not_configured";
+  await writeAuditLog({
+    actorUserId: admin.id,
+    action: EMAIL_ACTION_BLOCKED,
+    targetType,
+    targetId,
+    metadata: {
+      action: "order_install_email_resend",
+      source,
+      localOrderId: orderId,
+      failureCode: sendResult.failureCode,
+    },
+  });
+
+  if (configBlocked) {
+    return {
+      ok: false,
+      error: "Orders email is not configured right now.",
+    };
+  }
+  if (sendResult.failureCode === "duplicate_or_in_progress") {
+    return {
+      ok: false,
+      error: "A resend is already in progress for this order. Try again shortly.",
+    };
+  }
+  if (sendResult.failureCode === "install_details_unavailable") {
+    return {
+      ok: false,
+      error:
+        "Install details are not available from the provider yet. Try again later.",
+    };
+  }
+  return { ok: false, error: ORDER_INSTALL_RESEND_PUBLIC_ERROR };
 }
