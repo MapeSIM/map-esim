@@ -27,9 +27,9 @@ function formatGb(value: number | null): string {
 }
 
 function formatWhen(iso: string | null): string {
-  if (!iso) return "Not reported";
+  if (!iso) return "—";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "Not reported";
+  if (Number.isNaN(d.getTime())) return "—";
   return (
     new Intl.DateTimeFormat("en-GB", {
       day: "2-digit",
@@ -41,6 +41,17 @@ function formatWhen(iso: string | null): string {
       timeZone: "UTC",
     }).format(d) + " UTC"
   );
+}
+
+/** Activated timestamp — avoid raw "Not reported"; prefer clean dash or status hint. */
+function formatActivatedAt(
+  iso: string | null,
+  statusLabel: string | null | undefined
+): string {
+  const when = formatWhen(iso);
+  if (when !== "—") return when;
+  if (/\bactive\b/i.test(statusLabel ?? "")) return "Active on network";
+  return "—";
 }
 
 export default function AdminEsimUsagePanel({ orderId }: Props) {
@@ -129,8 +140,7 @@ export default function AdminEsimUsagePanel({ orderId }: Props) {
             Live eSIM usage
           </h2>
           <p className="mt-1 text-xs text-[var(--text-muted)]">
-            On-demand carrier usage check. No automatic refresh. Full ICCID is
-            never shown here.
+            On-demand carrier usage check. No automatic refresh.
           </p>
         </div>
         <button
@@ -218,7 +228,7 @@ export default function AdminEsimUsagePanel({ orderId }: Props) {
                 Activated
               </dt>
               <dd className="mt-0.5 font-medium text-[var(--heading)]">
-                {formatWhen(usage.activatedAt)}
+                {formatActivatedAt(usage.activatedAt, usage.statusLabel)}
               </dd>
             </div>
             <div>

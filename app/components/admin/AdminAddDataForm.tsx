@@ -25,25 +25,22 @@ export default function AdminAddDataForm({ orderId }: Props) {
   const formError = errorState.ok === false ? errorState.error : undefined;
 
   return (
-    <form action={formAction} className="space-y-3" noValidate>
+    <form action={formAction} className="space-y-2.5" noValidate>
       <input type="hidden" name="orderId" value={orderId} />
 
       <div>
-        <label
-          htmlFor={reasonId}
-          className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
-        >
+        <label htmlFor={reasonId} className="sr-only">
           Reason for assisted top-up
         </label>
-        <textarea
+        <input
           id={reasonId}
           name="reason"
+          type="text"
           required
-          rows={2}
           maxLength={ASSISTED_WALLET_REASON_MAX}
           disabled={pending}
-          placeholder="Why is MAP topping up this customer eSIM?"
-          className="mt-1.5 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--heading)] outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 disabled:opacity-60"
+          placeholder="Reason for assisted top-up (required)"
+          className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--heading)] outline-none transition placeholder:text-[var(--text-soft)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 disabled:opacity-60"
         />
         {fieldErrors?.reason ? (
           <p className="mt-1 text-xs text-[var(--danger-text)]" role="alert">
@@ -54,7 +51,7 @@ export default function AdminAddDataForm({ orderId }: Props) {
 
       {formError ? (
         <p
-          className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text-muted)]"
+          className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--text-muted)]"
           role="alert"
         >
           {formError}
@@ -64,7 +61,7 @@ export default function AdminAddDataForm({ orderId }: Props) {
       <button
         type="submit"
         disabled={pending}
-        className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_16px_rgba(0,0,0,0.14)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60 sm:w-auto"
+        className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60 sm:w-auto"
       >
         {pending ? "Preparing…" : "Add More Data"}
       </button>

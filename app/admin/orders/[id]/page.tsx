@@ -238,14 +238,9 @@ export default async function AdminOrderDetailPage({
           </div>
         )}
         {canFulfill && detail.addDataEligible ? (
-          <div className="rounded-2xl border border-[var(--accent-strong)]/40 bg-[var(--accent-strong)]/10 px-4 py-4 sm:px-5">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-4 sm:px-5">
             <p className="text-sm font-semibold text-[var(--heading)]">
               Add More Data
-            </p>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Tops up this existing eSIM with the same package using the
-              customer wallet. A new eSIM is not created. Continues to the
-              assisted wallet purchase review.
             </p>
             <div className="mt-3">
               <AdminAddDataForm orderId={detail.id} />

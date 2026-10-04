@@ -44,7 +44,8 @@ function main() {
   assert.match(adminApi, /role !== Role\.ADMIN/);
   assert.match(adminPanel, /Check live usage|Refresh live usage|Refresh Status/);
   assert.doesNotMatch(adminPanel, /setInterval/);
-  assert.match(adminPanel, /Full ICCID is\s+never shown/);
+  assert.doesNotMatch(adminPanel, /Full ICCID is\s+never shown/);
+  assert.match(adminPanel, /formatActivatedAt|Active on network/);
   assert.doesNotMatch(adminApi, /\biccid\s*:/);
   assert.match(adminPage, /AdminEsimUsagePanel/);
   assert.match(customerLib, /export async function fetchProviderUsage/);
