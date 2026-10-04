@@ -387,6 +387,7 @@ export async function getAdminOrdersPage(
       walletPurchaseStatus: row.walletEsimPurchase?.status,
       assignmentStatus: row.adminPackageAssignment?.status,
       hasCompletedRefund,
+      providerLifecycleStatus: row.providerLifecycleStatus,
     });
     const lifecycle = toProviderLifecycleCacheView({
       providerLifecycleStatus: row.providerLifecycleStatus,
@@ -558,6 +559,7 @@ export async function getAdminOrderDetail(
     walletPurchaseStatus: row.walletEsimPurchase?.status,
     assignmentStatus: row.adminPackageAssignment?.status,
     hasCompletedRefund,
+    providerLifecycleStatus: row.providerLifecycleStatus,
   });
   const isRefunded = statusBadge === "Refunded" || hasCompletedRefund;
   const installEligible =

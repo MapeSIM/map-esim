@@ -18,7 +18,9 @@ export type CustomerEsimStatusBadge =
   | "Processing"
   | "Review needed"
   | "Refunded"
-  | "Failed";
+  | "Failed"
+  /** Completed purchase whose VeSIM line cache reports EXPIRED. */
+  | "eSIM Expired";
 
 export type CustomerEsimStatusFilter =
   | "ALL"
@@ -103,10 +105,13 @@ export function resolveCustomerEsimStatusBadge(input: {
   assignmentStatus?: string | null;
   /** True when a customer RefundRequest is COMPLETED for this order. */
   hasCompletedRefund?: boolean;
+  /** Cached VeSIM line state (e.g. EXPIRED) — never invents expiry from validity. */
+  providerLifecycleStatus?: string | null;
 }): CustomerEsimStatusBadge {
   const purchase = (input.walletPurchaseStatus ?? "").trim();
   const assignment = (input.assignmentStatus ?? "").trim();
   const order = (input.orderStatus ?? "").trim();
+  const lifecycle = (input.providerLifecycleStatus ?? "").trim().toUpperCase();
 
   if (input.hasCompletedRefund === true || purchase === "FAILED_REFUNDED") {
     return "Refunded";
@@ -118,23 +123,32 @@ export function resolveCustomerEsimStatusBadge(input: {
     return "Review needed";
   }
   if (order === "FAILED" || assignment === "FAILED") return "Failed";
+
+  let badge: CustomerEsimStatusBadge | null = null;
   if (order === "COMPLETED" && (purchase === "COMPLETED" || !purchase)) {
-    if (!assignment || assignment === "COMPLETED") return "Completed";
+    if (!assignment || assignment === "COMPLETED") badge = "Completed";
   }
-  if (order === "COMPLETED") return "Completed";
+  if (!badge && order === "COMPLETED") badge = "Completed";
   if (
-    order === "PENDING" ||
-    purchase === "FUNDED" ||
-    purchase === "PROVIDER_PENDING" ||
-    purchase === "FUNDS_RESERVED" ||
-    purchase === "READY" ||
-    assignment === "PROVIDER_PENDING" ||
-    assignment === "READY"
+    !badge &&
+    (order === "PENDING" ||
+      purchase === "FUNDED" ||
+      purchase === "PROVIDER_PENDING" ||
+      purchase === "FUNDS_RESERVED" ||
+      purchase === "READY" ||
+      assignment === "PROVIDER_PENDING" ||
+      assignment === "READY")
   ) {
-    return "Processing";
+    badge = "Processing";
   }
-  if (order === "FAILED") return "Failed";
-  return "Processing";
+  if (!badge && order === "FAILED") badge = "Failed";
+  if (!badge) badge = "Processing";
+
+  // Lifecycle expiry only overrides a completed (install-ready) purchase.
+  if (badge === "Completed" && lifecycle === "EXPIRED") {
+    return "eSIM Expired";
+  }
+  return badge;
 }
 
 export function customerStatusMatchesFilter(
@@ -142,7 +156,9 @@ export function customerStatusMatchesFilter(
   filter: CustomerEsimStatusFilter
 ): boolean {
   if (filter === "ALL") return true;
-  if (filter === "COMPLETED") return badge === "Completed";
+  if (filter === "COMPLETED") {
+    return badge === "Completed" || badge === "eSIM Expired";
+  }
   if (filter === "PROCESSING") return badge === "Processing";
   if (filter === "REVIEW_NEEDED") return badge === "Review needed";
   if (filter === "REFUNDED") return badge === "Refunded";
@@ -165,6 +181,8 @@ export function customerEsimStatusLabel(
       return "Refunded";
     case "Failed":
       return "Could not complete";
+    case "eSIM Expired":
+      return "eSIM Expired";
     default:
       return badge;
   }
@@ -184,9 +202,25 @@ export function customerEsimStatusHelp(
       return "This eSIM was refunded. Installation is no longer available.";
     case "Failed":
       return "This purchase could not be completed. Open details or contact support.";
+    case "eSIM Expired":
+      return "This eSIM package has expired. Top up or purchase a new plan to continue using data.";
     default:
       return "";
   }
+}
+
+/** True when install QR should be offered (not refunded / expired). */
+export function customerEsimInstallAllowed(
+  badge: CustomerEsimStatusBadge
+): boolean {
+  return badge === "Completed";
+}
+
+/** Completed purchase line that may still show usage / Add More Data CTAs. */
+export function customerEsimLineReady(
+  badge: CustomerEsimStatusBadge
+): boolean {
+  return badge === "Completed" || badge === "eSIM Expired";
 }
 
 import { destinationFlagcdnUrl } from "@/app/lib/vesim/destinationPresentation";

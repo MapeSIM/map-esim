@@ -11,6 +11,7 @@ import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
 import { requireSession } from "@/app/lib/auth/session";
 import { getCustomerOwnedOrderDetail } from "@/app/lib/orders/customerOrders";
 import {
+  customerEsimLineReady,
   customerEsimStatusHelp,
   customerEsimStatusLabel,
   type CustomerEsimStatusBadge,
@@ -48,6 +49,7 @@ function statusBadgeClass(status: CustomerEsimStatusBadge): string {
       return "bg-[var(--warning-bg)] text-[var(--warning-text)] border-[var(--warning-border)]";
     case "Refunded":
     case "Failed":
+    case "eSIM Expired":
       return "bg-[var(--danger-bg)] text-[var(--danger-text)] border-[var(--danger-border)]";
     default:
       return "bg-[var(--surface)] text-[var(--text-muted)] border-[var(--border)]";
@@ -157,10 +159,18 @@ export default async function AccountOrderDetailPage({
                     isAddDataPurchase={detail.isAddDataPurchase}
                   />
                 </div>
-                {!detail.isRefunded ? (
+                {!detail.isRefunded && detail.statusBadge !== "eSIM Expired" ? (
                   <div className="mt-2">
                     <EsimLifecycleBadges
                       lifecycle={detail.lifecycle}
+                      remainingDataLabel={detail.remainingDataLabel}
+                    />
+                  </div>
+                ) : detail.statusBadge === "eSIM Expired" &&
+                  detail.remainingDataLabel ? (
+                  <div className="mt-2">
+                    <EsimLifecycleBadges
+                      lifecycle={null}
                       remainingDataLabel={detail.remainingDataLabel}
                     />
                   </div>
@@ -363,7 +373,9 @@ export default async function AccountOrderDetailPage({
         </div>
         <CustomerEsimUsagePanel
           orderId={detail.id}
-          usageEligible={detail.installEligible && !detail.isRefunded}
+          usageEligible={
+            customerEsimLineReady(detail.statusBadge) && !detail.isRefunded
+          }
           autoOpen={autoOpenUsage}
           addDataEligible={detail.addDataEligible}
         />

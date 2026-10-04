@@ -28,6 +28,8 @@ import {
   parseCustomerOrderDateFilter,
   parseCustomerOrdersPage,
   resolveCustomerEsimStatusBadge,
+  customerEsimInstallAllowed,
+  customerEsimLineReady,
   customerEsimStatusLabel,
   shortCustomerOrderReference,
   type CustomerEsimStatusBadge,
@@ -562,6 +564,7 @@ export async function listCustomerOrders(
       walletPurchaseStatus: row.walletEsimPurchase?.status,
       assignmentStatus: row.adminPackageAssignment?.status,
       hasCompletedRefund,
+      providerLifecycleStatus: row.providerLifecycleStatus,
     });
     // Safety net — approximate DB status filters may include edge cases.
     if (!customerStatusMatchesFilter(statusBadge, status)) continue;
@@ -591,8 +594,10 @@ export async function listCustomerOrders(
         row.adminPackageAssignment?.emailDeliveryStatus
       );
     const isRefunded = statusBadge === "Refunded";
+    const lineReady =
+      row.status === OrderStatus.COMPLETED && customerEsimLineReady(statusBadge);
     const installEligible =
-      row.status === OrderStatus.COMPLETED && statusBadge === "Completed";
+      lineReady && customerEsimInstallAllowed(statusBadge);
 
     const offerId =
       normalizeOfferId(row.offerId) ||
@@ -600,9 +605,10 @@ export async function listCustomerOrders(
       normalizeOfferId(row.adminPackageAssignment?.offerId) ||
       null;
     const providerOrderId = (row.providerOrderId ?? "").trim() || null;
+    // Add More Data uses line readiness (includes expired); install QR does not.
     const addDataEligible = listPageAddDataEligible({
       isRefunded,
-      installEligible,
+      installEligible: lineReady,
       offerId,
       providerOrderId,
     });
@@ -825,6 +831,7 @@ export async function getCustomerOwnedOrderDetail(
     walletPurchaseStatus: order.walletEsimPurchase?.status,
     assignmentStatus: order.adminPackageAssignment?.status,
     hasCompletedRefund,
+    providerLifecycleStatus: order.providerLifecycleStatus,
   });
   const iccidRevealable = Boolean(order.iccidEncrypted?.trim());
   const iccidMasked = customerIccidDisplay(
@@ -849,8 +856,10 @@ export async function getCustomerOwnedOrderDetail(
       order.adminPackageAssignment?.emailDeliveryStatus
     );
   const isRefunded = statusBadge === "Refunded";
+  const lineReady =
+    order.status === OrderStatus.COMPLETED && customerEsimLineReady(statusBadge);
   const installEligible =
-    order.status === OrderStatus.COMPLETED && statusBadge === "Completed";
+    lineReady && customerEsimInstallAllowed(statusBadge);
 
   const offerId =
     normalizeOfferId(order.offerId) ||
@@ -867,7 +876,8 @@ export async function getCustomerOwnedOrderDetail(
     providerOrderId,
     offerId,
     isRefunded,
-    installEligible,
+    // Catalog/top-up gate uses line readiness so expired lines can still surface CTA.
+    installEligible: lineReady,
     catalog,
   });
   const addDataPurchase = resolveAddDataPurchaseLabel(

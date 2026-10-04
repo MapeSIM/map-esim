@@ -20,18 +20,21 @@ import type { PartnerOrderListRow } from "@/app/lib/partner/partnerOrders";
 import { EsimLifecycleBadges } from "@/app/components/orders/EsimLifecycleBadges";
 import {
   PARTNER_ESIM_READY_LABEL,
+  partnerOrderInstallAllowed,
   partnerOrderIsRefunded,
+  partnerOrderLineReady,
+  partnerOrderStatusHelp,
   type PartnerOrderStatusBadge,
 } from "@/app/lib/partner/partnerOrdersDisplay";
 
 function StatusBadges({
   status,
   isAddDataPurchase,
-  completed,
+  showReady,
 }: {
   status: PartnerOrderStatusBadge;
   isAddDataPurchase: boolean;
-  completed: boolean;
+  showReady: boolean;
 }) {
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -41,7 +44,7 @@ function StatusBadges({
         {status}
       </span>
       <AddDataPurchaseBadge isAddDataPurchase={isAddDataPurchase} />
-      {completed ? (
+      {showReady ? (
         <span className="inline-flex rounded-full border border-[var(--accent-strong)]/35 bg-[var(--accent-strong)]/10 px-2.5 py-0.5 text-xs font-semibold text-[var(--heading)]">
           {PARTNER_ESIM_READY_LABEL}
         </span>
@@ -97,11 +100,14 @@ export default function PartnerEsimOrderCard({
 }: Props) {
   const [showUsage, setShowUsage] = useState(false);
   const refunded = partnerOrderIsRefunded(row.statusBadge);
-  const completed = row.statusBadge === "Completed" && !refunded;
+  const expired = row.statusBadge === "eSIM Expired";
+  const lineReady = partnerOrderLineReady(row.statusBadge) && !refunded;
+  const installAllowed = partnerOrderInstallAllowed(row.statusBadge) && !refunded;
   const addDataHref = row.addDataEligible
     ? `/partner/orders/${encodeURIComponent(row.orderId)}/add-data`
     : null;
   const detailHref = `/partner/orders/${encodeURIComponent(row.orderId)}`;
+  const expiredHelp = partnerOrderStatusHelp(row.statusBadge);
 
   if (variant === "list") {
     return (
@@ -130,13 +136,23 @@ export default function PartnerEsimOrderCard({
             <StatusBadges
               status={row.statusBadge}
               isAddDataPurchase={row.isAddDataPurchase}
-              completed={completed}
+              showReady={installAllowed}
             />
-            {!refunded ? (
+            {!refunded && !expired ? (
               <EsimLifecycleBadges
                 lifecycle={row.lifecycle}
                 remainingDataLabel={row.remainingDataLabel}
               />
+            ) : expired && row.remainingDataLabel ? (
+              <EsimLifecycleBadges
+                lifecycle={null}
+                remainingDataLabel={row.remainingDataLabel}
+              />
+            ) : null}
+            {expiredHelp ? (
+              <p className="text-xs font-medium text-[var(--text-muted)]">
+                {expiredHelp}
+              </p>
             ) : null}
             {refundRequest ? (
               <p className="text-xs font-medium text-[var(--text-muted)]">
@@ -155,11 +171,16 @@ export default function PartnerEsimOrderCard({
         </div>
 
         <div className="mt-5 grid gap-2 sm:grid-cols-2">
+          {expired && addDataHref ? (
+            <Link href={addDataHref} className={partnerSecondaryCtaClass}>
+              Add More Data
+            </Link>
+          ) : null}
           <Link href={detailHref} className={partnerSecondaryCtaClass}>
             View eSIM
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </Link>
-          {addDataHref ? (
+          {!expired && addDataHref ? (
             <Link href={addDataHref} className={partnerSecondaryCtaClass}>
               Add More Data
             </Link>
@@ -195,13 +216,21 @@ export default function PartnerEsimOrderCard({
             <StatusBadges
               status={row.statusBadge}
               isAddDataPurchase={row.isAddDataPurchase}
-              completed={completed}
+              showReady={installAllowed}
             />
-            {!refunded ? (
+            {!refunded && !expired ? (
               <EsimLifecycleBadges
                 lifecycle={row.lifecycle}
                 remainingDataLabel={row.remainingDataLabel}
               />
+            ) : expired && row.remainingDataLabel ? (
+              <EsimLifecycleBadges
+                lifecycle={null}
+                remainingDataLabel={row.remainingDataLabel}
+              />
+            ) : null}
+            {expiredHelp ? (
+              <p className="text-sm text-[var(--text-muted)]">{expiredHelp}</p>
             ) : null}
           </div>
         </div>
@@ -211,9 +240,16 @@ export default function PartnerEsimOrderCard({
         <div className="mt-4">
           <SummaryFacts row={row} />
         </div>
+        {expired && addDataHref ? (
+          <div className="mt-5">
+            <Link href={addDataHref} className={partnerSecondaryCtaClass}>
+              Add More Data
+            </Link>
+          </div>
+        ) : null}
       </article>
 
-      {completed ? (
+      {lineReady ? (
         <>
           <section className={partnerCardClass}>
             <p className={partnerSectionLabelClass}>Usage Statistics</p>
@@ -246,27 +282,46 @@ export default function PartnerEsimOrderCard({
             </div>
           </section>
 
-          <PartnerEsimInstallPanel
-            orderId={row.orderId}
-            installEligible
-            iccidMasked={row.iccidMasked}
-            iccidRevealable={row.iccidRevealable}
-            hasActiveShareToken={row.hasActiveShareToken}
-            partnerDisplayName={partnerDisplayName}
-            destination={row.destination}
-            planName={row.planName}
-            dataAllowance={row.dataAllowance}
-            validity={row.validity}
-            addDataHref={addDataHref}
-            defaultExpanded
-          />
+          {installAllowed ? (
+            <PartnerEsimInstallPanel
+              orderId={row.orderId}
+              installEligible
+              iccidMasked={row.iccidMasked}
+              iccidRevealable={row.iccidRevealable}
+              hasActiveShareToken={row.hasActiveShareToken}
+              partnerDisplayName={partnerDisplayName}
+              destination={row.destination}
+              planName={row.planName}
+              dataAllowance={row.dataAllowance}
+              validity={row.validity}
+              addDataHref={addDataHref}
+              defaultExpanded
+            />
+          ) : (
+            <section className={partnerCardClass}>
+              <p className={partnerSectionLabelClass}>Installation</p>
+              <p className="mt-2 text-sm text-[var(--text-muted)]">
+                Installation QR is unavailable because this eSIM has expired.
+                Use Add More Data when available, or purchase a new plan.
+              </p>
+              {addDataHref ? (
+                <div className="mt-4">
+                  <Link href={addDataHref} className={partnerSecondaryCtaClass}>
+                    Add More Data
+                  </Link>
+                </div>
+              ) : null}
+            </section>
+          )}
 
-          <PartnerRefundRequestControls
-            purchaseId={row.purchaseId}
-            partnerDebitLabel={row.partnerDebitLabel}
-            alreadyRefunded={false}
-            existingRequest={refundRequest}
-          />
+          {!expired ? (
+            <PartnerRefundRequestControls
+              purchaseId={row.purchaseId}
+              partnerDebitLabel={row.partnerDebitLabel}
+              alreadyRefunded={false}
+              existingRequest={refundRequest}
+            />
+          ) : null}
         </>
       ) : refunded ? (
         <section className={partnerCardClass}>

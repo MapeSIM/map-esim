@@ -39,6 +39,7 @@ export function partnerStatusBadgeClass(status: PartnerOrderStatusBadge): string
       return "bg-[var(--warning-bg)] text-[var(--warning-text)] border-[var(--warning-border)]";
     case "Refunded":
     case "Failed — balance returned":
+    case "eSIM Expired":
       return "bg-[var(--danger-bg)] text-[var(--danger-text)] border-[var(--danger-border)]";
     default:
       return "bg-[var(--surface)] text-[var(--text-muted)] border-[var(--border)]";

@@ -31,7 +31,9 @@ import {
   displayOrUnavailable,
   formatPartnerOrderDate,
   parsePartnerOrdersPage,
+  partnerOrderInstallAllowed,
   partnerOrderIsRefunded,
+  partnerOrderLineReady,
   partnerOrderStatusFromPurchase,
   shortPartnerOrderReference,
   type PartnerOrderStatusBadge,
@@ -215,15 +217,18 @@ export async function listPartnerOrdersPage(
     const hasCompletedRefund = row.refundRequests.length > 0;
     const statusBadge = partnerOrderStatusFromPurchase(row.status, {
       hasCompletedRefund,
+      providerLifecycleStatus: row.order.providerLifecycleStatus,
     });
     const purchasedAtLabel = formatPartnerOrderDate(
       row.completedAt ?? row.createdAt
     );
     const isRefunded = partnerOrderIsRefunded(statusBadge);
-    const installEligible =
+    const lineReady =
       row.order.status === OrderStatus.COMPLETED &&
-      statusBadge === "Completed" &&
+      partnerOrderLineReady(statusBadge) &&
       !isRefunded;
+    const installEligible =
+      lineReady && partnerOrderInstallAllowed(statusBadge);
     const offerIdForEligibility =
       normalizeOfferId(row.offerId) ||
       normalizeOfferId(row.order.offerId) ||
@@ -234,7 +239,7 @@ export async function listPartnerOrdersPage(
       null;
     const addDataEligible = listPageAddDataEligible({
       isRefunded,
-      installEligible,
+      installEligible: lineReady,
       offerId: offerIdForEligibility,
       providerOrderId,
     });
@@ -431,13 +436,16 @@ export async function getPartnerOwnedOrderDetail(
   const hasCompletedRefund = purchase.refundRequests.length > 0;
   const statusBadge = partnerOrderStatusFromPurchase(purchase.status, {
     hasCompletedRefund,
+    providerLifecycleStatus: order.providerLifecycleStatus,
   });
   const isRefunded = partnerOrderIsRefunded(statusBadge);
-  const installEligible =
+  const lineReady =
     order.status === OrderStatus.COMPLETED &&
     purchase.status === PartnerEsimPurchaseStatus.COMPLETED &&
-    statusBadge === "Completed" &&
+    partnerOrderLineReady(statusBadge) &&
     !isRefunded;
+  const installEligible =
+    lineReady && partnerOrderInstallAllowed(statusBadge);
   const offerIdForEligibility =
     normalizeOfferId(purchase.offerId) ||
     normalizeOfferId(order.offerId) ||
@@ -456,7 +464,7 @@ export async function getPartnerOwnedOrderDetail(
     providerOrderId,
     offerId: offerIdForEligibility,
     isRefunded,
-    installEligible,
+    installEligible: lineReady,
     catalog,
   });
   const addDataPurchase = resolveAddDataPurchaseLabel(purchase.idempotencyKey);

@@ -23,6 +23,8 @@ export type PartnerOrderStatusBadge =
   | "Processing"
   | "Under review"
   | "Refunded"
+  /** Completed purchase whose VeSIM line cache reports EXPIRED. */
+  | "eSIM Expired"
   /** @deprecated Prefer "Refunded"; kept for older UI/QA string matches. */
   | "Failed — balance returned";
 
@@ -59,7 +61,11 @@ export function formatPartnerOrderDate(date: Date): string {
 
 export function partnerOrderStatusFromPurchase(
   status: PartnerEsimPurchaseStatus,
-  options?: { hasCompletedRefund?: boolean }
+  options?: {
+    hasCompletedRefund?: boolean;
+    /** Cached VeSIM line state (e.g. EXPIRED) — never invents expiry from validity. */
+    providerLifecycleStatus?: string | null;
+  }
 ): PartnerOrderStatusBadge {
   if (
     options?.hasCompletedRefund === true ||
@@ -67,25 +73,67 @@ export function partnerOrderStatusFromPurchase(
   ) {
     return "Refunded";
   }
+  let badge: PartnerOrderStatusBadge;
   switch (status) {
     case PartnerEsimPurchaseStatus.COMPLETED:
-      return "Completed";
+      badge = "Completed";
+      break;
     case PartnerEsimPurchaseStatus.PROVIDER_PENDING:
     case PartnerEsimPurchaseStatus.FUNDS_RESERVED:
     case PartnerEsimPurchaseStatus.READY:
     case PartnerEsimPurchaseStatus.DRAFT:
-      return "Processing";
+      badge = "Processing";
+      break;
     case PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED:
-      return "Under review";
+      badge = "Under review";
+      break;
     default:
-      return "Processing";
+      badge = "Processing";
+      break;
   }
+
+  const lifecycle = (options?.providerLifecycleStatus ?? "")
+    .trim()
+    .toUpperCase();
+  if (badge === "Completed" && lifecycle === "EXPIRED") {
+    return "eSIM Expired";
+  }
+  return badge;
 }
 
 export function partnerOrderIsRefunded(
   badge: PartnerOrderStatusBadge
 ): boolean {
   return badge === "Refunded" || badge === "Failed — balance returned";
+}
+
+export function partnerOrderIsExpired(
+  badge: PartnerOrderStatusBadge
+): boolean {
+  return badge === "eSIM Expired";
+}
+
+/** Install QR only for non-expired completed purchases. */
+export function partnerOrderInstallAllowed(
+  badge: PartnerOrderStatusBadge
+): boolean {
+  return badge === "Completed";
+}
+
+/** Usage / top-up surfaces for completed or expired (non-refunded) lines. */
+export function partnerOrderLineReady(
+  badge: PartnerOrderStatusBadge
+): boolean {
+  return badge === "Completed" || badge === "eSIM Expired";
+}
+
+export function partnerOrderStatusHelp(
+  badge: PartnerOrderStatusBadge
+): string {
+  if (badge === "eSIM Expired") {
+    return "This eSIM package has expired. Top up or purchase a new plan to continue using data.";
+  }
+  return "";
 }
 
 export function partnerAttentionKindFromStatus(

@@ -101,6 +101,20 @@ function main() {
     customerEsimStatusHelp("Completed"),
     /Install it when you want to go online/
   );
+  assert.equal(
+    resolveCustomerEsimStatusBadge({
+      orderStatus: "COMPLETED",
+      walletPurchaseStatus: "COMPLETED",
+      providerLifecycleStatus: "EXPIRED",
+    }),
+    "eSIM Expired"
+  );
+  assert.equal(customerEsimStatusLabel("eSIM Expired"), "eSIM Expired");
+  assert.match(
+    customerEsimStatusHelp("eSIM Expired"),
+    /package has expired/
+  );
+  assert.equal(customerStatusMatchesFilter("eSIM Expired", "COMPLETED"), true);
   console.log("PASS display_helpers");
 
   const listPage = read("app/account/orders/page.tsx");

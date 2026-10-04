@@ -4,6 +4,8 @@ import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBad
 import { CustomerEsimInstallHelpLinks } from "@/app/components/orders/CustomerEsimInstallHelpLinks";
 import { EsimLifecycleBadges } from "@/app/components/orders/EsimLifecycleBadges";
 import {
+  customerEsimInstallAllowed,
+  customerEsimLineReady,
   customerEsimStatusHelp,
   customerEsimStatusLabel,
   type CustomerEsimStatusBadge,
@@ -41,6 +43,7 @@ function statusBadgeClass(status: CustomerEsimStatusBadge): string {
       return "bg-[var(--warning-bg)] text-[var(--warning-text)] border-[var(--warning-border)]";
     case "Refunded":
     case "Failed":
+    case "eSIM Expired":
       return "bg-[var(--danger-bg)] text-[var(--danger-text)] border-[var(--danger-border)]";
     default:
       return "bg-[var(--surface)] text-[var(--text-muted)] border-[var(--border)]";
@@ -52,7 +55,9 @@ export function CustomerEsimOrderCard({
 }: {
   order: CustomerEsimOrderCardOrder;
 }) {
-  const ready = order.statusBadge === "Completed";
+  const lineReady = customerEsimLineReady(order.statusBadge);
+  const installAllowed = customerEsimInstallAllowed(order.statusBadge);
+  const expired = order.statusBadge === "eSIM Expired";
   const href = `/account/orders/${encodeURIComponent(order.id)}`;
   const addDataHref = order.addDataEligible
     ? `/account/orders/${encodeURIComponent(order.id)}/add-data`
@@ -96,10 +101,17 @@ export function CustomerEsimOrderCard({
                 isAddDataPurchase={Boolean(order.isAddDataPurchase)}
               />
             </div>
-            {order.statusBadge !== "Refunded" ? (
+            {order.statusBadge !== "Refunded" && !expired ? (
               <div className="mt-2">
                 <EsimLifecycleBadges
                   lifecycle={order.lifecycle}
+                  remainingDataLabel={order.remainingDataLabel}
+                />
+              </div>
+            ) : expired && order.remainingDataLabel ? (
+              <div className="mt-2">
+                <EsimLifecycleBadges
+                  lifecycle={null}
                   remainingDataLabel={order.remainingDataLabel}
                 />
               </div>
@@ -168,38 +180,41 @@ export function CustomerEsimOrderCard({
         </dl>
 
         <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
-          {ready ? (
+          {expired && addDataHref ? (
+            <Link
+              href={addDataHref}
+              className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_18px_rgba(0,0,0,0.18)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
+            >
+              Add More Data
+            </Link>
+          ) : null}
+          {installAllowed ? (
             <Link
               href={`${href}#install`}
               className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_18px_rgba(0,0,0,0.18)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
             >
               Install eSIM
             </Link>
-          ) : (
-            <Link
-              href={href}
-              className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_18px_rgba(0,0,0,0.18)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
-            >
-              View details
-            </Link>
-          )}
-          {ready ? (
-            <>
-              <Link
-                href={href}
-                className="inline-flex h-11 w-full items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--border-hover)] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
-              >
-                View details
-              </Link>
-              <Link
-                href={`${href}?usage=1`}
-                className="inline-flex h-11 w-full items-center justify-center rounded-2xl border border-[var(--accent-strong)]/55 bg-[var(--accent-strong)]/12 px-4 text-sm font-bold text-[var(--heading)] transition hover:bg-[var(--accent-strong)]/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
-              >
-                View usage
-              </Link>
-            </>
           ) : null}
-          {addDataHref ? (
+          <Link
+            href={href}
+            className={
+              installAllowed || (expired && addDataHref)
+                ? "inline-flex h-11 w-full items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--border-hover)] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
+                : "inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_18px_rgba(0,0,0,0.18)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
+            }
+          >
+            View details
+          </Link>
+          {lineReady ? (
+            <Link
+              href={`${href}?usage=1`}
+              className="inline-flex h-11 w-full items-center justify-center rounded-2xl border border-[var(--accent-strong)]/55 bg-[var(--accent-strong)]/12 px-4 text-sm font-bold text-[var(--heading)] transition hover:bg-[var(--accent-strong)]/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
+            >
+              View usage
+            </Link>
+          ) : null}
+          {!expired && addDataHref ? (
             <Link
               href={addDataHref}
               className="inline-flex h-11 w-full items-center justify-center rounded-2xl border border-[var(--accent-strong)] bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_18px_rgba(0,0,0,0.16)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
