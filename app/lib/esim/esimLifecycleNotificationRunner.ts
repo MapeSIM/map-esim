@@ -1,6 +1,7 @@
 /**
  * Cron runner: poll authoritative VeSIM usage for customer orders and send
- * once-only lifecycle emails. Never invents expiry from catalog duration labels.
+ * once-only lifecycle emails (expiry + low data / depleted). Never invents
+ * expiry from catalog duration labels.
  */
 import "server-only";
 
@@ -10,10 +11,13 @@ import { prisma } from "@/app/lib/db";
 import { notifyEsimLifecycleEmail } from "@/app/lib/esim/esimLifecycleNotification";
 import {
   ESIM_LIFECYCLE_BATCH_SIZE,
+  ESIM_LIFECYCLE_CANDIDATE_POOL_MULTIPLIER,
   ESIM_LIFECYCLE_RUNNER_LOCK_TTL_MS,
   ESIM_LIFECYCLE_V1_ENABLED_KINDS,
   evaluateEsimLifecycleEvents,
+  scoreEsimLifecycleCandidatePriority,
   type EsimLifecycleKind,
+  type EsimLifecycleUsageInput,
 } from "@/app/lib/esim/esimLifecycleNotificationShared";
 import {
   decryptIccid,
@@ -25,6 +29,7 @@ import {
   fetchProviderUsage,
   normalizeProviderUsagePayload,
   persistOrderProviderLifecycleCache,
+  type CustomerUsageSnapshot,
 } from "@/app/lib/orders/customerEsimUsage";
 
 export type EsimLifecycleRunCounts = {
@@ -123,18 +128,40 @@ async function resolveOrderIccid(
   }
 }
 
+function toLifecycleUsageInput(
+  usage: CustomerUsageSnapshot | EsimLifecycleUsageInput
+): EsimLifecycleUsageInput {
+  return {
+    expiresAt: usage.expiresAt,
+    daysRemaining: usage.daysRemaining,
+    isExpired: usage.isExpired,
+    isUnlimited: usage.isUnlimited,
+    reportsDataAllowance: usage.reportsDataAllowance,
+    initialDataGB: usage.initialDataGB,
+    remainingDataGB: usage.remainingDataGB,
+  };
+}
+
 /**
  * Select completed customer-owned orders with a stored ICCID.
  * Excludes Partner wallet purchases and Partner-role owners.
+ * Prioritizes cached expiry-soon / low-data / depleted rows over pure FIFO.
  */
 export async function listEsimLifecycleCandidateOrders(options?: {
   take?: number;
+  now?: Date;
 }) {
   const take = Math.min(
     Math.max(1, options?.take ?? ESIM_LIFECYCLE_BATCH_SIZE),
     100
   );
-  return prisma.order.findMany({
+  const now = options?.now instanceof Date ? options.now : new Date();
+  const poolSize = Math.min(
+    take * ESIM_LIFECYCLE_CANDIDATE_POOL_MULTIPLIER,
+    160
+  );
+
+  const pool = await prisma.order.findMany({
     where: {
       status: OrderStatus.COMPLETED,
       iccidEncrypted: { not: null },
@@ -156,12 +183,50 @@ export async function listEsimLifecycleCandidateOrders(options?: {
       { lifecycleUsageCheckedAt: "asc" },
       { createdAt: "asc" },
     ],
-    take,
+    take: poolSize,
     select: {
       id: true,
       iccidEncrypted: true,
+      lifecycleUsageCheckedAt: true,
+      providerExpiresAt: true,
+      providerLifecycleStatus: true,
+      providerRemainingDataGb: true,
+      providerInitialDataGb: true,
+      createdAt: true,
     },
   });
+
+  const nowMs = now.getTime();
+  const ranked = pool
+    .map((row, index) => ({
+      row,
+      index,
+      score: scoreEsimLifecycleCandidatePriority({
+        nowMs,
+        providerExpiresAtMs: row.providerExpiresAt
+          ? row.providerExpiresAt.getTime()
+          : null,
+        providerLifecycleStatus: row.providerLifecycleStatus,
+        remainingDataGB: row.providerRemainingDataGb,
+        initialDataGB: row.providerInitialDataGb,
+        lifecycleUsageCheckedAtMs: row.lifecycleUsageCheckedAt
+          ? row.lifecycleUsageCheckedAt.getTime()
+          : null,
+      }),
+    }))
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      // Stable fairness: older lifecycleUsageCheckedAt / createdAt first.
+      const aChecked = a.row.lifecycleUsageCheckedAt?.getTime() ?? 0;
+      const bChecked = b.row.lifecycleUsageCheckedAt?.getTime() ?? 0;
+      if (aChecked !== bChecked) return aChecked - bChecked;
+      return a.index - b.index;
+    });
+
+  return ranked.slice(0, take).map(({ row }) => ({
+    id: row.id,
+    iccidEncrypted: row.iccidEncrypted,
+  }));
 }
 
 async function markOrderChecked(orderId: string, now: Date): Promise<void> {
@@ -169,6 +234,40 @@ async function markOrderChecked(orderId: string, now: Date): Promise<void> {
     where: { id: orderId },
     data: { lifecycleUsageCheckedAt: now },
   });
+}
+
+async function deliverKindsForUsage(options: {
+  orderId: string;
+  usage: EsimLifecycleUsageInput;
+  now: Date;
+  dryRun?: boolean;
+}): Promise<{
+  kinds: EsimLifecycleKind[];
+  results: Array<{ kind: EsimLifecycleKind; status: string }>;
+}> {
+  const kinds = evaluateEsimLifecycleEvents(
+    options.usage,
+    options.now.getTime()
+  );
+  // Defense in depth — allowlist includes expiry + data kinds.
+  void ESIM_LIFECYCLE_V1_ENABLED_KINDS;
+  const results: Array<{ kind: EsimLifecycleKind; status: string }> = [];
+  for (const kind of kinds) {
+    if (options.dryRun) {
+      results.push({ kind, status: "dry_run" });
+      continue;
+    }
+    const outcome = await notifyEsimLifecycleEmail({
+      orderId: options.orderId,
+      kind,
+      expiresAt: options.usage.expiresAt,
+      remainingDataGB: options.usage.remainingDataGB,
+      initialDataGB: options.usage.initialDataGB,
+      now: options.now,
+    });
+    results.push({ kind, status: outcome.status });
+  }
+  return { kinds, results };
 }
 
 /**
@@ -187,45 +286,44 @@ export async function processEsimLifecycleOrder(options: {
   results: Array<{ kind: EsimLifecycleKind; status: string }>;
 }> {
   const now = options.now instanceof Date ? options.now : new Date();
-  const results: Array<{ kind: EsimLifecycleKind; status: string }> = [];
   const iccid = await resolveOrderIccid(options.iccidEncrypted);
   if (!iccid) {
     await markOrderChecked(options.orderId, now);
-    return { polled: false, usageOk: false, kinds: [], results };
+    return { polled: false, usageOk: false, kinds: [], results: [] };
   }
 
   const usageRes = await fetchProviderUsage(iccid);
   await markOrderChecked(options.orderId, now);
   if (!usageRes.ok) {
-    return { polled: true, usageOk: false, kinds: [], results };
+    return { polled: true, usageOk: false, kinds: [], results: [] };
   }
   const snapshot = normalizeProviderUsagePayload(usageRes.payload);
   if (!snapshot) {
-    return { polled: true, usageOk: false, kinds: [], results };
+    return { polled: true, usageOk: false, kinds: [], results: [] };
   }
 
   await persistOrderProviderLifecycleCache(options.orderId, snapshot);
 
-  const kinds = evaluateEsimLifecycleEvents(snapshot, now.getTime());
-  // Defense in depth: V1 allowlist (expiry only). Data helpers are not called here.
-  void ESIM_LIFECYCLE_V1_ENABLED_KINDS;
-  for (const kind of kinds) {
-    if (options.dryRun) {
-      results.push({ kind, status: "dry_run" });
-      continue;
-    }
-    const outcome = await notifyEsimLifecycleEmail({
-      orderId: options.orderId,
-      kind,
-      expiresAt: snapshot.expiresAt,
-      remainingDataGB: snapshot.remainingDataGB,
-      initialDataGB: snapshot.initialDataGB,
-      now,
-    });
-    results.push({ kind, status: outcome.status });
-  }
-  return { polled: true, usageOk: true, kinds, results };
+  const delivered = await deliverKindsForUsage({
+    orderId: options.orderId,
+    usage: toLifecycleUsageInput(snapshot),
+    now,
+    dryRun: options.dryRun,
+  });
+  return {
+    polled: true,
+    usageOk: true,
+    kinds: delivered.kinds,
+    results: delivered.results,
+  };
 }
+
+/**
+ * On-demand path after a successful customer/admin usage refresh.
+ * Best-effort — never throws; CAS outbox prevents duplicate sends.
+ * Implemented in esimLifecycleNotification.ts to avoid import cycles.
+ */
+export { maybeDeliverEsimLifecycleNotificationsFromUsage } from "@/app/lib/esim/esimLifecycleNotification";
 
 export async function runEsimLifecycleNotifications(options?: {
   checkedAt?: Date;
@@ -261,6 +359,7 @@ export async function runEsimLifecycleNotifications(options?: {
 
     const candidates = await listEsimLifecycleCandidateOrders({
       take: options?.take,
+      now,
     });
     counts.candidates = candidates.length;
 

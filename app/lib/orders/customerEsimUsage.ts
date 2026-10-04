@@ -21,6 +21,7 @@ import {
   readJsonSafe,
 } from "@/app/lib/vesim/server";
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
+import { maybeDeliverEsimLifecycleNotificationsFromUsage } from "@/app/lib/esim/esimLifecycleNotification";
 import { classifyProviderLifecycleStatus } from "@/app/lib/orders/providerLifecycleShared";
 
 export type CustomerUsageErrorCode =
@@ -330,6 +331,12 @@ export async function getCustomerOwnedOrderUsage(
     authz.order.localOrderId,
     normalized
   );
+
+  // Best-effort: enqueue due expiry / low-data / depleted emails on refresh.
+  await maybeDeliverEsimLifecycleNotificationsFromUsage({
+    orderId: authz.order.localOrderId,
+    usage: normalized,
+  });
 
   return { ok: true, usage: normalized };
 }

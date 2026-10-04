@@ -23,10 +23,12 @@ import {
   buildEsimLifecycleEventKey,
   ESIM_LIFECYCLE_CLAIM_TTL_MS,
   ESIM_LIFECYCLE_V1_ENABLED_KINDS,
+  evaluateEsimLifecycleEvents,
   formatLifecycleExpiryLabel,
   lifecycleSubject,
   normalizeOpaqueLifecycleErrorCode,
   type EsimLifecycleKind,
+  type EsimLifecycleUsageInput,
 } from "@/app/lib/esim/esimLifecycleNotificationShared";
 import { isValidEmail } from "@/app/lib/vesim/server";
 
@@ -51,9 +53,9 @@ function statusLabelFor(kind: EsimLifecycleKind): string {
     case "EXPIRED":
       return "Expired";
     case "LOW_DATA":
-      return "Low data remaining";
+      return "Low data remaining (≤20%)";
     case "DATA_EXHAUSTED":
-      return "Data exhausted";
+      return "Data depleted";
     default:
       return "Plan update";
   }
@@ -351,6 +353,52 @@ export async function notifyEsimLifecycleEmail(options: {
   } catch {
     console.error("esim_lifecycle_email", "dispatch_error");
     return { status: "failed", reason: "dispatch_error" };
+  }
+}
+
+/**
+ * On-demand path after a successful customer/admin usage refresh.
+ * Best-effort — never throws; CAS outbox prevents duplicate sends.
+ */
+export async function maybeDeliverEsimLifecycleNotificationsFromUsage(options: {
+  orderId: string;
+  usage: {
+    expiresAt: string | null;
+    daysRemaining?: number | null;
+    isExpired: boolean | null;
+    isUnlimited: boolean;
+    reportsDataAllowance: boolean;
+    initialDataGB: number | null;
+    remainingDataGB: number | null;
+  };
+  now?: Date;
+}): Promise<void> {
+  const orderId = (options.orderId ?? "").trim();
+  if (!orderId || orderId.length > 64) return;
+  const now = options.now instanceof Date ? options.now : new Date();
+  try {
+    const usageInput: EsimLifecycleUsageInput = {
+      expiresAt: options.usage.expiresAt,
+      daysRemaining: options.usage.daysRemaining ?? null,
+      isExpired: options.usage.isExpired,
+      isUnlimited: options.usage.isUnlimited,
+      reportsDataAllowance: options.usage.reportsDataAllowance,
+      initialDataGB: options.usage.initialDataGB,
+      remainingDataGB: options.usage.remainingDataGB,
+    };
+    const kinds = evaluateEsimLifecycleEvents(usageInput, now.getTime());
+    for (const kind of kinds) {
+      await notifyEsimLifecycleEmail({
+        orderId,
+        kind,
+        expiresAt: usageInput.expiresAt,
+        remainingDataGB: usageInput.remainingDataGB,
+        initialDataGB: usageInput.initialDataGB,
+        now,
+      });
+    }
+  } catch {
+    // Manual usage UX must not fail because of notification side effects.
   }
 }
 

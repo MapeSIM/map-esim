@@ -1,5 +1,5 @@
 /**
- * Offline QA for customer eSIM lifecycle (expiry) notifications — V1 safety.
+ * Offline QA for customer eSIM lifecycle (expiry + usage) notifications.
  * Does not call VeSIM, mutate orders, or send SMTP mail.
  */
 import assert from "node:assert/strict";
@@ -22,6 +22,7 @@ import {
   formatLifecycleExpiryLabel,
   lifecycleSubject,
   parseProviderInstantMs,
+  scoreEsimLifecycleCandidatePriority,
   selectEsimLifecycleEventsForDelivery,
   type EsimLifecycleUsageInput,
 } from "../app/lib/esim/esimLifecycleNotificationShared";
@@ -83,6 +84,7 @@ function main() {
   const vercel = read("vercel.json");
   const pkg = read("package.json");
   const usage = read("app/lib/orders/customerEsimUsage.ts");
+  const adminUsage = read("app/lib/orders/adminEsimUsage.ts");
   const wallet = read("app/lib/esim/walletPurchase.ts");
   const partner = read("app/lib/partner/partnerEsimPurchase.ts");
   const refunds = read("app/lib/refunds/refundRequestExecution.ts");
@@ -101,12 +103,12 @@ function main() {
   assert.doesNotMatch(migration, /DROP COLUMN|DELETE FROM/i);
   console.log("   ok");
 
-  console.log("2) V1 expiry triggers — timestamp only, no daysRemaining guess");
+  console.log("2) Expiry triggers — timestamp only, no daysRemaining guess");
   assert.equal(ESIM_LIFECYCLE_EXPIRY_SOON_HOURS, 24);
-  assert.equal(ESIM_LIFECYCLE_LOW_DATA_REMAINING_PERCENT, 10);
+  assert.equal(ESIM_LIFECYCLE_LOW_DATA_REMAINING_PERCENT, 20);
   assert.deepEqual(
     [...ESIM_LIFECYCLE_V1_ENABLED_KINDS],
-    ["EXPIRY_SOON_24H", "EXPIRED"]
+    ["EXPIRY_SOON_24H", "EXPIRED", "LOW_DATA", "DATA_EXHAUSTED"]
   );
   assert.equal(ESIM_LIFECYCLE_CRON_SCHEDULE_DAILY_UTC, "0 6 * * *");
   assert.equal(parseProviderInstantMs("not-a-date"), null);
@@ -141,7 +143,7 @@ function main() {
     ),
     ["EXPIRED"]
   );
-  // daysRemaining alone must NOT trigger V1 expiry-soon.
+  // daysRemaining alone must NOT trigger expiry-soon.
   assert.deepEqual(
     evaluateEsimLifecycleEvents(
       baseUsage({ daysRemaining: 1, expiresAt: null }),
@@ -156,7 +158,7 @@ function main() {
     ),
     []
   );
-  // No expiry fields → no emails (never invent).
+  // No expiry fields and healthy remaining → no emails (never invent).
   assert.deepEqual(
     evaluateEsimLifecycleEvents(
       baseUsage({ expiresAt: null, daysRemaining: null, isExpired: null }),
@@ -184,7 +186,21 @@ function main() {
   assert.match(shared, /Does NOT use daysRemaining/);
   console.log("   ok");
 
-  console.log("3) Data helpers exist but V1 delivery blocks them");
+  console.log("3) Data alerts enabled — ≤20% remaining + depleted");
+  // 20% remaining (2/10) → LOW_DATA; 21% remaining stays quiet.
+  assert.deepEqual(
+    evaluateEsimLifecycleDataEvents(
+      baseUsage({ remainingDataGB: 2, initialDataGB: 10 })
+    ),
+    ["LOW_DATA"]
+  );
+  assert.deepEqual(
+    evaluateEsimLifecycleDataEvents(
+      baseUsage({ remainingDataGB: 2.1, initialDataGB: 10 })
+    ),
+    []
+  );
+  // Legacy 10% fixture still qualifies under the 20% threshold.
   assert.deepEqual(
     evaluateEsimLifecycleDataEvents(
       baseUsage({ remainingDataGB: 0.5, initialDataGB: 10 })
@@ -197,29 +213,29 @@ function main() {
     ),
     ["DATA_EXHAUSTED"]
   );
-  // Runner entry point must not emit data kinds even if mixed into selection.
   assert.deepEqual(
     selectEsimLifecycleEventsForDelivery(
       ["LOW_DATA", "DATA_EXHAUSTED", "EXPIRY_SOON_24H"],
       ESIM_LIFECYCLE_V1_ENABLED_KINDS
     ),
-    ["EXPIRY_SOON_24H"]
+    ["EXPIRY_SOON_24H", "DATA_EXHAUSTED", "LOW_DATA"]
   );
   assert.deepEqual(
     selectEsimLifecycleEventsForDelivery(
       ["LOW_DATA", "DATA_EXHAUSTED"],
       ESIM_LIFECYCLE_V1_ENABLED_KINDS
     ),
-    []
+    ["DATA_EXHAUSTED", "LOW_DATA"]
   );
-  // Explicit future precedence: at most one event per pass when all enabled.
+  // Explicit precedence: at most ordered delivery list when all enabled.
   assert.deepEqual(
     selectEsimLifecycleEventsForDelivery(
       ["LOW_DATA", "EXPIRY_SOON_24H", "DATA_EXHAUSTED", "EXPIRED"],
       ESIM_LIFECYCLE_DELIVERY_PRECEDENCE
     ),
-    ["EXPIRED"]
+    ["EXPIRED", "EXPIRY_SOON_24H", "DATA_EXHAUSTED", "LOW_DATA"]
   );
+  // Combined entry returns expiry-soon + depleted when both due.
   assert.deepEqual(
     evaluateEsimLifecycleEvents(
       baseUsage({
@@ -229,17 +245,67 @@ function main() {
       }),
       now
     ),
-    ["EXPIRY_SOON_24H"]
+    ["EXPIRY_SOON_24H", "DATA_EXHAUSTED"]
+  );
+  assert.deepEqual(
+    evaluateEsimLifecycleEvents(
+      baseUsage({
+        remainingDataGB: 1.5,
+        initialDataGB: 10,
+        expiresAt: null,
+      }),
+      now
+    ),
+    ["LOW_DATA"]
   );
   assert.match(notify, /kind_disabled_v1|ESIM_LIFECYCLE_V1_ENABLED_KINDS/);
   assert.match(runner, /ESIM_LIFECYCLE_V1_ENABLED_KINDS/);
-  assert.doesNotMatch(runner, /evaluateEsimLifecycleDataEvents/);
+  assert.match(runner, /evaluateEsimLifecycleEvents/);
+  assert.match(runner, /scoreEsimLifecycleCandidatePriority/);
+  assert.match(shared, /evaluateEsimLifecycleDataEvents/);
+  assert.match(shared, /ESIM_LIFECYCLE_LOW_DATA_REMAINING_PERCENT = 20/);
   console.log("   ok");
 
-  console.log("4) Duplicate protection + partner exclusion wiring");
+  console.log("4) Duplicate protection + partner exclusion + priority scoring");
   assert.equal(
     buildEsimLifecycleEventKey("ord_1", "EXPIRED"),
     "esim_lifecycle:ord_1:EXPIRED"
+  );
+  assert.ok(
+    scoreEsimLifecycleCandidatePriority({
+      nowMs: now,
+      providerExpiresAtMs: now + 12 * 3600_000,
+      providerLifecycleStatus: null,
+      remainingDataGB: null,
+      initialDataGB: null,
+      lifecycleUsageCheckedAtMs: null,
+    }) >
+      scoreEsimLifecycleCandidatePriority({
+        nowMs: now,
+        providerExpiresAtMs: null,
+        providerLifecycleStatus: null,
+        remainingDataGB: 5,
+        initialDataGB: 10,
+        lifecycleUsageCheckedAtMs: now,
+      })
+  );
+  assert.ok(
+    scoreEsimLifecycleCandidatePriority({
+      nowMs: now,
+      providerExpiresAtMs: null,
+      providerLifecycleStatus: "DEPLETED",
+      remainingDataGB: 0,
+      initialDataGB: 10,
+      lifecycleUsageCheckedAtMs: now,
+    }) >
+      scoreEsimLifecycleCandidatePriority({
+        nowMs: now,
+        providerExpiresAtMs: null,
+        providerLifecycleStatus: null,
+        remainingDataGB: 5,
+        initialDataGB: 10,
+        lifecycleUsageCheckedAtMs: now,
+      })
   );
   assert.match(notify, /eventKey/);
   assert.match(notify, /updateMany/);
@@ -247,6 +313,7 @@ function main() {
   assert.match(notify, /partnerEsimPurchase/);
   assert.match(notify, /Role\.PARTNER/);
   assert.match(notify, /channel:\s*"orders"/);
+  assert.match(notify, /maybeDeliverEsimLifecycleNotificationsFromUsage/);
   assert.match(runner, /claimEsimLifecycleRunnerLock/);
   assert.match(runner, /fetchProviderUsage/);
   assert.match(runner, /normalizeProviderUsagePayload/);
@@ -254,7 +321,7 @@ function main() {
   assert.match(runner, /partnerEsimPurchase:\s*null/);
   assert.match(runner, /PARTNER_BALANCE/);
   assert.doesNotMatch(runner, /createdAt \+ .*duration/);
-  assert.match(runner, /Never invents expiry/);
+  assert.match(runner, /Never invents[\s\S]*expiry|never invents expiry/i);
   console.log("   ok");
 
   console.log("5) Daily Hobby-compatible cron (not hourly)");
@@ -282,7 +349,7 @@ function main() {
   assert.match(envExample, /at least 16 characters/i);
   console.log("   ok");
 
-  console.log("6) Email template branding + CTAs");
+  console.log("6) Email template branding + CTAs + low-data copy");
   const payload = {
     kind: "EXPIRY_SOON_24H" as const,
     customerName: "Ada Lovelace",
@@ -307,17 +374,21 @@ function main() {
     lifecycleSubject("EXPIRED"),
     "Your MAP eSIM plan has expired"
   );
+  assert.match(template, /20% or less data remaining/);
+  assert.match(template, /about 80% used/);
   assertNoSensitive(html);
   assertNoSensitive(text);
   assert.match(template, /renderTransactionalEmailLayoutHtml/);
   console.log("   ok");
 
-  console.log("7) Isolation — payment / refund / rewards / partner untouched");
+  console.log("7) Isolation + on-demand refresh wiring");
   assert.doesNotMatch(wallet, /esimLifecycleNotification/);
   assert.doesNotMatch(partner, /esimLifecycleNotification/);
   assert.doesNotMatch(refunds, /esimLifecycleNotification/);
   assert.doesNotMatch(rewards, /esimLifecycleNotification/);
   assert.match(usage, /normalizeProviderUsagePayload/);
+  assert.match(usage, /maybeDeliverEsimLifecycleNotificationsFromUsage/);
+  assert.match(adminUsage, /maybeDeliverEsimLifecycleNotificationsFromUsage/);
   assert.match(pkg, /"qa:esim-lifecycle-notifications"/);
   console.log("   ok");
 

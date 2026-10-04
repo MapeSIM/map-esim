@@ -2,9 +2,8 @@
  * Pure eSIM lifecycle notification helpers (offline-safe).
  * Never invents expiry or remaining data — callers must pass provider/local usage.
  *
- * V1 delivery enables EXPIRY_SOON_24H + EXPIRED only.
- * LOW_DATA / DATA_EXHAUSTED helpers exist for a future release and must not be
- * wired into the runner until provider remaining-data semantics are proven.
+ * Delivery enables expiry (24h / expired) plus usage alerts:
+ * LOW_DATA (≤20% remaining ≈ 80% used) and DATA_EXHAUSTED (0 GB).
  */
 
 export const ESIM_LIFECYCLE_KINDS = [
@@ -17,17 +16,18 @@ export const ESIM_LIFECYCLE_KINDS = [
 export type EsimLifecycleKind = (typeof ESIM_LIFECYCLE_KINDS)[number];
 
 /**
- * V1 send allowlist. Data kinds stay detected only via future helpers and are
- * excluded from delivery until this set is expanded deliberately.
+ * Send allowlist — expiry + data depletion / low-data alerts.
  */
 export const ESIM_LIFECYCLE_V1_ENABLED_KINDS = [
   "EXPIRY_SOON_24H",
   "EXPIRED",
+  "LOW_DATA",
+  "DATA_EXHAUSTED",
 ] as const satisfies readonly EsimLifecycleKind[];
 
 /**
- * Highest-first precedence for a single delivery per order per runner pass.
- * Prevents multi-email spam if data kinds are enabled later without a policy.
+ * Highest-first precedence when multiple kinds are due in one pass.
+ * Runner may deliver each enabled due kind once (unique eventKey).
  */
 export const ESIM_LIFECYCLE_DELIVERY_PRECEDENCE: readonly EsimLifecycleKind[] = [
   "EXPIRED",
@@ -39,12 +39,18 @@ export const ESIM_LIFECYCLE_DELIVERY_PRECEDENCE: readonly EsimLifecycleKind[] = 
 /** Hours-before-expiry window for the single pre-expiry notice. */
 export const ESIM_LIFECYCLE_EXPIRY_SOON_HOURS = 24;
 
-/** Remaining-data threshold (percent of initial) for optional future low-data warning. */
-export const ESIM_LIFECYCLE_LOW_DATA_REMAINING_PERCENT = 10;
+/**
+ * Remaining-data threshold (percent of initial) for LOW_DATA.
+ * ≤20% remaining ≈ ≥80% consumed.
+ */
+export const ESIM_LIFECYCLE_LOW_DATA_REMAINING_PERCENT = 20;
 
 export const ESIM_LIFECYCLE_CLAIM_TTL_MS = 5 * 60 * 1000;
 export const ESIM_LIFECYCLE_RUNNER_LOCK_TTL_MS = 10 * 60 * 1000;
 export const ESIM_LIFECYCLE_BATCH_SIZE = 40;
+
+/** Fetch a wider pool, then prioritize urgent rows before taking BATCH_SIZE. */
+export const ESIM_LIFECYCLE_CANDIDATE_POOL_MULTIPLIER = 4;
 
 /**
  * Daily Vercel Hobby-compatible cron (UTC).
@@ -130,8 +136,9 @@ export function evaluateEsimLifecycleExpiryEvents(
 }
 
 /**
- * Future-only remaining-data candidates. Not used by V1 delivery/runner.
- * Exhausted takes precedence over low-data within the data family.
+ * Remaining-data candidates from provider GB fields only.
+ * Exhausted (0 GB) takes precedence over low-data within the data family.
+ * LOW_DATA when remaining ≤ 20% of initial (≈ 80% used).
  */
 export function evaluateEsimLifecycleDataEvents(
   usage: EsimLifecycleUsageInput
@@ -140,7 +147,11 @@ export function evaluateEsimLifecycleDataEvents(
     return [];
   }
 
-  if (usage.remainingDataGB === 0) {
+  if (
+    typeof usage.remainingDataGB === "number" &&
+    Number.isFinite(usage.remainingDataGB) &&
+    usage.remainingDataGB <= 0
+  ) {
     return ["DATA_EXHAUSTED"];
   }
 
@@ -163,8 +174,8 @@ export function evaluateEsimLifecycleDataEvents(
 }
 
 /**
- * Apply allowlist + single-event precedence for one runner pass.
- * Default allowlist is V1 (expiry only) — data kinds cannot create deliveries.
+ * Apply allowlist + precedence ordering for due kinds.
+ * Returns every enabled due kind (highest precedence first).
  */
 export function selectEsimLifecycleEventsForDelivery(
   candidates: readonly EsimLifecycleKind[],
@@ -174,26 +185,87 @@ export function selectEsimLifecycleEventsForDelivery(
   const present = new Set(
     candidates.filter((kind) => enabled.has(kind))
   );
+  const selected: EsimLifecycleKind[] = [];
   for (const kind of ESIM_LIFECYCLE_DELIVERY_PRECEDENCE) {
     if (present.has(kind)) {
-      return [kind];
+      selected.push(kind);
     }
   }
-  return [];
+  return selected;
 }
 
 /**
- * V1 entry point used by the runner: expiry evaluation + V1 delivery filter.
- * Does not call data-event helpers — remaining-data emails stay off.
+ * Runner / on-demand entry: expiry + data evaluation, then allowlist filter.
  */
 export function evaluateEsimLifecycleEvents(
   usage: EsimLifecycleUsageInput,
   nowMs: number = Date.now()
 ): EsimLifecycleKind[] {
   return selectEsimLifecycleEventsForDelivery(
-    evaluateEsimLifecycleExpiryEvents(usage, nowMs),
+    [
+      ...evaluateEsimLifecycleExpiryEvents(usage, nowMs),
+      ...evaluateEsimLifecycleDataEvents(usage),
+    ],
     ESIM_LIFECYCLE_V1_ENABLED_KINDS
   );
+}
+
+/**
+ * Higher score = poll sooner. Uses cached provider fields when present;
+ * never invents expiry from catalog duration.
+ */
+export function scoreEsimLifecycleCandidatePriority(input: {
+  nowMs: number;
+  providerExpiresAtMs: number | null;
+  providerLifecycleStatus: string | null;
+  remainingDataGB: number | null;
+  initialDataGB: number | null;
+  lifecycleUsageCheckedAtMs: number | null;
+}): number {
+  const nowMs = Number.isFinite(input.nowMs) ? input.nowMs : Date.now();
+  let score = 0;
+  const status = (input.providerLifecycleStatus ?? "").trim().toUpperCase();
+
+  if (status === "EXPIRED") score += 400;
+  if (status === "DEPLETED") score += 350;
+
+  const expiresMs = input.providerExpiresAtMs;
+  if (typeof expiresMs === "number" && Number.isFinite(expiresMs)) {
+    if (expiresMs <= nowMs) {
+      score += 400;
+    } else {
+      const hoursLeft = (expiresMs - nowMs) / 3_600_000;
+      if (hoursLeft <= ESIM_LIFECYCLE_EXPIRY_SOON_HOURS) {
+        score += 300;
+      }
+    }
+  }
+
+  const rem = input.remainingDataGB;
+  const initial = input.initialDataGB;
+  if (typeof rem === "number" && Number.isFinite(rem)) {
+    if (rem <= 0) {
+      score += 350;
+    } else if (
+      typeof initial === "number" &&
+      Number.isFinite(initial) &&
+      initial > 0 &&
+      (rem / initial) * 100 <= ESIM_LIFECYCLE_LOW_DATA_REMAINING_PERCENT
+    ) {
+      score += 250;
+    }
+  }
+
+  // Never-checked and stale checks get a small fairness boost.
+  if (input.lifecycleUsageCheckedAtMs == null) {
+    score += 40;
+  } else if (Number.isFinite(input.lifecycleUsageCheckedAtMs)) {
+    const ageHours =
+      (nowMs - input.lifecycleUsageCheckedAtMs) / 3_600_000;
+    if (ageHours >= 24) score += 20;
+  }
+
+  return score;
 }
 
 export function formatLifecycleExpiryLabel(

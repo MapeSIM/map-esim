@@ -117,7 +117,7 @@ export function sampleExpiryReminderPayload(
     LOW_DATA: {
       expiryStatusLabel: "Low data",
       expiryDateLabel: "20 Sep 2026, 10:00 UTC",
-      remainingDataLabel: "0.2 GB (≤10%)",
+      remainingDataLabel: "0.2 GB (≤20%)",
     },
     DATA_EXHAUSTED: {
       expiryStatusLabel: "Data exhausted",

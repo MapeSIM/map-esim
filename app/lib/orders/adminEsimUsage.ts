@@ -20,6 +20,7 @@ import {
 } from "@/app/lib/orders/customerEsimUsage";
 import { resolveOrderIccidPlaintext } from "@/app/lib/orders/orderIccidResolve";
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
+import { maybeDeliverEsimLifecycleNotificationsFromUsage } from "@/app/lib/esim/esimLifecycleNotification";
 import { RefundRequestStatus, WalletEsimPurchaseStatus } from "@prisma/client";
 
 export type AdminUsageErrorCode =
@@ -146,6 +147,11 @@ export async function getAdminOrderUsage(
   }
 
   await persistOrderProviderLifecycleCache(order.id, normalized);
+
+  await maybeDeliverEsimLifecycleNotificationsFromUsage({
+    orderId: order.id,
+    usage: normalized,
+  });
 
   return {
     ok: true,

@@ -52,7 +52,7 @@ function bodyIntro(kind: EsimLifecycleKind, name: string): string {
     case "EXPIRED":
       return `Hello ${name}, your ${escapeHtml(BRAND_NAME)} plan has expired according to the provider usage record.`;
     case "LOW_DATA":
-      return `Hello ${name}, your ${escapeHtml(BRAND_NAME)} plan has 10% or less data remaining.`;
+      return `Hello ${name}, your ${escapeHtml(BRAND_NAME)} plan has 20% or less data remaining (about 80% used).`;
     case "DATA_EXHAUSTED":
       return `Hello ${name}, your ${escapeHtml(BRAND_NAME)} plan has no remaining data according to the provider usage record.`;
     default:
@@ -115,7 +115,7 @@ export function renderEsimLifecycleEmailText(
       break;
     case "LOW_DATA":
       lines.push(
-        `Your ${BRAND_NAME} plan has 10% or less data remaining.`
+        `Your ${BRAND_NAME} plan has 20% or less data remaining (about 80% used).`
       );
       break;
     case "DATA_EXHAUSTED":
