@@ -2,9 +2,18 @@
  * Secured HTTP trigger for abandoned checkout recovery emails.
  * Auth: Authorization Bearer CRON_SECRET (or x-cron-secret header).
  *
+ * Recovery window (defaults): unpaid READY / AWAITING_GATEWAY_PAYMENT
+ * purchases with createdAt between 30 and 90 minutes ago, and
+ * abandonedCheckoutEmailNotificationStatus not yet sent/skipped/sending.
+ *
  * Not registered in vercel.json by default (Vercel Hobby = 1 cron/day;
- * lifecycle already owns that slot). Hit this endpoint from an approved
- * external scheduler or after a plan upgrade adds a second cron entry.
+ * lifecycle already owns that slot). Call this endpoint every 15–30 minutes
+ * from an external scheduler (cron-job.org, EasyCron, GitHub Actions, etc.):
+ *
+ *   GET https://mapesim.com/api/cron/abandoned-checkout-recovery
+ *   Authorization: Bearer $CRON_SECRET
+ *
+ * Optional: ?dryRun=1 or header x-cron-dry-run: 1
  */
 import { NextResponse } from "next/server";
 import { runAbandonedCheckoutRecovery } from "@/app/lib/esim/abandonedCheckoutRecoveryRunner";

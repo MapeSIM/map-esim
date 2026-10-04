@@ -1,7 +1,11 @@
 /**
- * Cron runner: find idle unfinished self-serve checkouts and trigger
- * once-only abandoned-checkout recovery emails.
+ * Cron runner: find unfinished self-serve checkouts whose createdAt falls in
+ * the recovery window (default 30–90 minutes ago) and trigger once-only
+ * abandoned-checkout recovery emails.
  * Never mutates payment, wallet, pricing, or checkout state.
+ *
+ * Duplicate prevention: list + notify CAS on abandonedCheckoutEmailNotificationStatus
+ * (null/failed/not_configured → sending → sent/skipped; sent never re-claimed).
  *
  * Per run: at most one email per customer (newest idle purchase by updatedAt).
  * Sibling abandoned purchases in the same batch are not scheduled.
@@ -52,8 +56,9 @@ function emptyCounts(): AbandonedCheckoutRecoveryRunCounts {
 }
 
 /**
- * Select self-serve WalletEsimPurchase rows idle past the threshold and not
- * already claimed as sent/skipped/sending.
+ * Select self-serve WalletEsimPurchase rows with createdAt in
+ * [now - maxAgeMs, now - idleMs] (default 30–90 minutes ago) that have not
+ * already been claimed as sent/skipped/sending.
  */
 export async function listAbandonedCheckoutRecoveryCandidates(options: {
   now?: Date;
@@ -69,6 +74,8 @@ export async function listAbandonedCheckoutRecoveryCandidates(options: {
     100
   );
 
+  // createdAt <= idleBefore → at least idleMs old (e.g. ≥ 30 minutes).
+  // createdAt >= notOlderThan → not older than maxAgeMs (e.g. ≤ 90 minutes).
   const idleBefore = new Date(now.getTime() - idleMs);
   const notOlderThan = new Date(now.getTime() - maxAgeMs);
 
@@ -81,7 +88,7 @@ export async function listAbandonedCheckoutRecoveryCandidates(options: {
           WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
         ],
       },
-      updatedAt: {
+      createdAt: {
         lte: idleBefore,
         gte: notOlderThan,
       },
@@ -97,7 +104,7 @@ export async function listAbandonedCheckoutRecoveryCandidates(options: {
         },
       ],
     },
-    orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     take,
     select: { id: true, customerUserId: true, updatedAt: true },
   });

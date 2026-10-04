@@ -1,9 +1,13 @@
 /**
  * Abandoned checkout recovery cron constants (offline-safe).
  * Delay/batch only — no SMTP, Prisma, or checkout side effects.
+ *
+ * Eligibility window (defaults): createdAt between 30 and 90 minutes ago.
+ * Call /api/cron/abandoned-checkout-recovery every 15–30 minutes via an
+ * external scheduler (Vercel Hobby allows only one daily vercel.json cron).
  */
 
-/** Default idle age before recovery email is eligible (30 minutes). */
+/** Minimum age before recovery email is eligible (30 minutes). */
 export const ABANDONED_CHECKOUT_IDLE_MS_DEFAULT = 30 * 60 * 1000;
 
 /**
@@ -60,10 +64,10 @@ export function coalesceAbandonedCheckoutCandidatesByCustomer(
 }
 
 /**
- * Do not recover checkouts older than this (matches pending-purchase UI window).
- * Prevents endless mail to ancient READY rows.
+ * Do not recover checkouts older than this (default 90 minutes).
+ * Keeps the send window tight so frequent cron hits only mail recent abandons.
  */
-export const ABANDONED_CHECKOUT_MAX_AGE_MS_DEFAULT = 3 * 24 * 60 * 60 * 1000;
+export const ABANDONED_CHECKOUT_MAX_AGE_MS_DEFAULT = 90 * 60 * 1000;
 
 export const ABANDONED_CHECKOUT_BATCH_SIZE = 40;
 
@@ -74,8 +78,8 @@ export const ABANDONED_CHECKOUT_RECOVERY_STATUSES = [
 ] as const;
 
 /**
- * Resolve idle threshold from ABANDONED_CHECKOUT_IDLE_MINUTES (positive int)
- * or fall back to the default.
+ * Resolve minimum age from ABANDONED_CHECKOUT_IDLE_MINUTES (positive int)
+ * or fall back to the default (30 minutes).
  */
 export function resolveAbandonedCheckoutIdleMs(
   envValue: string | undefined = process.env.ABANDONED_CHECKOUT_IDLE_MINUTES
@@ -89,14 +93,27 @@ export function resolveAbandonedCheckoutIdleMs(
   return minutes * 60 * 1000;
 }
 
+/**
+ * Resolve max age from ABANDONED_CHECKOUT_MAX_AGE_MINUTES (preferred) or
+ * legacy ABANDONED_CHECKOUT_MAX_AGE_HOURS. Default: 90 minutes.
+ */
 export function resolveAbandonedCheckoutMaxAgeMs(
-  envValue: string | undefined = process.env.ABANDONED_CHECKOUT_MAX_AGE_HOURS
+  envMinutes: string | undefined = process.env.ABANDONED_CHECKOUT_MAX_AGE_MINUTES,
+  envHours: string | undefined = process.env.ABANDONED_CHECKOUT_MAX_AGE_HOURS
 ): number {
-  const raw = (envValue ?? "").trim();
-  if (!raw) return ABANDONED_CHECKOUT_MAX_AGE_MS_DEFAULT;
-  const hours = Number.parseInt(raw, 10);
-  if (!Number.isFinite(hours) || hours < 1 || hours > 24 * 30) {
-    return ABANDONED_CHECKOUT_MAX_AGE_MS_DEFAULT;
+  const minutesRaw = (envMinutes ?? "").trim();
+  if (minutesRaw) {
+    const minutes = Number.parseInt(minutesRaw, 10);
+    if (Number.isFinite(minutes) && minutes >= 1 && minutes <= 60 * 24 * 30) {
+      return minutes * 60 * 1000;
+    }
   }
-  return hours * 60 * 60 * 1000;
+  const hoursRaw = (envHours ?? "").trim();
+  if (hoursRaw) {
+    const hours = Number.parseInt(hoursRaw, 10);
+    if (Number.isFinite(hours) && hours >= 1 && hours <= 24 * 30) {
+      return hours * 60 * 60 * 1000;
+    }
+  }
+  return ABANDONED_CHECKOUT_MAX_AGE_MS_DEFAULT;
 }

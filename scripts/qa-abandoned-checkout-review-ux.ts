@@ -175,6 +175,18 @@ function main() {
   const runner = read("app/lib/esim/abandonedCheckoutRecoveryRunner.ts");
   assert.match(runner, /coalesceAbandonedCheckoutCandidatesByCustomer/);
   assert.match(runner, /coalescedSkipped/);
+  assert.match(runner, /createdAt:\s*\{/);
+  assert.match(runner, /lte:\s*idleBefore/);
+  assert.match(runner, /gte:\s*notOlderThan/);
+  const recoveryShared = read("app/lib/esim/abandonedCheckoutRecoveryShared.ts");
+  assert.match(
+    recoveryShared,
+    /ABANDONED_CHECKOUT_IDLE_MS_DEFAULT\s*=\s*30\s*\*\s*60\s*\*\s*1000/
+  );
+  assert.match(
+    recoveryShared,
+    /ABANDONED_CHECKOUT_MAX_AGE_MS_DEFAULT\s*=\s*90\s*\*\s*60\s*\*\s*1000/
+  );
   console.log("PASS abandoned_recovery_customer_coalesce");
 
   console.log("OK qa-abandoned-checkout-review-ux");

@@ -8,8 +8,8 @@
 export const CUSTOMER_GATEWAY_STALE_IDLE_MS_DEFAULT = 30 * 60 * 1000;
 
 /**
- * Do not auto-release checkouts older than this (matches abandoned-checkout max age).
- * Ancient rows stay for admin/recon rather than silent release.
+ * Do not auto-release checkouts older than this (admin/recon window).
+ * Independent of abandoned-checkout email max age (default 90 minutes).
  */
 export const CUSTOMER_GATEWAY_STALE_MAX_AGE_MS_DEFAULT = 3 * 24 * 60 * 60 * 1000;
 
