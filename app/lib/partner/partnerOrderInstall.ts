@@ -32,6 +32,7 @@ import {
 import {
   fetchProviderUsage,
   normalizeProviderUsagePayload,
+  persistOrderProviderLifecycleCache,
   readUsageCapability,
   type CustomerUsageResult,
   type CustomerUsageSnapshot,
@@ -209,6 +210,7 @@ export async function authorizePartnerOwnedOrderInstall(
       status: PartnerEsimPurchaseStatus.COMPLETED,
     },
     select: {
+      id: true,
       order: {
         select: {
           id: true,
@@ -217,10 +219,20 @@ export async function authorizePartnerOwnedOrderInstall(
           status: true,
         },
       },
+      refundRequests: {
+        where: { status: "COMPLETED" },
+        select: { id: true },
+        take: 1,
+      },
     },
   });
 
   if (!purchase?.order || purchase.order.status !== OrderStatus.COMPLETED) {
+    return { ok: false, reason: "NOT_FOUND" };
+  }
+
+  // Completed partner refunds revoke install + usage even if purchase status lagged.
+  if (purchase.refundRequests.length > 0) {
     return { ok: false, reason: "NOT_FOUND" };
   }
 
@@ -375,6 +387,11 @@ export async function getPartnerOwnedOrderUsage(
   if (!normalized) {
     return { ok: false, code: "TEMPORARY_ERROR" };
   }
+
+  await persistOrderProviderLifecycleCache(
+    authz.order.localOrderId,
+    normalized
+  );
 
   return { ok: true, usage: normalized };
 }

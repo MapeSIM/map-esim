@@ -34,6 +34,7 @@ function main() {
     resolveCustomerEsimStatusBadge({
       orderStatus: "COMPLETED",
       walletPurchaseStatus: "FAILED_REFUNDED",
+      hasCompletedRefund: false,
     }),
     "Refunded"
   );
@@ -43,6 +44,14 @@ function main() {
       walletPurchaseStatus: "COMPLETED",
     }),
     "Completed"
+  );
+  assert.equal(
+    resolveCustomerEsimStatusBadge({
+      orderStatus: "COMPLETED",
+      walletPurchaseStatus: "COMPLETED",
+      hasCompletedRefund: true,
+    }),
+    "Refunded"
   );
   assert.equal(
     resolveCustomerEsimStatusBadge({
@@ -159,7 +168,7 @@ function main() {
   console.log("PASS list_page_my_esims");
 
   assert.match(ordersLib, /import "server-only"/);
-  assert.match(ordersLib, /userId:\s*id/);
+  assert.match(ordersLib, /OrderWhereInput = \{ userId \}/);
   assert.match(ordersLib, /userId:\s*owner\.id/);
   assert.match(ordersLib, /iccidLast4/);
   assert.match(ordersLib, /iccidMasked/);
@@ -336,7 +345,7 @@ function main() {
   assert.doesNotMatch(usageApi, /accessToken|bearer/i);
   assert.match(usageApi, /Retry-After/);
   assert.match(usagePanel, /View usage/);
-  assert.match(usagePanel, /Refresh usage/);
+  assert.match(usagePanel, /Refresh Status/);
   assert.match(usagePanel, /Usage data may be delayed by up to 1 hour/);
   assert.doesNotMatch(usagePanel, /setInterval|setTimeout\(\s*loadUsage/i);
   assert.doesNotMatch(usagePanel, /\bimei\b|\beid\b|\btac\b|deviceModel/i);

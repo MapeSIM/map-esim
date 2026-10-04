@@ -85,6 +85,9 @@ function main() {
   assert.match(detailSrc, /AdminOrderInstallEmailResendButton/);
   assert.match(detailSrc, /canResendInstallEmail/);
   assert.match(detailSrc, /Resend Installation Email \/ QR|installEmailResendEligible/);
+  assert.match(detailSrc, /displayStatusLabel|isRefunded/);
+  assert.match(ordersSrc, /hasCompletedRefund|RefundRequestStatus\.COMPLETED/);
+  assert.match(ordersSrc, /providerLifecycleStatus|displayStatusBadge/);
   assert.ok(!/JSON\.stringify/.test(detailSrc));
   assert.ok(!/createOrderAccessToken|checkout\/credit/i.test(detailSrc));
   assert.ok(!/decryptIccid/.test(detailSrc));

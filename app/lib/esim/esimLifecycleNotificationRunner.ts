@@ -24,6 +24,7 @@ import {
 import {
   fetchProviderUsage,
   normalizeProviderUsagePayload,
+  persistOrderProviderLifecycleCache,
 } from "@/app/lib/orders/customerEsimUsage";
 
 export type EsimLifecycleRunCounts = {
@@ -202,6 +203,8 @@ export async function processEsimLifecycleOrder(options: {
   if (!snapshot) {
     return { polled: true, usageOk: false, kinds: [], results };
   }
+
+  await persistOrderProviderLifecycleCache(options.orderId, snapshot);
 
   const kinds = evaluateEsimLifecycleEvents(snapshot, now.getTime());
   // Defense in depth: V1 allowlist (expiry only). Data helpers are not called here.

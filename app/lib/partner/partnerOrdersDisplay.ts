@@ -22,6 +22,8 @@ export type PartnerOrderStatusBadge =
   | "Completed"
   | "Processing"
   | "Under review"
+  | "Refunded"
+  /** @deprecated Prefer "Refunded"; kept for older UI/QA string matches. */
   | "Failed — balance returned";
 
 export type PartnerAttentionKind =
@@ -56,8 +58,15 @@ export function formatPartnerOrderDate(date: Date): string {
 }
 
 export function partnerOrderStatusFromPurchase(
-  status: PartnerEsimPurchaseStatus
+  status: PartnerEsimPurchaseStatus,
+  options?: { hasCompletedRefund?: boolean }
 ): PartnerOrderStatusBadge {
+  if (
+    options?.hasCompletedRefund === true ||
+    status === PartnerEsimPurchaseStatus.FAILED_REFUNDED
+  ) {
+    return "Refunded";
+  }
   switch (status) {
     case PartnerEsimPurchaseStatus.COMPLETED:
       return "Completed";
@@ -68,11 +77,15 @@ export function partnerOrderStatusFromPurchase(
       return "Processing";
     case PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED:
       return "Under review";
-    case PartnerEsimPurchaseStatus.FAILED_REFUNDED:
-      return "Failed — balance returned";
     default:
       return "Processing";
   }
+}
+
+export function partnerOrderIsRefunded(
+  badge: PartnerOrderStatusBadge
+): boolean {
+  return badge === "Refunded" || badge === "Failed — balance returned";
 }
 
 export function partnerAttentionKindFromStatus(

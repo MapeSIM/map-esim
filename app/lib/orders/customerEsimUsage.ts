@@ -22,6 +22,7 @@ import {
   readJsonSafe,
 } from "@/app/lib/vesim/server";
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
+import { classifyProviderLifecycleStatus } from "@/app/lib/orders/providerLifecycleShared";
 
 export type CustomerUsageErrorCode =
   | "NOT_FOUND"
@@ -230,6 +231,51 @@ export async function fetchProviderUsage(
 
 const USAGE_RATE_WINDOW_MS = 30_000;
 
+function parseUsageInstant(raw: string | null | undefined): Date | null {
+  const v = (raw ?? "").trim();
+  if (!v) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Persist normalized VeSIM usage/lifecycle onto the local Order row.
+ * Best-effort — never fails the caller usage response.
+ */
+export async function persistOrderProviderLifecycleCache(
+  localOrderId: string,
+  usage: CustomerUsageSnapshot
+): Promise<void> {
+  const id = (localOrderId ?? "").trim();
+  if (!id || id.length > 64) return;
+  const lifecycleStatus = classifyProviderLifecycleStatus({
+    status: usage.status,
+    statusLabel: usage.statusLabel,
+    isActivated: usage.isActivated,
+    isExpired: usage.isExpired,
+    remainingDataGB: usage.remainingDataGB,
+    isUnlimited: usage.isUnlimited,
+  });
+  try {
+    await prisma.order.updateMany({
+      where: { id },
+      data: {
+        providerLifecycleStatus: lifecycleStatus,
+        providerRemainingDataGb: usage.remainingDataGB,
+        providerUsedDataGb: usage.usedDataGB,
+        providerInitialDataGb: usage.initialDataGB,
+        providerUsagePercent: usage.usagePercent,
+        providerActivatedAt: parseUsageInstant(usage.activatedAt),
+        providerExpiresAt: parseUsageInstant(usage.expiresAt),
+        providerUsageSyncedAt: new Date(),
+        lifecycleUsageCheckedAt: new Date(),
+      },
+    });
+  } catch {
+    // Cache write must never break live usage reads.
+  }
+}
+
 /**
  * Explicit customer action: load sanitized usage for an owned completed order.
  */
@@ -291,6 +337,11 @@ export async function getCustomerOwnedOrderUsage(
   if (!normalized) {
     return { ok: false, code: "TEMPORARY_ERROR" };
   }
+
+  await persistOrderProviderLifecycleCache(
+    authz.order.localOrderId,
+    normalized
+  );
 
   return { ok: true, usage: normalized };
 }

@@ -431,21 +431,22 @@ async function main() {
       listNonCompleted!.orders.some((r) => r.purchaseId === recon.id),
       false
     );
+    // Refunded (FAILED_REFUNDED) purchases are shown with a Refunded badge.
     assert.equal(
       listNonCompleted!.orders.some((r) => r.purchaseId === failed.id),
-      false
+      true
     );
     assert.ok(
       listNonCompleted!.orders.some((r) => r.orderId === orderAId),
       "completed order must still appear"
     );
     assert.doesNotMatch(listPageSrc, /Purchases requiring attention|attention-heading/);
-    assert.doesNotMatch(ordersLibSrc, /PROVIDER_PENDING|FAILED_REFUNDED|RECONCILIATION_REQUIRED/);
-    console.log("PASS I_non_completed_excluded_from_my_esims");
+    console.log("PASS I_non_completed_excluded_except_refunded");
 
-    // J. list source only queries COMPLETED purchases
-    assert.match(ordersLibSrc, /status:\s*PartnerEsimPurchaseStatus\.COMPLETED/);
-    console.log("PASS J_list_fetches_completed_only");
+    // J. list source queries COMPLETED + FAILED_REFUNDED only
+    assert.match(ordersLibSrc, /PartnerEsimPurchaseStatus\.COMPLETED/);
+    assert.match(ordersLibSrc, /PartnerEsimPurchaseStatus\.FAILED_REFUNDED/);
+    console.log("PASS J_list_fetches_completed_and_refunded");
 
     // K. customer reveal pattern unaffected (non-owner → NOT_FOUND)
     const customerReveal = await revealIccidForCustomer(customer.id, orderAId);

@@ -2,11 +2,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBadge";
 import { CustomerEsimInstallHelpLinks } from "@/app/components/orders/CustomerEsimInstallHelpLinks";
+import { EsimLifecycleBadges } from "@/app/components/orders/EsimLifecycleBadges";
 import {
   customerEsimStatusHelp,
   customerEsimStatusLabel,
   type CustomerEsimStatusBadge,
 } from "@/app/lib/orders/customerOrderDisplay";
+import type { ProviderLifecycleCacheView } from "@/app/lib/orders/providerLifecycleShared";
 
 export type CustomerEsimOrderCardOrder = {
   id: string;
@@ -25,6 +27,8 @@ export type CustomerEsimOrderCardOrder = {
   addDataEligible?: boolean;
   /** True when this order itself was created by an Add More Data top-up. */
   isAddDataPurchase?: boolean;
+  lifecycle?: ProviderLifecycleCacheView | null;
+  remainingDataLabel?: string | null;
 };
 
 function statusBadgeClass(status: CustomerEsimStatusBadge): string {
@@ -92,6 +96,14 @@ export function CustomerEsimOrderCard({
                 isAddDataPurchase={Boolean(order.isAddDataPurchase)}
               />
             </div>
+            {order.statusBadge !== "Refunded" ? (
+              <div className="mt-2">
+                <EsimLifecycleBadges
+                  lifecycle={order.lifecycle}
+                  remainingDataLabel={order.remainingDataLabel}
+                />
+              </div>
+            ) : null}
             <p className="mt-1.5 text-xs font-medium text-[var(--text-soft)]">
               Ref {order.shortReference}
             </p>

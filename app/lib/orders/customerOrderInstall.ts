@@ -1,7 +1,7 @@
 import "server-only";
 
 import { NextResponse } from "next/server";
-import { OrderStatus, Role } from "@prisma/client";
+import { OrderStatus, RefundRequestStatus, Role } from "@prisma/client";
 import { auth } from "@/auth";
 import {
   extractOfficialActivationLinks,
@@ -86,6 +86,11 @@ export async function authorizeCustomerOwnedOrderInstall(
       adminPackageAssignment: {
         select: { status: true },
       },
+      refundRequests: {
+        where: { status: RefundRequestStatus.COMPLETED },
+        select: { id: true },
+        take: 1,
+      },
     },
   });
 
@@ -97,6 +102,7 @@ export async function authorizeCustomerOwnedOrderInstall(
   const assignmentStatus = order.adminPackageAssignment?.status;
   if (
     purchaseStatus === "FAILED_REFUNDED" ||
+    order.refundRequests.length > 0 ||
     purchaseStatus === "RECONCILIATION_REQUIRED" ||
     assignmentStatus === "RECONCILIATION_REQUIRED"
   ) {

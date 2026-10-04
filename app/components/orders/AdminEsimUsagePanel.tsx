@@ -147,11 +147,7 @@ export default function AdminEsimUsagePanel({ orderId }: Props) {
           ) : (
             <Signal className="h-4 w-4" aria-hidden="true" />
           )}
-          {loading
-            ? "Checking…"
-            : usage
-              ? "Refresh live usage"
-              : "Check live usage"}
+          {loading ? "Checking…" : "Refresh Status"}
         </button>
       </div>
 

@@ -1,6 +1,13 @@
 import "server-only";
 
-import { OrderStatus, Prisma, Role } from "@prisma/client";
+import {
+  OrderStatus,
+  PartnerEsimPurchaseStatus,
+  Prisma,
+  RefundRequestStatus,
+  Role,
+  WalletEsimPurchaseStatus,
+} from "@prisma/client";
 import {
   ADMIN_ORDERS_PAGE_SIZE,
   ADMIN_RECENT_ORDERS_LIMIT,
@@ -17,7 +24,16 @@ import {
 } from "@/app/lib/admin/display";
 import { prisma } from "@/app/lib/db";
 import { resolveAddDataPurchaseLabel } from "@/app/lib/esim/addDataCheckout";
-import { resolveCustomerEsimStatusBadge } from "@/app/lib/orders/customerOrderDisplay";
+import {
+  customerEsimStatusLabel,
+  resolveCustomerEsimStatusBadge,
+  type CustomerEsimStatusBadge,
+} from "@/app/lib/orders/customerOrderDisplay";
+import {
+  formatLifecycleGb,
+  toProviderLifecycleCacheView,
+  type ProviderLifecycleCacheView,
+} from "@/app/lib/orders/providerLifecycleShared";
 import {
   buildAddDataEligibility,
   lookupOfferTopUpFromCatalog,
@@ -40,6 +56,11 @@ export type AdminOrderListRow = {
   /** True when this order itself was created by an Add More Data top-up. */
   isAddDataPurchase: boolean;
   addDataSourceOrderId: string | null;
+  /** Refund-aware display badge (Completed / Refunded / …). */
+  displayStatusBadge: CustomerEsimStatusBadge;
+  displayStatusLabel: string;
+  lifecycleLabel: string | null;
+  remainingDataLabel: string | null;
 };
 
 export type AdminOrdersPageResult = {
@@ -103,6 +124,11 @@ export type AdminOrderDetail = {
    * (provider order present). Display/eligibility only — send path re-checks.
    */
   installEmailResendEligible: boolean;
+  isRefunded: boolean;
+  displayStatusBadge: CustomerEsimStatusBadge;
+  displayStatusLabel: string;
+  lifecycle: ProviderLifecycleCacheView;
+  remainingDataLabel: string | null;
 };
 
 function adminIccidDisplay(
@@ -288,11 +314,26 @@ export async function getAdminOrdersPage(
       fundingSource: true,
       iccidLast4: true,
       walletEsimPurchase: {
-        select: { idempotencyKey: true },
+        select: { idempotencyKey: true, status: true },
       },
       partnerEsimPurchase: {
-        select: { idempotencyKey: true },
+        select: { idempotencyKey: true, status: true },
       },
+      adminPackageAssignment: {
+        select: { status: true },
+      },
+      refundRequests: {
+        where: { status: RefundRequestStatus.COMPLETED },
+        select: { id: true },
+        take: 1,
+      },
+      partnerRefundRequests: {
+        where: { status: RefundRequestStatus.COMPLETED },
+        select: { id: true },
+        take: 1,
+      },
+      providerLifecycleStatus: true,
+      providerRemainingDataGb: true,
     },
   });
 
@@ -301,6 +342,21 @@ export async function getAdminOrdersPage(
       row.walletEsimPurchase?.idempotencyKey,
       row.partnerEsimPurchase?.idempotencyKey,
     ]);
+    const hasCompletedRefund =
+      row.refundRequests.length > 0 ||
+      row.partnerRefundRequests.length > 0 ||
+      row.partnerEsimPurchase?.status ===
+        PartnerEsimPurchaseStatus.FAILED_REFUNDED;
+    const displayStatusBadge = resolveCustomerEsimStatusBadge({
+      orderStatus: row.status,
+      walletPurchaseStatus: row.walletEsimPurchase?.status,
+      assignmentStatus: row.adminPackageAssignment?.status,
+      hasCompletedRefund,
+    });
+    const lifecycle = toProviderLifecycleCacheView({
+      providerLifecycleStatus: row.providerLifecycleStatus,
+      providerRemainingDataGb: row.providerRemainingDataGb,
+    });
     return {
       id: row.id,
       createdAtLabel: formatCreatedAt(row.createdAt),
@@ -314,6 +370,10 @@ export async function getAdminOrdersPage(
       fundingLabel: fundingSourceLabel(row.fundingSource),
       isAddDataPurchase: addDataPurchase.isAddDataPurchase,
       addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
+      displayStatusBadge,
+      displayStatusLabel: customerEsimStatusLabel(displayStatusBadge),
+      lifecycleLabel: lifecycle.lifecycleLabel,
+      remainingDataLabel: formatLifecycleGb(row.providerRemainingDataGb),
     };
   });
 
@@ -380,6 +440,7 @@ export async function getAdminOrderDetail(
       partnerEsimPurchase: {
         select: {
           idempotencyKey: true,
+          status: true,
         },
       },
       adminPackageAssignment: {
@@ -389,6 +450,24 @@ export async function getAdminOrderDetail(
           destinationCode: true,
         },
       },
+      refundRequests: {
+        where: { status: RefundRequestStatus.COMPLETED },
+        select: { id: true },
+        take: 1,
+      },
+      partnerRefundRequests: {
+        where: { status: RefundRequestStatus.COMPLETED },
+        select: { id: true },
+        take: 1,
+      },
+      providerLifecycleStatus: true,
+      providerRemainingDataGb: true,
+      providerUsedDataGb: true,
+      providerInitialDataGb: true,
+      providerUsagePercent: true,
+      providerActivatedAt: true,
+      providerExpiresAt: true,
+      providerUsageSyncedAt: true,
     },
   });
 
@@ -409,14 +488,33 @@ export async function getAdminOrderDetail(
   const iccidHint = adminIccidDisplay(row.iccidLast4, row.status);
   const iccidRevealable = Boolean(row.iccidEncrypted?.trim());
 
+  const hasCompletedRefund =
+    row.refundRequests.length > 0 ||
+    row.partnerRefundRequests.length > 0 ||
+    row.partnerEsimPurchase?.status ===
+      PartnerEsimPurchaseStatus.FAILED_REFUNDED ||
+    row.walletEsimPurchase?.status === WalletEsimPurchaseStatus.FAILED_REFUNDED;
   const statusBadge = resolveCustomerEsimStatusBadge({
     orderStatus: row.status,
     walletPurchaseStatus: row.walletEsimPurchase?.status,
     assignmentStatus: row.adminPackageAssignment?.status,
+    hasCompletedRefund,
   });
-  const isRefunded = statusBadge === "Refunded";
+  const isRefunded = statusBadge === "Refunded" || hasCompletedRefund;
   const installEligible =
-    row.status === OrderStatus.COMPLETED && statusBadge === "Completed";
+    row.status === OrderStatus.COMPLETED &&
+    statusBadge === "Completed" &&
+    !isRefunded;
+  const lifecycle = toProviderLifecycleCacheView({
+    providerLifecycleStatus: row.providerLifecycleStatus,
+    providerRemainingDataGb: row.providerRemainingDataGb,
+    providerUsedDataGb: row.providerUsedDataGb,
+    providerInitialDataGb: row.providerInitialDataGb,
+    providerUsagePercent: row.providerUsagePercent,
+    providerActivatedAt: row.providerActivatedAt,
+    providerExpiresAt: row.providerExpiresAt,
+    providerUsageSyncedAt: row.providerUsageSyncedAt,
+  });
   const offerIdForEligibility =
     normalizeOfferId(row.offerId) ||
     normalizeOfferId(row.walletEsimPurchase?.offerId) ||
@@ -474,8 +572,13 @@ export async function getAdminOrderDetail(
     isAddDataPurchase: addDataPurchase.isAddDataPurchase,
     addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
     installEmailResendEligible: Boolean(
-      installEligible && providerOrderId
+      installEligible && providerOrderId && !isRefunded
     ),
+    isRefunded,
+    displayStatusBadge: statusBadge,
+    displayStatusLabel: customerEsimStatusLabel(statusBadge),
+    lifecycle,
+    remainingDataLabel: formatLifecycleGb(row.providerRemainingDataGb),
   };
 }
 

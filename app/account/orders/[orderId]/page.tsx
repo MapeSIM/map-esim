@@ -5,6 +5,7 @@ import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBad
 import CustomerEsimInstallPanel from "@/app/components/orders/CustomerEsimInstallPanel";
 import { CustomerEsimInstallHelpLinks } from "@/app/components/orders/CustomerEsimInstallHelpLinks";
 import CustomerEsimUsagePanel from "@/app/components/orders/CustomerEsimUsagePanel";
+import { EsimLifecycleBadges } from "@/app/components/orders/EsimLifecycleBadges";
 import CustomerRefundRequestForm from "@/app/components/orders/CustomerRefundRequestForm";
 import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
 import { requireSession } from "@/app/lib/auth/session";
@@ -156,6 +157,14 @@ export default async function AccountOrderDetailPage({
                     isAddDataPurchase={detail.isAddDataPurchase}
                   />
                 </div>
+                {!detail.isRefunded ? (
+                  <div className="mt-2">
+                    <EsimLifecycleBadges
+                      lifecycle={detail.lifecycle}
+                      remainingDataLabel={detail.remainingDataLabel}
+                    />
+                  </div>
+                ) : null}
                 <p className="mt-1 text-sm text-[var(--text-muted)]">
                   Order {detail.shortReference}
                 </p>

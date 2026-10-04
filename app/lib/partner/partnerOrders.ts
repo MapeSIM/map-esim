@@ -8,12 +8,18 @@ import "server-only";
 import {
   OrderStatus,
   PartnerEsimPurchaseStatus,
+  RefundRequestStatus,
   Role,
 } from "@prisma/client";
 import { formatStoredIccidLast4 } from "@/app/lib/admin/display";
 import { prisma } from "@/app/lib/db";
 import { resolveAddDataPurchaseLabel } from "@/app/lib/esim/addDataCheckout";
 import { customerFlagImageUrl } from "@/app/lib/orders/customerOrderDisplay";
+import {
+  formatLifecycleGb,
+  toProviderLifecycleCacheView,
+  type ProviderLifecycleCacheView,
+} from "@/app/lib/orders/providerLifecycleShared";
 import {
   buildAddDataEligibility,
   lookupOfferTopUpFromCatalog,
@@ -25,6 +31,7 @@ import {
   displayOrUnavailable,
   formatPartnerOrderDate,
   parsePartnerOrdersPage,
+  partnerOrderIsRefunded,
   partnerOrderStatusFromPurchase,
   shortPartnerOrderReference,
   type PartnerOrderStatusBadge,
@@ -70,6 +77,8 @@ export type PartnerOrderListRow = {
   /** True when this order itself was created by an Add More Data top-up. */
   isAddDataPurchase: boolean;
   addDataSourceOrderId: string | null;
+  lifecycle: ProviderLifecycleCacheView;
+  remainingDataLabel: string | null;
 };
 
 export type PartnerOrdersPageData = {
@@ -115,6 +124,11 @@ const partnerPurchaseListSelect = {
   orderId: true,
   providerOrderId: true,
   idempotencyKey: true,
+  refundRequests: {
+    where: { status: RefundRequestStatus.COMPLETED },
+    select: { id: true },
+    take: 1,
+  },
   order: {
     select: {
       id: true,
@@ -128,14 +142,21 @@ const partnerPurchaseListSelect = {
       iccidEncrypted: true,
       offerId: true,
       providerOrderId: true,
+      providerLifecycleStatus: true,
+      providerRemainingDataGb: true,
+      providerUsedDataGb: true,
+      providerInitialDataGb: true,
+      providerUsagePercent: true,
+      providerActivatedAt: true,
+      providerExpiresAt: true,
+      providerUsageSyncedAt: true,
     },
   },
 } as const;
 
 /**
- * Completed Partner Orders for the active Partner only (newest first, paginated).
- * My eSIMs shows COMPLETED purchases with a linked order only — no pending,
- * reconciliation, failed-refunded, or other non-completed purchase states.
+ * Partner My eSIMs: completed purchases + refunded (FAILED_REFUNDED) with a
+ * linked order. Pending / reconciliation states stay excluded.
  * List pages skip public-catalog top-up lookups (detail still uses them).
  */
 export async function listPartnerOrdersPage(
@@ -150,7 +171,12 @@ export async function listPartnerOrdersPage(
 
   const completedWhere = {
     partnerId: actor.partnerId,
-    status: PartnerEsimPurchaseStatus.COMPLETED,
+    status: {
+      in: [
+        PartnerEsimPurchaseStatus.COMPLETED,
+        PartnerEsimPurchaseStatus.FAILED_REFUNDED,
+      ],
+    },
     orderId: { not: null },
   };
 
@@ -186,14 +212,18 @@ export async function listPartnerOrdersPage(
     const validity = displayOrUnavailable(row.order.validity || row.validity);
     const retailPriceLabel = `${formatUsdCents(row.retailPriceCents)} USD`;
     const partnerDebitLabel = `${formatUsdCents(row.partnerChargeCents)} USD`;
-    const statusBadge = partnerOrderStatusFromPurchase(row.status);
+    const hasCompletedRefund = row.refundRequests.length > 0;
+    const statusBadge = partnerOrderStatusFromPurchase(row.status, {
+      hasCompletedRefund,
+    });
     const purchasedAtLabel = formatPartnerOrderDate(
       row.completedAt ?? row.createdAt
     );
-    const isRefunded = statusBadge === "Failed — balance returned";
+    const isRefunded = partnerOrderIsRefunded(statusBadge);
     const installEligible =
       row.order.status === OrderStatus.COMPLETED &&
-      statusBadge === "Completed";
+      statusBadge === "Completed" &&
+      !isRefunded;
     const offerIdForEligibility =
       normalizeOfferId(row.offerId) ||
       normalizeOfferId(row.order.offerId) ||
@@ -233,6 +263,17 @@ export async function listPartnerOrdersPage(
       addDataEligible,
       isAddDataPurchase: addDataPurchase.isAddDataPurchase,
       addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
+      lifecycle: toProviderLifecycleCacheView({
+        providerLifecycleStatus: row.order.providerLifecycleStatus,
+        providerRemainingDataGb: row.order.providerRemainingDataGb,
+        providerUsedDataGb: row.order.providerUsedDataGb,
+        providerInitialDataGb: row.order.providerInitialDataGb,
+        providerUsagePercent: row.order.providerUsagePercent,
+        providerActivatedAt: row.order.providerActivatedAt,
+        providerExpiresAt: row.order.providerExpiresAt,
+        providerUsageSyncedAt: row.order.providerUsageSyncedAt,
+      }),
+      remainingDataLabel: formatLifecycleGb(row.order.providerRemainingDataGb),
     });
   }
 
@@ -291,6 +332,8 @@ export type PartnerOrderDetail = {
   isAddDataPurchase: boolean;
   /** Source MAP order id when isAddDataPurchase; never confuse with addDataEligible. */
   addDataSourceOrderId: string | null;
+  lifecycle: ProviderLifecycleCacheView;
+  remainingDataLabel: string | null;
 };
 
 /**
@@ -326,7 +369,12 @@ export async function getPartnerOwnedOrderDetail(
     where: {
       partnerId: actor.partnerId,
       orderId,
-      status: PartnerEsimPurchaseStatus.COMPLETED,
+      status: {
+        in: [
+          PartnerEsimPurchaseStatus.COMPLETED,
+          PartnerEsimPurchaseStatus.FAILED_REFUNDED,
+        ],
+      },
     },
     select: {
       id: true,
@@ -343,6 +391,11 @@ export async function getPartnerOwnedOrderDetail(
       completedAt: true,
       providerOrderId: true,
       idempotencyKey: true,
+      refundRequests: {
+        where: { status: RefundRequestStatus.COMPLETED },
+        select: { id: true },
+        take: 1,
+      },
       order: {
         select: {
           id: true,
@@ -356,6 +409,14 @@ export async function getPartnerOwnedOrderDetail(
           iccidEncrypted: true,
           offerId: true,
           providerOrderId: true,
+          providerLifecycleStatus: true,
+          providerRemainingDataGb: true,
+          providerUsedDataGb: true,
+          providerInitialDataGb: true,
+          providerUsagePercent: true,
+          providerActivatedAt: true,
+          providerExpiresAt: true,
+          providerUsageSyncedAt: true,
         },
       },
     },
@@ -367,12 +428,16 @@ export async function getPartnerOwnedOrderDetail(
   const encrypted = Boolean(order.iccidEncrypted?.trim());
 
   // Eligibility only — providerOrderId / offerId stay off the Partner DTO.
-  const statusBadge = partnerOrderStatusFromPurchase(purchase.status);
-  const isRefunded = statusBadge === "Failed — balance returned";
+  const hasCompletedRefund = purchase.refundRequests.length > 0;
+  const statusBadge = partnerOrderStatusFromPurchase(purchase.status, {
+    hasCompletedRefund,
+  });
+  const isRefunded = partnerOrderIsRefunded(statusBadge);
   const installEligible =
     order.status === OrderStatus.COMPLETED &&
     purchase.status === PartnerEsimPurchaseStatus.COMPLETED &&
-    statusBadge === "Completed";
+    statusBadge === "Completed" &&
+    !isRefunded;
   const offerIdForEligibility =
     normalizeOfferId(purchase.offerId) ||
     normalizeOfferId(order.offerId) ||
@@ -427,5 +492,16 @@ export async function getPartnerOwnedOrderDetail(
     destinationCode,
     isAddDataPurchase: addDataPurchase.isAddDataPurchase,
     addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
+    lifecycle: toProviderLifecycleCacheView({
+      providerLifecycleStatus: order.providerLifecycleStatus,
+      providerRemainingDataGb: order.providerRemainingDataGb,
+      providerUsedDataGb: order.providerUsedDataGb,
+      providerInitialDataGb: order.providerInitialDataGb,
+      providerUsagePercent: order.providerUsagePercent,
+      providerActivatedAt: order.providerActivatedAt,
+      providerExpiresAt: order.providerExpiresAt,
+      providerUsageSyncedAt: order.providerUsageSyncedAt,
+    }),
+    remainingDataLabel: formatLifecycleGb(order.providerRemainingDataGb),
   };
 }

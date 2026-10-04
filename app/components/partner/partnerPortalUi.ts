@@ -37,6 +37,7 @@ export function partnerStatusBadgeClass(status: PartnerOrderStatusBadge): string
       return "bg-[var(--surface)] text-[var(--text)] border-[var(--border-hover)]";
     case "Under review":
       return "bg-[var(--warning-bg)] text-[var(--warning-text)] border-[var(--warning-border)]";
+    case "Refunded":
     case "Failed — balance returned":
       return "bg-[var(--danger-bg)] text-[var(--danger-text)] border-[var(--danger-border)]";
     default:

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import AdminAddDataForm from "@/app/components/admin/AdminAddDataForm";
 import AdminOrderInstallEmailResendButton from "@/app/components/admin/AdminOrderInstallEmailResendButton";
 import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBadge";
+import { EsimLifecycleBadges } from "@/app/components/orders/EsimLifecycleBadges";
 import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
 import AdminEsimUsagePanel from "@/app/components/orders/AdminEsimUsagePanel";
 import { loadAdminAccess } from "@/app/lib/admin/adminPermissionAccess";
@@ -95,8 +96,11 @@ export default async function AdminOrderDetailPage({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <AdminStatusPill value={detail.displayStatusLabel}>
+            {detail.displayStatusLabel}
+          </AdminStatusPill>
           <AdminStatusPill value={detail.localStatus}>
-            {detail.localStatus}
+            Local: {detail.localStatus}
           </AdminStatusPill>
           <AdminStatusPill value={detail.fundingLabel}>
             {detail.fundingLabel}
@@ -106,6 +110,16 @@ export default async function AdminOrderDetailPage({
           </AdminStatusPill>
           {detail.isAddDataPurchase ? <AddDataPurchaseBadge isAddDataPurchase /> : null}
         </div>
+        {!detail.isRefunded ? (
+          <EsimLifecycleBadges
+            lifecycle={detail.lifecycle}
+            remainingDataLabel={detail.remainingDataLabel}
+          />
+        ) : (
+          <p className="text-sm font-medium text-[var(--danger-text)]">
+            This order is refunded. Installation QR and live usage are blocked.
+          </p>
+        )}
         {canResendInstallEmail && detail.installEmailResendEligible ? (
           <div className="rounded-2xl border border-[var(--accent-strong)]/35 bg-[var(--accent-strong)]/10 px-4 py-4 sm:px-5">
             <p className="text-sm font-semibold text-[var(--heading)]">
@@ -202,7 +216,13 @@ export default async function AdminOrderDetailPage({
         <div className="sr-only">
           <h2 id="admin-usage-heading">Usage</h2>
         </div>
-        <AdminEsimUsagePanel orderId={detail.id} />
+        {!detail.isRefunded ? (
+          <AdminEsimUsagePanel orderId={detail.id} />
+        ) : (
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 text-sm text-[var(--text-muted)]">
+            Live VeSIM usage is hidden for refunded orders.
+          </div>
+        )}
         {canFulfill && detail.addDataEligible ? (
           <div className="rounded-2xl border border-[var(--accent-strong)]/40 bg-[var(--accent-strong)]/10 px-4 py-4 sm:px-5">
             <p className="text-sm font-semibold text-[var(--heading)]">

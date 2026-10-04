@@ -1,6 +1,17 @@
 import "server-only";
 
-import { CustomerRewardTransactionType, OrderStatus, Prisma, Role } from "@prisma/client";
+import {
+  CustomerRewardTransactionType,
+  OrderStatus,
+  Prisma,
+  RefundRequestStatus,
+  Role,
+} from "@prisma/client";
+import {
+  formatLifecycleGb,
+  toProviderLifecycleCacheView,
+  type ProviderLifecycleCacheView,
+} from "@/app/lib/orders/providerLifecycleShared";
 import { formatStoredIccidLast4 } from "@/app/lib/admin/display";
 import { prisma } from "@/app/lib/db";
 import { resolveAddDataPurchaseLabel } from "@/app/lib/esim/addDataCheckout";
@@ -282,6 +293,9 @@ export type CustomerOrderListRow = {
   isAddDataPurchase: boolean;
   /** Source MAP order id when isAddDataPurchase; never confuse with addDataEligible. */
   addDataSourceOrderId: string | null;
+  /** Cached VeSIM line state when available (null until first refresh). */
+  lifecycle: ProviderLifecycleCacheView;
+  remainingDataLabel: string | null;
 };
 
 export type CustomerOrdersListResult = {
@@ -355,7 +369,16 @@ function buildCustomerOrdersWhere(
   }
 
   if (status === "REFUNDED") {
-    and.push({ walletEsimPurchase: { status: "FAILED_REFUNDED" } });
+    and.push({
+      OR: [
+        { walletEsimPurchase: { status: "FAILED_REFUNDED" } },
+        {
+          refundRequests: {
+            some: { status: RefundRequestStatus.COMPLETED },
+          },
+        },
+      ],
+    });
   } else if (status === "REVIEW_NEEDED") {
     and.push({
       OR: [
@@ -371,7 +394,16 @@ function buildCustomerOrdersWhere(
       ],
     });
     and.push({
-      NOT: { walletEsimPurchase: { status: "FAILED_REFUNDED" } },
+      NOT: {
+        OR: [
+          { walletEsimPurchase: { status: "FAILED_REFUNDED" } },
+          {
+            refundRequests: {
+              some: { status: RefundRequestStatus.COMPLETED },
+            },
+          },
+        ],
+      },
     });
   } else if (status === "COMPLETED") {
     and.push({ status: OrderStatus.COMPLETED });
@@ -379,6 +411,11 @@ function buildCustomerOrdersWhere(
       NOT: {
         OR: [
           { walletEsimPurchase: { status: "FAILED_REFUNDED" } },
+          {
+            refundRequests: {
+              some: { status: RefundRequestStatus.COMPLETED },
+            },
+          },
           { walletEsimPurchase: { status: "RECONCILIATION_REQUIRED" } },
           { adminPackageAssignment: { status: "RECONCILIATION_REQUIRED" } },
           { adminPackageAssignment: { status: "FAILED" } },
@@ -482,6 +519,14 @@ export async function listCustomerOrders(
         fundingSource: true,
         iccidLast4: true,
         iccidEncrypted: true,
+        providerLifecycleStatus: true,
+        providerRemainingDataGb: true,
+        providerUsedDataGb: true,
+        providerInitialDataGb: true,
+        providerUsagePercent: true,
+        providerActivatedAt: true,
+        providerExpiresAt: true,
+        providerUsageSyncedAt: true,
         walletEsimPurchase: {
           select: {
             status: true,
@@ -500,16 +545,23 @@ export async function listCustomerOrders(
             emailDeliveryStatus: true,
           },
         },
+        refundRequests: {
+          where: { status: RefundRequestStatus.COMPLETED },
+          select: { id: true },
+          take: 1,
+        },
       },
     });
 
   const mapped: CustomerOrderListRow[] = [];
 
   for (const row of rows) {
+    const hasCompletedRefund = row.refundRequests.length > 0;
     const statusBadge = resolveCustomerEsimStatusBadge({
       orderStatus: row.status,
       walletPurchaseStatus: row.walletEsimPurchase?.status,
       assignmentStatus: row.adminPackageAssignment?.status,
+      hasCompletedRefund,
     });
     // Safety net — approximate DB status filters may include edge cases.
     if (!customerStatusMatchesFilter(statusBadge, status)) continue;
@@ -584,6 +636,20 @@ export async function listCustomerOrders(
       addDataBlockedReason: addDataEligible ? null : "not_ready",
       isAddDataPurchase: addDataPurchase.isAddDataPurchase,
       addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
+      lifecycle: (() => {
+        const lifecycle = toProviderLifecycleCacheView({
+          providerLifecycleStatus: row.providerLifecycleStatus,
+          providerRemainingDataGb: row.providerRemainingDataGb,
+          providerUsedDataGb: row.providerUsedDataGb,
+          providerInitialDataGb: row.providerInitialDataGb,
+          providerUsagePercent: row.providerUsagePercent,
+          providerActivatedAt: row.providerActivatedAt,
+          providerExpiresAt: row.providerExpiresAt,
+          providerUsageSyncedAt: row.providerUsageSyncedAt,
+        });
+        return lifecycle;
+      })(),
+      remainingDataLabel: formatLifecycleGb(row.providerRemainingDataGb),
     });
   }
 
@@ -648,6 +714,8 @@ export type CustomerOrderDetail = {
   isAddDataPurchase: boolean;
   /** Source MAP order id when isAddDataPurchase; never confuse with addDataEligible. */
   addDataSourceOrderId: string | null;
+  lifecycle: ProviderLifecycleCacheView;
+  remainingDataLabel: string | null;
 };
 
 /**
@@ -701,6 +769,14 @@ export async function getCustomerOwnedOrderDetail(
       fundingSource: true,
       iccidLast4: true,
       iccidEncrypted: true,
+      providerLifecycleStatus: true,
+      providerRemainingDataGb: true,
+      providerUsedDataGb: true,
+      providerInitialDataGb: true,
+      providerUsagePercent: true,
+      providerActivatedAt: true,
+      providerExpiresAt: true,
+      providerUsageSyncedAt: true,
       walletEsimPurchase: {
         select: {
           status: true,
@@ -731,6 +807,11 @@ export async function getCustomerOwnedOrderDetail(
           emailDeliveryStatus: true,
         },
       },
+      refundRequests: {
+        where: { status: RefundRequestStatus.COMPLETED },
+        select: { id: true },
+        take: 1,
+      },
     },
   });
 
@@ -738,10 +819,12 @@ export async function getCustomerOwnedOrderDetail(
     return null;
   }
 
+  const hasCompletedRefund = order.refundRequests.length > 0;
   const statusBadge = resolveCustomerEsimStatusBadge({
     orderStatus: order.status,
     walletPurchaseStatus: order.walletEsimPurchase?.status,
     assignmentStatus: order.adminPackageAssignment?.status,
+    hasCompletedRefund,
   });
   const iccidRevealable = Boolean(order.iccidEncrypted?.trim());
   const iccidMasked = customerIccidDisplay(
@@ -924,5 +1007,16 @@ export async function getCustomerOwnedOrderDetail(
     addDataBlockedReason: addData.addDataBlockedReason,
     isAddDataPurchase: addDataPurchase.isAddDataPurchase,
     addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
+    lifecycle: toProviderLifecycleCacheView({
+      providerLifecycleStatus: order.providerLifecycleStatus,
+      providerRemainingDataGb: order.providerRemainingDataGb,
+      providerUsedDataGb: order.providerUsedDataGb,
+      providerInitialDataGb: order.providerInitialDataGb,
+      providerUsagePercent: order.providerUsagePercent,
+      providerActivatedAt: order.providerActivatedAt,
+      providerExpiresAt: order.providerExpiresAt,
+      providerUsageSyncedAt: order.providerUsageSyncedAt,
+    }),
+    remainingDataLabel: formatLifecycleGb(order.providerRemainingDataGb),
   };
 }

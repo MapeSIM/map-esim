@@ -109,6 +109,8 @@ export default async function PartnerOrderDetailPage({
           addDataEligible: detail.addDataEligible,
           isAddDataPurchase: detail.isAddDataPurchase,
           addDataSourceOrderId: detail.addDataSourceOrderId,
+          lifecycle: detail.lifecycle,
+          remainingDataLabel: detail.remainingDataLabel,
         }}
         refundRequest={refundRequest}
         partnerDisplayName={partnerDisplayName}

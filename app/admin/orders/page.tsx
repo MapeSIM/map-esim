@@ -203,9 +203,24 @@ export default async function AdminOrdersPage({
                   </div>
                 </td>
                 <td className="px-3 py-3">
-                  <AdminStatusPill value={order.localStatus}>
-                    {adminHumanStatusLabel(order.localStatus)}
-                  </AdminStatusPill>
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <AdminStatusPill value={order.displayStatusLabel}>
+                      {order.displayStatusLabel}
+                    </AdminStatusPill>
+                    {order.lifecycleLabel ? (
+                      <span className="text-xs font-medium text-[var(--text-muted)]">
+                        {order.lifecycleLabel}
+                        {order.remainingDataLabel
+                          ? ` · ${order.remainingDataLabel}`
+                          : ""}
+                      </span>
+                    ) : null}
+                    {order.displayStatusBadge === "Refunded" ? null : (
+                      <span className="sr-only">
+                        Local status {adminHumanStatusLabel(order.localStatus)}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-3 py-3">{order.fundingLabel}</td>
                 <td className="whitespace-nowrap px-3 py-3">

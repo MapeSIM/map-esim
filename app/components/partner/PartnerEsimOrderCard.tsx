@@ -17,8 +17,10 @@ import {
   partnerStatusBadgeClass,
 } from "@/app/components/partner/partnerPortalUi";
 import type { PartnerOrderListRow } from "@/app/lib/partner/partnerOrders";
+import { EsimLifecycleBadges } from "@/app/components/orders/EsimLifecycleBadges";
 import {
   PARTNER_ESIM_READY_LABEL,
+  partnerOrderIsRefunded,
   type PartnerOrderStatusBadge,
 } from "@/app/lib/partner/partnerOrdersDisplay";
 
@@ -94,7 +96,8 @@ export default function PartnerEsimOrderCard({
   partnerDisplayName = null,
 }: Props) {
   const [showUsage, setShowUsage] = useState(false);
-  const completed = row.statusBadge === "Completed";
+  const refunded = partnerOrderIsRefunded(row.statusBadge);
+  const completed = row.statusBadge === "Completed" && !refunded;
   const addDataHref = row.addDataEligible
     ? `/partner/orders/${encodeURIComponent(row.orderId)}/add-data`
     : null;
@@ -129,6 +132,12 @@ export default function PartnerEsimOrderCard({
               isAddDataPurchase={row.isAddDataPurchase}
               completed={completed}
             />
+            {!refunded ? (
+              <EsimLifecycleBadges
+                lifecycle={row.lifecycle}
+                remainingDataLabel={row.remainingDataLabel}
+              />
+            ) : null}
             {refundRequest ? (
               <p className="text-xs font-medium text-[var(--text-muted)]">
                 Refund: {refundRequest.statusLabel}
@@ -188,6 +197,12 @@ export default function PartnerEsimOrderCard({
               isAddDataPurchase={row.isAddDataPurchase}
               completed={completed}
             />
+            {!refunded ? (
+              <EsimLifecycleBadges
+                lifecycle={row.lifecycle}
+                remainingDataLabel={row.remainingDataLabel}
+              />
+            ) : null}
           </div>
         </div>
         <p className="mt-4 font-mono text-xs text-[var(--text-soft)]">
@@ -206,7 +221,8 @@ export default function PartnerEsimOrderCard({
               Data usage
             </h3>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Check used, remaining, and expiry when you need it.
+              Refresh to load live VeSIM status (Active / Expired / Depleted)
+              and remaining data.
             </p>
             <div className="mt-4">
               {!showUsage ? (
@@ -216,7 +232,7 @@ export default function PartnerEsimOrderCard({
                   className={partnerSecondaryCtaClass}
                 >
                   <Signal className="h-4 w-4" aria-hidden="true" />
-                  Show eSIM Status & Usage
+                  Refresh Status
                 </button>
               ) : (
                 <CustomerEsimUsagePanel
@@ -252,6 +268,20 @@ export default function PartnerEsimOrderCard({
             existingRequest={refundRequest}
           />
         </>
+      ) : refunded ? (
+        <section className={partnerCardClass}>
+          <p className={partnerSectionLabelClass}>Refunded</p>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">
+            This eSIM was refunded. Installation QR and live usage are no longer
+            available.
+          </p>
+          <PartnerRefundRequestControls
+            purchaseId={row.purchaseId}
+            partnerDebitLabel={row.partnerDebitLabel}
+            alreadyRefunded
+            existingRequest={refundRequest}
+          />
+        </section>
       ) : null}
     </div>
   );

@@ -16,10 +16,12 @@ import { fetchBrokerOrderPayload } from "@/app/lib/orders/customerOrderInstall";
 import {
   fetchProviderUsage,
   normalizeProviderUsagePayload,
+  persistOrderProviderLifecycleCache,
   readUsageCapability,
   type CustomerUsageSnapshot,
 } from "@/app/lib/orders/customerEsimUsage";
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
+import { RefundRequestStatus, WalletEsimPurchaseStatus } from "@prisma/client";
 
 export type AdminUsageErrorCode =
   | "NOT_FOUND"
@@ -77,9 +79,31 @@ export async function getAdminOrderUsage(
       id: true,
       providerOrderId: true,
       iccidEncrypted: true,
+      walletEsimPurchase: { select: { status: true } },
+      partnerEsimPurchase: { select: { status: true } },
+      refundRequests: {
+        where: { status: RefundRequestStatus.COMPLETED },
+        select: { id: true },
+        take: 1,
+      },
+      partnerRefundRequests: {
+        where: { status: RefundRequestStatus.COMPLETED },
+        select: { id: true },
+        take: 1,
+      },
     },
   });
   if (!order) {
+    return { ok: false, code: "NOT_FOUND" };
+  }
+
+  const refunded =
+    order.walletEsimPurchase?.status ===
+      WalletEsimPurchaseStatus.FAILED_REFUNDED ||
+    order.partnerEsimPurchase?.status === "FAILED_REFUNDED" ||
+    order.refundRequests.length > 0 ||
+    order.partnerRefundRequests.length > 0;
+  if (refunded) {
     return { ok: false, code: "NOT_FOUND" };
   }
 
@@ -132,6 +156,8 @@ export async function getAdminOrderUsage(
   if (!normalized) {
     return { ok: false, code: "TEMPORARY_ERROR" };
   }
+
+  await persistOrderProviderLifecycleCache(order.id, normalized);
 
   return {
     ok: true,

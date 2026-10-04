@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { RefreshCw, Signal } from "lucide-react";
 
 type UsagePayload = {
@@ -120,6 +121,7 @@ export default function CustomerEsimUsagePanel({
   compact = false,
   addDataEligible = false,
 }: Props) {
+  const router = useRouter();
   const headingId = useId();
   const [open, setOpen] = useState(Boolean(autoOpen && usageEligible));
   const [loading, setLoading] = useState(false);
@@ -199,13 +201,15 @@ export default function CustomerEsimUsagePanel({
             ? json.usage.isExpired
             : null,
       });
+      // Refresh RSC payloads so cached lifecycle badges update on the page.
+      router.refresh();
     } catch {
       setUsage(null);
       setError("Usage is temporarily unavailable. Please try again later.");
     } finally {
       setLoading(false);
     }
-  }, [orderId, usagePath]);
+  }, [orderId, usagePath, router]);
 
   const openAndLoad = useCallback(async () => {
     setOpen(true);
@@ -283,7 +287,7 @@ export default function CustomerEsimUsagePanel({
               className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_16px_rgba(0,0,0,0.14)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 disabled:opacity-60 sm:w-auto"
             >
               <Signal className="h-4 w-4" aria-hidden="true" />
-              {loading ? "Loading…" : compact ? "Check Usage" : "View usage"}
+              {loading ? "Loading…" : "Refresh Status"}
             </button>
           ) : (
             <button
@@ -296,7 +300,7 @@ export default function CustomerEsimUsagePanel({
                 className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
                 aria-hidden="true"
               />
-              {loading ? "Refreshing…" : "Refresh usage"}
+              {loading ? "Refreshing…" : "Refresh Status"}
             </button>
           )}
         </div>

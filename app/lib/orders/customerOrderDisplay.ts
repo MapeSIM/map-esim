@@ -101,12 +101,16 @@ export function resolveCustomerEsimStatusBadge(input: {
   orderStatus: string;
   walletPurchaseStatus?: string | null;
   assignmentStatus?: string | null;
+  /** True when a customer RefundRequest is COMPLETED for this order. */
+  hasCompletedRefund?: boolean;
 }): CustomerEsimStatusBadge {
   const purchase = (input.walletPurchaseStatus ?? "").trim();
   const assignment = (input.assignmentStatus ?? "").trim();
   const order = (input.orderStatus ?? "").trim();
 
-  if (purchase === "FAILED_REFUNDED") return "Refunded";
+  if (input.hasCompletedRefund === true || purchase === "FAILED_REFUNDED") {
+    return "Refunded";
+  }
   if (
     purchase === "RECONCILIATION_REQUIRED" ||
     assignment === "RECONCILIATION_REQUIRED"
