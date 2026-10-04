@@ -36,7 +36,7 @@ type Props = {
   orderId: string;
   installEligible: boolean;
   iccidMasked: string;
-  iccidRevealable: boolean;
+  iccid: string | null;
   hasActiveShareToken: boolean;
   partnerDisplayName?: string | null;
   destination: string | null;
@@ -51,7 +51,7 @@ export default function PartnerEsimInstallPanel({
   orderId,
   installEligible,
   iccidMasked,
-  iccidRevealable,
+  iccid,
   hasActiveShareToken,
   partnerDisplayName = null,
   destination,
@@ -276,9 +276,8 @@ export default function PartnerEsimInstallPanel({
 
       <IccidRevealPanel
         orderId={orderId}
-        maskedLabel={iccidMasked}
-        revealable={iccidRevealable}
-        revealPath={`/api/partner/orders/${encodeURIComponent(orderId)}/iccid`}
+        iccid={iccid}
+        unavailableLabel={iccidMasked}
         compact
       />
     </div>

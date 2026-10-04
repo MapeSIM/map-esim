@@ -118,7 +118,7 @@ export default async function AdminRefundRequestDetailPage({
           label="Reconciliation state"
           value={detail.reconciliationState || "Not available"}
         />
-        <DetailRow label="ICCID (masked)" value={detail.iccidMasked} />
+        <DetailRow label="ICCID" value={detail.iccidMasked} />
         <DetailRow
           label="Customer note"
           value={detail.customerNote || "None"}

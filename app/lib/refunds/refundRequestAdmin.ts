@@ -8,6 +8,7 @@ import {
   refundStatusLabel,
 } from "@/app/lib/refunds/refundRequestConstants";
 import { shortCustomerOrderReference } from "@/app/lib/orders/customerOrderDisplay";
+import { resolveOrderIccidPlaintext } from "@/app/lib/orders/orderIccidResolve";
 import { hasSuccessfulVesimReviewEmail } from "@/app/lib/refunds/refundRequestVesimReview";
 
 function formatDate(date: Date): string {
@@ -180,9 +181,8 @@ export async function getAdminRefundRequestDetail(
   if (!row) return null;
 
   const purchase = row.order.walletEsimPurchase;
-  const last4 = (row.order.iccidLast4 ?? "").replace(/\D+/g, "");
-  const iccidMasked =
-    last4.length === 4 ? `•••• ${last4}` : "Not available";
+  const iccidPlain = await resolveOrderIccidPlaintext(row.order.id);
+  const iccidMasked = iccidPlain ?? "Not available";
 
   const openForReview =
     row.status === RefundRequestStatus.REQUESTED ||

@@ -226,8 +226,8 @@ async function main() {
     assert.equal(rowA!.partnerDebitLabel, "$9.00 USD"); // 10% off
     assert.equal(rowA!.iccidRevealable, true);
     assert.equal(typeof rowA!.hasActiveShareToken, "boolean");
-    assert.equal(rowA!.iccidMasked.includes(SAMPLE_ICCID), false);
-    assert.match(rowA!.iccidMasked, /•|Pending|Not provided/);
+    assert.equal(rowA!.iccid, SAMPLE_ICCID);
+    assert.equal(rowA!.iccidMasked, SAMPLE_ICCID);
     console.log("PASS A_partner_sees_own_completed_order");
 
     // B. Partner A cannot see Partner B order (create B order first)
@@ -314,27 +314,31 @@ async function main() {
       path.join(root, "app/components/partner/PartnerEsimInstallPanel.tsx"),
       "utf8"
     );
-    assert.doesNotMatch(listPageSrc, /IccidRevealPanel|Show full ICCID/);
+    assert.doesNotMatch(listPageSrc, /Show full ICCID|Hide ICCID/);
     assert.match(
       cardSrc,
       /\/api\/partner\/orders\/\$\{encodeURIComponent\(row\.orderId\)\}\/usage/
     );
     assert.doesNotMatch(ordersLibSrc, /decryptIccid/);
+    assert.match(ordersLibSrc, /loadOrderIccidPlaintextMap|resolveOrderIccidPlaintext/);
     assert.match(detailPageSrc, /PartnerEsimOrderCard/);
-    assert.match(
-      installSrc,
-      /\/api\/partner\/orders\/\$\{encodeURIComponent\(orderId\)\}\/iccid/
-    );
+    assert.match(installSrc, /IccidRevealPanel/);
+    assert.match(installSrc, /iccid=\{iccid\}/);
+    assert.doesNotMatch(installSrc, /Show full ICCID|\/iccid\//);
     for (const blob of [
       JSON.stringify(listA2),
       JSON.stringify(
         await getPartnerOwnedOrderDetail(partnerAUserId, orderAId)
       ),
     ]) {
-      assert.equal(blob.includes(SAMPLE_ICCID), false);
       assert.equal(blob.includes("providerCostCents"), false);
     }
-    console.log("PASS F_no_full_iccid_in_list_or_static_dto");
+    const detailForIccid = await getPartnerOwnedOrderDetail(
+      partnerAUserId,
+      orderAId
+    );
+    assert.equal(detailForIccid?.iccid, SAMPLE_ICCID);
+    console.log("PASS F_full_iccid_in_owned_dto_no_provider_cost");
 
     // G + H. provider cost hidden; immutable retail + Partner debit
     const detailA = await getPartnerOwnedOrderDetail(partnerAUserId, orderAId);

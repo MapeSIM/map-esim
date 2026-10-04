@@ -104,6 +104,7 @@ export default async function PartnerOrderDetailPage({
           statusBadge: detail.statusBadge,
           purchasedAtLabel: detail.purchasedAtLabel,
           iccidMasked: detail.iccidMasked,
+          iccid: detail.iccid,
           iccidRevealable: detail.iccidRevealable,
           hasActiveShareToken: hasActiveToken,
           addDataEligible: detail.addDataEligible,

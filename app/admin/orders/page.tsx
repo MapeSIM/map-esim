@@ -242,6 +242,9 @@ export default async function AdminOrdersPage({
                         Shared with source
                       </span>
                     ) : null}
+                    {order.iccid ? (
+                      <span className="sr-only">Full ICCID available</span>
+                    ) : null}
                   </div>
                 </td>
                 <td className="px-3 py-3">

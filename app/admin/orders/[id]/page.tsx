@@ -47,10 +47,6 @@ export default async function AdminOrderDetailPage({
 }) {
   const admin = await requireRole("ADMIN");
   const access = await loadAdminAccess(admin.id);
-  const canRevealIccid = hasAdminPermission(
-    access?.permissions ?? [],
-    ["ESIM_FULFILLMENT", "ORDERS_MANAGE"]
-  );
   const canFulfill = hasAdminPermission(
     access?.permissions ?? [],
     "ESIM_FULFILLMENT"
@@ -223,16 +219,11 @@ export default async function AdminOrderDetailPage({
           }
         />
         <DetailRow label="Claimed at" value={detail.claimedAtLabel} />
-        {canRevealIccid ? (
-          <IccidRevealPanel
-            orderId={detail.id}
-            maskedLabel={detail.iccidHint}
-            revealable={detail.iccidRevealable}
-            revealPath={`/api/admin/orders/${encodeURIComponent(detail.id)}/iccid`}
-          />
-        ) : (
-          <DetailRow label="ICCID" value={detail.iccidHint} />
-        )}
+        <IccidRevealPanel
+          orderId={detail.id}
+          iccid={detail.iccid}
+          unavailableLabel={detail.iccidHint}
+        />
       </dl>
 
       <section className="min-w-0 space-y-3" aria-labelledby="admin-usage-heading">

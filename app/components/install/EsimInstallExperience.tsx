@@ -43,7 +43,7 @@ export type EsimInstallExperienceProps = {
   smdpAddress?: string | null;
   activationCode?: string | null;
   lpa?: string | null;
-  /** Only pass when already authorized for this surface (e.g. masked on /success). */
+  /** Full ICCID when already authorized for this surface. */
   iccid?: string | null;
   manualInstallText?: string | null;
   /** Parent may own the primary Install eSIM button (customer lazy-load). */

@@ -343,15 +343,14 @@ export default async function AccountOrderDetailPage({
             ICCID
           </h2>
           <p className="text-xs text-[var(--text-soft)]">
-            Secure reveal for this order only
+            Full ICCID for this order. Copy when you need it.
           </p>
         </div>
         <div className="px-4 py-1.5 sm:px-5">
           <IccidRevealPanel
             orderId={detail.id}
-            maskedLabel={detail.iccidMasked}
-            revealable={detail.iccidRevealable}
-            revealPath={`/api/account/orders/${encodeURIComponent(detail.id)}/iccid`}
+            iccid={detail.iccid}
+            unavailableLabel={detail.iccidMasked}
           />
         </div>
       </section>

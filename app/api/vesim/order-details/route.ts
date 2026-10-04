@@ -6,7 +6,10 @@ import {
   hasInstallDetails,
 } from "@/app/lib/email/extract";
 import { captureIccidForProviderOrder } from "@/app/lib/orders/iccidCapture";
-import { maskIccidLast4 } from "@/app/lib/orders/iccidCrypto";
+import {
+  normalizeIccid,
+  validateIccid,
+} from "@/app/lib/orders/iccidCrypto";
 import { buildSafeInstallActions } from "@/app/lib/vesim/installActions";
 import { authorizeOrderAccess } from "@/app/lib/vesim/orderAccess";
 import {
@@ -118,10 +121,14 @@ export async function GET(req: NextRequest) {
       accessToken
     );
 
-    // Public/guest JSON: masked ICCID only — full value stays server-side (email).
-    const iccidMasked = install.iccid
-      ? maskIccidLast4(install.iccid)
-      : undefined;
+    // Authorized order-details recipients see full ICCID (access-token gated).
+    const normalizedIccid = install.iccid
+      ? normalizeIccid(install.iccid)
+      : "";
+    const iccid =
+      normalizedIccid && validateIccid(normalizedIccid)
+        ? normalizedIccid
+        : undefined;
 
     const safeOrder = {
       orderId: resolvedOrderId,
@@ -145,7 +152,9 @@ export async function GET(req: NextRequest) {
         payload.total
       ),
       status: firstString(payload.status),
-      iccidMasked,
+      iccid,
+      // Legacy field — same full value when present (no longer masked).
+      iccidMasked: iccid,
       smdpAddress: install.smdpAddress,
       activationCode: install.activationCode,
       qrValue: install.qrValue,

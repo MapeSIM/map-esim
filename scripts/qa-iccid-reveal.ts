@@ -1,5 +1,6 @@
 /**
- * Offline QA for secure ADMIN + owning-CUSTOMER ICCID reveal.
+ * Offline QA for always-visible ICCID display (admin + customer).
+ * Reveal APIs remain authorized for legacy/audit; UI shows plaintext + Copy.
  * Does not call VeSIM, decrypt production data, or mutate the database.
  */
 import assert from "node:assert/strict";
@@ -23,6 +24,7 @@ function main() {
   const customerDetail = read("app/account/orders/[orderId]/page.tsx");
   const customerOrders = read("app/lib/orders/customerOrders.ts");
   const customerList = read("app/account/orders/page.tsx");
+  const resolver = read("app/lib/orders/orderIccidResolve.ts");
   const pkg = read("package.json");
 
   assert.match(reveal, /import "server-only"/);
@@ -56,32 +58,32 @@ function main() {
   console.log("PASS customer_api_owner_only");
 
   assert.match(panel, /"use client"/);
-  assert.match(panel, /Show full ICCID/);
   assert.match(panel, /Copy ICCID/);
-  assert.match(panel, /Hide ICCID/);
-  assert.match(panel, /AUTO_HIDE_MS\s*=\s*60_000/);
-  assert.match(panel, /method:\s*"POST"/);
-  assert.match(panel, /cache:\s*"no-store"/);
-  assert.match(panel, /disabled=\{!revealable/);
-  console.log("PASS reveal_copy_hide_ui");
+  assert.match(panel, /Always-visible ICCID|always shown/i);
+  assert.doesNotMatch(panel, /Show full ICCID|Hide ICCID|AUTO_HIDE_MS/);
+  assert.doesNotMatch(panel, /method:\s*"POST"|revealPath|revealable/);
+  assert.match(panel, /navigator\.clipboard\.writeText/);
+  console.log("PASS always_visible_copy_ui");
 
+  assert.match(resolver, /resolveOrderIccidPlaintext/);
+  assert.match(resolver, /loadOrderIccidPlaintextMap/);
   assert.match(adminDetail, /IccidRevealPanel/);
-  assert.match(adminDetail, /iccidRevealable/);
-  assert.match(adminDetail, /\/api\/admin\/orders\//);
-  assert.doesNotMatch(adminDetail, /decryptIccid/);
+  assert.match(adminDetail, /iccid=\{detail\.iccid\}/);
+  assert.doesNotMatch(adminDetail, /decryptIccid|canRevealIccid|Show full ICCID/);
+  assert.match(adminOrders, /loadOrderIccidPlaintextMap|resolveOrderIccidPlaintext/);
   assert.match(adminOrders, /iccidRevealable/);
-  assert.match(adminOrders, /Boolean\(row\.iccidEncrypted/);
   assert.doesNotMatch(adminOrders, /decryptIccid/);
   assert.doesNotMatch(adminList, /IccidRevealPanel|Show full ICCID/);
   assert.match(adminList, /iccidMasked/);
   console.log("PASS admin_detail_list_rules");
 
   assert.match(customerDetail, /IccidRevealPanel/);
-  assert.match(customerDetail, /iccidRevealable/);
-  assert.match(customerDetail, /\/api\/account\/orders\//);
+  assert.match(customerDetail, /iccid=\{detail\.iccid\}/);
+  assert.doesNotMatch(customerDetail, /Show full ICCID|Secure reveal/);
   assert.match(customerOrders, /iccidMasked/);
+  assert.match(customerOrders, /loadOrderIccidPlaintextMap|resolveOrderIccidPlaintext/);
   assert.match(customerOrders, /userId:\s*owner\.id/);
-  assert.match(customerList, /iccidMasked/);
+  assert.match(customerList, /iccidMasked|CustomerEsimOrderCard/);
   assert.doesNotMatch(customerList, /IccidRevealPanel|Show full ICCID|decryptIccid/);
   assert.doesNotMatch(customerOrders, /fetchBrokerOrderPayload|decryptIccid/);
   console.log("PASS customer_detail_list_rules");

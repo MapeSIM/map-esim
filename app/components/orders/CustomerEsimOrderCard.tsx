@@ -23,7 +23,9 @@ export type CustomerEsimOrderCardOrder = {
   statusBadge: CustomerEsimStatusBadge;
   amountLabel: string;
   createdAtLabel: string;
+  /** Full plaintext ICCID when stored; otherwise pending/not-provided label. */
   iccidMasked: string;
+  iccid?: string | null;
   emailDeliveryLabel: string | null;
   /** Read-model gate — show Add More Data CTA only when true. */
   addDataEligible?: boolean;

@@ -1,7 +1,8 @@
 /**
  * Partner Orders list + detail reads.
  * Ownership: PartnerEsimPurchase.partnerId === active Partner profile id.
- * Never returns provider cost, discount internals, or full ICCID.
+ * Never returns provider cost or discount internals.
+ * Authenticated Partner views receive full plaintext ICCID when stored.
  */
 import "server-only";
 
@@ -11,10 +12,14 @@ import {
   RefundRequestStatus,
   Role,
 } from "@prisma/client";
-import { formatStoredIccidLast4 } from "@/app/lib/admin/display";
 import { prisma } from "@/app/lib/db";
 import { resolveAddDataPurchaseLabel } from "@/app/lib/esim/addDataCheckout";
 import { customerFlagImageUrl } from "@/app/lib/orders/customerOrderDisplay";
+import {
+  iccidUnavailableLabel,
+  loadOrderIccidPlaintextMap,
+  resolveOrderIccidPlaintext,
+} from "@/app/lib/orders/orderIccidResolve";
 import {
   formatLifecycleGb,
   toProviderLifecycleCacheView,
@@ -41,19 +46,6 @@ import {
 import { formatUsdCents } from "@/app/lib/wallet/display";
 import { normalizeOfferId } from "@/app/lib/vesim/server";
 
-function partnerIccidMasked(
-  last4: string | null | undefined,
-  hasEncrypted: boolean,
-  orderStatus: OrderStatus
-): string {
-  const digits = (last4 ?? "").replace(/\D+/g, "");
-  if (digits.length === 4) {
-    return formatStoredIccidLast4(digits);
-  }
-  if (hasEncrypted) return "••••••••••••••••";
-  if (orderStatus === OrderStatus.FAILED) return "Not provided";
-  return "Pending from provider";
-}
 
 export type PartnerOrderListRow = {
   purchaseId: string;
@@ -68,9 +60,11 @@ export type PartnerOrderListRow = {
   partnerDebitLabel: string;
   statusBadge: PartnerOrderStatusBadge;
   purchasedAtLabel: string;
-  /** Masked last-4 or pending — never plaintext. */
+  /** Full plaintext ICCID when stored; otherwise pending/not-provided label. */
   iccidMasked: string;
-  /** True only when encrypted ICCID is stored. */
+  /** Full plaintext ICCID only — null when unavailable. */
+  iccid: string | null;
+  /** True when a full ICCID is available for display. */
   iccidRevealable: boolean;
   /** Boolean-only; never a raw share token. */
   hasActiveShareToken: boolean;
@@ -199,6 +193,11 @@ export async function listPartnerOrdersPage(
     select: partnerPurchaseListSelect,
   });
 
+  const iccidByOrderId = await loadOrderIccidPlaintextMap(
+    completedPurchases
+      .map((row) => row.order?.id)
+      .filter((id): id is string => Boolean(id))
+  );
   const orders: PartnerOrderListRow[] = [];
 
   for (const row of completedPurchases) {
@@ -244,6 +243,7 @@ export async function listPartnerOrdersPage(
       providerOrderId,
     });
     const addDataPurchase = resolveAddDataPurchaseLabel(row.idempotencyKey);
+    const iccid = iccidByOrderId.get(row.order.id) ?? null;
 
     orders.push({
       purchaseId: row.id,
@@ -258,12 +258,9 @@ export async function listPartnerOrdersPage(
       partnerDebitLabel,
       statusBadge,
       purchasedAtLabel,
-      iccidMasked: partnerIccidMasked(
-        row.order.iccidLast4,
-        Boolean(row.order.iccidEncrypted?.trim()),
-        row.order.status
-      ),
-      iccidRevealable: Boolean(row.order.iccidEncrypted?.trim()),
+      iccidMasked: iccid ?? iccidUnavailableLabel(row.order.status),
+      iccid,
+      iccidRevealable: Boolean(iccid),
       hasActiveShareToken: false,
       addDataEligible,
       isAddDataPurchase: addDataPurchase.isAddDataPurchase,
@@ -318,9 +315,11 @@ export type PartnerOrderDetail = {
   purchasedAtLabel: string;
   retailPriceLabel: string;
   partnerDebitLabel: string;
-  /** Masked last-4 or pending — never plaintext. */
+  /** Full plaintext ICCID when stored; otherwise pending/not-provided label. */
   iccidMasked: string;
-  /** True only when encrypted ICCID is stored. */
+  /** Full plaintext ICCID only — null when unavailable. */
+  iccid: string | null;
+  /** True when a full ICCID is available for display. */
   iccidRevealable: boolean;
   purchaseId: string;
   /** Same gates as customer/admin Add More Data (no provider ids exposed). */
@@ -430,7 +429,7 @@ export async function getPartnerOwnedOrderDetail(
   if (!purchase?.order) return null;
 
   const order = purchase.order;
-  const encrypted = Boolean(order.iccidEncrypted?.trim());
+  const iccid = await resolveOrderIccidPlaintext(order.id);
 
   // Eligibility only — providerOrderId / offerId stay off the Partner DTO.
   const hasCompletedRefund = purchase.refundRequests.length > 0;
@@ -487,12 +486,9 @@ export async function getPartnerOwnedOrderDetail(
     ),
     retailPriceLabel: `${formatUsdCents(purchase.retailPriceCents)} USD`,
     partnerDebitLabel: `${formatUsdCents(purchase.partnerChargeCents)} USD`,
-    iccidMasked: partnerIccidMasked(
-      order.iccidLast4,
-      encrypted,
-      order.status
-    ),
-    iccidRevealable: encrypted,
+    iccidMasked: iccid ?? iccidUnavailableLabel(order.status),
+    iccid,
+    iccidRevealable: Boolean(iccid),
     purchaseId: purchase.id,
     addDataEligible: addData.addDataEligible,
     addDataBlockedReason: addData.addDataBlockedReason,

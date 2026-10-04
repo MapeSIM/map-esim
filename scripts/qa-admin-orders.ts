@@ -55,12 +55,13 @@ function main() {
   assert.ok(!/orderAccess|createOrderAccessToken|broker\/orders/i.test(ordersSrc));
   assert.ok(!/qrValue|activationCode|smDpAddress|matchingId/i.test(ordersSrc));
   assert.match(ordersSrc, /customerEmail/);
-  assert.match(ordersSrc, /Pending from provider/);
+  assert.match(ordersSrc, /iccidUnavailableLabel/);
   assert.match(ordersSrc, /iccidLast4/);
   assert.match(ordersSrc, /iccidRevealable/);
   assert.match(ordersSrc, /iccidHash/);
   assert.match(ordersSrc, /hashIccid/);
-  assert.match(ordersSrc, /loadAddDataSourceIccidLast4Map/);
+  assert.match(ordersSrc, /loadOrderIccidPlaintextMap/);
+  assert.match(ordersSrc, /resolveOrderIccidPlaintext/);
   assert.match(ordersSrc, /getAdminCustomerRecentOrders/);
   assert.match(ordersSrc, /userId:\s*customer\.id/);
   assert.ok(!/decryptIccid/.test(ordersSrc));

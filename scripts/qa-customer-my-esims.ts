@@ -184,11 +184,11 @@ function main() {
   assert.match(ordersLib, /import "server-only"/);
   assert.match(ordersLib, /OrderWhereInput = \{ userId \}/);
   assert.match(ordersLib, /userId:\s*owner\.id/);
-  assert.match(ordersLib, /iccidLast4/);
   assert.match(ordersLib, /iccidMasked/);
+  assert.match(ordersLib, /loadOrderIccidPlaintextMap|resolveOrderIccidPlaintext/);
   assert.doesNotMatch(ordersLib, /fetchBrokerOrderPayload/);
   assert.doesNotMatch(ordersLib, /decryptIccid/);
-  assert.match(ordersLib, /Boolean\(.*iccidEncrypted/);
+  assert.match(ordersLib, /Boolean\(iccid\)|iccidRevealable:\s*Boolean\(iccid\)/);
   assert.doesNotMatch(
     ordersLib,
     /qrValue|activationCode|smdpAddress|manualInstallText/
@@ -203,9 +203,10 @@ function main() {
     detailPage,
     /smdpAddress|activationCode|qrValue|manualInstallText|fetchBrokerOrderPayload/
   );
-  assert.match(revealPanel, /Show full ICCID/);
-  assert.match(revealPanel, /AUTO_HIDE_MS/);
-  console.log("PASS detail_secure_reveal_and_install_panel");
+  assert.match(revealPanel, /Copy ICCID/);
+  assert.doesNotMatch(revealPanel, /Show full ICCID|Hide ICCID|AUTO_HIDE_MS/);
+  assert.match(ordersLib, /loadOrderIccidPlaintextMap|resolveOrderIccidPlaintext/);
+  console.log("PASS detail_always_visible_iccid_and_install_panel");
 
   assert.match(installApi, /authorizeCustomerOwnedOrderInstall/);
   assert.match(installApi, /Cache-Control": "private, no-store"|private, no-store/);

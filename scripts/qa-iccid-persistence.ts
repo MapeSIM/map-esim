@@ -235,15 +235,19 @@ async function main() {
   assert.match(guestRoute, /checkoutPayload:\s*checkoutData/);
   assert.match(guestRoute, /isGuestVesimCheckoutEnabled/);
   assert.match(deliver, /captureIccidForProviderOrder/);
-  assert.match(orderDetails, /iccidMasked,/);
-  assert.ok(
-    !/const safeOrder = \{[\s\S]*?\biccid:\s*install\.iccid/.test(orderDetails),
-    "safeOrder must not expose full install.iccid"
-  );
+  assert.match(orderDetails, /iccidMasked:\s*iccid/);
+  assert.match(orderDetails, /\biccid,/);
   assert.match(orderDetails, /"Cache-Control":\s*"private, no-store/);
-  assert.match(adminOrders, /formatStoredIccidLast4|adminIccidDisplay/);
-  assert.match(adminOrders, /Pending from provider/);
-  assert.doesNotMatch(adminOrders, /On file \(hidden\)/);
+  assert.match(
+    adminOrders,
+    /loadOrderIccidPlaintextMap|resolveOrderIccidPlaintext/
+  );
+  assert.match(adminOrders, /iccidUnavailableLabel/);
+  assert.match(
+    read("app/lib/orders/orderIccidResolve.ts"),
+    /Pending from provider/
+  );
+  assert.doesNotMatch(adminOrders, /On file \(hidden\)|adminIccidDisplay/);
   assert.match(cryptoSrc, /import "server-only"/);
   const cryptoCoreSrc = read("app/lib/orders/iccidCryptoCore.ts");
   assert.match(cryptoCoreSrc, /aes-256-gcm/i);
@@ -257,19 +261,16 @@ async function main() {
   assert.doesNotMatch(backfill, /console\.log\([^\n]*iccid/i);
   assert.match(pkg, /qa:iccid-persistence/);
 
-  console.log("8) no plaintext ICCID in public success path");
+  console.log("8) success path accepts authorized full ICCID payload");
   const success = read("app/success/page.tsx");
+  assert.match(success, /payload\.iccid/);
   assert.match(success, /iccidMasked/);
-  assert.doesNotMatch(success, /payload\.iccid\b/);
 
-  // Ensure sample ICCID bytes never appear in serialized "public" mock response shape.
-  const publicJson = JSON.stringify({
-    success: true,
-    order: { iccidMasked: masked },
-  });
-  assert.ok(!publicJson.includes(SAMPLE_ICCID));
+  // Mask helper still exists for last-4 search/display utilities.
+  assert.ok(masked.includes("3456"));
+  assert.ok(!masked.startsWith("890123456789"));
   assert.ok(
-    !createHash("sha256").update(publicJson).digest("hex").includes(SAMPLE_ICCID)
+    !createHash("sha256").update(masked).digest("hex").includes(SAMPLE_ICCID)
   );
 
   console.log("ALL_QA_PASSED=iccid-persistence");

@@ -287,7 +287,7 @@ export default function PartnerEsimOrderCard({
               orderId={row.orderId}
               installEligible
               iccidMasked={row.iccidMasked}
-              iccidRevealable={row.iccidRevealable}
+              iccid={row.iccid}
               hasActiveShareToken={row.hasActiveShareToken}
               partnerDisplayName={partnerDisplayName}
               destination={row.destination}

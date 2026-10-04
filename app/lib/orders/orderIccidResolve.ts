@@ -1,6 +1,6 @@
 /**
  * Resolve stored ICCID for an order, with Add More Data source fallback.
- * Never logs or returns ciphertext. Plaintext is for server-side VeSIM GETs only.
+ * Never logs ciphertext. Plaintext may be returned to authenticated order UIs.
  */
 import "server-only";
 
@@ -25,6 +25,14 @@ function decryptStoredIccid(
   } catch {
     return null;
   }
+}
+
+/** Pending / missing label when no plaintext ICCID is available. */
+export function iccidUnavailableLabel(
+  orderStatus: string | null | undefined
+): string {
+  if ((orderStatus ?? "").trim() === "FAILED") return "Not provided";
+  return "Pending from provider";
 }
 
 /**
@@ -120,6 +128,68 @@ export async function loadAddDataSourceIccidLast4Map(
   for (const row of rows) {
     const last4 = (row.iccidLast4 ?? "").replace(/\D+/g, "");
     if (last4.length === 4) out.set(row.id, last4);
+  }
+  return out;
+}
+
+/**
+ * Batch-resolve plaintext ICCIDs for order list/detail UIs.
+ * Includes Add More Data source fallback when the top-up row has no capture.
+ */
+export async function loadOrderIccidPlaintextMap(
+  orderIds: string[]
+): Promise<Map<string, string>> {
+  const ids = [
+    ...new Set(
+      orderIds
+        .map((id) => (id ?? "").trim())
+        .filter((id) => id && id.length <= 64 && /^[A-Za-z0-9_-]+$/.test(id))
+    ),
+  ];
+  const out = new Map<string, string>();
+  if (!ids.length || !isIccidEncryptionConfigured()) return out;
+
+  const rows = await prisma.order.findMany({
+    where: { id: { in: ids } },
+    select: {
+      id: true,
+      iccidEncrypted: true,
+      walletEsimPurchase: { select: { idempotencyKey: true } },
+      partnerEsimPurchase: { select: { idempotencyKey: true } },
+    },
+  });
+
+  const missingSourceByOrderId = new Map<string, string>();
+  for (const row of rows) {
+    const own = decryptStoredIccid(row.iccidEncrypted);
+    if (own) {
+      out.set(row.id, own);
+      continue;
+    }
+    const addData = resolveAddDataPurchaseLabel([
+      row.walletEsimPurchase?.idempotencyKey,
+      row.partnerEsimPurchase?.idempotencyKey,
+    ]);
+    if (addData.addDataSourceOrderId) {
+      missingSourceByOrderId.set(row.id, addData.addDataSourceOrderId);
+    }
+  }
+
+  const sourceIds = [...new Set(missingSourceByOrderId.values())];
+  if (!sourceIds.length) return out;
+
+  const sources = await prisma.order.findMany({
+    where: { id: { in: sourceIds } },
+    select: { id: true, iccidEncrypted: true },
+  });
+  const sourcePlain = new Map<string, string>();
+  for (const source of sources) {
+    const plain = decryptStoredIccid(source.iccidEncrypted);
+    if (plain) sourcePlain.set(source.id, plain);
+  }
+  for (const [orderId, sourceId] of missingSourceByOrderId) {
+    const plain = sourcePlain.get(sourceId);
+    if (plain) out.set(orderId, plain);
   }
   return out;
 }

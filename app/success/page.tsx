@@ -197,11 +197,13 @@ function SuccessContent() {
           priceUSD: firstNumber(payload.priceUSD) ?? undefined,
           status:
             typeof payload.status === "string" ? payload.status : undefined,
-          // Masked last-4 only — never accept a full ICCID from the API.
+          // Full ICCID when the authorized order-details payload includes it.
           iccid:
-            typeof payload.iccidMasked === "string"
-              ? payload.iccidMasked
-              : undefined,
+            typeof payload.iccid === "string"
+              ? payload.iccid
+              : typeof payload.iccidMasked === "string"
+                ? payload.iccidMasked
+                : undefined,
           smdpAddress:
             typeof payload.smdpAddress === "string"
               ? payload.smdpAddress

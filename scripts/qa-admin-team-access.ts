@@ -207,7 +207,7 @@ function main() {
   assert.match(fulfillment, /prepareWalletEsimPurchase/);
   assert.match(customerDetail, /canFulfill/);
   assert.match(customerDetail, /canAdjustWallet/);
-  assert.match(orderDetail, /canRevealIccid/);
+  assert.match(orderDetail, /IccidRevealPanel/);
   assert.match(orderDetail, /canFulfill && detail.addDataEligible/);
   assert.match(orderDetail, /canResendInstallEmail/);
   assert.match(orderDetail, /SUPPORT_EMAILS|ORDERS_MANAGE|INSTALL_ISSUES/);

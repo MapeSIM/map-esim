@@ -11,7 +11,6 @@ import {
 import {
   ADMIN_ORDERS_PAGE_SIZE,
   ADMIN_RECENT_ORDERS_LIMIT,
-  formatStoredIccidLast4,
   maskProviderOrderRef,
   normalizeAdminSearchQuery,
   normalizeAdminUserIdFilter,
@@ -35,7 +34,11 @@ import {
   normalizeIccid,
   validateIccid,
 } from "@/app/lib/orders/iccidCrypto";
-import { loadAddDataSourceIccidLast4Map } from "@/app/lib/orders/orderIccidResolve";
+import {
+  iccidUnavailableLabel,
+  loadOrderIccidPlaintextMap,
+  resolveOrderIccidPlaintext,
+} from "@/app/lib/orders/orderIccidResolve";
 import {
   formatLifecycleGb,
   toProviderLifecycleCacheView,
@@ -56,8 +59,10 @@ export type AdminOrderListRow = {
   localStatus: string;
   amountLabel: string;
   providerRefMasked: string;
-  /** Masked last-4 only — never plaintext or ciphertext. */
+  /** Full plaintext ICCID when stored; otherwise pending/not-provided label. */
   iccidMasked: string;
+  /** Full plaintext ICCID only — null when unavailable. */
+  iccid: string | null;
   associationLabel: "Linked customer" | "Guest order";
   fundingLabel: string;
   /** True when this order itself was created by an Add More Data top-up. */
@@ -101,9 +106,11 @@ export type AdminOrderDetail = {
   accountStatusLabel: string;
   claimStatusLabel: string;
   claimedAtLabel: string;
-  /** Never full ICCID — masked last-4, pending, or not provided */
+  /** Full plaintext ICCID when stored; otherwise pending/not-provided label. */
   iccidHint: string;
-  /** True only when encrypted ICCID is stored (never includes ciphertext). */
+  /** Full plaintext ICCID only — null when unavailable. */
+  iccid: string | null;
+  /** True when a full ICCID is available for display. */
   iccidRevealable: boolean;
   /** Linked customer user id when present; null for guest orders. */
   customerUserId: string | null;
@@ -137,20 +144,6 @@ export type AdminOrderDetail = {
   lifecycle: ProviderLifecycleCacheView;
   remainingDataLabel: string | null;
 };
-
-function adminIccidDisplay(
-  last4: string | null | undefined,
-  status: string
-): string {
-  const digits = (last4 ?? "").replace(/\D+/g, "");
-  if (digits.length === 4) {
-    return formatStoredIccidLast4(digits);
-  }
-  if (status === OrderStatus.FAILED) {
-    return "Not provided";
-  }
-  return "Pending from provider";
-}
 
 function fundingSourceLabel(
   fundingSource: string | null | undefined
@@ -358,19 +351,9 @@ export async function getAdminOrdersPage(
     },
   });
 
-  const addDataSourceIds: string[] = [];
-  for (const row of pageRows) {
-    const ownLast4 = (row.iccidLast4 ?? "").replace(/\D+/g, "");
-    if (ownLast4.length === 4) continue;
-    const label = resolveAddDataPurchaseLabel([
-      row.walletEsimPurchase?.idempotencyKey,
-      row.partnerEsimPurchase?.idempotencyKey,
-    ]);
-    if (label.addDataSourceOrderId) {
-      addDataSourceIds.push(label.addDataSourceOrderId);
-    }
-  }
-  const sourceLast4ById = await loadAddDataSourceIccidLast4Map(addDataSourceIds);
+  const iccidByOrderId = await loadOrderIccidPlaintextMap(
+    pageRows.map((row) => row.id)
+  );
 
   const rows: AdminOrderListRow[] = pageRows.map((row) => {
     const addDataPurchase = resolveAddDataPurchaseLabel([
@@ -393,13 +376,7 @@ export async function getAdminOrdersPage(
       providerLifecycleStatus: row.providerLifecycleStatus,
       providerRemainingDataGb: row.providerRemainingDataGb,
     });
-    const ownLast4 = (row.iccidLast4 ?? "").replace(/\D+/g, "");
-    const displayLast4 =
-      ownLast4.length === 4
-        ? ownLast4
-        : addDataPurchase.addDataSourceOrderId
-          ? sourceLast4ById.get(addDataPurchase.addDataSourceOrderId) ?? null
-          : null;
+    const iccid = iccidByOrderId.get(row.id) ?? null;
     return {
       id: row.id,
       createdAtLabel: formatCreatedAt(row.createdAt),
@@ -408,7 +385,8 @@ export async function getAdminOrdersPage(
       localStatus: displayOrUnavailable(row.status),
       amountLabel: formatOrderAmount(row.providerAmount, row.providerCurrency),
       providerRefMasked: maskProviderOrderRef(row.providerOrderId),
-      iccidMasked: adminIccidDisplay(displayLast4, row.status),
+      iccidMasked: iccid ?? iccidUnavailableLabel(row.status),
+      iccid,
       associationLabel: row.userId ? "Linked customer" : "Guest order",
       fundingLabel: fundingSourceLabel(row.fundingSource),
       isAddDataPurchase: addDataPurchase.isAddDataPurchase,
@@ -532,21 +510,9 @@ export async function getAdminOrderDetail(
     row.partnerEsimPurchase?.idempotencyKey,
   ]);
 
-  // Never decrypt or emit ICCID ciphertext/plaintext on this page.
-  // Add More Data top-ups may inherit the source order last-4 for display.
-  let displayLast4 = (row.iccidLast4 ?? "").replace(/\D+/g, "");
-  if (displayLast4.length !== 4 && addDataPurchase.addDataSourceOrderId) {
-    const sourceMap = await loadAddDataSourceIccidLast4Map([
-      addDataPurchase.addDataSourceOrderId,
-    ]);
-    displayLast4 =
-      sourceMap.get(addDataPurchase.addDataSourceOrderId) ?? "";
-  }
-  const iccidHint = adminIccidDisplay(
-    displayLast4.length === 4 ? displayLast4 : null,
-    row.status
-  );
-  const iccidRevealable = Boolean(row.iccidEncrypted?.trim());
+  const iccid = await resolveOrderIccidPlaintext(row.id);
+  const iccidHint = iccid ?? iccidUnavailableLabel(row.status);
+  const iccidRevealable = Boolean(iccid);
 
   const hasCompletedRefund =
     row.refundRequests.length > 0 ||
@@ -619,6 +585,7 @@ export async function getAdminOrderDetail(
       ? formatCreatedAt(row.claimedAt)
       : "Not available",
     iccidHint,
+    iccid,
     iccidRevealable,
     customerUserId: row.userId ?? null,
     providerOrderId,
@@ -650,14 +617,13 @@ export type AdminCustomerRecentOrderRow = {
   currencyLabel: string;
   fundingLabel: string;
   purchasedAtLabel: string;
-  /** Masked last-4, pending, or not provided — never plaintext/ciphertext. */
+  /** Full plaintext ICCID when stored; otherwise pending/not-provided label. */
   iccidMasked: string;
 };
 
 /**
  * Recent eSIM orders for a CUSTOMER profile. Call only after requireRole("ADMIN").
- * Scoped strictly by Order.userId. Never returns ICCID ciphertext/plaintext,
- * QR, activation codes, or provider payloads.
+ * Scoped strictly by Order.userId. Never returns ciphertext, QR, or activation secrets.
  */
 export async function getAdminCustomerRecentOrders(
   customerUserId: string,
@@ -694,14 +660,16 @@ export async function getAdminCustomerRecentOrders(
       providerAmount: true,
       providerCurrency: true,
       fundingSource: true,
-      iccidLast4: true,
     },
   });
+
+  const iccidByOrderId = await loadOrderIccidPlaintextMap(rows.map((r) => r.id));
 
   return rows.map((row) => {
     const amount = row.displayAmount ?? row.providerAmount;
     const currency = row.displayCurrency ?? row.providerCurrency;
     const currencyCode = (currency ?? "").trim().toUpperCase() || "USD";
+    const iccid = iccidByOrderId.get(row.id) ?? null;
     return {
       id: row.id,
       destination: displayOrUnavailable(row.destination),
@@ -713,7 +681,7 @@ export async function getAdminCustomerRecentOrders(
       currencyLabel: currencyCode,
       fundingLabel: fundingSourceLabel(row.fundingSource),
       purchasedAtLabel: formatCreatedAt(row.createdAt),
-      iccidMasked: adminIccidDisplay(row.iccidLast4, row.status),
+      iccidMasked: iccid ?? iccidUnavailableLabel(row.status),
     };
   });
 }

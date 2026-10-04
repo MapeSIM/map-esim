@@ -26,10 +26,11 @@ function main() {
   assert.match(ordersLib, /userId:\s*customer\.id/);
   assert.match(ordersLib, /role:\s*Role\.CUSTOMER/);
   assert.match(ordersLib, /iccidMasked/);
+  assert.match(ordersLib, /loadOrderIccidPlaintextMap/);
   const recentFnStart = ordersLib.indexOf("getAdminCustomerRecentOrders");
   assert.ok(recentFnStart > 0);
   const recentFn = ordersLib.slice(recentFnStart);
-  assert.match(recentFn, /iccidLast4:\s*true/);
+  assert.match(recentFn, /loadOrderIccidPlaintextMap/);
   assert.doesNotMatch(recentFn, /iccidEncrypted/);
   assert.doesNotMatch(
     ordersLib,
@@ -70,8 +71,10 @@ function main() {
   console.log("PASS customer_detail_ui");
 
   assert.match(layout, /requireRole\("ADMIN"\)/);
-  assert.match(nextConfig, /source: "\/admin\/:path\*"/);
-  assert.match(nextConfig, /private, no-store/);
+  assert.match(nextConfig, /buildNextConfigHeaderSources/);
+  const headerSources = read("app/lib/security/headers.ts");
+  assert.match(headerSources, /\/admin\/:path\*/);
+  assert.match(headerSources, /private, no-store/);
   console.log("PASS admin_auth_and_no_store");
 
   assert.match(schema, /model WalletEsimPurchase/);

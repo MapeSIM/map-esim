@@ -12,7 +12,11 @@ import {
   toProviderLifecycleCacheView,
   type ProviderLifecycleCacheView,
 } from "@/app/lib/orders/providerLifecycleShared";
-import { formatStoredIccidLast4 } from "@/app/lib/admin/display";
+import {
+  iccidUnavailableLabel,
+  loadOrderIccidPlaintextMap,
+  resolveOrderIccidPlaintext,
+} from "@/app/lib/orders/orderIccidResolve";
 import { prisma } from "@/app/lib/db";
 import { resolveAddDataPurchaseLabel } from "@/app/lib/esim/addDataCheckout";
 import {
@@ -65,20 +69,6 @@ function decimalToNumber(
   if (value == null) return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
-}
-
-function customerIccidDisplay(
-  last4: string | null | undefined,
-  status: string,
-  hasEncrypted: boolean
-): string {
-  const digits = (last4 ?? "").replace(/\D+/g, "");
-  if (digits.length === 4) {
-    return formatStoredIccidLast4(digits);
-  }
-  if (hasEncrypted) return "••••••••••••••••";
-  if (status === OrderStatus.FAILED) return "Not provided";
-  return "Pending from provider";
 }
 
 /** Why Add More Data is blocked — null when eligible. */
@@ -277,8 +267,10 @@ export type CustomerOrderListRow = {
   currencyLabel: string;
   fundingLabel: string;
   createdAtLabel: string;
-  /** Masked last-4 or pending — never plaintext/ciphertext. */
+  /** Full plaintext ICCID when stored; otherwise pending/not-provided label. */
   iccidMasked: string;
+  /** Full plaintext ICCID only — null when unavailable. */
+  iccid: string | null;
   emailDeliveryLabel: string | null;
   installEligible: boolean;
   isRefunded: boolean;
@@ -555,6 +547,7 @@ export async function listCustomerOrders(
       },
     });
 
+  const iccidByOrderId = await loadOrderIccidPlaintextMap(rows.map((r) => r.id));
   const mapped: CustomerOrderListRow[] = [];
 
   for (const row of rows) {
@@ -569,11 +562,9 @@ export async function listCustomerOrders(
     // Safety net — approximate DB status filters may include edge cases.
     if (!customerStatusMatchesFilter(statusBadge, status)) continue;
 
-    const iccidMasked = customerIccidDisplay(
-      row.iccidLast4,
-      row.status,
-      Boolean(row.iccidEncrypted?.trim())
-    );
+    const iccid = iccidByOrderId.get(row.id) ?? null;
+    // Field name kept for DTO compatibility — value is full ICCID when present.
+    const iccidMasked = iccid ?? iccidUnavailableLabel(row.status);
     const planName = displayOrUnavailable(row.planName);
     const destination = displayOrUnavailable(row.destination);
     const dataAllowance = displayOrUnavailable(row.dataAllowance);
@@ -630,6 +621,7 @@ export async function listCustomerOrders(
       fundingLabel: customerFundingLabel(row.fundingSource),
       createdAtLabel: formatOrderDate(row.createdAt),
       iccidMasked,
+      iccid,
       emailDeliveryLabel,
       installEligible,
       isRefunded,
@@ -690,9 +682,11 @@ export type CustomerOrderDetail = {
   currencyLabel: string;
   fundingLabel: string;
   createdAtLabel: string;
-  /** Masked last-4 or pending/not-provided — never plaintext. */
+  /** Full plaintext ICCID when stored; otherwise pending/not-provided label. */
   iccidMasked: string;
-  /** True only when encrypted ICCID is stored (never includes ciphertext). */
+  /** Full plaintext ICCID only — null when unavailable. */
+  iccid: string | null;
+  /** True when a full ICCID is available for display. */
   iccidRevealable: boolean;
   emailDeliveryLabel: string | null;
   installEligible: boolean;
@@ -833,12 +827,9 @@ export async function getCustomerOwnedOrderDetail(
     hasCompletedRefund,
     providerLifecycleStatus: order.providerLifecycleStatus,
   });
-  const iccidRevealable = Boolean(order.iccidEncrypted?.trim());
-  const iccidMasked = customerIccidDisplay(
-    order.iccidLast4,
-    order.status,
-    iccidRevealable
-  );
+  const iccid = await resolveOrderIccidPlaintext(order.id);
+  const iccidRevealable = Boolean(iccid);
+  const iccidMasked = iccid ?? iccidUnavailableLabel(order.status);
   const amount = decimalToNumber(order.displayAmount ?? order.providerAmount);
   const currency =
     (order.displayCurrency ?? order.providerCurrency ?? "USD")
@@ -996,6 +987,7 @@ export async function getCustomerOwnedOrderDetail(
     fundingLabel: customerFundingLabel(order.fundingSource),
     createdAtLabel: formatOrderDate(order.createdAt),
     iccidMasked,
+    iccid,
     iccidRevealable,
     emailDeliveryLabel,
     installEligible,
