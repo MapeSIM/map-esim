@@ -140,17 +140,30 @@ function main() {
   assert.match(guest, /guestCheckoutEnabled/);
   // Sprint B0: guest Pay CTA before trust (parity with logged-in).
   assert.match(guest, /Purchase eSIM[\s\S]*?CheckoutTrustPanel/);
+  assert.match(guest, /CheckoutCompatibilityCheck/);
+  assert.match(confirm, /CheckoutCompatibilityCheck/);
   console.log("PASS guest_checkout_two_column");
 
-  assert.match(trust, /HOME_TRUST_ITEMS/);
+  assert.match(trust, /CHECKOUT_TRUST_HIGHLIGHTS/);
   assert.match(trust, /aria-labelledby="checkout-trust-heading"/);
-  assert.match(trust, /Verified Payments|Support Available/);
-  assert.match(trust, /return "\/support"/);
-  // Compact trust: titles only (no description paragraphs under each item).
-  assert.doesNotMatch(trust, /item\.description/);
-  assert.match(trust, /grid-cols-1 gap-2 sm:grid-cols-2/);
+  assert.match(trust, /Instant Delivery/);
+  assert.match(trust, /Secure Checkout via Simpaisa/);
+  assert.match(trust, /Universal Connectivity/);
+  assert.match(trust, /unlocked eSIM-compatible devices/);
+  assert.doesNotMatch(trust, /Non-PTA|non-pta/i);
   assert.doesNotMatch(trust, /applyVerifiedPaymentEvent|PAYMENT_GATEWAY_ENABLED/);
   console.log("PASS trust_panel_display_only");
+
+  const compatModal = read("app/components/account/CheckoutCompatibilityModal.tsx");
+  const compatGuide = read("app/lib/checkout/checkoutCompatibilityGuide.ts");
+  assert.match(compatModal, /Check eSIM compatibility \(\?\)/);
+  assert.match(compatModal, /COMMON_SUPPORTED_ESIM_MODELS/);
+  assert.match(compatGuide, /iPhone XR through iPhone 16 \/ 17/);
+  assert.match(compatGuide, /Pixel 4 and newer/);
+  assert.match(compatGuide, /Galaxy S20\+/);
+  assert.doesNotMatch(compatModal, /Non-PTA|non-pta/i);
+  assert.doesNotMatch(compatGuide, /Non-PTA|non-pta/i);
+  console.log("PASS checkout_compatibility_modal");
 
   assert.doesNotMatch(apply, /CheckoutTrustPanel|lg:grid-cols-\[minmax\(0,1\.2fr\)/);
   assert.doesNotMatch(credit, /CheckoutTrustPanel/);

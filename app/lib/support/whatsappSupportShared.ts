@@ -94,7 +94,6 @@ const WHATSAPP_BLOCKED_PREFIXES = [
   "/admin",
   "/api",
   "/account",
-  "/checkout",
   "/payment",
   "/success",
   "/signin",
@@ -147,11 +146,19 @@ export function isWhatsAppStickyPaymentClearanceRoute(pathname: string): boolean
   );
 }
 
+/** Guest checkout (/checkout) — FAB allowed; no sticky pay bar on this path. */
+export function isWhatsAppGuestCheckoutRoute(pathname: string): boolean {
+  const path = normalizeWhatsAppPath(pathname);
+  return path === "/checkout" || path.startsWith("/checkout/");
+}
+
 /** True when the floating WhatsApp button may render on this pathname. */
 export function isWhatsAppSupportRoute(pathname: string): boolean {
   const path = normalizeWhatsAppPath(pathname);
   // Wallet checkout: support FAB allowed; bottom clearance clears sticky pay bar.
   if (isWhatsAppStickyPaymentClearanceRoute(path)) return true;
+  // Guest checkout: support FAB allowed (default bottom; no sticky CTA).
+  if (isWhatsAppGuestCheckoutRoute(path)) return true;
   if (matchesWhatsAppBlocked(path)) return false;
   if (WHATSAPP_ALLOWED_EXACT.has(path)) return true;
   if (path.startsWith("/countries/")) return true;
@@ -159,13 +166,13 @@ export function isWhatsAppSupportRoute(pathname: string): boolean {
 }
 
 /**
- * Bottom offset for the FAB. On sticky-checkout paths (if ever shown), clear
- * the tallest sticky pay bar + gap while still honoring safe-area.
+ * Bottom offset for the FAB. On sticky-checkout paths, clear the tallest sticky
+ * pay bar + gap while still honoring safe-area so the FAB is never covered.
  */
 export function whatsAppFabBottomClass(pathname: string): string {
   if (isWhatsAppStickyPaymentClearanceRoute(pathname)) {
-    // 12.5rem sticky + 0.75rem gap; safe-area already in sticky spacer.
-    return "bottom-[calc(12.5rem+0.75rem+env(safe-area-inset-bottom,0px))] lg:bottom-[max(1.25rem,env(safe-area-inset-bottom,0px))]";
+    // 12.5rem sticky + 1.25rem gap above the bar; safe-area already in sticky spacer.
+    return "bottom-[calc(12.5rem+1.25rem+env(safe-area-inset-bottom,0px))] lg:bottom-[max(1.25rem,env(safe-area-inset-bottom,0px))]";
   }
   return "bottom-[max(1.25rem,env(safe-area-inset-bottom,0px))]";
 }

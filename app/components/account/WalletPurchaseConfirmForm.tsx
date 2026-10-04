@@ -44,6 +44,7 @@ import {
   CheckoutMoney,
 } from "@/app/components/account/CheckoutMoney";
 import { CheckoutTrustPanel } from "@/app/components/account/CheckoutTrustPanel";
+import { CheckoutCompatibilityCheck } from "@/app/components/account/CheckoutCompatibilityModal";
 import SimpaisaWalletFields from "@/app/components/account/SimpaisaWalletFields";
 
 type Props = {
@@ -1026,7 +1027,8 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
             </div>
           )}
 
-          {/* Trust sits below Pay CTA so mobile users see action first. */}
+          {/* Compatibility + trust sit below Pay CTA so mobile users see action first. */}
+          <CheckoutCompatibilityCheck />
           <CheckoutTrustPanel />
         </aside>
       </div>

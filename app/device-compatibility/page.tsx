@@ -4,6 +4,12 @@ import { ArrowRight, LockKeyhole, Smartphone } from "lucide-react";
 import { BRAND_NAME } from "@/app/lib/brand";
 import { absoluteCanonical } from "@/app/lib/seo/canonical";
 import { publicPageShareMeta } from "@/app/lib/seo/socialShareMeta";
+import {
+  COMMON_SUPPORTED_ESIM_MODELS,
+  COMPATIBILITY_ANDROID_QUICK_CHECK,
+  COMPATIBILITY_IPHONE_QUICK_CHECK,
+  COMPATIBILITY_UNLOCKED_NOTE,
+} from "@/app/lib/checkout/checkoutCompatibilityGuide";
 
 const title = `Check Device Compatibility | ${BRAND_NAME}`;
 const description =
@@ -69,9 +75,9 @@ export default function DeviceCompatibilityPage() {
                 iPhone quick check
               </h3>
               <ol className="mt-3 list-decimal space-y-2 pl-4 text-sm leading-relaxed text-[var(--text)]">
-                <li>Open Settings</li>
-                <li>Go to Cellular / Mobile Data / Mobile Service</li>
-                <li>Look for “Add eSIM” or “Add Cellular Plan”</li>
+                {COMPATIBILITY_IPHONE_QUICK_CHECK.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
               </ol>
             </div>
             <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
@@ -79,12 +85,43 @@ export default function DeviceCompatibilityPage() {
                 Android quick check
               </h3>
               <ol className="mt-3 list-decimal space-y-2 pl-4 text-sm leading-relaxed text-[var(--text)]">
-                <li>Open Settings</li>
-                <li>Search for “eSIM”, “SIM Manager”, or “Add eSIM”</li>
-                <li>Wording varies by manufacturer and device</li>
+                {COMPATIBILITY_ANDROID_QUICK_CHECK.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
               </ol>
             </div>
           </div>
+        </section>
+
+        <section className={sectionCardClass} aria-labelledby="common-models-heading">
+          <h2
+            id="common-models-heading"
+            className="text-lg font-semibold tracking-tight"
+          >
+            Commonly supported models
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
+            These families often support eSIM when carrier-unlocked. Always
+            verify in your phone settings before purchase.
+          </p>
+          <ul className="mt-4 space-y-3">
+            {COMMON_SUPPORTED_ESIM_MODELS.map((item) => (
+              <li
+                key={item.brand}
+                className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3"
+              >
+                <p className="text-sm font-semibold text-[var(--heading)]">
+                  {item.brand}
+                </p>
+                <p className="mt-0.5 text-sm font-medium text-[var(--accent-strong)]">
+                  {item.summary}
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-[var(--text-muted)]">
+                  {item.detail}
+                </p>
+              </li>
+            ))}
+          </ul>
         </section>
 
         <section className={sectionCardClass} aria-labelledby="unlocked-heading">
@@ -103,10 +140,7 @@ export default function DeviceCompatibilityPage() {
                 Is my phone unlocked?
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-                A carrier-locked phone may support eSIM technically but may not
-                accept another provider’s eSIM. Check Settings for carrier lock
-                status where available, or contact your mobile carrier before you
-                buy.
+                {COMPATIBILITY_UNLOCKED_NOTE}
               </p>
             </div>
           </div>

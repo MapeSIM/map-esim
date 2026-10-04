@@ -5,6 +5,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCurrency } from "@/app/components/currency/CurrencyProvider";
 import { CheckoutTrustPanel } from "@/app/components/account/CheckoutTrustPanel";
+import { CheckoutCompatibilityCheck } from "@/app/components/account/CheckoutCompatibilityModal";
 
 type VerifiedOffer = {
   offerId: string;
@@ -355,7 +356,8 @@ function CheckoutContent() {
               {payLoading ? "Creating eSIM..." : "Purchase eSIM"}
             </button>
 
-            {/* Trust sits below Pay CTA (parity with logged-in checkout). */}
+            {/* Compatibility + trust sit below Pay CTA (parity with logged-in checkout). */}
+            <CheckoutCompatibilityCheck />
             <CheckoutTrustPanel />
 
             {message && (

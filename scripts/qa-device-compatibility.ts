@@ -57,6 +57,17 @@ function main() {
   assert.match(footer, /href:\s*["']\/device-compatibility["']/);
   console.log("   ok");
 
+  console.log("3b) Shared checkout compatibility guide (models + quick checks)");
+  const guide = read("app/lib/checkout/checkoutCompatibilityGuide.ts");
+  assert.match(page, /COMMON_SUPPORTED_ESIM_MODELS/);
+  assert.match(page, /COMPATIBILITY_IPHONE_QUICK_CHECK/);
+  assert.match(guide, /iPhone XR through iPhone 16 \/ 17/);
+  assert.match(guide, /Pixel 4 and newer/);
+  assert.match(guide, /Galaxy S20\+/);
+  assert.doesNotMatch(page, /Non-PTA|non-pta/i);
+  assert.doesNotMatch(guide, /Non-PTA|non-pta/i);
+  console.log("   ok");
+
   console.log("4) Purchase / payment / provider paths untouched by this QA scope");
   assert.doesNotMatch(wallet, /device-compatibility|DEVICE_FAMILIES|IMEI|EID|TAC/);
   assert.doesNotMatch(credit, /device-compatibility|DEVICE_FAMILIES/);

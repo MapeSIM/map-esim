@@ -159,6 +159,9 @@ function main() {
     // Phase 6: support FAB on wallet checkout; elevated above sticky pay bar.
     "/account/esim/buy",
     "/account/esim/buy/review",
+    // Guest checkout: FAB allowed (no sticky pay bar).
+    "/checkout",
+    "/checkout/pay",
   ]) {
     assert.equal(isWhatsAppSupportRoute(path), true, `allow ${path}`);
   }
@@ -173,8 +176,6 @@ function main() {
     "/verify-email",
     "/account",
     "/account/orders",
-    "/checkout",
-    "/checkout/pay",
     "/payment",
     "/payment/return",
     "/success",
