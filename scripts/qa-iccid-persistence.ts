@@ -165,22 +165,42 @@ async function main() {
   assert.equal(dup.status, "duplicate_other_order");
   assert.equal(orders[1].iccidHash, null);
 
+  // Add More Data / top-up: shared ICCID with source order is allowed.
+  const shared = await captureIccidForProviderOrder(
+    {
+      providerOrderId: "po-2",
+      iccid: SAMPLE_ICCID,
+      allowSharedIccid: true,
+    },
+    db
+  );
+  assert.equal(shared.status, "stored");
+  assert.equal(orders[1].iccidLast4, "3456");
+  assert.equal(orders[1].iccidHash, orders[0].iccidHash);
+
+  const emptyOrder: MockOrder = {
+    id: "o3",
+    providerOrderId: "po-3",
+    iccidHash: null,
+  };
+  orders.push(emptyOrder);
+
   const empty = await captureIccidForProviderOrder(
-    { providerOrderId: "po-2", iccid: null },
+    { providerOrderId: "po-3", iccid: null },
     db
   );
   assert.equal(empty.status, "skipped_empty");
-  assert.equal(orders[1].iccidEncrypted ?? null, null);
+  assert.equal(orders[2].iccidEncrypted ?? null, null);
 
   const late = await captureIccidForProviderOrder(
     {
-      providerOrderId: "po-2",
+      providerOrderId: "po-3",
       checkoutPayload: { icc_id: SAMPLE_ICCID_B },
     },
     db
   );
   assert.equal(late.status, "stored");
-  assert.equal(orders[1].iccidLast4, "3999");
+  assert.equal(orders[2].iccidLast4, "3999");
 
   console.log("7) static wiring — shared capture, no forced null");
   const persistAssigned = read("app/lib/orders/persistAssignedOrder.ts");
@@ -198,9 +218,19 @@ async function main() {
   const pkg = read("package.json");
 
   assert.match(persistAssigned, /captureIccidForProviderOrder/);
+  assert.match(persistAssigned, /allowSharedIccid/);
   assert.doesNotMatch(persistAssigned, /iccidEncrypted:\s*null/);
   assert.match(persistGuest, /captureIccidForProviderOrder/);
   assert.match(wallet, /checkoutPayload:\s*successCheckout\.payload/);
+  assert.match(wallet, /allowSharedIccid:\s*Boolean\(addDataSourceOrderId\)/);
+  assert.match(
+    read("app/lib/orders/iccidCaptureCore.ts"),
+    /allowSharedIccid|orderIsAddDataTopUp/
+  );
+  assert.match(
+    read("app/lib/orders/orderIccidResolve.ts"),
+    /resolveOrderIccidPlaintext/
+  );
   assert.match(adminAssign, /checkoutPayload:\s*checkoutData/);
   assert.match(guestRoute, /checkoutPayload:\s*checkoutData/);
   assert.match(guestRoute, /isGuestVesimCheckoutEnabled/);

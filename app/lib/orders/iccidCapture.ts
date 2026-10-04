@@ -19,6 +19,8 @@ export async function captureIccidForProviderOrder(
     providerOrderId: string;
     iccid?: string | null;
     checkoutPayload?: Record<string, unknown> | null;
+    /** Allow Add More Data / top-up orders to share an ICCID hash. */
+    allowSharedIccid?: boolean;
   },
   client: IccidCaptureDbClient = prisma
 ): Promise<CaptureIccidResult> {

@@ -35,6 +35,11 @@ export async function persistAssignedOrder(
     iccid?: string | null;
     /** Checkout/broker payload used to extract ICCID when needed. */
     checkoutPayload?: Record<string, unknown> | null;
+    /**
+     * Add More Data / top-up: allow storing an ICCID already linked to the
+     * source order (same physical eSIM, new provider transaction).
+     */
+    allowSharedIccid?: boolean;
   }
 ): Promise<{ id: string; providerOrderId: string }> {
   const providerOrderId = options.providerOrderId.trim();
@@ -129,6 +134,7 @@ export async function persistAssignedOrder(
       providerOrderId: order.providerOrderId,
       iccid: options.iccid,
       checkoutPayload: options.checkoutPayload,
+      allowSharedIccid: options.allowSharedIccid === true,
     },
     tx
   );

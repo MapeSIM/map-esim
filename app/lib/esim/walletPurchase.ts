@@ -1742,6 +1742,7 @@ export async function confirmWalletEsimPurchase(
           fundingSource: OrderFundingSource.CUSTOMER_WALLET,
           status: OrderStatus.COMPLETED,
           checkoutPayload: successCheckout.payload,
+          allowSharedIccid: Boolean(addDataSourceOrderId),
         });
 
         if (current.debitTransactionId) {

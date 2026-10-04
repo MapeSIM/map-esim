@@ -109,7 +109,7 @@ export default async function AdminOrdersPage({
             name="q"
             defaultValue={data.search}
             maxLength={100}
-            placeholder="Destination, plan, local ID, provider ref"
+            placeholder="Destination, plan, local ID, provider ref, ICCID / last-4"
             className={adminFilterControlClassName}
           />
         </AdminFilterField>
@@ -199,6 +199,11 @@ export default async function AdminOrdersPage({
                     <span>{order.planPackage}</span>
                     <AddDataPurchaseBadge
                       isAddDataPurchase={order.isAddDataPurchase}
+                      sourceOrderHref={
+                        order.addDataSourceOrderId
+                          ? `/admin/orders/${encodeURIComponent(order.addDataSourceOrderId)}`
+                          : null
+                      }
                     />
                   </div>
                 </td>
@@ -230,7 +235,14 @@ export default async function AdminOrdersPage({
                   {order.providerRefMasked}
                 </td>
                 <td className="px-3 py-3 font-mono text-xs">
-                  {order.iccidMasked}
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span>{order.iccidMasked}</span>
+                    {order.isAddDataPurchase ? (
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                        Shared with source
+                      </span>
+                    ) : null}
+                  </div>
                 </td>
                 <td className="px-3 py-3">
                   <AdminStatusPill value={order.associationLabel}>

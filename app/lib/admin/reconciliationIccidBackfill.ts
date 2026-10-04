@@ -574,10 +574,37 @@ export async function backfillReconciliationIccid(options: {
         };
       }
 
+      // Auto-detect Add More Data via purchase idempotency; also allow shared
+      // ICCID when a linked wallet/partner purchase is an adddata_ top-up.
+      const linkedOrderId = (fresh.orderId ?? "").trim();
+      const linkedProviderOrderId = (fresh.orderProviderOrderId ?? "").trim();
+      const purchaseOr: Array<
+        { orderId: string } | { providerOrderId: string }
+      > = [];
+      if (linkedOrderId) purchaseOr.push({ orderId: linkedOrderId });
+      if (linkedProviderOrderId) {
+        purchaseOr.push({ providerOrderId: linkedProviderOrderId });
+      }
+      let allowSharedIccid = false;
+      if (purchaseOr.length > 0) {
+        const walletKey = await tx.walletEsimPurchase.findFirst({
+          where: { OR: purchaseOr },
+          select: { idempotencyKey: true },
+        });
+        const partnerKey = await tx.partnerEsimPurchase.findFirst({
+          where: { OR: purchaseOr },
+          select: { idempotencyKey: true },
+        });
+        allowSharedIccid =
+          Boolean(walletKey?.idempotencyKey?.startsWith("adddata_")) ||
+          Boolean(partnerKey?.idempotencyKey?.startsWith("adddata_"));
+      }
+
       const result = await captureIccidForProviderOrder(
         {
           providerOrderId: fresh.orderProviderOrderId,
           iccid: normalizedIccid,
+          allowSharedIccid,
         },
         tx
       );

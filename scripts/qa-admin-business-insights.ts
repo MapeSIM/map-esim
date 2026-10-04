@@ -58,7 +58,9 @@ function main() {
   console.log("PASS insights_page_ui");
 
   const addData = read("app/lib/esim/addDataCheckout.ts");
-  assert.match(addData, /ADD_DATA_IDEMPOTENCY_PREFIX\s*=\s*"adddata_"/);
+  const addDataShared = read("app/lib/esim/addDataPurchaseLabelShared.ts");
+  assert.match(addData, /ADD_DATA_IDEMPOTENCY_PREFIX/);
+  assert.match(addDataShared, /ADD_DATA_IDEMPOTENCY_PREFIX\s*=\s*"adddata_"/);
   console.log("PASS add_more_data_prefix");
 
   const shared = read("app/lib/admin/revenueOverviewShared.ts");

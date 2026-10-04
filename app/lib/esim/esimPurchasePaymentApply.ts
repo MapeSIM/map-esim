@@ -1176,6 +1176,7 @@ async function fulfillFundedEsimPurchaseAfterPayment(
           fundingSource: purchase.fundingSource,
           status: OrderStatus.COMPLETED,
           checkoutPayload: checkout.payload,
+          allowSharedIccid: Boolean(addDataSourceOrderId),
         });
 
         const debitId =

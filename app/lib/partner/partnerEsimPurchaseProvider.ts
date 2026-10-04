@@ -725,6 +725,7 @@ export async function executePartnerEsimProviderPurchase(
         fundingSource: OrderFundingSource.PARTNER_BALANCE,
         status: OrderStatus.COMPLETED,
         checkoutPayload: successCheckout.payload,
+        allowSharedIccid: Boolean(addDataSourceOrderId),
       });
 
       if (input.afterOrderPersistInTx) {

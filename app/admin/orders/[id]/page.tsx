@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import AdminAddDataForm from "@/app/components/admin/AdminAddDataForm";
 import AdminOrderInstallEmailResendButton from "@/app/components/admin/AdminOrderInstallEmailResendButton";
@@ -108,7 +109,16 @@ export default async function AdminOrderDetailPage({
           <AdminStatusPill value={detail.associationLabel}>
             {detail.associationLabel}
           </AdminStatusPill>
-          {detail.isAddDataPurchase ? <AddDataPurchaseBadge isAddDataPurchase /> : null}
+          {detail.isAddDataPurchase ? (
+            <AddDataPurchaseBadge
+              isAddDataPurchase
+              sourceOrderHref={
+                detail.addDataSourceOrderId
+                  ? `/admin/orders/${encodeURIComponent(detail.addDataSourceOrderId)}`
+                  : null
+              }
+            />
+          ) : null}
         </div>
         {!detail.isRefunded ? (
           <EsimLifecycleBadges
@@ -157,7 +167,20 @@ export default async function AdminOrderDetailPage({
         {detail.isAddDataPurchase && detail.addDataSourceOrderId ? (
           <DetailRow
             label="Add More Data source"
-            value={detail.addDataSourceOrderId}
+            value={
+              <Link
+                href={`/admin/orders/${encodeURIComponent(detail.addDataSourceOrderId)}`}
+                className="font-mono text-sm font-semibold text-[var(--heading)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+              >
+                {detail.addDataSourceOrderId}
+              </Link>
+            }
+          />
+        ) : null}
+        {detail.isAddDataPurchase ? (
+          <DetailRow
+            label="ICCID note"
+            value="Shared with source eSIM (Add More Data top-up)."
           />
         ) : null}
         <DetailRow

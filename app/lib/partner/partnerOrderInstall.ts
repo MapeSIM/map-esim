@@ -20,8 +20,6 @@ import { extractInstallDetails, hasInstallDetails } from "@/app/lib/email/extrac
 import { isValidInstallQrValue } from "@/app/lib/email/qr";
 import { prisma } from "@/app/lib/db";
 import {
-  decryptIccid,
-  isIccidEncryptionConfigured,
   normalizeIccid,
   validateIccid,
 } from "@/app/lib/orders/iccidCrypto";
@@ -37,6 +35,7 @@ import {
   type CustomerUsageResult,
   type CustomerUsageSnapshot,
 } from "@/app/lib/orders/customerEsimUsage";
+import { resolveOrderIccidPlaintext } from "@/app/lib/orders/orderIccidResolve";
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
 import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
 import { PARTNER_INSTALL_UNAVAILABLE_MESSAGE } from "@/app/lib/partner/partnerOrderInstallClient";
@@ -307,19 +306,8 @@ export async function getPartnerOwnedOrderInstall(
 }
 
 async function resolveLocalIccid(localOrderId: string): Promise<string | null> {
-  const order = await prisma.order.findFirst({
-    where: { id: localOrderId },
-    select: { iccidEncrypted: true },
-  });
-  const encrypted = order?.iccidEncrypted?.trim();
-  if (!encrypted || !isIccidEncryptionConfigured()) return null;
-  try {
-    const plain = decryptIccid(encrypted);
-    const normalized = normalizeIccid(plain);
-    return validateIccid(normalized) ? normalized : null;
-  } catch {
-    return null;
-  }
+  // Includes Add More Data fallback to the source order ICCID.
+  return resolveOrderIccidPlaintext(localOrderId);
 }
 
 export async function getPartnerOwnedOrderUsage(

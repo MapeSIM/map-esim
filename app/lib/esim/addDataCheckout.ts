@@ -21,9 +21,21 @@ import {
   validateIccid,
 } from "@/app/lib/orders/iccidCrypto";
 import { normalizeOfferId } from "@/app/lib/vesim/server";
+import {
+  ADD_DATA_IDEMPOTENCY_PREFIX,
+  isAddDataIdempotencyKey,
+  parseAddDataSourceOrderId,
+  resolveAddDataPurchaseLabel,
+  type AddDataPurchaseLabel,
+} from "@/app/lib/esim/addDataPurchaseLabelShared";
 
-/** Idempotency prefix — encodes MAP local source order without a schema change. */
-export const ADD_DATA_IDEMPOTENCY_PREFIX = "adddata_";
+export {
+  ADD_DATA_IDEMPOTENCY_PREFIX,
+  isAddDataIdempotencyKey,
+  parseAddDataSourceOrderId,
+  resolveAddDataPurchaseLabel,
+};
+export type { AddDataPurchaseLabel };
 
 const LOCAL_ORDER_ID_RE = /^[A-Za-z0-9_-]+$/;
 const ADD_DATA_KEY_MAX_GENERATION = 64;
@@ -162,58 +174,6 @@ export async function resolvePartnerAddDataIdempotencyKey(input: {
     ...base,
     generation: ADD_DATA_KEY_MAX_GENERATION - 1,
   });
-}
-
-/** Extract MAP local source order id from an Add Data idempotency key. */
-export function parseAddDataSourceOrderId(
-  idempotencyKey: string | null | undefined
-): string | null {
-  const key = (idempotencyKey ?? "").trim();
-  if (!key.startsWith(ADD_DATA_IDEMPOTENCY_PREFIX)) return null;
-  const rest = key.slice(ADD_DATA_IDEMPOTENCY_PREFIX.length);
-  const sep = rest.indexOf("_");
-  if (sep <= 0 || sep >= rest.length - 1) return null;
-  const nonce = rest.slice(0, sep);
-  const orderId = rest.slice(sep + 1).trim();
-  if (!/^[a-f0-9]{16}$/i.test(nonce)) return null;
-  if (
-    !orderId ||
-    orderId.length > 64 ||
-    !LOCAL_ORDER_ID_RE.test(orderId)
-  ) {
-    return null;
-  }
-  return orderId;
-}
-
-export type AddDataPurchaseLabel = {
-  /** True only when this purchase/order was created via Add More Data top-up. */
-  isAddDataPurchase: boolean;
-  /** MAP local source order id embedded in adddata_ idempotency key. */
-  addDataSourceOrderId: string | null;
-};
-
-/**
- * Detect Add More Data purchases from purchase idempotencyKey (adddata_ convention).
- * Not the same as addDataEligible (CTA on a source eSIM that can receive top-up).
- */
-export function resolveAddDataPurchaseLabel(
-  idempotencyKeyOrKeys:
-    | string
-    | null
-    | undefined
-    | Array<string | null | undefined>
-): AddDataPurchaseLabel {
-  const keys = Array.isArray(idempotencyKeyOrKeys)
-    ? idempotencyKeyOrKeys
-    : [idempotencyKeyOrKeys];
-  for (const key of keys) {
-    const addDataSourceOrderId = parseAddDataSourceOrderId(key);
-    if (addDataSourceOrderId) {
-      return { isAddDataPurchase: true, addDataSourceOrderId };
-    }
-  }
-  return { isAddDataPurchase: false, addDataSourceOrderId: null };
 }
 
 export function normalizeAddDataFromOrderId(

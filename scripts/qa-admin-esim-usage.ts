@@ -37,10 +37,12 @@ function main() {
   assert.match(adminLib, /RATE_LIMITED/);
   assert.match(adminLib, /consumeRateLimit/);
   assert.match(adminLib, /30_000/);
+  assert.match(adminLib, /resolveOrderIccidPlaintext/);
+  assert.match(customerLib, /resolveOrderIccidPlaintext/);
   assert.doesNotMatch(adminApi, /iccid:\s/);
   assert.doesNotMatch(adminApi, /accessToken|refresh_token|VESIM_PASSWORD/i);
   assert.match(adminApi, /role !== Role\.ADMIN/);
-  assert.match(adminPanel, /Check live usage|Refresh live usage/);
+  assert.match(adminPanel, /Check live usage|Refresh live usage|Refresh Status/);
   assert.doesNotMatch(adminPanel, /setInterval/);
   assert.match(adminPanel, /Full ICCID is\s+never shown/);
   assert.doesNotMatch(adminApi, /\biccid\s*:/);

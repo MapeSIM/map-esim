@@ -748,7 +748,7 @@ model Order {
   @@index([customerEmail])
   @@index([userId])
   @@index([fundingSource])
-  /// Non-unique until backfill completes; app enforces one-hash-per-order.
+  /// Non-unique: Add More Data / top-up orders intentionally share ICCID hash with source.
   @@index([iccidHash])
   @@index([reconciliationResolvedAt])
   @@index([reconciliationLockedAt])

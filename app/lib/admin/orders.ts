@@ -30,6 +30,13 @@ import {
   type CustomerEsimStatusBadge,
 } from "@/app/lib/orders/customerOrderDisplay";
 import {
+  hashIccid,
+  isIccidEncryptionConfigured,
+  normalizeIccid,
+  validateIccid,
+} from "@/app/lib/orders/iccidCrypto";
+import { loadAddDataSourceIccidLast4Map } from "@/app/lib/orders/orderIccidResolve";
+import {
   formatLifecycleGb,
   toProviderLifecycleCacheView,
   type ProviderLifecycleCacheView,
@@ -241,16 +248,30 @@ function buildOrderWhere(options: {
   const q = options.search;
   if (q) {
     // Do not search customerEmail — avoids email-existence oracle.
-    const searchFilter: Prisma.OrderWhereInput = {
-      OR: [
-        { id: { equals: q } },
-        { providerOrderId: { contains: q, mode: "insensitive" } },
-        { destination: { contains: q, mode: "insensitive" } },
-        { planName: { contains: q, mode: "insensitive" } },
-        { dataAllowance: { contains: q, mode: "insensitive" } },
-      ],
-    };
+    const or: Prisma.OrderWhereInput[] = [
+      { id: { equals: q } },
+      { providerOrderId: { contains: q, mode: "insensitive" } },
+      { destination: { contains: q, mode: "insensitive" } },
+      { planName: { contains: q, mode: "insensitive" } },
+      { dataAllowance: { contains: q, mode: "insensitive" } },
+    ];
 
+    // ICCID last-4 (exact) or full ICCID via deterministic hash — never plaintext store.
+    const digits = normalizeIccid(q);
+    if (digits.length === 4) {
+      or.push({ iccidLast4: digits });
+    } else if (validateIccid(digits) && isIccidEncryptionConfigured()) {
+      try {
+        or.push({ iccidHash: hashIccid(digits) });
+        or.push({ iccidLast4: digits.slice(-4) });
+      } catch {
+        // Ignore hash failures — other search clauses still apply.
+      }
+    } else if (/[•*]{3,}/.test(q) && digits.length >= 4) {
+      or.push({ iccidLast4: digits.slice(-4) });
+    }
+
+    const searchFilter: Prisma.OrderWhereInput = { OR: or };
     where.AND = [...(Array.isArray(where.AND) ? where.AND : []), searchFilter];
   }
 
@@ -337,6 +358,20 @@ export async function getAdminOrdersPage(
     },
   });
 
+  const addDataSourceIds: string[] = [];
+  for (const row of pageRows) {
+    const ownLast4 = (row.iccidLast4 ?? "").replace(/\D+/g, "");
+    if (ownLast4.length === 4) continue;
+    const label = resolveAddDataPurchaseLabel([
+      row.walletEsimPurchase?.idempotencyKey,
+      row.partnerEsimPurchase?.idempotencyKey,
+    ]);
+    if (label.addDataSourceOrderId) {
+      addDataSourceIds.push(label.addDataSourceOrderId);
+    }
+  }
+  const sourceLast4ById = await loadAddDataSourceIccidLast4Map(addDataSourceIds);
+
   const rows: AdminOrderListRow[] = pageRows.map((row) => {
     const addDataPurchase = resolveAddDataPurchaseLabel([
       row.walletEsimPurchase?.idempotencyKey,
@@ -357,6 +392,13 @@ export async function getAdminOrdersPage(
       providerLifecycleStatus: row.providerLifecycleStatus,
       providerRemainingDataGb: row.providerRemainingDataGb,
     });
+    const ownLast4 = (row.iccidLast4 ?? "").replace(/\D+/g, "");
+    const displayLast4 =
+      ownLast4.length === 4
+        ? ownLast4
+        : addDataPurchase.addDataSourceOrderId
+          ? sourceLast4ById.get(addDataPurchase.addDataSourceOrderId) ?? null
+          : null;
     return {
       id: row.id,
       createdAtLabel: formatCreatedAt(row.createdAt),
@@ -365,7 +407,7 @@ export async function getAdminOrdersPage(
       localStatus: displayOrUnavailable(row.status),
       amountLabel: formatOrderAmount(row.providerAmount, row.providerCurrency),
       providerRefMasked: maskProviderOrderRef(row.providerOrderId),
-      iccidMasked: adminIccidDisplay(row.iccidLast4, row.status),
+      iccidMasked: adminIccidDisplay(displayLast4, row.status),
       associationLabel: row.userId ? "Linked customer" : "Guest order",
       fundingLabel: fundingSourceLabel(row.fundingSource),
       isAddDataPurchase: addDataPurchase.isAddDataPurchase,
@@ -484,8 +526,25 @@ export async function getAdminOrderDetail(
     accountStatusLabel = "Linked account unavailable";
   }
 
+  const addDataPurchase = resolveAddDataPurchaseLabel([
+    row.walletEsimPurchase?.idempotencyKey,
+    row.partnerEsimPurchase?.idempotencyKey,
+  ]);
+
   // Never decrypt or emit ICCID ciphertext/plaintext on this page.
-  const iccidHint = adminIccidDisplay(row.iccidLast4, row.status);
+  // Add More Data top-ups may inherit the source order last-4 for display.
+  let displayLast4 = (row.iccidLast4 ?? "").replace(/\D+/g, "");
+  if (displayLast4.length !== 4 && addDataPurchase.addDataSourceOrderId) {
+    const sourceMap = await loadAddDataSourceIccidLast4Map([
+      addDataPurchase.addDataSourceOrderId,
+    ]);
+    displayLast4 =
+      sourceMap.get(addDataPurchase.addDataSourceOrderId) ?? "";
+  }
+  const iccidHint = adminIccidDisplay(
+    displayLast4.length === 4 ? displayLast4 : null,
+    row.status
+  );
   const iccidRevealable = Boolean(row.iccidEncrypted?.trim());
 
   const hasCompletedRefund =
@@ -537,10 +596,6 @@ export async function getAdminOrderDetail(
     installEligible,
     catalog,
   });
-  const addDataPurchase = resolveAddDataPurchaseLabel([
-    row.walletEsimPurchase?.idempotencyKey,
-    row.partnerEsimPurchase?.idempotencyKey,
-  ]);
 
   return {
     id: row.id,

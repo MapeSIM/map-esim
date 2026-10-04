@@ -58,6 +58,9 @@ function main() {
   assert.match(ordersSrc, /Pending from provider/);
   assert.match(ordersSrc, /iccidLast4/);
   assert.match(ordersSrc, /iccidRevealable/);
+  assert.match(ordersSrc, /iccidHash/);
+  assert.match(ordersSrc, /hashIccid/);
+  assert.match(ordersSrc, /loadAddDataSourceIccidLast4Map/);
   assert.match(ordersSrc, /getAdminCustomerRecentOrders/);
   assert.match(ordersSrc, /userId:\s*customer\.id/);
   assert.ok(!/decryptIccid/.test(ordersSrc));
@@ -67,6 +70,9 @@ function main() {
   assert.ok(!/customerEmail/i.test(listSrc));
   assert.match(listSrc, /No local orders match the selected filters/);
   assert.match(listSrc, /Order data is temporarily unavailable/);
+  assert.match(listSrc, /ICCID \/ last-4/);
+  assert.match(listSrc, /Shared with source/);
+  assert.match(listSrc, /sourceOrderHref/);
   assert.match(
     readFileSync(join(root, "app/lib/admin/adminUxCopy.ts"), "utf8"),
     /Provider fulfilment status is not refreshed from this page/

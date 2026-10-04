@@ -7,8 +7,6 @@ import "server-only";
 import { extractInstallDetails } from "@/app/lib/email/extract";
 import { prisma } from "@/app/lib/db";
 import {
-  decryptIccid,
-  isIccidEncryptionConfigured,
   normalizeIccid,
   validateIccid,
 } from "@/app/lib/orders/iccidCrypto";
@@ -20,6 +18,7 @@ import {
   readUsageCapability,
   type CustomerUsageSnapshot,
 } from "@/app/lib/orders/customerEsimUsage";
+import { resolveOrderIccidPlaintext } from "@/app/lib/orders/orderIccidResolve";
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
 import { RefundRequestStatus, WalletEsimPurchaseStatus } from "@prisma/client";
 
@@ -42,19 +41,8 @@ export type AdminUsageResult =
 const USAGE_RATE_WINDOW_MS = 30_000;
 
 async function resolveLocalIccid(localOrderId: string): Promise<string | null> {
-  const order = await prisma.order.findFirst({
-    where: { id: localOrderId },
-    select: { iccidEncrypted: true },
-  });
-  const encrypted = order?.iccidEncrypted?.trim();
-  if (!encrypted || !isIccidEncryptionConfigured()) return null;
-  try {
-    const plain = decryptIccid(encrypted);
-    const normalized = normalizeIccid(plain);
-    return validateIccid(normalized) ? normalized : null;
-  } catch {
-    return null;
-  }
+  // Includes Add More Data fallback to the source order ICCID.
+  return resolveOrderIccidPlaintext(localOrderId);
 }
 
 /**

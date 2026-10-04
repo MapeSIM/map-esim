@@ -3,6 +3,7 @@
  * App server entrypoints must import via iccidCapture.ts.
  */
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { isAddDataIdempotencyKey } from "@/app/lib/esim/addDataPurchaseLabelShared";
 import { extractInstallDetails } from "@/app/lib/email/extract";
 import {
   buildIccidPersistFields,
@@ -29,6 +30,17 @@ export type CaptureIccidResult = {
 
 export type IccidCaptureDbClient = Prisma.TransactionClient | PrismaClient;
 
+export type CaptureIccidOptions = {
+  providerOrderId: string;
+  iccid?: string | null;
+  checkoutPayload?: Record<string, unknown> | null;
+  /**
+   * When true, allow storing an ICCID hash that already exists on another order.
+   * Used for Add More Data / top-up orders that intentionally reuse the source ICCID.
+   */
+  allowSharedIccid?: boolean;
+};
+
 function extractIccidFromPayload(
   payload: Record<string, unknown> | null | undefined
 ): string | undefined {
@@ -36,16 +48,76 @@ function extractIccidFromPayload(
   return extractInstallDetails(payload).iccid;
 }
 
+type PurchaseLookupDelegate = {
+  findFirst: (args: {
+    where: {
+      OR: Array<{ providerOrderId: string } | { orderId: string }>;
+    };
+    select: { idempotencyKey: true };
+  }) => Promise<{ idempotencyKey: string } | null>;
+};
+
+function asPurchaseDelegate(value: unknown): PurchaseLookupDelegate | null {
+  if (!value || typeof value !== "object") return null;
+  const findFirst = (value as { findFirst?: unknown }).findFirst;
+  return typeof findFirst === "function"
+    ? (value as PurchaseLookupDelegate)
+    : null;
+}
+
+/**
+ * Detect Add More Data via linked wallet/partner purchase idempotency key.
+ * Safe when purchase delegates are absent (unit mocks).
+ */
+async function orderIsAddDataTopUp(
+  client: IccidCaptureDbClient,
+  providerOrderId: string,
+  orderId: string
+): Promise<boolean> {
+  const wallet = asPurchaseDelegate(
+    (client as PrismaClient).walletEsimPurchase
+  );
+  if (wallet) {
+    try {
+      const row = await wallet.findFirst({
+        where: {
+          OR: [{ providerOrderId }, { orderId }],
+        },
+        select: { idempotencyKey: true },
+      });
+      if (isAddDataIdempotencyKey(row?.idempotencyKey)) return true;
+    } catch {
+      // Mock clients may not implement purchase lookups.
+    }
+  }
+
+  const partner = asPurchaseDelegate(
+    (client as PrismaClient).partnerEsimPurchase
+  );
+  if (partner) {
+    try {
+      const row = await partner.findFirst({
+        where: {
+          OR: [{ providerOrderId }, { orderId }],
+        },
+        select: { idempotencyKey: true },
+      });
+      if (isAddDataIdempotencyKey(row?.idempotencyKey)) return true;
+    } catch {
+      // Mock clients may not implement purchase lookups.
+    }
+  }
+
+  return false;
+}
+
 /**
  * Fill-once ICCID capture bound to providerOrderId.
  * Never overwrites a different stored ICCID. Never logs ICCID values.
+ * Add More Data / top-up orders may share an ICCID hash with the source order.
  */
 export async function captureIccidForProviderOrder(
-  options: {
-    providerOrderId: string;
-    iccid?: string | null;
-    checkoutPayload?: Record<string, unknown> | null;
-  },
+  options: CaptureIccidOptions,
   client: IccidCaptureDbClient
 ): Promise<CaptureIccidResult> {
   const providerOrderId = options.providerOrderId.trim();
@@ -114,7 +186,12 @@ export async function captureIccidForProviderOrder(
       select: { id: true },
     });
     if (other) {
-      return { status: "duplicate_other_order" };
+      const allowShared =
+        options.allowSharedIccid === true ||
+        (await orderIsAddDataTopUp(client, providerOrderId, order.id));
+      if (!allowShared) {
+        return { status: "duplicate_other_order" };
+      }
     }
 
     // Fill-once race-safe: only write when still null.
