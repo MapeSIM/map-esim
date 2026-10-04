@@ -19,8 +19,37 @@ export type CustomerEsimStatusBadge =
   | "Review needed"
   | "Refunded"
   | "Failed"
+  /** Completed purchase whose VeSIM line cache reports ACTIVE. */
+  | "Active"
+  /** Completed purchase whose VeSIM line cache reports DEPLETED. */
+  | "Data Depleted"
   /** Completed purchase whose VeSIM line cache reports EXPIRED. */
   | "eSIM Expired";
+
+/** Purchase-complete badges that still represent a usable / refreshable line. */
+const CUSTOMER_LINE_READY_BADGES: ReadonlySet<CustomerEsimStatusBadge> = new Set([
+  "Completed",
+  "Active",
+  "Data Depleted",
+  "eSIM Expired",
+]);
+
+/** Badges where install QR may still be offered (not refunded / expired). */
+const CUSTOMER_INSTALL_ALLOWED_BADGES: ReadonlySet<CustomerEsimStatusBadge> =
+  new Set(["Completed", "Active", "Data Depleted"]);
+
+function applyProviderLifecycleToCompletedBadge(
+  badge: CustomerEsimStatusBadge,
+  providerLifecycleStatus: string | null | undefined
+): CustomerEsimStatusBadge {
+  if (badge !== "Completed") return badge;
+  const lifecycle = (providerLifecycleStatus ?? "").trim().toUpperCase();
+  if (lifecycle === "EXPIRED") return "eSIM Expired";
+  if (lifecycle === "DEPLETED") return "Data Depleted";
+  if (lifecycle === "ACTIVE") return "Active";
+  // NOT_ACTIVE / UNKNOWN / unset → keep Completed ("Ready to install").
+  return badge;
+}
 
 export type CustomerEsimStatusFilter =
   | "ALL"
@@ -105,13 +134,15 @@ export function resolveCustomerEsimStatusBadge(input: {
   assignmentStatus?: string | null;
   /** True when a customer RefundRequest is COMPLETED for this order. */
   hasCompletedRefund?: boolean;
-  /** Cached VeSIM line state (e.g. EXPIRED) — never invents expiry from validity. */
+  /**
+   * Cached VeSIM line state (ACTIVE / DEPLETED / EXPIRED / NOT_ACTIVE).
+   * Never invents lifecycle from plan validity alone.
+   */
   providerLifecycleStatus?: string | null;
 }): CustomerEsimStatusBadge {
   const purchase = (input.walletPurchaseStatus ?? "").trim();
   const assignment = (input.assignmentStatus ?? "").trim();
   const order = (input.orderStatus ?? "").trim();
-  const lifecycle = (input.providerLifecycleStatus ?? "").trim().toUpperCase();
 
   if (input.hasCompletedRefund === true || purchase === "FAILED_REFUNDED") {
     return "Refunded";
@@ -144,11 +175,11 @@ export function resolveCustomerEsimStatusBadge(input: {
   if (!badge && order === "FAILED") badge = "Failed";
   if (!badge) badge = "Processing";
 
-  // Lifecycle expiry only overrides a completed (install-ready) purchase.
-  if (badge === "Completed" && lifecycle === "EXPIRED") {
-    return "eSIM Expired";
-  }
-  return badge;
+  // Lifecycle overrides Completed so Active / Depleted / Expired beat "Ready to install".
+  return applyProviderLifecycleToCompletedBadge(
+    badge,
+    input.providerLifecycleStatus
+  );
 }
 
 export function customerStatusMatchesFilter(
@@ -157,7 +188,7 @@ export function customerStatusMatchesFilter(
 ): boolean {
   if (filter === "ALL") return true;
   if (filter === "COMPLETED") {
-    return badge === "Completed" || badge === "eSIM Expired";
+    return CUSTOMER_LINE_READY_BADGES.has(badge);
   }
   if (filter === "PROCESSING") return badge === "Processing";
   if (filter === "REVIEW_NEEDED") return badge === "Review needed";
@@ -173,6 +204,10 @@ export function customerEsimStatusLabel(
   switch (badge) {
     case "Completed":
       return "Ready to install";
+    case "Active":
+      return "Active";
+    case "Data Depleted":
+      return "Data Depleted";
     case "Processing":
       return "Setting up";
     case "Review needed":
@@ -194,6 +229,10 @@ export function customerEsimStatusHelp(
   switch (badge) {
     case "Completed":
       return "Your eSIM is ready. Install it when you want to go online.";
+    case "Active":
+      return "Your eSIM is active and connected to the network.";
+    case "Data Depleted":
+      return "Your data allowance is used up. Add more data to keep using this eSIM.";
     case "Processing":
       return "We're preparing this eSIM. Installation options appear when it's ready.";
     case "Review needed":
@@ -213,14 +252,25 @@ export function customerEsimStatusHelp(
 export function customerEsimInstallAllowed(
   badge: CustomerEsimStatusBadge
 ): boolean {
-  return badge === "Completed";
+  return CUSTOMER_INSTALL_ALLOWED_BADGES.has(badge);
 }
 
 /** Completed purchase line that may still show usage / Add More Data CTAs. */
 export function customerEsimLineReady(
   badge: CustomerEsimStatusBadge
 ): boolean {
-  return badge === "Completed" || badge === "eSIM Expired";
+  return CUSTOMER_LINE_READY_BADGES.has(badge);
+}
+
+/** Primary badge already reflects provider lifecycle — skip duplicate lifecycle chip. */
+export function customerEsimLifecycleIsPrimaryBadge(
+  badge: CustomerEsimStatusBadge
+): boolean {
+  return (
+    badge === "Active" ||
+    badge === "Data Depleted" ||
+    badge === "eSIM Expired"
+  );
 }
 
 import { destinationFlagcdnUrl } from "@/app/lib/vesim/destinationPresentation";

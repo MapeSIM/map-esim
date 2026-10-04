@@ -105,6 +105,36 @@ function main() {
     resolveCustomerEsimStatusBadge({
       orderStatus: "COMPLETED",
       walletPurchaseStatus: "COMPLETED",
+      providerLifecycleStatus: "NOT_ACTIVE",
+    }),
+    "Completed"
+  );
+  assert.equal(
+    resolveCustomerEsimStatusBadge({
+      orderStatus: "COMPLETED",
+      walletPurchaseStatus: "COMPLETED",
+      providerLifecycleStatus: "ACTIVE",
+    }),
+    "Active"
+  );
+  assert.equal(customerEsimStatusLabel("Active"), "Active");
+  assert.match(
+    customerEsimStatusHelp("Active"),
+    /active and connected to the network/
+  );
+  assert.equal(
+    resolveCustomerEsimStatusBadge({
+      orderStatus: "COMPLETED",
+      walletPurchaseStatus: "COMPLETED",
+      providerLifecycleStatus: "DEPLETED",
+    }),
+    "Data Depleted"
+  );
+  assert.equal(customerEsimStatusLabel("Data Depleted"), "Data Depleted");
+  assert.equal(
+    resolveCustomerEsimStatusBadge({
+      orderStatus: "COMPLETED",
+      walletPurchaseStatus: "COMPLETED",
       providerLifecycleStatus: "EXPIRED",
     }),
     "eSIM Expired"
@@ -115,6 +145,8 @@ function main() {
     /package has expired/
   );
   assert.equal(customerStatusMatchesFilter("eSIM Expired", "COMPLETED"), true);
+  assert.equal(customerStatusMatchesFilter("Active", "COMPLETED"), true);
+  assert.equal(customerStatusMatchesFilter("Data Depleted", "COMPLETED"), true);
   console.log("PASS display_helpers");
 
   const listPage = read("app/account/orders/page.tsx");

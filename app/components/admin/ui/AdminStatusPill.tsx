@@ -35,6 +35,7 @@ export function resolveAdminStatusPillTone(
     normalized === "HEALTHY" ||
     normalized === "ENABLED" ||
     normalized === "ACTIVE" ||
+    normalized === "READY_TO_INSTALL" ||
     normalized === "YES" ||
     normalized === "EXPECTED" ||
     normalized === "COMPLETED" ||
@@ -58,6 +59,7 @@ export function resolveAdminStatusPillTone(
     normalized === "BLOCKED" ||
     normalized === "DELETED" ||
     normalized === "EXPIRED" ||
+    normalized === "ESIM_EXPIRED" ||
     normalized === "PAUSED" ||
     normalized === "UNAVAILABLE" ||
     normalized === "INVALID"
@@ -67,7 +69,9 @@ export function resolveAdminStatusPillTone(
   if (
     normalized === "HIGH" ||
     normalized === "RECONCILIATION_REQUIRED" ||
-    normalized === "PARTIALLY_PAUSED"
+    normalized === "PARTIALLY_PAUSED" ||
+    normalized === "DATA_DEPLETED" ||
+    normalized === "DEPLETED"
   ) {
     return "high";
   }

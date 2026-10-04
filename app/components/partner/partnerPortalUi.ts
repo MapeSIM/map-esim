@@ -32,7 +32,10 @@ export const partnerFieldClass =
 export function partnerStatusBadgeClass(status: PartnerOrderStatusBadge): string {
   switch (status) {
     case "Completed":
+    case "Active":
       return "bg-[var(--accent)]/15 text-[var(--heading)] border-[var(--accent-strong)]/40";
+    case "Data Depleted":
+      return "bg-[var(--warning-bg)] text-[var(--warning-text)] border-[var(--warning-border)]";
     case "Processing":
       return "bg-[var(--surface)] text-[var(--text)] border-[var(--border-hover)]";
     case "Under review":

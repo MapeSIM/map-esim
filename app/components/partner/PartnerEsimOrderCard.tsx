@@ -19,36 +19,30 @@ import {
 import type { PartnerOrderListRow } from "@/app/lib/partner/partnerOrders";
 import { EsimLifecycleBadges } from "@/app/components/orders/EsimLifecycleBadges";
 import {
-  PARTNER_ESIM_READY_LABEL,
   partnerOrderInstallAllowed,
   partnerOrderIsRefunded,
+  partnerOrderLifecycleIsPrimaryBadge,
   partnerOrderLineReady,
   partnerOrderStatusHelp,
+  partnerOrderStatusLabel,
   type PartnerOrderStatusBadge,
 } from "@/app/lib/partner/partnerOrdersDisplay";
 
 function StatusBadges({
   status,
   isAddDataPurchase,
-  showReady,
 }: {
   status: PartnerOrderStatusBadge;
   isAddDataPurchase: boolean;
-  showReady: boolean;
 }) {
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-2">
       <span
         className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${partnerStatusBadgeClass(status)}`}
       >
-        {status}
+        {partnerOrderStatusLabel(status)}
       </span>
       <AddDataPurchaseBadge isAddDataPurchase={isAddDataPurchase} />
-      {showReady ? (
-        <span className="inline-flex rounded-full border border-[var(--accent-strong)]/35 bg-[var(--accent-strong)]/10 px-2.5 py-0.5 text-xs font-semibold text-[var(--heading)]">
-          {PARTNER_ESIM_READY_LABEL}
-        </span>
-      ) : null}
     </div>
   );
 }
@@ -101,13 +95,14 @@ export default function PartnerEsimOrderCard({
   const [showUsage, setShowUsage] = useState(false);
   const refunded = partnerOrderIsRefunded(row.statusBadge);
   const expired = row.statusBadge === "eSIM Expired";
+  const lifecyclePrimary = partnerOrderLifecycleIsPrimaryBadge(row.statusBadge);
   const lineReady = partnerOrderLineReady(row.statusBadge) && !refunded;
   const installAllowed = partnerOrderInstallAllowed(row.statusBadge) && !refunded;
   const addDataHref = row.addDataEligible
     ? `/partner/orders/${encodeURIComponent(row.orderId)}/add-data`
     : null;
   const detailHref = `/partner/orders/${encodeURIComponent(row.orderId)}`;
-  const expiredHelp = partnerOrderStatusHelp(row.statusBadge);
+  const statusHelp = partnerOrderStatusHelp(row.statusBadge);
 
   if (variant === "list") {
     return (
@@ -136,22 +131,16 @@ export default function PartnerEsimOrderCard({
             <StatusBadges
               status={row.statusBadge}
               isAddDataPurchase={row.isAddDataPurchase}
-              showReady={installAllowed}
             />
-            {!refunded && !expired ? (
+            {!refunded ? (
               <EsimLifecycleBadges
-                lifecycle={row.lifecycle}
-                remainingDataLabel={row.remainingDataLabel}
-              />
-            ) : expired && row.remainingDataLabel ? (
-              <EsimLifecycleBadges
-                lifecycle={null}
+                lifecycle={lifecyclePrimary ? null : row.lifecycle}
                 remainingDataLabel={row.remainingDataLabel}
               />
             ) : null}
-            {expiredHelp ? (
+            {statusHelp ? (
               <p className="text-xs font-medium text-[var(--text-muted)]">
-                {expiredHelp}
+                {statusHelp}
               </p>
             ) : null}
             {refundRequest ? (
@@ -216,21 +205,15 @@ export default function PartnerEsimOrderCard({
             <StatusBadges
               status={row.statusBadge}
               isAddDataPurchase={row.isAddDataPurchase}
-              showReady={installAllowed}
             />
-            {!refunded && !expired ? (
+            {!refunded ? (
               <EsimLifecycleBadges
-                lifecycle={row.lifecycle}
-                remainingDataLabel={row.remainingDataLabel}
-              />
-            ) : expired && row.remainingDataLabel ? (
-              <EsimLifecycleBadges
-                lifecycle={null}
+                lifecycle={lifecyclePrimary ? null : row.lifecycle}
                 remainingDataLabel={row.remainingDataLabel}
               />
             ) : null}
-            {expiredHelp ? (
-              <p className="text-sm text-[var(--text-muted)]">{expiredHelp}</p>
+            {statusHelp ? (
+              <p className="text-sm text-[var(--text-muted)]">{statusHelp}</p>
             ) : null}
           </div>
         </div>

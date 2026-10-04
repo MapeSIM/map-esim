@@ -9,7 +9,10 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
 import { isProviderUsageExpired } from "@/app/lib/esim/esimLifecycleNotificationShared";
-import { resolveCustomerEsimStatusBadge } from "@/app/lib/orders/customerOrderDisplay";
+import {
+  customerEsimLineReady,
+  resolveCustomerEsimStatusBadge,
+} from "@/app/lib/orders/customerOrderDisplay";
 import {
   fetchProviderUsage,
   normalizeProviderUsagePayload,
@@ -245,6 +248,7 @@ export async function resolveOwnedRechargeOrderId(options: {
       status: true,
       providerOrderId: true,
       iccidEncrypted: true,
+      providerLifecycleStatus: true,
       walletEsimPurchase: { select: { status: true } },
       adminPackageAssignment: { select: { status: true } },
     },
@@ -255,9 +259,13 @@ export async function resolveOwnedRechargeOrderId(options: {
     orderStatus: order.status,
     walletPurchaseStatus: order.walletEsimPurchase?.status,
     assignmentStatus: order.adminPackageAssignment?.status,
+    providerLifecycleStatus: order.providerLifecycleStatus,
   });
   if (statusBadge === "Refunded") return null;
-  if (order.status !== OrderStatus.COMPLETED || statusBadge !== "Completed") {
+  if (
+    order.status !== OrderStatus.COMPLETED ||
+    !customerEsimLineReady(statusBadge)
+  ) {
     return null;
   }
 

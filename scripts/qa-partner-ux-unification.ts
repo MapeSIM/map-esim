@@ -97,8 +97,8 @@ function main() {
     /Use the full ICCID above|Secure QR and one-tap install for Partners will follow|eSIM activated and ready to use/
   );
   const partnerCard = read("app/components/partner/PartnerEsimOrderCard.tsx");
-  assert.match(partnerCard, /Show eSIM Status & Usage/);
-  assert.match(partnerCard, /PARTNER_ESIM_READY_LABEL/);
+  assert.match(partnerCard, /Refresh Status/);
+  assert.match(partnerCard, /partnerOrderStatusLabel/);
   assert.match(partnerCard, /Amount Paid/);
   assert.doesNotMatch(partnerCard, /Recharge|Add Data|Reward Points/i);
   const partnerInstall = read("app/components/partner/PartnerEsimInstallPanel.tsx");

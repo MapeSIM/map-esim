@@ -11,6 +11,7 @@ import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
 import { requireSession } from "@/app/lib/auth/session";
 import { getCustomerOwnedOrderDetail } from "@/app/lib/orders/customerOrders";
 import {
+  customerEsimLifecycleIsPrimaryBadge,
   customerEsimLineReady,
   customerEsimStatusHelp,
   customerEsimStatusLabel,
@@ -42,7 +43,10 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 function statusBadgeClass(status: CustomerEsimStatusBadge): string {
   switch (status) {
     case "Completed":
+    case "Active":
       return "bg-[var(--accent-strong)]/18 text-[var(--heading)] border-[var(--accent-strong)]/45";
+    case "Data Depleted":
+      return "bg-[var(--warning-bg)] text-[var(--warning-text)] border-[var(--warning-border)]";
     case "Processing":
       return "bg-[var(--surface)] text-[var(--text)] border-[var(--border-hover)]";
     case "Review needed":
@@ -159,18 +163,14 @@ export default async function AccountOrderDetailPage({
                     isAddDataPurchase={detail.isAddDataPurchase}
                   />
                 </div>
-                {!detail.isRefunded && detail.statusBadge !== "eSIM Expired" ? (
+                {!detail.isRefunded ? (
                   <div className="mt-2">
                     <EsimLifecycleBadges
-                      lifecycle={detail.lifecycle}
-                      remainingDataLabel={detail.remainingDataLabel}
-                    />
-                  </div>
-                ) : detail.statusBadge === "eSIM Expired" &&
-                  detail.remainingDataLabel ? (
-                  <div className="mt-2">
-                    <EsimLifecycleBadges
-                      lifecycle={null}
+                      lifecycle={
+                        customerEsimLifecycleIsPrimaryBadge(detail.statusBadge)
+                          ? null
+                          : detail.lifecycle
+                      }
                       remainingDataLabel={detail.remainingDataLabel}
                     />
                   </div>

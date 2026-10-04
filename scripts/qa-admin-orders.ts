@@ -95,6 +95,18 @@ function main() {
   assert.match(detailSrc, /displayStatusLabel|isRefunded/);
   assert.match(ordersSrc, /hasCompletedRefund|RefundRequestStatus\.COMPLETED/);
   assert.match(ordersSrc, /providerLifecycleStatus|displayStatusBadge/);
+  assert.match(ordersSrc, /customerEsimInstallAllowed|customerEsimLifecycleIsPrimaryBadge/);
+  const displaySrc = readFileSync(
+    join(root, "app/lib/orders/customerOrderDisplay.ts"),
+    "utf8"
+  );
+  assert.match(displaySrc, /providerLifecycleStatus/);
+  assert.match(displaySrc, /lifecycle === "ACTIVE"/);
+  assert.match(displaySrc, /lifecycle === "DEPLETED"/);
+  assert.match(displaySrc, /lifecycle === "EXPIRED"/);
+  assert.match(displaySrc, /return "Active"/);
+  assert.match(displaySrc, /return "Data Depleted"/);
+  assert.match(displaySrc, /Ready to install/);
   assert.ok(!/JSON\.stringify/.test(detailSrc));
   assert.ok(!/createOrderAccessToken|checkout\/credit/i.test(detailSrc));
   assert.ok(!/decryptIccid/.test(detailSrc));

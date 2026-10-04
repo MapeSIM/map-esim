@@ -4,8 +4,9 @@ function lifecycleBadgeClass(status: string | null | undefined): string {
   switch (status) {
     case "ACTIVE":
       return "border-[var(--accent-strong)]/45 bg-[var(--accent-strong)]/14 text-[var(--heading)]";
-    case "EXPIRED":
     case "DEPLETED":
+      return "border-[var(--warning-border)] bg-[var(--warning-bg)] text-[var(--warning-text)]";
+    case "EXPIRED":
       return "border-[var(--danger-border)] bg-[var(--danger-bg)] text-[var(--danger-text)]";
     case "NOT_ACTIVE":
       return "border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--heading)]";

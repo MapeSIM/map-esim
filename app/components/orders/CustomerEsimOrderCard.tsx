@@ -5,6 +5,7 @@ import { CustomerEsimInstallHelpLinks } from "@/app/components/orders/CustomerEs
 import { EsimLifecycleBadges } from "@/app/components/orders/EsimLifecycleBadges";
 import {
   customerEsimInstallAllowed,
+  customerEsimLifecycleIsPrimaryBadge,
   customerEsimLineReady,
   customerEsimStatusHelp,
   customerEsimStatusLabel,
@@ -38,7 +39,10 @@ export type CustomerEsimOrderCardOrder = {
 function statusBadgeClass(status: CustomerEsimStatusBadge): string {
   switch (status) {
     case "Completed":
+    case "Active":
       return "bg-[var(--accent-strong)]/18 text-[var(--heading)] border-[var(--accent-strong)]/45";
+    case "Data Depleted":
+      return "bg-[var(--warning-bg)] text-[var(--warning-text)] border-[var(--warning-border)]";
     case "Processing":
       return "bg-[var(--surface-2)] text-[var(--text)] border-[var(--border-hover)]";
     case "Review needed":
@@ -60,6 +64,9 @@ export function CustomerEsimOrderCard({
   const lineReady = customerEsimLineReady(order.statusBadge);
   const installAllowed = customerEsimInstallAllowed(order.statusBadge);
   const expired = order.statusBadge === "eSIM Expired";
+  const lifecyclePrimary = customerEsimLifecycleIsPrimaryBadge(
+    order.statusBadge
+  );
   const href = `/account/orders/${encodeURIComponent(order.id)}`;
   const addDataHref = order.addDataEligible
     ? `/account/orders/${encodeURIComponent(order.id)}/add-data`
@@ -103,17 +110,10 @@ export function CustomerEsimOrderCard({
                 isAddDataPurchase={Boolean(order.isAddDataPurchase)}
               />
             </div>
-            {order.statusBadge !== "Refunded" && !expired ? (
+            {order.statusBadge !== "Refunded" ? (
               <div className="mt-2">
                 <EsimLifecycleBadges
-                  lifecycle={order.lifecycle}
-                  remainingDataLabel={order.remainingDataLabel}
-                />
-              </div>
-            ) : expired && order.remainingDataLabel ? (
-              <div className="mt-2">
-                <EsimLifecycleBadges
-                  lifecycle={null}
+                  lifecycle={lifecyclePrimary ? null : order.lifecycle}
                   remainingDataLabel={order.remainingDataLabel}
                 />
               </div>

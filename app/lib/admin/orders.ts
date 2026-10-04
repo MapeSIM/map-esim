@@ -23,7 +23,9 @@ import {
 } from "@/app/lib/admin/display";
 import { prisma } from "@/app/lib/db";
 import { resolveAddDataPurchaseLabel } from "@/app/lib/esim/addDataCheckout";
-import {
+  import {
+  customerEsimInstallAllowed,
+  customerEsimLifecycleIsPrimaryBadge,
   customerEsimStatusLabel,
   resolveCustomerEsimStatusBadge,
   type CustomerEsimStatusBadge,
@@ -393,7 +395,10 @@ export async function getAdminOrdersPage(
       addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
       displayStatusBadge,
       displayStatusLabel: customerEsimStatusLabel(displayStatusBadge),
-      lifecycleLabel: lifecycle.lifecycleLabel,
+      // Avoid "Active" + "Active" when primary badge already reflects lifecycle.
+      lifecycleLabel: customerEsimLifecycleIsPrimaryBadge(displayStatusBadge)
+        ? null
+        : lifecycle.lifecycleLabel,
       remainingDataLabel: formatLifecycleGb(row.providerRemainingDataGb),
     };
   });
@@ -530,7 +535,7 @@ export async function getAdminOrderDetail(
   const isRefunded = statusBadge === "Refunded" || hasCompletedRefund;
   const installEligible =
     row.status === OrderStatus.COMPLETED &&
-    statusBadge === "Completed" &&
+    customerEsimInstallAllowed(statusBadge) &&
     !isRefunded;
   const lifecycle = toProviderLifecycleCacheView({
     providerLifecycleStatus: row.providerLifecycleStatus,

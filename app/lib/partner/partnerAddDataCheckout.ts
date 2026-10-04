@@ -19,7 +19,11 @@ import {
   lookupOfferTopUpFromCatalog,
 } from "@/app/lib/orders/customerOrders";
 import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
-import { partnerOrderStatusFromPurchase } from "@/app/lib/partner/partnerOrdersDisplay";
+import {
+  partnerOrderIsRefunded,
+  partnerOrderLineReady,
+  partnerOrderStatusFromPurchase,
+} from "@/app/lib/partner/partnerOrdersDisplay";
 import { normalizeOfferId } from "@/app/lib/vesim/server";
 
 /**
@@ -71,6 +75,7 @@ export async function resolvePartnerOwnedRechargeOrderId(options: {
           offerId: true,
           providerOrderId: true,
           iccidEncrypted: true,
+          providerLifecycleStatus: true,
         },
       },
     },
@@ -79,12 +84,16 @@ export async function resolvePartnerOwnedRechargeOrderId(options: {
   if (!purchase?.order) return null;
 
   const order = purchase.order;
-  const statusBadge = partnerOrderStatusFromPurchase(purchase.status);
-  const isRefunded = statusBadge === "Failed — balance returned";
-  const installEligible =
+  const statusBadge = partnerOrderStatusFromPurchase(purchase.status, {
+    providerLifecycleStatus: order.providerLifecycleStatus,
+  });
+  const isRefunded = partnerOrderIsRefunded(statusBadge);
+  const lineReady =
     order.status === OrderStatus.COMPLETED &&
     purchase.status === PartnerEsimPurchaseStatus.COMPLETED &&
-    statusBadge === "Completed";
+    partnerOrderLineReady(statusBadge) &&
+    !isRefunded;
+  const installEligible = lineReady;
 
   const offerId =
     normalizeOfferId(purchase.offerId) ||
