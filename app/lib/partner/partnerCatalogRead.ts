@@ -45,7 +45,7 @@ export type PartnerCatalogFundingDisplay = {
   gatewayAmountCents: number;
 };
 
-/** Partner-facing offer card. No discount / provider / charge cents fields. */
+/** Partner-facing offer card. No discount / provider / raw charge field names. */
 export type PartnerCatalogOffer = {
   offerId: string;
   name: string;
@@ -53,6 +53,11 @@ export type PartnerCatalogOffer = {
   validityLabel: string;
   /** Final Partner price after admin discount — display only. */
   partnerPriceLabel: string;
+  /**
+   * Final Partner payable (integer USD cents) for balance sufficiency UI.
+   * Display/check only — purchase path recomputes server-side.
+   */
+  partnerPriceCents: number;
   destinationLabel: string;
   /** Present when split payment UI is enabled. */
   fundingDisplay: PartnerCatalogFundingDisplay | null;
@@ -132,6 +137,7 @@ function buildPartnerCatalogOfferDisplay(input: {
     dataLabel: input.dataLabel,
     validityLabel: input.validityLabel,
     partnerPriceLabel: `${formatUsdCents(partnerChargeCents)} USD`,
+    partnerPriceCents: partnerChargeCents,
     destinationLabel: input.destinationLabel,
     fundingDisplay,
   };

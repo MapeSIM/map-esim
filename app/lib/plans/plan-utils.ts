@@ -73,7 +73,7 @@ export function buildCheckoutHref(
   return `/account/esim/buy?${params.toString()}`;
 }
 
-/** Partner wallet buy from the public storefront. Same offer/country hints only. */
+/** Partner wallet buy — lands on unified catalog with destination preselected. */
 export function buildPartnerCheckoutHref(
   offer: VesimOffer,
   destinationCode: string
@@ -84,7 +84,7 @@ export function buildPartnerCheckoutHref(
   if (destinationCode.trim()) {
     params.set("country", destinationCode.trim());
   }
-  return `/partner/buy?${params.toString()}`;
+  return `/partner/catalog?${params.toString()}`;
 }
 
 export function summarizePlanTypes(offers: VesimOffer[]) {

@@ -98,9 +98,13 @@ export default function PartnerOfferPaymentForm({
     splitPaymentEnabled && preview.gatewayAmountCents > 0;
   const showModePicker = splitPaymentEnabled && payableCents > 0;
   const showSimpaisa = onlineAllowed && gatewayRequired;
+  const walletCoversPlan =
+    payableCents <= 0 || balanceCents >= payableCents;
+  const walletOnlyInsufficient =
+    !splitPaymentEnabled && payableCents > 0 && !walletCoversPlan;
   const ctaLabel = gatewayRequired
     ? "Continue to payment"
-    : "Buy with Partner balance";
+    : "Confirm purchase";
   const ctaPendingLabel = gatewayRequired
     ? "Starting payment…"
     : "Purchasing…";
@@ -108,6 +112,7 @@ export default function PartnerOfferPaymentForm({
   const submitDisabled =
     buyPending ||
     visibility.walletOnlyInsufficient ||
+    walletOnlyInsufficient ||
     (gatewayRequired && !onlineAllowed);
 
   return (
@@ -122,6 +127,39 @@ export default function PartnerOfferPaymentForm({
         <input type="hidden" name="paymentMode" value={paymentMode} />
       ) : null}
 
+      {payableCents > 0 ? (
+        <p
+          className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--heading)]"
+          role="status"
+          aria-live="polite"
+        >
+          Wallet Balance:{" "}
+          <span className="font-semibold tabular-nums">
+            {formatUsdCents(balanceCents)} USD
+          </span>
+          <span className="mx-1.5 text-[var(--text-soft)]" aria-hidden="true">
+            |
+          </span>
+          Plan Cost:{" "}
+          <span className="font-semibold tabular-nums">
+            {formatUsdCents(payableCents)} USD
+          </span>
+          {!splitPaymentEnabled ? (
+            <span className="mt-1 block text-xs text-[var(--text-muted)]">
+              {walletCoversPlan
+                ? "Balance covers this plan — confirm to debit Partner wallet."
+                : "Insufficient Partner balance for this plan."}
+            </span>
+          ) : null}
+        </p>
+      ) : null}
+
+      {walletOnlyInsufficient ? (
+        <p className="text-sm text-[var(--heading)]" role="status">
+          Add funds to your Partner wallet, then return here to purchase.
+        </p>
+      ) : null}
+
       {showModePicker ? (
         <section aria-labelledby={paymentModeHeadingId} className="space-y-2">
           <h3
@@ -130,12 +168,6 @@ export default function PartnerOfferPaymentForm({
           >
             Payment
           </h3>
-          <p className="text-sm text-[var(--text-muted)]">
-            Partner balance:{" "}
-            <span className="font-semibold tabular-nums text-[var(--heading)]">
-              {formatUsdCents(balanceCents)} USD
-            </span>
-          </p>
 
           {visibility.walletOnlyInsufficient ? (
             <p className="text-sm text-[var(--heading)]" role="status">

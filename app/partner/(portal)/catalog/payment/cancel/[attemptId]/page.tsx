@@ -59,10 +59,10 @@ export default async function PartnerCatalogPaymentCancelPage({
           Partner balance.
         </p>
         <Link
-          href="/countries"
+          href="/partner/catalog"
           className="inline-flex h-10 items-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)]"
         >
-          Back to destinations
+          Back to catalog
         </Link>
       </div>
     </div>

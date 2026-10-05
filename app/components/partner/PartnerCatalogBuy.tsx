@@ -32,6 +32,10 @@ type Props = {
   destinations: PartnerCatalogDestination[];
   balanceLabel: string;
   balanceCents: number;
+  /** Optional deep-link destination (e.g. from public plan Buy Now). */
+  initialCountry?: string | null;
+  /** Optional deep-link offer highlight within the selected destination. */
+  initialOfferId?: string | null;
   /** When true, show payment mode + gateway remainder (feature-flagged). */
   splitPaymentEnabled?: boolean;
   paymentGatewayConfigured?: boolean;
@@ -120,13 +124,22 @@ export default function PartnerCatalogBuy({
   destinations,
   balanceLabel,
   balanceCents,
+  initialCountry = null,
+  initialOfferId = null,
   splitPaymentEnabled = false,
   paymentGatewayConfigured = false,
 }: Props) {
   const searchFieldId = useId();
   const offersHeadingId = useId();
   const [search, setSearch] = useState("");
-  const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  const [selectedCode, setSelectedCode] = useState<string | null>(() => {
+    const hint = (initialCountry ?? "").trim();
+    if (!hint) return null;
+    const match = destinations.find(
+      (d) => d.code.trim().toUpperCase() === hint.toUpperCase()
+    );
+    return match?.code ?? null;
+  });
   const [offers, setOffers] = useState<PartnerCatalogOffer[]>([]);
   const [offersError, setOffersError] = useState<string | null>(null);
   const [offersLoading, startOffersLoad] = useTransition();
@@ -187,12 +200,21 @@ export default function PartnerCatalogBuy({
           }
           return next;
         });
+        if (initialOfferId) {
+          const target = `partner-offer-${initialOfferId}`;
+          setTimeout(() => {
+            document.getElementById(target)?.scrollIntoView({
+              behavior: "smooth",
+              block: "nearest",
+            });
+          }, 0);
+        }
       } catch {
         setOffers([]);
         setOffersError("Plans are temporarily unavailable. Please try again.");
       }
     });
-  }, [selectedCode]);
+  }, [selectedCode, initialOfferId]);
 
   const showResult =
     buyState.kind !== "idle" &&
@@ -257,15 +279,12 @@ export default function PartnerCatalogBuy({
             >
               Back to dashboard
             </Link>
-            <button
-              type="button"
+            <Link
+              href="/partner/catalog"
               className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--surface)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-              onClick={() => {
-                window.location.href = "/countries";
-              }}
             >
-              Browse destinations again
-            </button>
+              Browse catalog again
+            </Link>
           </div>
         </div>
       ) : null}
@@ -374,11 +393,22 @@ export default function PartnerCatalogBuy({
         ) : (
           <ul className="mt-4 space-y-3">
             {offers.map((offer) => {
-              const payableCents = offer.fundingDisplay?.totalCents ?? 0;
+              const payableCents =
+                offer.partnerPriceCents > 0
+                  ? offer.partnerPriceCents
+                  : offer.fundingDisplay?.totalCents ?? 0;
+              const highlight =
+                Boolean(initialOfferId) &&
+                offer.offerId === initialOfferId;
               return (
                 <li
                   key={offer.offerId}
-                  className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5"
+                  id={`partner-offer-${offer.offerId}`}
+                  className={`rounded-2xl border bg-[var(--surface-2)] p-4 sm:p-5 ${
+                    highlight
+                      ? "border-[var(--accent-strong)]"
+                      : "border-[var(--border)]"
+                  }`}
                 >
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0 space-y-1">
@@ -403,11 +433,7 @@ export default function PartnerCatalogBuy({
                           idempotencyByOffer[offer.offerId] ||
                           newIdempotencyKey()
                         }
-                        payableCents={
-                          splitPaymentEnabled && payableCents > 0
-                            ? payableCents
-                            : 0
-                        }
+                        payableCents={payableCents}
                         balanceCents={balanceCents}
                         splitPaymentEnabled={splitPaymentEnabled}
                         paymentGatewayConfigured={paymentGatewayConfigured}

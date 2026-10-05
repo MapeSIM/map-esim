@@ -21,5 +21,5 @@ export function partnerEsimPurchasePaymentOrdersHref(): string {
 }
 
 export function partnerEsimPurchasePaymentCatalogHref(): string {
-  return "/countries";
+  return "/partner/catalog";
 }

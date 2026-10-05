@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireRole } from "@/app/lib/auth/session";
 import { prisma } from "@/app/lib/db";
 import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
@@ -14,6 +14,10 @@ import { formatUsdCents } from "@/app/lib/wallet/display";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Deep-link confirm for a single Partner-priced offer.
+ * Primary browse+buy lives at /partner/catalog — missing params redirect there.
+ */
 export default async function PartnerStorefrontBuyPage({
   searchParams,
 }: {
@@ -25,6 +29,14 @@ export default async function PartnerStorefrontBuyPage({
   const offerId = normalizeOfferId(query.offerId);
   const country = sanitizeCountryHint(query.country);
 
+  if (!offerId || !country) {
+    const params = new URLSearchParams();
+    if (country) params.set("country", country);
+    if (offerId) params.set("offerId", offerId);
+    const qs = params.toString();
+    redirect(qs ? `/partner/catalog?${qs}` : "/partner/catalog");
+  }
+
   if (!actor) {
     return (
       <div
@@ -34,23 +46,6 @@ export default async function PartnerStorefrontBuyPage({
         <p className="text-sm font-medium text-[var(--heading)]">
           Partner access is unavailable.
         </p>
-      </div>
-    );
-  }
-
-  if (!offerId || !country) {
-    return (
-      <div className="space-y-4">
-        <h1 className="text-2xl font-bold tracking-tight">Buy eSIM</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          Choose a plan from the destination catalog.
-        </p>
-        <Link
-          href="/countries"
-          className="inline-flex h-11 items-center rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--accent-ink)]"
-        >
-          Browse destinations
-        </Link>
       </div>
     );
   }
@@ -75,21 +70,7 @@ export default async function PartnerStorefrontBuyPage({
   const offer = offers.find((row) => row.offerId === offerId) ?? null;
 
   if (!offer) {
-    return (
-      <div className="space-y-4">
-        <h1 className="text-2xl font-bold tracking-tight">Buy eSIM</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          That plan is not available right now. Browse destinations and try
-          again.
-        </p>
-        <Link
-          href="/countries"
-          className="inline-flex h-11 items-center rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--accent-ink)]"
-        >
-          Browse destinations
-        </Link>
-      </div>
-    );
+    redirect(`/partner/catalog?country=${encodeURIComponent(country)}`);
   }
 
   return (
@@ -97,7 +78,7 @@ export default async function PartnerStorefrontBuyPage({
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Confirm purchase</h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Review your Partner price, then confirm the purchase.
+          Review your Partner price and wallet balance, then confirm.
         </p>
       </header>
       <PartnerStorefrontBuy

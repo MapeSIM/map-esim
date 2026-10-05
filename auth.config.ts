@@ -106,7 +106,7 @@ export const authConfig = {
             pathname === "/account/esim/buy" ||
             pathname.startsWith("/account/esim/buy/")
           ) {
-            const dest = new URL("/partner/buy", request.nextUrl);
+            const dest = new URL("/partner/catalog", request.nextUrl);
             dest.search = request.nextUrl.search;
             return Response.redirect(dest);
           }

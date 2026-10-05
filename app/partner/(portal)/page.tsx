@@ -118,9 +118,9 @@ export default async function PartnerDashboardPage() {
         <h2 className="text-lg font-semibold tracking-tight">Quick Actions</h2>
         <div className="grid gap-3">
           <AccountActionRow
-            href="/countries"
-            title="Destinations"
-            subtitle="Browse the same destinations and plans as customers"
+            href="/partner/catalog"
+            title="Buy eSIM"
+            subtitle="Browse destinations at your Partner wholesale price"
             icon={<CreditCard className="h-5 w-5" aria-hidden="true" />}
             emphasize
           />

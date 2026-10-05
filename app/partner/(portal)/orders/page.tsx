@@ -97,10 +97,10 @@ export default async function PartnerOrdersPage({
           <p className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-4 py-6 text-sm text-[var(--text-muted)]">
             You have not purchased an eSIM yet.{" "}
             <Link
-              href="/countries"
+              href="/partner/catalog"
               className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
             >
-              Browse destinations
+              Browse the catalog
             </Link>{" "}
             to find a plan.
           </p>

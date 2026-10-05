@@ -142,6 +142,7 @@ async function main() {
     });
     assert.ok(catalogOffer);
     assert.equal(catalogOffer!.partnerPriceLabel, "$10.00 USD");
+    assert.equal(catalogOffer!.partnerPriceCents, 1000);
     assert.equal(catalogOffer!.dataLabel, "1 GB");
     assert.equal(catalogOffer!.validityLabel, "7 Days");
     assert.equal(catalogOffer!.fundingDisplay, null);
@@ -159,6 +160,7 @@ async function main() {
     });
     assert.ok(discounted);
     assert.equal(discounted!.partnerPriceLabel, "$9.50 USD");
+    assert.equal(discounted!.partnerPriceCents, 950);
     assert.ok(discounted!.fundingDisplay);
     assert.equal(discounted!.fundingDisplay!.requiresGateway, true);
     assert.equal(discounted!.fundingDisplay!.totalLabel, "$9.50 USD");
@@ -578,10 +580,10 @@ async function main() {
       path.join(root, "app/partner/(portal)/layout.tsx"),
       "utf8"
     );
-    assert.ok(layoutSrc.includes('href: "/countries"'));
-    assert.ok(layoutSrc.includes('label: "Destinations"'));
-    assert.ok(!layoutSrc.includes('label: "Catalog"'));
-    assert.ok(!layoutSrc.includes('href: "/partner/catalog"'));
+    assert.ok(layoutSrc.includes('href: "/partner/catalog"'));
+    assert.ok(layoutSrc.includes('label: "Buy eSIM"'));
+    assert.ok(!layoutSrc.includes('label: "Destinations"'));
+    assert.ok(!layoutSrc.includes('href: "/countries"'));
     assert.ok(layoutSrc.includes('href: "/partner/orders"'));
     assert.equal(layoutSrc.includes('label: "Orders", disabled: true'), false);
     console.log("PASS nav_catalog_and_orders_enabled");
@@ -590,9 +592,9 @@ async function main() {
       path.join(root, "app/partner/(portal)/catalog/page.tsx"),
       "utf8"
     );
-    assert.ok(catalogPageSrc.includes('redirect("/countries")'));
-    assert.ok(!catalogPageSrc.includes("PartnerCatalogBuy"));
-    console.log("PASS catalog_page_redirects_to_countries");
+    assert.ok(catalogPageSrc.includes("PartnerCatalogBuy"));
+    assert.ok(!catalogPageSrc.includes('redirect("/countries")'));
+    console.log("PASS catalog_page_renders_partner_buy");
 
     const cancelSrc = readFileSync(
       path.join(
@@ -601,10 +603,10 @@ async function main() {
       ),
       "utf8"
     );
-    assert.ok(cancelSrc.includes('href="/countries"'));
-    assert.ok(cancelSrc.includes("Back to destinations"));
-    assert.ok(!cancelSrc.includes("Back to catalog"));
-    console.log("PASS payment_cancel_back_to_destinations");
+    assert.ok(cancelSrc.includes('href="/partner/catalog"'));
+    assert.ok(cancelSrc.includes("Back to catalog"));
+    assert.ok(!cancelSrc.includes("Back to destinations"));
+    console.log("PASS payment_cancel_back_to_catalog");
 
     const returnHrefSrc = readFileSync(
       path.join(
@@ -613,9 +615,9 @@ async function main() {
       ),
       "utf8"
     );
-    assert.ok(returnHrefSrc.includes('return "/countries"'));
-    assert.ok(!returnHrefSrc.includes('return "/partner/catalog"'));
-    console.log("PASS payment_return_destinations_href");
+    assert.ok(returnHrefSrc.includes('return "/partner/catalog"'));
+    assert.ok(!returnHrefSrc.includes('return "/countries"'));
+    console.log("PASS payment_return_catalog_href");
 
     console.log("ALL PASS qa-partner-catalog-buy");
   } finally {
