@@ -189,6 +189,35 @@ function main() {
   );
   console.log("PASS abandoned_recovery_customer_coalesce");
 
+  // Recovery email template + once-only claim + purchase resume deep-link
+  const template = read("app/lib/email/abandonedCheckoutTemplate.ts");
+  const notify = read("app/lib/esim/abandonedCheckoutNotification.ts");
+  const claim = read("app/lib/esim/abandonedCheckoutEmailClaim.ts");
+  const cron = read("app/api/cron/abandoned-checkout-recovery/route.ts");
+  const sample = read("app/dev/email-preview/samples.ts");
+
+  assert.match(template, /Complete Your Order/);
+  assert.match(template, /Destination/);
+  assert.match(template, /Plan/);
+  assert.match(template, /resumeCheckoutUrl/);
+  assert.match(notify, /customerPendingPurchaseHref/);
+  assert.match(notify, /dataAllowance/);
+  assert.match(notify, /validity/);
+  assert.match(notify, /planParts\.join\(" · "\)/);
+  assert.match(notify, /ABANDONED_CHECKOUT_EMAIL_SENT/);
+  assert.match(claim, /already_sent/);
+  assert.match(claim, /isAbandonedCheckoutEmailClaimable/);
+  assert.match(claim, /ABANDONED_CHECKOUT_EMAIL_SENT/);
+  assert.match(cron, /Not registered in vercel\.json/);
+  assert.match(cron, /30 and 90 minutes/);
+  assert.match(cron, /runAbandonedCheckoutRecovery/);
+  assert.match(
+    sample,
+    /\/account\/esim\/buy\/review\?purchase=/
+  );
+  assert.doesNotMatch(sample, /\?resume=/);
+  console.log("PASS abandoned_recovery_email_cta_and_resume");
+
   console.log("OK qa-abandoned-checkout-review-ux");
 }
 

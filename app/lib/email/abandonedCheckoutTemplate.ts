@@ -58,7 +58,7 @@ export function renderAbandonedCheckoutEmailHtml(
               )}
               ${renderEmailCtaButton(
                 payload.resumeCheckoutUrl,
-                "Continue checkout"
+                "Complete Your Order"
               )}
               ${renderEmailSupportBlock()}`,
   });
@@ -87,7 +87,7 @@ export function renderAbandonedCheckoutEmailText(
     `Amount: ${payload.amountLabel} ${payload.currencyLabel}`,
     "",
     "Continue checkout when you are ready — your package selection is still available.",
-    `Continue checkout: ${payload.resumeCheckoutUrl}`,
+    `Complete Your Order: ${payload.resumeCheckoutUrl}`,
     "",
     `Support: ${BRAND_SUPPORT_EMAIL}`,
     `Contact: ${BRAND_SITE_URL}/contact`,

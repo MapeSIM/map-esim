@@ -146,6 +146,8 @@ async function dispatchAbandonedCheckoutEmail(
         status: true,
         adminUserId: true,
         planName: true,
+        dataAllowance: true,
+        validity: true,
         destinationName: true,
         destinationCode: true,
         priceCents: true,
@@ -204,7 +206,10 @@ async function dispatchAbandonedCheckoutEmail(
       (row.destinationName ?? "").trim() ||
       (row.destinationCode ?? "").trim() ||
       null;
-    const planLabel = (row.planName ?? "").trim() || null;
+    const planParts = [row.planName, row.dataAllowance, row.validity]
+      .map((v) => (v ?? "").trim())
+      .filter(Boolean);
+    const planLabel = planParts.length > 0 ? planParts.join(" · ") : null;
     const resumeCheckoutUrl = `${BRAND_SITE_URL}${resumePath}`;
 
     const payload = {

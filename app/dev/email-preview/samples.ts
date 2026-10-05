@@ -85,12 +85,12 @@ export function sampleAbandonedCheckoutPayload(): AbandonedCheckoutEmailPayload 
   return {
     customerName: "Ada Lovelace",
     purchaseReference: "purc…9f2a",
-    planLabel: "1GB / 7 days",
+    planLabel: "1GB · 7 days",
     destinationLabel: "Turkey",
     amountLabel: "$12.99",
     currencyLabel: "USD",
     resumeCheckoutUrl:
-      "https://mapesim.com/account/esim/buy?resume=sample-opaque-token",
+      "https://mapesim.com/account/esim/buy/review?purchase=sample-purchase-id",
   };
 }
 
