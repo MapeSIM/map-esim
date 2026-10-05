@@ -72,6 +72,9 @@ export async function claimEsimLifecycleRunnerLock(
   const claimExpiresAt = new Date(
     now.getTime() + ESIM_LIFECYCLE_RUNNER_LOCK_TTL_MS
   );
+  // Treat locks older than TTL as crashed/stale even if claimExpiresAt was wrong.
+  const staleBefore = new Date(now.getTime() - ESIM_LIFECYCLE_RUNNER_LOCK_TTL_MS);
+
   await prisma.esimLifecycleNotificationRunnerLock.upsert({
     where: { id: "default" },
     create: {
@@ -82,6 +85,7 @@ export async function claimEsimLifecycleRunnerLock(
     },
     update: {},
   });
+
   const claimed = await prisma.esimLifecycleNotificationRunnerLock.updateMany({
     where: {
       id: "default",
@@ -89,6 +93,8 @@ export async function claimEsimLifecycleRunnerLock(
         { claimToken: null },
         { claimExpiresAt: null },
         { claimExpiresAt: { lte: now } },
+        { claimedAt: null },
+        { claimedAt: { lte: staleBefore } },
       ],
     },
     data: {
@@ -104,14 +110,40 @@ export async function claimEsimLifecycleRunnerLock(
 export async function releaseEsimLifecycleRunnerLock(
   claimToken: string
 ): Promise<void> {
+  const token = (claimToken ?? "").trim();
+  if (!token) return;
   await prisma.esimLifecycleNotificationRunnerLock.updateMany({
-    where: { id: "default", claimToken },
+    where: { id: "default", claimToken: token },
     data: {
       claimToken: null,
       claimedAt: null,
       claimExpiresAt: null,
     },
   });
+}
+
+/**
+ * Clear any stuck runner lock (auth-gated via cron route ?force=1 / ?unlock=1).
+ * Does not require the original claim token.
+ */
+export async function forceClearEsimLifecycleRunnerLock(): Promise<{
+  cleared: boolean;
+}> {
+  await prisma.esimLifecycleNotificationRunnerLock.upsert({
+    where: { id: "default" },
+    create: {
+      id: "default",
+      claimToken: null,
+      claimedAt: null,
+      claimExpiresAt: null,
+    },
+    update: {
+      claimToken: null,
+      claimedAt: null,
+      claimExpiresAt: null,
+    },
+  });
+  return { cleared: true };
 }
 
 async function resolveOrderIccid(
@@ -393,6 +425,12 @@ export async function runEsimLifecycleNotifications(options?: {
 
     return { ok: true, runnerClaimed: true, counts };
   } finally {
-    await releaseEsimLifecycleRunnerLock(lock.claimToken);
+    // Always release — even on early returns / thrown errors. Swallow release
+    // failures so they never mask the original result/error.
+    try {
+      await releaseEsimLifecycleRunnerLock(lock.claimToken);
+    } catch {
+      // ignore
+    }
   }
 }

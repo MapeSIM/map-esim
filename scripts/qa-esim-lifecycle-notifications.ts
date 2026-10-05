@@ -315,6 +315,13 @@ function main() {
   assert.match(notify, /channel:\s*"orders"/);
   assert.match(notify, /maybeDeliverEsimLifecycleNotificationsFromUsage/);
   assert.match(runner, /claimEsimLifecycleRunnerLock/);
+  assert.match(runner, /forceClearEsimLifecycleRunnerLock/);
+  assert.match(runner, /claimedAt: \{ lte: staleBefore \}|staleBefore/);
+  assert.match(runner, /finally \{/);
+  assert.match(shared, /ESIM_LIFECYCLE_BATCH_SIZE = 15/);
+  assert.match(shared, /ESIM_LIFECYCLE_RUNNER_LOCK_TTL_MS = 5 \* 60 \* 1000/);
+  assert.match(cron, /force=1|unlock=1|forceClearEsimLifecycleRunnerLock/);
+  assert.match(cron, /lockForceCleared/);
   assert.match(runner, /fetchProviderUsage/);
   assert.match(runner, /normalizeProviderUsagePayload/);
   assert.match(runner, /evaluateEsimLifecycleEvents/);

@@ -6,9 +6,15 @@
  * Schedule: daily UTC via vercel.json (`0 6 * * *`) for Vercel Hobby
  * (max 1 cron run/day). Runner stays reusable for hourly later via plan
  * upgrade or an approved external scheduler hitting this same endpoint.
+ *
+ * Ops: `?force=1` or `?unlock=1` clears a stuck EsimLifecycleNotificationRunnerLock
+ * before claiming (still requires valid CRON_SECRET).
  */
 import { NextResponse } from "next/server";
-import { runEsimLifecycleNotifications } from "@/app/lib/esim/esimLifecycleNotificationRunner";
+import {
+  forceClearEsimLifecycleRunnerLock,
+  runEsimLifecycleNotifications,
+} from "@/app/lib/esim/esimLifecycleNotificationRunner";
 import { reportServerErrorAsync } from "@/app/lib/monitoring/serverErrorMonitoring";
 import { runGatewayStaleReservationRecovery } from "@/app/lib/payments/gatewayStaleReservationRecovery";
 
@@ -51,9 +57,37 @@ async function handle(request: Request): Promise<Response> {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
+  const url = new URL(request.url);
   const dryRun =
-    new URL(request.url).searchParams.get("dryRun") === "1" ||
+    url.searchParams.get("dryRun") === "1" ||
     request.headers.get("x-cron-dry-run") === "1";
+  const forceUnlock =
+    url.searchParams.get("force") === "1" ||
+    url.searchParams.get("unlock") === "1" ||
+    request.headers.get("x-cron-force-unlock") === "1";
+
+  let lockForceCleared = false;
+  if (forceUnlock) {
+    try {
+      await forceClearEsimLifecycleRunnerLock();
+      lockForceCleared = true;
+    } catch (error) {
+      await reportServerErrorAsync(error, {
+        operation: "cron_esim_lifecycle_force_unlock",
+        cronJob: "esim-lifecycle-notifications",
+        errorCode: "force_unlock_failed",
+      });
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "force_unlock_failed",
+          lockForceCleared: false,
+          dryRun,
+        },
+        { status: 500 }
+      );
+    }
+  }
 
   try {
     const result = await runEsimLifecycleNotifications({ dryRun });
@@ -104,6 +138,7 @@ async function handle(request: Request): Promise<Response> {
         runnerClaimed: result.runnerClaimed,
         counts: result.counts,
         errorCode: result.errorCode ?? null,
+        lockForceCleared,
         staleRelease: staleRelease
           ? {
               ok: staleRelease.ok,
@@ -121,7 +156,10 @@ async function handle(request: Request): Promise<Response> {
       cronJob: "esim-lifecycle-notifications",
       errorCode: "unhandled",
     });
-    return NextResponse.json({ ok: false, error: "internal" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "internal", lockForceCleared },
+      { status: 500 }
+    );
   }
 }
 

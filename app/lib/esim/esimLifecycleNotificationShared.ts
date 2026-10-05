@@ -46,8 +46,9 @@ export const ESIM_LIFECYCLE_EXPIRY_SOON_HOURS = 24;
 export const ESIM_LIFECYCLE_LOW_DATA_REMAINING_PERCENT = 20;
 
 export const ESIM_LIFECYCLE_CLAIM_TTL_MS = 5 * 60 * 1000;
-export const ESIM_LIFECYCLE_RUNNER_LOCK_TTL_MS = 10 * 60 * 1000;
-export const ESIM_LIFECYCLE_BATCH_SIZE = 40;
+/** Runner lock TTL / stale threshold — reclaim after 5 minutes if prior run crashed. */
+export const ESIM_LIFECYCLE_RUNNER_LOCK_TTL_MS = 5 * 60 * 1000;
+export const ESIM_LIFECYCLE_BATCH_SIZE = 15;
 
 /** Fetch a wider pool, then prioritize urgent rows before taking BATCH_SIZE. */
 export const ESIM_LIFECYCLE_CANDIDATE_POOL_MULTIPLIER = 4;
