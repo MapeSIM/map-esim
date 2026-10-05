@@ -285,10 +285,11 @@ function main() {
   assert.match(orderCard, /\$\{encodeURIComponent\(order\.id\)\}/);
   assert.doesNotMatch(orderCard, /rechargeOrderId/);
   assert.match(detailPage, /addDataEligible/);
-  // Add More Data lives in Usage panel only (no duplicate detail-page CTA).
+  // Add More Data lives in the shared Order Details card (EsimOrderDetailCard).
   assert.doesNotMatch(detailPage, /Need more data\?/);
   assert.doesNotMatch(detailPage, /add-more-data-heading/);
-  assert.doesNotMatch(
+  assert.match(detailPage, /EsimOrderDetailCard/);
+  assert.match(
     detailPage,
     /\$\{encodeURIComponent\(detail\.id\)\}\/add-data/
   );
@@ -296,6 +297,9 @@ function main() {
     detailPage,
     /encodeURIComponent\(detail\.rechargeOrderId\)/
   );
+  const detailCard = read("app/components/orders/EsimOrderDetailCard.tsx");
+  assert.match(detailCard, /Add data to this eSIM/);
+  assert.match(detailCard, /addDataHref/);
   assert.match(usagePanel, /addDataEligible/);
   assert.match(usagePanel, /Add More Data/);
   assert.match(usagePanel, /\/add-data/);
@@ -377,7 +381,7 @@ function main() {
   );
   assert.match(partnerAddDataActions, /resolvePartnerAddDataIdempotencyKey/);
   assert.doesNotMatch(addDataPage, /Coming soon/);
-  assert.match(detailPage, /CustomerEsimUsagePanel/);
+  assert.match(detailPage, /EsimOrderDetailCard|CustomerEsimUsagePanel/);
   assert.match(usageLib, /import "server-only"/);
   assert.match(usageLib, /authorizeCustomerOwnedOrderInstall/);
   assert.match(usageLib, /\/api\/esim\/usage\//);

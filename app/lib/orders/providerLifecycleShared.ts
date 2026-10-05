@@ -24,6 +24,9 @@ export type ProviderLifecycleCacheView = {
   activatedAtLabel: string | null;
   expiresAtLabel: string | null;
   syncedAtLabel: string | null;
+  /** Raw ISO/instant for relative day math — never invents expiry. */
+  activatedAtIso: string | null;
+  expiresAtIso: string | null;
 };
 
 export function isProviderLifecycleStatus(
@@ -114,6 +117,19 @@ export function formatLifecycleSyncedAt(
   );
 }
 
+function toIsoInstant(
+  value: Date | string | null | undefined
+): string | null {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.toISOString();
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const ms = Date.parse(trimmed);
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+}
+
 export function toProviderLifecycleCacheView(input: {
   providerLifecycleStatus?: string | null;
   providerRemainingDataGb?: number | null;
@@ -127,6 +143,8 @@ export function toProviderLifecycleCacheView(input: {
   const lifecycleStatus = isProviderLifecycleStatus(input.providerLifecycleStatus)
     ? input.providerLifecycleStatus
     : null;
+  const activatedAtIso = toIsoInstant(input.providerActivatedAt ?? null);
+  const expiresAtIso = toIsoInstant(input.providerExpiresAt ?? null);
   return {
     lifecycleStatus,
     lifecycleLabel: providerLifecycleLabel(lifecycleStatus),
@@ -153,5 +171,7 @@ export function toProviderLifecycleCacheView(input: {
     activatedAtLabel: formatLifecycleSyncedAt(input.providerActivatedAt ?? null),
     expiresAtLabel: formatLifecycleSyncedAt(input.providerExpiresAt ?? null),
     syncedAtLabel: formatLifecycleSyncedAt(input.providerUsageSyncedAt ?? null),
+    activatedAtIso,
+    expiresAtIso,
   };
 }

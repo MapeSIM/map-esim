@@ -42,12 +42,12 @@ function main() {
   assert.doesNotMatch(adminApi, /iccid:\s/);
   assert.doesNotMatch(adminApi, /accessToken|refresh_token|VESIM_PASSWORD/i);
   assert.match(adminApi, /role !== Role\.ADMIN/);
-  assert.match(adminPanel, /Check live usage|Refresh live usage|Refresh Status/);
+  assert.match(adminPanel, /Update|Refresh Status|EsimOrderDetailCard/);
   assert.doesNotMatch(adminPanel, /setInterval/);
   assert.doesNotMatch(adminPanel, /Full ICCID is\s+never shown/);
-  assert.match(adminPanel, /formatActivatedAt|Active on network/);
+  assert.match(adminPanel, /EsimOrderDetailCard|formatActivatedAt|Active on network/);
   assert.doesNotMatch(adminApi, /\biccid\s*:/);
-  assert.match(adminPage, /AdminEsimUsagePanel/);
+  assert.match(adminPage, /AdminEsimUsagePanel|EsimOrderDetailCard/);
   assert.match(customerLib, /export async function fetchProviderUsage/);
   assert.match(customerLib, /getBrokerToken/);
   assert.match(

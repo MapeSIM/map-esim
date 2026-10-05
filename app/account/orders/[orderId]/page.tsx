@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBadge";
 import CustomerEsimInstallPanel from "@/app/components/orders/CustomerEsimInstallPanel";
 import { CustomerEsimInstallHelpLinks } from "@/app/components/orders/CustomerEsimInstallHelpLinks";
-import CustomerEsimUsagePanel from "@/app/components/orders/CustomerEsimUsagePanel";
+import EsimOrderDetailCard from "@/app/components/orders/EsimOrderDetailCard";
 import { EsimLifecycleBadges } from "@/app/components/orders/EsimLifecycleBadges";
 import CustomerRefundRequestForm from "@/app/components/orders/CustomerRefundRequestForm";
 import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
@@ -261,6 +261,48 @@ export default async function AccountOrderDetailPage({
         </section>
       ) : null}
 
+      <EsimOrderDetailCard
+        orderId={detail.id}
+        dataPlan={detail.planName}
+        validityPeriod={detail.validity}
+        amountPaid={detail.amountLabel}
+        purchasedAt={detail.createdAtLabel}
+        dataAllowance={detail.dataAllowance}
+        orderStatusLabel={customerEsimStatusLabel(detail.statusBadge)}
+        isRefunded={detail.isRefunded}
+        refundedAtLabel={detail.refundedAtLabel}
+        lifecycle={detail.lifecycle}
+        usagePath={`/api/account/orders/${encodeURIComponent(detail.id)}/usage`}
+        usageEligible={
+          customerEsimLineReady(detail.statusBadge) && !detail.isRefunded
+        }
+        autoRefresh={autoOpenUsage}
+        viewQrHref={
+          detail.installEligible && !detail.isRefunded
+            ? `#install`
+            : null
+        }
+        enableShare
+        shareUrl={`/account/orders/${encodeURIComponent(detail.id)}`}
+        shareTitle={detail.planName}
+        addDataHref={
+          detail.addDataEligible
+            ? `/account/orders/${encodeURIComponent(detail.id)}/add-data`
+            : null
+        }
+        raiseIssueHref="/support"
+        refundAction={
+          canRequestRefund ? (
+            <Link
+              href="#refund-request"
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-white/12 bg-transparent px-3.5 text-sm font-semibold text-white/80 transition hover:bg-white/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+            >
+              Refund
+            </Link>
+          ) : null
+        }
+      />
+
       <section
         className="overflow-hidden rounded-[22px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_10px_28px_rgba(0,0,0,0.14)]"
         aria-labelledby="plan-details-heading"
@@ -356,31 +398,6 @@ export default async function AccountOrderDetailPage({
       </section>
 
       <section
-        className="space-y-2.5"
-        aria-labelledby="usage-section-heading"
-      >
-        <div>
-          <h2
-            id="usage-section-heading"
-            className="text-base font-bold text-[var(--heading)]"
-          >
-            Usage
-          </h2>
-          <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-            Check remaining data for this eSIM when available.
-          </p>
-        </div>
-        <CustomerEsimUsagePanel
-          orderId={detail.id}
-          usageEligible={
-            customerEsimLineReady(detail.statusBadge) && !detail.isRefunded
-          }
-          autoOpen={autoOpenUsage}
-          addDataEligible={detail.addDataEligible}
-        />
-      </section>
-
-      <section
         className="space-y-2.5 border-t border-[var(--border)] pt-6"
         aria-labelledby="install-section-heading"
       >
@@ -442,13 +459,15 @@ export default async function AccountOrderDetailPage({
         </section>
       ) : null}
 
-      <CustomerRefundRequestForm
-        orderId={detail.id}
-        canRequest={canRequestRefund}
-        openStatusLabel={
-          openRefund ? refundStatusLabel(openRefund.status) : null
-        }
-      />
+      <div id="refund-request">
+        <CustomerRefundRequestForm
+          orderId={detail.id}
+          canRequest={canRequestRefund}
+          openStatusLabel={
+            openRefund ? refundStatusLabel(openRefund.status) : null
+          }
+        />
+      </div>
     </div>
   );
 }

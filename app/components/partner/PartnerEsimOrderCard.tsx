@@ -3,9 +3,9 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight, Signal } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBadge";
-import CustomerEsimUsagePanel from "@/app/components/orders/CustomerEsimUsagePanel";
+import EsimOrderDetailCard from "@/app/components/orders/EsimOrderDetailCard";
 import PartnerEsimInstallPanel from "@/app/components/partner/PartnerEsimInstallPanel";
 import PartnerRefundRequestControls, {
   type PartnerRefundRequestCardState,
@@ -92,12 +92,13 @@ export default function PartnerEsimOrderCard({
   variant = "detail",
   partnerDisplayName = null,
 }: Props) {
-  const [showUsage, setShowUsage] = useState(false);
+  const [installFocus, setInstallFocus] = useState(false);
   const refunded = partnerOrderIsRefunded(row.statusBadge);
   const expired = row.statusBadge === "eSIM Expired";
   const lifecyclePrimary = partnerOrderLifecycleIsPrimaryBadge(row.statusBadge);
   const lineReady = partnerOrderLineReady(row.statusBadge) && !refunded;
-  const installAllowed = partnerOrderInstallAllowed(row.statusBadge) && !refunded;
+  const installAllowed =
+    partnerOrderInstallAllowed(row.statusBadge) && !refunded;
   const addDataHref = row.addDataEligible
     ? `/partner/orders/${encodeURIComponent(row.orderId)}/add-data`
     : null;
@@ -220,107 +221,95 @@ export default function PartnerEsimOrderCard({
         <p className="mt-4 font-mono text-xs text-[var(--text-soft)]">
           {row.shortReference}
         </p>
-        <div className="mt-4">
-          <SummaryFacts row={row} />
-        </div>
-        {expired && addDataHref ? (
-          <div className="mt-5">
-            <Link href={addDataHref} className={partnerSecondaryCtaClass}>
-              Add More Data
-            </Link>
-          </div>
-        ) : null}
       </article>
 
-      {lineReady ? (
-        <>
-          <section className={partnerCardClass}>
-            <p className={partnerSectionLabelClass}>Usage Statistics</p>
-            <h3 className="mt-2 text-base font-semibold tracking-tight text-[var(--heading)]">
-              Data usage
-            </h3>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Refresh to load live VeSIM status (Active / Expired / Depleted)
-              and remaining data.
-            </p>
-            <div className="mt-4">
-              {!showUsage ? (
-                <button
-                  type="button"
-                  onClick={() => setShowUsage(true)}
-                  className={partnerSecondaryCtaClass}
-                >
-                  <Signal className="h-4 w-4" aria-hidden="true" />
-                  Refresh Status
-                </button>
-              ) : (
-                <CustomerEsimUsagePanel
-                  orderId={row.orderId}
-                  usageEligible
-                  compact
-                  autoOpen
-                  usagePath={`/api/partner/orders/${encodeURIComponent(row.orderId)}/usage`}
-                />
-              )}
-            </div>
-          </section>
+      <EsimOrderDetailCard
+        orderId={row.orderId}
+        dataPlan={row.planName}
+        validityPeriod={row.validity}
+        amountPaid={row.partnerDebitLabel}
+        purchasedAt={row.purchasedAtLabel}
+        dataAllowance={row.dataAllowance}
+        orderStatusLabel={partnerOrderStatusLabel(row.statusBadge)}
+        isRefunded={refunded}
+        lifecycle={row.lifecycle}
+        usagePath={
+          lineReady
+            ? `/api/partner/orders/${encodeURIComponent(row.orderId)}/usage`
+            : null
+        }
+        usageEligible={lineReady}
+        onViewQr={
+          installAllowed
+            ? () => {
+                setInstallFocus(true);
+                document
+                  .getElementById("partner-install")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }
+            : undefined
+        }
+        enableShare
+        shareUrl={`/partner/orders/${encodeURIComponent(row.orderId)}`}
+        shareTitle={row.planName}
+        addDataHref={addDataHref}
+        raiseIssueHref="/support"
+        refundAction={
+          !expired && !refunded ? (
+            <a
+              href="#partner-refund"
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-white/12 bg-transparent px-3.5 text-sm font-semibold text-white/80 transition hover:bg-white/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+            >
+              Refund
+            </a>
+          ) : null
+        }
+      />
 
-          {installAllowed ? (
-            <PartnerEsimInstallPanel
-              orderId={row.orderId}
-              installEligible
-              iccidMasked={row.iccidMasked}
-              iccid={row.iccid}
-              hasActiveShareToken={row.hasActiveShareToken}
-              partnerDisplayName={partnerDisplayName}
-              destination={row.destination}
-              planName={row.planName}
-              dataAllowance={row.dataAllowance}
-              validity={row.validity}
-              addDataHref={addDataHref}
-              defaultExpanded
-            />
-          ) : (
-            <section className={partnerCardClass}>
-              <p className={partnerSectionLabelClass}>Installation</p>
-              <p className="mt-2 text-sm text-[var(--text-muted)]">
-                Installation QR is unavailable because this eSIM has expired.
-                Use Add More Data when available, or purchase a new plan.
-              </p>
-              {addDataHref ? (
-                <div className="mt-4">
-                  <Link href={addDataHref} className={partnerSecondaryCtaClass}>
-                    Add More Data
-                  </Link>
-                </div>
-              ) : null}
-            </section>
-          )}
-
-          {!expired ? (
-            <PartnerRefundRequestControls
-              purchaseId={row.purchaseId}
-              partnerDebitLabel={row.partnerDebitLabel}
-              alreadyRefunded={false}
-              existingRequest={refundRequest}
-            />
-          ) : null}
-        </>
-      ) : refunded ? (
+      {installAllowed ? (
+        <div id="partner-install">
+          <PartnerEsimInstallPanel
+            orderId={row.orderId}
+            installEligible
+            iccidMasked={row.iccidMasked}
+            iccid={row.iccid}
+            hasActiveShareToken={row.hasActiveShareToken}
+            partnerDisplayName={partnerDisplayName}
+            destination={row.destination}
+            planName={row.planName}
+            dataAllowance={row.dataAllowance}
+            validity={row.validity}
+            addDataHref={addDataHref}
+            defaultExpanded={installFocus || true}
+          />
+        </div>
+      ) : expired ? (
         <section className={partnerCardClass}>
-          <p className={partnerSectionLabelClass}>Refunded</p>
+          <p className={partnerSectionLabelClass}>Installation</p>
           <p className="mt-2 text-sm text-[var(--text-muted)]">
-            This eSIM was refunded. Installation QR and live usage are no longer
-            available.
+            Installation QR is unavailable because this eSIM has expired. Use
+            Add More Data when available, or purchase a new plan.
           </p>
+          {addDataHref ? (
+            <div className="mt-4">
+              <Link href={addDataHref} className={partnerSecondaryCtaClass}>
+                Add More Data
+              </Link>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      <div id="partner-refund">
+        {!expired || refunded ? (
           <PartnerRefundRequestControls
             purchaseId={row.purchaseId}
             partnerDebitLabel={row.partnerDebitLabel}
-            alreadyRefunded
+            alreadyRefunded={refunded}
             existingRequest={refundRequest}
           />
-        </section>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }

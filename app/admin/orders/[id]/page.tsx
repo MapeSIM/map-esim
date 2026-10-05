@@ -228,25 +228,31 @@ export default async function AdminOrderDetailPage({
 
       <section className="min-w-0 space-y-3" aria-labelledby="admin-usage-heading">
         <div className="sr-only">
-          <h2 id="admin-usage-heading">Usage</h2>
+          <h2 id="admin-usage-heading">Order details</h2>
         </div>
-        {!detail.isRefunded ? (
-          <AdminEsimUsagePanel orderId={detail.id} />
-        ) : (
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 text-sm text-[var(--text-muted)]">
-            Live VeSIM usage is hidden for refunded orders.
-          </div>
-        )}
-        {canFulfill && detail.addDataEligible ? (
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-4 sm:px-5">
-            <p className="text-sm font-semibold text-[var(--heading)]">
-              Add More Data
-            </p>
-            <div className="mt-3">
-              <AdminAddDataForm orderId={detail.id} />
-            </div>
-          </div>
-        ) : null}
+        <AdminEsimUsagePanel
+          orderId={detail.id}
+          dataPlan={detail.planPackage}
+          validityPeriod={detail.validity}
+          amountPaid={detail.amountLabel}
+          purchasedAt={detail.createdAtLabel}
+          dataAllowance={detail.planPackage}
+          orderStatusLabel={detail.displayStatusLabel}
+          isRefunded={detail.isRefunded}
+          lifecycle={detail.lifecycle}
+          addDataSlot={
+            canFulfill && detail.addDataEligible ? (
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3.5 text-[var(--heading)]">
+                <p className="text-sm font-semibold text-[var(--heading)]">
+                  Add More Data
+                </p>
+                <div className="mt-3">
+                  <AdminAddDataForm orderId={detail.id} />
+                </div>
+              </div>
+            ) : null
+          }
+        />
       </section>
     </div>
   );
