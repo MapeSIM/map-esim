@@ -57,7 +57,7 @@ function main() {
   const partnerPurchaseWallet = read(
     "app/lib/partner/partnerPurchaseWallet.ts"
   );
-  const cardsGate = read("app/lib/payments/simpaisaCardsFundingGate.ts");
+  const gatewaySelect = read("app/lib/payments/gatewaySelect.ts");
   const pkg = read("package.json");
   const uxQa = read("scripts/qa-partner-ux-unification.ts");
 
@@ -274,18 +274,18 @@ function main() {
   assert.doesNotMatch(uxQa, /Reward Points\|rewardPoints\|Add funds/i);
   console.log("PASS partner_ui_add_funds");
 
-  // Cards remain disabled — Partner credit path must reject SIMPAISA_CARDS.
+  // Cards / non-Simpaisa remain disabled for Partner Add Funds credit.
   assert.match(core, /SIMPAISA_CARDS/);
   assert.match(
     core,
     /provider === "SIMPAISA_CARDS"[\s\S]{0,200}not approved for Partner wallet credit/
   );
   assert.doesNotMatch(core, /mayFund\s*[:=]/);
-  assert.ok(
-    cardsGate.includes("Cards") ||
-      cardsGate.includes("mayFund") ||
-      cardsGate.includes("WAITING")
-  );
+  assert.match(core, /adapter\.provider !== "SIMPAISA"/);
+  assert.match(walletPage, /selectedProvider === "SIMPAISA"/);
+  assert.match(walletPage, /resolveHostedCheckoutProvider/);
+  assert.match(gatewaySelect, /resolveHostedCheckoutProvider/);
+  assert.match(gatewaySelect, /SAFEPAY resolves to SIMPAISA|isCustomerSafepayCheckoutDisabled/);
   console.log("PASS cards_and_production_untouched_shape");
 
   assert.match(constants, /logPartnerTopupFailure/);
