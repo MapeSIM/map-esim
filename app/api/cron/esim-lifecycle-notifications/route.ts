@@ -8,7 +8,7 @@
  * upgrade or an approved external scheduler hitting this same endpoint.
  *
  * Ops: `?force=1` or `?unlock=1` clears a stuck EsimLifecycleNotificationRunnerLock
- * before claiming (still requires valid CRON_SECRET).
+ * and returns immediately (does not run the usage batch). Still requires valid CRON_SECRET.
  */
 import { NextResponse } from "next/server";
 import {
@@ -66,11 +66,22 @@ async function handle(request: Request): Promise<Response> {
     url.searchParams.get("unlock") === "1" ||
     request.headers.get("x-cron-force-unlock") === "1";
 
-  let lockForceCleared = false;
   if (forceUnlock) {
     try {
       await forceClearEsimLifecycleRunnerLock();
-      lockForceCleared = true;
+      // Unlock-only: return immediately so external cron does not time out.
+      return NextResponse.json(
+        {
+          ok: true,
+          lockForceCleared: true,
+          runnerClaimed: false,
+          counts: null,
+          errorCode: null,
+          dryRun,
+          mode: "force_unlock",
+        },
+        { status: 200 }
+      );
     } catch (error) {
       await reportServerErrorAsync(error, {
         operation: "cron_esim_lifecycle_force_unlock",
@@ -83,6 +94,7 @@ async function handle(request: Request): Promise<Response> {
           error: "force_unlock_failed",
           lockForceCleared: false,
           dryRun,
+          mode: "force_unlock",
         },
         { status: 500 }
       );
@@ -138,7 +150,7 @@ async function handle(request: Request): Promise<Response> {
         runnerClaimed: result.runnerClaimed,
         counts: result.counts,
         errorCode: result.errorCode ?? null,
-        lockForceCleared,
+        lockForceCleared: false,
         staleRelease: staleRelease
           ? {
               ok: staleRelease.ok,
@@ -157,7 +169,7 @@ async function handle(request: Request): Promise<Response> {
       errorCode: "unhandled",
     });
     return NextResponse.json(
-      { ok: false, error: "internal", lockForceCleared },
+      { ok: false, error: "internal", lockForceCleared: false },
       { status: 500 }
     );
   }
