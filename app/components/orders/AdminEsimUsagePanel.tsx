@@ -15,7 +15,9 @@ type Props = {
   isRefunded: boolean;
   refundedAtLabel?: string | null;
   lifecycle?: ProviderLifecycleCacheView | null;
-  addDataHref?: string | null;
+  /** When true, show View/Download QR against the admin QR API. */
+  qrEligible?: boolean;
+  addDataEligible?: boolean;
   addDataSlot?: ReactNode;
 };
 
@@ -34,9 +36,14 @@ export default function AdminEsimUsagePanel({
   isRefunded,
   refundedAtLabel = null,
   lifecycle = null,
-  addDataHref = null,
+  qrEligible = false,
+  addDataEligible = false,
   addDataSlot = null,
 }: Props) {
+  const qrBase = `/api/admin/orders/${encodeURIComponent(orderId)}/qr`;
+  const showQr = qrEligible && !isRefunded;
+  const showAddData = addDataEligible && !isRefunded;
+
   return (
     <EsimOrderDetailCard
       orderId={orderId}
@@ -56,9 +63,15 @@ export default function AdminEsimUsagePanel({
           : `/api/admin/orders/${encodeURIComponent(orderId)}/usage`
       }
       usageEligible={!isRefunded}
-      addDataHref={addDataHref}
-      hideActions={!addDataHref}
-      footer={addDataSlot}
+      viewQrHref={showQr ? qrBase : null}
+      qrDownloadHref={showQr ? `${qrBase}?download=1` : null}
+      addDataHref={showAddData ? "#admin-add-data" : null}
+      hideActions={isRefunded && !showQr && !showAddData}
+      footer={
+        addDataSlot ? (
+          <div id="admin-add-data">{addDataSlot}</div>
+        ) : null
+      }
     />
   );
 }

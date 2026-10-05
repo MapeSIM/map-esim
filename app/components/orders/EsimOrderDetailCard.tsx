@@ -26,9 +26,9 @@ import {
   daysLeftFromExpiresAt,
   formatOrderDetailGb,
   formatOrderDetailWhen,
-  isUnlimitedDataAllowance,
   lifecycleToUsageView,
   remainingPercent,
+  resolveIsUnlimitedPlan,
   type EsimOrderDetailUsageView,
 } from "@/app/lib/orders/esimOrderDetailDisplay";
 
@@ -107,7 +107,10 @@ function progressBarClass(
   }
 }
 
-function mapLiveUsage(raw: Record<string, unknown>): EsimOrderDetailUsageView {
+function mapLiveUsage(
+  raw: Record<string, unknown>,
+  hints?: { dataAllowance?: string | null; dataPlan?: string | null }
+): EsimOrderDetailUsageView {
   const num = (v: unknown): number | null =>
     typeof v === "number" && Number.isFinite(v) ? v : null;
   const str = (v: unknown): string | null =>
@@ -115,15 +118,25 @@ function mapLiveUsage(raw: Record<string, unknown>): EsimOrderDetailUsageView {
   const bool = (v: unknown): boolean | null =>
     typeof v === "boolean" ? v : null;
 
-  const isUnlimited = Boolean(raw.isUnlimited || raw.planUnlimited);
+  const initialDataGB = num(raw.initialDataGB);
+  const remainingDataGB = num(raw.remainingDataGB);
+  const isUnlimited = resolveIsUnlimitedPlan({
+    isUnlimited: Boolean(raw.isUnlimited || raw.planUnlimited),
+    dataAllowance: hints?.dataAllowance,
+    dataPlan: hints?.dataPlan,
+    initialDataGB,
+    remainingDataGB,
+    reportsDataAllowance:
+      raw.reportsDataAllowance === false ? false : true,
+  });
   return {
     statusLabel: String(raw.statusLabel || raw.status || "Unknown"),
-    initialDataGB: num(raw.initialDataGB),
-    remainingDataGB: num(raw.remainingDataGB),
-    usedDataGB: num(raw.usedDataGB),
-    usagePercent: num(raw.usagePercent),
+    initialDataGB: isUnlimited ? null : initialDataGB,
+    remainingDataGB: isUnlimited ? null : remainingDataGB,
+    usedDataGB: isUnlimited ? null : num(raw.usedDataGB),
+    usagePercent: isUnlimited ? null : num(raw.usagePercent),
     isUnlimited,
-    reportsDataAllowance: raw.reportsDataAllowance !== false,
+    reportsDataAllowance: !isUnlimited && raw.reportsDataAllowance !== false,
     activatedAt: str(raw.activatedAt),
     expiresAt: str(raw.expiresAt),
     daysRemaining: num(raw.daysRemaining),
@@ -170,35 +183,47 @@ export default function EsimOrderDetailCard({
   const [shareCopied, setShareCopied] = useState(false);
 
   const cachedUsage = useMemo(
-    () => lifecycleToUsageView(lifecycle, dataAllowance),
-    [lifecycle, dataAllowance]
+    () => lifecycleToUsageView(lifecycle, dataAllowance, dataPlan),
+    [lifecycle, dataAllowance, dataPlan]
   );
   const usage = liveUsage ?? cachedUsage;
+
+  const unlimited = resolveIsUnlimitedPlan({
+    isUnlimited: usage?.isUnlimited,
+    dataAllowance,
+    dataPlan,
+    initialDataGB: usage?.initialDataGB,
+    remainingDataGB: usage?.remainingDataGB,
+    reportsDataAllowance: usage?.reportsDataAllowance,
+  });
 
   const statusText = composeEsimStatusBadgeText({
     isRefunded,
     orderStatusLabel,
     lifecycle,
-    usage,
+    usage: usage
+      ? { ...usage, isUnlimited: unlimited }
+      : null,
+    dataAllowance,
+    dataPlan,
   });
 
-  const unlimited =
-    Boolean(usage?.isUnlimited) ||
-    (isUnlimitedDataAllowance(dataAllowance) &&
-      (usage?.remainingDataGB == null || usage?.isUnlimited));
-
-  const remPct = usage
-    ? remainingPercent(usage.remainingDataGB, usage.initialDataGB)
-    : null;
-  const tone = usage
-    ? dataUsageTone(remPct, usage.remainingDataGB)
-    : "unknown";
+  const remPct =
+    !unlimited && usage
+      ? remainingPercent(usage.remainingDataGB, usage.initialDataGB)
+      : null;
+  const tone =
+    !unlimited && usage
+      ? dataUsageTone(remPct, usage.remainingDataGB)
+      : "unknown";
   const usedPct =
-    usage?.usagePercent != null && Number.isFinite(usage.usagePercent)
-      ? Math.min(100, Math.max(0, usage.usagePercent))
-      : remPct != null
-        ? Math.min(100, Math.max(0, 100 - remPct))
-        : null;
+    unlimited || !usage
+      ? null
+      : usage.usagePercent != null && Number.isFinite(usage.usagePercent)
+        ? Math.min(100, Math.max(0, usage.usagePercent))
+        : remPct != null
+          ? Math.min(100, Math.max(0, 100 - remPct))
+          : null;
 
   const daysLeft =
     usage?.daysRemaining ??
@@ -229,14 +254,19 @@ export default function EsimOrderDetailCard({
         );
         return;
       }
-      setLiveUsage(mapLiveUsage(json.usage));
+      setLiveUsage(
+        mapLiveUsage(json.usage, {
+          dataAllowance,
+          dataPlan,
+        })
+      );
       router.refresh();
     } catch {
       setError("Live usage is temporarily unavailable. Please try again later.");
     } finally {
       setLoading(false);
     }
-  }, [usagePath, canUpdate, router]);
+  }, [usagePath, canUpdate, router, dataAllowance, dataPlan]);
 
   useEffect(() => {
     if (!autoRefresh || !canUpdate || liveUsage || loading) return;
@@ -499,6 +529,8 @@ export default function EsimOrderDetailCard({
                 ) : (
                   <Link
                     href={viewQrHref!}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
                   >
                     <QrCode className="h-4 w-4" aria-hidden="true" />

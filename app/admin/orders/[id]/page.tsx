@@ -240,6 +240,8 @@ export default async function AdminOrderDetailPage({
           orderStatusLabel={detail.displayStatusLabel}
           isRefunded={detail.isRefunded}
           lifecycle={detail.lifecycle}
+          qrEligible={detail.installEmailResendEligible}
+          addDataEligible={canFulfill && detail.addDataEligible}
           addDataSlot={
             canFulfill && detail.addDataEligible ? (
               <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3.5 text-[var(--heading)]">

@@ -46,8 +46,18 @@ function main() {
   assert.doesNotMatch(adminPanel, /setInterval/);
   assert.doesNotMatch(adminPanel, /Full ICCID is\s+never shown/);
   assert.match(adminPanel, /EsimOrderDetailCard|formatActivatedAt|Active on network/);
+  assert.match(adminPanel, /viewQrHref|\/qr/);
+  assert.match(adminPanel, /Add data to this eSIM|addDataHref|#admin-add-data/);
   assert.doesNotMatch(adminApi, /\biccid\s*:/);
   assert.match(adminPage, /AdminEsimUsagePanel|EsimOrderDetailCard/);
+  assert.match(adminPage, /qrEligible|installEmailResendEligible/);
+  const adminQrApi = read("app/api/admin/orders/[orderId]/qr/route.ts");
+  assert.match(adminQrApi, /authorizeAdminOrderInstall|Role\.ADMIN/);
+  assert.match(adminQrApi, /generateEsimQrPngBuffer/);
+  assert.doesNotMatch(adminQrApi, /searchParams\.get\([`'"]lpa/);
+  const detailDisplay = read("app/lib/orders/esimOrderDetailDisplay.ts");
+  assert.match(detailDisplay, /resolveIsUnlimitedPlan/);
+  assert.match(detailDisplay, /Unlimited must never show as Data Depleted/);
   assert.match(customerLib, /export async function fetchProviderUsage/);
   assert.match(customerLib, /getBrokerToken/);
   assert.match(

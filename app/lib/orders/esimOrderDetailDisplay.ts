@@ -24,7 +24,41 @@ export type EsimOrderDetailDataTone = "healthy" | "low" | "depleted" | "unknown"
 export function isUnlimitedDataAllowance(
   dataAllowance: string | null | undefined
 ): boolean {
-  return /\bunlimited\b/i.test((dataAllowance ?? "").trim());
+  const raw = (dataAllowance ?? "").trim();
+  if (!raw) return false;
+  return /\bunlimited\b|\b∞\b/i.test(raw);
+}
+
+/**
+ * Unlimited plans must never render as metered "0 GB / Data Depleted".
+ * Detect via live flag, catalog labels, or VeSIM's common 0 GB total report.
+ */
+export function resolveIsUnlimitedPlan(input: {
+  isUnlimited?: boolean | null;
+  dataAllowance?: string | null;
+  dataPlan?: string | null;
+  initialDataGB?: number | null;
+  remainingDataGB?: number | null;
+  reportsDataAllowance?: boolean | null;
+}): boolean {
+  if (input.isUnlimited === true) return true;
+  if (
+    isUnlimitedDataAllowance(input.dataAllowance) ||
+    isUnlimitedDataAllowance(input.dataPlan)
+  ) {
+    return true;
+  }
+  void input.reportsDataAllowance;
+  void input.remainingDataGB;
+  // VeSIM often reports initial/remaining as 0 for unlimited lines.
+  if (
+    typeof input.initialDataGB === "number" &&
+    Number.isFinite(input.initialDataGB) &&
+    input.initialDataGB <= 0
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export function formatOrderDetailGb(
@@ -130,26 +164,39 @@ export function composeEsimStatusBadgeText(input: {
   orderStatusLabel?: string | null;
   lifecycle?: ProviderLifecycleCacheView | null;
   usage?: EsimOrderDetailUsageView | null;
+  dataAllowance?: string | null;
+  dataPlan?: string | null;
   nowMs?: number;
 }): string {
   if (input.isRefunded) return "Refunded";
 
   const usage = input.usage;
+  const unlimited = resolveIsUnlimitedPlan({
+    isUnlimited: usage?.isUnlimited,
+    dataAllowance: input.dataAllowance,
+    dataPlan: input.dataPlan,
+    initialDataGB: usage?.initialDataGB,
+    remainingDataGB: usage?.remainingDataGB,
+    reportsDataAllowance: usage?.reportsDataAllowance,
+  });
+
   if (usage?.isExpired === true || /expir/i.test(usage?.statusLabel ?? "")) {
     return "eSIM Expired";
-  }
-  if (
-    usage &&
-    !usage.isUnlimited &&
-    usage.remainingDataGB != null &&
-    usage.remainingDataGB <= 0
-  ) {
-    return "Data Depleted";
   }
 
   const lifecycle = input.lifecycle?.lifecycleStatus ?? null;
   if (lifecycle === "EXPIRED") return "eSIM Expired";
-  if (lifecycle === "DEPLETED") return "Data Depleted";
+
+  // Unlimited must never show as Data Depleted (even if cache says DEPLETED / 0 GB).
+  if (
+    !unlimited &&
+    ((usage &&
+      usage.remainingDataGB != null &&
+      usage.remainingDataGB <= 0) ||
+      lifecycle === "DEPLETED")
+  ) {
+    return "Data Depleted";
+  }
 
   const expiresAt =
     usage?.expiresAt ?? input.lifecycle?.expiresAtIso ?? null;
@@ -157,7 +204,14 @@ export function composeEsimStatusBadgeText(input: {
     usage?.daysRemaining ??
     daysLeftFromExpiresAt(expiresAt, input.nowMs ?? Date.now());
 
-  if (lifecycle === "ACTIVE" || /active/i.test(usage?.statusLabel ?? "")) {
+  const looksActive =
+    unlimited ||
+    lifecycle === "ACTIVE" ||
+    /active/i.test(usage?.statusLabel ?? "") ||
+    // Cached DEPLETED on an unlimited catalog plan still means Active.
+    (lifecycle === "DEPLETED" && unlimited);
+
+  if (looksActive) {
     if (days != null && days >= 0) {
       return days === 1
         ? "Active (1 day left)"
@@ -165,7 +219,7 @@ export function composeEsimStatusBadgeText(input: {
     }
     if (
       usage &&
-      !usage.isUnlimited &&
+      !unlimited &&
       usage.usedDataGB != null &&
       Number.isFinite(usage.usedDataGB)
     ) {
@@ -186,7 +240,8 @@ export function composeEsimStatusBadgeText(input: {
 
 export function lifecycleToUsageView(
   lifecycle: ProviderLifecycleCacheView | null | undefined,
-  dataAllowance?: string | null
+  dataAllowance?: string | null,
+  dataPlan?: string | null
 ): EsimOrderDetailUsageView | null {
   if (!lifecycle) return null;
   const hasMeter =
@@ -202,23 +257,30 @@ export function lifecycleToUsageView(
     return null;
   }
 
-  const unlimited =
-    isUnlimitedDataAllowance(dataAllowance) &&
-    lifecycle.remainingDataGb == null &&
-    lifecycle.initialDataGb == null;
-
-  const used =
-    lifecycle.usedDataGb ??
-    (lifecycle.initialDataGb != null && lifecycle.remainingDataGb != null
-      ? Math.max(lifecycle.initialDataGb - lifecycle.remainingDataGb, 0)
-      : null);
-
-  return {
-    statusLabel: lifecycle.lifecycleLabel ?? "Unknown",
+  const unlimited = resolveIsUnlimitedPlan({
+    dataAllowance,
+    dataPlan,
     initialDataGB: lifecycle.initialDataGb,
     remainingDataGB: lifecycle.remainingDataGb,
+  });
+
+  const used = unlimited
+    ? null
+    : lifecycle.usedDataGb ??
+      (lifecycle.initialDataGb != null && lifecycle.remainingDataGb != null
+        ? Math.max(lifecycle.initialDataGb - lifecycle.remainingDataGb, 0)
+        : null);
+
+  return {
+    statusLabel: unlimited
+      ? lifecycle.lifecycleStatus === "EXPIRED"
+        ? "Expired"
+        : "Active"
+      : lifecycle.lifecycleLabel ?? "Unknown",
+    initialDataGB: unlimited ? null : lifecycle.initialDataGb,
+    remainingDataGB: unlimited ? null : lifecycle.remainingDataGb,
     usedDataGB: used,
-    usagePercent: lifecycle.usagePercent,
+    usagePercent: unlimited ? null : lifecycle.usagePercent,
     isUnlimited: unlimited,
     reportsDataAllowance: !unlimited && hasMeter,
     activatedAt: lifecycle.activatedAtIso,
