@@ -48,8 +48,7 @@ export default async function AccountOrdersPage({
       <div>
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">My eSIMs</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Your purchased and assigned eSIMs. Open an order for installation
-          options and secure ICCID reveal.
+          Tap an eSIM to manage usage, QR install, and top-ups.
         </p>
       </div>
 

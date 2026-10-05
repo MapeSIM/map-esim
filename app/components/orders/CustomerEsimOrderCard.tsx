@@ -1,16 +1,17 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBadge";
-import { CustomerEsimInstallHelpLinks } from "@/app/components/orders/CustomerEsimInstallHelpLinks";
-import { EsimLifecycleBadges } from "@/app/components/orders/EsimLifecycleBadges";
 import {
-  customerEsimInstallAllowed,
-  customerEsimLifecycleIsPrimaryBadge,
-  customerEsimLineReady,
-  customerEsimStatusHelp,
   customerEsimStatusLabel,
   type CustomerEsimStatusBadge,
 } from "@/app/lib/orders/customerOrderDisplay";
+import {
+  isUnlimitedDataAllowance,
+  resolveIsUnlimitedPlan,
+} from "@/app/lib/orders/esimOrderDetailDisplay";
 import type { ProviderLifecycleCacheView } from "@/app/lib/orders/providerLifecycleShared";
 
 export type CustomerEsimOrderCardOrder = {
@@ -56,187 +57,88 @@ function statusBadgeClass(status: CustomerEsimStatusBadge): string {
   }
 }
 
+function quickDataSummary(order: CustomerEsimOrderCardOrder): string {
+  if (order.statusBadge === "Refunded") return "Refunded";
+  const unlimited = resolveIsUnlimitedPlan({
+    dataAllowance: order.dataAllowance,
+    dataPlan: order.planName,
+    initialDataGB: order.lifecycle?.initialDataGb,
+    remainingDataGB: order.lifecycle?.remainingDataGb,
+  });
+  if (unlimited || isUnlimitedDataAllowance(order.dataAllowance)) {
+    return "∞ Unlimited";
+  }
+  if (order.remainingDataLabel) return order.remainingDataLabel;
+  if (order.dataAllowance && order.dataAllowance !== "Not available") {
+    return order.dataAllowance;
+  }
+  return "View details";
+}
+
+/**
+ * Lightweight My eSIMs list row — VeSIM-style.
+ * Whole card opens order details; no stacked action clutter.
+ */
 export function CustomerEsimOrderCard({
   order,
 }: {
   order: CustomerEsimOrderCardOrder;
 }) {
-  const lineReady = customerEsimLineReady(order.statusBadge);
-  const installAllowed = customerEsimInstallAllowed(order.statusBadge);
-  const expired = order.statusBadge === "eSIM Expired";
-  const lifecyclePrimary = customerEsimLifecycleIsPrimaryBadge(
-    order.statusBadge
-  );
   const href = `/account/orders/${encodeURIComponent(order.id)}`;
-  const addDataHref = order.addDataEligible
-    ? `/account/orders/${encodeURIComponent(order.id)}/add-data`
-    : null;
-  const showData = order.dataAllowance !== "Not available";
-  const showValidity = order.validity !== "Not available";
+  const dataSummary = quickDataSummary(order);
 
   return (
-    <article className="min-w-0 overflow-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_14px_36px_rgba(0,0,0,0.22)]">
-      <div className="border-b border-[var(--border)] bg-[var(--surface-2)]/55 px-5 py-5 sm:px-6 sm:py-5">
-        <div className="flex min-w-0 items-start gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] shadow-sm">
-            {order.flagUrl ? (
-              <Image
-                src={order.flagUrl}
-                alt=""
-                width={56}
-                height={42}
-                sizes="56px"
-                className="h-9 w-auto object-contain"
-                unoptimized
-              />
-            ) : (
-              <span className="text-xs font-bold text-[var(--text-soft)]">
-                eSIM
-              </span>
-            )}
-          </div>
+    <Link
+      href={href}
+      className="group block min-w-0 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[0_8px_22px_rgba(0,0,0,0.12)] transition hover:border-[var(--border-hover)] hover:bg-[var(--surface-2)]/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+      aria-label={`View details for ${order.destination}`}
+    >
+      <article className="flex min-w-0 items-center gap-3 px-3.5 py-3.5 sm:gap-4 sm:px-4 sm:py-4">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] sm:h-12 sm:w-12 sm:rounded-2xl">
+          {order.flagUrl ? (
+            <Image
+              src={order.flagUrl}
+              alt=""
+              width={48}
+              height={36}
+              sizes="48px"
+              className="h-7 w-auto object-contain sm:h-8"
+              unoptimized
+            />
+          ) : (
+            <span className="text-[10px] font-bold text-[var(--text-soft)]">
+              eSIM
+            </span>
+          )}
+        </div>
 
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 flex-wrap items-center gap-2.5">
-              <h2 className="text-xl font-bold tracking-tight text-[var(--heading)] break-words">
-                {order.destination}
-              </h2>
-              <span
-                className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold tracking-wide ${statusBadgeClass(order.statusBadge)}`}
-              >
-                {customerEsimStatusLabel(order.statusBadge)}
-              </span>
-              <AddDataPurchaseBadge
-                isAddDataPurchase={Boolean(order.isAddDataPurchase)}
-              />
-            </div>
-            {order.statusBadge !== "Refunded" ? (
-              <div className="mt-2">
-                <EsimLifecycleBadges
-                  lifecycle={lifecyclePrimary ? null : order.lifecycle}
-                  remainingDataLabel={order.remainingDataLabel}
-                />
-              </div>
-            ) : null}
-            <p className="mt-1.5 text-xs font-medium text-[var(--text-soft)]">
-              Ref {order.shortReference}
-            </p>
-            <p className="mt-2 text-sm font-medium text-[var(--text-muted)] break-words">
-              {order.planName}
-            </p>
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h2 className="truncate text-base font-bold tracking-tight text-[var(--heading)] sm:text-lg">
+              {order.destination}
+            </h2>
+            <span
+              className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-bold tracking-wide ${statusBadgeClass(order.statusBadge)}`}
+            >
+              {customerEsimStatusLabel(order.statusBadge)}
+            </span>
+            <AddDataPurchaseBadge
+              isAddDataPurchase={Boolean(order.isAddDataPurchase)}
+            />
           </div>
-
-          <p className="shrink-0 pt-0.5 text-right text-base font-bold tabular-nums text-[var(--heading)] sm:text-lg">
-            {order.amountLabel}
+          <p className="mt-1 truncate text-sm font-medium text-[var(--text-muted)]">
+            {dataSummary}
+          </p>
+          <p className="mt-0.5 truncate text-xs text-[var(--text-soft)]">
+            Ref {order.shortReference}
           </p>
         </div>
-      </div>
 
-      <div className="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
-        {(showData || showValidity) && (
-          <div className="flex flex-wrap gap-2">
-            {showData ? (
-              <span className="inline-flex items-center rounded-xl border border-[var(--accent-strong)]/30 bg-[var(--accent-strong)]/10 px-3 py-1.5 text-sm font-bold text-[var(--heading)]">
-                {order.dataAllowance}
-              </span>
-            ) : null}
-            {showValidity ? (
-              <span className="inline-flex items-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 py-1.5 text-sm font-semibold text-[var(--heading)]">
-                {order.validity}
-              </span>
-            ) : null}
-          </div>
-        )}
-
-        <p className="text-sm leading-relaxed text-[var(--text)]">
-          {customerEsimStatusHelp(order.statusBadge)}
-        </p>
-
-        <dl className="grid gap-3 rounded-2xl border border-[var(--border)] bg-[var(--page-bg)]/40 p-3.5 sm:grid-cols-2 sm:p-4">
-          <div className="min-w-0">
-            <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              ICCID
-            </dt>
-            <dd className="mt-1 font-mono text-sm font-semibold tracking-wide text-[var(--heading)] break-all">
-              {order.iccidMasked}
-            </dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              Purchased
-            </dt>
-            <dd className="mt-1 text-sm font-medium text-[var(--text)]">
-              {order.createdAtLabel}
-            </dd>
-          </div>
-          {order.emailDeliveryLabel ? (
-            <div className="min-w-0 sm:col-span-2">
-              <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-                Email
-              </dt>
-              <dd className="mt-1 text-sm font-medium text-[var(--text)]">
-                {order.emailDeliveryLabel}
-              </dd>
-            </div>
-          ) : null}
-        </dl>
-
-        <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
-          {expired && addDataHref ? (
-            <Link
-              href={addDataHref}
-              className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_18px_rgba(0,0,0,0.18)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
-            >
-              Add More Data
-            </Link>
-          ) : null}
-          {installAllowed ? (
-            <Link
-              href={`${href}#install`}
-              className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_18px_rgba(0,0,0,0.18)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
-            >
-              Install eSIM
-            </Link>
-          ) : null}
-          <Link
-            href={href}
-            className={
-              installAllowed || (expired && addDataHref)
-                ? "inline-flex h-11 w-full items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--border-hover)] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
-                : "inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_18px_rgba(0,0,0,0.18)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
-            }
-          >
-            View details
-          </Link>
-          {lineReady ? (
-            <Link
-              href={`${href}?usage=1`}
-              className="inline-flex h-11 w-full items-center justify-center rounded-2xl border border-[var(--accent-strong)]/55 bg-[var(--accent-strong)]/12 px-4 text-sm font-bold text-[var(--heading)] transition hover:bg-[var(--accent-strong)]/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
-            >
-              View usage
-            </Link>
-          ) : null}
-          {!expired && addDataHref ? (
-            <Link
-              href={addDataHref}
-              className="inline-flex h-11 w-full items-center justify-center rounded-2xl border border-[var(--accent-strong)] bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_18px_rgba(0,0,0,0.16)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
-            >
-              Add More Data
-            </Link>
-          ) : null}
-          {order.statusBadge === "Review needed" ||
-          order.statusBadge === "Failed" ? (
-            <Link
-              href="/support"
-              className="inline-flex h-11 w-full items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--border-hover)] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:w-auto"
-            >
-              Contact support
-            </Link>
-          ) : null}
-        </div>
-
-        <CustomerEsimInstallHelpLinks className="text-sm text-[var(--text-muted)]" />
-      </div>
-    </article>
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-2.5 py-2 text-xs font-semibold text-[var(--heading)] transition group-hover:border-[var(--accent-strong)]/45 sm:px-3 sm:text-sm">
+          View details
+          <ChevronRight className="h-4 w-4 opacity-70" aria-hidden="true" />
+        </span>
+      </article>
+    </Link>
   );
 }

@@ -155,6 +155,8 @@ function main() {
     "app/components/orders/CustomerEsimInstallHelpLinks.tsx"
   );
   const detailPage = read("app/account/orders/[orderId]/page.tsx");
+  const detailView = read("app/components/orders/CustomerOrderDetailView.tsx");
+  const detailCard = read("app/components/orders/EsimOrderDetailCard.tsx");
   const ordersLib = read("app/lib/orders/customerOrders.ts");
   const installLib = read("app/lib/orders/customerOrderInstall.ts");
   const installApi = read("app/api/account/orders/[orderId]/install/route.ts");
@@ -181,12 +183,10 @@ function main() {
   assert.match(listPage, /CustomerEsimOrderCard/);
   assert.match(orderCard, /iccidMasked/);
   assert.match(orderCard, /View details/);
-  assert.match(orderCard, /Install eSIM/);
   assert.match(
     orderCard,
-    /\/account\/orders\/\$\{encodeURIComponent\(order\.id\)\}|href=\{\`\$\{href\}#install\`\}|#install/
+    /\/account\/orders\/\$\{encodeURIComponent\(order\.id\)\}/
   );
-  assert.match(orderCard, /#install/);
   assert.doesNotMatch(
     orderCard,
     /#install\?|carddata=|activationCode=|lpa=|qrValue=/i
@@ -195,15 +195,10 @@ function main() {
   assert.match(listPage, /name="q"/);
   assert.match(helpLinks, /href="\/install\/iphone"/);
   assert.match(helpLinks, /href="\/install\/android"/);
-  assert.match(orderCard, /CustomerEsimInstallHelpLinks/);
   assert.match(orderCard, /customerEsimStatusLabel/);
   assert.match(detailPage, /customerEsimStatusLabel/);
-  assert.match(detailPage, /CustomerEsimInstallHelpLinks/);
-  // P1: detail Status row uses friendly label (not raw badge like "Completed").
-  assert.match(
-    detailPage,
-    /label="Status"[\s\S]*?customerEsimStatusLabel\(detail\.statusBadge\)/
-  );
+  assert.match(detailView, /CustomerEsimInstallHelpLinks/);
+  assert.match(detailView, /CustomerOrderDetailView|EsimOrderDetailCard/);
   assert.match(ordersLib, /statusLabel:\s*customerEsimStatusLabel\(statusBadge\)/);
   assert.doesNotMatch(ordersLib, /statusLabel:\s*statusBadge,/);
   assert.doesNotMatch(listPage, /Show full ICCID|decryptIccid|IccidRevealPanel/);
@@ -227,10 +222,11 @@ function main() {
   );
   console.log("PASS orders_lib_local_db_only");
 
-  assert.match(detailPage, /IccidRevealPanel/);
-  assert.match(detailPage, /CustomerEsimInstallPanel/);
+  assert.match(detailView, /IccidRevealPanel/);
+  assert.match(detailView, /CustomerEsimInstallPanel/);
   assert.match(detailPage, /notFound/);
-  assert.match(detailPage, /Order refunded/);
+  assert.match(detailPage, /CustomerOrderDetailView/);
+  assert.match(detailCard, /Order Refunded/);
   assert.doesNotMatch(
     detailPage,
     /smdpAddress|activationCode|qrValue|manualInstallText|fetchBrokerOrderPayload/
@@ -275,29 +271,22 @@ function main() {
   const usageLib = read("app/lib/orders/customerEsimUsage.ts");
   const usageApi = read("app/api/account/orders/[orderId]/usage/route.ts");
   const usagePanel = read("app/components/orders/CustomerEsimUsagePanel.tsx");
-  assert.match(orderCard, /View usage/);
-  assert.match(orderCard, /addDataEligible/);
-  assert.match(orderCard, /Add More Data/);
-  assert.match(
-    orderCard,
-    /addDataEligible[\s\S]*?Add More Data|Add More Data[\s\S]*?addDataEligible/
-  );
-  assert.match(orderCard, /\$\{encodeURIComponent\(order\.id\)\}/);
-  assert.doesNotMatch(orderCard, /rechargeOrderId/);
-  assert.match(detailPage, /addDataEligible/);
+  assert.match(orderCard, /View details/);
+  assert.match(orderCard, /∞ Unlimited|remainingDataLabel/);
+  assert.match(detailView, /addDataEligible/);
   // Add More Data lives in the shared Order Details card (EsimOrderDetailCard).
   assert.doesNotMatch(detailPage, /Need more data\?/);
   assert.doesNotMatch(detailPage, /add-more-data-heading/);
-  assert.match(detailPage, /EsimOrderDetailCard/);
+  assert.match(detailPage, /CustomerOrderDetailView/);
+  assert.match(detailView, /EsimOrderDetailCard/);
   assert.match(
-    detailPage,
-    /\$\{encodeURIComponent\(detail\.id\)\}\/add-data/
+    detailView,
+    /\$\{encodeURIComponent\(orderId\)\}\/add-data/
   );
   assert.doesNotMatch(
     detailPage,
     /encodeURIComponent\(detail\.rechargeOrderId\)/
   );
-  const detailCard = read("app/components/orders/EsimOrderDetailCard.tsx");
   assert.match(detailCard, /Add data to this eSIM/);
   assert.match(detailCard, /addDataHref/);
   assert.match(usagePanel, /addDataEligible/);
@@ -381,7 +370,8 @@ function main() {
   );
   assert.match(partnerAddDataActions, /resolvePartnerAddDataIdempotencyKey/);
   assert.doesNotMatch(addDataPage, /Coming soon/);
-  assert.match(detailPage, /EsimOrderDetailCard|CustomerEsimUsagePanel/);
+  assert.match(detailPage, /CustomerOrderDetailView/);
+  assert.match(detailView, /EsimOrderDetailCard/);
   assert.match(usageLib, /import "server-only"/);
   assert.match(usageLib, /authorizeCustomerOwnedOrderInstall/);
   assert.match(usageLib, /\/api\/esim\/usage\//);

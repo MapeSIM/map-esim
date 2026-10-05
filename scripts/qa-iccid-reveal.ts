@@ -77,8 +77,12 @@ function main() {
   assert.match(adminList, /iccidMasked/);
   console.log("PASS admin_detail_list_rules");
 
-  assert.match(customerDetail, /IccidRevealPanel/);
-  assert.match(customerDetail, /iccid=\{detail\.iccid\}/);
+  assert.match(customerDetail, /CustomerOrderDetailView/);
+  const customerDetailView = read(
+    "app/components/orders/CustomerOrderDetailView.tsx"
+  );
+  assert.match(customerDetailView, /IccidRevealPanel/);
+  assert.match(customerDetailView, /iccid=\{iccid\}/);
   assert.doesNotMatch(customerDetail, /Show full ICCID|Secure reveal/);
   assert.match(customerOrders, /iccidMasked/);
   assert.match(customerOrders, /loadOrderIccidPlaintextMap|resolveOrderIccidPlaintext/);

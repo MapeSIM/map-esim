@@ -102,9 +102,11 @@ function main() {
   assert.match(accountLayout, /label:\s*["']Support["']/);
   console.log("PASS no_duplicate_mobile_account_menu");
 
-  // C) My eSIMs journey + #install preserved (order card → install panel)
+  // C) My eSIMs journey — list card → detail → install panel (#install)
   assert.match(ordersPage, /My eSIMs/);
-  assert.match(orderCard, /#install/);
+  assert.match(orderCard, /View details/);
+  const detailView = read("app/components/orders/CustomerOrderDetailView.tsx");
+  assert.match(detailView, /#install|id="install"/);
   assert.match(installPanel, /hasInstallHashIntent|location\.hash/);
   assert.match(installPanel, /autoOpenStarted/);
   console.log("PASS my_esims_install_journey");

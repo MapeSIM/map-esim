@@ -106,7 +106,11 @@ function offlineChecks(): void {
   // No standalone redeem UI; Buy eSIM CTA removed from Rewards page.
   assert.doesNotMatch(rewardsPage, /href="\/account\/esim\/buy"/);
   assert.doesNotMatch(rewardsPage, /Buy eSIM/);
-  assert.match(orderDetail, /Rewards earned/);
+  assert.match(orderDetail, /CustomerOrderDetailView/);
+  assert.match(
+    read("app/components/orders/CustomerOrderDetailView.tsx"),
+    /Rewards earned/
+  );
   assert.doesNotMatch(safepay, /CustomerReward|rewardPoints/);
   assert.doesNotMatch(earn, /executeCreditCheckout|createCheckoutSession|PURCHASE_DEBIT/);
   console.log("PASS source_hooks_partner_exclusion_no_redemption_ui");

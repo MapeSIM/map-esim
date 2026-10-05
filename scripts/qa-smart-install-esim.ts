@@ -160,7 +160,7 @@ function main() {
   const sheet = read("app/components/install/SmartInstallFallbackSheet.tsx");
   const experience = read("app/components/install/EsimInstallExperience.tsx");
   const panel = read("app/components/orders/CustomerEsimInstallPanel.tsx");
-  const card = read("app/components/orders/CustomerEsimOrderCard.tsx");
+  const detailView = read("app/components/orders/CustomerOrderDetailView.tsx");
   const success = read("app/components/install/OrderInstallActions.tsx");
   const installSheet = read("app/components/install/InstallEsimSheet.tsx");
   const partnerPanel = read(
@@ -204,9 +204,9 @@ function main() {
   assert.doesNotMatch(panel, /location\.assign/);
   assert.doesNotMatch(panel, /View QR Code & Details/);
 
-  assert.match(card, />\s*Install eSIM\s*</);
-  assert.match(card, /#install/);
-  assert.doesNotMatch(card, /View QR Code & Details/);
+  assert.match(detailView, /Install eSIM/);
+  assert.match(detailView, /id="install"|#install/);
+  assert.doesNotMatch(detailView, /View QR Code & Details/);
 
   assert.match(success, /EsimInstallExperience/);
   assert.doesNotMatch(success, /useAppleOneTapInstallState/);

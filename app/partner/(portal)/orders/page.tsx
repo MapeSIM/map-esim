@@ -85,13 +85,13 @@ export default async function PartnerOrdersPage({
       <header>
         <h1 className="text-2xl font-bold tracking-tight">My eSIMs</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-          Your purchased Partner eSIMs. Open an eSIM to install or check usage.
+          Tap an eSIM to manage usage, QR install, and top-ups.
         </p>
       </header>
 
       <section className="min-w-0 space-y-3" aria-labelledby="orders-heading">
         <h2 id="orders-heading" className={partnerSectionLabelClass}>
-          Completed orders
+          Your eSIMs
         </h2>
         {data.orders.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-4 py-6 text-sm text-[var(--text-muted)]">
