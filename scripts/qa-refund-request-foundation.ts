@@ -40,6 +40,9 @@ function main() {
     "app/components/admin/AdminRefundRequestActions.tsx"
   );
   const orderPage = read("app/account/orders/[orderId]/page.tsx");
+  const orderDetailView = read(
+    "app/components/orders/CustomerOrderDetailView.tsx"
+  );
   const adminList = read("app/admin/refund-requests/page.tsx");
   const adminDetail = read("app/admin/refund-requests/[id]/page.tsx");
   const nav = read("app/components/admin/AdminNav.tsx");
@@ -108,9 +111,10 @@ function main() {
     service,
     /scheduleRefundStatusNotification\(current\.id,\s*"rejected"\)/
   );
-  assert.match(orderPage, /CustomerRefundRequestForm/);
+  assert.match(orderDetailView, /CustomerRefundRequestForm/);
+  assert.match(orderDetailView, /Request Refund|Hide refund/);
   assert.match(orderPage, /listCustomerRefundRequestsForOrder/);
-  assert.match(orderPage, /Fail soft/);
+  assert.match(orderPage, /CustomerOrderDetailView/);
   assert.match(orderPage, /refundJustRequested/);
   assert.match(customerForm, /Select a reason/);
   console.log("PASS customer_request_ownership_amount");
@@ -123,7 +127,11 @@ function main() {
   assert.match(admin, /getAdminRefundRequestDetail/);
   assert.match(adminDetail, /Payment composition/);
   assert.match(adminDetail, /Provider result/);
-  assert.match(adminDetail, /ICCID \(masked\)/);
+  assert.match(adminDetail, /label="ICCID"/);
+  assert.match(adminDetail, /iccidMasked/);
+  assert.match(adminDetail, /Gateway refund/);
+  assert.match(adminDetail, /Not executed \(exceptional \/ manual only\)/);
+  assert.match(adminDetail, /MAP Wallet credited|credits MAP Wallet/);
   assert.doesNotMatch(adminDetail, /iccidEncrypted|full ICCID/i);
   console.log("PASS admin_queue_review_admin_only");
 
