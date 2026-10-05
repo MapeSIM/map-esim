@@ -148,8 +148,9 @@ function main() {
   assert.match(types, /paymentAttemptId/);
   assert.match(types, /CreateEsimPurchaseCheckoutInput/);
   assert.match(topup, /purpose:\s*"WALLET_TOPUP"/);
-  assert.match(topup, /chargeAmountMinor:\s*topup\.creditAmountCents/);
-  assert.match(topup, /chargeCurrency:\s*"USD"/);
+  assert.match(topup, /chargeAmountMinor/);
+  assert.match(topup, /chargeCurrency/);
+  assert.match(topup, /Gateway charge — Simpaisa PKR quote or Safepay USD/);
   assert.match(topup, /event\.purpose !== "WALLET_TOPUP"/);
   console.log("PASS esim_and_topup_checkout_input_generalized");
 

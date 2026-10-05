@@ -10,8 +10,10 @@
  * Ops: `?force=1` or `?unlock=1` clears a stuck EsimLifecycleNotificationRunnerLock
  * and returns immediately (does not run the usage batch). Still requires valid CRON_SECRET.
  *
- * Speed: response returns as soon as the lifecycle batch finishes. Optional
- * `?staleRelease=1` piggybacks unpaid gateway hold release (can exceed ~30s).
+ * Speed: lifecycle batch is small; unpaid gateway hold release piggybacks by
+ * default so Hobby’s single daily cron still recovers stale reservations.
+ * Opt out with `?staleRelease=0` (or header x-cron-stale-release: 0) when an
+ * external scheduler needs a fast lifecycle-only response.
  */
 import { NextResponse } from "next/server";
 import {
@@ -69,8 +71,8 @@ async function handle(request: Request): Promise<Response> {
     url.searchParams.get("unlock") === "1" ||
     request.headers.get("x-cron-force-unlock") === "1";
   const runStaleRelease =
-    url.searchParams.get("staleRelease") === "1" ||
-    request.headers.get("x-cron-stale-release") === "1";
+    url.searchParams.get("staleRelease") !== "0" &&
+    request.headers.get("x-cron-stale-release") !== "0";
 
   if (forceUnlock) {
     try {
@@ -120,8 +122,8 @@ async function handle(request: Request): Promise<Response> {
       );
     }
 
-    // Default: return immediately after the lifecycle batch so external
-    // schedulers with ~30s timeouts do not fail. Opt-in piggyback only.
+    // Default: piggyback stale unpaid gateway hold release after the lifecycle
+    // batch (Hobby = 1 cron/day). Pass staleRelease=0 to skip.
     let staleRelease: Awaited<
       ReturnType<typeof runGatewayStaleReservationRecovery>
     > | null = null;

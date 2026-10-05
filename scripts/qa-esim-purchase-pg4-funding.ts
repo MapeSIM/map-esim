@@ -105,6 +105,7 @@ function main() {
   const walletPurchase = read("app/lib/esim/walletPurchase.ts");
   const persist = read("app/lib/orders/persistAssignedOrder.ts");
   const guestGate = read("app/lib/vesim/guestCheckoutGate.ts");
+  const messaging = read("app/lib/esim/customerPurchaseStatusMessaging.ts");
   const pkg = read("package.json");
 
   assert.match(route, /verifySafepayCardWebhookSignature/);
@@ -255,7 +256,11 @@ function main() {
   assert.match(cancelView, /Payment not completed/);
   assert.match(apply, /maybeReleasePendingGatewayReservationForPurchase/);
   assert.match(actions, /cancelPendingEsimGatewayCheckoutAction/);
-  assert.match(confirmForm, /Cancel payment & unlock wallet/);
+  assert.match(confirmForm, /CUSTOMER_AWAITING_GATEWAY_CANCEL_LABEL/);
+  assert.match(
+    messaging,
+    /CUSTOMER_AWAITING_GATEWAY_CANCEL_LABEL[\s\S]*Cancel payment & unlock wallet/
+  );
   console.log("PASS browser_return_non_authoritative_cancel_safe_release");
 
   assert.match(adapter, /verifySafepayCardWebhookSignature/);
