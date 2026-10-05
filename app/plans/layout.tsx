@@ -13,6 +13,7 @@ export const metadata: Metadata = {
   description,
   alternates: { canonical },
   ...publicPageShareMeta({ title, description, url: canonical }),
+  robots: { index: true, follow: true },
 };
 
 export default function PlansLayout({

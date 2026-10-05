@@ -3,11 +3,18 @@ import LegalDocument from "@/app/components/legal/LegalDocument";
 import { BRAND_NAME } from "@/app/lib/brand";
 import { LEGAL_CONTACTS, type LegalSection } from "@/app/lib/legal";
 import { absoluteCanonical } from "@/app/lib/seo/canonical";
+import { publicPageShareMeta } from "@/app/lib/seo/socialShareMeta";
+
+const title = `Refund Policy | ${BRAND_NAME}`;
+const description = `How ${BRAND_NAME} reviews refund requests for digital eSIM orders.`;
+const canonical = absoluteCanonical("/refund-policy");
 
 export const metadata: Metadata = {
-  title: `Refund Policy | ${BRAND_NAME}`,
-  description: `How ${BRAND_NAME} reviews refund requests for digital eSIM orders.`,
-  alternates: { canonical: absoluteCanonical("/refund-policy") },
+  title,
+  description,
+  alternates: { canonical },
+  ...publicPageShareMeta({ title, description, url: canonical }),
+  robots: { index: true, follow: true },
 };
 
 const sections: LegalSection[] = [

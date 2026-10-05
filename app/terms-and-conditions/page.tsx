@@ -3,11 +3,18 @@ import LegalDocument from "@/app/components/legal/LegalDocument";
 import { BRAND_NAME, BRAND_SITE_HOST } from "@/app/lib/brand";
 import { LEGAL_CONTACTS, type LegalSection } from "@/app/lib/legal";
 import { absoluteCanonical } from "@/app/lib/seo/canonical";
+import { publicPageShareMeta } from "@/app/lib/seo/socialShareMeta";
+
+const title = `Terms & Conditions | ${BRAND_NAME}`;
+const description = `Terms of use for ${BRAND_NAME} websites, customer accounts, Partner services, shared eSIM links and digital eSIM products.`;
+const canonical = absoluteCanonical("/terms-and-conditions");
 
 export const metadata: Metadata = {
-  title: `Terms & Conditions | ${BRAND_NAME}`,
-  description: `Terms of use for ${BRAND_NAME} websites, customer accounts, Partner services, shared eSIM links and digital eSIM products.`,
-  alternates: { canonical: absoluteCanonical("/terms-and-conditions") },
+  title,
+  description,
+  alternates: { canonical },
+  ...publicPageShareMeta({ title, description, url: canonical }),
+  robots: { index: true, follow: true },
 };
 
 const sections: LegalSection[] = [

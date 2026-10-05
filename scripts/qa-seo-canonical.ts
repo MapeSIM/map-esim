@@ -84,6 +84,39 @@ function main() {
 
   const sitemap = read("app/sitemap.ts");
   assert.match(sitemap, /lastModified/);
+  assert.match(sitemap, /getCanonicalDestinationPathsForSitemap/);
+  assert.match(sitemap, /path:\s*["']\/countries["']/);
+
+  const robots = read("app/robots.ts");
+  assert.match(robots, /sitemap:\s*`\$\{BRAND_SITE_URL\}\/sitemap\.xml`/);
+  assert.match(robots, /["']\/share\/["']/);
+  assert.match(robots, /["']\/partner["']/);
+  assert.match(robots, /["']\/dev["']/);
+  assert.match(robots, /["']\/account["']/);
+
+  const notFound = read("app/not-found.tsx");
+  assert.match(notFound, /Page not found/);
+  assert.match(notFound, /href=["']\/["']/);
+  assert.match(notFound, /href=["']\/countries["']/);
+
+  const errorBoundary = read("app/error.tsx");
+  assert.match(errorBoundary, /["']use client["']/);
+  assert.match(errorBoundary, /Something went wrong|Try again/);
+  assert.match(errorBoundary, /href=["']\/["']/);
+  assert.match(errorBoundary, /href=["']\/countries["']/);
+  assert.match(errorBoundary, /reset\(/);
+
+  for (const legal of [
+    "app/privacy-policy/page.tsx",
+    "app/terms-and-conditions/page.tsx",
+    "app/cookie-policy/page.tsx",
+    "app/refund-policy/page.tsx",
+  ]) {
+    const src = read(legal);
+    assert.match(src, /absoluteCanonical/);
+    assert.match(src, /publicPageShareMeta/);
+    assert.match(src, /robots:\s*\{\s*index:\s*true/);
+  }
 
   const graph = read("app/lib/seo/siteGraph.ts");
   assert.match(graph, /logo:\s*\{/);

@@ -27,6 +27,7 @@ export default function robots(): MetadataRoute.Robots {
         "/partner/setup-password/exchange",
         "/admin-setup-password",
         "/share/",
+        "/dev",
       ],
     },
     sitemap: `${BRAND_SITE_URL}/sitemap.xml`,

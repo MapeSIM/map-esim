@@ -3,11 +3,18 @@ import LegalDocument from "@/app/components/legal/LegalDocument";
 import { BRAND_NAME, BRAND_SITE_HOST } from "@/app/lib/brand";
 import { LEGAL_CONTACTS, type LegalSection } from "@/app/lib/legal";
 import { absoluteCanonical } from "@/app/lib/seo/canonical";
+import { publicPageShareMeta } from "@/app/lib/seo/socialShareMeta";
+
+const title = `Cookie Policy | ${BRAND_NAME}`;
+const description = `How ${BRAND_NAME} uses cookies and similar technologies.`;
+const canonical = absoluteCanonical("/cookie-policy");
 
 export const metadata: Metadata = {
-  title: `Cookie Policy | ${BRAND_NAME}`,
-  description: `How ${BRAND_NAME} uses cookies and similar technologies.`,
-  alternates: { canonical: absoluteCanonical("/cookie-policy") },
+  title,
+  description,
+  alternates: { canonical },
+  ...publicPageShareMeta({ title, description, url: canonical }),
+  robots: { index: true, follow: true },
 };
 
 const sections: LegalSection[] = [
