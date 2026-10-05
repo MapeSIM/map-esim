@@ -12,6 +12,7 @@ import { notifyEsimLifecycleEmail } from "@/app/lib/esim/esimLifecycleNotificati
 import {
   ESIM_LIFECYCLE_BATCH_SIZE,
   ESIM_LIFECYCLE_CANDIDATE_POOL_MULTIPLIER,
+  ESIM_LIFECYCLE_PROCESS_CONCURRENCY,
   ESIM_LIFECYCLE_RUNNER_LOCK_TTL_MS,
   ESIM_LIFECYCLE_V1_ENABLED_KINDS,
   evaluateEsimLifecycleEvents,
@@ -63,6 +64,67 @@ function emptyCounts(): EsimLifecycleRunCounts {
 
 function newClaimToken(): string {
   return randomBytes(16).toString("hex");
+}
+
+/**
+ * Run workers with a fixed concurrency cap, collecting Promise.allSettled-style
+ * results in input order.
+ */
+async function mapSettledWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>
+): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = new Array(items.length);
+  if (items.length === 0) return results;
+
+  const limit = Math.max(1, Math.min(concurrency, items.length));
+  let nextIndex = 0;
+
+  async function runWorker(): Promise<void> {
+    while (true) {
+      const index = nextIndex;
+      nextIndex += 1;
+      if (index >= items.length) return;
+      try {
+        const value = await worker(items[index]!, index);
+        results[index] = { status: "fulfilled", value };
+      } catch (reason) {
+        results[index] = { status: "rejected", reason };
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: limit }, () => runWorker())
+  );
+  return results;
+}
+
+function applyProcessOutcomeToCounts(
+  counts: EsimLifecycleRunCounts,
+  outcome: {
+    polled: boolean;
+    usageOk: boolean;
+    kinds: EsimLifecycleKind[];
+    results: Array<{ kind: EsimLifecycleKind; status: string }>;
+  }
+): void {
+  if (outcome.polled) counts.polled += 1;
+  if (!outcome.usageOk) {
+    if (outcome.polled) counts.usageUnavailable += 1;
+    return;
+  }
+  counts.eventsDue += outcome.kinds.length;
+  for (const row of outcome.results) {
+    if (row.status === "sent" || row.status === "dry_run") {
+      counts.sent += 1;
+    } else if (row.status === "failed") {
+      counts.failed += 1;
+    } else {
+      counts.skipped += 1;
+    }
+  }
 }
 
 export async function claimEsimLifecycleRunnerLock(
@@ -395,30 +457,22 @@ export async function runEsimLifecycleNotifications(options?: {
     });
     counts.candidates = candidates.length;
 
-    for (const order of candidates) {
-      try {
-        const outcome = await processEsimLifecycleOrder({
+    const settled = await mapSettledWithConcurrency(
+      candidates,
+      ESIM_LIFECYCLE_PROCESS_CONCURRENCY,
+      async (order) =>
+        processEsimLifecycleOrder({
           orderId: order.id,
           iccidEncrypted: order.iccidEncrypted,
           now,
           dryRun: options?.dryRun,
-        });
-        if (outcome.polled) counts.polled += 1;
-        if (!outcome.usageOk) {
-          if (outcome.polled) counts.usageUnavailable += 1;
-          continue;
-        }
-        counts.eventsDue += outcome.kinds.length;
-        for (const row of outcome.results) {
-          if (row.status === "sent" || row.status === "dry_run") {
-            counts.sent += 1;
-          } else if (row.status === "failed") {
-            counts.failed += 1;
-          } else {
-            counts.skipped += 1;
-          }
-        }
-      } catch {
+        })
+    );
+
+    for (const entry of settled) {
+      if (entry.status === "fulfilled") {
+        applyProcessOutcomeToCounts(counts, entry.value);
+      } else {
         counts.failed += 1;
       }
     }

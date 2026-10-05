@@ -318,11 +318,15 @@ function main() {
   assert.match(runner, /forceClearEsimLifecycleRunnerLock/);
   assert.match(runner, /claimedAt: \{ lte: staleBefore \}|staleBefore/);
   assert.match(runner, /finally \{/);
-  assert.match(shared, /ESIM_LIFECYCLE_BATCH_SIZE = 5/);
+  assert.match(shared, /ESIM_LIFECYCLE_BATCH_SIZE = 2/);
+  assert.match(shared, /ESIM_LIFECYCLE_PROCESS_CONCURRENCY = 3/);
   assert.match(shared, /ESIM_LIFECYCLE_RUNNER_LOCK_TTL_MS = 5 \* 60 \* 1000/);
+  assert.match(runner, /mapSettledWithConcurrency/);
+  assert.match(runner, /ESIM_LIFECYCLE_PROCESS_CONCURRENCY/);
   assert.match(cron, /force=1|unlock=1|forceClearEsimLifecycleRunnerLock/);
   assert.match(cron, /lockForceCleared/);
   assert.match(cron, /mode:\s*"force_unlock"|force_unlock/);
+  assert.match(cron, /staleRelease|skipped:\s*true/);
   assert.match(runner, /fetchProviderUsage/);
   assert.match(runner, /normalizeProviderUsagePayload/);
   assert.match(runner, /evaluateEsimLifecycleEvents/);

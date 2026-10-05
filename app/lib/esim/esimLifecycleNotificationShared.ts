@@ -48,7 +48,10 @@ export const ESIM_LIFECYCLE_LOW_DATA_REMAINING_PERCENT = 20;
 export const ESIM_LIFECYCLE_CLAIM_TTL_MS = 5 * 60 * 1000;
 /** Runner lock TTL / stale threshold — reclaim after 5 minutes if prior run crashed. */
 export const ESIM_LIFECYCLE_RUNNER_LOCK_TTL_MS = 5 * 60 * 1000;
-export const ESIM_LIFECYCLE_BATCH_SIZE = 5;
+/** Keep cron under external ~30s timeouts (carrier usage GETs are slow). */
+export const ESIM_LIFECYCLE_BATCH_SIZE = 2;
+/** Max concurrent order usage polls within a cron batch. */
+export const ESIM_LIFECYCLE_PROCESS_CONCURRENCY = 3;
 
 /** Fetch a wider pool, then prioritize urgent rows before taking BATCH_SIZE. */
 export const ESIM_LIFECYCLE_CANDIDATE_POOL_MULTIPLIER = 4;

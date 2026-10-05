@@ -9,6 +9,9 @@
  *
  * Ops: `?force=1` or `?unlock=1` clears a stuck EsimLifecycleNotificationRunnerLock
  * and returns immediately (does not run the usage batch). Still requires valid CRON_SECRET.
+ *
+ * Speed: response returns as soon as the lifecycle batch finishes. Optional
+ * `?staleRelease=1` piggybacks unpaid gateway hold release (can exceed ~30s).
  */
 import { NextResponse } from "next/server";
 import {
@@ -20,7 +23,7 @@ import { runGatewayStaleReservationRecovery } from "@/app/lib/payments/gatewaySt
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-/** Allow enough time for lifecycle batch + best-effort stale wallet release. */
+/** Lifecycle batch is small + parallel; keep headroom for optional staleRelease. */
 export const maxDuration = 60;
 
 function readConfiguredCronSecret(): string | null {
@@ -65,6 +68,9 @@ async function handle(request: Request): Promise<Response> {
     url.searchParams.get("force") === "1" ||
     url.searchParams.get("unlock") === "1" ||
     request.headers.get("x-cron-force-unlock") === "1";
+  const runStaleRelease =
+    url.searchParams.get("staleRelease") === "1" ||
+    request.headers.get("x-cron-stale-release") === "1";
 
   if (forceUnlock) {
     try {
@@ -114,33 +120,35 @@ async function handle(request: Request): Promise<Response> {
       );
     }
 
-    // Hobby allows one Vercel cron/day — piggyback unpaid gateway hold release.
-    // Failures here must not fail lifecycle delivery status.
+    // Default: return immediately after the lifecycle batch so external
+    // schedulers with ~30s timeouts do not fail. Opt-in piggyback only.
     let staleRelease: Awaited<
       ReturnType<typeof runGatewayStaleReservationRecovery>
     > | null = null;
-    try {
-      staleRelease = await runGatewayStaleReservationRecovery({ dryRun });
-      if (staleRelease && !staleRelease.ok) {
-        await reportServerErrorAsync(
-          new Error("piggyback_stale_release_failed"),
-          {
-            operation: "cron_esim_lifecycle_stale_release",
-            cronJob: "esim-lifecycle-notifications",
-            errorCode:
-              staleRelease.customer.errorCode ??
-              staleRelease.partner.errorCode ??
-              "stale_release_failed",
-          }
-        );
+    if (runStaleRelease) {
+      try {
+        staleRelease = await runGatewayStaleReservationRecovery({ dryRun });
+        if (staleRelease && !staleRelease.ok) {
+          await reportServerErrorAsync(
+            new Error("piggyback_stale_release_failed"),
+            {
+              operation: "cron_esim_lifecycle_stale_release",
+              cronJob: "esim-lifecycle-notifications",
+              errorCode:
+                staleRelease.customer.errorCode ??
+                staleRelease.partner.errorCode ??
+                "stale_release_failed",
+            }
+          );
+        }
+      } catch (error) {
+        await reportServerErrorAsync(error, {
+          operation: "cron_esim_lifecycle_stale_release",
+          cronJob: "esim-lifecycle-notifications",
+          errorCode: "stale_release_unhandled",
+        });
+        staleRelease = null;
       }
-    } catch (error) {
-      await reportServerErrorAsync(error, {
-        operation: "cron_esim_lifecycle_stale_release",
-        cronJob: "esim-lifecycle-notifications",
-        errorCode: "stale_release_unhandled",
-      });
-      staleRelease = null;
     }
 
     const status = result.ok ? 200 : result.errorCode === "runner_busy" ? 409 : 500;
@@ -151,13 +159,15 @@ async function handle(request: Request): Promise<Response> {
         counts: result.counts,
         errorCode: result.errorCode ?? null,
         lockForceCleared: false,
-        staleRelease: staleRelease
-          ? {
-              ok: staleRelease.ok,
-              customer: staleRelease.customer.counts,
-              partner: staleRelease.partner.counts,
-            }
-          : { ok: false, errorCode: "stale_release_failed" },
+        staleRelease: runStaleRelease
+          ? staleRelease
+            ? {
+                ok: staleRelease.ok,
+                customer: staleRelease.customer.counts,
+                partner: staleRelease.partner.counts,
+              }
+            : { ok: false, errorCode: "stale_release_failed" }
+          : { ok: true, skipped: true },
         dryRun,
       },
       { status }
