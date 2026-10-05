@@ -6,8 +6,12 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  buildEsimLifecycleAddDataUrl,
+  buildEsimLifecycleBrowseDestinationsUrl,
+  buildEsimLifecycleOrderUrl,
   renderEsimLifecycleEmailHtml,
   renderEsimLifecycleEmailText,
+  resolveEsimLifecyclePrimaryCta,
 } from "../app/lib/email/esimLifecycleTemplate";
 import {
   buildEsimLifecycleEventKey,
@@ -361,7 +365,33 @@ function main() {
   assert.match(envExample, /at least 16 characters/i);
   console.log("   ok");
 
-  console.log("6) Email template branding + CTAs + low-data copy");
+  console.log("6) Email template branding + order-bound CTAs + low-data copy");
+  const sampleOrderId = "ord_abc12345";
+  const expiryCta = resolveEsimLifecyclePrimaryCta({
+    kind: "EXPIRY_SOON_24H",
+    orderId: sampleOrderId,
+  });
+  assert.equal(expiryCta.label, "Manage My eSIM");
+  assert.equal(expiryCta.url, buildEsimLifecycleOrderUrl(sampleOrderId));
+  assert.match(expiryCta.url, /\/account\/orders\/ord_abc12345$/);
+
+  const lowDataCta = resolveEsimLifecyclePrimaryCta({
+    kind: "LOW_DATA",
+    orderId: sampleOrderId,
+    addDataApplicable: true,
+  });
+  assert.equal(lowDataCta.label, "Add More Data");
+  assert.equal(lowDataCta.url, buildEsimLifecycleAddDataUrl(sampleOrderId));
+  assert.match(lowDataCta.url, /\/account\/orders\/ord_abc12345\/add-data$/);
+
+  const depletedFallback = resolveEsimLifecyclePrimaryCta({
+    kind: "DATA_EXHAUSTED",
+    orderId: sampleOrderId,
+    addDataApplicable: false,
+  });
+  assert.equal(depletedFallback.label, "Manage My eSIM");
+  assert.equal(depletedFallback.url, buildEsimLifecycleOrderUrl(sampleOrderId));
+
   const payload = {
     kind: "EXPIRY_SOON_24H" as const,
     customerName: "Ada Lovelace",
@@ -370,26 +400,56 @@ function main() {
     expiryStatusLabel: "Expires in about 24 hours",
     expiryDateLabel: formatLifecycleExpiryLabel(in12h, now),
     remainingDataLabel: null,
-    myEsimUrl: "https://mapesim.com/account/orders",
-    buyAnotherUrl: "https://mapesim.com/countries",
+    primaryCtaUrl: expiryCta.url,
+    primaryCtaLabel: expiryCta.label,
+    browseDestinationsUrl: buildEsimLifecycleBrowseDestinationsUrl(),
   };
   const html = renderEsimLifecycleEmailHtml(payload);
   const text = renderEsimLifecycleEmailText(payload);
   assert.match(html, /Stay connected, wherever you go/);
-  assert.match(html, /View My eSIM/);
-  assert.match(html, /Buy another plan/);
+  assert.match(html, /Manage My eSIM/);
+  assert.match(html, /Browse All Destinations/);
+  assert.match(html, /\/account\/orders\/ord_abc12345/);
   assert.match(html, /Asia/);
   assert.match(html, /3 GB · 30 Days/);
-  assert.match(text, /View My eSIM/);
-  assert.match(text, /Buy another plan/);
+  assert.match(text, /Manage My eSIM/);
+  assert.match(text, /Browse All Destinations/);
+  assert.doesNotMatch(html, /View My eSIM|Buy another plan/);
+  assert.doesNotMatch(text, /View My eSIM|Buy another plan/);
+
+  const dataPayload = {
+    kind: "LOW_DATA" as const,
+    customerName: "Ada Lovelace",
+    destinationLabel: "Asia",
+    planLabel: "3 GB · 30 Days",
+    expiryStatusLabel: "Low data remaining (≤20%)",
+    expiryDateLabel: null,
+    remainingDataLabel: "2 GB of 10 GB",
+    primaryCtaUrl: lowDataCta.url,
+    primaryCtaLabel: lowDataCta.label,
+    browseDestinationsUrl: buildEsimLifecycleBrowseDestinationsUrl(),
+  };
+  const dataHtml = renderEsimLifecycleEmailHtml(dataPayload);
+  assert.match(dataHtml, /Add More Data/);
+  assert.match(dataHtml, /\/account\/orders\/ord_abc12345\/add-data/);
+  assert.match(dataHtml, /Browse All Destinations/);
+  assert.match(dataHtml, /2 GB of 10 GB/);
+
   assert.equal(
     lifecycleSubject("EXPIRED"),
     "Your MAP eSIM plan has expired"
   );
   assert.match(template, /20% or less data remaining/);
   assert.match(template, /about 80% used/);
+  assert.match(template, /resolveEsimLifecyclePrimaryCta/);
+  assert.match(template, /Add More Data/);
+  assert.match(template, /Manage My eSIM/);
+  assert.match(template, /Browse All Destinations/);
+  assert.match(notify, /resolveEsimLifecyclePrimaryCta/);
+  assert.match(notify, /addDataApplicable/);
   assertNoSensitive(html);
   assertNoSensitive(text);
+  assertNoSensitive(dataHtml);
   assert.match(template, /renderTransactionalEmailLayoutHtml/);
   console.log("   ok");
 

@@ -26,9 +26,48 @@ export type EsimLifecycleEmailPayload = {
   expiryStatusLabel: string;
   expiryDateLabel: string | null;
   remainingDataLabel: string | null;
-  myEsimUrl: string;
-  buyAnotherUrl: string;
+  /** Primary CTA — order-bound (Add More Data / Manage My eSIM). */
+  primaryCtaUrl: string;
+  primaryCtaLabel: string;
+  /** Secondary destinations browse link. */
+  browseDestinationsUrl: string;
 };
+
+export function buildEsimLifecycleOrderUrl(orderId: string): string {
+  const id = encodeURIComponent((orderId ?? "").trim());
+  return `${BRAND_SITE_URL}/account/orders/${id}`;
+}
+
+export function buildEsimLifecycleAddDataUrl(orderId: string): string {
+  return `${buildEsimLifecycleOrderUrl(orderId)}/add-data`;
+}
+
+export function buildEsimLifecycleBrowseDestinationsUrl(): string {
+  return `${BRAND_SITE_URL}/countries`;
+}
+
+/**
+ * Order-bound primary CTA by lifecycle kind.
+ * Data alerts prefer Add More Data when applicable; expiry alerts open the order.
+ */
+export function resolveEsimLifecyclePrimaryCta(input: {
+  kind: EsimLifecycleKind;
+  orderId: string;
+  /** Soft gate — false falls back to the order detail page. */
+  addDataApplicable?: boolean;
+}): { label: string; url: string } {
+  const orderUrl = buildEsimLifecycleOrderUrl(input.orderId);
+  if (input.kind === "LOW_DATA" || input.kind === "DATA_EXHAUSTED") {
+    if (input.addDataApplicable === false) {
+      return { label: "Manage My eSIM", url: orderUrl };
+    }
+    return {
+      label: "Add More Data",
+      url: buildEsimLifecycleAddDataUrl(input.orderId),
+    };
+  }
+  return { label: "Manage My eSIM", url: orderUrl };
+}
 
 function headlineFor(kind: EsimLifecycleKind): string {
   switch (kind) {
@@ -85,9 +124,9 @@ export function renderEsimLifecycleEmailHtml(
               ${renderEmailHeading(headlineFor(payload.kind))}
               ${renderEmailLead(bodyIntro(payload.kind, name))}
               ${renderEmailSummaryPanel("Plan status", rows)}
-              ${renderEmailCtaButton(payload.myEsimUrl, "View My eSIM")}
+              ${renderEmailCtaButton(payload.primaryCtaUrl, payload.primaryCtaLabel)}
               <p style="margin:4px 0 0;font-size:14px;line-height:1.55;">
-                ${renderEmailTextLink(payload.buyAnotherUrl, "Buy another plan")}
+                ${renderEmailTextLink(payload.browseDestinationsUrl, "Browse All Destinations")}
               </p>
               ${renderEmailSupportBlock()}`,
   });
@@ -140,8 +179,8 @@ export function renderEsimLifecycleEmailText(
   }
   lines.push(
     "",
-    `View My eSIM: ${payload.myEsimUrl}`,
-    `Buy another plan: ${payload.buyAnotherUrl}`,
+    `${payload.primaryCtaLabel}: ${payload.primaryCtaUrl}`,
+    `Browse All Destinations: ${payload.browseDestinationsUrl}`,
     "",
     `Support: ${BRAND_SUPPORT_EMAIL}`,
     "",

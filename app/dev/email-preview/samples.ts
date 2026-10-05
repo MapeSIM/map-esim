@@ -126,14 +126,19 @@ export function sampleExpiryReminderPayload(
     },
   };
 
+  const orderId = "ord_abc12345";
+  const orderUrl = `https://mapesim.com/account/orders/${orderId}`;
+  const isDataAlert = kind === "LOW_DATA" || kind === "DATA_EXHAUSTED";
+
   return {
     kind,
     customerName: "Ada Lovelace",
     destinationLabel: "Asia",
     planLabel: "3 GB · 30 Days",
     ...byKind[kind],
-    myEsimUrl: "https://mapesim.com/account/orders",
-    buyAnotherUrl: "https://mapesim.com/countries",
+    primaryCtaUrl: isDataAlert ? `${orderUrl}/add-data` : orderUrl,
+    primaryCtaLabel: isDataAlert ? "Add More Data" : "Manage My eSIM",
+    browseDestinationsUrl: "https://mapesim.com/countries",
   };
 }
 

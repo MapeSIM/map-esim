@@ -11,12 +11,13 @@ import {
   Role,
 } from "@prisma/client";
 import { randomBytes } from "node:crypto";
-import { BRAND_SITE_URL } from "@/app/lib/brand";
 import { prisma } from "@/app/lib/db";
 import { isEmailConfigured, sanitizeEmailHeaderValue } from "@/app/lib/email/config";
 import {
+  buildEsimLifecycleBrowseDestinationsUrl,
   renderEsimLifecycleEmailHtml,
   renderEsimLifecycleEmailText,
+  resolveEsimLifecyclePrimaryCta,
 } from "@/app/lib/email/esimLifecycleTemplate";
 import { sendChannelMail } from "@/app/lib/email/transport";
 import {
@@ -30,7 +31,7 @@ import {
   type EsimLifecycleKind,
   type EsimLifecycleUsageInput,
 } from "@/app/lib/esim/esimLifecycleNotificationShared";
-import { isValidEmail } from "@/app/lib/vesim/server";
+import { isValidEmail, normalizeOfferId } from "@/app/lib/vesim/server";
 
 export type EsimLifecycleNotifyResult =
   | { status: "sent" }
@@ -240,9 +241,13 @@ export async function notifyEsimLifecycleEmail(options: {
         destination: true,
         planName: true,
         dataAllowance: true,
+        offerId: true,
+        providerOrderId: true,
         fundingSource: true,
         userId: true,
         partnerEsimPurchase: { select: { id: true } },
+        walletEsimPurchase: { select: { offerId: true } },
+        adminPackageAssignment: { select: { offerId: true } },
         user: {
           select: {
             email: true,
@@ -298,6 +303,19 @@ export async function notifyEsimLifecycleEmail(options: {
     const planLabel = planParts.length > 0 ? planParts.join(" · ") : null;
     const destinationLabel = (order.destination ?? "").trim() || null;
     const expiryDateLabel = formatLifecycleExpiryLabel(options.expiresAt, now.getTime());
+    const offerId =
+      normalizeOfferId(order.offerId) ||
+      normalizeOfferId(order.walletEsimPurchase?.offerId) ||
+      normalizeOfferId(order.adminPackageAssignment?.offerId) ||
+      null;
+    const providerOrderId = (order.providerOrderId ?? "").trim() || null;
+    // Soft gate only — full catalog supportTopUp is enforced on the add-data page.
+    const addDataApplicable = Boolean(offerId && providerOrderId);
+    const primaryCta = resolveEsimLifecyclePrimaryCta({
+      kind: options.kind,
+      orderId: order.id,
+      addDataApplicable,
+    });
     const payload = {
       kind: options.kind,
       customerName,
@@ -309,8 +327,9 @@ export async function notifyEsimLifecycleEmail(options: {
         remainingDataGB: options.remainingDataGB,
         initialDataGB: options.initialDataGB,
       }),
-      myEsimUrl: `${BRAND_SITE_URL}/account/orders`,
-      buyAnotherUrl: `${BRAND_SITE_URL}/countries`,
+      primaryCtaUrl: primaryCta.url,
+      primaryCtaLabel: primaryCta.label,
+      browseDestinationsUrl: buildEsimLifecycleBrowseDestinationsUrl(),
     };
 
     const subject = sanitizeEmailHeaderValue(
