@@ -45,7 +45,7 @@ export default function EsimOrderDetailModal({
     <>
       {children}
       <div
-        className="fixed inset-0 z-[80] flex items-end justify-center bg-black/65 p-3 sm:items-center sm:p-6"
+        className="fixed inset-0 z-[80] flex items-end justify-center bg-black/65 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] sm:items-center sm:p-6"
         role="presentation"
         onClick={onClose}
       >
@@ -53,7 +53,7 @@ export default function EsimOrderDetailModal({
           role="dialog"
           aria-modal="true"
           aria-label="Order details"
-          className="w-full max-w-lg"
+          className="w-full min-w-0 max-w-lg"
           onClick={(event) => event.stopPropagation()}
         >
           <EsimOrderDetailCard

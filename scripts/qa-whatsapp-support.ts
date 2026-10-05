@@ -185,7 +185,7 @@ function main() {
   }
   console.log("PASS route_allow_deny");
 
-  // Sticky payment clearance (FAB above ~12.5rem bar + safe-area on mobile).
+  // Sticky payment clearance (FAB above ~14rem bar + safe-area on mobile).
   assert.equal(
     isWhatsAppStickyPaymentClearanceRoute("/account/esim/buy/review"),
     true
@@ -193,7 +193,7 @@ function main() {
   assert.equal(isWhatsAppStickyPaymentClearanceRoute("/countries"), false);
   assert.match(
     whatsAppFabBottomClass("/account/esim/buy"),
-    /12\.5rem.*safe-area-inset-bottom/
+    /14rem.*safe-area-inset-bottom/
   );
   assert.match(
     whatsAppFabBottomClass("/"),

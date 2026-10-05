@@ -121,7 +121,7 @@ export default async function AccountWalletBuyReviewPage({
   });
 
   return (
-    <div className="space-y-8">
+    <div className="min-w-0 space-y-8">
       <div>
         <Link
           href={back.href}

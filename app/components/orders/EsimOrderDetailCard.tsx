@@ -515,15 +515,15 @@ export default function EsimOrderDetailCard({
 
         {showActionBar ? (
           <div className="space-y-2.5 border-t border-white/8 pt-4">
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid min-w-0 gap-2 sm:grid-cols-3">
               {showViewQr ? (
                 onViewQr ? (
                   <button
                     type="button"
                     onClick={onViewQr}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
                   >
-                    <QrCode className="h-4 w-4" aria-hidden="true" />
+                    <QrCode className="h-4 w-4 shrink-0" aria-hidden="true" />
                     View QR Code
                   </button>
                 ) : (
@@ -531,9 +531,9 @@ export default function EsimOrderDetailCard({
                     href={viewQrHref!}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
                   >
-                    <QrCode className="h-4 w-4" aria-hidden="true" />
+                    <QrCode className="h-4 w-4 shrink-0" aria-hidden="true" />
                     View QR Code
                   </Link>
                 )
@@ -542,18 +542,18 @@ export default function EsimOrderDetailCard({
                 <button
                   type="button"
                   onClick={() => void onShare()}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
                 >
-                  <Share2 className="h-4 w-4" aria-hidden="true" />
+                  <Share2 className="h-4 w-4 shrink-0" aria-hidden="true" />
                   {shareCopied ? "Link copied" : "Share QR"}
                 </button>
               ) : null}
               {showDownload ? (
                 <a
                   href={qrDownloadHref!}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
                 >
-                  <Download className="h-4 w-4" aria-hidden="true" />
+                  <Download className="h-4 w-4 shrink-0" aria-hidden="true" />
                   Download QR
                 </a>
               ) : null}

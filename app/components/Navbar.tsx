@@ -215,7 +215,7 @@ export default function Navbar({
             width={184}
             height={48}
             sizes="168px"
-            className="h-8 w-[128px] max-w-[128px] object-contain object-left dark:hidden sm:h-9 sm:w-[150px] sm:max-w-[150px] md:h-10 md:w-[168px] md:max-w-[168px]"
+            className="h-8 w-[112px] max-w-[112px] object-contain object-left dark:hidden sm:h-9 sm:w-[150px] sm:max-w-[150px] md:h-10 md:w-[168px] md:max-w-[168px]"
             priority
             unoptimized
           />
@@ -225,7 +225,7 @@ export default function Navbar({
             width={184}
             height={48}
             sizes="168px"
-            className="hidden h-8 w-[128px] max-w-[128px] object-contain object-left dark:block sm:h-9 sm:w-[150px] sm:max-w-[150px] md:h-10 md:w-[168px] md:max-w-[168px]"
+            className="hidden h-8 w-[112px] max-w-[112px] object-contain object-left dark:block sm:h-9 sm:w-[150px] sm:max-w-[150px] md:h-10 md:w-[168px] md:max-w-[168px]"
             unoptimized
             aria-hidden="true"
           />
@@ -310,7 +310,7 @@ export default function Navbar({
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1 sm:gap-2 lg:hidden">
+        <div className="flex min-w-0 shrink-0 items-center gap-1 sm:gap-2 lg:hidden">
           <CurrencySelector />
           <ThemeToggle />
           <button

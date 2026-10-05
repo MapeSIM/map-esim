@@ -105,7 +105,7 @@ export default function InstallEsimSheet({
           </div>
 
           {qrSrc ? (
-            <div className="rounded-2xl border border-[var(--border)] bg-white p-4">
+            <div className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border)] bg-white p-3">
               {/* data URL or authorized partner QR route */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -113,7 +113,7 @@ export default function InstallEsimSheet({
                 alt="eSIM installation QR code"
                 width={240}
                 height={240}
-                className="mx-auto h-auto w-full max-w-[220px]"
+                className="mx-auto h-auto w-full max-w-[min(220px,100%)]"
               />
             </div>
           ) : null}

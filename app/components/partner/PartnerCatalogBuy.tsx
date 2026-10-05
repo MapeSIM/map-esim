@@ -223,9 +223,9 @@ export default function PartnerCatalogBuy({
       : true);
 
   return (
-    <div className="space-y-8">
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--heading)]">
-        <p>
+    <div className="min-w-0 space-y-8">
+      <div className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-3 text-sm text-[var(--heading)] sm:px-4">
+        <p className="break-words">
           Purchases are charged from your MAP eSIM Partner balance (
           <span className="font-semibold tabular-nums">{balanceLabel} USD</span>
           ).

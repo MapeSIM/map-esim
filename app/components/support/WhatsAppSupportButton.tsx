@@ -79,10 +79,10 @@ export default function WhatsAppSupportButton() {
       aria-label="Chat with MAP eSIM on WhatsApp"
       data-whatsapp-fab="true"
       data-whatsapp-sticky-clearance={
-        bottomClass.includes("12.5rem") ? "true" : "false"
+        bottomClass.includes("14rem") ? "true" : "false"
       }
       data-whatsapp-checkout-clearance={
-        bottomClass.includes("12.5rem") ? "sticky-pay" : "default"
+        bottomClass.includes("14rem") ? "sticky-pay" : "default"
       }
       className={`fixed z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-md transition hover:bg-[#1ebe57] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--page-bg)] left-[max(1.25rem,env(safe-area-inset-left))] ${bottomClass}`}
     >

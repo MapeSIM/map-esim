@@ -83,14 +83,14 @@ export default function EsimInstallExperience({
   return (
     <div className="space-y-5">
       {showQr ? (
-        <div className="rounded-2xl border border-[var(--border)] bg-white p-4 sm:p-5">
+        <div className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border)] bg-white p-3 sm:p-5">
           <Image
             src={qrViewHref!}
             alt="MAP eSIM installation QR code"
             width={320}
             height={320}
             unoptimized
-            className="mx-auto h-auto w-full max-w-[280px] sm:max-w-[320px]"
+            className="mx-auto h-auto w-full max-w-[min(280px,100%)] sm:max-w-[320px]"
           />
         </div>
       ) : null}
@@ -173,33 +173,33 @@ export default function EsimInstallExperience({
         </section>
       ) : null}
 
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid min-w-0 gap-2 sm:grid-cols-2">
         {hasVerifiedLpa && qrDownloadHref ? (
           <a
             href={qrDownloadHref}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-center text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
           >
-            <Download className="h-4 w-4" />
+            <Download className="h-4 w-4 shrink-0" />
             Download QR Code
           </a>
         ) : null}
         {androidActivationUrl ? (
           <a
             href={androidActivationUrl}
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-center text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
           >
             Open Android activation link
           </a>
         ) : null}
         <Link
           href={iphoneGuideHref}
-          className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+          className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-center text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
         >
           View iPhone installation guide
         </Link>
         <Link
           href={androidGuideHref}
-          className="inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+          className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-center text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
         >
           View Android installation guide
         </Link>
@@ -260,15 +260,15 @@ function CopyRow({
   onCopy: () => void;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-3">
+    <div className="min-w-0 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+        <p className="min-w-0 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
           {label}
         </p>
         <button
           type="button"
           onClick={onCopy}
-          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-[var(--accent-strong)] transition hover:bg-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+          className="inline-flex h-10 min-w-10 shrink-0 items-center justify-center gap-1 rounded-xl px-2.5 text-xs font-semibold text-[var(--accent-strong)] transition hover:bg-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
         >
           <Copy className="h-3.5 w-3.5" />
           {copied ? "Copied" : "Copy"}

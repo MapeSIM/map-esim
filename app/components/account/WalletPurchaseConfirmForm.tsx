@@ -391,15 +391,15 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
     review.status === WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT;
 
   const stickyBarVisible = !awaitingGatewayPayment;
-  // Tallest sticky bar ≈ confirm checkbox + due row + helper + safe-area.
+  // Tallest sticky bar ≈ confirm checkbox + due row + full-width CTA + helper + safe-area.
   // Spacer (not form padding alone) keeps mobile number / amount above the CTA.
   const stickySpacerClass =
     stickyShowConfirm || Boolean(stickyDisabledReason)
-      ? "pointer-events-none h-[calc(12.5rem+env(safe-area-inset-bottom,0px))] lg:hidden"
-      : "pointer-events-none h-[calc(8.5rem+env(safe-area-inset-bottom,0px))] lg:hidden";
+      ? "pointer-events-none h-[calc(14rem+env(safe-area-inset-bottom,0px))] lg:hidden"
+      : "pointer-events-none h-[calc(10rem+env(safe-area-inset-bottom,0px))] lg:hidden";
 
   return (
-    <div className="space-y-6 max-lg:[scroll-padding-bottom:calc(8.5rem+env(safe-area-inset-bottom,0px))]">
+    <div className="min-w-0 space-y-6 max-lg:[scroll-padding-bottom:calc(10rem+env(safe-area-inset-bottom,0px))]">
       {awaitingGatewayPayment ? (
         <div
           className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 py-4 sm:px-5"
@@ -1045,11 +1045,11 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
       {/* Mobile sticky pay action — sole mobile CTA; aside buttons stay desktop-only. */}
       {stickyBarVisible ? (
       <div
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] backdrop-blur supports-[padding:max(0px)]:pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/95 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] backdrop-blur supports-[padding:max(0px)]:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4 lg:hidden"
         role="region"
         aria-label="Checkout payment action"
       >
-        <div className="mx-auto flex max-w-5xl flex-col gap-2">
+        <div className="mx-auto flex max-w-5xl min-w-0 flex-col gap-2">
           {stickyShowConfirm ? (
             <label
               htmlFor={confirmStickyId}
@@ -1064,7 +1064,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                 className="mt-0.5"
                 aria-controls={confirmSectionId}
               />
-              <span>
+              <span className="min-w-0 break-words">
                 {confirmCheckboxText}{" "}
                 <a
                   href={`#${confirmSectionId}`}
@@ -1076,45 +1076,43 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
               </span>
             </label>
           ) : null}
-          <div className="flex items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-                {dueLabel}
-              </p>
-              <p className="truncate text-sm font-semibold text-[var(--heading)]">
-                {dueOnline ? (
-                  <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout} cents={preview.gatewayAmountCents} />
-                ) : (
-                  "Covered"
-                )}
-              </p>
-            </div>
-            {zeroCashConfirm ? (
-              <button
-                type="submit"
-                disabled={stickyCtaDisabled}
-                className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
-              >
-                {pending ? stickyCtaPendingLabel : primaryCtaLabel}
-              </button>
-            ) : gatewayReady ? (
-              <button
-                type="submit"
-                disabled={stickyCtaDisabled}
-                className="inline-flex h-11 max-w-[58%] shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-3 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
-              >
-                {pending ? stickyCtaPendingLabel : primaryCtaLabel}
-              </button>
-            ) : walletOnlyInsufficient ? null : (
-              <button
-                type="button"
-                disabled
-                className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 text-sm font-semibold text-[var(--heading)] opacity-60"
-              >
-                Continue to Payment
-              </button>
-            )}
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              {dueLabel}
+            </p>
+            <p className="truncate text-sm font-semibold text-[var(--heading)]">
+              {dueOnline ? (
+                <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout} cents={preview.gatewayAmountCents} />
+              ) : (
+                "Covered"
+              )}
+            </p>
           </div>
+          {zeroCashConfirm ? (
+            <button
+              type="submit"
+              disabled={stickyCtaDisabled}
+              className="inline-flex h-11 w-full min-w-0 items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
+            >
+              {pending ? stickyCtaPendingLabel : primaryCtaLabel}
+            </button>
+          ) : gatewayReady ? (
+            <button
+              type="submit"
+              disabled={stickyCtaDisabled}
+              className="inline-flex h-11 w-full min-w-0 items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
+            >
+              {pending ? stickyCtaPendingLabel : primaryCtaLabel}
+            </button>
+          ) : walletOnlyInsufficient ? null : (
+            <button
+              type="button"
+              disabled
+              className="inline-flex h-11 w-full min-w-0 items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 text-sm font-semibold text-[var(--heading)] opacity-60"
+            >
+              Continue to Payment
+            </button>
+          )}
           {stickyDisabledReason ? (
             <p className="text-xs leading-snug text-[var(--text-muted)]" role="status">
               {stickyDisabledReason}

@@ -136,7 +136,7 @@ function matchesWhatsAppBlocked(pathname: string): boolean {
 }
 
 /**
- * Wallet checkout review has a fixed mobile sticky payment bar (~8.5–12.5rem).
+ * Wallet checkout review has a fixed mobile sticky payment bar (~10–14rem).
  * FAB must clear that bar (+ safe-area) when both could share the viewport.
  */
 export function isWhatsAppStickyPaymentClearanceRoute(pathname: string): boolean {
@@ -171,8 +171,8 @@ export function isWhatsAppSupportRoute(pathname: string): boolean {
  */
 export function whatsAppFabBottomClass(pathname: string): string {
   if (isWhatsAppStickyPaymentClearanceRoute(pathname)) {
-    // 12.5rem sticky + 1.25rem gap above the bar; safe-area already in sticky spacer.
-    return "bottom-[calc(12.5rem+1.25rem+env(safe-area-inset-bottom,0px))] lg:bottom-[max(1.25rem,env(safe-area-inset-bottom,0px))]";
+    // 14rem sticky + 1.25rem gap above the bar; safe-area already in sticky spacer.
+    return "bottom-[calc(14rem+1.25rem+env(safe-area-inset-bottom,0px))] lg:bottom-[max(1.25rem,env(safe-area-inset-bottom,0px))]";
   }
   return "bottom-[max(1.25rem,env(safe-area-inset-bottom,0px))]";
 }

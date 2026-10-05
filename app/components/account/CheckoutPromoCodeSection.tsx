@@ -88,7 +88,7 @@ export default function CheckoutPromoCodeSection({
 
   return (
     <section
-      className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] px-5 py-5 sm:px-6"
+      className="min-w-0 rounded-[24px] border border-[var(--border)] bg-[var(--surface)] px-4 py-5 sm:px-6"
       aria-labelledby={headingId}
     >
       <h2
@@ -151,7 +151,7 @@ export default function CheckoutPromoCodeSection({
       ) : (
         <div className="mt-3 space-y-2">
           <input type="hidden" name="purchaseId" value={purchaseId} />
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
             <label htmlFor={inputId} className="sr-only">
               Enter promo code
             </label>
@@ -165,14 +165,14 @@ export default function CheckoutPromoCodeSection({
               disabled={busy}
               placeholder="Enter code"
               onKeyDown={onPromoInputKeyDown}
-              className="min-w-0 flex-1 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm uppercase text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+              className="min-h-11 min-w-0 flex-1 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm uppercase text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
             />
             <button
               ref={applyButtonRef}
               type="submit"
               formAction={applyAction}
               disabled={busy}
-              className="inline-flex h-10 shrink-0 items-center justify-center rounded-[12px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-ink)] disabled:opacity-60"
+              className="inline-flex h-11 w-full shrink-0 items-center justify-center rounded-[12px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-ink)] disabled:opacity-60 sm:w-auto"
             >
               {applyPending ? "Applying…" : "Apply"}
             </button>

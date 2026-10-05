@@ -118,7 +118,7 @@ export default function PartnerOfferPaymentForm({
   return (
     <form
       action={buyAction}
-      className={compact ? "shrink-0 space-y-3 sm:min-w-[240px]" : "space-y-4"}
+      className={compact ? "w-full min-w-0 space-y-3 sm:w-auto sm:min-w-[240px] sm:shrink-0" : "space-y-4"}
     >
       <input type="hidden" name="offerId" value={offerId} />
       <input type="hidden" name="destinationCode" value={destinationCode} />
@@ -129,7 +129,7 @@ export default function PartnerOfferPaymentForm({
 
       {payableCents > 0 ? (
         <p
-          className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--heading)]"
+          className="min-w-0 break-words rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--heading)]"
           role="status"
           aria-live="polite"
         >

@@ -50,10 +50,13 @@ function main() {
   assert.match(confirm, /safe-area-inset-bottom/);
   assert.match(confirm, /sole mobile CTA|Mobile sticky pay action/);
   assert.match(confirm, /data-checkout-sticky-spacer/);
-  assert.match(confirm, /stickySpacerClass|12\.5rem\+env\(safe-area-inset-bottom/);
+  assert.match(confirm, /stickySpacerClass|14rem\+env\(safe-area-inset-bottom/);
+  assert.match(confirm, /10rem\+env\(safe-area-inset-bottom/);
   assert.match(confirm, /scroll-padding-bottom/);
+  assert.match(confirm, /w-full min-w-0 items-center justify-center rounded-2xl bg-\[var\(--accent-strong\)\]/);
+  assert.doesNotMatch(confirm, /max-w-\[58%\]/);
   // Spacer clears sticky CTA (+ safe-area) at common mobile widths.
-  const stickyClearancePx = 12.5 * 16;
+  const stickyClearancePx = 14 * 16;
   for (const width of [360, 390, 412]) {
     assert.ok(
       stickyClearancePx > 0 && stickyClearancePx < width,
@@ -66,9 +69,10 @@ function main() {
   const whatsappButton = read("app/components/support/WhatsAppSupportButton.tsx");
   assert.match(whatsappShared, /isWhatsAppStickyPaymentClearanceRoute/);
   assert.match(whatsappShared, /whatsAppFabBottomClass/);
-  assert.match(whatsappShared, /12\.5rem.*safe-area-inset-bottom/);
+  assert.match(whatsappShared, /14rem.*safe-area-inset-bottom/);
   assert.match(whatsappButton, /whatsAppFabBottomClass/);
   assert.match(whatsappButton, /data-whatsapp-sticky-clearance/);
+  assert.match(whatsappButton, /14rem/);
   // Sticky bar stays z-40; FAB stays z-30 but sits above the bar vertically.
   assert.match(confirm, /fixed inset-x-0 bottom-0 z-40/);
   assert.match(whatsappButton, /fixed z-30/);
