@@ -29,6 +29,7 @@ import {
   localFinalizationBlockerLabel,
   partnerRefundBlockerLabel,
   isPartnerRefundSourceType,
+  resolutionEligibilityAllowsAdminClear,
   walletRefundBlockerLabel,
   isWalletRefundSourceType,
   LOCK_CASE_PHRASE,
@@ -56,6 +57,7 @@ import {
 } from "@/app/lib/admin/reconciliationFundFulfillRecoveryShared";
 
 export {
+  ADMINISTRATIVE_CLEAR_RESOLUTION_CODES,
   CASE_REASON_MAX,
   CASE_REASON_MIN,
   DEESCALATE_CASE_PHRASE,
@@ -65,11 +67,13 @@ export {
   RESOLVE_CASE_PHRASE,
   UNLOCK_CASE_PHRASE,
   evaluateResolutionEligibility,
+  isAdministrativeClearResolutionCode,
   parseCaseReason,
   parseConfirmPhrase,
   parseEscalationPriority,
   parseResolutionCode,
   resolutionBlockerLabel,
+  resolutionEligibilityAllowsAdminClear,
 } from "@/app/lib/admin/reconciliationCaseShared";
 
 export const CASE_LOCKED = "reconciliation.case_locked";
@@ -579,7 +583,8 @@ async function enrichActorNames(row: LoadedCase): Promise<LoadedCase> {
 
 function eligibilityFromRow(
   sourceType: CaseManagementSourceType,
-  row: LoadedCase
+  row: LoadedCase,
+  resolutionCode?: string | null
 ): ResolutionEligibility {
   return evaluateResolutionEligibility({
     sourceType,
@@ -600,6 +605,7 @@ function eligibilityFromRow(
     providerRefreshResult: row.providerRefreshResult,
     providerRefreshClaimedAt: row.providerRefreshClaimedAt,
     providerRefreshCompletedAt: row.providerRefreshCompletedAt,
+    resolutionCode,
   });
 }
 
@@ -681,7 +687,9 @@ export async function getCaseManagementEligibility(options: {
 
   const eligibilityMessage = eligibility.allowed
     ? "Local evidence shows no active financial, provider, email, or ICCID risk."
-    : eligibility.blockers.map(resolutionBlockerLabel).join(" ");
+    : resolutionEligibilityAllowsAdminClear(eligibility)
+      ? `${eligibility.blockers.map(resolutionBlockerLabel).join(" ")} Use resolution code ALREADY_RECOVERED or CANCELLED_NO_REFUND_DUE to clear this stuck/test case.`
+      : eligibility.blockers.map(resolutionBlockerLabel).join(" ");
 
   let iccidBackfillMessage =
     "ICCID backfill is not available for this case type.";
@@ -922,7 +930,11 @@ export async function getCaseManagementEligibility(options: {
     canEscalate: !resolved,
     canDeescalate: !resolved && escalated && deescalatePriorityOptions.length > 0,
     deescalatePriorityOptions,
-    canResolve: !resolved && !locked && eligibility.allowed && !refreshInProgress,
+    canResolve:
+      !resolved &&
+      !locked &&
+      !refreshInProgress &&
+      (eligibility.allowed || resolutionEligibilityAllowsAdminClear(eligibility)),
     refreshBlockedByCase: resolved || locked,
     emailResendSupported: emailSupported,
     emailResendAllowed: Boolean(emailEligibility?.allowed),
@@ -1908,7 +1920,11 @@ export async function resolveReconciliationCase(options: {
       return { ok: true, idempotent: true };
     }
 
-    const eligibility = eligibilityFromRow(ids.sourceType, row);
+    const eligibility = eligibilityFromRow(
+      ids.sourceType,
+      row,
+      codeParsed.code
+    );
     if (!eligibility.allowed) {
       await writeAuditLog({
         actorUserId: admin.id,
@@ -1929,7 +1945,7 @@ export async function resolveReconciliationCase(options: {
         ok: false,
         error:
           eligibility.blockers.map(resolutionBlockerLabel).join(" ") ||
-          "This case cannot be resolved yet.",
+          "This case cannot be resolved yet. For stuck/test cases choose ALREADY_RECOVERED or CANCELLED_NO_REFUND_DUE.",
       };
     }
 

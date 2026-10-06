@@ -128,9 +128,38 @@ export const RESOLUTION_CODES = [
   "ALREADY_RECOVERED",
   "DATA_CORRECTED",
   "DUPLICATE_TEST_DATA",
+  "CANCELLED_NO_REFUND_DUE",
 ] as const;
 
 export type ResolutionCode = (typeof RESOLUTION_CODES)[number];
+
+/**
+ * Admin clear codes for stuck/test cases where local risk blockers remain
+ * (e.g. ICCID still pending, cancelled/failed provider order). These do not
+ * mutate wallets/orders — they only set reconciliationResolvedAt.
+ */
+export const ADMINISTRATIVE_CLEAR_RESOLUTION_CODES = [
+  "ALREADY_RECOVERED",
+  "CANCELLED_NO_REFUND_DUE",
+] as const;
+
+export type AdministrativeClearResolutionCode =
+  (typeof ADMINISTRATIVE_CLEAR_RESOLUTION_CODES)[number];
+
+const HARD_RESOLUTION_BLOCKERS = new Set([
+  "already_resolved",
+  "case_locked",
+  "provider_refresh_in_progress",
+]);
+
+export function isAdministrativeClearResolutionCode(
+  code: string | null | undefined
+): boolean {
+  const v = String(code ?? "").trim().toUpperCase();
+  return (ADMINISTRATIVE_CLEAR_RESOLUTION_CODES as readonly string[]).includes(
+    v
+  );
+}
 
 export const CASE_MANAGEMENT_SOURCE_TYPES = [
   "wallet_purchase",
@@ -1505,6 +1534,12 @@ export type ResolutionBlockInput = {
   providerRefreshClaimedAt?: Date | string | null;
   providerRefreshCompletedAt?: Date | string | null;
   sourceType: CaseManagementSourceType;
+  /**
+   * When set to an administrative clear code, soft risk blockers
+   * (ICCID pending, cancelled/failed provider state, etc.) are waived.
+   * Hard blockers (already resolved / locked / refresh in progress) remain.
+   */
+  resolutionCode?: string | null;
 };
 
 export type ResolutionEligibility = {
@@ -1512,9 +1547,31 @@ export type ResolutionEligibility = {
   blockers: string[];
 };
 
+/** True when blockers can be waived by ALREADY_RECOVERED / CANCELLED_NO_REFUND_DUE. */
+export function resolutionEligibilityAllowsAdminClear(
+  eligibility: ResolutionEligibility
+): boolean {
+  if (eligibility.allowed) return true;
+  return eligibility.blockers.every((b) => !HARD_RESOLUTION_BLOCKERS.has(b));
+}
+
+function finalizeResolutionEligibility(
+  blockers: string[],
+  resolutionCode: string | null | undefined
+): ResolutionEligibility {
+  if (
+    isAdministrativeClearResolutionCode(resolutionCode) &&
+    blockers.every((b) => !HARD_RESOLUTION_BLOCKERS.has(b))
+  ) {
+    return { allowed: true, blockers: [] };
+  }
+  return { allowed: blockers.length === 0, blockers };
+}
+
 /**
  * Safe resolution eligibility from local fields only.
- * Blocks whenever any active financial/provider/email/ICCID risk remains.
+ * Blocks whenever any active financial/provider/email/ICCID risk remains,
+ * unless an administrative clear resolution code is supplied.
  */
 export function evaluateResolutionEligibility(
   input: ResolutionBlockInput
@@ -1538,21 +1595,31 @@ export function evaluateResolutionEligibility(
     if (isFailedEmail(input.emailDeliveryStatus)) {
       blockers.push("order_email_failed");
     }
-    return { allowed: blockers.length === 0, blockers };
+    return finalizeResolutionEligibility(blockers, input.resolutionCode);
   }
 
   if (input.sourceType === "wallet_email") {
     if (isFailedWalletEmail(input.emailNotificationStatus)) {
       blockers.push("wallet_notification_failed");
     }
-    return { allowed: blockers.length === 0, blockers };
+    return finalizeResolutionEligibility(blockers, input.resolutionCode);
   }
 
   if (input.sourceType === "iccid") {
     if (!input.iccidHash && !input.iccidCapturedAt) {
       blockers.push("iccid_pending");
     }
-    return { allowed: blockers.length === 0, blockers };
+    // Cancelled/failed/pending provider order rows still appear in ICCID inbox;
+    // capture may never arrive — admin clear codes may resolve them.
+    if (
+      status === "PENDING" ||
+      status === "FAILED" ||
+      status === "CANCELLED" ||
+      status === "PROVIDER_PENDING"
+    ) {
+      blockers.push("funds_or_provider_pending");
+    }
+    return finalizeResolutionEligibility(blockers, input.resolutionCode);
   }
 
   if (input.sourceType === "topup") {
@@ -1564,10 +1631,10 @@ export function evaluateResolutionEligibility(
     ) {
       blockers.push("reconciliation_still_active");
     }
-    return { allowed: blockers.length === 0, blockers };
+    return finalizeResolutionEligibility(blockers, input.resolutionCode);
   }
 
-  // wallet_purchase | assignment
+  // wallet_purchase | assignment | partner_purchase
   if (status === "FUNDS_RESERVED" || status === "PROVIDER_PENDING") {
     blockers.push("funds_or_provider_pending");
   }
@@ -1640,7 +1707,7 @@ export function evaluateResolutionEligibility(
     blockers.push("reconciliation_still_active");
   }
 
-  return { allowed: blockers.length === 0, blockers };
+  return finalizeResolutionEligibility(blockers, input.resolutionCode);
 }
 
 export function resolutionBlockerLabel(code: string): string {

@@ -286,6 +286,7 @@ export default async function AdminReconciliationDetailPage({
           resolvedByLabel={caseUi.resolvedByLabel}
           resolutionReason={caseUi.resolutionReason}
           resolutionCode={caseUi.resolutionCode}
+          resolutionEligibility={caseUi.resolutionEligibility}
           resolutionEligibilityMessage={caseUi.resolutionEligibilityMessage}
           canLock={caseUi.canLock}
           canUnlock={caseUi.canUnlock}

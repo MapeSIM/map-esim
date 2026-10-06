@@ -78,6 +78,7 @@ function main() {
     "ALREADY_RECOVERED",
     "DATA_CORRECTED",
     "DUPLICATE_TEST_DATA",
+    "CANCELLED_NO_REFUND_DUE",
   ]);
   assert.equal(normalizeCaseManagementSourceType("wallet_topup"), "topup");
   assert.equal(
@@ -185,6 +186,35 @@ function main() {
   assert.equal(iccidPending.allowed, false);
   assert.ok(iccidPending.blockers.includes("iccid_pending"));
 
+  const iccidPendingCleared = evaluateResolutionEligibility({
+    sourceType: "iccid",
+    locked: false,
+    alreadyResolved: false,
+    status: "FAILED",
+    resolutionCode: "ALREADY_RECOVERED",
+  });
+  assert.equal(iccidPendingCleared.allowed, true);
+  assert.deepEqual(iccidPendingCleared.blockers, []);
+
+  const iccidCancelledCleared = evaluateResolutionEligibility({
+    sourceType: "iccid",
+    locked: false,
+    alreadyResolved: false,
+    status: "CANCELLED",
+    resolutionCode: "CANCELLED_NO_REFUND_DUE",
+  });
+  assert.equal(iccidCancelledCleared.allowed, true);
+
+  const iccidStillBlockedWithoutClearCode = evaluateResolutionEligibility({
+    sourceType: "iccid",
+    locked: false,
+    alreadyResolved: false,
+    status: "PROVIDER_PENDING",
+    resolutionCode: "NO_LONGER_ACTIONABLE",
+  });
+  assert.equal(iccidStillBlockedWithoutClearCode.allowed, false);
+  assert.ok(iccidStillBlockedWithoutClearCode.blockers.includes("iccid_pending"));
+
   const recovered = evaluateResolutionEligibility({
     sourceType: "wallet_purchase",
     locked: false,
@@ -206,6 +236,7 @@ function main() {
     debitStatus: "COMPLETED",
   });
   assert.equal(refunded.allowed, true);
+  assert.equal(parseResolutionCode("CANCELLED_NO_REFUND_DUE").ok, true);
   console.log("PASS resolution_eligibility_classifier");
 
   // Filters / UI

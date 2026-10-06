@@ -90,6 +90,7 @@ export default function CaseManagementPanel(props: {
   resolvedByLabel: string;
   resolutionReason: string;
   resolutionCode: string;
+  resolutionEligibility: { allowed: boolean; blockers: string[] };
   resolutionEligibilityMessage: string;
   canLock: boolean;
   canUnlock: boolean;
@@ -964,8 +965,14 @@ export default function CaseManagementPanel(props: {
             </div>
             {!props.canResolve ? (
               <p className="text-sm text-[var(--text-muted)]" role="status">
-                Mark resolved is unavailable until eligibility passes and the
-                case is unlocked.
+                Mark resolved is unavailable until the case is unlocked and no
+                hard blocker remains (already resolved / provider refresh in
+                progress).
+              </p>
+            ) : !props.resolutionEligibility.allowed ? (
+              <p className="text-sm text-[var(--text-muted)]" role="status">
+                Local risk still present. Choose ALREADY_RECOVERED or
+                CANCELLED_NO_REFUND_DUE to clear stuck/test cases after review.
               </p>
             ) : null}
             <ActionMessage state={resolveState} />
