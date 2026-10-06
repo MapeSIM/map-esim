@@ -1,5 +1,12 @@
+/**
+ * Customer eSIM payment return — display only.
+ * Never funds, never creates orders, never trusts browser payment params.
+ */
+"use client";
+
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Loader2 } from "lucide-react";
 import {
   CUSTOMER_PURCHASE_PROCESSING_MESSAGE,
   CUSTOMER_PURCHASE_REVIEW_NEEDED_MESSAGE,
@@ -7,43 +14,39 @@ import {
 } from "@/app/lib/esim/customerPurchaseStatusMessaging";
 import type { EsimPaymentReturnKind } from "@/app/lib/esim/esimPurchasePaymentReturnState";
 import { esimPurchasePaymentReviewHref } from "@/app/lib/esim/esimPurchasePaymentReturnState";
+import {
+  PAYMENT_RETURN_CHECK_STATUS_LABEL,
+  PAYMENT_RETURN_PREPARING_HEADLINE,
+  PAYMENT_RETURN_VERIFYING_HEADLINE,
+  paymentReturnPendingGuidance,
+} from "@/app/lib/payments/paymentReturnUxCopy";
+import StatusRefreshPoller from "@/app/components/payments/StatusRefreshPoller";
 
-/** Display-only. Never funds, never creates orders, never trusts browser payment params. */
 export function EsimPurchasePaymentReturnView({
   kind,
   purchaseId,
   refreshHref,
-  cancelHref = null,
-  paymentProvider = null,
+  walletOperatorLabel = null,
 }: {
   kind: Exclude<EsimPaymentReturnKind, "completed">;
   purchaseId: string;
   refreshHref: string;
-  /** Authenticated cancel URL — releases a still-pending wallet reservation. */
-  cancelHref?: string | null;
-  /** Display-only provider for copy. Never used to mark paid. */
-  paymentProvider?: "SIMPAISA" | "SAFEPAY" | null;
+  /** Display-only JazzCash / Easypaisa label when known. */
+  walletOperatorLabel?: string | null;
 }) {
   const reviewHref = esimPurchasePaymentReviewHref(purchaseId);
-  const isSimpaisa = paymentProvider === "SIMPAISA";
 
   if (kind === "verified") {
     return (
       <ReturnShell>
-        <h1 className="text-2xl font-bold tracking-tight">Payment verified</h1>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
-          {CUSTOMER_PURCHASE_PROCESSING_MESSAGE}
-        </p>
-        <StatusCard>
-          Refresh this page in a moment. When the eSIM is ready you will be
-          taken to your purchase confirmation.
-        </StatusCard>
-        {isSimpaisa ? <SimpaisaWaitingChecklist /> : null}
-        <ActionRow>
-          <PrimaryLink href={refreshHref}>Refresh status</PrimaryLink>
-          <SecondaryLink href="/account/orders">My eSIMs</SecondaryLink>
-          <SecondaryLink href="/account">Account</SecondaryLink>
-        </ActionRow>
+        <StatusRefreshPoller enabled />
+        <VerifyingCard
+          headline={PAYMENT_RETURN_PREPARING_HEADLINE}
+          guidance={CUSTOMER_PURCHASE_PROCESSING_MESSAGE}
+          refreshHref={refreshHref}
+          secondaryHref="/account"
+          secondaryLabel="Return to account"
+        />
       </ReturnShell>
     );
   }
@@ -57,17 +60,9 @@ export function EsimPurchasePaymentReturnView({
         <p className="mt-2 text-sm text-[var(--text-muted)]">
           Your payment was not completed. No eSIM was created from this return.
         </p>
-        <StatusCard>
-          {isSimpaisa
-            ? "You can return to checkout and try again when you are ready. This page does not charge your wallet or complete mobile payment. Any reserved wallet amount is restored when cancel completes."
-            : "You can return to checkout and try again when you are ready. This page does not charge your wallet or complete online payment. Any reserved wallet amount is restored when cancel completes."}
-        </StatusCard>
         <ActionRow>
           <PrimaryLink href={reviewHref}>Back to checkout</PrimaryLink>
-          <SecondaryLink href="/account/esim/buy">
-            Choose another package
-          </SecondaryLink>
-          <SecondaryLink href="/account">Account</SecondaryLink>
+          <QuietLink href="/account">Return to account</QuietLink>
         </ActionRow>
       </ReturnShell>
     );
@@ -82,15 +77,12 @@ export function EsimPurchasePaymentReturnView({
         <p className="mt-2 text-sm text-[var(--text-muted)]">
           {CUSTOMER_PURCHASE_REVIEW_NEEDED_MESSAGE}
         </p>
-        <StatusCard>
-          Do not start another purchase for the same package. Refresh for an
-          update, or contact support if the status does not change. Reserved
-          wallet funds stay held until review finishes.
-        </StatusCard>
         <ActionRow>
-          <PrimaryLink href={refreshHref}>Refresh status</PrimaryLink>
-          <SecondaryLink href="/contact">Contact support</SecondaryLink>
-          <SecondaryLink href="/account">Account</SecondaryLink>
+          <SecondaryButtonLink href={refreshHref}>
+            {PAYMENT_RETURN_CHECK_STATUS_LABEL}
+          </SecondaryButtonLink>
+          <QuietLink href="/contact">Contact support</QuietLink>
+          <QuietLink href="/account">Return to account</QuietLink>
         </ActionRow>
       </ReturnShell>
     );
@@ -98,49 +90,62 @@ export function EsimPurchasePaymentReturnView({
 
   return (
     <ReturnShell>
-      <h1 className="text-2xl font-bold tracking-tight">Payment processing</h1>
-      <p className="mt-2 text-sm text-[var(--text-muted)]">
-        {isSimpaisa
-          ? "We received your return from mobile payment. Your payment is being verified. This page does not confirm payment or activate an eSIM."
-          : "We received your return from the payment page. Your payment is being verified. This page does not confirm payment or activate an eSIM."}
-      </p>
-      <StatusCard>
-        You will be able to access your eSIM only after payment is verified. No
-        wallet funds were charged from this return page. Use Refresh status
-        below after you finish approving the payment.
-        {isSimpaisa
-          ? " If you abandon mobile payment, cancel below to unlock any reserved wallet funds."
-          : " If you abandon payment, cancel below to unlock any reserved wallet funds."}
-      </StatusCard>
-      {isSimpaisa ? <SimpaisaWaitingChecklist /> : null}
-      <ActionRow>
-        <PrimaryLink href={refreshHref}>Refresh status</PrimaryLink>
-        <SecondaryLink href={reviewHref}>Back to checkout</SecondaryLink>
-        {cancelHref ? (
-          <SecondaryLink href={cancelHref}>
-            Cancel payment & unlock wallet
-          </SecondaryLink>
-        ) : null}
-        <SecondaryLink href="/account">Account</SecondaryLink>
-      </ActionRow>
+      <StatusRefreshPoller enabled />
+      <VerifyingCard
+        headline={PAYMENT_RETURN_VERIFYING_HEADLINE}
+        guidance={paymentReturnPendingGuidance(walletOperatorLabel)}
+        refreshHref={refreshHref}
+        secondaryHref="/account"
+        secondaryLabel="Return to account"
+      />
     </ReturnShell>
   );
 }
 
-function SimpaisaWaitingChecklist() {
+function VerifyingCard({
+  headline,
+  guidance,
+  refreshHref,
+  secondaryHref,
+  secondaryLabel,
+}: {
+  headline: string;
+  guidance: string;
+  refreshHref: string;
+  secondaryHref: string;
+  secondaryLabel: string;
+}) {
   return (
     <div
-      className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 sm:px-5"
-      role="note"
+      className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8 sm:px-8 sm:py-10"
+      role="status"
+      aria-live="polite"
     >
-      <p className="text-sm font-semibold text-[var(--heading)]">
-        Waiting for JazzCash / Easypaisa
-      </p>
-      <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-[var(--text-muted)]">
-        <li>Open JazzCash or Easypaisa and approve the payment request.</li>
-        <li>Return to this page and stay signed in.</li>
-        <li>Tap Refresh status until your eSIM is ready.</li>
-      </ol>
+      <div className="flex flex-col items-center text-center">
+        <span className="relative inline-flex h-14 w-14 items-center justify-center">
+          <span
+            aria-hidden="true"
+            className="absolute inset-0 rounded-full bg-[var(--accent-strong)]/15 animate-pulse"
+          />
+          <Loader2
+            className="relative h-8 w-8 animate-spin text-[var(--accent-strong)]"
+            aria-hidden="true"
+          />
+          <span className="sr-only">Loading</span>
+        </span>
+        <h1 className="mt-5 text-xl font-bold tracking-tight text-[var(--heading)] sm:text-2xl">
+          {headline}
+        </h1>
+        <p className="mt-3 max-w-md text-sm leading-relaxed text-[var(--text-muted)] sm:text-[15px]">
+          {guidance}
+        </p>
+        <div className="mt-7 flex w-full max-w-sm flex-col items-center gap-3">
+          <SecondaryButtonLink href={refreshHref}>
+            {PAYMENT_RETURN_CHECK_STATUS_LABEL}
+          </SecondaryButtonLink>
+          <QuietLink href={secondaryHref}>{secondaryLabel}</QuietLink>
+        </div>
+      </div>
     </div>
   );
 }
@@ -149,20 +154,11 @@ function ReturnShell({ children }: { children: ReactNode }) {
   return <div className="mx-auto max-w-xl space-y-8">{children}</div>;
 }
 
-function StatusCard({ children }: { children: ReactNode }) {
-  return (
-    <div
-      className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 sm:px-5"
-      role="status"
-    >
-      <p className="text-sm text-[var(--heading)]">{children}</p>
-    </div>
-  );
-}
-
 function ActionRow({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">{children}</div>
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+      {children}
+    </div>
   );
 }
 
@@ -183,7 +179,7 @@ function PrimaryLink({
   );
 }
 
-function SecondaryLink({
+function SecondaryButtonLink({
   href,
   children,
 }: {
@@ -193,7 +189,24 @@ function SecondaryLink({
   return (
     <Link
       href={href}
-      className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface-2)]"
+      className="inline-flex h-11 w-full items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface)]/80 sm:w-auto"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function QuietLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className="text-sm font-medium text-[var(--text-muted)] underline-offset-2 transition hover:text-[var(--heading)] hover:underline"
     >
       {children}
     </Link>

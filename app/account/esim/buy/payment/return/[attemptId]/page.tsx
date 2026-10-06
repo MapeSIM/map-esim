@@ -7,10 +7,9 @@ import {
   esimPurchasePaymentSuccessHref,
   resolveEsimPaymentReturnKind,
 } from "@/app/lib/esim/esimPurchasePaymentReturnState";
-import {
-  esimPurchasePaymentCancelPath,
-  parsePaymentAttemptId,
-} from "@/app/lib/payments/safepayCheckoutPaths";
+import { parsePaymentAttemptId } from "@/app/lib/payments/safepayCheckoutPaths";
+import { resolvePaymentReturnWalletOperatorLabel } from "@/app/lib/payments/paymentReturnUxCopy";
+import { getSimpaisaWalletOperatorConfig } from "@/app/lib/payments/simpaisaWalletOperatorConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -57,22 +56,17 @@ export default async function EsimPurchasePaymentReturnAttemptPage({
     }).catch(() => undefined);
   }
 
+  const operators = await getSimpaisaWalletOperatorConfig();
+  const walletOperatorLabel = resolvePaymentReturnWalletOperatorLabel({
+    enabledOperatorIds: operators.enabledOperatorIds,
+  });
+
   return (
     <EsimPurchasePaymentReturnView
       kind={kind}
       purchaseId={attempt.purchaseId}
       refreshHref={`/account/esim/buy/payment/return/${encodeURIComponent(attempt.attemptId)}`}
-      cancelHref={
-        kind === "pending"
-          ? esimPurchasePaymentCancelPath(attempt.attemptId)
-          : null
-      }
-      paymentProvider={
-        attempt.gatewayProvider === "SIMPAISA" ||
-        attempt.gatewayProvider === "SAFEPAY"
-          ? attempt.gatewayProvider
-          : null
-      }
+      walletOperatorLabel={walletOperatorLabel}
     />
   );
 }

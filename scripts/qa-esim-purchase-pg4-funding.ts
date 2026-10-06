@@ -242,11 +242,18 @@ function main() {
   assert.match(confirmForm, /Buy eSIM with Wallet/);
   console.log("PASS split_unblocked_full_wallet_unchanged_ui");
 
-  assert.match(returnView, /Payment processing/);
+  assert.match(returnView, /PAYMENT_RETURN_VERIFYING_HEADLINE/);
   assert.match(returnView, /Payment not completed/);
-  assert.match(returnView, /Payment verified/);
-  assert.match(returnView, /Cancel payment & unlock wallet/);
-  assert.match(returnView, /cancelHref/);
+  assert.match(returnView, /PAYMENT_RETURN_PREPARING_HEADLINE/);
+  assert.match(returnView, /PAYMENT_RETURN_CHECK_STATUS_LABEL|Check status/);
+  assert.match(returnView, /StatusRefreshPoller/);
+  assert.doesNotMatch(returnView, /Cancel payment & unlock wallet/);
+  assert.doesNotMatch(returnView, /Waiting for JazzCash \/ Easypaisa/);
+  const returnCopy = read("app/lib/payments/paymentReturnUxCopy.ts");
+  assert.match(returnCopy, /Verifying your payment/);
+  assert.match(returnCopy, /Preparing your eSIM/);
+  assert.match(returnCopy, /Check status/);
+  assert.match(returnCopy, /authorize the MPIN/);
   assert.match(returnPage, /parsePaymentAttemptId/);
   assert.match(returnPage, /resolveEsimPaymentReturnKind/);
   assert.match(returnPage, /maybeReleasePendingGatewayReservation/);

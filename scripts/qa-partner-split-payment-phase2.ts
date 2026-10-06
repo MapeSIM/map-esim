@@ -235,10 +235,17 @@ function main() {
   assert.match(returnView, /kind === "verified"/);
   assert.match(returnView, /kind === "not_completed"/);
   assert.match(returnView, /kind === "invalid"/);
-  assert.match(returnView, /Payment processing/);
-  assert.match(returnView, /Payment verified/);
+  assert.match(returnView, /PAYMENT_RETURN_VERIFYING_HEADLINE/);
+  assert.match(returnView, /PAYMENT_RETURN_PREPARING_HEADLINE/);
+  assert.match(returnView, /PAYMENT_RETURN_CHECK_STATUS_LABEL/);
+  assert.match(returnView, /StatusRefreshPoller/);
   assert.match(returnView, /Payment not completed/);
   assert.match(returnView, /Payment reference not found/);
+  assert.doesNotMatch(returnView, /Cancel payment & unlock wallet/);
+  assert.doesNotMatch(returnView, /Waiting for JazzCash \/ Easypaisa/);
+  const returnCopy = read("app/lib/payments/paymentReturnUxCopy.ts");
+  assert.match(returnCopy, /Verifying your payment/);
+  assert.match(returnCopy, /authorize the MPIN/);
   // Must not always claim success regardless of status.
   assert.doesNotMatch(
     returnPage,

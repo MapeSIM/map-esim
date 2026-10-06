@@ -257,11 +257,11 @@ function main() {
   assert.match(returnAttemptPage, /kind === "completed"/);
   assert.match(
     read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
-    /Payment processing/
+    /PAYMENT_RETURN_VERIFYING_HEADLINE/
   );
   assert.match(
-    read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
-    /does not confirm payment/
+    read("app/lib/payments/paymentReturnUxCopy.ts"),
+    /authorize the MPIN/
   );
   assert.match(
     read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
@@ -269,7 +269,7 @@ function main() {
   );
   assert.match(
     read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
-    /Payment verified/
+    /PAYMENT_RETURN_PREPARING_HEADLINE/
   );
   assert.match(
     read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
@@ -289,7 +289,19 @@ function main() {
   );
   assert.match(
     read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
-    /Refresh status/
+    /PAYMENT_RETURN_CHECK_STATUS_LABEL/
+  );
+  assert.match(
+    read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
+    /StatusRefreshPoller/
+  );
+  assert.doesNotMatch(
+    read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
+    /Cancel payment & unlock wallet/
+  );
+  assert.match(
+    read("app/lib/payments/paymentReturnUxCopy.ts"),
+    /Verifying your payment/
   );
   assert.doesNotMatch(returnPage, /confirmWalletEsimPurchase|applyVerifiedTopup|executeCreditCheckout/);
   assert.doesNotMatch(returnAttemptPage, /confirmWalletEsimPurchase|applyVerifiedTopup|executeCreditCheckout/);

@@ -9,6 +9,8 @@ import {
 } from "@/app/lib/partner/partnerEsimPurchasePaymentReturnState";
 import { partnerEsimPurchasePaymentReturnPath } from "@/app/lib/partner/partnerEsimPurchaseCheckoutPaths";
 import { parsePaymentAttemptId } from "@/app/lib/payments/safepayCheckoutPaths";
+import { resolvePaymentReturnWalletOperatorLabel } from "@/app/lib/payments/paymentReturnUxCopy";
+import { getSimpaisaWalletOperatorConfig } from "@/app/lib/payments/simpaisaWalletOperatorConfig";
 import { PartnerEsimPurchasePaymentReturnView } from "@/app/partner/(portal)/catalog/payment/return/PartnerEsimPurchasePaymentReturnView";
 
 export const dynamic = "force-dynamic";
@@ -78,18 +80,17 @@ export default async function PartnerCatalogPaymentReturnPage({
   }
 
   const refreshHref = partnerEsimPurchasePaymentReturnPath(attempt.attemptId);
+  const operators = await getSimpaisaWalletOperatorConfig();
+  const walletOperatorLabel = resolvePaymentReturnWalletOperatorLabel({
+    enabledOperatorIds: operators.enabledOperatorIds,
+  });
 
   return (
     <PartnerEsimPurchasePaymentReturnView
       kind={kind}
       attemptId={attempt.attemptId}
       refreshHref={refreshHref}
-      paymentProvider={
-        attempt.gatewayProvider === "SIMPAISA" ||
-        attempt.gatewayProvider === "SAFEPAY"
-          ? attempt.gatewayProvider
-          : null
-      }
+      walletOperatorLabel={walletOperatorLabel}
     />
   );
 }
