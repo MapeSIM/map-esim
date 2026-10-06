@@ -243,7 +243,7 @@ function main() {
   console.log("PASS split_unblocked_full_wallet_unchanged_ui");
 
   assert.match(returnView, /PAYMENT_RETURN_VERIFYING_HEADLINE/);
-  assert.match(returnView, /Payment not completed/);
+  assert.match(returnView, /PaymentReturnNotCompletedCard/);
   assert.match(returnView, /PAYMENT_RETURN_PREPARING_HEADLINE/);
   assert.match(returnView, /PAYMENT_RETURN_CHECK_STATUS_LABEL|Check status/);
   assert.match(returnView, /StatusRefreshPoller/);
@@ -254,6 +254,17 @@ function main() {
   assert.match(returnCopy, /Preparing your eSIM/);
   assert.match(returnCopy, /Check status/);
   assert.match(returnCopy, /authorize the MPIN/);
+  const notCompletedCard = read(
+    "app/components/payments/PaymentReturnNotCompletedCard.tsx"
+  );
+  assert.match(notCompletedCard, /Payment not completed/);
+  assert.match(notCompletedCard, /Help via WhatsApp|PAYMENT_RETURN_WHATSAPP_CTA_LABEL/);
+  assert.match(notCompletedCard, /data-payment-return-whatsapp-cta/);
+  const whatsappShared = read("app/lib/support/whatsappSupportShared.ts");
+  assert.match(whatsappShared, /buildPaymentReturnWhatsAppRecoveryHref/);
+  assert.match(whatsappShared, /could not be completed on mapesim\.com/);
+  assert.match(returnPage, /buildPaymentReturnWhatsAppRecoveryHref/);
+  assert.match(returnPage, /getPublicWhatsAppSupportConfig/);
   assert.match(returnPage, /parsePaymentAttemptId/);
   assert.match(returnPage, /resolveEsimPaymentReturnKind/);
   assert.match(returnPage, /maybeReleasePendingGatewayReservation/);

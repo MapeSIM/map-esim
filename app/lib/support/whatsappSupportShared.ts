@@ -204,3 +204,26 @@ export function toPublicWhatsAppSupportConfig(input: {
   if (!href) return { enabled: false };
   return { enabled: true, phone, message, href };
 }
+
+/** Prefill for payment-return "not completed" recovery CTA. */
+export const PAYMENT_RETURN_WHATSAPP_RECOVERY_MESSAGE =
+  "Hello, my eSIM payment could not be completed on mapesim.com. Please assist me.";
+
+export const PAYMENT_RETURN_WHATSAPP_HELP_HINT =
+  "Need help completing your order? Contact us directly.";
+
+export const PAYMENT_RETURN_WHATSAPP_CTA_LABEL = "Help via WhatsApp";
+
+/**
+ * Build a wa.me recovery link when public WhatsApp support is enabled.
+ * Uses a fixed payment-failure prefill (not the admin default broadcast message).
+ */
+export function buildPaymentReturnWhatsAppRecoveryHref(
+  config: PublicWhatsAppSupportConfig
+): string | null {
+  if (!config.enabled) return null;
+  return buildWhatsAppClickToChatUrl(
+    config.phone,
+    PAYMENT_RETURN_WHATSAPP_RECOVERY_MESSAGE
+  );
+}

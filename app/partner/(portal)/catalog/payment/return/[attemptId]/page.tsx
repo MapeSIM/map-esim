@@ -11,6 +11,8 @@ import { partnerEsimPurchasePaymentReturnPath } from "@/app/lib/partner/partnerE
 import { parsePaymentAttemptId } from "@/app/lib/payments/safepayCheckoutPaths";
 import { resolvePaymentReturnWalletOperatorLabel } from "@/app/lib/payments/paymentReturnUxCopy";
 import { getSimpaisaWalletOperatorConfig } from "@/app/lib/payments/simpaisaWalletOperatorConfig";
+import { getPublicWhatsAppSupportConfig } from "@/app/lib/support/whatsappSupport";
+import { buildPaymentReturnWhatsAppRecoveryHref } from "@/app/lib/support/whatsappSupportShared";
 import { PartnerEsimPurchasePaymentReturnView } from "@/app/partner/(portal)/catalog/payment/return/PartnerEsimPurchasePaymentReturnView";
 
 export const dynamic = "force-dynamic";
@@ -80,10 +82,17 @@ export default async function PartnerCatalogPaymentReturnPage({
   }
 
   const refreshHref = partnerEsimPurchasePaymentReturnPath(attempt.attemptId);
-  const operators = await getSimpaisaWalletOperatorConfig();
+  const [operators, whatsappConfig] = await Promise.all([
+    getSimpaisaWalletOperatorConfig(),
+    getPublicWhatsAppSupportConfig(),
+  ]);
   const walletOperatorLabel = resolvePaymentReturnWalletOperatorLabel({
     enabledOperatorIds: operators.enabledOperatorIds,
   });
+  const whatsappHref =
+    kind === "not_completed"
+      ? buildPaymentReturnWhatsAppRecoveryHref(whatsappConfig)
+      : null;
 
   return (
     <PartnerEsimPurchasePaymentReturnView
@@ -91,6 +100,7 @@ export default async function PartnerCatalogPaymentReturnPage({
       attemptId={attempt.attemptId}
       refreshHref={refreshHref}
       walletOperatorLabel={walletOperatorLabel}
+      whatsappHref={whatsappHref}
     />
   );
 }

@@ -265,7 +265,15 @@ function main() {
   );
   assert.match(
     read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
+    /PaymentReturnNotCompletedCard/
+  );
+  assert.match(
+    read("app/components/payments/PaymentReturnNotCompletedCard.tsx"),
     /Payment not completed/
+  );
+  assert.match(
+    read("app/components/payments/PaymentReturnNotCompletedCard.tsx"),
+    /data-payment-return-whatsapp-cta/
   );
   assert.match(
     read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),

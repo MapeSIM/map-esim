@@ -239,13 +239,20 @@ function main() {
   assert.match(returnView, /PAYMENT_RETURN_PREPARING_HEADLINE/);
   assert.match(returnView, /PAYMENT_RETURN_CHECK_STATUS_LABEL/);
   assert.match(returnView, /StatusRefreshPoller/);
-  assert.match(returnView, /Payment not completed/);
+  assert.match(returnView, /PaymentReturnNotCompletedCard/);
   assert.match(returnView, /Payment reference not found/);
   assert.doesNotMatch(returnView, /Cancel payment & unlock wallet/);
   assert.doesNotMatch(returnView, /Waiting for JazzCash \/ Easypaisa/);
   const returnCopy = read("app/lib/payments/paymentReturnUxCopy.ts");
   assert.match(returnCopy, /Verifying your payment/);
   assert.match(returnCopy, /authorize the MPIN/);
+  const notCompletedCard = read(
+    "app/components/payments/PaymentReturnNotCompletedCard.tsx"
+  );
+  assert.match(notCompletedCard, /Payment not completed/);
+  assert.match(notCompletedCard, /Help via WhatsApp|PAYMENT_RETURN_WHATSAPP_CTA_LABEL/);
+  assert.match(returnPage, /buildPaymentReturnWhatsAppRecoveryHref/);
+  assert.match(returnPage, /getPublicWhatsAppSupportConfig/);
   // Must not always claim success regardless of status.
   assert.doesNotMatch(
     returnPage,

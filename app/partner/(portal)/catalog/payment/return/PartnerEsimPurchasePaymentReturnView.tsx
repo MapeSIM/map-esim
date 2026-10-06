@@ -19,11 +19,13 @@ import {
   paymentReturnPendingGuidance,
 } from "@/app/lib/payments/paymentReturnUxCopy";
 import StatusRefreshPoller from "@/app/components/payments/StatusRefreshPoller";
+import { PaymentReturnNotCompletedCard } from "@/app/components/payments/PaymentReturnNotCompletedCard";
 
 export function PartnerEsimPurchasePaymentReturnView({
   kind,
   refreshHref,
   walletOperatorLabel = null,
+  whatsappHref = null,
 }: {
   kind: Exclude<EsimPaymentReturnKind, "completed"> | "invalid";
   /** Kept for route ownership diagnostics; unused in clean pending UI. */
@@ -31,6 +33,8 @@ export function PartnerEsimPurchasePaymentReturnView({
   refreshHref: string | null;
   /** Display-only JazzCash / Easypaisa label when known. */
   walletOperatorLabel?: string | null;
+  /** Prefill wa.me recovery link when WhatsApp support is enabled. */
+  whatsappHref?: string | null;
 }) {
   const ordersHref = partnerEsimPurchasePaymentOrdersHref();
   const catalogHref = partnerEsimPurchasePaymentCatalogHref();
@@ -71,16 +75,13 @@ export function PartnerEsimPurchasePaymentReturnView({
   if (kind === "not_completed") {
     return (
       <ReturnShell>
-        <h1 className="text-2xl font-bold tracking-tight">
-          Payment not completed
-        </h1>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Your payment was not completed. No eSIM was created from this return.
-        </p>
-        <ActionRow>
-          <PrimaryLink href={catalogHref}>Back to catalog</PrimaryLink>
-          <QuietLink href={ordersHref}>View orders</QuietLink>
-        </ActionRow>
+        <PaymentReturnNotCompletedCard
+          primaryHref={catalogHref}
+          primaryLabel="Back to catalog"
+          tertiaryHref={ordersHref}
+          tertiaryLabel="View orders"
+          whatsappHref={whatsappHref}
+        />
       </ReturnShell>
     );
   }
