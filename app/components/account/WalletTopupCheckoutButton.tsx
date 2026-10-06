@@ -13,6 +13,7 @@ type Props = {
   enabled: boolean;
   simpaisaWalletCheckout?: boolean;
   usdCents?: number;
+  enabledSimpaisaOperatorIds?: readonly string[];
 };
 
 export default function WalletTopupCheckoutButton({
@@ -20,6 +21,7 @@ export default function WalletTopupCheckoutButton({
   enabled,
   simpaisaWalletCheckout = false,
   usdCents = 0,
+  enabledSimpaisaOperatorIds,
 }: Props) {
   const [state, formAction, pending] = useActionState(
     startWalletTopupCheckoutAction,
@@ -38,6 +40,7 @@ export default function WalletTopupCheckoutButton({
         <SimpaisaWalletFields
           usdCents={usdCents}
           disabled={pending || !enabled}
+          enabledOperatorIds={enabledSimpaisaOperatorIds}
           operatorError={
             errorState.ok === false
               ? errorState.fieldErrors?.walletOperatorId

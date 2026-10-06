@@ -42,8 +42,8 @@ import {
 } from "@/app/lib/payments/safepayCheckoutPaths";
 import { resumeSafepayHostedCheckout } from "@/app/lib/payments/safepayAdapter";
 import { resumeSimpaisaWalletCheckout } from "@/app/lib/payments/simpaisaAdapter";
+import { parseSimpaisaWalletCheckoutFieldsLive } from "@/app/lib/payments/parseSimpaisaWalletCheckoutFieldsLive";
 import {
-  parseSimpaisaWalletCheckoutFields,
   quoteSimpaisaPkrChargeFromUsdCents,
   simpaisaChargeMatchesQuote,
 } from "@/app/lib/payments/simpaisaPkrQuote";
@@ -384,7 +384,7 @@ export async function startEsimPurchaseHostedCheckout(
         "Payment checkout quote is unavailable. Please try again."
       );
     }
-    const walletFields = parseSimpaisaWalletCheckoutFields({
+    const walletFields = await parseSimpaisaWalletCheckoutFieldsLive({
       walletOperatorId: input.walletOperatorId,
       customerMsisdn: input.customerMsisdn,
     });

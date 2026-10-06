@@ -43,7 +43,7 @@ import {
   isCustomerPaymentCheckoutDisabled,
 } from "@/app/lib/payments/customerPaymentCheckoutPolicy";
 import { resolveHostedCheckoutProvider } from "@/app/lib/payments/gatewaySelect";
-import { parseSimpaisaWalletCheckoutFields } from "@/app/lib/payments/simpaisaPkrQuote";
+import { parseSimpaisaWalletCheckoutFieldsLive } from "@/app/lib/payments/parseSimpaisaWalletCheckoutFieldsLive";
 import {
   normalizeOfferId,
   sanitizeCountryHint,
@@ -381,7 +381,7 @@ export async function confirmWalletEsimPurchaseAction(
       process.env.PAYMENT_GATEWAY_PROVIDER
     );
     if (selected === "SIMPAISA") {
-      const walletFields = parseSimpaisaWalletCheckoutFields({
+      const walletFields = await parseSimpaisaWalletCheckoutFieldsLive({
         walletOperatorId: walletOperatorIdRaw,
         customerMsisdn: customerMsisdnRaw,
       });

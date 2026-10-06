@@ -13,6 +13,13 @@ import {
   SIMPAISA_CHARGE_CURRENCY,
   SIMPAISA_WALLET_OPERATORS,
 } from "@/app/lib/payments/simpaisaPolicy";
+import {
+  isSimpaisaWalletOperatorEnabled,
+  simpaisaWalletOperatorDisabledMessage,
+  simpaisaWalletOperatorSelectPrompt,
+  simpaisaWalletOperatorsUnavailableMessage,
+  type SimpaisaWalletOperatorEnablement,
+} from "@/app/lib/payments/simpaisaWalletOperatorConfigShared";
 
 export const SIMPAISA_PKR_USD_RATE = FALLBACK_USD_RATES.PKR;
 
@@ -71,10 +78,7 @@ export const SIMPAISA_WALLET_OPERATOR_OPTIONS = [
   { id: SIMPAISA_WALLET_OPERATORS.JAZZCASH, label: "JazzCash" },
 ] as const;
 
-export function parseSimpaisaWalletCheckoutFields(input: {
-  walletOperatorId: unknown;
-  customerMsisdn: unknown;
-}):
+export type ParseSimpaisaWalletCheckoutFieldsResult =
   | {
       ok: true;
       walletOperatorId: string;
@@ -87,16 +91,42 @@ export function parseSimpaisaWalletCheckoutFields(input: {
         customerMsisdn?: string;
       };
       error: string;
-    } {
+    };
+
+/**
+ * Validate operator ID + MSISDN. When `operatorConfig` is provided, also reject
+ * admin-disabled operators (JazzCash / Easypaisa toggles).
+ */
+export function parseSimpaisaWalletCheckoutFields(input: {
+  walletOperatorId: unknown;
+  customerMsisdn: unknown;
+  operatorConfig?: SimpaisaWalletOperatorEnablement | null;
+}): ParseSimpaisaWalletCheckoutFieldsResult {
   const operator = String(input.walletOperatorId ?? "").trim();
   const msisdn = normalizeSimpaisaMsisdn(String(input.customerMsisdn ?? ""));
   const fieldErrors: {
     walletOperatorId?: string;
     customerMsisdn?: string;
   } = {};
+
   if (!isSimpaisaWalletOperatorId(operator)) {
-    fieldErrors.walletOperatorId = "Select Easypaisa or JazzCash.";
+    fieldErrors.walletOperatorId = input.operatorConfig
+      ? simpaisaWalletOperatorSelectPrompt(input.operatorConfig)
+      : "Select Easypaisa or JazzCash.";
+  } else if (
+    input.operatorConfig &&
+    !isSimpaisaWalletOperatorEnabled(operator, input.operatorConfig)
+  ) {
+    const enabled = [
+      input.operatorConfig.easypaisaEnabled,
+      input.operatorConfig.jazzcashEnabled,
+    ].filter(Boolean).length;
+    fieldErrors.walletOperatorId =
+      enabled === 0
+        ? simpaisaWalletOperatorsUnavailableMessage()
+        : simpaisaWalletOperatorDisabledMessage(operator);
   }
+
   if (!msisdn) {
     fieldErrors.customerMsisdn = "Enter a valid Pakistani mobile number.";
   }
@@ -104,7 +134,10 @@ export function parseSimpaisaWalletCheckoutFields(input: {
     return {
       ok: false,
       fieldErrors,
-      error: fieldErrors.walletOperatorId || fieldErrors.customerMsisdn || "Invalid wallet details.",
+      error:
+        fieldErrors.walletOperatorId ||
+        fieldErrors.customerMsisdn ||
+        "Invalid wallet details.",
     };
   }
   return {

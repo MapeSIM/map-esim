@@ -15,6 +15,7 @@ import SimpaisaWalletFields from "@/app/components/account/SimpaisaWalletFields"
 type Props = {
   balanceLabel: string;
   gatewayReady: boolean;
+  enabledSimpaisaOperatorIds?: readonly string[];
 };
 
 type AmountPreset = "10" | "50" | "100" | "150" | "500" | "custom";
@@ -42,6 +43,7 @@ function newIdempotencyKey(): string {
 export default function PartnerWalletAddFundsForm({
   balanceLabel,
   gatewayReady,
+  enabledSimpaisaOperatorIds,
 }: Props) {
   const [state, formAction, pending] = useActionState(
     startPartnerWalletAddFundsAction,
@@ -186,6 +188,7 @@ export default function PartnerWalletAddFundsForm({
         <SimpaisaWalletFields
           usdCents={amountCents}
           disabled={pending}
+          enabledOperatorIds={enabledSimpaisaOperatorIds}
           operatorError={
             errorState.ok === false
               ? errorState.fieldErrors?.walletOperatorId

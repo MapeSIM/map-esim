@@ -8,6 +8,7 @@ import { listPartnerCatalogDestinations } from "@/app/lib/partner/partnerCatalog
 import PartnerCatalogBuy from "@/app/components/partner/PartnerCatalogBuy";
 import { isPartnerEsimSplitPaymentEnabled } from "@/app/lib/partner/partnerEsimSplitPaymentPolicy";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
+import { getSimpaisaWalletOperatorConfig } from "@/app/lib/payments/simpaisaWalletOperatorConfig";
 import {
   normalizeOfferId,
   sanitizeCountryHint,
@@ -51,20 +52,23 @@ export default async function PartnerCatalogPage({
   > = [];
   let balanceLabel = "$0.00";
   let balanceCents = 0;
+  let enabledSimpaisaOperatorIds: string[] = [];
   let loadError = false;
 
   try {
-    const [dest, balance, wallet] = await Promise.all([
+    const [dest, balance, wallet, simpaisaOperators] = await Promise.all([
       listPartnerCatalogDestinations(),
       getPartnerBalanceLabel(user.id),
       prisma.partnerWalletAccount.findUnique({
         where: { partnerId: actor.partnerId },
         select: { balanceCents: true },
       }),
+      getSimpaisaWalletOperatorConfig(),
     ]);
     destinations = dest;
     balanceLabel = balance ?? "$0.00";
     balanceCents = wallet?.balanceCents ?? 0;
+    enabledSimpaisaOperatorIds = simpaisaOperators.enabledOperatorIds;
   } catch {
     loadError = true;
   }
@@ -100,6 +104,7 @@ export default async function PartnerCatalogPage({
         initialOfferId={initialOfferId}
         splitPaymentEnabled={isPartnerEsimSplitPaymentEnabled()}
         paymentGatewayConfigured={isPaymentGatewayConfigured()}
+        enabledSimpaisaOperatorIds={enabledSimpaisaOperatorIds}
       />
     </div>
   );

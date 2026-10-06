@@ -21,7 +21,7 @@ import {
   CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE,
   isCustomerPaymentCheckoutDisabled,
 } from "@/app/lib/payments/customerPaymentCheckoutPolicy";
-import { parseSimpaisaWalletCheckoutFields } from "@/app/lib/payments/simpaisaPkrQuote";
+import { parseSimpaisaWalletCheckoutFieldsLive } from "@/app/lib/payments/parseSimpaisaWalletCheckoutFieldsLive";
 
 function detailPath(topupId: string): string {
   return `/account/wallet/top-up/${encodeURIComponent(topupId)}`;
@@ -129,7 +129,7 @@ export async function startWalletTopupCheckoutAction(
   let walletOperatorId: string | undefined;
   let customerMsisdn: string | undefined;
   if (getActivePaymentAdapter().provider === "SIMPAISA") {
-    const walletFields = parseSimpaisaWalletCheckoutFields({
+    const walletFields = await parseSimpaisaWalletCheckoutFieldsLive({
       walletOperatorId: formData.get("walletOperatorId"),
       customerMsisdn: formData.get("customerMsisdn"),
     });

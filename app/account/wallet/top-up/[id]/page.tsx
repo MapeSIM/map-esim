@@ -3,6 +3,7 @@ import { requireRole } from "@/app/lib/auth/session";
 import { getCustomerTopupView } from "@/app/lib/wallet/topupRead";
 import { browserReturnMustNotCreditWallet } from "@/app/lib/wallet/topupConstants";
 import WalletTopupCheckoutButton from "@/app/components/account/WalletTopupCheckoutButton";
+import { getSimpaisaWalletOperatorConfig } from "@/app/lib/payments/simpaisaWalletOperatorConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export default async function AccountWalletTopUpDetailPage({
   browserReturnMustNotCreditWallet();
 
   const view = await getCustomerTopupView(user.id, id);
+  const simpaisaOperators = await getSimpaisaWalletOperatorConfig();
 
   return (
     <div className="space-y-8">
@@ -198,6 +200,7 @@ export default async function AccountWalletTopUpDetailPage({
             enabled={view.canAttemptCheckout}
             simpaisaWalletCheckout={view.simpaisaWalletCheckout}
             usdCents={view.creditAmountCents}
+            enabledSimpaisaOperatorIds={simpaisaOperators.enabledOperatorIds}
           />
         </div>
       ) : null}

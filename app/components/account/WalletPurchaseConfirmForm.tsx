@@ -49,6 +49,8 @@ import SimpaisaWalletFields from "@/app/components/account/SimpaisaWalletFields"
 
 type Props = {
   review: WalletPurchaseReview;
+  /** Admin-enabled Simpaisa operators (JazzCash / Easypaisa). */
+  enabledSimpaisaOperatorIds?: readonly string[];
 };
 
 function defaultPaymentMode(
@@ -173,7 +175,10 @@ function previewPurchaseFunding(
   }
 }
 
-export default function WalletPurchaseConfirmForm({ review }: Props) {
+export default function WalletPurchaseConfirmForm({
+  review,
+  enabledSimpaisaOperatorIds,
+}: Props) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(
     confirmWalletEsimPurchaseAction,
@@ -790,6 +795,7 @@ export default function WalletPurchaseConfirmForm({ review }: Props) {
                     <SimpaisaWalletFields
                       usdCents={preview.gatewayAmountCents}
                       disabled={busy}
+                      enabledOperatorIds={enabledSimpaisaOperatorIds}
                       onValidityChange={setSimpaisaFieldsReady}
                       operatorError={
                         errorState.ok === false

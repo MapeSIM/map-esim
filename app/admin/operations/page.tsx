@@ -8,6 +8,7 @@ import type { HealthStatus, OpsWarning } from "@/app/lib/admin/operationsHealthS
 import { OperationalControlsPanel } from "@/app/components/admin/OperationalControlsPanel";
 import { RunAlertNotificationsPanel } from "@/app/components/admin/RunAlertNotificationsPanel";
 import { WhatsAppSupportPanel } from "@/app/components/admin/WhatsAppSupportPanel";
+import { SimpaisaWalletOperatorsPanel } from "@/app/components/admin/SimpaisaWalletOperatorsPanel";
 import { ProviderWalletPanel } from "@/app/components/admin/ProviderWalletPanel";
 import {
   getMonitoringAlertSummary,
@@ -22,6 +23,7 @@ import {
 } from "@/app/lib/admin/walletReservationMonitorShared";
 import { isSafeAdminHref } from "@/app/lib/admin/monitoringAlertShared";
 import { getAdminWhatsAppSupportView } from "@/app/lib/support/whatsappSupport";
+import { getAdminSimpaisaWalletOperatorView } from "@/app/lib/payments/simpaisaWalletOperatorConfig";
 import {
   AdminButton,
   AdminKpiCard,
@@ -354,9 +356,13 @@ function OperationsPriorityView({
 function OperationsDeferredView({
   data,
   whatsappSupport,
+  simpaisaWalletOperators,
 }: {
   data: OperationsHealthDashboard;
   whatsappSupport: Awaited<ReturnType<typeof getAdminWhatsAppSupportView>>;
+  simpaisaWalletOperators: Awaited<
+    ReturnType<typeof getAdminSimpaisaWalletOperatorView>
+  >;
 }) {
   const app = data.applicationDatabase;
   const recon = data.reconciliation;
@@ -375,6 +381,8 @@ function OperationsDeferredView({
       />
 
       <WhatsAppSupportPanel initial={whatsappSupport} />
+
+      <SimpaisaWalletOperatorsPanel initial={simpaisaWalletOperators} />
 
       <ProviderWalletPanel />
 
@@ -672,30 +680,47 @@ async function OperationsDeferredSection() {
   let whatsappSupport: Awaited<
     ReturnType<typeof getAdminWhatsAppSupportView>
   > | null = null;
+  let simpaisaWalletOperators: Awaited<
+    ReturnType<typeof getAdminSimpaisaWalletOperatorView>
+  > | null = null;
   let failed = false;
   try {
-    const [health, whatsapp] = await Promise.all([
+    const [health, whatsapp, operators] = await Promise.all([
       loadOpsHealth(),
       getAdminWhatsAppSupportView(),
+      getAdminSimpaisaWalletOperatorView(),
     ]);
     data = health;
     whatsappSupport = whatsapp;
+    simpaisaWalletOperators = operators;
   } catch {
     failed = true;
   }
 
-  if (!failed && data && whatsappSupport) {
+  if (!failed && data && whatsappSupport && simpaisaWalletOperators) {
     return (
-      <OperationsDeferredView data={data} whatsappSupport={whatsappSupport} />
+      <OperationsDeferredView
+        data={data}
+        whatsappSupport={whatsappSupport}
+        simpaisaWalletOperators={simpaisaWalletOperators}
+      />
     );
   }
 
   try {
-    whatsappSupport = await getAdminWhatsAppSupportView();
+    const [whatsapp, operators] = await Promise.all([
+      getAdminWhatsAppSupportView(),
+      getAdminSimpaisaWalletOperatorView(),
+    ]);
+    return (
+      <div className="min-w-0 space-y-8">
+        <WhatsAppSupportPanel initial={whatsapp} />
+        <SimpaisaWalletOperatorsPanel initial={operators} />
+      </div>
+    );
   } catch {
     return null;
   }
-  return <WhatsAppSupportPanel initial={whatsappSupport} />;
 }
 
 export default async function AdminOperationsPage() {

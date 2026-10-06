@@ -10,6 +10,7 @@ import {
   resolveAbandonedCheckoutReviewGuidance,
 } from "@/app/lib/esim/customerPurchaseStatusMessaging";
 import { getWalletPurchaseReview } from "@/app/lib/esim/walletPurchaseRead";
+import { getSimpaisaWalletOperatorConfig } from "@/app/lib/payments/simpaisaWalletOperatorConfig";
 import { resolveCheckoutBackHref } from "@/app/lib/plans/checkoutBackHref";
 import { WalletEsimPurchaseStatus } from "@prisma/client";
 
@@ -119,6 +120,7 @@ export default async function AccountWalletBuyReviewPage({
     destinationCode: review.destinationCode,
     destinationName: review.destinationName,
   });
+  const simpaisaOperators = await getSimpaisaWalletOperatorConfig();
 
   return (
     <div className="min-w-0 space-y-8">
@@ -139,7 +141,11 @@ export default async function AccountWalletBuyReviewPage({
         <AbandonedCheckoutReviewGuidanceBanner guidance={guidance} />
       ) : null}
 
-      <WalletPurchaseConfirmForm key={review.purchaseId} review={review} />
+      <WalletPurchaseConfirmForm
+        key={review.purchaseId}
+        review={review}
+        enabledSimpaisaOperatorIds={simpaisaOperators.enabledOperatorIds}
+      />
     </div>
   );
 }

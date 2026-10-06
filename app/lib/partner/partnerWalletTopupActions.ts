@@ -18,7 +18,7 @@ import {
   getActivePaymentAdapter,
   isPaymentGatewayConfigured,
 } from "@/app/lib/payments/disabledAdapter";
-import { parseSimpaisaWalletCheckoutFields } from "@/app/lib/payments/simpaisaPkrQuote";
+import { parseSimpaisaWalletCheckoutFieldsLive } from "@/app/lib/payments/parseSimpaisaWalletCheckoutFieldsLive";
 import { parseTopupCheckoutIdempotencyKey } from "@/app/lib/wallet/amount";
 
 function detailPath(topupId: string): string {
@@ -74,7 +74,7 @@ export async function startPartnerWalletAddFundsAction(
   let walletOperatorId: string | undefined;
   let customerMsisdn: string | undefined;
   if (getActivePaymentAdapter().provider === "SIMPAISA") {
-    const walletFields = parseSimpaisaWalletCheckoutFields({
+    const walletFields = await parseSimpaisaWalletCheckoutFieldsLive({
       walletOperatorId: formData.get("walletOperatorId"),
       customerMsisdn: formData.get("customerMsisdn"),
     });
@@ -196,7 +196,7 @@ export async function startPartnerWalletTopupCheckoutAction(
   let walletOperatorId: string | undefined;
   let customerMsisdn: string | undefined;
   if (getActivePaymentAdapter().provider === "SIMPAISA") {
-    const walletFields = parseSimpaisaWalletCheckoutFields({
+    const walletFields = await parseSimpaisaWalletCheckoutFieldsLive({
       walletOperatorId: formData.get("walletOperatorId"),
       customerMsisdn: formData.get("customerMsisdn"),
     });

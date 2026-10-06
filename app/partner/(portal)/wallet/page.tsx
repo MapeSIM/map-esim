@@ -3,6 +3,7 @@ import { getPartnerPortalSummary } from "@/app/lib/partner/partnerAccess";
 import { requireRole } from "@/app/lib/auth/session";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
 import { resolveHostedCheckoutProvider } from "@/app/lib/payments/gatewaySelect";
+import { getSimpaisaWalletOperatorConfig } from "@/app/lib/payments/simpaisaWalletOperatorConfig";
 import PartnerWalletAddFundsForm from "@/app/components/partner/PartnerWalletAddFundsForm";
 
 export const dynamic = "force-dynamic";
@@ -59,6 +60,7 @@ export default async function PartnerWalletPage() {
   );
   const gatewayReady =
     selectedProvider === "SIMPAISA" && isPaymentGatewayConfigured();
+  const simpaisaOperators = await getSimpaisaWalletOperatorConfig();
 
   return (
     <div className="min-w-0 w-full max-w-full space-y-8">
@@ -98,6 +100,7 @@ export default async function PartnerWalletPage() {
       <PartnerWalletAddFundsForm
         balanceLabel={summary.balanceLabel}
         gatewayReady={gatewayReady}
+        enabledSimpaisaOperatorIds={simpaisaOperators.enabledOperatorIds}
       />
 
       <section className="min-w-0 w-full max-w-full space-y-4">

@@ -44,5 +44,23 @@ export const SIMPAISA_MOBILE_WALLET_METHODS: MobileWalletMethodPresentation[] =
     ...MOBILE_WALLET_PRESENTATION[option.id as SimpaisaWalletOperatorId],
   }));
 
+/**
+ * Filter radio choices to admin-enabled operators only.
+ * Unknown / empty ids fall back to no methods (server still rejects).
+ */
+export function filterSimpaisaMobileWalletMethods(
+  enabledOperatorIds: readonly string[] | null | undefined
+): MobileWalletMethodPresentation[] {
+  if (!enabledOperatorIds || enabledOperatorIds.length === 0) {
+    return [];
+  }
+  const allowed = new Set(
+    enabledOperatorIds.map((id) => String(id ?? "").trim()).filter(Boolean)
+  );
+  return SIMPAISA_MOBILE_WALLET_METHODS.filter((method) =>
+    allowed.has(method.id)
+  );
+}
+
 /** Reserved slot shape for a future card gateway option (not implemented). */
 export const FUTURE_CARD_PAYMENT_METHOD_LABEL = "Card — Visa / Mastercard";

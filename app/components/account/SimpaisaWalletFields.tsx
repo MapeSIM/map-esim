@@ -1,11 +1,11 @@
 /**
  * Shared Simpaisa wallet checkout fields (operator + MSISDN).
  * Amounts are display-only; the server recomputes the PKR charge.
- * UI only shows JazzCash and Easypaisa (no card option).
+ * UI only shows admin-enabled JazzCash / Easypaisa options.
  */
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { Check } from "lucide-react";
 import {
   formatSimpaisaPkrChargeLabel,
@@ -15,34 +15,70 @@ import {
   isSimpaisaWalletOperatorId,
   normalizeSimpaisaMsisdn,
 } from "@/app/lib/payments/simpaisaPolicy";
-import { SIMPAISA_MOBILE_WALLET_METHODS } from "@/app/components/account/simpaisaWalletMethodPresentation";
+import {
+  filterSimpaisaMobileWalletMethods,
+} from "@/app/components/account/simpaisaWalletMethodPresentation";
+import {
+  SIMPAISA_WALLET_OPERATOR_SOFT_DEFAULT,
+  enabledSimpaisaWalletOperatorIds,
+  simpaisaWalletOperatorsUnavailableMessage,
+} from "@/app/lib/payments/simpaisaWalletOperatorConfigShared";
 
 type Props = {
   usdCents: number;
   disabled?: boolean;
   operatorError?: string;
   msisdnError?: string;
+  /**
+   * Admin-enabled operator ids from the server.
+   * Defaults to soft JazzCash-only when omitted (safe maintenance fallback).
+   */
+  enabledOperatorIds?: readonly string[];
   /** UI-only: true when operator + MSISDN pass the same checks as server parse. */
   onValidityChange?: (ready: boolean) => void;
 };
 
 const operatorName = "walletOperatorId";
 
+function defaultEnabledOperatorIds(): string[] {
+  return enabledSimpaisaWalletOperatorIds(SIMPAISA_WALLET_OPERATOR_SOFT_DEFAULT);
+}
+
 export default function SimpaisaWalletFields({
   usdCents,
   disabled = false,
   operatorError,
   msisdnError,
+  enabledOperatorIds,
   onValidityChange,
 }: Props) {
   const legendId = useId();
   const operatorGroupId = useId();
   const msisdnId = useId();
   const quote = quoteSimpaisaPkrChargeFromUsdCents(usdCents);
-  const [operatorId, setOperatorId] = useState("");
+  const methods = useMemo(
+    () =>
+      filterSimpaisaMobileWalletMethods(
+        enabledOperatorIds ?? defaultEnabledOperatorIds()
+      ),
+    [enabledOperatorIds]
+  );
+  const soleOperatorId = methods.length === 1 ? methods[0]!.id : "";
+  const [operatorId, setOperatorId] = useState(soleOperatorId);
   const [msisdn, setMsisdn] = useState("");
 
+  useEffect(() => {
+    if (methods.length === 1) {
+      setOperatorId(methods[0]!.id);
+      return;
+    }
+    if (operatorId && !methods.some((m) => m.id === operatorId)) {
+      setOperatorId("");
+    }
+  }, [methods, operatorId]);
+
   const fieldsReady =
+    methods.length > 0 &&
     isSimpaisaWalletOperatorId(operatorId) &&
     Boolean(normalizeSimpaisaMsisdn(msisdn));
 
@@ -55,6 +91,21 @@ export default function SimpaisaWalletFields({
       onValidityChange?.(false);
     };
   }, [onValidityChange]);
+
+  if (methods.length === 0) {
+    return (
+      <div className="mt-3 min-w-0 space-y-4">
+        <div
+          className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3.5 py-2.5"
+          role="alert"
+        >
+          <p className="text-sm text-[var(--heading)]">
+            {simpaisaWalletOperatorsUnavailableMessage()}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-3 min-w-0 space-y-4">
@@ -74,9 +125,12 @@ export default function SimpaisaWalletFields({
           aria-describedby={
             operatorError ? `${operatorGroupId}-error` : undefined
           }
-          className="grid min-w-0 grid-cols-2 gap-2 sm:gap-2.5"
+          className={[
+            "grid min-w-0 gap-2 sm:gap-2.5",
+            methods.length === 1 ? "grid-cols-1 sm:max-w-xs" : "grid-cols-2",
+          ].join(" ")}
         >
-          {SIMPAISA_MOBILE_WALLET_METHODS.map((method) => (
+          {methods.map((method) => (
             <label
               key={method.id}
               className={[

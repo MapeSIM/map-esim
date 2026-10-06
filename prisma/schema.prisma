@@ -1856,3 +1856,17 @@ model CustomerReferralProgramConfig {
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 }
+
+/// Singleton admin config for Simpaisa PK wallet operators (JazzCash / Easypaisa).
+/// Never stores secrets. Operator IDs remain in simpaisaPolicy.
+model SimpaisaWalletOperatorConfig {
+  /// Fixed singleton id — always "default".
+  id                 String   @id @default("default")
+  jazzcashEnabled    Boolean  @default(true)
+  /// Default false — Easypaisa can be re-enabled from Admin Operations.
+  easypaisaEnabled   Boolean  @default(false)
+  version            Int      @default(1)
+  updatedByAdminId   String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}

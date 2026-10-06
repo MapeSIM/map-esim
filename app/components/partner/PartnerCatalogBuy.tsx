@@ -39,6 +39,7 @@ type Props = {
   /** When true, show payment mode + gateway remainder (feature-flagged). */
   splitPaymentEnabled?: boolean;
   paymentGatewayConfigured?: boolean;
+  enabledSimpaisaOperatorIds?: readonly string[];
 };
 
 function newIdempotencyKey(): string {
@@ -128,6 +129,7 @@ export default function PartnerCatalogBuy({
   initialOfferId = null,
   splitPaymentEnabled = false,
   paymentGatewayConfigured = false,
+  enabledSimpaisaOperatorIds,
 }: Props) {
   const searchFieldId = useId();
   const offersHeadingId = useId();
@@ -437,6 +439,7 @@ export default function PartnerCatalogBuy({
                         balanceCents={balanceCents}
                         splitPaymentEnabled={splitPaymentEnabled}
                         paymentGatewayConfigured={paymentGatewayConfigured}
+                        enabledSimpaisaOperatorIds={enabledSimpaisaOperatorIds}
                         buyAction={buyAction}
                         buyPending={buyPending}
                         buyState={buyState}

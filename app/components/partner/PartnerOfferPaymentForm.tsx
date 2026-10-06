@@ -25,6 +25,8 @@ type Props = {
   buyState: PartnerPurchaseActionState;
   /** Compact layout for catalog list cards. */
   compact?: boolean;
+  /** Admin-enabled Simpaisa operators (JazzCash / Easypaisa). */
+  enabledSimpaisaOperatorIds?: readonly string[];
 };
 
 function paymentOptionClass(selected: boolean): string {
@@ -51,6 +53,7 @@ export default function PartnerOfferPaymentForm({
   buyPending,
   buyState,
   compact = false,
+  enabledSimpaisaOperatorIds,
 }: Props) {
   const paymentModeHeadingId = useId();
   const onlineAllowed = splitPaymentEnabled && paymentGatewayConfigured;
@@ -278,6 +281,7 @@ export default function PartnerOfferPaymentForm({
         <SimpaisaWalletFields
           usdCents={preview.gatewayAmountCents}
           disabled={buyPending}
+          enabledOperatorIds={enabledSimpaisaOperatorIds}
           operatorError={
             !buyState.ok && buyState.fieldErrors?.walletOperatorId
               ? buyState.fieldErrors.walletOperatorId

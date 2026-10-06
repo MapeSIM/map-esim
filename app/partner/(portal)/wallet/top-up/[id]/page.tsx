@@ -4,6 +4,7 @@ import { getPartnerTopupView } from "@/app/lib/partner/partnerWalletTopupRead";
 import { browserReturnMustNotCreditPartnerWallet } from "@/app/lib/partner/partnerWalletTopupConstants";
 import PartnerWalletTopupCheckoutButton from "@/app/components/partner/PartnerWalletTopupCheckoutButton";
 import PartnerWalletTopupPendingPoller from "@/app/components/partner/PartnerWalletTopupPendingPoller";
+import { getSimpaisaWalletOperatorConfig } from "@/app/lib/payments/simpaisaWalletOperatorConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export default async function PartnerWalletTopUpDetailPage({
   browserReturnMustNotCreditPartnerWallet();
 
   const view = await getPartnerTopupView(user.id, id);
+  const simpaisaOperators = await getSimpaisaWalletOperatorConfig();
 
   const pageTitle = view.isCredited
     ? "Payment successful"
@@ -220,6 +222,7 @@ export default async function PartnerWalletTopUpDetailPage({
             enabled={view.canAttemptCheckout}
             simpaisaWalletCheckout={view.simpaisaWalletCheckout}
             usdCents={view.totalPayableCents}
+            enabledSimpaisaOperatorIds={simpaisaOperators.enabledOperatorIds}
           />
           <Link
             href="/partner/wallet"

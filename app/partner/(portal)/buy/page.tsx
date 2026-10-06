@@ -6,6 +6,7 @@ import { listPartnerCatalogOffers } from "@/app/lib/partner/partnerCatalogRead";
 import { isPartnerEsimSplitPaymentEnabled } from "@/app/lib/partner/partnerEsimSplitPaymentPolicy";
 import PartnerStorefrontBuy from "@/app/components/partner/PartnerStorefrontBuy";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
+import { getSimpaisaWalletOperatorConfig } from "@/app/lib/payments/simpaisaWalletOperatorConfig";
 import {
   normalizeOfferId,
   sanitizeCountryHint,
@@ -51,7 +52,7 @@ export default async function PartnerStorefrontBuyPage({
   }
 
   const splitPaymentEnabled = isPartnerEsimSplitPaymentEnabled();
-  const [profile, wallet] = await Promise.all([
+  const [profile, wallet, simpaisaOperators] = await Promise.all([
     prisma.partnerProfile.findUnique({
       where: { id: actor.partnerId },
       select: { discountBps: true },
@@ -60,6 +61,7 @@ export default async function PartnerStorefrontBuyPage({
       where: { partnerId: actor.partnerId },
       select: { balanceCents: true },
     }),
+    getSimpaisaWalletOperatorConfig(),
   ]);
   const balanceCents = wallet?.balanceCents ?? 0;
   const offers = await listPartnerCatalogOffers(country, {
@@ -88,6 +90,7 @@ export default async function PartnerStorefrontBuyPage({
         balanceCents={balanceCents}
         splitPaymentEnabled={splitPaymentEnabled}
         paymentGatewayConfigured={isPaymentGatewayConfigured()}
+        enabledSimpaisaOperatorIds={simpaisaOperators.enabledOperatorIds}
       />
     </div>
   );
