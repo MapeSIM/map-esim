@@ -541,6 +541,8 @@ export async function getReconciliationListPage(options: {
           validity: true,
           displayAmount: true,
           displayCurrency: true,
+          iccidHash: true,
+          iccidCapturedAt: true,
           reconciliationResolvedAt: true,
           reconciliationLockedAt: true,
           reconciliationEscalatedAt: true,
@@ -921,8 +923,10 @@ export async function getReconciliationListPage(options: {
         sourceType: "iccid",
         status: "COMPLETED",
         providerOrderId: row.providerOrderId,
-        iccidHash: null,
-        iccidCapturedAt: null,
+        iccidHash: row.iccidHash,
+        iccidCapturedAt: row.iccidCapturedAt,
+        // Without this, admin-cleared ICCID rows stay ICCID_PENDING in Needs review.
+        reconciliationResolvedAt: row.reconciliationResolvedAt,
         updatedAt: row.updatedAt,
         now,
       });
