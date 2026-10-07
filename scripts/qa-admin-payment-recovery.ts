@@ -273,7 +273,15 @@ function main() {
   assert.match(detail, /gatewayOnlyDismissEligible|showDismissOrRelease/);
   assert.match(
     read("app/components/admin/StaleGatewayReservationReleaseForm.tsx"),
-    /Dismiss \/ Mark Expired/
+    /PAYMENT_WORKBENCH_LABEL\.dismissStale|Dismiss Stale Attempt|Dismiss \/ Mark Expired/
+  );
+  assert.match(
+    read("app/components/admin/StaleGatewayReservationReleaseForm.tsx"),
+    /ADMIN_GATEWAY_ONLY_DISMISS_REASON|Admin dismissed stale uncompleted attempt/
+  );
+  assert.match(
+    read("app/lib/admin/paymentDetailWorkbenchShared.ts"),
+    /Dismiss Stale Attempt/
   );
   assert.match(service, /gatewayOnlyDismissEligible/);
   assert.match(service, /isGatewayOnlyDismissEligible/);

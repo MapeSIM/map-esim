@@ -39,12 +39,66 @@ export const PAYMENT_WORKBENCH_LABEL = {
   paymentStatus: "Payment Status",
   gatewayDecision: "Gateway Decision",
   amount: "Amount",
-  walletFunds: "Wallet funds",
+  walletFunds: "Funds deducted",
   noFundsDeducted: "No funds deducted / Unpaid",
-  dismissStale: "Mark as Abandoned / Expired",
+  dismissStale: "Dismiss Stale Attempt",
   nextSafeAction: "Next safe action",
-  technicalLogs: "Technical Logs / Debug Details",
+  technicalLogs: "Technical & Audit Details",
+  closedNoFundsBanner:
+    "This attempt was closed without funds being deducted",
 } as const;
+
+/** Default audit reason for one-click gateway-only dismiss (server still validates). */
+export const ADMIN_GATEWAY_ONLY_DISMISS_REASON =
+  "Admin dismissed stale uncompleted attempt";
+
+/** Default audit reason for one-click wallet-hold stale release. */
+export const ADMIN_STALE_HOLD_RELEASE_REASON =
+  "Admin released stale unpaid wallet hold";
+
+/**
+ * Split "Name · masked@email" display labels from payment detail loaders.
+ */
+export function splitPaymentPartyLabel(label: string): {
+  name: string;
+  email: string;
+} {
+  const raw = String(label ?? "").trim();
+  if (!raw) return { name: "Not available", email: "—" };
+  const sep = raw.indexOf(" · ");
+  if (sep <= 0) return { name: raw, email: "—" };
+  return {
+    name: raw.slice(0, sep).trim() || "Not available",
+    email: raw.slice(sep + 3).trim() || "—",
+  };
+}
+
+/** Terminal / closed attempt — suppress live investigate and dismiss actions. */
+export function isPaymentAttemptActionSuppressed(input: {
+  attemptStatus: string;
+  purchaseStatus: string;
+}): boolean {
+  const attempt = String(input.attemptStatus ?? "").trim().toUpperCase();
+  const purchase = String(input.purchaseStatus ?? "").trim().toUpperCase();
+  if (
+    attempt === "EXPIRED" ||
+    attempt === "CANCELLED" ||
+    attempt === "CANCELED" ||
+    attempt === "FAILED" ||
+    attempt === "PAYMENT_CONFIRMED" ||
+    attempt === "REFUNDED"
+  ) {
+    return true;
+  }
+  if (
+    purchase === "FUNDED" ||
+    purchase === "COMPLETED" ||
+    purchase === "FAILED_REFUNDED"
+  ) {
+    return true;
+  }
+  return false;
+}
 
 /**
  * Human payment-status badge for the workbench summary.

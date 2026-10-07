@@ -133,18 +133,19 @@ export default function PendingSimpaisaInvestigateForm(props: {
   return (
     <section className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
       <div className="space-y-2">
-        <h2 className="text-lg font-semibold tracking-tight">
+        <h2 className="text-base font-semibold tracking-tight">
           Check gateway status
         </h2>
         <p className="text-sm text-[var(--text-muted)]">
-          Asks the payment gateway for the current decision on this attempt.
-          Browser return data is ignored. This never invents a mark-paid action.
+          Live gateway lookup for this attempt. Never invents a mark-paid
+          action
           {ownerKind === "partner"
-            ? " For partner attempts, a confirmed success applies funding only through the existing partner payment path."
-            : " For customer attempts this never marks a purchase funded, never creates an eSIM order, and never releases a wallet hold by itself."}
+            ? "; partner confirmed success uses the existing apply path only"
+            : "; this never marks a purchase funded, never creates an eSIM order, and never releases a wallet hold by itself"}
+          .
         </p>
         <p className="text-xs text-[var(--text-soft)]">
-          Stored transaction: {props.transactionRefMasked}
+          Ref: {props.transactionRefMasked}
         </p>
       </div>
 

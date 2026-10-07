@@ -15,22 +15,19 @@ import {
   humanGatewayDecisionLabel,
   humanPaymentStatusBadge,
   humanWalletFundsLabel,
+  isPaymentAttemptActionSuppressed,
   PAYMENT_DETAIL_WORKBENCH_DESCRIPTION,
   PAYMENT_DETAIL_WORKBENCH_TITLE,
   PAYMENT_WORKBENCH_LABEL,
   paymentDetailStatusSummary,
+  splitPaymentPartyLabel,
   suggestPaymentDetailNextSafeAction,
 } from "@/app/lib/admin/paymentDetailWorkbenchShared";
 import { getAdminPaymentRecoveryDetailExtras } from "@/app/lib/admin/paymentRecovery";
-import {
-  PAYMENT_RECOVERY_BANNER_TITLE,
-  PAYMENT_RECOVERY_POLICY_BLURB,
-} from "@/app/lib/admin/paymentRecoveryShared";
 import { requireRole } from "@/app/lib/auth/session";
 import {
   AdminButton,
   AdminEmptyState,
-  AdminKpiCard,
   AdminPageHeader,
   AdminStatusPill,
   ADMIN_CARD_CLASS,
@@ -99,18 +96,25 @@ export default async function AdminPaymentDetailPage({
         ? detail.walletAppliedCents
         : 0;
 
+  const actionsSuppressed = isPaymentAttemptActionSuppressed({
+    attemptStatus: detail.attemptStatus,
+    purchaseStatus: detail.purchaseStatus,
+  });
   const gatewayOnlyDismissEligible = Boolean(
     recovery?.gatewayOnlyDismissEligible
   );
   const showDismissOrRelease =
-    Boolean(recovery?.staleReleaseEligible) || gatewayOnlyDismissEligible;
+    !actionsSuppressed &&
+    (Boolean(recovery?.staleReleaseEligible) || gatewayOnlyDismissEligible);
+  const showInvestigate =
+    !actionsSuppressed && Boolean(detail.investigationAvailable);
 
   const nextSafeAction = suggestPaymentDetailNextSafeAction({
     ownerKind: detail.ownerKind,
     attemptStatus: detail.attemptStatus,
     purchaseStatus: detail.purchaseStatus,
     webhookPresent: detail.webhookEventIdPresent,
-    investigationAvailable: detail.investigationAvailable,
+    investigationAvailable: showInvestigate,
     isRecoveryCandidate: Boolean(recovery?.isRecoveryCandidate),
     staleReleaseEligible: showDismissOrRelease,
     showStuckCaseLink: showRecon,
@@ -125,6 +129,11 @@ export default async function AdminPaymentDetailPage({
   });
   const gatewayBadge = humanGatewayDecisionLabel(detail.webhookEventIdPresent);
   const walletFunds = humanWalletFundsLabel(walletCents);
+  const party = splitPaymentPartyLabel(detail.customerLabel);
+  const closedWithoutFunds =
+    actionsSuppressed &&
+    walletCents <= 0 &&
+    paymentBadge.label !== "Paid";
 
   const timeline = buildPaymentDetailTimeline([
     {
@@ -194,16 +203,6 @@ export default async function AdminPaymentDetailPage({
       <AdminPageHeader
         title={PAYMENT_DETAIL_WORKBENCH_TITLE}
         description={PAYMENT_DETAIL_WORKBENCH_DESCRIPTION}
-        meta={
-          <>
-            {detail.ownerKind === "partner" ? "Partner" : "Customer"} ·{" "}
-            {paymentDetailStatusSummary({
-              attemptStatus: detail.attemptStatus,
-              purchaseStatus: detail.purchaseStatus,
-              webhookLabel: detail.webhookLabel,
-            })}
-          </>
-        }
         actions={
           <>
             <AdminButton href="/admin/payments" variant="ghost" size="sm">
@@ -216,15 +215,6 @@ export default async function AdminPaymentDetailPage({
             >
               Verify Pending
             </AdminButton>
-            {recovery?.isRecoveryCandidate ? (
-              <AdminButton
-                href="/admin/payments/recovery"
-                variant="ghost"
-                size="sm"
-              >
-                Stale unpaid holds
-              </AdminButton>
-            ) : null}
             {showRecon ? (
               <AdminButton
                 href={buildAdminWalletPurchaseReconciliationHref(
@@ -240,49 +230,106 @@ export default async function AdminPaymentDetailPage({
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <AdminStatusPill value={detail.ownerKind}>
-          {detail.ownerKind === "partner" ? "Partner" : "Customer"}
-        </AdminStatusPill>
-        <AdminStatusPill value={paymentBadge.toneValue}>
-          {paymentBadge.label}
-        </AdminStatusPill>
-        <AdminStatusPill value={gatewayBadge.toneValue}>
-          {gatewayBadge.label}
-        </AdminStatusPill>
-      </div>
-
+      {/* Single overview card */}
       <section
-        aria-label="Payment summary"
-        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+        className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] shadow-sm"
+        aria-label="Payment overview"
       >
-        <AdminKpiCard
-          label={PAYMENT_WORKBENCH_LABEL.paymentStatus}
-          value={paymentBadge.label}
-        />
-        <AdminKpiCard
-          label={PAYMENT_WORKBENCH_LABEL.gatewayDecision}
-          value={gatewayBadge.label}
-        />
-        <AdminKpiCard
-          label={PAYMENT_WORKBENCH_LABEL.amount}
-          value={detail.amountLabel}
-        />
+        <div className="flex flex-col gap-4 border-b border-[var(--border)] px-4 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <AdminStatusPill value={detail.ownerKind}>
+                {detail.ownerKind === "partner" ? "Partner" : "Customer"}
+              </AdminStatusPill>
+              <AdminStatusPill value={paymentBadge.toneValue}>
+                {paymentBadge.label}
+              </AdminStatusPill>
+            </div>
+            <h2 className="truncate text-xl font-semibold tracking-tight text-[var(--heading)]">
+              {detail.customerHref ? (
+                <Link
+                  href={detail.customerHref}
+                  className="text-[var(--heading)] underline-offset-2 hover:underline"
+                >
+                  {party.name}
+                </Link>
+              ) : (
+                party.name
+              )}
+            </h2>
+            <p className="text-sm text-[var(--text-muted)]">{party.email}</p>
+            <p className="text-xs text-[var(--text-soft)]">
+              Created {detail.createdAtLabel}
+            </p>
+          </div>
+          <div className="text-left sm:text-right">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              {PAYMENT_WORKBENCH_LABEL.amount}
+            </p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--heading)]">
+              {detail.amountLabel}
+            </p>
+          </div>
+        </div>
+
+        <dl className="grid gap-4 px-4 py-5 sm:grid-cols-2 lg:grid-cols-4 sm:px-6">
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              Gateway
+            </dt>
+            <dd className="mt-1 text-sm font-medium text-[var(--heading)]">
+              {detail.providerLabel}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              Gateway ref
+            </dt>
+            <dd className="mt-1 break-all font-mono text-sm text-[var(--heading)]">
+              {detail.providerRefMasked}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              {PAYMENT_WORKBENCH_LABEL.gatewayDecision}
+            </dt>
+            <dd className="mt-1">
+              <AdminStatusPill value={gatewayBadge.toneValue}>
+                {gatewayBadge.label}
+              </AdminStatusPill>
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              {PAYMENT_WORKBENCH_LABEL.walletFunds}
+            </dt>
+            <dd className="mt-1 text-sm font-medium text-[var(--heading)]">
+              {walletFunds.label}
+            </dd>
+          </div>
+        </dl>
+
+        {!actionsSuppressed ? (
+          <div
+            className="border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3 sm:px-6"
+            aria-label="Next safe action"
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              {PAYMENT_WORKBENCH_LABEL.nextSafeAction}
+            </p>
+            <p className="mt-1 text-sm text-[var(--heading)]">{nextSafeAction}</p>
+          </div>
+        ) : null}
       </section>
 
-      <section
-        className="rounded-2xl border border-[var(--accent-strong)]/30 bg-[var(--accent-strong)]/8 p-4 text-sm sm:p-5"
-        aria-label="Next safe action"
-      >
-        <h2 className="text-base font-semibold text-[var(--heading)]">
-          {PAYMENT_WORKBENCH_LABEL.nextSafeAction}
-        </h2>
-        <p className="mt-2 text-[var(--heading)]">{nextSafeAction}</p>
-        <p className="mt-2 text-xs text-[var(--text-soft)]">
-          Guidance only — existing tools and permissions below are unchanged.
-          This page never funds or marks paid.
-        </p>
-      </section>
+      {closedWithoutFunds ? (
+        <div
+          className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--heading)]"
+          role="status"
+        >
+          {PAYMENT_WORKBENCH_LABEL.closedNoFundsBanner}
+        </div>
+      ) : null}
 
       {showDismissOrRelease ? (
         <StaleGatewayReservationReleaseForm
@@ -291,60 +338,26 @@ export default async function AdminPaymentDetailPage({
           walletAppliedCents={walletCents}
           gatewayOnlyDismiss={gatewayOnlyDismissEligible || walletCents === 0}
         />
-      ) : (
-        <section className={ADMIN_CARD_CLASS} aria-label="Wallet funds">
-          <h2 className="text-base font-semibold tracking-tight text-[var(--heading)]">
-            {PAYMENT_WORKBENCH_LABEL.walletFunds}
-          </h2>
-          <p className="mt-2 text-sm font-medium text-[var(--heading)]">
-            Status: {walletFunds.label}
-          </p>
-          {walletFunds.hasHold ? (
-            <p className="mt-1 text-xs text-[var(--text-soft)]">
-              {formatAdminReservedWalletAmount(walletCents, {
-                showCentsSecondary: false,
-              })}
-            </p>
-          ) : null}
-        </section>
-      )}
+      ) : null}
 
-      {recovery?.isRecoveryCandidate ? (
-        <section
-          className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm sm:p-5"
-          aria-label={PAYMENT_RECOVERY_BANNER_TITLE}
-        >
-          <h2 className="text-base font-semibold text-[var(--heading)]">
-            {PAYMENT_RECOVERY_BANNER_TITLE}
-          </h2>
-          <p className="mt-2 text-[var(--text-muted)]">
-            {PAYMENT_RECOVERY_POLICY_BLURB}
-          </p>
-          <dl className="mt-3 grid gap-2 sm:grid-cols-2">
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-                Last check
-              </dt>
-              <dd className="mt-1 text-[var(--heading)]">
-                {recovery.lastDecisionLabel}
-                {recovery.lastDecisionAtLabel ? (
-                  <span className="text-[var(--text-soft)]">
-                    {" "}
-                    · {recovery.lastDecisionAtLabel}
-                  </span>
-                ) : null}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-                Suggested action
-              </dt>
-              <dd className="mt-1 text-[var(--heading)]">
-                {recovery.suggestedSafeAction}
-              </dd>
-            </div>
-          </dl>
-        </section>
+      {showInvestigate ? (
+        detail.isSimpaisa ? (
+          <PendingSimpaisaInvestigateForm
+            paymentAttemptId={detail.attemptId}
+            transactionRefMasked={detail.providerRefMasked}
+            walletAppliedCents={detail.walletAppliedCents}
+            ownerKind={detail.ownerKind === "partner" ? "partner" : "customer"}
+          />
+        ) : detail.ownerKind === "customer" ? (
+          <PendingPaymentVerifyForm
+            paymentAttemptId={detail.attemptId}
+            trackerRefMasked={detail.providerRefMasked}
+          />
+        ) : (
+          <AdminEmptyState title="Check status not available">
+            Partner pending checks currently support Simpaisa attempts only.
+          </AdminEmptyState>
+        )
       ) : null}
 
       <section className={ADMIN_CARD_CLASS} aria-labelledby="related-records-heading">
@@ -354,11 +367,7 @@ export default async function AdminPaymentDetailPage({
         >
           Related records
         </h2>
-        <p className="mt-1 text-xs text-[var(--text-soft)]">
-          Jump to customer, partner, order, or wallet context without changing
-          payment state.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           {detail.customerHref ? (
             <AdminButton href={detail.customerHref} variant="secondary" size="sm">
               {detail.ownerKind === "partner" ? "Partner profile" : "Customer"}
@@ -394,15 +403,6 @@ export default async function AdminPaymentDetailPage({
               Open stuck case
             </AdminButton>
           ) : null}
-          {detail.ownerKind === "customer" ? (
-            <AdminButton
-              href={`/admin/payments/pending/${encodeURIComponent(detail.attemptId)}`}
-              variant="secondary"
-              size="sm"
-            >
-              Verify Pending
-            </AdminButton>
-          ) : null}
           <AdminButton
             href="/admin/payments/webhooks"
             variant="ghost"
@@ -413,41 +413,12 @@ export default async function AdminPaymentDetailPage({
         </div>
       </section>
 
-      {detail.investigationAvailable ? (
-        detail.isSimpaisa ? (
-          <PendingSimpaisaInvestigateForm
-            paymentAttemptId={detail.attemptId}
-            transactionRefMasked={detail.providerRefMasked}
-            walletAppliedCents={detail.walletAppliedCents}
-            ownerKind={detail.ownerKind === "partner" ? "partner" : "customer"}
-          />
-        ) : detail.ownerKind === "customer" ? (
-          <PendingPaymentVerifyForm
-            paymentAttemptId={detail.attemptId}
-            trackerRefMasked={detail.providerRefMasked}
-          />
-        ) : (
-          <AdminEmptyState title="Check status not available">
-            Partner pending checks currently support Simpaisa attempts only.
-            Use Stuck Cases when applicable.
-          </AdminEmptyState>
-        )
-      ) : (
-        <AdminEmptyState title="Check status not available">
-          Gateway check tools appear when the attempt is still awaiting payment
-          {detail.ownerKind === "customer"
-            ? ", payment pending, or needs reconciliation"
-            : ""}
-          . This page never marks paid without the webhook path.
-        </AdminEmptyState>
-      )}
-
       <details className={ADMIN_CARD_CLASS}>
         <summary className="cursor-pointer text-base font-semibold tracking-tight text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]">
           {PAYMENT_WORKBENCH_LABEL.technicalLogs}
         </summary>
         <p className="mt-2 text-xs text-[var(--text-soft)]">
-          Payment timeline and engineering fields for cross-checks.
+          Payment timeline, webhook receipts, and engineering fields.
         </p>
 
         <h3 className="mt-4 text-sm font-semibold text-[var(--heading)]">
@@ -460,7 +431,7 @@ export default async function AdminPaymentDetailPage({
             </AdminEmptyState>
           </div>
         ) : (
-          <ol className="mt-3 space-y-3">
+          <ol className="mt-3 space-y-2">
             {timeline.map((event) => (
               <li
                 key={event.id}
@@ -484,11 +455,9 @@ export default async function AdminPaymentDetailPage({
           Webhook receipts for this attempt
         </h3>
         {!recovery || recovery.receipts.length === 0 ? (
-          <div className="mt-2">
-            <AdminEmptyState title="No receipts for this attempt">
-              No webhook receipts claimed for this attempt id.
-            </AdminEmptyState>
-          </div>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">
+            No webhook receipts claimed for this attempt id.
+          </p>
         ) : (
           <ul className="mt-2 space-y-2">
             {recovery.receipts.map((receipt) => (
@@ -539,26 +508,10 @@ export default async function AdminPaymentDetailPage({
             </div>
             <div>
               <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-                Provider reference
-              </dt>
-              <dd className="mt-1 text-[var(--heading)]">
-                {detail.providerRefMasked}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-                Attempt status (enum)
+                Attempt / purchase enums
               </dt>
               <dd className="mt-1 font-mono text-xs text-[var(--heading)]">
-                {detail.attemptStatus}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-                Purchase status (enum)
-              </dt>
-              <dd className="mt-1 font-mono text-xs text-[var(--heading)]">
-                {detail.purchaseStatus}
+                {detail.attemptStatus} · {detail.purchaseStatus}
               </dd>
             </div>
             <div>
@@ -587,19 +540,12 @@ export default async function AdminPaymentDetailPage({
             </div>
             <div>
               <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-                {detail.ownerKind === "partner" ? "Partner" : "Customer"}
+                Human labels
               </dt>
-              <dd className="mt-1 text-[var(--heading)]">
-                {detail.customerHref ? (
-                  <Link
-                    href={detail.customerHref}
-                    className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-                  >
-                    {detail.customerLabel}
-                  </Link>
-                ) : (
-                  detail.customerLabel
-                )}
+              <dd className="mt-1 text-xs text-[var(--text-muted)]">
+                Attempt {adminHumanStatusLabel(detail.attemptStatus)} · Purchase{" "}
+                {adminHumanStatusLabel(detail.purchaseStatus)} · Webhook{" "}
+                {adminHumanStatusLabel(detail.webhookLabel)}
               </dd>
             </div>
             {detail.failureCategory || detail.failureCode ? (
@@ -614,25 +560,22 @@ export default async function AdminPaymentDetailPage({
                 </dd>
               </div>
             ) : null}
-            <div className="sm:col-span-2">
-              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-                Human enums
-              </dt>
-              <dd className="mt-1 text-xs text-[var(--text-muted)]">
-                Attempt {adminHumanStatusLabel(detail.attemptStatus)} · Purchase{" "}
-                {adminHumanStatusLabel(detail.purchaseStatus)} · Webhook{" "}
-                {adminHumanStatusLabel(detail.webhookLabel)} · Provider{" "}
-                {detail.providerLabel}
-              </dd>
-            </div>
+            {recovery?.lastDecisionLabel ? (
+              <div className="sm:col-span-2">
+                <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                  Last investigation
+                </dt>
+                <dd className="mt-1 text-[var(--heading)]">
+                  {recovery.lastDecisionLabel}
+                  {recovery.lastDecisionAtLabel
+                    ? ` · ${recovery.lastDecisionAtLabel}`
+                    : ""}
+                </dd>
+              </div>
+            ) : null}
           </dl>
         </details>
       </details>
-
-      <p className="text-xs text-[var(--text-soft)]">
-        Wallet funds: {walletFunds.label}. This page does not invent generic
-        mark-paid shortcuts.
-      </p>
     </div>
   );
 }
