@@ -12,6 +12,7 @@ import {
   quoteSimpaisaPkrChargeFromUsdCents,
 } from "@/app/lib/payments/simpaisaPkrQuote";
 import {
+  formatSimpaisaMsisdnInput,
   isSimpaisaWalletOperatorId,
   normalizeSimpaisaMsisdn,
 } from "@/app/lib/payments/simpaisaPolicy";
@@ -196,21 +197,50 @@ export default function SimpaisaWalletFields({
         >
           Mobile number
         </label>
-        <input
-          id={msisdnId}
-          name="customerMsisdn"
-          type="tel"
-          inputMode="numeric"
-          autoComplete="tel"
-          required
-          disabled={disabled}
-          value={msisdn}
-          onChange={(event) => setMsisdn(event.currentTarget.value)}
-          placeholder="3XXXXXXXXX"
-          className="w-full min-w-0 rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
-        />
+        <div
+          className={[
+            "flex w-full min-w-0 overflow-hidden rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)]",
+            "focus-within:ring-2 focus-within:ring-[var(--accent-strong)]/60",
+            disabled ? "opacity-60" : "",
+          ].join(" ")}
+        >
+          <span
+            aria-hidden="true"
+            className="inline-flex shrink-0 items-center border-r border-[var(--border)] bg-[var(--surface-2)] px-3 text-sm font-medium tabular-nums text-[var(--text-muted)]"
+          >
+            +92
+          </span>
+          <input
+            id={msisdnId}
+            name="customerMsisdn"
+            type="tel"
+            inputMode="numeric"
+            autoComplete="tel-national"
+            required
+            disabled={disabled}
+            value={msisdn}
+            maxLength={10}
+            pattern="3[0-9]{9}"
+            title="10-digit Pakistani mobile starting with 3"
+            onChange={(event) =>
+              setMsisdn(formatSimpaisaMsisdnInput(event.currentTarget.value))
+            }
+            onPaste={(event) => {
+              event.preventDefault();
+              const pasted = event.clipboardData.getData("text");
+              const el = event.currentTarget;
+              const start = el.selectionStart ?? msisdn.length;
+              const end = el.selectionEnd ?? msisdn.length;
+              const next =
+                msisdn.slice(0, start) + pasted + msisdn.slice(end);
+              setMsisdn(formatSimpaisaMsisdnInput(next));
+            }}
+            placeholder="3XXXXXXXXX"
+            className="min-w-0 flex-1 border-0 bg-transparent px-3 py-2.5 text-sm text-[var(--heading)] outline-none"
+          />
+        </div>
         <p className="text-xs text-[var(--text-muted)]">
-          10 digits, no country code (e.g. 3001234567).
+          +92 (3XX) XXXXXXX — 10 digits starting with 3 (e.g. 3001234567).
         </p>
         {msisdnError ? (
           <p className="text-sm text-[var(--heading)]" role="alert">

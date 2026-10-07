@@ -6,6 +6,10 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { normalizeCustomerBuyCountryHint } from "../app/lib/plans/customerBuyCountryHint";
+import {
+  formatSimpaisaMsisdnInput,
+  normalizeSimpaisaMsisdn,
+} from "../app/lib/payments/simpaisaPolicy";
 
 const root = join(__dirname, "..");
 
@@ -113,8 +117,21 @@ function main() {
   const simpaisaFields = read("app/components/account/SimpaisaWalletFields.tsx");
   assert.match(simpaisaFields, /onValidityChange/);
   assert.match(simpaisaFields, /normalizeSimpaisaMsisdn/);
+  assert.match(simpaisaFields, /formatSimpaisaMsisdnInput/);
+  assert.match(simpaisaFields, /maxLength=\{10\}/);
+  assert.match(simpaisaFields, /placeholder="3XXXXXXXXX"/);
+  assert.match(simpaisaFields, /\+92/);
   assert.match(simpaisaFields, /min-h-\[6\.75rem\]/);
   assert.match(simpaisaFields, /grid-cols-2/);
+  assert.equal(formatSimpaisaMsisdnInput("03001234567"), "3001234567");
+  assert.equal(formatSimpaisaMsisdnInput("+923001234567"), "3001234567");
+  assert.equal(formatSimpaisaMsisdnInput("923001234567"), "3001234567");
+  assert.equal(formatSimpaisaMsisdnInput("30012345678999"), "3001234567");
+  assert.equal(formatSimpaisaMsisdnInput("30a0-123 4567"), "3001234567");
+  assert.equal(normalizeSimpaisaMsisdn("300123"), null);
+  assert.equal(normalizeSimpaisaMsisdn("03001234567"), "3001234567");
+  assert.equal(normalizeSimpaisaMsisdn("+92 300 1234567"), "3001234567");
+  assert.equal(normalizeSimpaisaMsisdn("3001234567"), "3001234567");
   // Mobile cards: logos sized to fit half-width columns at 360–412px.
   const presentation = read(
     "app/components/account/simpaisaWalletMethodPresentation.ts"

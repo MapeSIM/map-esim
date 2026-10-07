@@ -299,24 +299,48 @@ export function simpaisaMinorAmountFromMajor(
 }
 
 /**
+ * Live input mask toward the Simpaisa national MSISDN contract (3XXXXXXXXX).
+ * Digits only; strips leading 0 / 92 / +92 as typed or pasted; caps at 10.
+ * Partial values while typing are allowed (shorter than 10).
+ */
+export function formatSimpaisaMsisdnInput(
+  raw: string | undefined | null
+): string {
+  let digits = (raw ?? "").replace(/\D/g, "");
+
+  // Peel country / trunk prefixes (paste of "+92 03…" → 9203… → 03… → 3…).
+  for (let i = 0; i < 3; i++) {
+    if (digits.startsWith("92") && digits.length >= 3) {
+      digits = digits.slice(2);
+      continue;
+    }
+    if (digits.startsWith("0") && digits.length >= 2) {
+      digits = digits.slice(1);
+      continue;
+    }
+    break;
+  }
+
+  if (digits.length > 0 && !digits.startsWith("3")) {
+    const idx = digits.indexOf("3");
+    digits = idx >= 0 ? digits.slice(idx) : "";
+  }
+
+  return digits.slice(0, 10);
+}
+
+/**
  * Normalize Pakistani MSISDN to 10 digits without country code (3XXXXXXXXX).
  * Accepts 03XXXXXXXXX / 923XXXXXXXXX input and strips the prefix.
  */
 export function normalizeSimpaisaMsisdn(
   raw: string | undefined | null
 ): string | null {
-  const digits = (raw ?? "").replace(/\D/g, "");
-  let national: string | null = null;
-  if (digits.length === 10 && digits.startsWith("3")) national = digits;
-  else if (digits.length === 11 && digits.startsWith("03")) {
-    national = digits.slice(1);
-  } else if (digits.length === 12 && digits.startsWith("923")) {
-    national = digits.slice(2);
-  }
-  if (!national || national.length !== 10 || !national.startsWith("3")) {
+  const digits = formatSimpaisaMsisdnInput(raw);
+  if (digits.length !== 10 || !digits.startsWith("3")) {
     return null;
   }
-  return national;
+  return digits;
 }
 
 /** Customer-safe MSISDN mask: 300****4567. Never returns the full number. */
