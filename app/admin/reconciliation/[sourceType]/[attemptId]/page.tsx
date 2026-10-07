@@ -178,82 +178,43 @@ export default async function AdminReconciliationDetailPage({
           ← Back to Stuck Cases
         </AdminButton>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Reconciliation case
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight">Stuck case</h1>
           <p className="mt-2 text-sm text-[var(--text-muted)]">
-            Sanitized timeline and controlled case management. Recovery actions
-            require a locked case, confirmation phrases where applicable, and
-            conclusive provider or local evidence. They never auto-unlock or
-            auto-resolve.
+            Review what happened, then Close &amp; Resolve when no further
+            recovery is needed. Advanced tools stay evidence-gated.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <AdminStatusPill value={detail.categoryLabel}>
             {detail.categoryLabel}
           </AdminStatusPill>
-          <AdminStatusPill value={detail.providerResultKindLabel}>
-            {detail.providerResultKindLabel}
-          </AdminStatusPill>
           <AdminStatusPill value={detail.resolutionLabel}>
             {detail.resolutionLabel}
+          </AdminStatusPill>
+          <AdminStatusPill value={detail.amountLabel}>
+            Amount · {detail.amountLabel}
           </AdminStatusPill>
         </div>
       </header>
 
-      <div
-        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--heading)]"
-        role="status"
-      >
-        Provider status observations do not automatically authorize a refund or
-        local finalization. Unsupported source and action combinations remain
-        blocked. Successful recoveries keep the case locked and open for manual
-        review.
-      </div>
-
       <dl className={CARD_CLASS}>
-        <DetailRow label="Attempt ID" value={detail.attemptId} />
-        <DetailRow label="Source" value={detail.sourceType} />
-        <DetailRow label="Purchase type" value={detail.purchaseType} />
-        <DetailRow
-          label="Category"
-          value={
-            <AdminStatusPill value={detail.categoryLabel}>
-              {detail.categoryLabel}
-            </AdminStatusPill>
-          }
-        />
         <DetailRow label="Customer" value={detail.customerLabel} />
         <DetailRow label="Package" value={detail.destinationPackage} />
         <DetailRow label="Amount" value={detail.amountLabel} />
         <DetailRow
-          label="Wallet debit / refund"
+          label="Wallet funds"
           value={detail.walletDebitRefundLabel}
         />
         <DetailRow
-          label="Provider result"
+          label="Gateway decision"
           value={
             <AdminStatusPill value={detail.providerResultKindLabel}>
               {detail.providerResultKindLabel}
             </AdminStatusPill>
           }
         />
-        <DetailRow
-          label="Provider reference"
-          value={detail.providerRefMasked}
-        />
         <DetailRow label="Local order" value={detail.localOrderLabel} />
-        <DetailRow label="Failure" value={detail.failureLabel} />
-        <DetailRow label="Created" value={detail.createdAtLabel} />
         <DetailRow label="Updated" value={detail.updatedAtLabel} />
-        <DetailRow
-          label="Resolution / lock"
-          value={
-            <AdminStatusPill value={detail.resolutionLabel}>
-              {detail.resolutionLabel}
-            </AdminStatusPill>
-          }
-        />
       </dl>
 
       {detail.sourceType === "order_email" &&
@@ -315,16 +276,37 @@ export default async function AdminReconciliationDetailPage({
           fundFulfillRecoverySupported={caseUi.fundFulfillRecoverySupported}
           fundFulfillRecoveryAllowed={caseUi.fundFulfillRecoveryAllowed}
           fundFulfillRecoveryMessage={caseUi.fundFulfillRecoveryMessage}
+          categoryLabel={detail.categoryLabel}
+          failureLabel={detail.failureLabel}
         />
       ) : null}
 
-      <section className="min-w-0 space-y-3">
-        <h2 className="text-lg font-semibold tracking-tight">Timeline</h2>
-        <ol className="space-y-2">
+      <details className={SECTION_CARD_CLASS}>
+        <summary className="cursor-pointer text-lg font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]">
+          Technical Logs / Debug Details
+        </summary>
+        <p className="mt-2 text-xs text-[var(--text-soft)]">
+          Timeline and identifiers for engineering review.
+        </p>
+        <dl className="mt-3">
+          <DetailRow label="Attempt ID" value={detail.attemptId} />
+          <DetailRow label="Source" value={detail.sourceType} />
+          <DetailRow label="Purchase type" value={detail.purchaseType} />
+          <DetailRow
+            label="Provider reference"
+            value={detail.providerRefMasked}
+          />
+          <DetailRow label="Failure" value={detail.failureLabel} />
+          <DetailRow label="Created" value={detail.createdAtLabel} />
+        </dl>
+        <h3 className="mt-4 text-sm font-semibold text-[var(--heading)]">
+          Timeline
+        </h3>
+        <ol className="mt-2 space-y-2">
           {detail.timeline.map((event) => (
             <li
               key={event.label}
-              className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3"
+              className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-[var(--heading)]">
@@ -340,7 +322,7 @@ export default async function AdminReconciliationDetailPage({
             </li>
           ))}
         </ol>
-      </section>
+      </details>
 
       {showRefreshSection ? (
         <>

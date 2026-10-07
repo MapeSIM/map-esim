@@ -169,7 +169,7 @@ function main() {
   );
   assert.match(
     read("app/components/admin/PaymentListRowActions.tsx"),
-    /Release stale reservation/
+    /Mark as Abandoned \/ Expired/
   );
   assert.match(
     read("app/components/admin/PaymentListRowActions.tsx"),

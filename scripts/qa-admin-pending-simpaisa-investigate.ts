@@ -218,8 +218,8 @@ function main() {
     releaseBody,
     /maybeReleasePendingGatewayReservation|releaseFn\s*\?\?/
   );
-  assert.match(form, /Check Simpaisa Status/);
-  assert.match(form, /Release Reservation/);
+  assert.match(form, /Check gateway status/);
+  assert.match(form, /Release wallet hold/);
   assert.match(form, /releaseEligible/);
   console.log("PASS two_step_release_only_after_failed_check");
 

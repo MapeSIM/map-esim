@@ -12,8 +12,12 @@ import { adminHumanStatusLabel } from "@/app/lib/admin/adminUxCopy";
 import { getAdminPaymentDetail } from "@/app/lib/admin/paymentDashboard";
 import {
   buildPaymentDetailTimeline,
+  humanGatewayDecisionLabel,
+  humanPaymentStatusBadge,
+  humanWalletFundsLabel,
   PAYMENT_DETAIL_WORKBENCH_DESCRIPTION,
   PAYMENT_DETAIL_WORKBENCH_TITLE,
+  PAYMENT_WORKBENCH_LABEL,
   paymentDetailStatusSummary,
   suggestPaymentDetailNextSafeAction,
 } from "@/app/lib/admin/paymentDetailWorkbenchShared";
@@ -88,6 +92,13 @@ export default async function AdminPaymentDetailPage({
       attemptStatus: detail.attemptStatus,
     });
 
+  const walletCents =
+    typeof recovery?.walletAppliedCents === "number"
+      ? recovery.walletAppliedCents
+      : typeof detail.walletAppliedCents === "number"
+        ? detail.walletAppliedCents
+        : 0;
+
   const nextSafeAction = suggestPaymentDetailNextSafeAction({
     ownerKind: detail.ownerKind,
     attemptStatus: detail.attemptStatus,
@@ -98,7 +109,16 @@ export default async function AdminPaymentDetailPage({
     staleReleaseEligible: Boolean(recovery?.staleReleaseEligible),
     showStuckCaseLink: showRecon,
     recoverySuggestedSafeAction: recovery?.suggestedSafeAction ?? null,
+    walletAppliedCents: walletCents,
   });
+
+  const paymentBadge = humanPaymentStatusBadge({
+    attemptStatus: detail.attemptStatus,
+    purchaseStatus: detail.purchaseStatus,
+    webhookPresent: detail.webhookEventIdPresent,
+  });
+  const gatewayBadge = humanGatewayDecisionLabel(detail.webhookEventIdPresent);
+  const walletFunds = humanWalletFundsLabel(walletCents);
 
   const timeline = buildPaymentDetailTimeline([
     {
@@ -213,27 +233,43 @@ export default async function AdminPaymentDetailPage({
           </>
         }
       />
+
       <div className="flex flex-wrap items-center gap-2">
         <AdminStatusPill value={detail.ownerKind}>
           {detail.ownerKind === "partner" ? "Partner" : "Customer"}
         </AdminStatusPill>
-        <AdminStatusPill value={detail.attemptStatus}>
-          {adminHumanStatusLabel(detail.attemptStatus)}
+        <AdminStatusPill value={paymentBadge.toneValue}>
+          {paymentBadge.label}
         </AdminStatusPill>
-        <AdminStatusPill value={detail.purchaseStatus}>
-          {adminHumanStatusLabel(detail.purchaseStatus)}
-        </AdminStatusPill>
-        <AdminStatusPill value={detail.webhookLabel}>
-          Webhook {adminHumanStatusLabel(detail.webhookLabel)}
+        <AdminStatusPill value={gatewayBadge.toneValue}>
+          {gatewayBadge.label}
         </AdminStatusPill>
       </div>
+
+      <section
+        aria-label="Payment summary"
+        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+      >
+        <AdminKpiCard
+          label={PAYMENT_WORKBENCH_LABEL.paymentStatus}
+          value={paymentBadge.label}
+        />
+        <AdminKpiCard
+          label={PAYMENT_WORKBENCH_LABEL.gatewayDecision}
+          value={gatewayBadge.label}
+        />
+        <AdminKpiCard
+          label={PAYMENT_WORKBENCH_LABEL.amount}
+          value={detail.amountLabel}
+        />
+      </section>
 
       <section
         className="rounded-2xl border border-[var(--accent-strong)]/30 bg-[var(--accent-strong)]/8 p-4 text-sm sm:p-5"
         aria-label="Next safe action"
       >
         <h2 className="text-base font-semibold text-[var(--heading)]">
-          Next safe action
+          {PAYMENT_WORKBENCH_LABEL.nextSafeAction}
         </h2>
         <p className="mt-2 text-[var(--heading)]">{nextSafeAction}</p>
         <p className="mt-2 text-xs text-[var(--text-soft)]">
@@ -242,19 +278,29 @@ export default async function AdminPaymentDetailPage({
         </p>
       </section>
 
-      <section
-        aria-label="Payment summary"
-        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
-      >
-        <AdminKpiCard label="Amount" value={detail.amountLabel} />
-        <AdminKpiCard label="Provider" value={detail.providerLabel} />
-        <AdminKpiCard
-          label="Wallet reserved"
-          value={formatAdminReservedWalletAmount(detail.walletAppliedCents, {
-            showCentsSecondary: false,
-          })}
+      {recovery?.staleReleaseEligible ? (
+        <StaleGatewayReservationReleaseForm
+          paymentAttemptId={detail.attemptId}
+          ownerKind={detail.ownerKind === "partner" ? "partner" : "customer"}
+          walletAppliedCents={walletCents}
         />
-      </section>
+      ) : (
+        <section className={ADMIN_CARD_CLASS} aria-label="Wallet funds">
+          <h2 className="text-base font-semibold tracking-tight text-[var(--heading)]">
+            {PAYMENT_WORKBENCH_LABEL.walletFunds}
+          </h2>
+          <p className="mt-2 text-sm font-medium text-[var(--heading)]">
+            Status: {walletFunds.label}
+          </p>
+          {walletFunds.hasHold ? (
+            <p className="mt-1 text-xs text-[var(--text-soft)]">
+              {formatAdminReservedWalletAmount(walletCents, {
+                showCentsSecondary: false,
+              })}
+            </p>
+          ) : null}
+        </section>
+      )}
 
       {recovery?.isRecoveryCandidate ? (
         <section
@@ -270,7 +316,7 @@ export default async function AdminPaymentDetailPage({
           <dl className="mt-3 grid gap-2 sm:grid-cols-2">
             <div>
               <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-                Last investigation decision
+                Last check
               </dt>
               <dd className="mt-1 text-[var(--heading)]">
                 {recovery.lastDecisionLabel}
@@ -284,7 +330,7 @@ export default async function AdminPaymentDetailPage({
             </div>
             <div>
               <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-                Suggested safe action
+                Suggested action
               </dt>
               <dd className="mt-1 text-[var(--heading)]">
                 {recovery.suggestedSafeAction}
@@ -360,24 +406,54 @@ export default async function AdminPaymentDetailPage({
         </div>
       </section>
 
-      <section className={ADMIN_CARD_CLASS} aria-labelledby="payment-timeline-heading">
-        <h2
-          id="payment-timeline-heading"
-          className="text-base font-semibold tracking-tight text-[var(--heading)]"
-        >
-          Payment timeline
-        </h2>
-        <p className="mt-1 text-xs text-[var(--text-soft)]">
-          Read-only history from attempt timestamps and webhook receipts.
+      {detail.investigationAvailable ? (
+        detail.isSimpaisa ? (
+          <PendingSimpaisaInvestigateForm
+            paymentAttemptId={detail.attemptId}
+            transactionRefMasked={detail.providerRefMasked}
+            walletAppliedCents={detail.walletAppliedCents}
+            ownerKind={detail.ownerKind === "partner" ? "partner" : "customer"}
+          />
+        ) : detail.ownerKind === "customer" ? (
+          <PendingPaymentVerifyForm
+            paymentAttemptId={detail.attemptId}
+            trackerRefMasked={detail.providerRefMasked}
+          />
+        ) : (
+          <AdminEmptyState title="Check status not available">
+            Partner pending checks currently support Simpaisa attempts only.
+            Use Stuck Cases when applicable.
+          </AdminEmptyState>
+        )
+      ) : (
+        <AdminEmptyState title="Check status not available">
+          Gateway check tools appear when the attempt is still awaiting payment
+          {detail.ownerKind === "customer"
+            ? ", payment pending, or needs reconciliation"
+            : ""}
+          . This page never marks paid without the webhook path.
+        </AdminEmptyState>
+      )}
+
+      <details className={ADMIN_CARD_CLASS}>
+        <summary className="cursor-pointer text-base font-semibold tracking-tight text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]">
+          {PAYMENT_WORKBENCH_LABEL.technicalLogs}
+        </summary>
+        <p className="mt-2 text-xs text-[var(--text-soft)]">
+          Payment timeline and engineering fields for cross-checks.
         </p>
+
+        <h3 className="mt-4 text-sm font-semibold text-[var(--heading)]">
+          Payment timeline
+        </h3>
         {timeline.length === 0 ? (
-          <div className="mt-3">
+          <div className="mt-2">
             <AdminEmptyState title="No timeline events">
               No timeline events available for this attempt.
             </AdminEmptyState>
           </div>
         ) : (
-          <ol className="mt-4 space-y-3">
+          <ol className="mt-3 space-y-3">
             {timeline.map((event) => (
               <li
                 key={event.id}
@@ -396,24 +472,18 @@ export default async function AdminPaymentDetailPage({
             ))}
           </ol>
         )}
-      </section>
 
-      <section className={ADMIN_CARD_CLASS}>
-        <h2 className="text-base font-semibold tracking-tight text-[var(--heading)]">
+        <h3 className="mt-5 text-sm font-semibold text-[var(--heading)]">
           Webhook receipts for this attempt
-        </h2>
-        <p className="mt-1 text-xs text-[var(--text-soft)]">
-          Read-only observability. Receipts do not authorize admin funding or
-          webhook replay.
-        </p>
+        </h3>
         {!recovery || recovery.receipts.length === 0 ? (
-          <div className="mt-3">
+          <div className="mt-2">
             <AdminEmptyState title="No receipts for this attempt">
               No webhook receipts claimed for this attempt id.
             </AdminEmptyState>
           </div>
         ) : (
-          <ul className="mt-3 space-y-2">
+          <ul className="mt-2 space-y-2">
             {recovery.receipts.map((receipt) => (
               <li
                 key={receipt.id}
@@ -430,178 +500,131 @@ export default async function AdminPaymentDetailPage({
             ))}
           </ul>
         )}
-        <div className="mt-3">
-          <AdminButton
-            href="/admin/payments/webhooks"
-            variant="ghost"
-            size="sm"
-          >
-            All webhook receipts
-          </AdminButton>
-        </div>
-      </section>
 
-      <details className={ADMIN_CARD_CLASS}>
-        <summary className="cursor-pointer text-base font-semibold tracking-tight text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]">
-          Advanced technical details
-        </summary>
-        <p className="mt-2 text-xs text-[var(--text-soft)]">
-          Raw identifiers and diagnostic fields for engineering cross-checks.
-        </p>
-        <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              Payment id
-            </dt>
-            <dd className="mt-1 break-all font-mono text-xs text-[var(--heading)]">
-              {detail.attemptId}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              Purchase id
-            </dt>
-            <dd className="mt-1 break-all font-mono text-xs text-[var(--heading)]">
-              {detail.purchaseId}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              Order id
-            </dt>
-            <dd className="mt-1 break-all font-mono text-xs text-[var(--heading)]">
-              {detail.orderId ?? "none"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              Provider reference
-            </dt>
-            <dd className="mt-1 text-[var(--heading)]">
-              {detail.providerRefMasked}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              Attempt status (enum)
-            </dt>
-            <dd className="mt-1 font-mono text-xs text-[var(--heading)]">
-              {detail.attemptStatus}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              Purchase status (enum)
-            </dt>
-            <dd className="mt-1 font-mono text-xs text-[var(--heading)]">
-              {detail.purchaseStatus}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              Charge
-            </dt>
-            <dd className="mt-1 text-[var(--heading)]">
-              {detail.chargeLabel ?? "Not available"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              Method / inquiry
-            </dt>
-            <dd className="mt-1 text-[var(--heading)]">
-              {detail.methodLabel} · {detail.inquiryLabel}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              Wallet reserved
-            </dt>
-            <dd className="mt-1 text-[var(--heading)]">
-              {formatAdminReservedWalletAmount(detail.walletAppliedCents)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              {detail.ownerKind === "partner" ? "Partner" : "Customer"}
-            </dt>
-            <dd className="mt-1 text-[var(--heading)]">
-              {detail.customerHref ? (
-                <Link
-                  href={detail.customerHref}
-                  className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-                >
-                  {detail.customerLabel}
-                </Link>
-              ) : (
-                detail.customerLabel
-              )}
-            </dd>
-          </div>
-          {detail.failureCategory || detail.failureCode ? (
-            <div className="sm:col-span-2">
+        <details className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3">
+          <summary className="cursor-pointer text-sm font-semibold text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]">
+            Advanced technical details
+          </summary>
+          <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
               <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-                Failure
+                Payment id
               </dt>
-              <dd className="mt-1 text-[var(--heading)]">
-                {[detail.failureCategory, detail.failureCode]
-                  .filter(Boolean)
-                  .join(" · ")}
+              <dd className="mt-1 break-all font-mono text-xs text-[var(--heading)]">
+                {detail.attemptId}
               </dd>
             </div>
-          ) : null}
-        </dl>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                Purchase id
+              </dt>
+              <dd className="mt-1 break-all font-mono text-xs text-[var(--heading)]">
+                {detail.purchaseId}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                Order id
+              </dt>
+              <dd className="mt-1 break-all font-mono text-xs text-[var(--heading)]">
+                {detail.orderId ?? "none"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                Provider reference
+              </dt>
+              <dd className="mt-1 text-[var(--heading)]">
+                {detail.providerRefMasked}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                Attempt status (enum)
+              </dt>
+              <dd className="mt-1 font-mono text-xs text-[var(--heading)]">
+                {detail.attemptStatus}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                Purchase status (enum)
+              </dt>
+              <dd className="mt-1 font-mono text-xs text-[var(--heading)]">
+                {detail.purchaseStatus}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                Charge
+              </dt>
+              <dd className="mt-1 text-[var(--heading)]">
+                {detail.chargeLabel ?? "Not available"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                Method / inquiry
+              </dt>
+              <dd className="mt-1 text-[var(--heading)]">
+                {detail.methodLabel} · {detail.inquiryLabel}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                Wallet reserved
+              </dt>
+              <dd className="mt-1 text-[var(--heading)]">
+                {formatAdminReservedWalletAmount(detail.walletAppliedCents)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                {detail.ownerKind === "partner" ? "Partner" : "Customer"}
+              </dt>
+              <dd className="mt-1 text-[var(--heading)]">
+                {detail.customerHref ? (
+                  <Link
+                    href={detail.customerHref}
+                    className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+                  >
+                    {detail.customerLabel}
+                  </Link>
+                ) : (
+                  detail.customerLabel
+                )}
+              </dd>
+            </div>
+            {detail.failureCategory || detail.failureCode ? (
+              <div className="sm:col-span-2">
+                <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                  Failure
+                </dt>
+                <dd className="mt-1 text-[var(--heading)]">
+                  {[detail.failureCategory, detail.failureCode]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </dd>
+              </div>
+            ) : null}
+            <div className="sm:col-span-2">
+              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                Human enums
+              </dt>
+              <dd className="mt-1 text-xs text-[var(--text-muted)]">
+                Attempt {adminHumanStatusLabel(detail.attemptStatus)} · Purchase{" "}
+                {adminHumanStatusLabel(detail.purchaseStatus)} · Webhook{" "}
+                {adminHumanStatusLabel(detail.webhookLabel)} · Provider{" "}
+                {detail.providerLabel}
+              </dd>
+            </div>
+          </dl>
+        </details>
       </details>
 
-      {recovery?.staleReleaseEligible ? (
-        <StaleGatewayReservationReleaseForm
-          paymentAttemptId={detail.attemptId}
-          ownerKind={detail.ownerKind === "partner" ? "partner" : "customer"}
-          walletAppliedCents={
-            typeof recovery.walletAppliedCents === "number"
-              ? recovery.walletAppliedCents
-              : typeof detail.walletAppliedCents === "number"
-                ? detail.walletAppliedCents
-                : 0
-          }
-        />
-      ) : null}
-
-      {detail.investigationAvailable ? (
-        detail.isSimpaisa ? (
-          <PendingSimpaisaInvestigateForm
-            paymentAttemptId={detail.attemptId}
-            transactionRefMasked={detail.providerRefMasked}
-            walletAppliedCents={detail.walletAppliedCents}
-            ownerKind={detail.ownerKind === "partner" ? "partner" : "customer"}
-          />
-        ) : detail.ownerKind === "customer" ? (
-          <PendingPaymentVerifyForm
-            paymentAttemptId={detail.attemptId}
-            trackerRefMasked={detail.providerRefMasked}
-          />
-        ) : (
-          <AdminEmptyState title="Investigation tools not available">
-            Partner pending investigation currently supports Simpaisa attempts
-            only. Use Stuck Cases / reconciliation tools when applicable.
-          </AdminEmptyState>
-        )
-      ) : (
-        <AdminEmptyState title="Investigation tools not available">
-          Investigation tools are available when the attempt is awaiting
-          gateway payment, payment pending
-          {detail.ownerKind === "customer"
-            ? ", or reconciliation required"
-            : ""}
-          . Customer checks never mark paid without the webhook path; partner
-          confirmed Inquire uses the existing partner apply path only.
-        </AdminEmptyState>
-      )}
-
       <p className="text-xs text-[var(--text-soft)]">
-        Reserved wallet display:{" "}
-        {formatAdminReservedWalletAmount(detail.walletAppliedCents)}. This
-        page does not invent generic mark-paid shortcuts.
+        Wallet funds: {walletFunds.label}. This page does not invent generic
+        mark-paid shortcuts.
       </p>
     </div>
   );

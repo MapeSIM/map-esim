@@ -41,7 +41,7 @@ export function PaymentListRowActions({
             size="sm"
             className="w-full"
           >
-            Release stale reservation
+            Mark as Abandoned / Expired
           </AdminButton>
         ) : null}
         {reconciliationHref ? (

@@ -182,7 +182,7 @@ function main() {
   assert.equal(paymentRecoveryDecisionLabel(null), "Never checked");
   assert.match(
     suggestPaymentRecoverySafeAction(null),
-    /Check Status|Verify/i
+    /Check gateway|Abandoned/i
   );
   assert.match(
     suggestPaymentRecoverySafeAction("CONFIRMED_SUCCESS_WEBHOOK_REQUIRED"),
@@ -190,7 +190,7 @@ function main() {
   );
   assert.match(
     suggestPaymentRecoverySafeAction("VERIFIED_FAILED"),
-    /release if eligible/i
+    /wallet hold|eligible/i
   );
   assert.equal(buildAdminPaymentRecoveryHref({}), "/admin/payments/recovery");
   assert.match(PAYMENT_RECOVERY_POLICY_BLURB, /never marks paid/i);

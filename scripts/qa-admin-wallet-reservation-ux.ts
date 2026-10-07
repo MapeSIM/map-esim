@@ -103,7 +103,7 @@ function main() {
 
   assert.match(pendingList, /formatAdminReservedWalletListFragment/);
   assert.match(pendingList, /adminWalletReservationStatusLabel/);
-  assert.match(pendingList, /buildAdminWalletPurchaseReconciliationHref/);
+  assert.match(pendingList, /reconciliationHref|buildAdminWalletPurchaseReconciliationHref/);
   assert.match(pendingList, /Stale Unpaid Holds|staleUnpaidHolds|Stale unpaid holds/);
   assert.doesNotMatch(pendingList, /wallet reserved \$\{row\.walletAppliedCents\}/);
   assert.doesNotMatch(pendingList, /wallet reserved \$\{.*walletAppliedCents\}/);
@@ -119,14 +119,14 @@ function main() {
   assert.match(recovery, /\/admin\/payments\/pending/);
 
   assert.match(simpaisaForm, /ADMIN_RELEASE_RESERVATION_BLURB/);
-  assert.match(simpaisaForm, /Release Reservation/);
+  assert.match(simpaisaForm, /Release wallet hold/);
   assert.match(casePanel, /ADMIN_REFUND_WALLET_FUNDS_BLURB/);
   assert.match(casePanel, /Refund wallet funds/);
   assert.match(casePanel, /confirmed refund cases/i);
 
   assert.match(
     recoveryShared,
-    /Open Verify Pending for release if eligible/
+    /Release the wallet hold if eligible|Open Verify Pending for release if eligible/
   );
   assert.match(shared, /formatAdminReservedWalletAmount/);
   assert.match(pkg, /"qa:admin-wallet-reservation-ux"/);

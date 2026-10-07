@@ -47,7 +47,9 @@ export function resolveAdminStatusPillTone(
     normalized === "VALID" ||
     normalized === "CREDITED" ||
     normalized === "RESOLVED" ||
-    normalized === "ESCALATED"
+    normalized === "ESCALATED" ||
+    normalized === "PAID" ||
+    normalized === "FUNDED"
   ) {
     return "success";
   }
@@ -58,13 +60,21 @@ export function resolveAdminStatusPillTone(
     normalized === "CANCELED" ||
     normalized === "BLOCKED" ||
     normalized === "DELETED" ||
-    normalized === "EXPIRED" ||
     normalized === "ESIM_EXPIRED" ||
     normalized === "PAUSED" ||
     normalized === "UNAVAILABLE" ||
     normalized === "INVALID"
   ) {
     return "critical";
+  }
+  if (
+    normalized === "EXPIRED" ||
+    normalized === "EXPIRED_/_CLOSED" ||
+    normalized === "ABANDONED" ||
+    normalized === "CLOSED" ||
+    normalized === "UNPAID"
+  ) {
+    return "muted";
   }
   if (
     normalized === "HIGH" ||

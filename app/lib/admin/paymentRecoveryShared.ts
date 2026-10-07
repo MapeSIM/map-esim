@@ -244,26 +244,26 @@ export function suggestPaymentRecoverySafeAction(
   const owner = options?.ownerKind ?? "customer";
   if (!d) {
     return owner === "partner"
-      ? "Release stale Partner wallet reservation if still unpaid — do not mark paid"
-      : "Run provider Check Status / Verify, or release stale reservation if unpaid";
+      ? "Mark as Abandoned / Expired if still unpaid — do not mark paid"
+      : "Check gateway status, or Mark as Abandoned / Expired if unpaid and stale";
   }
   if (
     (PAYMENT_RECOVERY_SUCCESS_DECISIONS as readonly string[]).includes(d)
   ) {
-    return "Wait for authoritative webhook; escalate delivery — do not mark paid";
+    return "Wait for the gateway webhook; escalate delivery — do not mark paid";
   }
   if ((PAYMENT_RECOVERY_FAILED_DECISIONS as readonly string[]).includes(d)) {
-    return "Open Verify Pending for release if eligible — not recovery funding";
+    return "Release the wallet hold if eligible — never fund from admin";
   }
   if (
     (PAYMENT_RECOVERY_MISMATCH_DECISIONS as readonly string[]).includes(d)
   ) {
-    return "Re-check refs/amount; escalate engineering";
+    return "Re-check amount / reference; escalate engineering";
   }
   if (d === "PENDING" || d === "PROVIDER_UNAVAILABLE" || d === "UNKNOWN") {
-    return "Run provider Check Status / Verify";
+    return "Check gateway status";
   }
-  return "Run provider Check Status / Verify";
+  return "Check gateway status";
 }
 
 export function parsePaymentRecoveryPage(

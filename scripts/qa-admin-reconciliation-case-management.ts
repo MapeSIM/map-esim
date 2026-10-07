@@ -19,6 +19,7 @@ import {
   parseResolutionCode,
   RESOLUTION_CODES,
   RESOLVE_CASE_PHRASE,
+  suggestAdministrativeResolutionCode,
   UNLOCK_CASE_PHRASE,
 } from "../app/lib/admin/reconciliationCaseShared";
 import {
@@ -215,6 +216,31 @@ function main() {
   assert.equal(iccidStillBlockedWithoutClearCode.allowed, false);
   assert.ok(iccidStillBlockedWithoutClearCode.blockers.includes("iccid_pending"));
 
+  assert.equal(
+    suggestAdministrativeResolutionCode({
+      sourceType: "iccid",
+      blockers: ["iccid_pending"],
+      allowed: false,
+    }),
+    "ALREADY_RECOVERED"
+  );
+  assert.equal(
+    suggestAdministrativeResolutionCode({
+      sourceType: "iccid",
+      blockers: ["iccid_pending", "funds_or_provider_pending"],
+      allowed: false,
+    }),
+    "CANCELLED_NO_REFUND_DUE"
+  );
+  assert.equal(
+    suggestAdministrativeResolutionCode({
+      sourceType: "wallet_purchase",
+      blockers: [],
+      allowed: true,
+    }),
+    "NO_LONGER_ACTIONABLE"
+  );
+
   const recovered = evaluateResolutionEligibility({
     sourceType: "wallet_purchase",
     locked: false,
@@ -263,6 +289,9 @@ function main() {
   assert.match(panel, /UNLOCK_CASE_PHRASE/);
   assert.match(panel, /RESOLVE_CASE_PHRASE/);
   assert.match(panel, /Mark resolved/);
+  assert.match(panel, /Close & Resolve Case/);
+  assert.match(panel, /suggestAdministrativeResolutionCode/);
+  assert.match(panel, /What happened/);
   assert.doesNotMatch(panel, /iccidEncrypted|LPA:|activationCode|smtp/i);
   assert.doesNotMatch(detail, /iccidEncrypted|LPA:|qrValue/i);
   console.log("PASS ui_filters_and_safe_props");

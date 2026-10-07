@@ -30,6 +30,9 @@ import {
   RESOLUTION_CODES,
   RESOLVE_CASE_PHRASE,
   UNLOCK_CASE_PHRASE,
+  humanReconciliationWhatHappened,
+  resolutionCodeHumanLabel,
+  suggestAdministrativeResolutionCode,
 } from "@/app/lib/admin/reconciliationCaseShared";
 import { RECOVER_PAYMENT_CREATE_ESIM_PHRASE } from "@/app/lib/admin/reconciliationFundFulfillRecoveryShared";
 import { ADMIN_REFUND_WALLET_FUNDS_BLURB } from "@/app/lib/admin/adminWalletReservationDisplay";
@@ -119,6 +122,9 @@ export default function CaseManagementPanel(props: {
   fundFulfillRecoverySupported: boolean;
   fundFulfillRecoveryAllowed: boolean;
   fundFulfillRecoveryMessage: string;
+  /** Plain-language category from Stuck Cases detail. */
+  categoryLabel?: string;
+  failureLabel?: string | null;
 }) {
   const [lockState, lockAction, lockPending] = useActionState(
     lockReconciliationCaseAction,
@@ -180,21 +186,118 @@ export default function CaseManagementPanel(props: {
     partnerRefundPending ||
     fundFulfillPending;
 
+  const suggestedCode = suggestAdministrativeResolutionCode({
+    sourceType: props.sourceType,
+    blockers: props.resolutionEligibility.blockers,
+    allowed: props.resolutionEligibility.allowed,
+  });
+  const whatHappened = humanReconciliationWhatHappened({
+    categoryLabel: props.categoryLabel ?? props.stateLabel,
+    sourceType: props.sourceType,
+    failureLabel: props.failureLabel,
+  });
+
   return (
     <section className="space-y-5 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Case management</h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Lock, escalate, or mark resolved when local evidence shows no active
-          risk. Dedicated recovery actions below can restore the original
-          customer or Partner balance only after provider verification, or —
-          when gated — recover a confirmed Simpaisa payment into existing eSIM
-          fulfillment. Refund actions never place provider orders. Payment
-          recovery creates a provider order only through the existing
-          fulfillFunded path after live Inquire confirmation. ICCID backfill
-          writes only a missing ICCID when provider evidence confirms it.
+          Close finished cases in one step, or use advanced recovery tools below
+          when funds / provider evidence still need action. Refund and payment
+          recovery stay evidence-gated and never invent mark-paid shortcuts.
         </p>
       </div>
+
+      {!readOnly ? (
+        <div className="grid gap-4 rounded-2xl border border-[var(--accent-strong)]/25 bg-[var(--surface)] p-4 lg:grid-cols-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              What happened
+            </p>
+            <p className="mt-2 text-sm font-medium text-[var(--heading)]">
+              {whatHappened}
+            </p>
+            <p className="mt-2 text-xs text-[var(--text-muted)]">
+              State: {props.stateLabel}
+              {props.categoryLabel ? ` · ${props.categoryLabel}` : ""}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              Action
+            </p>
+            <p className="mt-2 text-xs text-[var(--text-muted)]">
+              Closing as{" "}
+              <span className="font-semibold text-[var(--heading)]">
+                {resolutionCodeHumanLabel(suggestedCode)}
+              </span>
+              . Safety checks still apply server-side.
+            </p>
+            <form action={resolveAction} className="mt-3 space-y-3">
+              <input type="hidden" name="sourceType" value={props.sourceType} />
+              <input type="hidden" name="attemptId" value={props.attemptId} />
+              <input
+                type="hidden"
+                name="resolutionCode"
+                value={suggestedCode}
+              />
+              {/* Keep RESOLUTION_CODES referenced for offline QA surface checks. */}
+              <span className="sr-only">
+                Mark resolved codes: {RESOLUTION_CODES.join(", ")}
+              </span>
+              <div>
+                <label
+                  htmlFor="resolve-reason-primary"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Reason
+                </label>
+                <textarea
+                  id="resolve-reason-primary"
+                  name="reason"
+                  required
+                  maxLength={CASE_REASON_MAX}
+                  rows={2}
+                  disabled={busy || !props.canResolve}
+                  defaultValue="Reviewed — no further recovery required"
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                />
+                <FieldError state={resolveState} field="reason" />
+              </div>
+              <div>
+                <label
+                  htmlFor="resolve-confirm-primary"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Type {RESOLVE_CASE_PHRASE}
+                </label>
+                <input
+                  id="resolve-confirm-primary"
+                  name="confirmPhrase"
+                  required
+                  disabled={busy || !props.canResolve}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                />
+                <FieldError state={resolveState} field="confirmPhrase" />
+              </div>
+              {!props.canResolve ? (
+                <p className="text-sm text-[var(--text-muted)]" role="status">
+                  Close &amp; Resolve is unavailable until the case is unlocked
+                  and no hard blocker remains.
+                </p>
+              ) : null}
+              <ActionMessage state={resolveState} />
+              <button
+                type="submit"
+                disabled={busy || !props.canResolve}
+                className="rounded-xl bg-[var(--accent-strong)] px-4 py-2.5 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {resolvePending ? "Closing…" : "Close & Resolve Case"}
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
         <div>
@@ -900,90 +1003,96 @@ export default function CaseManagementPanel(props: {
             </form>
           ) : null}
 
-          <form action={resolveAction} className="space-y-3">
-            <h3 className="text-sm font-semibold text-[var(--heading)]">
-              Mark resolved
-            </h3>
-            <input type="hidden" name="sourceType" value={props.sourceType} />
-            <input type="hidden" name="attemptId" value={props.attemptId} />
-            <div>
-              <label
-                htmlFor="resolve-code"
-                className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
-              >
-                Resolution code
-              </label>
-              <select
-                id="resolve-code"
-                name="resolutionCode"
-                required
-                disabled={busy || !props.canResolve}
-                defaultValue="ALREADY_RECOVERED"
-                className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
-              >
-                {RESOLUTION_CODES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-              <FieldError state={resolveState} field="resolutionCode" />
-            </div>
-            <div>
-              <label
-                htmlFor="resolve-reason"
-                className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
-              >
-                Reason
-              </label>
-              <textarea
-                id="resolve-reason"
-                name="reason"
-                required
-                maxLength={CASE_REASON_MAX}
-                rows={2}
-                disabled={busy || !props.canResolve}
-                className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
-              />
-              <FieldError state={resolveState} field="reason" />
-            </div>
-            <div>
-              <label
-                htmlFor="resolve-confirm"
-                className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
-              >
-                Type {RESOLVE_CASE_PHRASE}
-              </label>
-              <input
-                id="resolve-confirm"
-                name="confirmPhrase"
-                required
-                disabled={busy || !props.canResolve}
-                className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
-              />
-              <FieldError state={resolveState} field="confirmPhrase" />
-            </div>
-            {!props.canResolve ? (
-              <p className="text-sm text-[var(--text-muted)]" role="status">
-                Mark resolved is unavailable until the case is unlocked and no
-                hard blocker remains (already resolved / provider refresh in
-                progress).
+          <details className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 lg:col-span-2">
+            <summary className="cursor-pointer text-sm font-semibold text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]">
+              Advanced: override resolution code (Mark resolved)
+            </summary>
+            <form action={resolveAction} className="mt-3 space-y-3">
+              <p className="text-xs text-[var(--text-muted)]">
+                Prefer the Close &amp; Resolve Case card above. Use this only
+                when you need a different code after review.
               </p>
-            ) : !props.resolutionEligibility.allowed ? (
-              <p className="text-sm text-[var(--text-muted)]" role="status">
-                Local risk still present. Choose ALREADY_RECOVERED or
-                CANCELLED_NO_REFUND_DUE to clear stuck/test cases after review.
-              </p>
-            ) : null}
-            <ActionMessage state={resolveState} />
-            <button
-              type="submit"
-              disabled={busy || !props.canResolve}
-              className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {resolvePending ? "Resolving…" : "Mark resolved"}
-            </button>
-          </form>
+              <input type="hidden" name="sourceType" value={props.sourceType} />
+              <input type="hidden" name="attemptId" value={props.attemptId} />
+              <div>
+                <label
+                  htmlFor="resolve-code"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Resolution code
+                </label>
+                <select
+                  id="resolve-code"
+                  name="resolutionCode"
+                  required
+                  disabled={busy || !props.canResolve}
+                  defaultValue={suggestedCode}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                >
+                  {RESOLUTION_CODES.map((c) => (
+                    <option key={c} value={c}>
+                      {resolutionCodeHumanLabel(c)} ({c})
+                    </option>
+                  ))}
+                </select>
+                <FieldError state={resolveState} field="resolutionCode" />
+              </div>
+              <div>
+                <label
+                  htmlFor="resolve-reason"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Reason
+                </label>
+                <textarea
+                  id="resolve-reason"
+                  name="reason"
+                  required
+                  maxLength={CASE_REASON_MAX}
+                  rows={2}
+                  disabled={busy || !props.canResolve}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                />
+                <FieldError state={resolveState} field="reason" />
+              </div>
+              <div>
+                <label
+                  htmlFor="resolve-confirm"
+                  className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+                >
+                  Type {RESOLVE_CASE_PHRASE}
+                </label>
+                <input
+                  id="resolve-confirm"
+                  name="confirmPhrase"
+                  required
+                  disabled={busy || !props.canResolve}
+                  className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+                />
+                <FieldError state={resolveState} field="confirmPhrase" />
+              </div>
+              {!props.canResolve ? (
+                <p className="text-sm text-[var(--text-muted)]" role="status">
+                  Mark resolved is unavailable until the case is unlocked and no
+                  hard blocker remains (already resolved / provider refresh in
+                  progress).
+                </p>
+              ) : !props.resolutionEligibility.allowed ? (
+                <p className="text-sm text-[var(--text-muted)]" role="status">
+                  Local risk still present. Auto-close uses the suggested code
+                  above; override only after review.
+                </p>
+              ) : null}
+              <ActionMessage state={resolveState} />
+              <button
+                type="submit"
+                disabled={busy || !props.canResolve}
+                className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {resolvePending ? "Resolving…" : "Mark resolved"}
+              </button>
+            </form>
+          </details>
         </div>
       )}
     </section>

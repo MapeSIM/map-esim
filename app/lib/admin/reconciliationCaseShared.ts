@@ -1743,6 +1743,116 @@ export function resolutionBlockerLabel(code: string): string {
   }
 }
 
+/** Human label for auto-selected resolution codes (UI only). */
+export function resolutionCodeHumanLabel(code: string | null | undefined): string {
+  switch (String(code ?? "").trim().toUpperCase()) {
+    case "NO_LONGER_ACTIONABLE":
+      return "No longer actionable";
+    case "ALREADY_RECOVERED":
+      return "Already recovered";
+    case "DATA_CORRECTED":
+      return "Data corrected";
+    case "DUPLICATE_TEST_DATA":
+      return "Duplicate / test data";
+    case "CANCELLED_NO_REFUND_DUE":
+      return "Cancelled — no refund due";
+    default:
+      return "Case closed";
+  }
+}
+
+/**
+ * Pick a safe default resolution code so operators do not guess enums.
+ * Soft blockers that need admin-clear map to ALREADY_RECOVERED vs
+ * CANCELLED_NO_REFUND_DUE; fully-allowed cases use NO_LONGER_ACTIONABLE.
+ * Does not bypass server-side eligibility — only suggests a code.
+ */
+export function suggestAdministrativeResolutionCode(input: {
+  sourceType: string;
+  blockers: readonly string[];
+  allowed: boolean;
+}): ResolutionCode {
+  const source = String(input.sourceType ?? "").trim();
+  const blockers = input.blockers.map((b) => String(b ?? "").trim());
+
+  if (input.allowed && blockers.length === 0) {
+    return "NO_LONGER_ACTIONABLE";
+  }
+
+  if (source === "iccid") {
+    if (blockers.includes("funds_or_provider_pending")) {
+      return "CANCELLED_NO_REFUND_DUE";
+    }
+    return "ALREADY_RECOVERED";
+  }
+
+  if (
+    blockers.includes("order_email_failed") ||
+    blockers.includes("wallet_notification_failed")
+  ) {
+    return "ALREADY_RECOVERED";
+  }
+
+  if (
+    blockers.includes("funds_or_provider_pending") ||
+    blockers.includes("reconciliation_still_active") ||
+    blockers.includes("debit_pending") ||
+    blockers.includes("provider_uncertain") ||
+    blockers.includes("missing_provider_reference") ||
+    blockers.includes("refund_incomplete") ||
+    blockers.includes("finalization_failed")
+  ) {
+    return "CANCELLED_NO_REFUND_DUE";
+  }
+
+  return "ALREADY_RECOVERED";
+}
+
+/**
+ * Plain-language “what happened” for the Stuck Cases close card.
+ */
+export function humanReconciliationWhatHappened(input: {
+  categoryLabel: string;
+  sourceType: string;
+  failureLabel?: string | null;
+}): string {
+  const category = String(input.categoryLabel ?? "").trim().toLowerCase();
+  const source = String(input.sourceType ?? "").trim();
+  const failure = String(input.failureLabel ?? "").trim();
+
+  if (category.includes("iccid")) {
+    return "eSIM identity (ICCID) was never captured for this order — often a cancelled or abandoned purchase.";
+  }
+  if (category.includes("funds reserved")) {
+    return "Wallet funds were reserved but the purchase did not finish.";
+  }
+  if (category.includes("refund")) {
+    return "A refund was started but is not complete yet.";
+  }
+  if (category.includes("finalization")) {
+    return "Payment looked successful but the local order record failed to finalize.";
+  }
+  if (category.includes("missing provider")) {
+    return "No provider order reference was stored for this attempt.";
+  }
+  if (category.includes("email") || source === "order_email") {
+    return "The installation / order email did not send successfully.";
+  }
+  if (category.includes("notification") || source === "wallet_email") {
+    return "A wallet notification email failed to send.";
+  }
+  if (category.includes("uncertain")) {
+    return "The provider result is still uncertain — treat carefully before closing.";
+  }
+  if (category.includes("resolved")) {
+    return "This case is already closed.";
+  }
+  if (failure) {
+    return `Customer or partner flow stalled (${failure}). Review before closing.`;
+  }
+  return "This purchase needs a manual decision. Close only when no further recovery is required.";
+}
+
 export function caseManagementStateLabel(options: {
   resolvedAt?: Date | string | null;
   lockedAt?: Date | string | null;

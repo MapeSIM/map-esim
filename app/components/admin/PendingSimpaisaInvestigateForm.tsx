@@ -29,7 +29,7 @@ function EvidencePanel(props: {
       role="status"
     >
       <p className="font-semibold text-[var(--heading)]">
-        Decision: {evidence.decision}
+        Gateway Decision: {evidence.decision}
       </p>
       <p className="text-[var(--heading)]">{evidence.message}</p>
       {evidence.decision === "CONFIRMED_SUCCESS_WEBHOOK_REQUIRED" ? (
@@ -48,20 +48,16 @@ function EvidencePanel(props: {
           <dd>{evidence.ownerKind === "partner" ? "Partner" : "Customer"}</dd>
         </div>
         <div>
-          <dt className="font-semibold">Local amount</dt>
+          <dt className="font-semibold">Amount</dt>
           <dd>
             {evidence.localExpectedAmountMinor} {evidence.localExpectedCurrency}
+            {evidence.observedAmountMinor != null
+              ? ` · gateway ${evidence.observedAmountMinor} ${evidence.observedCurrency ?? ""}`
+              : ""}
           </dd>
         </div>
         <div>
-          <dt className="font-semibold">Observed amount</dt>
-          <dd>
-            {evidence.observedAmountMinor ?? "—"}{" "}
-            {evidence.observedCurrency ?? ""}
-          </dd>
-        </div>
-        <div>
-          <dt className="font-semibold">Inquire status</dt>
+          <dt className="font-semibold">Payment Status</dt>
           <dd>{evidence.inquiryStatus ?? "—"}</dd>
         </div>
         <div>
@@ -93,11 +89,11 @@ function EvidencePanel(props: {
           <dd>{evidence.verifiedAt}</dd>
         </div>
         <div>
-          <dt className="font-semibold">Release eligible</dt>
+          <dt className="font-semibold">Can release hold</dt>
           <dd>{evidence.releaseEligible ? "yes" : "no"}</dd>
         </div>
         <div>
-          <dt className="font-semibold">Reservation released</dt>
+          <dt className="font-semibold">Hold released</dt>
           <dd>{evidence.reservationReleased ? "yes" : "no"}</dd>
         </div>
         <div>
@@ -138,14 +134,14 @@ export default function PendingSimpaisaInvestigateForm(props: {
     <section className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
       <div className="space-y-2">
         <h2 className="text-lg font-semibold tracking-tight">
-          Check Simpaisa status
+          Check gateway status
         </h2>
         <p className="text-sm text-[var(--text-muted)]">
-          Calls authenticated Simpaisa Inquire for this attempt. Browser return
-          data is ignored. This never invents a generic mark-paid action.
+          Asks the payment gateway for the current decision on this attempt.
+          Browser return data is ignored. This never invents a mark-paid action.
           {ownerKind === "partner"
-            ? " For partner attempts, a validated Inquire confirmation applies funding only through the existing partner payment apply path (idempotent)."
-            : " For customer attempts this never marks a purchase funded, never creates an eSIM order, and never releases a wallet reservation by itself."}
+            ? " For partner attempts, a confirmed success applies funding only through the existing partner payment path."
+            : " For customer attempts this never marks a purchase funded, never creates an eSIM order, and never releases a wallet hold by itself."}
         </p>
         <p className="text-xs text-[var(--text-soft)]">
           Stored transaction: {props.transactionRefMasked}
@@ -201,20 +197,20 @@ export default function PendingSimpaisaInvestigateForm(props: {
           disabled={checkPending}
           className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white outline-none ring-[var(--accent-strong)] focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {checkPending ? "Checking…" : "Check Simpaisa Status"}
+          {checkPending ? "Checking…" : "Check gateway status"}
         </button>
       </form>
 
       {showRelease ? (
         <div className="space-y-3 border-t border-[var(--border)] pt-4">
           <h3 className="text-base font-semibold tracking-tight">
-            Release reservation
+            Release wallet hold
           </h3>
           <p className="text-sm text-[var(--text-muted)]">
-            {ADMIN_RELEASE_RESERVATION_BLURB} Inquire must confirm
-            failed/terminal unpaid and this purchase must still show reserved
-            wallet funds. Release re-runs Inquire and only then calls the
-            existing reservation release helper.
+            {ADMIN_RELEASE_RESERVATION_BLURB} Gateway must confirm
+            failed/unpaid and this purchase must still show reserved wallet
+            funds. Release re-checks the gateway, then uses the existing hold
+            release helper.
           </p>
           <form action={releaseAction} className="space-y-3">
             <input
@@ -261,7 +257,7 @@ export default function PendingSimpaisaInvestigateForm(props: {
               disabled={releasePending}
               className="rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-2 text-sm font-semibold text-[var(--heading)] outline-none ring-[var(--accent-strong)] focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {releasePending ? "Releasing…" : "Release Reservation"}
+              {releasePending ? "Releasing…" : "Release wallet hold"}
             </button>
           </form>
         </div>

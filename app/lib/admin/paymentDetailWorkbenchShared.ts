@@ -26,12 +26,98 @@ export type PaymentDetailNextSafeActionInput = {
   showStuckCaseLink: boolean;
   /** Existing recovery suggested action when candidate (reuse; do not invent funding). */
   recoverySuggestedSafeAction: string | null;
+  walletAppliedCents?: number | null;
 };
 
 export const PAYMENT_DETAIL_WORKBENCH_TITLE = "Payment workbench";
 
 export const PAYMENT_DETAIL_WORKBENCH_DESCRIPTION =
-  "Investigate this gateway payment attempt. Tools never fund or mark paid. Funding remains webhook-authoritative.";
+  "Review this payment attempt. Tools never fund or mark paid. Paid status still requires the payment gateway webhook.";
+
+/** Operator-facing labels (avoid gateway jargon on the primary surface). */
+export const PAYMENT_WORKBENCH_LABEL = {
+  paymentStatus: "Payment Status",
+  gatewayDecision: "Gateway Decision",
+  amount: "Amount",
+  walletFunds: "Wallet funds",
+  noFundsDeducted: "No funds deducted / Unpaid",
+  dismissStale: "Mark as Abandoned / Expired",
+  nextSafeAction: "Next safe action",
+  technicalLogs: "Technical Logs / Debug Details",
+} as const;
+
+/**
+ * Human payment-status badge for the workbench summary.
+ */
+export function humanPaymentStatusBadge(input: {
+  attemptStatus: string;
+  purchaseStatus: string;
+  webhookPresent: boolean;
+}): { label: string; toneValue: string } {
+  const attempt = String(input.attemptStatus ?? "").trim().toUpperCase();
+  const purchase = String(input.purchaseStatus ?? "").trim().toUpperCase();
+
+  if (
+    attempt === "PAYMENT_CONFIRMED" ||
+    purchase === "FUNDED" ||
+    purchase === "COMPLETED"
+  ) {
+    return { label: "Paid", toneValue: "PAID" };
+  }
+  if (attempt === "FAILED") {
+    return { label: "Failed", toneValue: "FAILED" };
+  }
+  if (attempt === "CANCELLED" || attempt === "CANCELED" || attempt === "EXPIRED") {
+    return { label: "Expired / Closed", toneValue: "EXPIRED" };
+  }
+  if (
+    attempt === "AWAITING_PAYMENT" ||
+    attempt === "PAYMENT_PENDING" ||
+    purchase === "AWAITING_GATEWAY_PAYMENT"
+  ) {
+    return {
+      label: input.webhookPresent ? "Pending (webhook received)" : "Pending",
+      toneValue: "PENDING",
+    };
+  }
+  if (purchase === "RECONCILIATION_REQUIRED" || attempt === "RECONCILIATION_REQUIRED") {
+    return { label: "Needs review", toneValue: "RECONCILIATION_REQUIRED" };
+  }
+  return {
+    label: adminHumanStatusLabel(input.attemptStatus),
+    toneValue: input.attemptStatus || "UNKNOWN",
+  };
+}
+
+/**
+ * Gateway decision = whether an authoritative webhook claimed this attempt.
+ */
+export function humanGatewayDecisionLabel(webhookPresent: boolean): {
+  label: string;
+  toneValue: string;
+} {
+  if (webhookPresent) {
+    return { label: "Webhook confirmed", toneValue: "PRESENT" };
+  }
+  return { label: "Waiting for gateway", toneValue: "MISSING" };
+}
+
+/**
+ * Wallet hold display — gateway-only attempts should not look like empty hold cards.
+ */
+export function humanWalletFundsLabel(walletAppliedCents: number | null | undefined): {
+  hasHold: boolean;
+  label: string;
+} {
+  const cents =
+    typeof walletAppliedCents === "number" && Number.isFinite(walletAppliedCents)
+      ? Math.trunc(walletAppliedCents)
+      : 0;
+  if (cents > 0) {
+    return { hasHold: true, label: `Wallet hold · ${cents}¢ reserved` };
+  }
+  return { hasHold: false, label: PAYMENT_WORKBENCH_LABEL.noFundsDeducted };
+}
 
 /**
  * Operator-facing next step from existing statuses only.
@@ -40,6 +126,15 @@ export const PAYMENT_DETAIL_WORKBENCH_DESCRIPTION =
 export function suggestPaymentDetailNextSafeAction(
   input: PaymentDetailNextSafeActionInput
 ): string {
+  if (input.staleReleaseEligible) {
+    const hasHold =
+      typeof input.walletAppliedCents === "number" &&
+      input.walletAppliedCents > 0;
+    return hasHold
+      ? "This unpaid attempt is stale. Mark it Abandoned / Expired to release the wallet hold — never mark paid."
+      : "This unpaid attempt is stale. Mark it Abandoned / Expired to close it — never mark paid.";
+  }
+
   if (input.isRecoveryCandidate && input.recoverySuggestedSafeAction) {
     return input.recoverySuggestedSafeAction;
   }
@@ -55,23 +150,19 @@ export function suggestPaymentDetailNextSafeAction(
     if (input.webhookPresent) {
       return "No payment action needed — confirmed with webhook. Use order/customer links if fulfilment needs review.";
     }
-    return "Payment looks confirmed locally — wait for or confirm webhook evidence; do not mark paid.";
+    return "Payment looks confirmed locally — wait for webhook evidence; do not mark paid.";
   }
 
   if (attempt === "FAILED" || attempt === "CANCELLED" || attempt === "CANCELED") {
-    return "Review failure details. Customer/partner may retry checkout. Do not mark paid or fund from admin.";
-  }
-
-  if (input.staleReleaseEligible) {
-    return "Release unpaid wallet hold if eligible after provider check — never mark paid.";
+    return "Review failure details. Customer/partner may retry checkout. Do not mark paid from admin.";
   }
 
   if (input.investigationAvailable) {
-    return "Run provider Check Status / Verify. Successful evidence still requires an authoritative webhook before funding.";
+    return "Check gateway status. A successful check still needs the real webhook before funding.";
   }
 
   if (input.showStuckCaseLink) {
-    return "Open Stuck Cases for evidence-gated recovery. Do not mark paid from this page.";
+    return "Open Stuck Cases for controlled recovery. Do not mark paid from this page.";
   }
 
   if (
@@ -80,15 +171,15 @@ export function suggestPaymentDetailNextSafeAction(
     purchase === "AWAITING_GATEWAY_PAYMENT"
   ) {
     return input.ownerKind === "partner"
-      ? "Wait for webhook or use Stale Unpaid Holds when the hold is stale. Do not mark paid."
-      : "Wait for webhook, or use Verify Pending when ready. Do not mark paid.";
+      ? "Wait for the gateway webhook, or open Stale Unpaid Holds when this age is past the threshold."
+      : "Wait for the gateway webhook, or use Verify Pending when ready.";
   }
 
   if (purchase === "RECONCILIATION_REQUIRED" || attempt === "RECONCILIATION_REQUIRED") {
     return "Open Stuck Cases for controlled recovery. Do not mark paid.";
   }
 
-  return "Monitor webhook and related records. This page never funds or marks paid.";
+  return "Monitor the webhook and related records. This page never marks paid.";
 }
 
 export function paymentDetailStatusSummary(input: {
@@ -96,10 +187,17 @@ export function paymentDetailStatusSummary(input: {
   purchaseStatus: string;
   webhookLabel: string;
 }): string {
-  const attempt = adminHumanStatusLabel(input.attemptStatus);
-  const purchase = adminHumanStatusLabel(input.purchaseStatus);
-  const webhook = adminHumanStatusLabel(input.webhookLabel);
-  return `Attempt: ${attempt} · Purchase: ${purchase} · Webhook: ${webhook}`;
+  const payment = humanPaymentStatusBadge({
+    attemptStatus: input.attemptStatus,
+    purchaseStatus: input.purchaseStatus,
+    webhookPresent: String(input.webhookLabel ?? "")
+      .trim()
+      .toLowerCase() === "present",
+  }).label;
+  const gateway = humanGatewayDecisionLabel(
+    String(input.webhookLabel ?? "").trim().toLowerCase() === "present"
+  ).label;
+  return `${PAYMENT_WORKBENCH_LABEL.paymentStatus}: ${payment} · ${PAYMENT_WORKBENCH_LABEL.gatewayDecision}: ${gateway}`;
 }
 
 /**

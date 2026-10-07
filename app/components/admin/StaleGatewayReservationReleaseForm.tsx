@@ -7,6 +7,7 @@ import {
 } from "@/app/lib/admin/staleGatewayReservationReleaseActions";
 import { PENDING_PAYMENT_VERIFY_REASON_MAX } from "@/app/lib/admin/pendingSimpaisaPaymentInvestigateShared";
 import type { PaymentRecoveryOwnerKind } from "@/app/lib/admin/paymentRecoveryShared";
+import { PAYMENT_WORKBENCH_LABEL } from "@/app/lib/admin/paymentDetailWorkbenchShared";
 import { AdminButton } from "@/app/components/admin/ui";
 
 const initial: StaleGatewayReleaseFormState = null;
@@ -24,29 +25,32 @@ export default function StaleGatewayReservationReleaseForm(props: {
     releaseStaleGatewayReservationAction,
     initial
   );
+  const hasHold =
+    Number.isInteger(props.walletAppliedCents) && props.walletAppliedCents > 0;
 
   return (
     <section
       id="stale-release"
-      className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm sm:p-5"
+      className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm sm:p-5"
     >
       <h2 className="text-base font-semibold text-[var(--heading)]">
-        Release stale wallet reservation
+        Dismiss unpaid attempt
       </h2>
       <p className="mt-2 text-[var(--text-muted)]">
-        Releases an unpaid {props.ownerKind === "partner" ? "Partner" : "customer"}{" "}
-        wallet hold that is past the stale threshold or expired. Restores the
-        purchase to READY. Never marks paid, never funds, never replays
-        webhooks.
+        This attempt is past the stale threshold and still unpaid. Mark it
+        abandoned / expired to close it
+        {hasHold
+          ? " and release the wallet hold"
+          : ""}
+        . Never marks paid.
       </p>
-      {props.walletAppliedCents > 0 ? (
+      {hasHold ? (
         <p className="mt-2 text-xs text-[var(--text-soft)]">
-          Reserved wallet amount on record: {props.walletAppliedCents}¢
+          Wallet hold on record: {props.walletAppliedCents}¢
         </p>
       ) : (
-        <p className="mt-2 text-xs text-[var(--text-soft)]">
-          No wallet debit on this attempt (gateway-only). Release still closes
-          the open attempt when eligible.
+        <p className="mt-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm font-medium text-[var(--heading)]">
+          Status: {PAYMENT_WORKBENCH_LABEL.noFundsDeducted}
         </p>
       )}
 
@@ -69,10 +73,11 @@ export default function StaleGatewayReservationReleaseForm(props: {
             name="reason"
             required
             maxLength={PENDING_PAYMENT_VERIFY_REASON_MAX}
-            rows={3}
+            rows={2}
             className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--heading)]"
-            placeholder="Why this unpaid reservation should be released"
+            placeholder="Why this unpaid attempt should be closed"
             disabled={pending}
+            defaultValue="Stale unpaid attempt — customer/partner did not complete payment"
           />
           {state && !state.ok && state.fieldErrors?.reason ? (
             <p className="mt-1 text-xs text-red-600" role="alert">
@@ -80,8 +85,8 @@ export default function StaleGatewayReservationReleaseForm(props: {
             </p>
           ) : null}
         </div>
-        <AdminButton type="submit" variant="secondary" disabled={pending}>
-          {pending ? "Releasing…" : "Release reservation"}
+        <AdminButton type="submit" variant="primary" disabled={pending}>
+          {pending ? "Closing…" : PAYMENT_WORKBENCH_LABEL.dismissStale}
         </AdminButton>
       </form>
 
