@@ -41,10 +41,9 @@ function main() {
   const authConfig = read("auth.config.ts");
 
   assert.match(partnerLayout, /AccountMenu/);
-  assert.match(partnerLayout, /["']\/partner\/catalog["']/);
+  assert.match(partnerLayout, /["']\/countries["']/);
   assert.match(partnerLayout, /label:\s*["']Buy eSIM["']/);
   assert.doesNotMatch(partnerLayout, /label:\s*["']Destinations["']/);
-  assert.doesNotMatch(partnerLayout, /["']\/countries["']/);
   assert.match(partnerLayout, /["']\/partner\/orders["']/);
   assert.match(partnerLayout, /["']\/partner\/sales["']/);
   assert.match(partnerHome, /Partner Balance|Available Partner Balance|balanceLabel/);
@@ -55,14 +54,18 @@ function main() {
   assert.match(partnerHome, /Total savings|totalSavingsLabel/);
   assert.match(partnerHome, /Share Branding/);
   assert.match(partnerHome, /Quick Actions/);
-  assert.match(partnerHome, /href=["']\/partner\/catalog["']/);
+  assert.match(partnerHome, /href=["']\/countries["']/);
   assert.match(partnerHome, /title=["']Buy eSIM["']|title=\{?"Buy eSIM"?\}/);
   assert.doesNotMatch(partnerHome, /title=["']Destinations["']/);
   assert.doesNotMatch(partnerHome, /Reward Points|rewardPoints/i);
 
   const catalogPage = read("app/partner/(portal)/catalog/page.tsx");
-  assert.match(catalogPage, /PartnerCatalogBuy/);
-  assert.doesNotMatch(catalogPage, /redirect\(\s*["']\/countries["']\s*\)/);
+  assert.match(catalogPage, /redirect\(\s*["']\/countries["']\s*\)/);
+  const nextConfig = read("next.config.ts");
+  assert.match(
+    nextConfig,
+    /source:\s*["']\/partner\/catalog["'][\s\S]*destination:\s*["']\/countries["']/
+  );
 
   const returnState = read(
     "app/lib/partner/partnerEsimPurchasePaymentReturnState.ts"

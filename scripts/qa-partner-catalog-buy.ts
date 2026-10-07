@@ -580,10 +580,9 @@ async function main() {
       path.join(root, "app/partner/(portal)/layout.tsx"),
       "utf8"
     );
-    assert.ok(layoutSrc.includes('href: "/partner/catalog"'));
+    assert.ok(layoutSrc.includes('href: "/countries"'));
     assert.ok(layoutSrc.includes('label: "Buy eSIM"'));
     assert.ok(!layoutSrc.includes('label: "Destinations"'));
-    assert.ok(!layoutSrc.includes('href: "/countries"'));
     assert.ok(layoutSrc.includes('href: "/partner/orders"'));
     assert.equal(layoutSrc.includes('label: "Orders", disabled: true'), false);
     console.log("PASS nav_catalog_and_orders_enabled");
@@ -592,9 +591,8 @@ async function main() {
       path.join(root, "app/partner/(portal)/catalog/page.tsx"),
       "utf8"
     );
-    assert.ok(catalogPageSrc.includes("PartnerCatalogBuy"));
-    assert.ok(!catalogPageSrc.includes('redirect("/countries")'));
-    console.log("PASS catalog_page_renders_partner_buy");
+    assert.ok(catalogPageSrc.includes('redirect("/countries")'));
+    console.log("PASS catalog_page_redirects_to_countries");
 
     const cancelSrc = readFileSync(
       path.join(

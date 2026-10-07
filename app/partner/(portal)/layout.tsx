@@ -15,7 +15,7 @@ const partnerLinks: AccountNavLink[] = [
   { href: "/partner/orders", label: "My eSIMs" },
   { href: "/partner/sales", label: "Sales" },
   { href: "/partner/wallet", label: "Wallet" },
-  { href: "/partner/catalog", label: "Buy eSIM" },
+  { href: "/countries", label: "Buy eSIM" },
   { href: "/partner/profile", label: "Profile" },
   { href: "/partner/security", label: "Security" },
 ];

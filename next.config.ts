@@ -32,6 +32,11 @@ const nextConfig: NextConfig = {
         destination: "/countries",
         permanent: true,
       },
+      {
+        source: "/partner/catalog",
+        destination: "/countries",
+        permanent: true,
+      },
     ];
   },
 };
