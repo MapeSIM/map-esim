@@ -15,8 +15,10 @@ import {
 import { assertSameOriginAdminRequest } from "@/app/lib/admin/reconciliationCaseManagement";
 import { reportServerError } from "@/app/lib/monitoring/serverErrorMonitoring";
 import {
+  GATEWAY_ONLY_DISMISS_MIN_AGE_MS,
   PAYMENT_RECOVERY_STALE_RELEASE_AUDIT,
   PAYMENT_RECOVERY_STALE_RELEASE_BLOCKED_AUDIT,
+  isGatewayOnlyDismissEligible,
   parsePaymentRecoveryStaleMs,
   type PaymentRecoveryOwnerKind,
 } from "@/app/lib/admin/paymentRecoveryShared";
@@ -369,11 +371,28 @@ export async function releaseStaleGatewayReservation(options: {
     });
 
     if (customer) {
+      const walletAppliedCents = customer.purchase.walletAppliedCents ?? 0;
+      const gatewayOnlyDismiss = isGatewayOnlyDismissEligible({
+        status: customer.status,
+        purchaseStatus: customer.purchase.status,
+        webhookEventId: customer.webhookEventId,
+        updatedAt: customer.updatedAt,
+        expiresAt: customer.expiresAt,
+        walletAppliedCents,
+        nowMs,
+        minAgeMs: GATEWAY_ONLY_DISMISS_MIN_AGE_MS,
+      });
+      const purchaseAwaiting =
+        customer.purchase.status ===
+        WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT;
+      const purchaseReadyGatewayOnly =
+        gatewayOnlyDismiss &&
+        customer.purchase.status === WalletEsimPurchaseStatus.READY;
+
       if (
         customer.webhookEventId ||
         !ATTEMPT_OPEN.includes(customer.status) ||
-        customer.purchase.status !==
-          WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT
+        (!purchaseAwaiting && !purchaseReadyGatewayOnly)
       ) {
         await writeAudit({
           actorUserId: adminId,
@@ -392,14 +411,13 @@ export async function releaseStaleGatewayReservation(options: {
         return { ok: false, error: publicError };
       }
 
-      if (
-        !isStaleEnough({
-          updatedAt: customer.updatedAt,
-          expiresAt: customer.expiresAt,
-          nowMs,
-          staleMs,
-        })
-      ) {
+      const staleOk = isStaleEnough({
+        updatedAt: customer.updatedAt,
+        expiresAt: customer.expiresAt,
+        nowMs,
+        staleMs: gatewayOnlyDismiss ? GATEWAY_ONLY_DISMISS_MIN_AGE_MS : staleMs,
+      });
+      if (!staleOk && !gatewayOnlyDismiss) {
         await writeAudit({
           actorUserId: adminId,
           action: PAYMENT_RECOVERY_STALE_RELEASE_BLOCKED_AUDIT,
@@ -416,6 +434,25 @@ export async function releaseStaleGatewayReservation(options: {
           ok: false,
           error:
             "This attempt is not past the stale threshold yet. Wait or use Pending verify tools.",
+        };
+      }
+      if (!staleOk && gatewayOnlyDismiss) {
+        await writeAudit({
+          actorUserId: adminId,
+          action: PAYMENT_RECOVERY_STALE_RELEASE_BLOCKED_AUDIT,
+          targetType: "EsimPurchasePaymentAttempt",
+          targetId: customer.id,
+          metadata: {
+            method: "admin_stale_release",
+            ownerKind: "customer",
+            failureCode: "not_stale",
+            reason: reasonParsed.reason.slice(0, 80),
+          },
+        });
+        return {
+          ok: false,
+          error:
+            "Gateway-only dismiss requires the attempt to be older than 30 minutes (or past expiry).",
         };
       }
 
@@ -436,10 +473,15 @@ export async function releaseStaleGatewayReservation(options: {
           ownerKind: "customer",
           released: release.released,
           purchaseId: customer.purchase.id,
-          walletAppliedCents: customer.purchase.walletAppliedCents,
+          walletAppliedCents,
+          gatewayOnlyDismiss,
           reason: reasonParsed.reason.slice(0, 80),
         },
       });
+
+      const gatewayOnlyMessage = release.released
+        ? "Attempt marked expired and cleared from pending lists. Never marked paid."
+        : "Could not expire this attempt (already closed or funded race).";
 
       return {
         ok: true,
@@ -447,9 +489,12 @@ export async function releaseStaleGatewayReservation(options: {
         ownerKind: "customer",
         purchaseId: customer.purchase.id,
         attemptId: customer.id,
-        message: release.released
-          ? "Reserved wallet amount released. Purchase restored to READY. Never marked paid."
-          : "No releasable reservation remained (already clean or funded race).",
+        message:
+          walletAppliedCents <= 0
+            ? gatewayOnlyMessage
+            : release.released
+              ? "Reserved wallet amount released. Purchase restored to READY. Never marked paid."
+              : "No releasable reservation remained (already clean or funded race).",
       };
     }
 
@@ -500,11 +545,28 @@ export async function releaseStaleGatewayReservation(options: {
     return { ok: false, error: publicError };
   }
 
+  const walletAppliedCents = partner.purchase.walletAppliedCents ?? 0;
+  const gatewayOnlyDismiss = isGatewayOnlyDismissEligible({
+    status: partner.status,
+    purchaseStatus: partner.purchase.status,
+    webhookEventId: partner.webhookEventId,
+    updatedAt: partner.updatedAt,
+    expiresAt: partner.expiresAt,
+    walletAppliedCents,
+    nowMs,
+    minAgeMs: GATEWAY_ONLY_DISMISS_MIN_AGE_MS,
+  });
+  const purchaseAwaiting =
+    partner.purchase.status ===
+    PartnerEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT;
+  const purchaseReadyGatewayOnly =
+    gatewayOnlyDismiss &&
+    partner.purchase.status === PartnerEsimPurchaseStatus.READY;
+
   if (
     partner.webhookEventId ||
     !ATTEMPT_OPEN.includes(partner.status) ||
-    partner.purchase.status !==
-      PartnerEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT
+    (!purchaseAwaiting && !purchaseReadyGatewayOnly)
   ) {
     await writeAudit({
       actorUserId: adminId,
@@ -523,14 +585,13 @@ export async function releaseStaleGatewayReservation(options: {
     return { ok: false, error: publicError };
   }
 
-  if (
-    !isStaleEnough({
-      updatedAt: partner.updatedAt,
-      expiresAt: partner.expiresAt,
-      nowMs,
-      staleMs,
-    })
-  ) {
+  const partnerStaleOk = isStaleEnough({
+    updatedAt: partner.updatedAt,
+    expiresAt: partner.expiresAt,
+    nowMs,
+    staleMs: gatewayOnlyDismiss ? GATEWAY_ONLY_DISMISS_MIN_AGE_MS : staleMs,
+  });
+  if (!partnerStaleOk) {
     await writeAudit({
       actorUserId: adminId,
       action: PAYMENT_RECOVERY_STALE_RELEASE_BLOCKED_AUDIT,
@@ -545,8 +606,9 @@ export async function releaseStaleGatewayReservation(options: {
     });
     return {
       ok: false,
-      error:
-        "This attempt is not past the stale threshold yet. Wait for expiry or a failure webhook.",
+      error: gatewayOnlyDismiss
+        ? "Gateway-only dismiss requires the attempt to be older than 30 minutes (or past expiry)."
+        : "This attempt is not past the stale threshold yet. Wait for expiry or a failure webhook.",
     };
   }
 
@@ -581,10 +643,15 @@ export async function releaseStaleGatewayReservation(options: {
       ownerKind: "partner",
       released: release.released,
       purchaseId: partner.purchase.id,
-      walletAppliedCents: partner.purchase.walletAppliedCents,
+      walletAppliedCents,
+      gatewayOnlyDismiss,
       reason: reasonParsed.reason.slice(0, 80),
     },
   });
+
+  const gatewayOnlyMessage = release.released
+    ? "Attempt marked expired and cleared from pending lists. Never marked paid."
+    : "Could not expire this attempt (already closed or funded race).";
 
   return {
     ok: true,
@@ -592,8 +659,11 @@ export async function releaseStaleGatewayReservation(options: {
     ownerKind: "partner",
     purchaseId: partner.purchase.id,
     attemptId: partner.id,
-    message: release.released
-      ? "Reserved wallet amount released. Purchase restored to READY. Never marked paid."
-      : "No releasable reservation remained (already clean or funded race).",
+    message:
+      walletAppliedCents <= 0
+        ? gatewayOnlyMessage
+        : release.released
+          ? "Reserved wallet amount released. Purchase restored to READY. Never marked paid."
+          : "No releasable reservation remained (already clean or funded race).",
   };
 }

@@ -162,6 +162,7 @@ function main() {
   assert.match(service, /isPaymentRecoveryStaleReleaseEligible/);
   assert.match(service, /isAdminWalletReconciliationLinkApplicable/);
   assert.match(service, /buildAdminWalletPurchaseReconciliationHref/);
+  assert.match(detail, /gatewayOnlyDismissEligible|Dismiss \/ Mark Expired/);
   assert.match(shared, /kind=partner/);
   assert.match(
     read("app/components/admin/PaymentListRowActions.tsx"),

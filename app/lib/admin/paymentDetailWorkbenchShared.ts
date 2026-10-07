@@ -132,7 +132,7 @@ export function suggestPaymentDetailNextSafeAction(
       input.walletAppliedCents > 0;
     return hasHold
       ? "This unpaid attempt is stale. Mark it Abandoned / Expired to release the wallet hold — never mark paid."
-      : "This unpaid attempt is stale. Mark it Abandoned / Expired to close it — never mark paid.";
+      : "This unpaid gateway-only attempt is stale. Use Dismiss / Mark Expired to clear it from pending lists — never mark paid.";
   }
 
   if (input.isRecoveryCandidate && input.recoverySuggestedSafeAction) {

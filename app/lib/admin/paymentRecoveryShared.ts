@@ -11,6 +11,12 @@ export const PAYMENT_RECOVERY_STALE_MS_DEFAULT = 20 * 60 * 1000;
 export const PAYMENT_RECOVERY_STALE_MS_MIN = 15 * 60 * 1000;
 export const PAYMENT_RECOVERY_STALE_MS_MAX = 30 * 60 * 1000;
 
+/**
+ * Gateway-only (no wallet hold) dismiss / expire floor.
+ * Operators may clear unpaid attempts older than this even when no reservation exists.
+ */
+export const GATEWAY_ONLY_DISMISS_MIN_AGE_MS = 30 * 60 * 1000;
+
 export const ADMIN_PAYMENT_RECOVERY_PAGE_SIZE = 25;
 
 export const PAYMENT_RECOVERY_ATTEMPT_STATUSES = [
@@ -191,6 +197,66 @@ export function isPaymentRecoveryStaleReleaseEligible(input: {
     }
   }
   return updatedAtMs <= nowMs - staleMs;
+}
+
+/**
+ * Admin dismiss for gateway-only unpaid attempts (walletAppliedCents === 0).
+ * Does not require a wallet reservation. Age floor is 30 minutes (or past expiresAt).
+ * Purchase may still be AWAITING_GATEWAY_PAYMENT or already READY with an open attempt.
+ */
+export function isGatewayOnlyDismissEligible(input: {
+  status: string | null | undefined;
+  purchaseStatus: string | null | undefined;
+  webhookEventId: string | null | undefined;
+  updatedAt: Date | string | null | undefined;
+  expiresAt?: Date | string | null | undefined;
+  walletAppliedCents: number | null | undefined;
+  nowMs?: number;
+  minAgeMs?: number;
+}): boolean {
+  const walletCents =
+    typeof input.walletAppliedCents === "number" &&
+    Number.isFinite(input.walletAppliedCents)
+      ? Math.trunc(input.walletAppliedCents)
+      : 0;
+  if (walletCents !== 0) return false;
+  if (String(input.webhookEventId ?? "").trim()) return false;
+  const status = String(input.status ?? "").trim();
+  if (
+    status !== "AWAITING_PAYMENT" &&
+    status !== "PAYMENT_PENDING" &&
+    status !== "DRAFT"
+  ) {
+    return false;
+  }
+  const purchase = String(input.purchaseStatus ?? "").trim();
+  if (purchase !== "AWAITING_GATEWAY_PAYMENT" && purchase !== "READY") {
+    return false;
+  }
+  if (!input.updatedAt) return false;
+  const updatedAtMs =
+    input.updatedAt instanceof Date
+      ? input.updatedAt.getTime()
+      : new Date(input.updatedAt).getTime();
+  if (!Number.isFinite(updatedAtMs)) return false;
+  const nowMs =
+    typeof input.nowMs === "number" && Number.isFinite(input.nowMs)
+      ? input.nowMs
+      : Date.now();
+  const minAgeMs =
+    typeof input.minAgeMs === "number" && Number.isFinite(input.minAgeMs)
+      ? input.minAgeMs
+      : GATEWAY_ONLY_DISMISS_MIN_AGE_MS;
+  if (input.expiresAt) {
+    const expiresAtMs =
+      input.expiresAt instanceof Date
+        ? input.expiresAt.getTime()
+        : new Date(input.expiresAt).getTime();
+    if (Number.isFinite(expiresAtMs) && expiresAtMs <= nowMs) {
+      return true;
+    }
+  }
+  return updatedAtMs <= nowMs - minAgeMs;
 }
 
 export function formatPaymentRecoveryAge(

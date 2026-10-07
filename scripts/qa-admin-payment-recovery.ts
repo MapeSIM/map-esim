@@ -9,11 +9,13 @@ import {
   PAYMENT_RECOVERY_ATTEMPT_STATUSES,
   PAYMENT_RECOVERY_POLICY_BLURB,
   PAYMENT_RECOVERY_PROVIDERS,
+  GATEWAY_ONLY_DISMISS_MIN_AGE_MS,
   PAYMENT_RECOVERY_STALE_MS_DEFAULT,
   PAYMENT_RECOVERY_STALE_MS_MAX,
   PAYMENT_RECOVERY_STALE_MS_MIN,
   buildAdminPaymentRecoveryHref,
   formatPaymentRecoveryAge,
+  isGatewayOnlyDismissEligible,
   isPaymentRecoveryCandidate,
   isPaymentRecoveryStaleReleaseEligible,
   parsePaymentRecoveryStaleMs,
@@ -177,6 +179,53 @@ function main() {
     false
   );
   assert.match(formatPaymentRecoveryAge(staleOk, now), /21m/);
+  assert.equal(GATEWAY_ONLY_DISMISS_MIN_AGE_MS, 30 * 60 * 1000);
+  const gatewayOnlyStale = new Date(now - GATEWAY_ONLY_DISMISS_MIN_AGE_MS - 60_000);
+  const gatewayOnlyFresh = new Date(now - 20 * 60 * 1000);
+  assert.equal(
+    isGatewayOnlyDismissEligible({
+      status: "PAYMENT_PENDING",
+      purchaseStatus: "AWAITING_GATEWAY_PAYMENT",
+      webhookEventId: null,
+      updatedAt: gatewayOnlyStale,
+      walletAppliedCents: 0,
+      nowMs: now,
+    }),
+    true
+  );
+  assert.equal(
+    isGatewayOnlyDismissEligible({
+      status: "PAYMENT_PENDING",
+      purchaseStatus: "READY",
+      webhookEventId: null,
+      updatedAt: gatewayOnlyStale,
+      walletAppliedCents: 0,
+      nowMs: now,
+    }),
+    true
+  );
+  assert.equal(
+    isGatewayOnlyDismissEligible({
+      status: "PAYMENT_PENDING",
+      purchaseStatus: "AWAITING_GATEWAY_PAYMENT",
+      webhookEventId: null,
+      updatedAt: gatewayOnlyFresh,
+      walletAppliedCents: 0,
+      nowMs: now,
+    }),
+    false
+  );
+  assert.equal(
+    isGatewayOnlyDismissEligible({
+      status: "PAYMENT_PENDING",
+      purchaseStatus: "AWAITING_GATEWAY_PAYMENT",
+      webhookEventId: null,
+      updatedAt: gatewayOnlyStale,
+      walletAppliedCents: 500,
+      nowMs: now,
+    }),
+    false
+  );
   console.log("PASS candidate_eligibility_helpers");
 
   assert.equal(paymentRecoveryDecisionLabel(null), "Never checked");
@@ -221,6 +270,13 @@ function main() {
   assert.match(detail, /PendingSimpaisaInvestigateForm/);
   assert.match(detail, /PendingPaymentVerifyForm/);
   assert.match(detail, /StaleGatewayReservationReleaseForm/);
+  assert.match(detail, /gatewayOnlyDismissEligible|showDismissOrRelease/);
+  assert.match(
+    read("app/components/admin/StaleGatewayReservationReleaseForm.tsx"),
+    /Dismiss \/ Mark Expired/
+  );
+  assert.match(service, /gatewayOnlyDismissEligible/);
+  assert.match(service, /isGatewayOnlyDismissEligible/);
   assert.match(detail, /Webhook receipts for this attempt/);
   assert.match(detail, /lastDecisionAtLabel/);
   assert.match(detail, /recovery extras load failed|getAdminPaymentRecoveryDetailExtras/);
@@ -257,6 +313,8 @@ function main() {
   assert.match(release, /debitTransactionId/);
   assert.match(release, /maybeReleasePendingGatewayReservation/);
   assert.match(release, /PAYMENT_RECOVERY_STALE_RELEASE_AUDIT/);
+  assert.match(release, /GATEWAY_ONLY_DISMISS_MIN_AGE_MS|isGatewayOnlyDismissEligible/);
+  assert.match(release, /Attempt marked expired and cleared from pending lists/);
   assert.doesNotMatch(release, /applyVerified|markPaid\b|Mark paid/);
   assert.doesNotMatch(release, /status:\s*EsimPurchasePaymentAttemptStatus\.PAYMENT_CONFIRMED/);
   assert.match(release, /PAYMENT_CONFIRMED/); // guard: skip if already confirmed

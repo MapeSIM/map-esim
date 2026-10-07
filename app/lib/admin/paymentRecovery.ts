@@ -16,6 +16,7 @@ import {
   PAYMENT_RECOVERY_INVESTIGATE_AUDIT_ACTIONS,
   buildAdminPaymentRecoveryHref,
   formatPaymentRecoveryAge,
+  isGatewayOnlyDismissEligible,
   isPaymentRecoveryCandidate,
   isPaymentRecoveryStaleReleaseEligible,
   normalizePaymentRecoveryDecision,
@@ -58,6 +59,8 @@ export type AdminPaymentRecoveryDetailExtras = {
   suggestedSafeAction: string;
   receipts: AdminPaymentWebhookReceiptRow[];
   staleReleaseEligible: boolean;
+  /** Gateway-only (no wallet hold) dismiss / expire eligible. */
+  gatewayOnlyDismissEligible: boolean;
   walletAppliedCents: number;
 };
 
@@ -436,6 +439,7 @@ export async function getAdminPaymentRecoveryDetailExtras(
       const audit = decisions.get(row.id);
       const decision = audit?.decision ?? null;
       const receipts = await listPaymentWebhookReceiptsForAttempt(row.id);
+      const walletAppliedCents = purchase.walletAppliedCents ?? 0;
       const staleReleaseEligible = isPaymentRecoveryStaleReleaseEligible({
         status: row.status,
         purchaseStatus: purchase.status,
@@ -444,6 +448,15 @@ export async function getAdminPaymentRecoveryDetailExtras(
         expiresAt: row.expiresAt,
         nowMs,
         staleMs,
+      });
+      const gatewayOnlyDismissEligible = isGatewayOnlyDismissEligible({
+        status: row.status,
+        purchaseStatus: purchase.status,
+        webhookEventId: row.webhookEventId,
+        updatedAt: row.updatedAt,
+        expiresAt: row.expiresAt,
+        walletAppliedCents,
+        nowMs,
       });
 
       return {
@@ -457,7 +470,8 @@ export async function getAdminPaymentRecoveryDetailExtras(
         }),
         receipts,
         staleReleaseEligible,
-        walletAppliedCents: purchase.walletAppliedCents ?? 0,
+        gatewayOnlyDismissEligible,
+        walletAppliedCents,
       };
     } catch (error) {
       console.error("[admin.payments.recovery] customer extras load failed", {
@@ -508,6 +522,7 @@ export async function getAdminPaymentRecoveryDetailExtras(
       const audit = decisions.get(row.id);
       const decision = audit?.decision ?? null;
       const receipts = await listPaymentWebhookReceiptsForAttempt(row.id);
+      const walletAppliedCents = purchase.walletAppliedCents ?? 0;
       const staleReleaseEligible = isPaymentRecoveryStaleReleaseEligible({
         status: row.status,
         purchaseStatus: purchase.status,
@@ -516,6 +531,15 @@ export async function getAdminPaymentRecoveryDetailExtras(
         expiresAt: row.expiresAt,
         nowMs,
         staleMs,
+      });
+      const gatewayOnlyDismissEligible = isGatewayOnlyDismissEligible({
+        status: row.status,
+        purchaseStatus: purchase.status,
+        webhookEventId: row.webhookEventId,
+        updatedAt: row.updatedAt,
+        expiresAt: row.expiresAt,
+        walletAppliedCents,
+        nowMs,
       });
 
       return {
@@ -529,7 +553,8 @@ export async function getAdminPaymentRecoveryDetailExtras(
         }),
         receipts,
         staleReleaseEligible,
-        walletAppliedCents: purchase.walletAppliedCents ?? 0,
+        gatewayOnlyDismissEligible,
+        walletAppliedCents,
       };
     } catch (error) {
       console.error("[admin.payments.recovery] partner extras load failed", {

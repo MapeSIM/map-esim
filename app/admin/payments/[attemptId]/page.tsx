@@ -99,6 +99,12 @@ export default async function AdminPaymentDetailPage({
         ? detail.walletAppliedCents
         : 0;
 
+  const gatewayOnlyDismissEligible = Boolean(
+    recovery?.gatewayOnlyDismissEligible
+  );
+  const showDismissOrRelease =
+    Boolean(recovery?.staleReleaseEligible) || gatewayOnlyDismissEligible;
+
   const nextSafeAction = suggestPaymentDetailNextSafeAction({
     ownerKind: detail.ownerKind,
     attemptStatus: detail.attemptStatus,
@@ -106,7 +112,7 @@ export default async function AdminPaymentDetailPage({
     webhookPresent: detail.webhookEventIdPresent,
     investigationAvailable: detail.investigationAvailable,
     isRecoveryCandidate: Boolean(recovery?.isRecoveryCandidate),
-    staleReleaseEligible: Boolean(recovery?.staleReleaseEligible),
+    staleReleaseEligible: showDismissOrRelease,
     showStuckCaseLink: showRecon,
     recoverySuggestedSafeAction: recovery?.suggestedSafeAction ?? null,
     walletAppliedCents: walletCents,
@@ -278,11 +284,12 @@ export default async function AdminPaymentDetailPage({
         </p>
       </section>
 
-      {recovery?.staleReleaseEligible ? (
+      {showDismissOrRelease ? (
         <StaleGatewayReservationReleaseForm
           paymentAttemptId={detail.attemptId}
           ownerKind={detail.ownerKind === "partner" ? "partner" : "customer"}
           walletAppliedCents={walletCents}
+          gatewayOnlyDismiss={gatewayOnlyDismissEligible || walletCents === 0}
         />
       ) : (
         <section className={ADMIN_CARD_CLASS} aria-label="Wallet funds">
