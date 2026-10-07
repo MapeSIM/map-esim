@@ -6,7 +6,6 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Loader2 } from "lucide-react";
 import {
   CUSTOMER_PURCHASE_PROCESSING_MESSAGE,
   CUSTOMER_PURCHASE_REVIEW_NEEDED_MESSAGE,
@@ -20,7 +19,7 @@ import {
   PAYMENT_RETURN_VERIFYING_HEADLINE,
   paymentReturnPendingGuidance,
 } from "@/app/lib/payments/paymentReturnUxCopy";
-import StatusRefreshPoller from "@/app/components/payments/StatusRefreshPoller";
+import { PaymentAuthorizePendingPanel } from "@/app/components/payments/PaymentAuthorizePendingPanel";
 import { PaymentReturnNotCompletedCard } from "@/app/components/payments/PaymentReturnNotCompletedCard";
 
 export function EsimPurchasePaymentReturnView({
@@ -28,6 +27,7 @@ export function EsimPurchasePaymentReturnView({
   purchaseId,
   refreshHref,
   walletOperatorLabel = null,
+  walletOperatorId = null,
   whatsappHref = null,
 }: {
   kind: Exclude<EsimPaymentReturnKind, "completed">;
@@ -35,6 +35,8 @@ export function EsimPurchasePaymentReturnView({
   refreshHref: string;
   /** Display-only JazzCash / Easypaisa label when known. */
   walletOperatorLabel?: string | null;
+  /** Operator id when known (100007 / 100008) — drives authorize countdown. */
+  walletOperatorId?: string | null;
   /** Prefill wa.me recovery link when WhatsApp support is enabled. */
   whatsappHref?: string | null;
 }) {
@@ -43,13 +45,14 @@ export function EsimPurchasePaymentReturnView({
   if (kind === "verified") {
     return (
       <ReturnShell>
-        <StatusRefreshPoller enabled />
-        <VerifyingCard
+        <PaymentAuthorizePendingPanel
           headline={PAYMENT_RETURN_PREPARING_HEADLINE}
           guidance={CUSTOMER_PURCHASE_PROCESSING_MESSAGE}
           refreshHref={refreshHref}
           secondaryHref="/account"
           secondaryLabel="Return to account"
+          tryAgainHref={reviewHref}
+          showAuthorizeCountdown={false}
         />
       </ReturnShell>
     );
@@ -91,63 +94,18 @@ export function EsimPurchasePaymentReturnView({
 
   return (
     <ReturnShell>
-      <StatusRefreshPoller enabled />
-      <VerifyingCard
+      <PaymentAuthorizePendingPanel
         headline={PAYMENT_RETURN_VERIFYING_HEADLINE}
         guidance={paymentReturnPendingGuidance(walletOperatorLabel)}
         refreshHref={refreshHref}
         secondaryHref="/account"
         secondaryLabel="Return to account"
+        tryAgainHref={reviewHref}
+        walletOperatorLabel={walletOperatorLabel}
+        walletOperatorId={walletOperatorId}
+        showAuthorizeCountdown
       />
     </ReturnShell>
-  );
-}
-
-function VerifyingCard({
-  headline,
-  guidance,
-  refreshHref,
-  secondaryHref,
-  secondaryLabel,
-}: {
-  headline: string;
-  guidance: string;
-  refreshHref: string;
-  secondaryHref: string;
-  secondaryLabel: string;
-}) {
-  return (
-    <div
-      className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8 sm:px-8 sm:py-10"
-      role="status"
-      aria-live="polite"
-    >
-      <div className="flex flex-col items-center text-center">
-        <span className="relative inline-flex h-14 w-14 items-center justify-center">
-          <span
-            aria-hidden="true"
-            className="absolute inset-0 rounded-full bg-[var(--accent-strong)]/15 animate-pulse"
-          />
-          <Loader2
-            className="relative h-8 w-8 animate-spin text-[var(--accent-strong)]"
-            aria-hidden="true"
-          />
-          <span className="sr-only">Loading</span>
-        </span>
-        <h1 className="mt-5 text-xl font-bold tracking-tight text-[var(--heading)] sm:text-2xl">
-          {headline}
-        </h1>
-        <p className="mt-3 max-w-md text-sm leading-relaxed text-[var(--text-muted)] sm:text-[15px]">
-          {guidance}
-        </p>
-        <div className="mt-7 flex w-full max-w-sm flex-col items-center gap-3">
-          <SecondaryButtonLink href={refreshHref}>
-            {PAYMENT_RETURN_CHECK_STATUS_LABEL}
-          </SecondaryButtonLink>
-          <QuietLink href={secondaryHref}>{secondaryLabel}</QuietLink>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -160,23 +118,6 @@ function ActionRow({ children }: { children: ReactNode }) {
     <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
       {children}
     </div>
-  );
-}
-
-function PrimaryLink({
-  href,
-  children,
-}: {
-  href: string;
-  children: ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]"
-    >
-      {children}
-    </Link>
   );
 }
 

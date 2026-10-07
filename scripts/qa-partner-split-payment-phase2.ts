@@ -238,7 +238,15 @@ function main() {
   assert.match(returnView, /PAYMENT_RETURN_VERIFYING_HEADLINE/);
   assert.match(returnView, /PAYMENT_RETURN_PREPARING_HEADLINE/);
   assert.match(returnView, /PAYMENT_RETURN_CHECK_STATUS_LABEL/);
-  assert.match(returnView, /StatusRefreshPoller/);
+  assert.match(returnView, /PaymentAuthorizePendingPanel|StatusRefreshPoller/);
+  assert.match(
+    read("app/lib/partner/partnerEsimPurchaseGatewayCheckout.ts"),
+    /simpaisaForceFreshVerify|fresh Verify/
+  );
+  assert.doesNotMatch(
+    read("app/lib/partner/partnerEsimPurchaseGatewayCheckout.ts"),
+    /resumeSimpaisaWalletCheckout/
+  );
   assert.match(returnView, /PaymentReturnNotCompletedCard/);
   assert.match(returnView, /Payment reference not found/);
   assert.doesNotMatch(returnView, /Cancel payment & unlock wallet/);

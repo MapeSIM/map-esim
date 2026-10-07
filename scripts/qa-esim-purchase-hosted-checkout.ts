@@ -301,7 +301,31 @@ function main() {
   );
   assert.match(
     read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),
-    /StatusRefreshPoller/
+    /PaymentAuthorizePendingPanel|StatusRefreshPoller/
+  );
+  assert.match(
+    read("app/components/payments/StatusRefreshPoller.tsx"),
+    /popstate/
+  );
+  assert.match(
+    read("app/components/payments/PaymentAuthorizePendingPanel.tsx"),
+    /PAYMENT_RETURN_EXPIRED_GUIDANCE|Payment window expired/
+  );
+  assert.match(
+    read("app/lib/payments/paymentReturnUxCopy.ts"),
+    /PAYMENT_AUTHORIZE_WINDOW_JAZZCASH_SECONDS\s*=\s*360/
+  );
+  assert.match(
+    read("app/lib/payments/paymentReturnUxCopy.ts"),
+    /PAYMENT_AUTHORIZE_WINDOW_EASYPAISA_SECONDS\s*=\s*60/
+  );
+  assert.match(
+    read("app/lib/esim/esimPurchaseGatewayCheckout.ts"),
+    /simpaisaForceFreshVerify|fresh Verify/
+  );
+  assert.doesNotMatch(
+    read("app/lib/esim/esimPurchaseGatewayCheckout.ts"),
+    /resumeSimpaisaWalletCheckout/
   );
   assert.doesNotMatch(
     read("app/account/esim/buy/payment/return/EsimPurchasePaymentReturnView.tsx"),

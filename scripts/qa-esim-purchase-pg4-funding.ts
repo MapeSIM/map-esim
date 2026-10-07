@@ -246,7 +246,7 @@ function main() {
   assert.match(returnView, /PaymentReturnNotCompletedCard/);
   assert.match(returnView, /PAYMENT_RETURN_PREPARING_HEADLINE/);
   assert.match(returnView, /PAYMENT_RETURN_CHECK_STATUS_LABEL|Check status/);
-  assert.match(returnView, /StatusRefreshPoller/);
+  assert.match(returnView, /PaymentAuthorizePendingPanel|StatusRefreshPoller/);
   assert.doesNotMatch(returnView, /Cancel payment & unlock wallet/);
   assert.doesNotMatch(returnView, /Waiting for JazzCash \/ Easypaisa/);
   const returnCopy = read("app/lib/payments/paymentReturnUxCopy.ts");

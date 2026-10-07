@@ -6,7 +6,6 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Loader2 } from "lucide-react";
 import type { EsimPaymentReturnKind } from "@/app/lib/esim/esimPurchasePaymentReturnState";
 import {
   partnerEsimPurchasePaymentCatalogHref,
@@ -18,13 +17,14 @@ import {
   PAYMENT_RETURN_VERIFYING_HEADLINE,
   paymentReturnPendingGuidance,
 } from "@/app/lib/payments/paymentReturnUxCopy";
-import StatusRefreshPoller from "@/app/components/payments/StatusRefreshPoller";
+import { PaymentAuthorizePendingPanel } from "@/app/components/payments/PaymentAuthorizePendingPanel";
 import { PaymentReturnNotCompletedCard } from "@/app/components/payments/PaymentReturnNotCompletedCard";
 
 export function PartnerEsimPurchasePaymentReturnView({
   kind,
   refreshHref,
   walletOperatorLabel = null,
+  walletOperatorId = null,
   whatsappHref = null,
 }: {
   kind: Exclude<EsimPaymentReturnKind, "completed"> | "invalid";
@@ -33,6 +33,8 @@ export function PartnerEsimPurchasePaymentReturnView({
   refreshHref: string | null;
   /** Display-only JazzCash / Easypaisa label when known. */
   walletOperatorLabel?: string | null;
+  /** Operator id when known (100007 / 100008) — drives authorize countdown. */
+  walletOperatorId?: string | null;
   /** Prefill wa.me recovery link when WhatsApp support is enabled. */
   whatsappHref?: string | null;
 }) {
@@ -60,13 +62,14 @@ export function PartnerEsimPurchasePaymentReturnView({
   if (kind === "verified") {
     return (
       <ReturnShell>
-        <StatusRefreshPoller enabled />
-        <VerifyingCard
+        <PaymentAuthorizePendingPanel
           headline={PAYMENT_RETURN_PREPARING_HEADLINE}
           guidance="Your payment is confirmed. We're preparing your eSIM — this page updates automatically."
           refreshHref={refreshHref}
           secondaryHref={catalogHref}
           secondaryLabel="Back to catalog"
+          tryAgainHref={catalogHref}
+          showAuthorizeCountdown={false}
         />
       </ReturnShell>
     );
@@ -111,65 +114,18 @@ export function PartnerEsimPurchasePaymentReturnView({
 
   return (
     <ReturnShell>
-      <StatusRefreshPoller enabled />
-      <VerifyingCard
+      <PaymentAuthorizePendingPanel
         headline={PAYMENT_RETURN_VERIFYING_HEADLINE}
         guidance={paymentReturnPendingGuidance(walletOperatorLabel)}
         refreshHref={refreshHref}
         secondaryHref={catalogHref}
         secondaryLabel="Back to catalog"
+        tryAgainHref={catalogHref}
+        walletOperatorLabel={walletOperatorLabel}
+        walletOperatorId={walletOperatorId}
+        showAuthorizeCountdown
       />
     </ReturnShell>
-  );
-}
-
-function VerifyingCard({
-  headline,
-  guidance,
-  refreshHref,
-  secondaryHref,
-  secondaryLabel,
-}: {
-  headline: string;
-  guidance: string;
-  refreshHref: string | null;
-  secondaryHref: string;
-  secondaryLabel: string;
-}) {
-  return (
-    <div
-      className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8 sm:px-8 sm:py-10"
-      role="status"
-      aria-live="polite"
-    >
-      <div className="flex flex-col items-center text-center">
-        <span className="relative inline-flex h-14 w-14 items-center justify-center">
-          <span
-            aria-hidden="true"
-            className="absolute inset-0 rounded-full bg-[var(--accent-strong)]/15 animate-pulse"
-          />
-          <Loader2
-            className="relative h-8 w-8 animate-spin text-[var(--accent-strong)]"
-            aria-hidden="true"
-          />
-          <span className="sr-only">Loading</span>
-        </span>
-        <h1 className="mt-5 text-xl font-bold tracking-tight text-[var(--heading)] sm:text-2xl">
-          {headline}
-        </h1>
-        <p className="mt-3 max-w-md text-sm leading-relaxed text-[var(--text-muted)] sm:text-[15px]">
-          {guidance}
-        </p>
-        <div className="mt-7 flex w-full max-w-sm flex-col items-center gap-3">
-          {refreshHref ? (
-            <SecondaryButtonLink href={refreshHref}>
-              {PAYMENT_RETURN_CHECK_STATUS_LABEL}
-            </SecondaryButtonLink>
-          ) : null}
-          <QuietLink href={secondaryHref}>{secondaryLabel}</QuietLink>
-        </div>
-      </div>
-    </div>
   );
 }
 

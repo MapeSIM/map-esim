@@ -41,7 +41,6 @@ import {
   esimPurchasePaymentReturnPath,
 } from "@/app/lib/payments/safepayCheckoutPaths";
 import { resumeSafepayHostedCheckout } from "@/app/lib/payments/safepayAdapter";
-import { resumeSimpaisaWalletCheckout } from "@/app/lib/payments/simpaisaAdapter";
 import { parseSimpaisaWalletCheckoutFieldsLive } from "@/app/lib/payments/parseSimpaisaWalletCheckoutFieldsLive";
 import {
   quoteSimpaisaPkrChargeFromUsdCents,
@@ -618,10 +617,46 @@ export async function startEsimPurchaseHostedCheckout(
       attempt.status === EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING ||
       attempt.status === EsimPurchasePaymentAttemptStatus.DRAFT);
 
+  /** When true, next Verify uses a fresh Request-Id so Simpaisa re-dispatches MPIN. */
+  let simpaisaForceFreshVerify = false;
+
   if (canResumeTracker && existingRef) {
     if (attempt.gatewayProvider === PaymentGatewayProvider.SIMPAISA) {
-      // Existing provider ref — do not re-call Verify (no outbound Simpaisa request).
-      const resumed = resumeSimpaisaWalletCheckout({ returnPath });
+      // Invalidate dead / unconfirmed Simpaisa ref — never resume waiting UI
+      // without a new Verify (no MPIN / push would be delivered otherwise).
+      await prisma.esimPurchasePaymentAttempt.updateMany({
+        where: {
+          id: attempt.id,
+          webhookEventId: null,
+          status: {
+            in: [
+              EsimPurchasePaymentAttemptStatus.DRAFT,
+              EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
+              EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING,
+            ],
+          },
+        },
+        data: {
+          gatewayPaymentRef: null,
+          status: EsimPurchasePaymentAttemptStatus.DRAFT,
+          failedAt: null,
+          failureCategory: null,
+          failureCode: null,
+        },
+      });
+      attempt = {
+        ...attempt,
+        gatewayPaymentRef: null,
+        status: EsimPurchasePaymentAttemptStatus.DRAFT,
+      };
+      simpaisaForceFreshVerify = true;
+      // Fall through to createCheckoutSession → fresh Verify.
+    } else {
+      const resumed = await resumeSafepayHostedCheckout({
+        trackerToken: existingRef,
+        returnPath,
+        cancelPath,
+      });
       if (!resumed.ok) {
         throw new EsimPurchaseGatewayCheckoutError(
           resumed.code === "MISCONFIGURED" ||
@@ -654,43 +689,17 @@ export async function startEsimPurchaseHostedCheckout(
         reusedTracker: true,
       };
     }
+  }
 
-    const resumed = await resumeSafepayHostedCheckout({
-      trackerToken: existingRef,
-      returnPath,
-      cancelPath,
-    });
-    if (!resumed.ok) {
-      throw new EsimPurchaseGatewayCheckoutError(
-        resumed.code === "MISCONFIGURED" ||
-          resumed.code === "GATEWAY_UNAVAILABLE"
-          ? "GATEWAY_UNAVAILABLE"
-          : "UNAVAILABLE",
-        resumed.message
-      );
-    }
-
-    await prisma.walletEsimPurchase.updateMany({
-      where: {
-        id: purchase.id,
-        customerUserId,
-        status: {
-          in: [
-            WalletEsimPurchaseStatus.READY,
-            WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
-          ],
-        },
-      },
-      data: { status: WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT },
-    });
-
-    return {
-      purchaseId: purchase.id,
-      paymentAttemptId: attempt.id,
-      checkoutUrl: resumed.checkoutUrl,
-      reusedAttempt,
-      reusedTracker: true,
-    };
+  // Fresh Request-Id on Simpaisa retry so Verify is not idempotent with the dead txn.
+  const sessionCheckoutKey = simpaisaForceFreshVerify
+    ? `${checkoutKey}:retry:${Date.now()}`
+    : checkoutKey;
+  if (sessionCheckoutKey.length > 128) {
+    throw new EsimPurchaseGatewayCheckoutError(
+      "UNAVAILABLE",
+      CARD_PAYMENT_UNAVAILABLE_MESSAGE
+    );
   }
 
   let session;
@@ -702,7 +711,7 @@ export async function startEsimPurchaseHostedCheckout(
       paymentAttemptId: attempt.id,
       chargeAmountMinor,
       chargeCurrency,
-      checkoutIdempotencyKey: checkoutKey,
+      checkoutIdempotencyKey: sessionCheckoutKey,
       returnPath,
       cancelPath,
       walletOperatorId,

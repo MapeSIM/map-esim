@@ -65,6 +65,10 @@ export default async function EsimPurchasePaymentReturnAttemptPage({
   const walletOperatorLabel = resolvePaymentReturnWalletOperatorLabel({
     enabledOperatorIds: operators.enabledOperatorIds,
   });
+  const walletOperatorId =
+    operators.enabledOperatorIds.length === 1
+      ? operators.enabledOperatorIds[0]!
+      : null;
   const whatsappHref =
     kind === "not_completed"
       ? buildPaymentReturnWhatsAppRecoveryHref(whatsappConfig)
@@ -76,6 +80,7 @@ export default async function EsimPurchasePaymentReturnAttemptPage({
       purchaseId={attempt.purchaseId}
       refreshHref={`/account/esim/buy/payment/return/${encodeURIComponent(attempt.attemptId)}`}
       walletOperatorLabel={walletOperatorLabel}
+      walletOperatorId={walletOperatorId}
       whatsappHref={whatsappHref}
     />
   );

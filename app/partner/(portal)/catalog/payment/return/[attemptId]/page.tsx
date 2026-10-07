@@ -89,6 +89,10 @@ export default async function PartnerCatalogPaymentReturnPage({
   const walletOperatorLabel = resolvePaymentReturnWalletOperatorLabel({
     enabledOperatorIds: operators.enabledOperatorIds,
   });
+  const walletOperatorId =
+    operators.enabledOperatorIds.length === 1
+      ? operators.enabledOperatorIds[0]!
+      : null;
   const whatsappHref =
     kind === "not_completed"
       ? buildPaymentReturnWhatsAppRecoveryHref(whatsappConfig)
@@ -100,6 +104,7 @@ export default async function PartnerCatalogPaymentReturnPage({
       attemptId={attempt.attemptId}
       refreshHref={refreshHref}
       walletOperatorLabel={walletOperatorLabel}
+      walletOperatorId={walletOperatorId}
       whatsappHref={whatsappHref}
     />
   );

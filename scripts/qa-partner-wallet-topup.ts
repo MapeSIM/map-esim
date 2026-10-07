@@ -132,7 +132,15 @@ function main() {
   // 6 pending refresh-safe
   assert.match(detailPage, /browserReturnMustNotCreditPartnerWallet/);
   assert.match(detailPage, /PartnerWalletTopupPendingPoller/);
-  assert.match(poller, /router\.refresh\(\)/);
+  assert.match(poller, /StatusRefreshPoller/);
+  assert.match(
+    read("app/components/payments/StatusRefreshPoller.tsx"),
+    /router\.refresh\(\)/
+  );
+  assert.match(
+    read("app/components/payments/StatusRefreshPoller.tsx"),
+    /popstate/
+  );
   assert.doesNotMatch(poller, /createCheckoutSession|verifyWallet|applyVerified/);
   assert.match(detailPage, /Refreshing this page does/);
   console.log("PASS pending_refresh_safe");
