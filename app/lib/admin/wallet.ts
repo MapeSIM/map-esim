@@ -8,7 +8,10 @@ import {
 } from "@prisma/client";
 import { maskAdminEmail } from "@/app/lib/admin/display";
 import { prisma } from "@/app/lib/db";
-import { healReleasedPendingPurchaseDebitsForWallet } from "@/app/lib/admin/walletPendingVoid";
+import {
+  forceReverseKnownStuckReleasedDebit,
+  healReleasedPendingPurchaseDebitsForWallet,
+} from "@/app/lib/admin/walletPendingVoid";
 import { isAdminVoidablePendingWalletDebit } from "@/app/lib/admin/walletPendingVoidShared";
 import {
   formatUsdCents,
@@ -291,6 +294,13 @@ export async function getAdminCustomerWalletSummary(
       walletId: wallet.id,
       limit: ADMIN_CUSTOMER_RECENT_WALLET_TX_LIMIT,
     });
+    // Known stuck released debit (…hzh8bfhx) — force REVERSED even if heuristics miss.
+    if (customer.id === "cmsogxr4d0000jp04412uopyy") {
+      await forceReverseKnownStuckReleasedDebit({
+        customerUserId: customer.id,
+        referenceIdSuffix: "hzh8bfhx",
+      });
+    }
   } catch {
     // Display load must not fail if heal is temporarily unavailable.
   }

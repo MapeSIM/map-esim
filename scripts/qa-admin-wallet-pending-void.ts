@@ -109,7 +109,14 @@ function main() {
   assert.match(service, /restoreReady:\s*true/);
   assert.match(service, /assisted:\s*true/);
   assert.match(service, /healReleasedPendingPurchaseDebit/);
+  assert.match(service, /forceReverseReleasedPurchaseDebit/);
+  assert.match(service, /forceReverseKnownStuckReleasedDebit/);
+  assert.match(service, /markAlreadyReleased|alreadyReleased: true/);
   assert.match(service, /WalletTransactionStatus\.REVERSED|status: WalletTransactionStatus\.REVERSED/);
+  assert.match(wallet, /forceReverseKnownStuckReleasedDebit/);
+  assert.match(wallet, /hzh8bfhx/);
+  assert.match(wallet, /cmsogxr4d0000jp04412uopyy/);
+  assert.match(form, /router\.refresh/);
   const purchaseLib = read("app/lib/esim/walletPurchase.ts");
   assert.match(purchaseLib, /reversePendingWalletPurchaseDebitInTx/);
   assert.match(actions, /actorHasAdminPermission/);

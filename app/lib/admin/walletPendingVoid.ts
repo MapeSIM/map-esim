@@ -36,6 +36,40 @@ type PurchaseMeta = {
 };
 
 /**
+ * Hard-set a still-PENDING WALLET_ESIM_PURCHASE debit to REVERSED.
+ * Used when the reservation is already known released (UI "already released")
+ * so the badge cannot stay Pending and Void/Cancel is removed.
+ */
+export async function forceReverseReleasedPurchaseDebit(input: {
+  walletTransactionId: string;
+  customerUserId?: string | null;
+}): Promise<boolean> {
+  const walletTransactionId = (input.walletTransactionId ?? "").trim();
+  if (
+    !walletTransactionId ||
+    walletTransactionId.length > 64 ||
+    !/^[A-Za-z0-9_-]+$/.test(walletTransactionId)
+  ) {
+    return false;
+  }
+  const customerUserId = (input.customerUserId ?? "").trim() || null;
+
+  const updated = await prisma.walletTransaction.updateMany({
+    where: {
+      id: walletTransactionId,
+      type: WalletTransactionType.PURCHASE_DEBIT,
+      status: WalletTransactionStatus.PENDING,
+      referenceType: WALLET_PURCHASE_DEBIT_REF,
+      ...(customerUserId
+        ? { wallet: { userId: customerUserId } }
+        : {}),
+    },
+    data: { status: WalletTransactionStatus.REVERSED },
+  });
+  return updated.count === 1;
+}
+
+/**
  * If a PURCHASE_DEBIT is still PENDING but the reservation was already released
  * (purchase no longer holds the debit, or a release_gw_* refund credit exists),
  * flip the debit to REVERSED so admin UI stops showing Pending / Void.
@@ -120,16 +154,11 @@ export async function healReleasedPendingPurchaseDebit(input: {
     return { healed: false };
   }
 
-  const updated = await prisma.walletTransaction.updateMany({
-    where: {
-      id: debit.id,
-      status: WalletTransactionStatus.PENDING,
-      type: WalletTransactionType.PURCHASE_DEBIT,
-    },
-    data: { status: WalletTransactionStatus.REVERSED },
+  const forced = await forceReverseReleasedPurchaseDebit({
+    walletTransactionId: debit.id,
+    customerUserId,
   });
-
-  return { healed: updated.count === 1 };
+  return { healed: forced };
 }
 
 /**
@@ -164,6 +193,47 @@ export async function healReleasedPendingPurchaseDebitsForWallet(input: {
     if (result.healed) healed += 1;
   }
   return healed;
+}
+
+/**
+ * One-time force reverse for a known stuck released debit (ref suffix + customer).
+ * Idempotent: no-op when already REVERSED or not found.
+ */
+export async function forceReverseKnownStuckReleasedDebit(input: {
+  customerUserId: string;
+  referenceIdSuffix: string;
+}): Promise<{ updated: boolean; walletTransactionId: string | null }> {
+  const customerUserId = (input.customerUserId ?? "").trim();
+  const suffix = (input.referenceIdSuffix ?? "").trim().toLowerCase();
+  if (!customerUserId || customerUserId.length > 64) {
+    return { updated: false, walletTransactionId: null };
+  }
+  if (!suffix || suffix.length < 4 || suffix.length > 32) {
+    return { updated: false, walletTransactionId: null };
+  }
+  if (!/^[a-z0-9_-]+$/.test(suffix)) {
+    return { updated: false, walletTransactionId: null };
+  }
+
+  const debit = await prisma.walletTransaction.findFirst({
+    where: {
+      type: WalletTransactionType.PURCHASE_DEBIT,
+      status: WalletTransactionStatus.PENDING,
+      referenceType: WALLET_PURCHASE_DEBIT_REF,
+      referenceId: { endsWith: suffix },
+      wallet: { userId: customerUserId },
+    },
+    select: { id: true },
+  });
+  if (!debit) {
+    return { updated: false, walletTransactionId: null };
+  }
+
+  const updated = await forceReverseReleasedPurchaseDebit({
+    walletTransactionId: debit.id,
+    customerUserId,
+  });
+  return { updated, walletTransactionId: debit.id };
 }
 
 export async function voidPendingWalletEsimPurchaseReservation(input: {
@@ -228,6 +298,22 @@ export async function voidPendingWalletEsimPurchaseReservation(input: {
     return { ok: false, error: "Wallet transaction is unavailable." };
   }
 
+  const debitId = debit.id;
+  const ownerCustomerId = customer.id;
+
+  async function markAlreadyReleased(): Promise<VoidPendingWalletReservationResult> {
+    // UI message "already released" must always leave debit REVERSED — never Pending.
+    await forceReverseReleasedPurchaseDebit({
+      walletTransactionId: debitId,
+      customerUserId: ownerCustomerId,
+    });
+    return {
+      ok: true,
+      refundTransactionId: null,
+      alreadyReleased: true,
+    };
+  }
+
   // One-time / idempotent heal for already-released rows (e.g. …hzh8bfhx)
   // still showing PENDING after a prior release_gw credit.
   if (debit.status === WalletTransactionStatus.PENDING) {
@@ -236,12 +322,16 @@ export async function voidPendingWalletEsimPurchaseReservation(input: {
       customerUserId: customer.id,
     });
     if (healed.healed) {
-      return {
-        ok: true,
-        refundTransactionId: null,
-        alreadyReleased: true,
-      };
+      return markAlreadyReleased();
     }
+  }
+
+  if (debit.status !== WalletTransactionStatus.PENDING) {
+    return {
+      ok: true,
+      refundTransactionId: null,
+      alreadyReleased: true,
+    };
   }
 
   const purchaseId =
@@ -276,22 +366,8 @@ export async function voidPendingWalletEsimPurchaseReservation(input: {
   }
 
   if (purchaseMeta.debitTransactionId !== debit.id) {
-    // Debit unlinked from purchase — heal stale PENDING badge if release evidence exists.
-    const healed = await healReleasedPendingPurchaseDebit({
-      walletTransactionId: debit.id,
-      customerUserId: customer.id,
-    });
-    if (healed.healed) {
-      return {
-        ok: true,
-        refundTransactionId: null,
-        alreadyReleased: true,
-      };
-    }
-    return {
-      ok: false,
-      error: "This pending reservation cannot be voided.",
-    };
+    // Debit unlinked from purchase — reservation already released; force badge.
+    return markAlreadyReleased();
   }
 
   if (
@@ -310,11 +386,7 @@ export async function voidPendingWalletEsimPurchaseReservation(input: {
       customerUserId: customer.id,
     });
     if (healed.healed) {
-      return {
-        ok: true,
-        refundTransactionId: null,
-        alreadyReleased: true,
-      };
+      return markAlreadyReleased();
     }
     return {
       ok: false,
@@ -352,29 +424,20 @@ export async function voidPendingWalletEsimPurchaseReservation(input: {
     });
 
     if (createdRefundId) {
-      // New release credit created — debit must show Reversed in admin UI.
-      await prisma.walletTransaction.updateMany({
-        where: {
-          id: debit.id,
-          type: WalletTransactionType.PURCHASE_DEBIT,
-          status: WalletTransactionStatus.PENDING,
-        },
-        data: { status: WalletTransactionStatus.REVERSED },
+      await forceReverseReleasedPurchaseDebit({
+        walletTransactionId: debitId,
+        customerUserId: ownerCustomerId,
       });
       scheduleWalletTransactionNotification(createdRefundId);
-    } else {
-      // already_refunded / linked_existing — heal only with release evidence.
-      await healReleasedPendingPurchaseDebit({
-        walletTransactionId: debit.id,
-        customerUserId: customer.id,
-      });
+      return {
+        ok: true,
+        refundTransactionId: createdRefundId,
+        alreadyReleased: false,
+      };
     }
 
-    return {
-      ok: true,
-      refundTransactionId: createdRefundId,
-      alreadyReleased,
-    };
+    // already_refunded / linked_existing — force REVERSED so UI cannot stay Pending.
+    return markAlreadyReleased();
   } catch (error) {
     if (error instanceof WalletEsimPurchaseError) {
       return { ok: false, error: error.message };

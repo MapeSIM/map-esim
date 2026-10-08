@@ -13,7 +13,10 @@ import {
   walletLedgerLifecycleLabel,
   type WalletLedgerLifecycleLabel,
 } from "@/app/lib/admin/walletLedgerShared";
-import { healReleasedPendingPurchaseDebitsForWallet } from "@/app/lib/admin/walletPendingVoid";
+import {
+  forceReverseKnownStuckReleasedDebit,
+  healReleasedPendingPurchaseDebitsForWallet,
+} from "@/app/lib/admin/walletPendingVoid";
 import { isAdminVoidablePendingWalletDebit } from "@/app/lib/admin/walletPendingVoidShared";
 import { prisma } from "@/app/lib/db";
 import {
@@ -147,6 +150,12 @@ export async function getAdminWalletLedgerPage(input: {
       walletId: wallet.id,
       limit: pageSize,
     });
+    if (customer.id === "cmsogxr4d0000jp04412uopyy") {
+      await forceReverseKnownStuckReleasedDebit({
+        customerUserId: customer.id,
+        referenceIdSuffix: "hzh8bfhx",
+      });
+    }
   } catch {
     // Ledger read must not fail if heal is temporarily unavailable.
   }

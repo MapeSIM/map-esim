@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useId, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   voidPendingWalletReservationAction,
   type VoidPendingWalletFormState,
@@ -13,6 +14,7 @@ export function AdminVoidPendingWalletForm(props: {
   returnTo: string;
   compact?: boolean;
 }) {
+  const router = useRouter();
   const formId = useId();
   const customerUserId = props.customerUserId.trim();
   const walletTransactionId = props.walletTransactionId.trim();
@@ -26,8 +28,21 @@ export function AdminVoidPendingWalletForm(props: {
   useEffect(() => {
     if (state?.ok) {
       setConfirmed(false);
+      router.refresh();
     }
-  }, [state]);
+  }, [state, router]);
+
+  // After success, drop Void controls entirely — badge refreshes via router.refresh().
+  if (state?.ok) {
+    return (
+      <p
+        className="text-xs font-medium text-[var(--accent-strong)]"
+        role="status"
+      >
+        {state.message}
+      </p>
+    );
+  }
 
   return (
     <form
@@ -56,7 +71,7 @@ export function AdminVoidPendingWalletForm(props: {
           type="checkbox"
           className="mt-0.5"
           checked={confirmed}
-          disabled={pending || Boolean(state?.ok)}
+          disabled={pending}
           onChange={(event) => setConfirmed(event.target.checked)}
         />
         <span>Confirm void / restore wallet balance</span>
@@ -65,7 +80,7 @@ export function AdminVoidPendingWalletForm(props: {
         type="submit"
         variant="danger"
         size="sm"
-        disabled={pending || Boolean(state?.ok) || !confirmed}
+        disabled={pending || !confirmed}
       >
         {pending ? "Processing…" : "Void / Cancel pending"}
       </AdminButton>
@@ -75,14 +90,6 @@ export function AdminVoidPendingWalletForm(props: {
           role="alert"
         >
           {state.error}
-        </p>
-      ) : null}
-      {state?.ok ? (
-        <p
-          className="text-xs font-medium text-[var(--accent-strong)]"
-          role="status"
-        >
-          {state.message}
         </p>
       ) : null}
     </form>
