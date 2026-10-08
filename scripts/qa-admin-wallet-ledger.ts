@@ -33,8 +33,8 @@ function main() {
 
   assert.match(page, /requireRole\("ADMIN"\)/);
   assert.match(page, /getAdminWalletLedgerPage/);
-  assert.match(page, /never[\s\S]{0,40}balance/i);
   assert.match(page, /never marks paid|never[\s\S]{0,20}marks paid/i);
+  assert.match(page, /Void \/ Cancel|AdminVoidPendingWalletForm/);
   assert.doesNotMatch(page, /Release Reservation|Mark paid|markPaid/i);
   assert.doesNotMatch(service, /maybeReleasePendingGatewayReservation\s*\(/);
   assert.doesNotMatch(service, /reserveWalletPurchaseFundsInTx\s*\(/);

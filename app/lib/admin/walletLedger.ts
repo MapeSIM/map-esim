@@ -13,6 +13,7 @@ import {
   walletLedgerLifecycleLabel,
   type WalletLedgerLifecycleLabel,
 } from "@/app/lib/admin/walletLedgerShared";
+import { isAdminVoidablePendingWalletDebit } from "@/app/lib/admin/walletPendingVoidShared";
 import { prisma } from "@/app/lib/db";
 import {
   formatUsdCents,
@@ -46,6 +47,8 @@ export type AdminWalletLedgerRow = {
   paymentAttemptHref: string | null;
   orderId: string | null;
   orderHref: string | null;
+  /** True when pending eSIM reserve is safe to admin-void. */
+  canVoidPending: boolean;
 };
 
 export type AdminWalletLedgerPage = {
@@ -165,7 +168,13 @@ export async function getAdminWalletLedgerPage(input: {
       referenceId: true,
       emailNotificationStatus: true,
       purchaseAsDebit: {
-        select: { id: true, status: true, orderId: true },
+        select: {
+          id: true,
+          status: true,
+          orderId: true,
+          providerOrderId: true,
+          providerResultKind: true,
+        },
       },
       purchaseAsRefund: {
         select: { id: true, status: true, orderId: true },
@@ -175,14 +184,27 @@ export async function getAdminWalletLedgerPage(input: {
 
   const purchaseMeta = new Map<
     string,
-    { status: string; orderId: string | null }
+    {
+      status: string;
+      orderId: string | null;
+      providerOrderId: string | null;
+      providerResultKind: string | null;
+    }
   >();
   for (const row of rows) {
-    const fromRel = row.purchaseAsDebit ?? row.purchaseAsRefund;
-    if (fromRel) {
-      purchaseMeta.set(fromRel.id, {
-        status: fromRel.status,
-        orderId: fromRel.orderId,
+    if (row.purchaseAsDebit) {
+      purchaseMeta.set(row.purchaseAsDebit.id, {
+        status: row.purchaseAsDebit.status,
+        orderId: row.purchaseAsDebit.orderId,
+        providerOrderId: row.purchaseAsDebit.providerOrderId,
+        providerResultKind: row.purchaseAsDebit.providerResultKind,
+      });
+    } else if (row.purchaseAsRefund) {
+      purchaseMeta.set(row.purchaseAsRefund.id, {
+        status: row.purchaseAsRefund.status,
+        orderId: row.purchaseAsRefund.orderId,
+        providerOrderId: null,
+        providerResultKind: null,
       });
     }
   }
@@ -206,10 +228,21 @@ export async function getAdminWalletLedgerPage(input: {
   if (missingMetaIds.length > 0) {
     const purchases = await prisma.walletEsimPurchase.findMany({
       where: { id: { in: missingMetaIds } },
-      select: { id: true, status: true, orderId: true },
+      select: {
+        id: true,
+        status: true,
+        orderId: true,
+        providerOrderId: true,
+        providerResultKind: true,
+      },
     });
     for (const p of purchases) {
-      purchaseMeta.set(p.id, { status: p.status, orderId: p.orderId });
+      purchaseMeta.set(p.id, {
+        status: p.status,
+        orderId: p.orderId,
+        providerOrderId: p.providerOrderId,
+        providerResultKind: p.providerResultKind,
+      });
     }
   }
 
@@ -258,6 +291,15 @@ export async function getAdminWalletLedgerPage(input: {
         ? attemptByPurchaseId.get(purchaseId) ?? null
         : null;
       const orderId = (meta?.orderId ?? "").trim() || null;
+      const canVoidPending = isAdminVoidablePendingWalletDebit({
+        type: row.type,
+        status: row.status,
+        referenceType: row.referenceType,
+        purchaseStatus: meta?.status ?? null,
+        orderId: meta?.orderId ?? null,
+        providerOrderId: meta?.providerOrderId ?? null,
+        providerResultKind: meta?.providerResultKind ?? null,
+      });
 
       return {
         id: row.id,
@@ -298,6 +340,7 @@ export async function getAdminWalletLedgerPage(input: {
         orderHref: orderId
           ? `/admin/orders/${encodeURIComponent(orderId)}`
           : null,
+        canVoidPending,
       };
     }),
   };

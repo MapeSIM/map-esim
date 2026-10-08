@@ -8,6 +8,7 @@ import {
 } from "@prisma/client";
 import { maskAdminEmail } from "@/app/lib/admin/display";
 import { prisma } from "@/app/lib/db";
+import { isAdminVoidablePendingWalletDebit } from "@/app/lib/admin/walletPendingVoidShared";
 import {
   formatUsdCents,
   formatWalletDateTime,
@@ -197,6 +198,13 @@ export type AdminCustomerWalletTransactionRow = {
   relatedOrderId: string | null;
   /** Safe email delivery label — never exposes SMTP errors. */
   notificationLabel: string | null;
+  /**
+   * True only when a pending eSIM reserve is safe to admin-void
+   * (no Order / no provider success). Never invents eligibility.
+   */
+  canVoidPending: boolean;
+  /** Linked WalletEsimPurchase id when known from relation or reference. */
+  purchaseId: string | null;
 };
 
 /**
@@ -270,7 +278,13 @@ export async function getAdminCustomerWalletSummary(
       referenceId: true,
       emailNotificationStatus: true,
       purchaseAsDebit: {
-        select: { orderId: true },
+        select: {
+          id: true,
+          status: true,
+          orderId: true,
+          providerOrderId: true,
+          providerResultKind: true,
+        },
       },
       purchaseAsRefund: {
         select: { orderId: true },
@@ -305,6 +319,20 @@ export async function getAdminCustomerWalletSummary(
         row.purchaseAsDebit?.orderId?.trim() ||
         row.purchaseAsRefund?.orderId?.trim() ||
         null;
+      const purchaseId =
+        row.purchaseAsDebit?.id ??
+        (String(row.referenceType ?? "").trim() === "WALLET_ESIM_PURCHASE"
+          ? String(row.referenceId ?? "").trim() || null
+          : null);
+      const canVoidPending = isAdminVoidablePendingWalletDebit({
+        type: row.type,
+        status: row.status,
+        referenceType: row.referenceType,
+        purchaseStatus: row.purchaseAsDebit?.status ?? null,
+        orderId: row.purchaseAsDebit?.orderId ?? null,
+        providerOrderId: row.purchaseAsDebit?.providerOrderId ?? null,
+        providerResultKind: row.purchaseAsDebit?.providerResultKind ?? null,
+      });
       return {
         id: row.id,
         createdAtLabel: formatWalletDateTime(row.createdAt),
@@ -327,6 +355,8 @@ export async function getAdminCustomerWalletSummary(
         notificationLabel: walletEmailNotificationLabel(
           row.emailNotificationStatus
         ),
+        canVoidPending,
+        purchaseId,
       };
     }),
   };

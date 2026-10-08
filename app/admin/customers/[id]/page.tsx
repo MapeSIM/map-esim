@@ -1,19 +1,20 @@
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
-import { getAdminCustomerDetail } from "@/app/lib/admin/customers";
-import { getAdminCustomerRecentOrders } from "@/app/lib/admin/orders";
-import { getAdminCustomerRecentTopups } from "@/app/lib/admin/topups";
-import { getAdminCustomerWalletSummary } from "@/app/lib/admin/wallet";
-import { loadAdminAccess } from "@/app/lib/admin/adminPermissionAccess";
-import { hasAdminPermission } from "@/app/lib/admin/adminPermissions";
-import { ADMIN_DEBIT_MIN_CENTS } from "@/app/lib/wallet/amount";
+import { AdminVoidPendingWalletForm } from "@/app/components/admin/AdminVoidPendingWalletForm";
 import { CustomerBlockPanel } from "@/app/components/admin/CustomerBlockPanel";
-import { requireRole } from "@/app/lib/auth/session";
 import {
   AdminButton,
   AdminKpiCard,
   AdminStatusPill,
 } from "@/app/components/admin/ui";
+import { loadAdminAccess } from "@/app/lib/admin/adminPermissionAccess";
+import { hasAdminPermission } from "@/app/lib/admin/adminPermissions";
+import { getAdminCustomerDetail } from "@/app/lib/admin/customers";
+import { getAdminCustomerRecentOrders } from "@/app/lib/admin/orders";
+import { getAdminCustomerRecentTopups } from "@/app/lib/admin/topups";
+import { getAdminCustomerWalletSummary } from "@/app/lib/admin/wallet";
+import { requireRole } from "@/app/lib/auth/session";
+import { ADMIN_DEBIT_MIN_CENTS } from "@/app/lib/wallet/amount";
 
 export const dynamic = "force-dynamic";
 
@@ -47,8 +48,10 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
 
 export default async function AdminCustomerDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ walletVoid?: string; walletVoidError?: string }>;
 }) {
   const admin = await requireRole("ADMIN");
   const access = await loadAdminAccess(admin.id);
@@ -69,6 +72,17 @@ export default async function AdminCustomerDetailPage({
     "TRANSACTIONS_VIEW"
   );
   const { id } = await params;
+  const sp = await searchParams;
+  const walletVoidFlash =
+    sp.walletVoid === "ok"
+      ? "Pending wallet reservation voided and balance restored."
+      : sp.walletVoid === "already"
+        ? "Pending wallet reservation was already released."
+        : sp.walletVoidError === "confirm_required"
+          ? "Confirm the checkbox before voiding a pending reservation."
+          : sp.walletVoidError
+            ? "Could not void this pending reservation."
+            : null;
 
   let detail: Awaited<ReturnType<typeof getAdminCustomerDetail>>;
   try {
@@ -503,6 +517,15 @@ export default async function AdminCustomerDetailPage({
               />
             </dl>
 
+            {walletVoidFlash ? (
+              <div
+                className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--heading)]"
+                role="status"
+              >
+                {walletVoidFlash}
+              </div>
+            ) : null}
+
             <div className="space-y-3">
               <h3 className="text-sm font-semibold text-[var(--heading)]">
                 Recent wallet transactions
@@ -545,16 +568,25 @@ export default async function AdminCustomerDetailPage({
                             </p>
                           ) : null}
                         </div>
-                        {canViewOrders && row.relatedOrderId ? (
-                          <AdminButton
-                            href={`/admin/orders/${encodeURIComponent(row.relatedOrderId)}`}
-                            variant="secondary"
-                            size="sm"
-                            className="shrink-0"
-                          >
-                            View related order
-                          </AdminButton>
-                        ) : null}
+                        <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+                          {canViewOrders && row.relatedOrderId ? (
+                            <AdminButton
+                              href={`/admin/orders/${encodeURIComponent(row.relatedOrderId)}`}
+                              variant="secondary"
+                              size="sm"
+                              className="shrink-0"
+                            >
+                              View related order
+                            </AdminButton>
+                          ) : null}
+                          {canAdjustWallet && row.canVoidPending ? (
+                            <AdminVoidPendingWalletForm
+                              customerUserId={detail.id}
+                              walletTransactionId={row.id}
+                              returnTo={`/admin/customers/${encodeURIComponent(detail.id)}`}
+                            />
+                          ) : null}
+                        </div>
                       </div>
                     </li>
                   ))}

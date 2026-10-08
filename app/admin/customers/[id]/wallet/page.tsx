@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AdminVoidPendingWalletForm } from "@/app/components/admin/AdminVoidPendingWalletForm";
 import { loadAdminAccess } from "@/app/lib/admin/adminPermissionAccess";
 import { hasAdminPermission } from "@/app/lib/admin/adminPermissions";
 import { getAdminWalletLedgerPage } from "@/app/lib/admin/walletLedger";
@@ -16,7 +17,11 @@ export default async function AdminCustomerWalletLedgerPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    walletVoid?: string;
+    walletVoidError?: string;
+  }>;
 }) {
   const admin = await requireRole("ADMIN");
   const access = await loadAdminAccess(admin.id);
@@ -38,6 +43,16 @@ export default async function AdminCustomerWalletLedgerPage({
   ]);
   const { id: rawId } = await params;
   const sp = await searchParams;
+  const walletVoidFlash =
+    sp.walletVoid === "ok"
+      ? "Pending wallet reservation voided and balance restored."
+      : sp.walletVoid === "already"
+        ? "Pending wallet reservation was already released."
+        : sp.walletVoidError === "confirm_required"
+          ? "Confirm the checkbox before voiding a pending reservation."
+          : sp.walletVoidError
+            ? "Could not void this pending reservation."
+            : null;
 
   let data: Awaited<ReturnType<typeof getAdminWalletLedgerPage>>;
   try {
@@ -81,9 +96,18 @@ export default async function AdminCustomerWalletLedgerPage({
         </p>
         <h1 className="text-2xl font-bold tracking-tight">Wallet ledger</h1>
         <p className="text-sm text-[var(--text-muted)]">
-          Read-only investigate view of MAP Wallet history. This page never
-          changes balance, never marks paid, and never releases reservations.
+          Investigate view of MAP Wallet history. This page never marks paid.
+          Eligible pending eSIM reserves can be voided by WALLET_ADJUST admins
+          (restores balance via the existing reservation-release path).
         </p>
+        {walletVoidFlash ? (
+          <p
+            className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--heading)]"
+            role="status"
+          >
+            {walletVoidFlash}
+          </p>
+        ) : null}
       </header>
 
       <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm sm:p-5">
@@ -188,6 +212,7 @@ export default async function AdminCustomerWalletLedgerPage({
                   <th className="px-3 py-3 font-semibold">Lifecycle</th>
                   <th className="px-3 py-3 font-semibold">Amount</th>
                   <th className="px-3 py-3 font-semibold">Related</th>
+                  <th className="px-3 py-3 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)] bg-[var(--surface)]">
@@ -277,6 +302,21 @@ export default async function AdminCustomerWalletLedgerPage({
                           </Link>
                         </p>
                       ) : null}
+                    </td>
+                    <td className="px-3 py-3 align-top text-xs">
+                      {canAdjustWallet && row.canVoidPending ? (
+                        <AdminVoidPendingWalletForm
+                          customerUserId={data.customerId}
+                          walletTransactionId={row.id}
+                          returnTo={buildAdminWalletLedgerHref({
+                            customerId: data.customerId,
+                            page: data.page,
+                          })}
+                          compact
+                        />
+                      ) : (
+                        <span className="text-[var(--text-soft)]">—</span>
+                      )}
                     </td>
                   </tr>
                 ))}
