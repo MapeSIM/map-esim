@@ -168,6 +168,8 @@ async function handle(request: Request): Promise<Response> {
                 ok: staleRelease.ok,
                 customer: staleRelease.customer.counts,
                 partner: staleRelease.partner.counts,
+                fullWallet: staleRelease.fullWallet.counts,
+                partnerFullWallet: staleRelease.partnerFullWallet.counts,
               }
             : { ok: false, errorCode: "stale_release_failed" }
           : { ok: true, skipped: true },

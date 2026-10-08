@@ -337,7 +337,14 @@ function main() {
   assert.match(combined, /runPartnerGatewayStaleReservationRecovery/);
   assert.match(combined, /runPartnerFullWalletStaleReservationRelease/);
   assert.match(combined, /partnerFullWallet/);
+  assert.match(combined, /Promise\.allSettled/);
+  assert.match(combined, /sub_job_rejected/);
   assert.match(lifecycleCron, /runGatewayStaleReservationRecovery/);
+  assert.match(lifecycleCron, /fullWallet:\s*staleRelease\.fullWallet\.counts/);
+  assert.match(
+    lifecycleCron,
+    /partnerFullWallet:\s*staleRelease\.partnerFullWallet\.counts/
+  );
   console.log("PASS stale_release_and_auto_recovery");
 
   assert.doesNotMatch(service, /applyVerifiedEsimPurchasePaymentEvent/);

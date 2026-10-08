@@ -666,6 +666,7 @@ async function main() {
       gatewayRecovery,
       /partnerFullWallet/
     );
+    assert.match(gatewayRecovery, /Promise\.allSettled/);
     assert.match(
       partnerProvider,
       /reconcileOrphanedPartnerProviderClaimAfterThrow/

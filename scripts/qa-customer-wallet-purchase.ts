@@ -211,6 +211,10 @@ function main() {
     /runPartnerFullWalletStaleReservationRelease/
   );
   assert.match(
+    read("app/lib/payments/gatewayStaleReservationRecovery.ts"),
+    /Promise\.allSettled/
+  );
+  assert.match(
     read("app/lib/partner/partnerEsimPurchaseFullWalletStaleRelease.ts"),
     /PARTNER_FULL_WALLET_STALE_IDLE_MS\s*=\s*5\s*\*\s*60\s*\*\s*1000/
   );

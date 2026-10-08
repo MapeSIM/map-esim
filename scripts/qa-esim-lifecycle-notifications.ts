@@ -334,6 +334,11 @@ function main() {
   assert.match(cron, /get\("staleRelease"\) !== "0"/);
   assert.match(cron, /runGatewayStaleReservationRecovery/);
   assert.match(cron, /piggyback stale unpaid gateway hold release/i);
+  assert.match(cron, /fullWallet:\s*staleRelease\.fullWallet\.counts/);
+  assert.match(
+    cron,
+    /partnerFullWallet:\s*staleRelease\.partnerFullWallet\.counts/
+  );
   assert.match(runner, /fetchProviderUsage/);
   assert.match(runner, /normalizeProviderUsagePayload/);
   assert.match(runner, /evaluateEsimLifecycleEvents/);
