@@ -59,6 +59,7 @@
     "qa:admin-partner-wallet-security": "tsx scripts/qa-admin-partner-wallet-security.ts",
     "qa:admin-partner-purchases-visibility": "tsx scripts/qa-admin-partner-purchases-visibility.ts",
     "qa:admin-partner-active-holds": "tsx scripts/qa-admin-partner-active-holds.ts",
+    "qa:admin-partner-pending-void": "tsx scripts/qa-admin-partner-pending-void.ts",
     "qa:admin-package-assignment": "tsx scripts/qa-admin-package-assignment.ts",
     "qa:admin-package-share-link": "tsx scripts/qa-admin-package-share-link.ts",
     "qa:admin-countries-package-share": "tsx scripts/qa-admin-countries-package-share.ts",

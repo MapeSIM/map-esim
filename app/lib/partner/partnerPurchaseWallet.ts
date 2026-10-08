@@ -786,7 +786,7 @@ export async function releasePartnerGatewayReservationInTx(
 
 /**
  * Release a stuck full-wallet Partner reservation (no gateway remainder) and restore READY.
- * Eligible statuses: FUNDS_RESERVED | PROVIDER_PENDING.
+ * Eligible statuses: FUNDS_RESERVED | PROVIDER_PENDING | RECONCILIATION_REQUIRED.
  * Never releases when an Order / provider success evidence exists.
  * Uses debit-scoped release keys so reserve→release cycles remain idempotent.
  */
@@ -855,7 +855,8 @@ export async function releasePartnerFullWalletStaleReservationInTx(
 
   const releasable =
     purchase.status === PartnerEsimPurchaseStatus.FUNDS_RESERVED ||
-    purchase.status === PartnerEsimPurchaseStatus.PROVIDER_PENDING;
+    purchase.status === PartnerEsimPurchaseStatus.PROVIDER_PENDING ||
+    purchase.status === PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED;
   if (!releasable) {
     return { outcome: "already_released", refundTransactionId: null };
   }
@@ -895,6 +896,7 @@ export async function releasePartnerFullWalletStaleReservationInTx(
   const releasableStatuses = [
     PartnerEsimPurchaseStatus.FUNDS_RESERVED,
     PartnerEsimPurchaseStatus.PROVIDER_PENDING,
+    PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED,
   ];
 
   if (existingRelease) {

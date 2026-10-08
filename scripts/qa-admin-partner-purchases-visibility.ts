@@ -1,5 +1,5 @@
 /**
- * Offline QA: Admin partner detail shows all PartnerEsimPurchase rows (read-only).
+ * Offline QA: Admin partner detail shows all PartnerEsimPurchase rows.
  * Does not mutate DB, call providers, or move funds.
  */
 import assert from "node:assert/strict";
@@ -80,6 +80,7 @@ function main() {
   assert.match(page, /purchaseStatus/);
   assert.match(page, /All statuses/);
   assert.match(page, /All partner eSIM purchases/);
+  assert.match(page, /AdminVoidPendingPartnerPurchaseForm|canVoidPending/);
   console.log("   ok");
 
   console.log("4) Partner boundary + payment attempt scoping");
@@ -95,6 +96,7 @@ function main() {
   );
   assert.match(page, /Open payment|paymentHref/);
   assert.doesNotMatch(page, /Investigate|Mark Paid|Release Reservation|Verify/);
+  assert.match(page, /Open reconciliation/);
   console.log("   ok");
 
   console.log("5) Server-side pagination + filter preserved");

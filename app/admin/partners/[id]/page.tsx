@@ -1,9 +1,13 @@
 import { notFound } from "next/navigation";
+import { AdminVoidPendingPartnerPurchaseForm } from "@/app/components/admin/AdminVoidPendingPartnerPurchaseForm";
 import { PartnerDiscountPanel } from "@/app/components/admin/PartnerDiscountPanel";
 import { PartnerInviteResendPanel } from "@/app/components/admin/PartnerInviteResendPanel";
 import { PartnerNameEditPanel } from "@/app/components/admin/PartnerNameEditPanel";
 import { PartnerStatusPanel } from "@/app/components/admin/PartnerStatusPanel";
 import { PartnerWalletPanel } from "@/app/components/admin/PartnerWalletPanel";
+import { loadAdminAccess } from "@/app/lib/admin/adminPermissionAccess";
+import { hasAdminPermission } from "@/app/lib/admin/adminPermissions";
+import { requireRole } from "@/app/lib/auth/session";
 import {
   AdminButton,
   AdminEmptyState,
@@ -86,6 +90,16 @@ export default async function AdminPartnerDetailPage({
     purchaseStatus?: string;
   }>;
 }) {
+  const admin = await requireRole("ADMIN");
+  const access = await loadAdminAccess(admin.id);
+  const canVoidPartnerHolds =
+    hasAdminPermission(access?.permissions ?? [], "WALLET_ADJUST") ||
+    hasAdminPermission(access?.permissions ?? [], "PARTNERS_MANAGE");
+  const canOpenReconciliation = hasAdminPermission(
+    access?.permissions ?? [],
+    "RECONCILIATION"
+  );
+
   const { id } = await params;
   const query = await searchParams;
 
@@ -222,9 +236,12 @@ export default async function AdminPartnerDetailPage({
             Active Wallet Holds
           </h2>
           <p className={ADMIN_SOFT_COPY_CLASS}>
-            Read-only open Partner wallet reservations for this partner ·{" "}
+            Open Partner wallet reservations for this partner ·{" "}
             {detail.activeHolds.length} shown
             {detail.activeHoldsTruncated ? " (list truncated)" : ""}
+            {canVoidPartnerHolds
+              ? " · WALLET_ADJUST / PARTNERS_MANAGE can void unprovisioned holds"
+              : ""}
           </p>
         </div>
         {detail.activeHolds.length === 0 ? (
@@ -245,6 +262,7 @@ export default async function AdminPartnerDetailPage({
                 <th className="px-3 py-3 font-semibold">Payment</th>
                 <th className="px-3 py-3 font-semibold">Reserved at</th>
                 <th className="px-3 py-3 font-semibold">Age</th>
+                <th className="px-3 py-3 font-semibold">Actions</th>
               </tr>
             </AdminTableHead>
             <AdminTableBody>
@@ -288,6 +306,30 @@ export default async function AdminPartnerDetailPage({
                   <td className="whitespace-nowrap px-3 py-3 text-[var(--text-muted)]">
                     {hold.ageLabel}
                   </td>
+                  <td className="px-3 py-3">
+                    <div className="flex flex-col gap-2">
+                      {canVoidPartnerHolds && hold.canVoidPending ? (
+                        <AdminVoidPendingPartnerPurchaseForm
+                          partnerId={detail.id}
+                          partnerEsimPurchaseId={hold.purchaseId}
+                          compact
+                        />
+                      ) : null}
+                      {canOpenReconciliation && hold.reconciliationHref ? (
+                        <AdminButton
+                          href={hold.reconciliationHref}
+                          variant="secondary"
+                          size="sm"
+                        >
+                          Open reconciliation
+                        </AdminButton>
+                      ) : null}
+                      {!(canVoidPartnerHolds && hold.canVoidPending) &&
+                      !(canOpenReconciliation && hold.reconciliationHref) ? (
+                        <span className="text-[var(--text-muted)]">—</span>
+                      ) : null}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </AdminTableBody>
@@ -305,9 +347,11 @@ export default async function AdminPartnerDetailPage({
               Purchases
             </h2>
             <p className={ADMIN_SOFT_COPY_CLASS}>
-              All partner eSIM purchases (read-only) ·{" "}
+              All partner eSIM purchases ·{" "}
               {detail.purchasesTotalCount} matching · page {detail.purchasesPage}{" "}
               / {detail.purchasesTotalPages}
+              . Stuck unprovisioned rows can be voided; provider-evidence cases
+              open reconciliation for refund / finalize.
             </p>
           </div>
         </div>
@@ -364,6 +408,7 @@ export default async function AdminPartnerDetailPage({
                 <th className="px-3 py-3 font-semibold">Charge</th>
                 <th className="px-3 py-3 font-semibold">Funding</th>
                 <th className="px-3 py-3 font-semibold">Payment</th>
+                <th className="px-3 py-3 font-semibold">Actions</th>
               </tr>
             </AdminTableHead>
             <AdminTableBody>
@@ -415,6 +460,32 @@ export default async function AdminPartnerDetailPage({
                     ) : (
                       <span className="text-[var(--text-muted)]">—</span>
                     )}
+                  </td>
+                  <td className="px-3 py-3">
+                    <div className="flex flex-col gap-2">
+                      {canVoidPartnerHolds && purchase.canVoidPending ? (
+                        <AdminVoidPendingPartnerPurchaseForm
+                          partnerId={detail.id}
+                          partnerEsimPurchaseId={purchase.id}
+                          compact
+                        />
+                      ) : null}
+                      {canOpenReconciliation && purchase.reconciliationHref ? (
+                        <AdminButton
+                          href={purchase.reconciliationHref}
+                          variant="secondary"
+                          size="sm"
+                        >
+                          Open reconciliation
+                        </AdminButton>
+                      ) : null}
+                      {!(canVoidPartnerHolds && purchase.canVoidPending) &&
+                      !(
+                        canOpenReconciliation && purchase.reconciliationHref
+                      ) ? (
+                        <span className="text-[var(--text-muted)]">—</span>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}

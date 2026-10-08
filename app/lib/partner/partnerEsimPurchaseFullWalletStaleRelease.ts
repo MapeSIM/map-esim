@@ -3,7 +3,7 @@
  * Never funds purchases and never calls VeSIM.
  *
  * Eligible when:
- * - status ∈ PROVIDER_PENDING | FUNDS_RESERVED
+ * - status ∈ PROVIDER_PENDING | FUNDS_RESERVED | RECONCILIATION_REQUIRED
  * - fundingSource = PARTNER_BALANCE
  * - gatewayAmountCents = 0
  * - no orderId / no providerOrderId / providerResultKind ≠ success
@@ -75,6 +75,7 @@ export async function runPartnerFullWalletStaleReservationRelease(options?: {
           in: [
             PartnerEsimPurchaseStatus.PROVIDER_PENDING,
             PartnerEsimPurchaseStatus.FUNDS_RESERVED,
+            PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED,
           ],
         },
         NOT: { providerResultKind: "success" },

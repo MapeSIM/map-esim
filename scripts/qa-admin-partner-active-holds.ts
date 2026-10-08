@@ -1,5 +1,5 @@
 /**
- * Offline QA: Admin Partner Detail active wallet holds (read-only).
+ * Offline QA: Admin Partner Detail active wallet holds.
  * Does not mutate DB, call providers, or move funds.
  */
 import assert from "node:assert/strict";
@@ -137,6 +137,7 @@ function main() {
     page,
     /Release Reservation|Mark Paid|Investigate|Recover|Refund Wallet/
   );
+  assert.match(page, /AdminVoidPendingPartnerPurchaseForm|canVoidPending/);
   console.log("   ok");
 
   console.log("3) Bounded query, no N+1, no mutations/provider calls");
@@ -147,11 +148,6 @@ function main() {
     /paymentAttempts:\s*\{[\s\S]*orderBy:[\s\S]*take:\s*1/
   );
   assert.equal(gitDiff(walletPath).trim(), "", "partnerWallet.ts untouched");
-  assert.equal(
-    gitDiff(purchaseWalletPath).trim(),
-    "",
-    "partnerPurchaseWallet.ts untouched"
-  );
   assert.equal(gitDiff(schemaPath).trim(), "", "prisma schema untouched");
   assert.doesNotMatch(lib, /fetch\(|axios|simpaisa|inquireTransaction/i);
   assert.doesNotMatch(shared, /from ["']@prisma\/client["']|PrismaClient/);

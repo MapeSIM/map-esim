@@ -22,6 +22,11 @@ import {
   parseDiscountPercentToBps,
 } from "@/app/lib/partner/discount";
 import {
+  isAdminVoidablePartnerPurchase,
+  partnerPurchaseNeedsReconciliationCase,
+  partnerPurchaseReconciliationHref,
+} from "@/app/lib/admin/partnerPendingVoidShared";
+import {
   PARTNER_DETAIL_ACTIVE_HOLDS_TAKE,
   PARTNER_DETAIL_ACTIVE_HOLD_STATUS_STRINGS,
   isPartnerActiveWalletHold,
@@ -137,6 +142,8 @@ export type PartnerDetailPurchaseRow = {
   paymentAttemptStatus: string | null;
   paymentAttemptStatusLabel: string | null;
   paymentHref: string | null;
+  canVoidPending: boolean;
+  reconciliationHref: string | null;
 };
 
 export type PartnerDetailPaymentRow = {
@@ -162,6 +169,8 @@ export type PartnerDetailActiveHoldRow = {
   paymentHref: string | null;
   reservedAtLabel: string;
   ageLabel: string;
+  canVoidPending: boolean;
+  reconciliationHref: string | null;
 };
 
 export type PartnerDetail = {
@@ -745,6 +754,13 @@ export async function getPartnerDetail(
         fundingSource: true,
         status: true,
         createdAt: true,
+        orderId: true,
+        providerOrderId: true,
+        providerResultKind: true,
+        debitTransactionId: true,
+        refundTransactionId: true,
+        walletAppliedCents: true,
+        gatewayAmountCents: true,
         paymentAttempts: {
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
           take: 1,
@@ -786,8 +802,13 @@ export async function getPartnerDetail(
         id: true,
         status: true,
         walletAppliedCents: true,
+        gatewayAmountCents: true,
         currency: true,
         fundingSource: true,
+        orderId: true,
+        providerOrderId: true,
+        providerResultKind: true,
+        debitTransactionId: true,
         refundTransactionId: true,
         createdAt: true,
         updatedAt: true,
@@ -828,6 +849,19 @@ export async function getPartnerDetail(
           : null,
         reservedAtLabel: formatDateTime(hold.createdAt),
         ageLabel: partnerActiveHoldAgeLabel(hold.updatedAt, nowMs),
+        canVoidPending: isAdminVoidablePartnerPurchase({
+          status: hold.status,
+          orderId: hold.orderId,
+          providerOrderId: hold.providerOrderId,
+          providerResultKind: hold.providerResultKind,
+          debitTransactionId: hold.debitTransactionId,
+          refundTransactionId: hold.refundTransactionId,
+          walletAppliedCents: hold.walletAppliedCents,
+          gatewayAmountCents: hold.gatewayAmountCents,
+        }),
+        reconciliationHref: partnerPurchaseNeedsReconciliationCase(hold.status)
+          ? partnerPurchaseReconciliationHref(hold.id)
+          : null,
       };
     });
 
@@ -902,6 +936,21 @@ export async function getPartnerDetail(
           : null,
         paymentHref: latestAttempt
           ? `/admin/payments/${encodeURIComponent(latestAttempt.id)}?kind=partner`
+          : null,
+        canVoidPending: isAdminVoidablePartnerPurchase({
+          status: purchase.status,
+          orderId: purchase.orderId,
+          providerOrderId: purchase.providerOrderId,
+          providerResultKind: purchase.providerResultKind,
+          debitTransactionId: purchase.debitTransactionId,
+          refundTransactionId: purchase.refundTransactionId,
+          walletAppliedCents: purchase.walletAppliedCents,
+          gatewayAmountCents: purchase.gatewayAmountCents,
+        }),
+        reconciliationHref: partnerPurchaseNeedsReconciliationCase(
+          purchase.status
+        )
+          ? partnerPurchaseReconciliationHref(purchase.id)
           : null,
       };
     }),
