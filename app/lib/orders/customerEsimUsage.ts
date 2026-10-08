@@ -228,6 +228,36 @@ function parseUsageInstant(raw: string | null | undefined): Date | null {
 }
 
 /**
+ * One-shot best-effort usage poll + lifecycle cache write for an order.
+ * Used after Add Data provision so the parent eSIM is not stuck on depleted cache.
+ * Never throws. Safe to await from purchase success paths (fail-open).
+ */
+export async function refreshOrderProviderLifecycleCacheBestEffort(
+  localOrderIdRaw: string
+): Promise<{ ok: boolean }> {
+  const localOrderId = (localOrderIdRaw ?? "").trim();
+  if (
+    !localOrderId ||
+    localOrderId.length > 64 ||
+    !/^[A-Za-z0-9_-]+$/.test(localOrderId)
+  ) {
+    return { ok: false };
+  }
+  try {
+    const iccid = await resolveLocalIccid(localOrderId);
+    if (!iccid) return { ok: false };
+    const usageRes = await fetchProviderUsage(iccid);
+    if (!usageRes.ok) return { ok: false };
+    const normalized = normalizeProviderUsagePayload(usageRes.payload);
+    if (!normalized) return { ok: false };
+    await persistOrderProviderLifecycleCache(localOrderId, normalized);
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/**
  * Persist normalized VeSIM usage/lifecycle onto the local Order row.
  * Best-effort — never fails the caller usage response.
  */

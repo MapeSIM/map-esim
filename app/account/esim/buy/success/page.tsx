@@ -59,6 +59,14 @@ export default async function AccountWalletBuySuccessPage({
     paymentProvider: purchase.paymentProvider,
   });
 
+  // Add Data: deep-link the parent eSIM with a one-shot live usage pull so the
+  // data bar is not stuck on the pre-top-up depleted cache.
+  const detailOrderId =
+    purchase.addDataSourceOrderId ?? purchase.orderId;
+  const detailHref = purchase.addDataSourceOrderId
+    ? `/account/orders/${encodeURIComponent(detailOrderId)}?usage=1`
+    : `/account/orders/${encodeURIComponent(detailOrderId)}`;
+
   return (
     <div className="mx-auto max-w-xl space-y-8">
       <div>
@@ -141,10 +149,12 @@ export default async function AccountWalletBuySuccessPage({
 
       <div className="flex flex-col gap-3 text-sm sm:flex-row sm:flex-wrap">
         <Link
-          href={`/account/orders/${encodeURIComponent(purchase.orderId)}`}
+          href={detailHref}
           className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]"
         >
-          View order details
+          {purchase.addDataSourceOrderId
+            ? "View eSIM details"
+            : "View order details"}
         </Link>
         <Link
           href="/account/orders"

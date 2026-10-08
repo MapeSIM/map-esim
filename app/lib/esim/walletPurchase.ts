@@ -12,6 +12,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
 import { usdPriceToCents } from "@/app/lib/esim/assignmentValidation";
+import { refreshOrderProviderLifecycleCacheBestEffort } from "@/app/lib/orders/customerEsimUsage";
 import { persistAssignedOrder } from "@/app/lib/orders/persistAssignedOrder";
 import {
   alternateDeliveryEmailLockClaim,
@@ -1358,6 +1359,20 @@ export async function runWalletPurchasePostCommitSideEffects(options: {
     orderId: options.orderId,
     actorUserId: options.actorUserId,
   });
+  // Fail-open: Add Data top-ups refresh the parent eSIM lifecycle cache once.
+  // Never throws / never reverses purchase success if VeSIM usage is slow/down.
+  try {
+    const purchase = await prisma.walletEsimPurchase.findUnique({
+      where: { id: options.purchaseId },
+      select: { idempotencyKey: true },
+    });
+    const sourceOrderId = parseAddDataSourceOrderId(purchase?.idempotencyKey);
+    if (sourceOrderId) {
+      await refreshOrderProviderLifecycleCacheBestEffort(sourceOrderId);
+    }
+  } catch {
+    // ignore — purchase already committed
+  }
 }
 
 /**

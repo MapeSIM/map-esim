@@ -271,6 +271,24 @@ function main() {
   const usageLib = read("app/lib/orders/customerEsimUsage.ts");
   const usageApi = read("app/api/account/orders/[orderId]/usage/route.ts");
   const usagePanel = read("app/components/orders/CustomerEsimUsagePanel.tsx");
+  const walletPurchasePostCommit = read("app/lib/esim/walletPurchase.ts");
+  const walletPurchaseRead = read("app/lib/esim/walletPurchaseRead.ts");
+  const buySuccess = read("app/account/esim/buy/success/page.tsx");
+  assert.match(usageLib, /refreshOrderProviderLifecycleCacheBestEffort/);
+  assert.match(usageLib, /persistOrderProviderLifecycleCache/);
+  assert.match(
+    walletPurchasePostCommit,
+    /refreshOrderProviderLifecycleCacheBestEffort/
+  );
+  assert.match(walletPurchasePostCommit, /parseAddDataSourceOrderId/);
+  assert.match(walletPurchaseRead, /addDataSourceOrderId/);
+  assert.match(buySuccess, /addDataSourceOrderId/);
+  assert.match(buySuccess, /\?usage=1/);
+  assert.match(buySuccess, /View eSIM details/);
+  assert.match(detailPage, /autoRefreshUsage|autoOpenUsage/);
+  assert.match(detailView, /autoRefresh=\{autoRefreshUsage\}/);
+  assert.match(detailCard, /autoRefresh/);
+  assert.match(detailCard, /liveUsage \|\| loading/);
   assert.match(orderCard, /View details/);
   assert.match(orderCard, /∞ Unlimited|remainingDataLabel/);
   assert.match(detailView, /addDataEligible/);

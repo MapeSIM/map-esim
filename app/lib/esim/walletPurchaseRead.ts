@@ -18,6 +18,7 @@ import {
   isCustomerStaleCheckoutDisplay,
   resolveCustomerPendingPurchaseVisibility,
 } from "@/app/lib/esim/customerPurchaseStatusMessaging";
+import { parseAddDataSourceOrderId } from "@/app/lib/esim/addDataPurchaseLabelShared";
 import { formatWalletPurchasePriceLabel } from "@/app/lib/esim/walletPurchase";
 import {
   canEditPurchaseDeliveryEmail,
@@ -330,6 +331,11 @@ export type WalletPurchaseSuccess = {
   /** Display-only: latest attempt provider when gateway was used. */
   paymentProvider: "SIMPAISA" | "SAFEPAY" | null;
   orderId: string;
+  /**
+   * When this purchase was Add More Data, the parent eSIM MAP order id.
+   * Success UI should deep-link here (with live usage) instead of the top-up row.
+   */
+  addDataSourceOrderId: string | null;
 };
 
 /** Completed self-service purchases that may land on /account/esim/buy/success. */
@@ -372,6 +378,7 @@ export async function getCompletedWalletPurchase(
       status: true,
       orderId: true,
       fundingSource: true,
+      idempotencyKey: true,
       customer: {
         select: {
           id: true,
@@ -462,6 +469,7 @@ export async function getCompletedWalletPurchase(
     fundingSource: row.fundingSource,
     paymentProvider,
     orderId: row.orderId,
+    addDataSourceOrderId: parseAddDataSourceOrderId(row.idempotencyKey),
   };
 }
 
