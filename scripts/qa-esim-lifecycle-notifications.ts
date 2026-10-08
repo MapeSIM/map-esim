@@ -24,8 +24,14 @@ import {
   evaluateEsimLifecycleEvents,
   evaluateEsimLifecycleExpiryEvents,
   formatLifecycleExpiryLabel,
+  isInEsimLifecycleDataAlertZone,
+  isSignificantEsimLifecycleDataRefill,
+  isSignificantEsimLifecycleExpiryExtension,
   lifecycleSubject,
+  normalizeEsimLifecycleAlertCycleToken,
   parseProviderInstantMs,
+  quantizeEsimLifecycleGb,
+  resolveEsimLifecycleAlertCycleToken,
   scoreEsimLifecycleCandidatePriority,
   selectEsimLifecycleEventsForDelivery,
   type EsimLifecycleUsageInput,
@@ -275,6 +281,124 @@ function main() {
     buildEsimLifecycleEventKey("ord_1", "EXPIRED"),
     "esim_lifecycle:ord_1:EXPIRED"
   );
+  assert.equal(
+    buildEsimLifecycleEventKey("ord_1", "LOW_DATA", "0"),
+    "esim_lifecycle:ord_1:LOW_DATA"
+  );
+  assert.equal(
+    buildEsimLifecycleEventKey("ord_1", "LOW_DATA", "t1_100_20000"),
+    "esim_lifecycle:ord_1:LOW_DATA:ct1_100_20000"
+  );
+  assert.equal(normalizeEsimLifecycleAlertCycleToken("0"), null);
+  assert.equal(normalizeEsimLifecycleAlertCycleToken("bad token"), null);
+  assert.equal(quantizeEsimLifecycleGb(10), 100);
+  assert.equal(
+    isInEsimLifecycleDataAlertZone({
+      remainingDataGB: 1,
+      initialDataGB: 10,
+      isUnlimited: false,
+      reportsDataAllowance: true,
+    }),
+    true
+  );
+  assert.equal(
+    isSignificantEsimLifecycleDataRefill({
+      previousRemainingDataGB: 0.5,
+      previousInitialDataGB: 10,
+      currentRemainingDataGB: 8,
+      currentInitialDataGB: 10,
+    }),
+    true
+  );
+  assert.equal(
+    isSignificantEsimLifecycleDataRefill({
+      previousRemainingDataGB: 0.5,
+      previousInitialDataGB: 10,
+      currentRemainingDataGB: 0.4,
+      currentInitialDataGB: 10,
+    }),
+    false
+  );
+  assert.equal(
+    isSignificantEsimLifecycleExpiryExtension({
+      previousExpiresAtMs: now + 2 * 3600_000,
+      currentExpiresAt: new Date(now + 48 * 3600_000).toISOString(),
+    }),
+    true
+  );
+  // Legacy cycle while still depleted after Add Data (spam guard).
+  assert.equal(
+    resolveEsimLifecycleAlertCycleToken({
+      completedAddDataCount: 1,
+      previousRemainingDataGB: 0.5,
+      previousInitialDataGB: 10,
+      previousExpiresAtMs: now + 48 * 3600_000,
+      currentRemainingDataGB: 0.4,
+      currentInitialDataGB: 10,
+      currentExpiresAt: new Date(now + 48 * 3600_000).toISOString(),
+    }),
+    "0"
+  );
+  // After healthy prior cache + Add Data, open a new cycle for re-alert.
+  assert.match(
+    resolveEsimLifecycleAlertCycleToken({
+      completedAddDataCount: 1,
+      previousRemainingDataGB: 8,
+      previousInitialDataGB: 10,
+      previousExpiresAtMs: now + 48 * 3600_000,
+      currentRemainingDataGB: 1,
+      currentInitialDataGB: 10,
+      currentExpiresAt: new Date(now + 48 * 3600_000).toISOString(),
+    }),
+    /^t1_/
+  );
+  // Provider refill without MAP Add Data row still re-arms.
+  assert.match(
+    resolveEsimLifecycleAlertCycleToken({
+      completedAddDataCount: 0,
+      previousRemainingDataGB: 0,
+      previousInitialDataGB: 5,
+      previousExpiresAtMs: now + 24 * 3600_000,
+      currentRemainingDataGB: 10,
+      currentInitialDataGB: 10,
+      currentExpiresAt: new Date(now + 72 * 3600_000).toISOString(),
+    }),
+    /^r/
+  );
+  // Re-enter low-data after healthy prior cache (post-refill) → new cycle, not legacy.
+  assert.match(
+    resolveEsimLifecycleAlertCycleToken({
+      completedAddDataCount: 0,
+      previousRemainingDataGB: 8,
+      previousInitialDataGB: 10,
+      previousExpiresAtMs: now + 72 * 3600_000,
+      currentRemainingDataGB: 1,
+      currentInitialDataGB: 10,
+      currentExpiresAt: new Date(now + 72 * 3600_000).toISOString(),
+    }),
+    /^r/
+  );
+  // Still depleted, no recovery → stay on legacy key (within-cycle dedupe).
+  assert.equal(
+    resolveEsimLifecycleAlertCycleToken({
+      completedAddDataCount: 0,
+      previousRemainingDataGB: 0.5,
+      previousInitialDataGB: 10,
+      previousExpiresAtMs: now + 48 * 3600_000,
+      currentRemainingDataGB: 0.3,
+      currentInitialDataGB: 10,
+      currentExpiresAt: new Date(now + 48 * 3600_000).toISOString(),
+    }),
+    "0"
+  );
+  assert.match(notify, /countCompletedAddDataForSourceOrder/);
+  assert.match(notify, /resolveEsimLifecycleAlertCycleToken/);
+  assert.match(notify, /cycleToken/);
+  assert.match(runner, /resolveEsimLifecycleAlertCycleToken/);
+  assert.match(runner, /previousRemainingDataGB/);
+  assert.match(usage, /previousRemainingDataGB/);
+  assert.match(adminUsage, /previousRemainingDataGB/);
+  assert.match(schema, /c\{cycle\}|Add Data \/ refill/);
   assert.ok(
     scoreEsimLifecycleCandidatePriority({
       nowMs: now,

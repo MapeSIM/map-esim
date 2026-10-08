@@ -327,6 +327,16 @@ export async function getCustomerOwnedOrderUsage(
     return { ok: false, code: "TEMPORARY_ERROR" };
   }
 
+  // Capture prior cache before persist so Add Data / refill can re-arm alerts.
+  const prior = await prisma.order.findUnique({
+    where: { id: authz.order.localOrderId },
+    select: {
+      providerRemainingDataGb: true,
+      providerInitialDataGb: true,
+      providerExpiresAt: true,
+    },
+  });
+
   await persistOrderProviderLifecycleCache(
     authz.order.localOrderId,
     normalized
@@ -336,6 +346,11 @@ export async function getCustomerOwnedOrderUsage(
   await maybeDeliverEsimLifecycleNotificationsFromUsage({
     orderId: authz.order.localOrderId,
     usage: normalized,
+    previousRemainingDataGB: prior?.providerRemainingDataGb ?? null,
+    previousInitialDataGB: prior?.providerInitialDataGb ?? null,
+    previousExpiresAtMs: prior?.providerExpiresAt
+      ? prior.providerExpiresAt.getTime()
+      : null,
   });
 
   return { ok: true, usage: normalized };

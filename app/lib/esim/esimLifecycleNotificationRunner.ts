@@ -8,7 +8,10 @@ import "server-only";
 import { OrderFundingSource, OrderStatus, Role } from "@prisma/client";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/app/lib/db";
-import { notifyEsimLifecycleEmail } from "@/app/lib/esim/esimLifecycleNotification";
+import {
+  countCompletedAddDataForSourceOrder,
+  notifyEsimLifecycleEmail,
+} from "@/app/lib/esim/esimLifecycleNotification";
 import {
   ESIM_LIFECYCLE_BATCH_SIZE,
   ESIM_LIFECYCLE_CANDIDATE_POOL_MULTIPLIER,
@@ -16,6 +19,7 @@ import {
   ESIM_LIFECYCLE_RUNNER_LOCK_TTL_MS,
   ESIM_LIFECYCLE_V1_ENABLED_KINDS,
   evaluateEsimLifecycleEvents,
+  resolveEsimLifecycleAlertCycleToken,
   scoreEsimLifecycleCandidatePriority,
   type EsimLifecycleKind,
   type EsimLifecycleUsageInput,
@@ -320,6 +324,11 @@ export async function listEsimLifecycleCandidateOrders(options?: {
   return ranked.slice(0, take).map(({ row }) => ({
     id: row.id,
     iccidEncrypted: row.iccidEncrypted,
+    previousRemainingDataGB: row.providerRemainingDataGb,
+    previousInitialDataGB: row.providerInitialDataGb,
+    previousExpiresAtMs: row.providerExpiresAt
+      ? row.providerExpiresAt.getTime()
+      : null,
   }));
 }
 
@@ -335,6 +344,7 @@ async function deliverKindsForUsage(options: {
   usage: EsimLifecycleUsageInput;
   now: Date;
   dryRun?: boolean;
+  cycleToken?: string | null;
 }): Promise<{
   kinds: EsimLifecycleKind[];
   results: Array<{ kind: EsimLifecycleKind; status: string }>;
@@ -358,6 +368,7 @@ async function deliverKindsForUsage(options: {
       remainingDataGB: options.usage.remainingDataGB,
       initialDataGB: options.usage.initialDataGB,
       now: options.now,
+      cycleToken: options.cycleToken,
     });
     results.push({ kind, status: outcome.status });
   }
@@ -373,6 +384,9 @@ export async function processEsimLifecycleOrder(options: {
   now?: Date;
   /** QA/smoke: skip SMTP; still evaluate and claim SKIPPED/FAILED paths via dry notify. */
   dryRun?: boolean;
+  previousRemainingDataGB?: number | null;
+  previousInitialDataGB?: number | null;
+  previousExpiresAtMs?: number | null;
 }): Promise<{
   polled: boolean;
   usageOk: boolean;
@@ -396,6 +410,19 @@ export async function processEsimLifecycleOrder(options: {
     return { polled: true, usageOk: false, kinds: [], results: [] };
   }
 
+  const completedAddDataCount = await countCompletedAddDataForSourceOrder(
+    options.orderId
+  );
+  const cycleToken = resolveEsimLifecycleAlertCycleToken({
+    completedAddDataCount,
+    previousRemainingDataGB: options.previousRemainingDataGB,
+    previousInitialDataGB: options.previousInitialDataGB,
+    previousExpiresAtMs: options.previousExpiresAtMs,
+    currentRemainingDataGB: snapshot.remainingDataGB,
+    currentInitialDataGB: snapshot.initialDataGB,
+    currentExpiresAt: snapshot.expiresAt,
+  });
+
   await persistOrderProviderLifecycleCache(options.orderId, snapshot);
 
   const delivered = await deliverKindsForUsage({
@@ -403,6 +430,7 @@ export async function processEsimLifecycleOrder(options: {
     usage: toLifecycleUsageInput(snapshot),
     now,
     dryRun: options.dryRun,
+    cycleToken,
   });
   return {
     polled: true,
@@ -466,6 +494,9 @@ export async function runEsimLifecycleNotifications(options?: {
           iccidEncrypted: order.iccidEncrypted,
           now,
           dryRun: options?.dryRun,
+          previousRemainingDataGB: order.previousRemainingDataGB,
+          previousInitialDataGB: order.previousInitialDataGB,
+          previousExpiresAtMs: order.previousExpiresAtMs,
         })
     );
 

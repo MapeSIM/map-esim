@@ -1729,7 +1729,7 @@ model CustomerRewardTransaction {
 /// Unique eventKey + CAS claim prevent duplicate sends across cron retries.
 model EsimLifecycleNotificationDelivery {
   id             String                                   @id @default(cuid())
-  /// Deterministic: esim_lifecycle:{orderId}:{kind}
+  /// Deterministic: esim_lifecycle:{orderId}:{kind} or …:c{cycle} after Add Data / refill.
   eventKey       String                                   @unique
   orderId        String
   kind           EsimLifecycleNotificationKind

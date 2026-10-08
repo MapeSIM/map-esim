@@ -9,6 +9,7 @@ import {
   EsimLifecycleNotificationKind,
   OrderFundingSource,
   Role,
+  WalletEsimPurchaseStatus,
 } from "@prisma/client";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/app/lib/db";
@@ -21,6 +22,10 @@ import {
 } from "@/app/lib/email/esimLifecycleTemplate";
 import { sendChannelMail } from "@/app/lib/email/transport";
 import {
+  ADD_DATA_IDEMPOTENCY_PREFIX,
+  parseAddDataSourceOrderId,
+} from "@/app/lib/esim/addDataPurchaseLabelShared";
+import {
   buildEsimLifecycleEventKey,
   ESIM_LIFECYCLE_CLAIM_TTL_MS,
   ESIM_LIFECYCLE_V1_ENABLED_KINDS,
@@ -28,6 +33,7 @@ import {
   formatLifecycleExpiryLabel,
   lifecycleSubject,
   normalizeOpaqueLifecycleErrorCode,
+  resolveEsimLifecycleAlertCycleToken,
   type EsimLifecycleKind,
   type EsimLifecycleUsageInput,
 } from "@/app/lib/esim/esimLifecycleNotificationShared";
@@ -84,15 +90,50 @@ function remainingDataLabel(options: {
 }
 
 /**
+ * Count COMPLETED customer Add More Data purchases sourced from this order.
+ * Used to scope lifecycle outbox keys so top-ups can re-arm alerts.
+ */
+export async function countCompletedAddDataForSourceOrder(
+  orderId: string
+): Promise<number> {
+  const id = (orderId ?? "").trim();
+  if (!id || id.length > 64) return 0;
+  const rows = await prisma.walletEsimPurchase.findMany({
+    where: {
+      status: WalletEsimPurchaseStatus.COMPLETED,
+      idempotencyKey: {
+        startsWith: ADD_DATA_IDEMPOTENCY_PREFIX,
+        endsWith: `_${id}`,
+      },
+    },
+    select: { idempotencyKey: true },
+    take: 200,
+  });
+  let count = 0;
+  for (const row of rows) {
+    if (parseAddDataSourceOrderId(row.idempotencyKey) === id) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+/**
  * Ensure a PENDING outbox row exists for this event (unique eventKey).
  * Returns false when a terminal/in-flight row already exists.
  */
 export async function ensureEsimLifecycleDeliveryPending(options: {
   orderId: string;
   kind: EsimLifecycleKind;
+  /** Alert cycle token; omit/"0" keeps legacy unsuffixed eventKey. */
+  cycleToken?: string | null;
 }): Promise<{ ok: true; deliveryId: string } | { ok: false; reason: string }> {
   const orderId = options.orderId.trim();
-  const eventKey = buildEsimLifecycleEventKey(orderId, options.kind);
+  const eventKey = buildEsimLifecycleEventKey(
+    orderId,
+    options.kind,
+    options.cycleToken
+  );
   if (!orderId) return { ok: false, reason: "invalid_order" };
 
   const existing = await prisma.esimLifecycleNotificationDelivery.findUnique({
@@ -205,6 +246,8 @@ export async function notifyEsimLifecycleEmail(options: {
   remainingDataGB: number | null;
   initialDataGB: number | null;
   now?: Date;
+  /** Alert cycle token; omit/"0" keeps legacy unsuffixed eventKey. */
+  cycleToken?: string | null;
 }): Promise<EsimLifecycleNotifyResult> {
   const orderId = options.orderId.trim();
   if (!orderId) return { status: "skipped", reason: "invalid_order" };
@@ -222,6 +265,7 @@ export async function notifyEsimLifecycleEmail(options: {
     const ensured = await ensureEsimLifecycleDeliveryPending({
       orderId,
       kind: options.kind,
+      cycleToken: options.cycleToken,
     });
     if (!ensured.ok) {
       return { status: "skipped", reason: ensured.reason };
@@ -378,6 +422,7 @@ export async function notifyEsimLifecycleEmail(options: {
 /**
  * On-demand path after a successful customer/admin usage refresh.
  * Best-effort — never throws; CAS outbox prevents duplicate sends.
+ * Pass prior Order lifecycle cache (before persist) so top-up re-arm works.
  */
 export async function maybeDeliverEsimLifecycleNotificationsFromUsage(options: {
   orderId: string;
@@ -391,6 +436,10 @@ export async function maybeDeliverEsimLifecycleNotificationsFromUsage(options: {
     remainingDataGB: number | null;
   };
   now?: Date;
+  previousRemainingDataGB?: number | null;
+  previousInitialDataGB?: number | null;
+  previousExpiresAtMs?: number | null;
+  completedAddDataCount?: number;
 }): Promise<void> {
   const orderId = (options.orderId ?? "").trim();
   if (!orderId || orderId.length > 64) return;
@@ -405,6 +454,20 @@ export async function maybeDeliverEsimLifecycleNotificationsFromUsage(options: {
       initialDataGB: options.usage.initialDataGB,
       remainingDataGB: options.usage.remainingDataGB,
     };
+    const completedAddDataCount =
+      typeof options.completedAddDataCount === "number" &&
+      Number.isFinite(options.completedAddDataCount)
+        ? Math.max(0, Math.floor(options.completedAddDataCount))
+        : await countCompletedAddDataForSourceOrder(orderId);
+    const cycleToken = resolveEsimLifecycleAlertCycleToken({
+      completedAddDataCount,
+      previousRemainingDataGB: options.previousRemainingDataGB,
+      previousInitialDataGB: options.previousInitialDataGB,
+      previousExpiresAtMs: options.previousExpiresAtMs,
+      currentRemainingDataGB: usageInput.remainingDataGB,
+      currentInitialDataGB: usageInput.initialDataGB,
+      currentExpiresAt: usageInput.expiresAt,
+    });
     const kinds = evaluateEsimLifecycleEvents(usageInput, now.getTime());
     for (const kind of kinds) {
       await notifyEsimLifecycleEmail({
@@ -414,6 +477,7 @@ export async function maybeDeliverEsimLifecycleNotificationsFromUsage(options: {
         remainingDataGB: usageInput.remainingDataGB,
         initialDataGB: usageInput.initialDataGB,
         now,
+        cycleToken,
       });
     }
   } catch {

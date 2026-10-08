@@ -73,12 +73,52 @@ export type EsimLifecycleUsageInput = {
   remainingDataGB: number | null;
 };
 
+/**
+ * Normalize an alert-cycle token for eventKey suffixing.
+ * Empty / "0" → null (legacy unsuffixed key for backward compatibility).
+ */
+export function normalizeEsimLifecycleAlertCycleToken(
+  raw: string | null | undefined
+): string | null {
+  const value = (raw ?? "").trim();
+  if (!value || value === "0") return null;
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(value)) return null;
+  return value;
+}
+
+/**
+ * Deterministic outbox key.
+ * - cycle 0 / omitted → `esim_lifecycle:{orderId}:{kind}` (legacy, keeps existing SENT rows)
+ * - otherwise → `esim_lifecycle:{orderId}:{kind}:c{cycleToken}`
+ */
 export function buildEsimLifecycleEventKey(
   orderId: string,
-  kind: EsimLifecycleKind
+  kind: EsimLifecycleKind,
+  cycleToken?: string | null
 ): string {
-  return `esim_lifecycle:${orderId.trim()}:${kind}`;
+  const base = `esim_lifecycle:${orderId.trim()}:${kind}`;
+  const cycle = normalizeEsimLifecycleAlertCycleToken(cycleToken);
+  return cycle ? `${base}:c${cycle}` : base;
 }
+
+/** Quantize GB to 0.1 for stable cycle fingerprints. */
+export function quantizeEsimLifecycleGb(
+  value: number | null | undefined
+): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return 0;
+  }
+  return Math.round(value * 10);
+}
+
+export function esimLifecycleExpiryDayBucket(
+  expiresAt: string | null | undefined
+): number {
+  const ms = parseProviderInstantMs(expiresAt);
+  if (ms == null) return 0;
+  return Math.floor(ms / 86_400_000);
+}
+
 
 /** Parse provider ISO/instant strings only — returns null when unparseable. */
 export function parseProviderInstantMs(
@@ -175,6 +215,195 @@ export function evaluateEsimLifecycleDataEvents(
   }
 
   return [];
+}
+
+/** True when usage would currently qualify for LOW_DATA or DATA_EXHAUSTED. */
+export function isInEsimLifecycleDataAlertZone(
+  usage: Pick<
+    EsimLifecycleUsageInput,
+    | "remainingDataGB"
+    | "initialDataGB"
+    | "isUnlimited"
+    | "reportsDataAllowance"
+  >
+): boolean {
+  return (
+    evaluateEsimLifecycleDataEvents({
+      expiresAt: null,
+      daysRemaining: null,
+      isExpired: null,
+      isUnlimited: usage.isUnlimited === true,
+      reportsDataAllowance: usage.reportsDataAllowance !== false,
+      initialDataGB: usage.initialDataGB,
+      remainingDataGB: usage.remainingDataGB,
+    }).length > 0
+  );
+}
+
+/**
+ * Significant remaining/initial increase after a prior data-alert (top-up / refill).
+ * Requires previous sample in the alert zone and a clear recovery jump.
+ */
+export function isSignificantEsimLifecycleDataRefill(input: {
+  previousRemainingDataGB: number | null | undefined;
+  previousInitialDataGB: number | null | undefined;
+  currentRemainingDataGB: number | null | undefined;
+  currentInitialDataGB: number | null | undefined;
+}): boolean {
+  const prevRem = input.previousRemainingDataGB;
+  const curRem = input.currentRemainingDataGB;
+  if (
+    typeof prevRem !== "number" ||
+    !Number.isFinite(prevRem) ||
+    typeof curRem !== "number" ||
+    !Number.isFinite(curRem)
+  ) {
+    return false;
+  }
+
+  const prevInitial =
+    typeof input.previousInitialDataGB === "number" &&
+    Number.isFinite(input.previousInitialDataGB) &&
+    input.previousInitialDataGB > 0
+      ? input.previousInitialDataGB
+      : null;
+  const curInitial =
+    typeof input.currentInitialDataGB === "number" &&
+    Number.isFinite(input.currentInitialDataGB) &&
+    input.currentInitialDataGB > 0
+      ? input.currentInitialDataGB
+      : null;
+
+  const prevInAlert = isInEsimLifecycleDataAlertZone({
+    remainingDataGB: prevRem,
+    initialDataGB: prevInitial,
+    isUnlimited: false,
+    reportsDataAllowance: true,
+  });
+  if (!prevInAlert) return false;
+
+  const initialBump =
+    curInitial != null &&
+    prevInitial != null &&
+    curInitial >= prevInitial + 0.25;
+
+  const threshold = Math.max(
+    0.5,
+    ((curInitial ?? prevInitial ?? 1) * 15) / 100
+  );
+  const remainingBump = curRem >= prevRem + threshold;
+  const leftAlertZone = !isInEsimLifecycleDataAlertZone({
+    remainingDataGB: curRem,
+    initialDataGB: curInitial ?? prevInitial,
+    isUnlimited: false,
+    reportsDataAllowance: true,
+  });
+
+  return (remainingBump || initialBump) && (leftAlertZone || initialBump);
+}
+
+/** Expiry pushed out by at least 12 hours (typical top-up / plan extension). */
+export function isSignificantEsimLifecycleExpiryExtension(input: {
+  previousExpiresAtMs: number | null | undefined;
+  currentExpiresAt: string | null | undefined;
+  minExtensionMs?: number;
+}): boolean {
+  const prev = input.previousExpiresAtMs;
+  const cur = parseProviderInstantMs(input.currentExpiresAt);
+  if (typeof prev !== "number" || !Number.isFinite(prev) || cur == null) {
+    return false;
+  }
+  const minMs =
+    typeof input.minExtensionMs === "number" &&
+    Number.isFinite(input.minExtensionMs) &&
+    input.minExtensionMs > 0
+      ? input.minExtensionMs
+      : 12 * 3_600_000;
+  return cur >= prev + minMs;
+}
+
+export type EsimLifecycleAlertCycleInput = {
+  completedAddDataCount: number;
+  previousRemainingDataGB?: number | null;
+  previousInitialDataGB?: number | null;
+  previousExpiresAtMs?: number | null;
+  currentRemainingDataGB?: number | null;
+  currentInitialDataGB?: number | null;
+  currentExpiresAt?: string | null;
+};
+
+/**
+ * Resolve outbox cycle token for re-alerting after Add Data / allowance refill.
+ * Returns "0" for the legacy unsuffixed eventKey (backward compatible).
+ *
+ * Spam guard: with completed top-ups, only leave legacy once prior cache was
+ * healthy, remaining/initial clearly recovered, or expiry extended — so a
+ * still-depleted usage read right after purchase does not open a new cycle.
+ */
+export function resolveEsimLifecycleAlertCycleToken(
+  input: EsimLifecycleAlertCycleInput
+): string {
+  const topUps = Math.max(
+    0,
+    Math.floor(
+      Number.isFinite(input.completedAddDataCount)
+        ? input.completedAddDataCount
+        : 0
+    )
+  );
+  const initialQ = quantizeEsimLifecycleGb(input.currentInitialDataGB);
+  const expDay = esimLifecycleExpiryDayBucket(input.currentExpiresAt);
+
+  const dataRefill = isSignificantEsimLifecycleDataRefill({
+    previousRemainingDataGB: input.previousRemainingDataGB,
+    previousInitialDataGB: input.previousInitialDataGB,
+    currentRemainingDataGB: input.currentRemainingDataGB,
+    currentInitialDataGB: input.currentInitialDataGB,
+  });
+  const expiryExt = isSignificantEsimLifecycleExpiryExtension({
+    previousExpiresAtMs: input.previousExpiresAtMs,
+    currentExpiresAt: input.currentExpiresAt,
+  });
+
+  const prevRem = input.previousRemainingDataGB;
+  const prevInitial = input.previousInitialDataGB;
+  const prevHadCache =
+    (typeof prevRem === "number" && Number.isFinite(prevRem)) ||
+    (typeof prevInitial === "number" && Number.isFinite(prevInitial)) ||
+    (typeof input.previousExpiresAtMs === "number" &&
+      Number.isFinite(input.previousExpiresAtMs));
+
+  const prevInDataAlert =
+    typeof prevRem === "number" &&
+    Number.isFinite(prevRem) &&
+    isInEsimLifecycleDataAlertZone({
+      remainingDataGB: prevRem,
+      initialDataGB:
+        typeof prevInitial === "number" && Number.isFinite(prevInitial)
+          ? prevInitial
+          : null,
+      isUnlimited: false,
+      reportsDataAllowance: true,
+    });
+
+  const recoveredOrExtended = dataRefill || expiryExt || !prevInDataAlert;
+
+  if (topUps > 0) {
+    // Sticky after Add Data once recovery/extension is observed (or no prior
+    // alert-zone cache). Avoids immediate re-spam while still depleted.
+    if (!prevHadCache || recoveredOrExtended) {
+      return `t${topUps}_${initialQ}_${expDay}`;
+    }
+    return "0";
+  }
+
+  // No MAP Add Data row — re-arm on observed refill/extension, or when re-entering
+  // an alert after a healthy prior cache (legacy SENT must not block forever).
+  if (dataRefill || expiryExt || (prevHadCache && !prevInDataAlert)) {
+    return `r${initialQ}_${expDay}`;
+  }
+
+  return "0";
 }
 
 /**

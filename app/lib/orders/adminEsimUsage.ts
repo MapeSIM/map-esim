@@ -68,6 +68,9 @@ export async function getAdminOrderUsage(
       id: true,
       providerOrderId: true,
       iccidEncrypted: true,
+      providerRemainingDataGb: true,
+      providerInitialDataGb: true,
+      providerExpiresAt: true,
       walletEsimPurchase: { select: { status: true } },
       partnerEsimPurchase: { select: { status: true } },
       refundRequests: {
@@ -151,6 +154,11 @@ export async function getAdminOrderUsage(
   await maybeDeliverEsimLifecycleNotificationsFromUsage({
     orderId: order.id,
     usage: normalized,
+    previousRemainingDataGB: order.providerRemainingDataGb,
+    previousInitialDataGB: order.providerInitialDataGb,
+    previousExpiresAtMs: order.providerExpiresAt
+      ? order.providerExpiresAt.getTime()
+      : null,
   });
 
   return {
