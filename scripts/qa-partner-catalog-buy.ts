@@ -617,6 +617,65 @@ async function main() {
     assert.ok(!returnHrefSrc.includes('return "/countries"'));
     console.log("PASS payment_return_catalog_href");
 
+    const partnerStaleRelease = readFileSync(
+      path.join(
+        process.cwd(),
+        "app/lib/partner/partnerEsimPurchaseFullWalletStaleRelease.ts"
+      ),
+      "utf8"
+    );
+    const partnerWallet = readFileSync(
+      path.join(process.cwd(), "app/lib/partner/partnerPurchaseWallet.ts"),
+      "utf8"
+    );
+    const gatewayRecovery = readFileSync(
+      path.join(
+        process.cwd(),
+        "app/lib/payments/gatewayStaleReservationRecovery.ts"
+      ),
+      "utf8"
+    );
+    const partnerProvider = readFileSync(
+      path.join(
+        process.cwd(),
+        "app/lib/partner/partnerEsimPurchaseProvider.ts"
+      ),
+      "utf8"
+    );
+    assert.match(
+      partnerStaleRelease,
+      /runPartnerFullWalletStaleReservationRelease/
+    );
+    assert.match(
+      partnerStaleRelease,
+      /PARTNER_FULL_WALLET_STALE_IDLE_MS\s*=\s*5\s*\*\s*60\s*\*\s*1000/
+    );
+    assert.match(
+      partnerWallet,
+      /releasePartnerFullWalletStaleReservationInTx/
+    );
+    assert.match(
+      partnerWallet,
+      /refundPartnerPurchaseFundsInTx/
+    );
+    assert.match(
+      gatewayRecovery,
+      /runPartnerFullWalletStaleReservationRelease/
+    );
+    assert.match(
+      gatewayRecovery,
+      /partnerFullWallet/
+    );
+    assert.match(
+      partnerProvider,
+      /reconcileOrphanedPartnerProviderClaimAfterThrow/
+    );
+    assert.match(partnerProvider, /unexpected_throw/);
+    assert.match(
+      partnerProvider,
+      /try \{[\s\S]*executeClaimedPartnerEsimProviderPurchase[\s\S]*\} catch/
+    );
+    console.log("PASS partner_full_wallet_stale_release_and_provider_guard");
     console.log("ALL PASS qa-partner-catalog-buy");
   } finally {
     await prisma.$disconnect();

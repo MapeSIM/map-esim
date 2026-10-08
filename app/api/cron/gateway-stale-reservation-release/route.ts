@@ -66,6 +66,7 @@ async function handle(request: Request): Promise<Response> {
             result.customer.errorCode ??
             result.partner.errorCode ??
             result.fullWallet.errorCode ??
+            result.partnerFullWallet.errorCode ??
             "recovery_failed",
         }
       );
@@ -93,6 +94,12 @@ async function handle(request: Request): Promise<Response> {
           counts: result.fullWallet.counts,
           idleMs: result.fullWallet.idleMs,
           errorCode: result.fullWallet.errorCode ?? null,
+        },
+        partnerFullWallet: {
+          ok: result.partnerFullWallet.ok,
+          counts: result.partnerFullWallet.counts,
+          idleMs: result.partnerFullWallet.idleMs,
+          errorCode: result.partnerFullWallet.errorCode ?? null,
         },
         dryRun,
       },

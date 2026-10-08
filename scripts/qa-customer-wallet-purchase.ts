@@ -206,6 +206,14 @@ function main() {
     read("app/lib/payments/gatewayStaleReservationRecovery.ts"),
     /runFullWalletStaleReservationRelease/
   );
+  assert.match(
+    read("app/lib/payments/gatewayStaleReservationRecovery.ts"),
+    /runPartnerFullWalletStaleReservationRelease/
+  );
+  assert.match(
+    read("app/lib/partner/partnerEsimPurchaseFullWalletStaleRelease.ts"),
+    /PARTNER_FULL_WALLET_STALE_IDLE_MS\s*=\s*5\s*\*\s*60\s*\*\s*1000/
+  );
   console.log("PASS stale_full_wallet_pending_debit_release");
 
   assert.match(successPage, /getCompletedWalletPurchase/);

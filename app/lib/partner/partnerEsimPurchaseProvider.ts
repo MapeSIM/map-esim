@@ -256,6 +256,38 @@ async function claimPartnerProviderExecution(
   return claimed.count === 1;
 }
 
+/**
+ * Post-claim throws must not leave PROVIDER_PENDING with an orphaned claim.
+ * Refund / complete / recon paths already clear the claim — those are no-ops.
+ * Still-claimed PROVIDER_PENDING → RECONCILIATION_REQUIRED (never blind-retry).
+ */
+async function reconcileOrphanedPartnerProviderClaimAfterThrow(options: {
+  purchaseId: string;
+  partnerUserId: string;
+}): Promise<void> {
+  const current = await prisma.partnerEsimPurchase.findUnique({
+    where: { id: options.purchaseId },
+    select: {
+      status: true,
+      orderId: true,
+      providerRefreshClaimedAt: true,
+    },
+  });
+  if (
+    current?.status !== PartnerEsimPurchaseStatus.PROVIDER_PENDING ||
+    !current.providerRefreshClaimedAt ||
+    (current.orderId ?? "").trim()
+  ) {
+    return;
+  }
+  await markPartnerReconciliationRequired({
+    purchaseId: options.purchaseId,
+    partnerUserId: options.partnerUserId,
+    category: "provider_execution_error",
+    code: "unexpected_throw",
+  });
+}
+
 async function markPartnerReconciliationRequired(options: {
   purchaseId: string;
   partnerUserId: string;
@@ -595,6 +627,55 @@ export async function executePartnerEsimProviderPurchase(
     );
   }
 
+  try {
+    return await executeClaimedPartnerEsimProviderPurchase({
+      purchase,
+      partner,
+      checkoutFn,
+      afterRefundInTx: input.afterRefundInTx,
+      afterOrderPersistInTx: input.afterOrderPersistInTx,
+    });
+  } catch (error) {
+    await reconcileOrphanedPartnerProviderClaimAfterThrow({
+      purchaseId: purchase.id,
+      partnerUserId: partner.partnerUserId,
+    });
+    throw error;
+  }
+}
+
+async function executeClaimedPartnerEsimProviderPurchase(options: {
+  purchase: {
+    id: string;
+    partnerId: string;
+    offerId: string;
+    retailPriceCents: number;
+    discountBps: number;
+    discountVersion: number;
+    partnerChargeCents: number;
+    providerCostCents: number;
+    currency: string;
+    walletAppliedCents: number;
+    gatewayAmountCents: number;
+    debitTransactionId: string | null;
+    planName: string | null;
+    destinationCode: string | null;
+    destinationName: string | null;
+    dataAllowance: string | null;
+    validity: string | null;
+    idempotencyKey: string;
+  };
+  partner: {
+    partnerUserId: string;
+    partnerEmail: string;
+    partnerId: string;
+  };
+  checkoutFn: PartnerProviderCheckoutExecutor;
+  afterRefundInTx?: (tx: Prisma.TransactionClient) => Promise<void>;
+  afterOrderPersistInTx?: (tx: Prisma.TransactionClient) => Promise<void>;
+}): Promise<ExecutePartnerEsimProviderPurchaseResult> {
+  const { purchase, partner, checkoutFn } = options;
+
   // External provider write — outside Prisma transaction. Never blind-retry.
   // Add More Data only: bind VeSIM recharge from adddata_ idempotency key.
   // Normal Partner Buy eSIM never sets that prefix → no rechargeOrderId.
@@ -633,7 +714,7 @@ export async function executePartnerEsimProviderPurchase(
           providerResultKind: "declined",
           safeProviderStatusCode: `http_${checkout.httpStatus}`,
         },
-        afterRefundInTx: input.afterRefundInTx,
+        afterRefundInTx: options.afterRefundInTx,
       });
     } catch (error) {
       if (error instanceof PartnerEsimPurchaseError) throw error;
@@ -728,8 +809,8 @@ export async function executePartnerEsimProviderPurchase(
         allowSharedIccid: Boolean(addDataSourceOrderId),
       });
 
-      if (input.afterOrderPersistInTx) {
-        await input.afterOrderPersistInTx(tx);
+      if (options.afterOrderPersistInTx) {
+        await options.afterOrderPersistInTx(tx);
       }
 
       await tx.partnerEsimPurchase.update({

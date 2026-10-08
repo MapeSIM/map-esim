@@ -335,6 +335,8 @@ function main() {
   assert.match(partnerStale, /expireStalePartnerGatewayPaymentAttempt/);
   assert.match(combined, /runCustomerGatewayStaleReservationRecovery/);
   assert.match(combined, /runPartnerGatewayStaleReservationRecovery/);
+  assert.match(combined, /runPartnerFullWalletStaleReservationRelease/);
+  assert.match(combined, /partnerFullWallet/);
   assert.match(lifecycleCron, /runGatewayStaleReservationRecovery/);
   console.log("PASS stale_release_and_auto_recovery");
 
