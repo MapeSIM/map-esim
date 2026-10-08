@@ -26,7 +26,8 @@ function isVoidablePurchaseStatus(
 
 /**
  * True when a pending PURCHASE_DEBIT may be admin-voided / balance restored.
- * Never true when an Order exists or provider success evidence is present.
+ * Never true when already REVERSED/COMPLETED, an Order exists, or provider
+ * success evidence is present. Released rows must not show Void / Cancel.
  */
 export function isAdminVoidablePendingWalletDebit(row: {
   type: string;
@@ -38,6 +39,7 @@ export function isAdminVoidablePendingWalletDebit(row: {
   providerResultKind: string | null | undefined;
 }): boolean {
   if (String(row.type ?? "").trim() !== "PURCHASE_DEBIT") return false;
+  // Released / captured rows never show Void / Cancel.
   if (String(row.status ?? "").trim() !== "PENDING") return false;
   if (
     String(row.referenceType ?? "").trim() !==

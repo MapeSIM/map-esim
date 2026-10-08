@@ -760,6 +760,45 @@ export async function reserveWalletPurchaseFundsInTx(
 }
 
 /**
+ * Mark any still-PENDING PURCHASE_DEBIT for a wallet eSIM purchase as REVERSED.
+ * Used after reservation release so admin/customer ledgers never keep a stale Pending badge.
+ */
+async function reversePendingWalletPurchaseDebitInTx(
+  tx: Prisma.TransactionClient,
+  options: {
+    purchaseId: string;
+    debitTransactionId?: string | null;
+  }
+): Promise<number> {
+  const purchaseId = (options.purchaseId ?? "").trim();
+  if (!purchaseId) return 0;
+  let reversed = 0;
+  const debitId = (options.debitTransactionId ?? "").trim();
+  if (debitId) {
+    const byId = await tx.walletTransaction.updateMany({
+      where: {
+        id: debitId,
+        type: WalletTransactionType.PURCHASE_DEBIT,
+        status: WalletTransactionStatus.PENDING,
+      },
+      data: { status: WalletTransactionStatus.REVERSED },
+    });
+    reversed += byId.count;
+  }
+  const byRef = await tx.walletTransaction.updateMany({
+    where: {
+      referenceType: WALLET_PURCHASE_DEBIT_REF,
+      referenceId: purchaseId,
+      type: WalletTransactionType.PURCHASE_DEBIT,
+      status: WalletTransactionStatus.PENDING,
+    },
+    data: { status: WalletTransactionStatus.REVERSED },
+  });
+  reversed += byRef.count;
+  return reversed;
+}
+
+/**
  * Exact-once refund of reserved wallet purchase funds.
  * Amount must come from durable purchase/debit records (never admin form).
  * Safe to call from recovery when eligibility is already verified.
@@ -864,6 +903,10 @@ export async function refundReservedFundsInTx(
     purchase.status === WalletEsimPurchaseStatus.READY &&
     !purchase.debitTransactionId
   ) {
+    await reversePendingWalletPurchaseDebitInTx(tx, {
+      purchaseId: purchase.id,
+      debitTransactionId: purchase.debitTransactionId,
+    });
     return { outcome: "already_refunded", refundTransactionId: null };
   }
 
@@ -881,6 +924,8 @@ export async function refundReservedFundsInTx(
       purchase.status === WalletEsimPurchaseStatus.FUNDS_RESERVED ||
       providerPendingRestorable;
     if (!releasable) {
+      // Do not reverse here — purchase may still be holding funds (e.g. FUNDED /
+      // reconciliation). Orphan PENDING badges are healed only with release evidence.
       return { outcome: "already_refunded", refundTransactionId: null };
     }
   }
@@ -960,12 +1005,10 @@ export async function refundReservedFundsInTx(
           reconciliationState: null,
         },
       });
-      if (relinked.count === 1 && purchase.debitTransactionId) {
-        await tx.walletTransaction.update({
-          where: { id: purchase.debitTransactionId },
-          data: { status: WalletTransactionStatus.REVERSED },
-        });
-      }
+      await reversePendingWalletPurchaseDebitInTx(tx, {
+        purchaseId: purchase.id,
+        debitTransactionId: purchase.debitTransactionId,
+      });
     } else {
       await tx.walletEsimPurchase.update({
         where: { id: purchase.id },
@@ -1012,6 +1055,21 @@ export async function refundReservedFundsInTx(
       },
     });
     if (claimedRelease.count !== 1) {
+      // Concurrent finalize or release won the CAS — only reverse when purchase
+      // is already restored to READY without a debit link.
+      const latest = await tx.walletEsimPurchase.findUnique({
+        where: { id: purchase.id },
+        select: { status: true, debitTransactionId: true },
+      });
+      if (
+        latest?.status === WalletEsimPurchaseStatus.READY &&
+        !(latest.debitTransactionId ?? "").trim()
+      ) {
+        await reversePendingWalletPurchaseDebitInTx(tx, {
+          purchaseId: purchase.id,
+          debitTransactionId: purchase.debitTransactionId,
+        });
+      }
       return { outcome: "already_refunded", refundTransactionId: null };
     }
   }
@@ -1052,12 +1110,10 @@ export async function refundReservedFundsInTx(
     select: { id: true },
   });
 
-  if (purchase.debitTransactionId) {
-    await tx.walletTransaction.update({
-      where: { id: purchase.debitTransactionId },
-      data: { status: WalletTransactionStatus.REVERSED },
-    });
-  }
+  await reversePendingWalletPurchaseDebitInTx(tx, {
+    purchaseId: purchase.id,
+    debitTransactionId: purchase.debitTransactionId,
+  });
 
   if (!restoreReady) {
     await tx.walletEsimPurchase.update({

@@ -13,6 +13,7 @@ import {
   walletLedgerLifecycleLabel,
   type WalletLedgerLifecycleLabel,
 } from "@/app/lib/admin/walletLedgerShared";
+import { healReleasedPendingPurchaseDebitsForWallet } from "@/app/lib/admin/walletPendingVoid";
 import { isAdminVoidablePendingWalletDebit } from "@/app/lib/admin/walletPendingVoidShared";
 import { prisma } from "@/app/lib/db";
 import {
@@ -139,6 +140,15 @@ export async function getAdminWalletLedgerPage(input: {
       totalCount: 0,
       totalPages: 1,
     };
+  }
+
+  try {
+    await healReleasedPendingPurchaseDebitsForWallet({
+      walletId: wallet.id,
+      limit: pageSize,
+    });
+  } catch {
+    // Ledger read must not fail if heal is temporarily unavailable.
   }
 
   const totalCount = await prisma.walletTransaction.count({

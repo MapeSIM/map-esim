@@ -87,6 +87,7 @@ function main() {
 
   assert.match(service, /INSUFFICIENT_FUNDS/);
   assert.match(service, /reserveWalletPurchaseFundsInTx/);
+  assert.match(service, /reversePendingWalletPurchaseDebitInTx/);
   assert.match(service, /amountCents:\s*snapshot\.priceCents/);
   assert.match(service, /balanceCents:\s*\{\s*gte:\s*amountCents/);
   assert.ok(

@@ -55,6 +55,20 @@ function main() {
   assert.equal(
     isAdminVoidablePendingWalletDebit({
       ...eligible,
+      status: "REVERSED",
+    }),
+    false
+  );
+  assert.equal(
+    isAdminVoidablePendingWalletDebit({
+      ...eligible,
+      purchaseStatus: "READY",
+    }),
+    false
+  );
+  assert.equal(
+    isAdminVoidablePendingWalletDebit({
+      ...eligible,
       orderId: "ord_1",
     }),
     false
@@ -94,6 +108,10 @@ function main() {
   assert.match(service, /refundReservedFundsInTx/);
   assert.match(service, /restoreReady:\s*true/);
   assert.match(service, /assisted:\s*true/);
+  assert.match(service, /healReleasedPendingPurchaseDebit/);
+  assert.match(service, /WalletTransactionStatus\.REVERSED|status: WalletTransactionStatus\.REVERSED/);
+  const purchaseLib = read("app/lib/esim/walletPurchase.ts");
+  assert.match(purchaseLib, /reversePendingWalletPurchaseDebitInTx/);
   assert.match(actions, /actorHasAdminPermission/);
   assert.match(actions, /WALLET_ADJUST/);
   assert.match(actions, /voidPendingWalletEsimPurchaseReservation/);

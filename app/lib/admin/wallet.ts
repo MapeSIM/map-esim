@@ -8,6 +8,7 @@ import {
 } from "@prisma/client";
 import { maskAdminEmail } from "@/app/lib/admin/display";
 import { prisma } from "@/app/lib/db";
+import { healReleasedPendingPurchaseDebitsForWallet } from "@/app/lib/admin/walletPendingVoid";
 import { isAdminVoidablePendingWalletDebit } from "@/app/lib/admin/walletPendingVoidShared";
 import {
   formatUsdCents,
@@ -282,6 +283,17 @@ export async function getAdminCustomerWalletSummary(
     } | null;
     purchaseAsRefund: { orderId: string | null } | null;
   };
+
+  // Flip orphaned PENDING purchase debits to REVERSED when release evidence exists
+  // (fixes stale Pending badges / Void buttons after restoreReady release).
+  try {
+    await healReleasedPendingPurchaseDebitsForWallet({
+      walletId: wallet.id,
+      limit: ADMIN_CUSTOMER_RECENT_WALLET_TX_LIMIT,
+    });
+  } catch {
+    // Display load must not fail if heal is temporarily unavailable.
+  }
 
   let recent: RecentWalletTxRow[];
   try {
