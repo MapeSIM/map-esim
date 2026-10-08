@@ -71,11 +71,6 @@ function successPath(purchaseId: string): string {
   return `/account/esim/buy/success?${params.toString()}`;
 }
 
-function failedPath(purchaseId: string): string {
-  const params = new URLSearchParams({ purchase: purchaseId });
-  return `/account/esim/buy/failed?${params.toString()}`;
-}
-
 function reconciliationPath(purchaseId: string): string {
   const params = new URLSearchParams({ purchase: purchaseId });
   return `/account/esim/buy/review-needed?${params.toString()}`;
@@ -510,13 +505,16 @@ export async function confirmWalletEsimPurchaseAction(
     });
   } catch (error) {
     if (error instanceof WalletEsimPurchaseError) {
-      if (error.code === "PROVIDER_FAILED") {
-        redirect(failedPath(purchaseId));
-      }
       if (error.code === "RECONCILIATION_REQUIRED") {
         redirect(reconciliationPath(purchaseId));
       }
-      if (error.code === "PROMO_INVALID" || error.code === "REWARDS_INVALID") {
+      // PROVIDER_FAILED restores wallet to READY — surface error on review so
+      // the customer can retry (do not send them to a dead-end failed page).
+      if (
+        error.code === "PROVIDER_FAILED" ||
+        error.code === "PROMO_INVALID" ||
+        error.code === "REWARDS_INVALID"
+      ) {
         return { ok: false, error: error.message };
       }
       return { ok: false, error: error.message };

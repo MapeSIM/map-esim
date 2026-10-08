@@ -35,6 +35,15 @@ export type CreditCheckoutResult =
       payload?: Record<string, unknown>;
     };
 
+/** Per-attempt AbortController timeout for VeSIM credit checkout. */
+const VESIM_CREDIT_CHECKOUT_TIMEOUT_MS = 25_000;
+
+function isAbortError(error: unknown): boolean {
+  if (error == null || typeof error !== "object") return false;
+  const name = "name" in error ? String((error as { name: unknown }).name) : "";
+  return name === "AbortError" || name === "TimeoutError";
+}
+
 /**
  * Single VeSIM credit checkout call.
  * Not wrapped in a Prisma transaction. No invented idempotency header.
@@ -67,6 +76,10 @@ export async function executeCreditCheckout(options: {
 
   let response: Response;
   let payload: Record<string, unknown> = {};
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, VESIM_CREDIT_CHECKOUT_TIMEOUT_MS);
   try {
     const token = await getBrokerToken();
     const baseUrl = getVesimBaseUrl();
@@ -84,6 +97,7 @@ export async function executeCreditCheckout(options: {
         ...(rechargeOrderId ? { rechargeOrderId } : {}),
       }),
       cache: "no-store",
+      signal: controller.signal,
     });
     payload = await readJsonSafe(response);
   } catch (error) {
@@ -94,11 +108,20 @@ export async function executeCreditCheckout(options: {
         code: "vesim_env_invalid",
       };
     }
+    if (controller.signal.aborted || isAbortError(error)) {
+      return {
+        kind: "uncertain",
+        category: "provider_timeout",
+        code: "checkout_timeout",
+      };
+    }
     return {
       kind: "uncertain",
       category: "provider_timeout",
       code: "checkout_transport_error",
     };
+  } finally {
+    clearTimeout(timer);
   }
 
   const providerOrderId = extractOrderId(payload);

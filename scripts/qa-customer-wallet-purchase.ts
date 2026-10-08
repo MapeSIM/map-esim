@@ -189,10 +189,23 @@ function main() {
   const afterCheckout = service.slice(service.indexOf("await executeCreditCheckout"));
   const uncertainIdx = afterCheckout.indexOf('checkout.kind !== "success"');
   assert.ok(uncertainIdx > 0);
-  assert.ok(
-    !afterCheckout.slice(uncertainIdx, uncertainIdx + 280).includes("refundReservedFunds")
+  // Uncertain WITH providerOrderId → reconciliation (no auto-refund).
+  // Uncertain WITHOUT provider order evidence → rollbackUnconfirmedWalletReservation.
+  assert.match(service, /rollbackUnconfirmedWalletReservation/);
+  assert.match(afterCheckout, /observedProviderOrderId/);
+  assert.match(afterCheckout, /markReconciliationRequired/);
+  console.log("PASS uncertain_with_provider_order_recon_else_rollback");
+  assert.match(checkout, /VESIM_CREDIT_CHECKOUT_TIMEOUT_MS|AbortController|checkout_timeout/);
+  console.log("PASS provider_checkout_has_timeout");
+  assert.match(
+    read("app/lib/esim/walletPurchaseStaleRelease.ts"),
+    /FULL_WALLET_STALE_IDLE_MS\s*=\s*5\s*\*\s*60\s*\*\s*1000/
   );
-  console.log("PASS uncertain_not_auto_refunded_or_retried");
+  assert.match(
+    read("app/lib/payments/gatewayStaleReservationRecovery.ts"),
+    /runFullWalletStaleReservationRelease/
+  );
+  console.log("PASS stale_full_wallet_pending_debit_release");
 
   assert.match(successPage, /getCompletedWalletPurchase/);
   assert.match(successPage, /void query\.price/);

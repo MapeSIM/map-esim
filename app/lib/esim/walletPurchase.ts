@@ -801,6 +801,9 @@ export async function refundReservedFundsInTx(
       status: true,
       refundTransactionId: true,
       debitTransactionId: true,
+      orderId: true,
+      providerOrderId: true,
+      providerResultKind: true,
       priceCents: true,
       walletAppliedCents: true,
       gatewayAmountCents: true,
@@ -864,16 +867,31 @@ export async function refundReservedFundsInTx(
     return { outcome: "already_refunded", refundTransactionId: null };
   }
 
-  // Gateway reservation release is only valid before verified funding.
-  // FUNDED / fulfilled / reconciliation purchases must never be credited here.
+  // Reservation release is only valid before verified funding / provider success.
+  // FUNDED / fulfilled / reconciliation-with-provider-order must never be credited here.
+  const providerPendingRestorable =
+    purchase.status === WalletEsimPurchaseStatus.PROVIDER_PENDING &&
+    !purchase.orderId &&
+    !(purchase.providerOrderId ?? "").trim() &&
+    purchase.providerResultKind !== "success";
+
   if (restoreReady) {
     const releasable =
       purchase.status === WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT ||
-      purchase.status === WalletEsimPurchaseStatus.FUNDS_RESERVED;
+      purchase.status === WalletEsimPurchaseStatus.FUNDS_RESERVED ||
+      providerPendingRestorable;
     if (!releasable) {
       return { outcome: "already_refunded", refundTransactionId: null };
     }
   }
+
+  const restoreReadyStatuses: WalletEsimPurchaseStatus[] = [
+    WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+    WalletEsimPurchaseStatus.FUNDS_RESERVED,
+    ...(providerPendingRestorable
+      ? [WalletEsimPurchaseStatus.PROVIDER_PENDING]
+      : []),
+  ];
 
   if (!restoreReady && purchase.refundTransactionId) {
     await tx.walletEsimPurchase.update({
@@ -929,12 +947,7 @@ export async function refundReservedFundsInTx(
       const relinked = await tx.walletEsimPurchase.updateMany({
         where: {
           id: purchase.id,
-          status: {
-            in: [
-              WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
-              WalletEsimPurchaseStatus.FUNDS_RESERVED,
-            ],
-          },
+          status: { in: restoreReadyStatuses },
         },
         data: {
           status: WalletEsimPurchaseStatus.READY,
@@ -942,6 +955,9 @@ export async function refundReservedFundsInTx(
           debitTransactionId: null,
           failureCategory: null,
           failureCode: null,
+          providerResultKind: null,
+          safeProviderStatusCode: null,
+          reconciliationState: null,
         },
       });
       if (relinked.count === 1 && purchase.debitTransactionId) {
@@ -979,12 +995,10 @@ export async function refundReservedFundsInTx(
     const claimedRelease = await tx.walletEsimPurchase.updateMany({
       where: {
         id: purchase.id,
-        status: {
-          in: [
-            WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
-            WalletEsimPurchaseStatus.FUNDS_RESERVED,
-          ],
-        },
+        status: { in: restoreReadyStatuses },
+        orderId: null,
+        providerOrderId: null,
+        NOT: { providerResultKind: "success" },
       },
       data: {
         status: WalletEsimPurchaseStatus.READY,
@@ -992,6 +1006,9 @@ export async function refundReservedFundsInTx(
         debitTransactionId: null,
         failureCategory: null,
         failureCode: null,
+        providerResultKind: null,
+        safeProviderStatusCode: null,
+        reconciliationState: null,
       },
     });
     if (claimedRelease.count !== 1) {
@@ -1098,6 +1115,8 @@ async function refundReservedFunds(options: {
   assisted: boolean;
   priceCents: number;
   debitTransactionId: string;
+  /** When true, restore purchase to READY so the customer can retry. */
+  restoreReady?: boolean;
 }): Promise<string | null> {
   void options.debitTransactionId;
   let createdRefundTransactionId: string | null = null;
@@ -1109,6 +1128,7 @@ async function refundReservedFunds(options: {
       actorUserId: options.actorUserId,
       assisted: options.assisted,
       priceCents: options.priceCents,
+      restoreReady: Boolean(options.restoreReady),
     });
     if (result.outcome === "created") {
       createdRefundTransactionId = result.refundTransactionId;
@@ -1119,6 +1139,69 @@ async function refundReservedFunds(options: {
     scheduleWalletTransactionNotification(createdRefundTransactionId);
   }
   return createdRefundTransactionId;
+}
+
+/**
+ * Best-effort rollback of an unconfirmed full-wallet reservation when provider
+ * provisioning failed without durable provider-order evidence.
+ * Never refunds when a provider order id or success observation exists.
+ */
+async function rollbackUnconfirmedWalletReservation(options: {
+  purchaseId: string;
+  customerUserId: string;
+  actorUserId: string;
+  assisted: boolean;
+  walletDebitCents: number;
+  reservedDebitTransactionId: string;
+}): Promise<void> {
+  if (options.walletDebitCents <= 0) {
+    await prisma.$transaction(async (tx) => {
+      await releasePromoRedemptionInTx(tx, options.purchaseId);
+      await releaseRewardRedemptionInTx(tx, options.purchaseId);
+      await tx.walletEsimPurchase.updateMany({
+        where: {
+          id: options.purchaseId,
+          orderId: null,
+          providerOrderId: null,
+          status: {
+            in: [
+              WalletEsimPurchaseStatus.FUNDS_RESERVED,
+              WalletEsimPurchaseStatus.PROVIDER_PENDING,
+            ],
+          },
+          NOT: { providerResultKind: "success" },
+        },
+        data: {
+          status: WalletEsimPurchaseStatus.READY,
+          debitTransactionId: null,
+          failureCategory: null,
+          failureCode: null,
+          providerResultKind: null,
+          safeProviderStatusCode: null,
+          reconciliationState: null,
+        },
+      });
+    });
+    return;
+  }
+
+  try {
+    await refundReservedFunds({
+      purchaseId: options.purchaseId,
+      customerUserId: options.customerUserId,
+      actorUserId: options.actorUserId,
+      assisted: options.assisted,
+      priceCents: options.walletDebitCents,
+      debitTransactionId: options.reservedDebitTransactionId,
+      restoreReady: true,
+    });
+  } catch (error) {
+    console.error("WALLET_PURCHASE_ROLLBACK_FAILED", {
+      purchaseId: options.purchaseId,
+      code:
+        error instanceof Error ? error.name.slice(0, 64) : "unknown_error",
+    });
+  }
 }
 
 async function markReconciliationRequired(options: {
@@ -1608,82 +1691,123 @@ export async function confirmWalletEsimPurchase(
   }
 
   // External provider write — outside Prisma transaction.
+  // On any failure without durable provider-order evidence, restore wallet so
+  // the customer is not left with a stuck PENDING debit and no Order row.
   const addDataSourceOrderId = parseAddDataSourceOrderId(purchase.idempotencyKey);
   let rechargeOrderId: string | null = null;
-  if (addDataSourceOrderId) {
-    rechargeOrderId = await resolveOwnedRechargeOrderId({
-      customerUserId,
-      localOrderId: addDataSourceOrderId,
-    });
-    if (!rechargeOrderId) {
-      throw new WalletEsimPurchaseError(
-        "INVALID_STATE",
-        "Add More Data is not available for this eSIM."
-      );
+  let successCheckout: Extract<
+    Awaited<ReturnType<typeof executeCreditCheckout>>,
+    { kind: "success" }
+  >;
+
+  try {
+    if (addDataSourceOrderId) {
+      rechargeOrderId = await resolveOwnedRechargeOrderId({
+        customerUserId,
+        localOrderId: addDataSourceOrderId,
+      });
+      if (!rechargeOrderId) {
+        throw new WalletEsimPurchaseError(
+          "INVALID_STATE",
+          "Add More Data is not available for this eSIM."
+        );
+      }
     }
-  }
 
-  const checkout = await executeCreditCheckout({
-    offerId: snapshot.offerId,
-    customerEmail: customer.email,
-    rechargeOrderId,
-  });
+    const checkout = await executeCreditCheckout({
+      offerId: snapshot.offerId,
+      customerEmail: customer.email,
+      rechargeOrderId,
+    });
 
-  if (checkout.kind === "declined") {
-    if (walletDebitCents > 0) {
-      await refundReservedFunds({
+    if (checkout.kind === "declined") {
+      // Restore READY so the customer can retry; never leave a stuck PENDING debit.
+      await rollbackUnconfirmedWalletReservation({
         purchaseId: purchase.id,
         customerUserId,
         actorUserId,
         assisted: isAssisted,
-        priceCents: walletDebitCents,
-        debitTransactionId: reservedDebitTransactionId,
+        walletDebitCents,
+        reservedDebitTransactionId,
       });
-    } else {
-      await prisma.$transaction(async (tx) => {
-        await releasePromoRedemptionInTx(tx, purchase.id);
-        await releaseRewardRedemptionInTx(tx, purchase.id);
-        await tx.walletEsimPurchase.updateMany({
-          where: {
-            id: purchase.id,
-            status: WalletEsimPurchaseStatus.PROVIDER_PENDING,
-          },
-          data: {
-            status: WalletEsimPurchaseStatus.FAILED_REFUNDED,
-            failureCategory: "provider_declined",
-            failureCode: "refunded",
+      throw new WalletEsimPurchaseError(
+        "PROVIDER_FAILED",
+        isAssisted
+          ? "The provider could not complete this purchase. The customer wallet amount was restored. Please try again."
+          : "The provider could not complete this purchase. Your wallet amount was restored. Please try again."
+      );
+    }
+
+    if (checkout.kind !== "success") {
+      const observedProviderOrderId = (checkout.providerOrderId ?? "").trim();
+      if (observedProviderOrderId) {
+        // Provider may have created an eSIM — never auto-refund; manual review.
+        await markReconciliationRequired({
+          purchaseId: purchase.id,
+          customerUserId,
+          actorUserId,
+          assisted: isAssisted,
+          category: checkout.category,
+          code: checkout.code,
+          providerObservation: {
+            providerOrderId: observedProviderOrderId,
+            providerResultKind: "uncertain",
+            safeProviderStatusCode: checkout.code,
           },
         });
-      });
-    }
-    throw new WalletEsimPurchaseError(
-      "PROVIDER_FAILED",
-      isAssisted
-        ? "The provider could not complete this purchase. The customer wallet amount was restored."
-        : "The provider could not complete this purchase. Your wallet amount was restored."
-    );
-  }
+      }
 
-  if (checkout.kind !== "success") {
-    await markReconciliationRequired({
+      // No provider order id — safe to restore balance and let the customer retry.
+      await rollbackUnconfirmedWalletReservation({
+        purchaseId: purchase.id,
+        customerUserId,
+        actorUserId,
+        assisted: isAssisted,
+        walletDebitCents,
+        reservedDebitTransactionId,
+      });
+      throw new WalletEsimPurchaseError(
+        "PROVIDER_FAILED",
+        isAssisted
+          ? "The provider did not confirm this purchase. The customer wallet amount was restored. Please try again."
+          : "We could not confirm your eSIM with the provider. Your wallet amount was restored. Please try again."
+      );
+    }
+
+    successCheckout = checkout;
+  } catch (error) {
+    if (error instanceof WalletEsimPurchaseError) {
+      if (
+        error.code === "RECONCILIATION_REQUIRED" ||
+        error.code === "PROVIDER_FAILED"
+      ) {
+        throw error;
+      }
+      await rollbackUnconfirmedWalletReservation({
+        purchaseId: purchase.id,
+        customerUserId,
+        actorUserId,
+        assisted: isAssisted,
+        walletDebitCents,
+        reservedDebitTransactionId,
+      });
+      throw error;
+    }
+    await rollbackUnconfirmedWalletReservation({
       purchaseId: purchase.id,
       customerUserId,
       actorUserId,
       assisted: isAssisted,
-      category: checkout.category,
-      code: checkout.code,
-      providerObservation: {
-        providerOrderId: checkout.providerOrderId ?? null,
-        providerResultKind: "uncertain",
-        safeProviderStatusCode: checkout.code,
-      },
+      walletDebitCents,
+      reservedDebitTransactionId,
     });
+    throw new WalletEsimPurchaseError(
+      "UNAVAILABLE",
+      isAssisted
+        ? "Wallet purchase is temporarily unavailable. The customer wallet amount was restored. Please try again shortly."
+        : "Wallet purchase is temporarily unavailable. Your wallet amount was restored. Please try again shortly."
+    );
   }
-
-  const successCheckout = checkout as Extract<
-    typeof checkout,
-    { kind: "success" }
-  >;
 
   // Durable provider-success evidence BEFORE local money/order finalization.
   // If finalize crashes afterward: observation remains, VeSIM is never retried,
@@ -1807,6 +1931,7 @@ export async function confirmWalletEsimPurchase(
     }
   } catch (error) {
     if (error instanceof WalletEsimPurchaseError) throw error;
+    // Provider already succeeded — never auto-refund; hold for reconciliation.
     await markReconciliationRequired({
       purchaseId: purchase.id,
       customerUserId,
@@ -1822,22 +1947,29 @@ export async function confirmWalletEsimPurchase(
     });
   }
 
-  // Post-commit side effects — never reverse Order/debit or retry VeSIM.
-  if (orderId) {
-    await runWalletPurchasePostCommitSideEffects({
-      purchaseId: purchase.id,
-      orderId,
-      customerUserId,
-      actorUserId,
-    });
-    await deliverCompletedWalletPurchaseInstallEmail({
-      purchaseId: purchase.id,
-      checkoutPayload: successCheckout.payload,
-      verifiedOffer,
-      actorUserId,
-      assistedWalletPurchaseNotice: isAssisted,
-    });
+  if (!orderId) {
+    throw new WalletEsimPurchaseError(
+      "RECONCILIATION_REQUIRED",
+      isAssisted
+        ? "This purchase requires reconciliation. Do not retry. Review the attempt before taking further action."
+        : "Your purchase is under review. Do not buy again. Contact support for help."
+    );
   }
+
+  // Post-commit side effects — never reverse Order/debit or retry VeSIM.
+  await runWalletPurchasePostCommitSideEffects({
+    purchaseId: purchase.id,
+    orderId,
+    customerUserId,
+    actorUserId,
+  });
+  await deliverCompletedWalletPurchaseInstallEmail({
+    purchaseId: purchase.id,
+    checkoutPayload: successCheckout.payload,
+    verifiedOffer,
+    actorUserId,
+    assistedWalletPurchaseNotice: isAssisted,
+  });
 
   return {
     purchaseId: purchase.id,

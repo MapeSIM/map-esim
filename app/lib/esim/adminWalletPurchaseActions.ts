@@ -38,11 +38,6 @@ function successPath(customerUserId: string, purchaseId: string): string {
   return `/admin/customers/${encodeURIComponent(customerUserId)}/esim/wallet-buy/success?${params.toString()}`;
 }
 
-function failedPath(customerUserId: string, purchaseId: string): string {
-  const params = new URLSearchParams({ purchase: purchaseId });
-  return `/admin/customers/${encodeURIComponent(customerUserId)}/esim/wallet-buy/failed?${params.toString()}`;
-}
-
 function reconciliationPath(customerUserId: string, purchaseId: string): string {
   const params = new URLSearchParams({ purchase: purchaseId });
   return `/admin/customers/${encodeURIComponent(customerUserId)}/esim/wallet-buy/review-needed?${params.toString()}`;
@@ -233,12 +228,10 @@ export async function confirmAdminWalletPurchaseAction(
     });
   } catch (error) {
     if (error instanceof WalletEsimPurchaseError) {
-      if (error.code === "PROVIDER_FAILED") {
-        redirect(failedPath(customerUserId, purchaseId));
-      }
       if (error.code === "RECONCILIATION_REQUIRED") {
         redirect(reconciliationPath(customerUserId, purchaseId));
       }
+      // PROVIDER_FAILED restores READY — show error so admin can retry.
       return { ok: false, error: error.message };
     }
     return {

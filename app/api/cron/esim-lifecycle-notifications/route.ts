@@ -139,6 +139,7 @@ async function handle(request: Request): Promise<Response> {
               errorCode:
                 staleRelease.customer.errorCode ??
                 staleRelease.partner.errorCode ??
+                staleRelease.fullWallet.errorCode ??
                 "stale_release_failed",
             }
           );
