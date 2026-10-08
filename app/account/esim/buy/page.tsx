@@ -14,6 +14,7 @@ import {
   WalletEsimPurchaseError,
 } from "@/app/lib/esim/walletPurchase";
 import {
+  isCustomerSourceOrderExpiredForAddData,
   normalizeAddDataFromOrderId,
   resolveOwnedRechargeOrderId,
   resolveWalletAddDataIdempotencyKey,
@@ -32,8 +33,14 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function reviewPath(purchaseId: string): string {
+function reviewPath(
+  purchaseId: string,
+  addDataBanner?: "topup" | "expired" | null
+): string {
   const params = new URLSearchParams({ purchase: purchaseId });
+  if (addDataBanner === "topup" || addDataBanner === "expired") {
+    params.set("addDataBanner", addDataBanner);
+  }
   return `/account/esim/buy/review?${params.toString()}`;
 }
 
@@ -194,21 +201,32 @@ export default async function AccountWalletBuyPage({
     }
     try {
       let idempotencyKey = newIdempotencyKey();
+      let addDataBanner: "topup" | "expired" | null = null;
       if (fromOrderId) {
-        const rechargeOrderId = await resolveOwnedRechargeOrderId({
+        const sourceExpired = await isCustomerSourceOrderExpiredForAddData({
           customerUserId: user.id,
           localOrderId: fromOrderId,
         });
-        if (!rechargeOrderId) {
-          directOfferError =
-            "Add More Data is not available for this eSIM.";
+        if (sourceExpired) {
+          // Fresh eSIM — do not bind rechargeOrderId / adddata_ key.
+          addDataBanner = "expired";
         } else {
-          idempotencyKey = await resolveWalletAddDataIdempotencyKey({
+          const rechargeOrderId = await resolveOwnedRechargeOrderId({
+            customerUserId: user.id,
             localOrderId: fromOrderId,
-            ownerKind: "customer",
-            ownerId: user.id,
-            offerId: offerIdHint,
           });
+          if (!rechargeOrderId) {
+            directOfferError =
+              "Add More Data is not available for this eSIM.";
+          } else {
+            idempotencyKey = await resolveWalletAddDataIdempotencyKey({
+              localOrderId: fromOrderId,
+              ownerKind: "customer",
+              ownerId: user.id,
+              offerId: offerIdHint,
+            });
+            addDataBanner = "topup";
+          }
         }
       }
       if (!directOfferError) {
@@ -219,6 +237,9 @@ export default async function AccountWalletBuyPage({
           idempotencyKey,
         });
         directPurchaseId = prepared.purchaseId;
+        if (directPurchaseId && addDataBanner) {
+          redirect(reviewPath(directPurchaseId, addDataBanner));
+        }
       }
     } catch (error) {
       if (error instanceof WalletEsimPurchaseError) {

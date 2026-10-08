@@ -3,8 +3,11 @@ import { notFound, redirect } from "next/navigation";
 import AbandonedCheckoutNonConfirmablePanel from "@/app/components/account/AbandonedCheckoutNonConfirmablePanel";
 import AbandonedCheckoutReviewGuidanceBanner from "@/app/components/account/AbandonedCheckoutReviewGuidanceBanner";
 import WalletPurchaseConfirmForm from "@/app/components/account/WalletPurchaseConfirmForm";
+import AddDataCheckoutBanner from "@/app/components/orders/AddDataCheckoutBanner";
 import { buildWalletBuyReviewReturnPath } from "@/app/lib/auth/redirects";
 import { requireRole } from "@/app/lib/auth/session";
+import { parseAddDataSourceOrderId } from "@/app/lib/esim/addDataPurchaseLabelShared";
+import { parseAddDataCheckoutBannerParam } from "@/app/lib/esim/addDataCheckoutBannerShared";
 import {
   resolveAbandonedCheckoutNonConfirmableGuidance,
   resolveAbandonedCheckoutReviewGuidance,
@@ -26,7 +29,7 @@ function parsePurchaseId(raw: string | undefined): string | null {
 export default async function AccountWalletBuyReviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ purchase?: string }>;
+  searchParams: Promise<{ purchase?: string; addDataBanner?: string }>;
 }) {
   const query = await searchParams;
   const purchaseId = parsePurchaseId(query.purchase);
@@ -122,6 +125,17 @@ export default async function AccountWalletBuyReviewPage({
   });
   const simpaisaOperators = await getSimpaisaWalletOperatorConfig();
 
+  const bannerFromQuery = parseAddDataCheckoutBannerParam(query.addDataBanner);
+  const isAddDataTopUp = Boolean(
+    parseAddDataSourceOrderId(review.idempotencyKey)
+  );
+  const addDataBanner =
+    bannerFromQuery === "expired"
+      ? ("expired" as const)
+      : isAddDataTopUp || bannerFromQuery === "topup"
+        ? ("topup" as const)
+        : null;
+
   return (
     <div className="min-w-0 space-y-8">
       <div>
@@ -136,6 +150,13 @@ export default async function AccountWalletBuyReviewPage({
           Review your plan and choose how to fund this purchase.
         </p>
       </div>
+
+      {addDataBanner ? (
+        <AddDataCheckoutBanner
+          variant={addDataBanner}
+          iccidLast4={review.addDataTopUpIccidLast4}
+        />
+      ) : null}
 
       {guidance ? (
         <AbandonedCheckoutReviewGuidanceBanner guidance={guidance} />

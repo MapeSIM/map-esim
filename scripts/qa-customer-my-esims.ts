@@ -326,9 +326,43 @@ function main() {
     /buildAddDataEligibility\(\{\s*orderId:/
   );
   const addDataPage = read("app/account/orders/[orderId]/add-data/page.tsx");
+  const addDataBannerShared = read(
+    "app/lib/esim/addDataCheckoutBannerShared.ts"
+  );
+  const addDataBannerUi = read(
+    "app/components/orders/AddDataCheckoutBanner.tsx"
+  );
+  const reviewPage = read("app/account/esim/buy/review/page.tsx");
   assert.match(addDataPage, /CustomerAddDataForm/);
   assert.match(addDataPage, /Continue to checkout/);
   assert.match(addDataPage, /getCustomerOwnedOrderDetail/);
+  assert.match(addDataPage, /AddDataCheckoutBanner/);
+  assert.match(addDataPage, /isCustomerSourceOrderExpiredForAddData/);
+  assert.match(addDataPage, /canContinueExpiredFresh|expired_fresh|sourceExpired/);
+  assert.match(addDataBannerShared, /Adding Data to Existing eSIM/);
+  assert.match(
+    addDataBannerShared,
+    /This eSIM has Expired and cannot be recharged/
+  );
+  assert.match(addDataBannerShared, /create a new eSIM instead of topping up/);
+  assert.match(addDataBannerUi, /data-add-data-banner="topup"/);
+  assert.match(addDataBannerUi, /data-add-data-banner="expired"/);
+  assert.match(reviewPage, /AddDataCheckoutBanner/);
+  assert.match(reviewPage, /addDataBanner/);
+  const walletActionsAddData = read("app/lib/esim/walletPurchaseActions.ts");
+  assert.match(
+    walletActionsAddData,
+    /isCustomerSourceOrderExpiredForAddData/
+  );
+  assert.match(
+    walletActionsAddData,
+    /reviewPath\(prepared\.purchaseId, "expired"\)/
+  );
+  assert.match(walletActionsAddData, /newFreshPurchaseIdempotencyKey/);
+  assert.match(
+    read("app/lib/esim/addDataCheckout.ts"),
+    /isCustomerSourceOrderExpiredForAddData/
+  );
   assert.doesNotMatch(addDataPage, /name="rechargeOrderId"|name="providerOrderId"/);
   const customerAddDataForm = read(
     "app/components/orders/CustomerAddDataForm.tsx"

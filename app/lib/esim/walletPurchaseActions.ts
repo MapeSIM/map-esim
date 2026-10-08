@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/app/lib/auth/session";
 import {
@@ -13,6 +14,7 @@ import {
   prepareWalletEsimPurchase,
   setWalletPurchaseFundingChoice,
 } from "@/app/lib/esim/walletPurchase";
+import { customerEsimLineReady } from "@/app/lib/orders/customerOrderDisplay";
 import { getCustomerOwnedOrderDetail } from "@/app/lib/orders/customerOrders";
 import { esimPurchasePaymentCancelPath } from "@/app/lib/payments/safepayCheckoutPaths";
 import {
@@ -49,10 +51,12 @@ import {
   sanitizeCountryHint,
 } from "@/app/lib/vesim/server";
 import {
+  isCustomerSourceOrderExpiredForAddData,
   normalizeAddDataFromOrderId,
   resolveOwnedRechargeOrderId,
   resolveWalletAddDataIdempotencyKey,
 } from "@/app/lib/esim/addDataCheckout";
+import type { AddDataCheckoutBannerVariant } from "@/app/lib/esim/addDataCheckoutBannerShared";
 
 export async function loadCustomerWalletPurchaseOffersAction(
   destinationCode: string
@@ -61,9 +65,19 @@ export async function loadCustomerWalletPurchaseOffersAction(
   return listAdminAssignmentOffers(destinationCode);
 }
 
-function reviewPath(purchaseId: string): string {
+function reviewPath(
+  purchaseId: string,
+  addDataBanner?: AddDataCheckoutBannerVariant | null
+): string {
   const params = new URLSearchParams({ purchase: purchaseId });
+  if (addDataBanner === "topup" || addDataBanner === "expired") {
+    params.set("addDataBanner", addDataBanner);
+  }
   return `/account/esim/buy/review?${params.toString()}`;
+}
+
+function newFreshPurchaseIdempotencyKey(): string {
+  return randomBytes(16).toString("hex");
 }
 
 function successPath(purchaseId: string): string {
@@ -182,12 +196,29 @@ export async function startCustomerAddDataCheckoutAction(
   }
 
   const detail = await getCustomerOwnedOrderDetail(customer.id, localOrderId);
-  if (!detail || !detail.addDataEligible) {
+  if (!detail || !detail.offerId) {
     redirect(
       `/account/orders/${encodeURIComponent(localOrderId)}/add-data`
     );
   }
-  if (!detail.offerId || !detail.rechargeOrderId) {
+
+  const sourceExpired = await isCustomerSourceOrderExpiredForAddData({
+    customerUserId: customer.id,
+    localOrderId,
+  });
+
+  // Expired → fresh eSIM purchase (no recharge bind). Active → top-up bind.
+  if (!sourceExpired) {
+    if (!detail.addDataEligible || !detail.rechargeOrderId) {
+      redirect(
+        `/account/orders/${encodeURIComponent(localOrderId)}/add-data`
+      );
+    }
+  } else if (
+    detail.isRefunded ||
+    !customerEsimLineReady(detail.statusBadge)
+  ) {
+    // Refunded never proceeds; expired fresh still needs a completed line.
     redirect(
       `/account/orders/${encodeURIComponent(localOrderId)}/add-data`
     );
@@ -196,6 +227,16 @@ export async function startCustomerAddDataCheckoutAction(
   const countryHint = sanitizeCountryHint(detail.destinationCode);
 
   try {
+    if (sourceExpired) {
+      const prepared = await prepareWalletEsimPurchase({
+        customerUserId: customer.id,
+        offerId: detail.offerId,
+        countryHint,
+        idempotencyKey: newFreshPurchaseIdempotencyKey(),
+      });
+      redirect(reviewPath(prepared.purchaseId, "expired"));
+    }
+
     const idempotencyKey = await resolveWalletAddDataIdempotencyKey({
       localOrderId,
       ownerKind: "customer",
@@ -208,7 +249,7 @@ export async function startCustomerAddDataCheckoutAction(
       countryHint,
       idempotencyKey,
     });
-    redirect(reviewPath(prepared.purchaseId));
+    redirect(reviewPath(prepared.purchaseId, "topup"));
   } catch (error) {
     if (error instanceof WalletEsimPurchaseError) {
       redirect(

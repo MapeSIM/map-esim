@@ -1,15 +1,21 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import AddDataCheckoutBanner from "@/app/components/orders/AddDataCheckoutBanner";
 import CustomerAddDataForm from "@/app/components/orders/CustomerAddDataForm";
 import { requireSession } from "@/app/lib/auth/session";
+import {
+  isCustomerSourceOrderExpiredForAddData,
+  resolveCustomerAddDataIccidLast4,
+} from "@/app/lib/esim/addDataCheckout";
+import { customerEsimLineReady } from "@/app/lib/orders/customerOrderDisplay";
 import { getCustomerOwnedOrderDetail } from "@/app/lib/orders/customerOrders";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Add More Data entry — starts the existing wallet credit checkout with
- * rechargeOrderId bound to this eSIM's VeSIM providerOrderId.
- * Package catalog browsing remains on the shared buy/review flow.
+ * rechargeOrderId bound to this eSIM's VeSIM providerOrderId when active.
+ * Expired source orders continue as a fresh eSIM purchase (no recharge bind).
  */
 export default async function AccountOrderAddDataPage({
   params,
@@ -38,6 +44,28 @@ export default async function AccountOrderAddDataPage({
   const backHref = `/account/orders/${encodeURIComponent(detail.id)}`;
   const showError = query.error === "1";
 
+  const sourceExpired = await isCustomerSourceOrderExpiredForAddData({
+    customerUserId: user.id,
+    localOrderId: detail.id,
+  });
+  const iccidLast4 = await resolveCustomerAddDataIccidLast4({
+    customerUserId: user.id,
+    localOrderId: detail.id,
+  });
+
+  const canContinueTopUp =
+    !sourceExpired &&
+    detail.addDataEligible &&
+    Boolean(detail.offerId) &&
+    Boolean(detail.rechargeOrderId);
+  // Expired: allow a fresh eSIM purchase even when catalog supportTopUp is false.
+  const canContinueExpiredFresh =
+    sourceExpired &&
+    !detail.isRefunded &&
+    Boolean(detail.offerId) &&
+    customerEsimLineReady(detail.statusBadge);
+  const canContinue = canContinueTopUp || canContinueExpiredFresh;
+
   return (
     <div className="space-y-6">
       <div>
@@ -53,18 +81,26 @@ export default async function AccountOrderAddDataPage({
         </p>
       </div>
 
+      {canContinue ? (
+        <AddDataCheckoutBanner
+          variant={sourceExpired ? "expired" : "topup"}
+          iccidLast4={iccidLast4}
+        />
+      ) : null}
+
       <section
         className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-5 sm:px-5"
         role="status"
       >
-        {detail.addDataEligible && detail.offerId && detail.rechargeOrderId ? (
+        {canContinue ? (
           <>
             <p className="text-sm font-semibold text-[var(--heading)]">
               Continue to checkout
             </p>
             <p className="mt-2 text-sm text-[var(--text-muted)]">
-              You will review pricing and pay with your existing wallet checkout.
-              Data is added to this eSIM — a new eSIM is not created.
+              {sourceExpired
+                ? "You will review pricing and pay with your existing wallet checkout. A new eSIM will be created."
+                : "You will review pricing and pay with your existing wallet checkout. Data is added to this eSIM — a new eSIM is not created."}
             </p>
             {showError ? (
               <p
@@ -75,7 +111,14 @@ export default async function AccountOrderAddDataPage({
                 contact support.
               </p>
             ) : null}
-            <CustomerAddDataForm orderId={detail.id} />
+            <CustomerAddDataForm
+              orderId={detail.id}
+              buttonLabel={
+                sourceExpired
+                  ? "Continue — buy new eSIM"
+                  : "Continue to checkout"
+              }
+            />
           </>
         ) : (
           <>

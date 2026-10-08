@@ -871,6 +871,16 @@ export async function getCustomerOwnedOrderDetail(
     installEligible: lineReady,
     catalog,
   });
+  // Expired lines may buy a fresh eSIM even when catalog supportTopUp is false.
+  const lifecycleExpired =
+    statusBadge === "eSIM Expired" ||
+    (order.providerLifecycleStatus ?? "").trim().toUpperCase() === "EXPIRED";
+  const addDataEligible =
+    addData.addDataEligible ||
+    (lifecycleExpired && !isRefunded && lineReady && Boolean(offerId));
+  const addDataBlockedReason = addDataEligible
+    ? null
+    : addData.addDataBlockedReason;
   const addDataPurchase = resolveAddDataPurchaseLabel(
     order.walletEsimPurchase?.idempotencyKey
   );
@@ -1005,8 +1015,8 @@ export async function getCustomerOwnedOrderDetail(
     supportTopUp: addData.supportTopUp,
     supportTopUpType: addData.supportTopUpType,
     rechargeOrderId: addData.rechargeOrderId,
-    addDataEligible: addData.addDataEligible,
-    addDataBlockedReason: addData.addDataBlockedReason,
+    addDataEligible,
+    addDataBlockedReason,
     isAddDataPurchase: addDataPurchase.isAddDataPurchase,
     addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
     lifecycle: toProviderLifecycleCacheView({

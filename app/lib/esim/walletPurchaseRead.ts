@@ -19,6 +19,7 @@ import {
   resolveCustomerPendingPurchaseVisibility,
 } from "@/app/lib/esim/customerPurchaseStatusMessaging";
 import { parseAddDataSourceOrderId } from "@/app/lib/esim/addDataPurchaseLabelShared";
+import { normalizeIccidLast4ForBanner } from "@/app/lib/esim/addDataCheckoutBannerShared";
 import { formatWalletPurchasePriceLabel } from "@/app/lib/esim/walletPurchase";
 import {
   canEditPurchaseDeliveryEmail,
@@ -105,6 +106,11 @@ export type WalletPurchaseReview = {
   alternateDeliveryEmail: string | null;
   deliveryEmailLocked: boolean;
   deliveryEmailEditable: boolean;
+  /**
+   * When this review is an Add Data top-up (adddata_ idempotency), last-4 of the
+   * source eSIM ICCID for the blue checkout banner. Null for fresh / expired-fresh.
+   */
+  addDataTopUpIccidLast4: string | null;
 };
 
 export async function getWalletPurchaseReview(
@@ -246,6 +252,16 @@ export async function getWalletPurchaseReview(
     pendingGatewayAttemptId = pendingAttempt?.id ?? null;
   }
 
+  let addDataTopUpIccidLast4: string | null = null;
+  const addDataSourceOrderId = parseAddDataSourceOrderId(row.idempotencyKey);
+  if (addDataSourceOrderId) {
+    const source = await prisma.order.findFirst({
+      where: { id: addDataSourceOrderId, userId: owner.id },
+      select: { iccidLast4: true },
+    });
+    addDataTopUpIccidLast4 = normalizeIccidLast4ForBanner(source?.iccidLast4);
+  }
+
   return {
     purchaseId: row.id,
     customerId: owner.id,
@@ -307,6 +323,7 @@ export async function getWalletPurchaseReview(
       alternateDeliveryEmailLockedAt: row.alternateDeliveryEmailLockedAt,
       adminUserId: row.adminUserId,
     }),
+    addDataTopUpIccidLast4,
   };
 }
 

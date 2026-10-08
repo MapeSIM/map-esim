@@ -188,6 +188,68 @@ export function normalizeAddDataFromOrderId(
 }
 
 /**
+ * Whether a customer-owned source order should use expired → fresh eSIM checkout
+ * (omit rechargeOrderId) instead of ICCID top-up.
+ * Prefers live VeSIM usage; falls back to cached providerLifecycleStatus=EXPIRED.
+ */
+export async function isCustomerSourceOrderExpiredForAddData(options: {
+  customerUserId: string;
+  localOrderId: string;
+}): Promise<boolean> {
+  const customerUserId = (options.customerUserId ?? "").trim();
+  const localOrderId = normalizeAddDataFromOrderId(options.localOrderId);
+  if (!customerUserId || customerUserId.length > 64 || !localOrderId) {
+    return false;
+  }
+
+  const order = await prisma.order.findFirst({
+    where: { id: localOrderId, userId: customerUserId },
+    select: {
+      iccidEncrypted: true,
+      providerLifecycleStatus: true,
+      iccidLast4: true,
+    },
+  });
+  if (!order) return false;
+
+  if (await isEncryptedOrderIccidExpiredForAddData(order.iccidEncrypted)) {
+    return true;
+  }
+
+  return (order.providerLifecycleStatus ?? "").trim().toUpperCase() === "EXPIRED";
+}
+
+/** Last-4 for Add Data banners — never returns a full ICCID. */
+export async function resolveCustomerAddDataIccidLast4(options: {
+  customerUserId: string;
+  localOrderId: string;
+}): Promise<string | null> {
+  const customerUserId = (options.customerUserId ?? "").trim();
+  const localOrderId = normalizeAddDataFromOrderId(options.localOrderId);
+  if (!customerUserId || !localOrderId) return null;
+
+  const order = await prisma.order.findFirst({
+    where: { id: localOrderId, userId: customerUserId },
+    select: { iccidLast4: true, iccidEncrypted: true },
+  });
+  if (!order) return null;
+
+  const stored = (order.iccidLast4 ?? "").replace(/\D/g, "");
+  if (stored.length >= 4) return stored.slice(-4);
+
+  const encrypted = (order.iccidEncrypted ?? "").trim();
+  if (!encrypted || !isIccidEncryptionConfigured()) return null;
+  try {
+    const plain = decryptIccid(encrypted);
+    const normalized = normalizeIccid(plain);
+    if (!validateIccid(normalized)) return null;
+    return normalized.slice(-4);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Live VeSIM usage expiry for Add More Data checkout.
  * Returns true only when usage proves expired (isExpired or expiresAt <= now).
  * Unknown / unavailable usage → false (does not invent expiry from validity).

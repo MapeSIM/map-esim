@@ -6,13 +6,18 @@ import { startCustomerAddDataCheckoutAction } from "@/app/lib/esim/walletPurchas
 type Props = {
   /** MAP local order id only — never VeSIM provider ids. */
   orderId: string;
+  /** Idle button label (server-resolved top-up vs expired-fresh). */
+  buttonLabel?: string;
 };
 
 /**
  * Client wrapper so Add More Data start disables while the server action runs.
  * Server action redirects on success / failure paths.
  */
-export default function CustomerAddDataForm({ orderId }: Props) {
+export default function CustomerAddDataForm({
+  orderId,
+  buttonLabel = "Continue to checkout",
+}: Props) {
   const [, formAction, pending] = useActionState(
     startCustomerAddDataCheckoutAction,
     null
@@ -26,7 +31,7 @@ export default function CustomerAddDataForm({ orderId }: Props) {
         disabled={pending}
         className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60 sm:w-auto"
       >
-        {pending ? "Continuing…" : "Continue to checkout"}
+        {pending ? "Continuing…" : buttonLabel}
       </button>
     </form>
   );
