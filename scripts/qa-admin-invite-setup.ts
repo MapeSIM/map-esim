@@ -64,7 +64,10 @@ async function main() {
   assert.match(pkg, /qa:admin-invite-setup/);
   assert.match(setup, /randomBytes\(32\)/);
   assert.match(shared, /createHash\(["']sha256["']\)/);
-  assert.match(shared, /ADMIN_INVITE_SETUP_TTL_MS\s*=\s*30\s*\*\s*60\s*\*\s*1000/);
+  assert.match(
+    shared,
+    /ADMIN_INVITE_SETUP_TTL_MS\s*=\s*30\s*\*\s*24\s*\*\s*60\s*\*\s*60\s*\*\s*1000/
+  );
   assert.match(service, /mintAdminInviteSetupToken/);
   assert.match(service, /sendAdminInviteEmail/);
   assert.match(service, /inviteMethod:\s*["']opaque_setup_link["']/);
@@ -81,21 +84,29 @@ async function main() {
   assert.match(page, /hiddenFields=\{\{\s*token:\s*rawToken/);
   console.log("PASS B_D_no_numeric_code_opens_password_form");
 
-  assert.equal(ADMIN_INVITE_SETUP_TTL_MS, 30 * 60 * 1000);
+  assert.equal(ADMIN_INVITE_SETUP_TTL_MS, 30 * 24 * 60 * 60 * 1000);
   const issued = new Date("2026-08-16T12:00:00.000Z");
   const expiresAt = adminInviteSetupExpiresAt(issued);
   assert.equal(expiresAt.getTime(), issued.getTime() + ADMIN_INVITE_SETUP_TTL_MS);
-  const at29m59s = new Date(issued.getTime() + 29 * 60 * 1000 + 59 * 1000);
-  const at30m00s = new Date(issued.getTime() + 30 * 60 * 1000);
+  const nearEnd = new Date(issued.getTime() + ADMIN_INVITE_SETUP_TTL_MS - 1000);
+  const atExpiry = new Date(issued.getTime() + ADMIN_INVITE_SETUP_TTL_MS);
   assert.equal(
-    isAdminInviteSetupLive({ expiresAt, consumedAt: null, now: at29m59s }),
+    isAdminInviteSetupLive({ expiresAt, consumedAt: null, now: nearEnd }),
     true
   );
   assert.equal(
-    isAdminInviteSetupLive({ expiresAt, consumedAt: null, now: at30m00s }),
+    isAdminInviteSetupLive({ expiresAt, consumedAt: null, now: atExpiry }),
     false
   );
-  console.log("PASS E_F_exact_30_minute_expiry_helper");
+  assert.equal(
+    isAdminInviteSetupLive({
+      expiresAt,
+      consumedAt: issued,
+      now: nearEnd,
+    }),
+    false
+  );
+  console.log("PASS E_F_exact_30_day_expiry_and_one_time_consume_helper");
 
   assert.match(setup, /completeAdminInvitePasswordSetupInDb/);
   assert.match(setup, /consumedAt:\s*now/);
@@ -156,10 +167,12 @@ async function main() {
 
   assert.match(emailTpl, /You have been invited as a .* administrator/);
   assert.match(emailTpl, /Use the secure link below to create your password/);
-  assert.match(emailTpl, /This link expires in 30 minutes/);
+  assert.match(emailTpl, /Use this link to set your password/);
+  assert.match(emailTpl, /works once and cannot be reused/);
+  assert.doesNotMatch(emailTpl, /expires in 30 minutes/i);
   assert.match(
     emailTpl,
-    /If the link expires, contact the administrator to resend the setup link/
+    /If you need a new link, contact the administrator to resend the invitation/
   );
   assert.doesNotMatch(emailTpl, /temporary password|setup code|OTP/i);
   assert.match(send, /channel:\s*["']security["']/);
@@ -215,20 +228,20 @@ async function main() {
 
     const peekOk = await peekAdminInviteSetupToken(
       minted.rawToken,
-      new Date(issuedAt.getTime() + 29 * 60 * 1000 + 59 * 1000)
+      new Date(issuedAt.getTime() + ADMIN_INVITE_SETUP_TTL_MS - 1000)
     );
     assert.equal(peekOk.ok, true);
-    console.log("PASS E_runtime_29m59s_valid");
+    console.log("PASS E_runtime_near_end_of_ttl_valid");
 
     const peekExpired = await peekAdminInviteSetupToken(
       minted.rawToken,
-      new Date(issuedAt.getTime() + 30 * 60 * 1000)
+      new Date(issuedAt.getTime() + ADMIN_INVITE_SETUP_TTL_MS)
     );
     assert.equal(peekExpired.ok, false);
     if (!peekExpired.ok) {
       assert.equal(peekExpired.error, ADMIN_INVITE_INVALID_MESSAGE);
     }
-    console.log("PASS F_runtime_30m00s_expired");
+    console.log("PASS F_runtime_at_ttl_expired");
 
     const peekInvalid = await peekAdminInviteSetupToken("not-a-real-token");
     assert.equal(peekInvalid.ok, false);

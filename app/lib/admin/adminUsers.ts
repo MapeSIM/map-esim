@@ -231,7 +231,7 @@ export async function listAdminUsers(actorUserId: string): Promise<AdminUserList
 }
 
 /**
- * Invite a new ADMIN by email. Sends a one-time password setup link (30 minutes).
+ * Invite a new ADMIN by email. Sends a one-time password setup link (30 days).
  * Sets emailVerifiedAt so credentials login works after password is established (ACTIVE).
  * No temporary password. No numeric setup code.
  */
@@ -445,7 +445,7 @@ export async function inviteAdminUser(options: {
   return {
     ok: true,
     message: inviteEmailDelivered
-      ? "Admin invited. They will receive a password setup link by email (expires in 30 minutes)."
+      ? "Admin invited. They will receive a one-time password setup link by email."
       : "Admin account created (INVITED), but the invitation email could not be sent. Use Resend setup link.",
     status: "INVITED",
     adminStatusVersion: 0,

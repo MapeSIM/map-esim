@@ -1210,7 +1210,7 @@ export async function resendPartnerInvitation(options: {
   return {
     ok: true,
     partnerId: partner.id,
-    message: "Setup link resent. It expires in 30 minutes.",
+    message: "Setup link resent. Use it to set your password (one-time use).",
   };
 }
 

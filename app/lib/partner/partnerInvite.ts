@@ -3,10 +3,10 @@ import { cookies } from "next/headers";
 import { prisma } from "@/app/lib/db";
 import { Role } from "@prisma/client";
 
-/** Email invite link lifetime. */
-export const PARTNER_INVITE_TTL_MS = 30 * 60 * 1000;
-/** HttpOnly setup-session cookie lifetime after URL exchange. */
-export const PARTNER_INVITE_SETUP_TTL_MS = 15 * 60 * 1000;
+/** Email invite link lifetime (unused until exchanged). 30 days. */
+export const PARTNER_INVITE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** HttpOnly setup-session cookie lifetime after URL exchange. 30 days. */
+export const PARTNER_INVITE_SETUP_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const PARTNER_INVITE_SETUP_COOKIE = "mapesim_partner_invite_setup";
 

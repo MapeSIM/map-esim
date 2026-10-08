@@ -30,7 +30,14 @@ async function main() {
   console.log("PASS migration_additive_invite_tokens");
 
   const invite = read("app/lib/partner/partnerInvite.ts");
-  assert.match(invite, /PARTNER_INVITE_TTL_MS\s*=\s*30\s*\*\s*60\s*\*\s*1000/);
+  assert.match(
+    invite,
+    /PARTNER_INVITE_TTL_MS\s*=\s*30\s*\*\s*24\s*\*\s*60\s*\*\s*60\s*\*\s*1000/
+  );
+  assert.match(
+    invite,
+    /PARTNER_INVITE_SETUP_TTL_MS\s*=\s*30\s*\*\s*24\s*\*\s*60\s*\*\s*60\s*\*\s*1000/
+  );
   assert.match(invite, /randomBytes\(32\)/);
   assert.match(invite, /createHash\(["']sha256["']\)/);
   assert.match(invite, /mintPartnerInviteToken/);
@@ -88,7 +95,9 @@ async function main() {
   assert.match(emailTpl, /Welcome to .* Partner/);
   assert.match(emailTpl, /Your .* Partner account is ready/);
   assert.match(emailTpl, /Set up my password/);
-  assert.match(emailTpl, /expires in 30 minutes/);
+  assert.match(emailTpl, /Use this link to set your password/);
+  assert.match(emailTpl, /works once and cannot be reused/);
+  assert.doesNotMatch(emailTpl, /expires in 30 minutes/i);
   assert.match(emailTpl, /If you were not expecting this invitation/);
   assert.doesNotMatch(emailTpl, /one-time code|OTP|temporary password/i);
   console.log("PASS partner_invite_email_copy");

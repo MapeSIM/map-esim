@@ -45,10 +45,10 @@ export function renderAdminInviteEmailHtml(options: {
               </p>
               ${ctaButton(options.setupUrl, "Create password")}
               <p style="margin:0 0 12px;font-size:13px;line-height:1.55;color:${TEXT_SECONDARY};">
-                This link expires in 30 minutes.
+                Use this link to set your password. It works once and cannot be reused after you submit.
               </p>
               <p style="margin:0 0 8px;font-size:13px;line-height:1.55;color:${TEXT_SECONDARY};">
-                If the link expires, contact the administrator to resend the setup link.
+                If you need a new link, contact the administrator to resend the invitation.
               </p>
               <p style="margin:16px 0 0;font-size:12px;line-height:1.5;color:${TEXT_SECONDARY};">
                 Sent to ${email}.
@@ -69,8 +69,8 @@ export function renderAdminInviteEmailText(options: {
     "Create password:",
     options.setupUrl,
     "",
-    "This link expires in 30 minutes.",
-    "If the link expires, contact the administrator to resend the setup link.",
+    "Use this link to set your password. It works once and cannot be reused after you submit.",
+    "If you need a new link, contact the administrator to resend the invitation.",
     "",
     `Sent to ${options.recipientEmail}.`,
     "",

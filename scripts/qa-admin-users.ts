@@ -198,10 +198,12 @@ async function main() {
   const inviteTpl = read("app/lib/email/adminInviteTemplate.ts");
   assert.match(inviteTpl, /You have been invited as a \$\{escapeHtml\(BRAND_NAME\)\} administrator/);
   assert.match(inviteTpl, /Use the secure link below to create your password/);
-  assert.match(inviteTpl, /This link expires in 30 minutes/);
+  assert.match(inviteTpl, /Use this link to set your password/);
+  assert.match(inviteTpl, /works once and cannot be reused/);
+  assert.doesNotMatch(inviteTpl, /expires in 30 minutes/i);
   assert.match(
     inviteTpl,
-    /If the link expires, contact the administrator to resend the setup link/
+    /If you need a new link, contact the administrator to resend the invitation/
   );
   assert.doesNotMatch(inviteTpl, /setup code|temporary password|OTP/i);
   console.log("PASS admin_invite_email_wording_distinct_from_password_reset");
@@ -223,10 +225,12 @@ async function main() {
   assert.match(ADMIN_INVITE_EMAIL_SUBJECT, /Set up your MAP eSIM Admin account/);
   assert.match(inviteHtml, /You have been invited as a MAP eSIM administrator/);
   assert.match(inviteHtml, /Use the secure link below to create your password/);
-  assert.match(inviteHtml, /This link expires in 30 minutes/);
+  assert.match(inviteHtml, /Use this link to set your password/);
+  assert.match(inviteHtml, /works once and cannot be reused/);
+  assert.doesNotMatch(inviteHtml, /expires in 30 minutes/i);
   assert.match(
     inviteHtml,
-    /If the link expires, contact the administrator to resend the setup link/
+    /If you need a new link, contact the administrator to resend the invitation/
   );
   assert.doesNotMatch(inviteHtml, /Password reset code|setup code|temporary password/i);
   assert.doesNotMatch(inviteText, /Password reset code|setup code/i);

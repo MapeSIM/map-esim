@@ -47,8 +47,7 @@ export function PartnerInviteResendPanel({ partnerId }: { partnerId: string }) {
         </h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           This Partner has not set a password yet. Resending invalidates any
-          previous unused setup link and emails a new one (expires in 30
-          minutes).
+          previous unused setup link and emails a new one-time link.
         </p>
       </div>
 

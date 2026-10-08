@@ -101,8 +101,7 @@ export function InviteAdminForm() {
         </h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           Creates a dedicated admin account, assigns a team role, and emails a
-          one-time password setup link that expires in 30 minutes. Customer
-          emails cannot be promoted.
+          one-time password setup link. Customer emails cannot be promoted.
         </p>
       </div>
 

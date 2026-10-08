@@ -106,7 +106,8 @@ async function main() {
     assert.equal(PARTNER_INVITE_EMAIL_SUBJECT, `Welcome to ${BRAND_NAME} Partner`);
     assert.match(html, /Your .* Partner account is ready/);
     assert.match(html, /Set up my password/);
-    assert.match(html, /expires in 30 minutes/);
+    assert.match(html, /Use this link to set your password/);
+    assert.doesNotMatch(html, /expires in 30 minutes/i);
     assert.doesNotMatch(html, /\b\d{6}\b/);
     assert.doesNotMatch(html, /temporary password|plaintext/i);
     assert.doesNotMatch(text, /\b\d{6}\b/);

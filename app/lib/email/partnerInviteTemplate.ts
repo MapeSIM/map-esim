@@ -45,7 +45,7 @@ export function renderPartnerInviteEmailHtml(options: {
               </p>
               ${ctaButton(options.setupUrl, "Set up my password")}
               <p style="margin:0 0 12px;font-size:13px;line-height:1.55;color:${TEXT_SECONDARY};">
-                This secure setup link expires in 30 minutes.
+                Use this link to set your password. It works once and cannot be reused after you submit.
               </p>
               <p style="margin:0 0 8px;font-size:13px;line-height:1.55;color:${TEXT_SECONDARY};">
                 If you were not expecting this invitation, you can ignore this email.
@@ -71,7 +71,7 @@ export function renderPartnerInviteEmailText(options: {
     "Set up my password:",
     options.setupUrl,
     "",
-    "This secure setup link expires in 30 minutes.",
+    "Use this link to set your password. It works once and cannot be reused after you submit.",
     "If you were not expecting this invitation, you can ignore this email.",
     "",
     `Sent to ${options.recipientEmail}.`,

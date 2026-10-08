@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
-/** Email setup-link lifetime. 29m59s is valid; 30m00s is expired (`expiresAt > now`). */
-export const ADMIN_INVITE_SETUP_TTL_MS = 30 * 60 * 1000;
+/** Email setup-link lifetime (unused until consumed). 30 days. */
+export const ADMIN_INVITE_SETUP_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const ADMIN_INVITE_INVALID_MESSAGE =
   "This password setup link is invalid or has expired.";

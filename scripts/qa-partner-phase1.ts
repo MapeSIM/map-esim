@@ -407,7 +407,8 @@ async function main() {
 
   const inviteEmail = read("app/lib/email/partnerInviteTemplate.ts");
   assert.match(inviteEmail, /Set up my password/);
-  assert.match(inviteEmail, /expires in 30 minutes/);
+  assert.match(inviteEmail, /Use this link to set your password/);
+  assert.doesNotMatch(inviteEmail, /expires in 30 minutes/i);
   const otp = read("app/lib/email/otpTemplate.ts");
   assert.match(otp, /admin_invite/);
   assert.match(otp, /Password reset code/);
