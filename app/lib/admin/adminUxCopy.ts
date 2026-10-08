@@ -27,7 +27,7 @@ export const ADMIN_UX_PAGE = {
   verifyPending: {
     title: "Verify pending gateway",
     description:
-      "Check awaiting gateway attempts with Safepay reporter or Simpaisa Inquire. Successful evidence still needs an authoritative webhook before funding.",
+      "Check awaiting gateway attempts with Safepay reporter or Simpaisa Inquire. After confirmed success, admins can Apply verified payment (re-checks gateway, then canonical funding).",
   },
   failedPayments: {
     title: "Failed payments",

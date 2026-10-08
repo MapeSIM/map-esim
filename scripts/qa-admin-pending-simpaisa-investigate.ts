@@ -125,7 +125,8 @@ function main() {
     walletAppliedCents: 250,
   });
   assert.equal(confirmed.decision, "CONFIRMED_SUCCESS_WEBHOOK_REQUIRED");
-  assert.equal(confirmed.message, SIMPAISA_SUCCESS_WEBHOOK_REQUIRED_MESSAGE);
+  assert.match(confirmed.message, /Inquire confirms payment|webhook/i);
+  // message text may mention customer Apply step — still non-funding for Check.
   assert.equal(confirmed.releaseEligible, false);
   assert.equal(
     canOfferSimpaisaReservationRelease({

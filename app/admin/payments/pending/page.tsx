@@ -45,9 +45,9 @@ export default async function AdminPendingPaymentsPage() {
         meta={
           <>
             Customer and Partner awaiting gateway attempts. Open payment detail
-            for Simpaisa Check Status / Investigate tools (customer never
-            mark-paid; partner confirmed Inquire uses the existing partner apply
-            path).
+            for Verify / Check Status. After gateway-confirmed success, customer
+            Apply uses the canonical funding path; partner confirmed Inquire uses
+            the existing partner apply path (auto-apply when eligible).
           </>
         }
         actions={

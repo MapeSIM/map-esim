@@ -1,6 +1,15 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useId, useState } from "react";
+import {
+  applyCustomerVerifiedPendingPaymentAction,
+  type CustomerPendingApplyFormState,
+} from "@/app/lib/admin/pendingCustomerPaymentApplyActions";
+import {
+  CUSTOMER_APPLY_CONFIRM_LABEL,
+  CUSTOMER_APPLY_SUCCESS_MESSAGE,
+  isSimpaisaCustomerApplyEligibleDecision,
+} from "@/app/lib/admin/pendingCustomerPaymentApplyShared";
 import {
   checkSimpaisaPendingPaymentStatusAction,
   releaseSimpaisaPendingReservationAction,
@@ -16,6 +25,7 @@ import { ADMIN_RELEASE_RESERVATION_BLURB } from "@/app/lib/admin/adminWalletRese
 
 const initialCheckState: SimpaisaPendingInvestigateFormState = null;
 const initialReleaseState: SimpaisaPendingReleaseFormState = null;
+const initialApplyState: CustomerPendingApplyFormState = null;
 
 function EvidencePanel(props: {
   evidence: NonNullable<
@@ -112,6 +122,8 @@ export default function PendingSimpaisaInvestigateForm(props: {
   ownerKind?: "customer" | "partner";
 }) {
   const ownerKind = props.ownerKind === "partner" ? "partner" : "customer";
+  const formId = useId();
+  const [applyConfirmed, setApplyConfirmed] = useState(false);
   const [checkState, checkAction, checkPending] = useActionState(
     checkSimpaisaPendingPaymentStatusAction,
     initialCheckState
@@ -119,6 +131,10 @@ export default function PendingSimpaisaInvestigateForm(props: {
   const [releaseState, releaseAction, releasePending] = useActionState(
     releaseSimpaisaPendingReservationAction,
     initialReleaseState
+  );
+  const [applyState, applyAction, applyPending] = useActionState(
+    applyCustomerVerifiedPendingPaymentAction,
+    initialApplyState
   );
 
   const checkOk = checkState && checkState.ok ? checkState.evidence : null;
@@ -129,6 +145,15 @@ export default function PendingSimpaisaInvestigateForm(props: {
     props.walletAppliedCents > 0 &&
     !releaseOk?.reservationReleased &&
     !checkOk?.fundingApplied;
+  const showCustomerApply =
+    ownerKind === "customer" &&
+    Boolean(checkOk) &&
+    isSimpaisaCustomerApplyEligibleDecision(
+      checkOk?.decision,
+      Boolean(checkOk?.validatedConfirmed)
+    ) &&
+    !checkOk?.fundingApplied &&
+    !(applyState && applyState.ok);
 
   return (
     <section className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
@@ -141,7 +166,7 @@ export default function PendingSimpaisaInvestigateForm(props: {
           action
           {ownerKind === "partner"
             ? "; partner confirmed success uses the existing apply path only"
-            : "; this never marks a purchase funded, never creates an eSIM order, and never releases a wallet hold by itself"}
+            : "; Check alone never marks a purchase funded — after confirmed success, use Apply below (re-inquires then applies)"}
           .
         </p>
         <p className="text-xs text-[var(--text-soft)]">
@@ -201,6 +226,102 @@ export default function PendingSimpaisaInvestigateForm(props: {
           {checkPending ? "Checking…" : "Check gateway status"}
         </button>
       </form>
+
+      {showCustomerApply ? (
+        <form
+          action={applyAction}
+          className="space-y-3 border-t border-[var(--border)] pt-4"
+          aria-busy={applyPending}
+        >
+          <h3 className="text-base font-semibold tracking-tight">
+            Apply verified payment / fulfill
+          </h3>
+          <p className="text-sm text-[var(--text-muted)]">
+            Re-runs Simpaisa Inquire, then applies through the same customer
+            payment path as the missing webhook (idempotent).
+          </p>
+          <input
+            type="hidden"
+            name="paymentAttemptId"
+            value={props.paymentAttemptId}
+          />
+          <div>
+            <label
+              htmlFor={`${formId}-simpaisa-apply-reason`}
+              className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+            >
+              Apply reason (required)
+            </label>
+            <textarea
+              id={`${formId}-simpaisa-apply-reason`}
+              name="reason"
+              required
+              maxLength={PENDING_PAYMENT_VERIFY_REASON_MAX}
+              rows={2}
+              disabled={applyPending}
+              className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+              placeholder="Why are you applying this verified payment now?"
+            />
+            {applyState &&
+            !applyState.ok &&
+            applyState.fieldErrors?.reason ? (
+              <p className="mt-1 text-sm text-[var(--danger-text)]">
+                {applyState.fieldErrors.reason}
+              </p>
+            ) : null}
+          </div>
+          {applyConfirmed ? (
+            <input type="hidden" name="confirm" value="on" />
+          ) : null}
+          <label
+            htmlFor={`${formId}-simpaisa-apply-confirm`}
+            className="flex items-start gap-2 text-xs text-[var(--text-muted)]"
+          >
+            <input
+              id={`${formId}-simpaisa-apply-confirm`}
+              type="checkbox"
+              className="mt-0.5"
+              checked={applyConfirmed}
+              disabled={applyPending}
+              onChange={(event) => setApplyConfirmed(event.target.checked)}
+            />
+            <span>{CUSTOMER_APPLY_CONFIRM_LABEL}</span>
+          </label>
+          {applyState && !applyState.ok && applyState.fieldErrors?.confirm ? (
+            <p className="text-sm text-[var(--danger-text)]" role="alert">
+              {applyState.fieldErrors.confirm}
+            </p>
+          ) : null}
+          {applyState &&
+          !applyState.ok &&
+          applyState.error &&
+          !applyState.fieldErrors?.reason &&
+          !applyState.fieldErrors?.confirm ? (
+            <p className="text-sm text-[var(--danger-text)]" role="alert">
+              {applyState.error}
+            </p>
+          ) : null}
+          <button
+            type="submit"
+            disabled={applyPending || !applyConfirmed}
+            className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--accent-ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {applyPending
+              ? "Applying…"
+              : "Apply verified payment / fulfill"}
+          </button>
+        </form>
+      ) : null}
+
+      {applyState && applyState.ok ? (
+        <p
+          className="text-sm font-medium text-[var(--accent-strong)]"
+          role="status"
+        >
+          {applyState.message || CUSTOMER_APPLY_SUCCESS_MESSAGE}
+          {applyState.duplicate ? " (already applied)" : ""}
+        </p>
+      ) : null}
 
       {showRelease ? (
         <div className="space-y-3 border-t border-[var(--border)] pt-4">

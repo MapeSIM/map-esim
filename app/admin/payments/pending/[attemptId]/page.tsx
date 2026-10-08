@@ -68,8 +68,8 @@ export default async function AdminPendingPaymentDetailPage({
         </h1>
         <p className="text-sm text-[var(--text-muted)]">
           {isSimpaisa
-            ? "Read-only local state plus authenticated Simpaisa Inquire. Funding remains webhook-authoritative."
-            : "Read-only local state plus authenticated Safepay verification. Funding remains webhook-authoritative."}
+            ? "Authenticated Simpaisa Inquire. Check alone does not fund customers; after confirmed success, Apply re-inquires then uses the canonical payment apply path."
+            : "Authenticated Safepay reporter verify. Verify alone does not fund; after confirmed success, Apply re-checks then uses the canonical payment apply path."}
         </p>
         {showRecon ? (
           <p className="flex flex-wrap gap-2 pt-1">

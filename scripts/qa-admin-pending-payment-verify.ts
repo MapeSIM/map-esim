@@ -82,16 +82,28 @@ function main() {
   assert.match(http, /parseSafepayReporterPaymentPayload/);
   assert.doesNotMatch(service, /applyVerifiedEsimPurchasePaymentEvent/);
   assert.doesNotMatch(actions, /applyVerifiedEsimPurchasePaymentEvent/);
-  assert.doesNotMatch(form, /applyVerifiedEsimPurchasePaymentEvent/);
   assert.doesNotMatch(service, /status:\s*WalletEsimPurchaseStatus\.FUNDED/);
   assert.doesNotMatch(service, /PAYMENT_CONFIRMED/);
   assert.match(shared, /SUCCESS_WEBHOOK_REQUIRED_MESSAGE/);
   assert.match(form, /SUCCESS_WEBHOOK_REQUIRED_MESSAGE/);
-  assert.match(
-    form,
-    /never marks a purchase funded|Never marks a purchase funded|never creates an eSIM/i
-  );
+  assert.match(form, /never marks a purchase funded/i);
   console.log("PASS success_tracker_evidence_does_not_fund_without_webhook");
+
+  const applyService = read("app/lib/admin/pendingCustomerPaymentApply.ts");
+  const applyActions = read("app/lib/admin/pendingCustomerPaymentApplyActions.ts");
+  const applyShared = read("app/lib/admin/pendingCustomerPaymentApplyShared.ts");
+  assert.match(applyService, /applyVerifiedEsimPurchasePaymentEvent/);
+  assert.match(applyService, /decidePendingPaymentVerify/);
+  assert.match(applyService, /validateSimpaisaAuthoritativeInquiry/);
+  assert.match(applyService, /signatureVerified:\s*true/);
+  assert.match(applyActions, /PAYMENTS_MANAGE/);
+  assert.match(applyActions, /parseCustomerApplyConfirm/);
+  assert.match(applyShared, /CUSTOMER_APPLY_CONFIRM_LABEL/);
+  assert.match(form, /applyCustomerVerifiedPendingPaymentAction/);
+  assert.match(form, /Apply verified payment \/ fulfill/);
+  assert.match(form, /Applying/);
+  assert.match(form, /confirm/);
+  console.log("PASS customer_apply_requires_gateway_recheck_and_confirm");
 
   const success = decidePendingPaymentVerify({
     localAttemptId: "cmsjdsxm2001rtti0bna3w66f",

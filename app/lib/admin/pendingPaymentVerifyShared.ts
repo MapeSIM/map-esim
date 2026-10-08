@@ -15,7 +15,7 @@ export const PENDING_PAYMENT_RELEASE_AUDIT =
   "admin.pending_payment_reservation_release";
 
 export const SUCCESS_WEBHOOK_REQUIRED_MESSAGE =
-  "Safepay reports successful payment, but authoritative payment webhook is still required.";
+  "Safepay reports successful payment, but the webhook is still missing. Use Apply verified payment / fulfill after confirming (re-checks gateway).";
 
 export const PENDING_PAYMENT_VERIFY_DECISIONS = [
   "VERIFIED_SUCCESS_BUT_WEBHOOK_REQUIRED",

@@ -28,7 +28,7 @@ export const SIMPAISA_PENDING_RELEASE_BLOCKED_AUDIT =
   "admin.pending_simpaisa_payment.reservation_release_blocked";
 
 export const SIMPAISA_SUCCESS_WEBHOOK_REQUIRED_MESSAGE =
-  "Simpaisa Inquire confirms payment, but the authoritative payment webhook is still required. Admin must not fund or mark paid.";
+  "Simpaisa Inquire confirms payment, but the webhook is still missing. For customer attempts, use Apply verified payment / fulfill after confirming (re-inquires then applies). Partner confirmed success may auto-apply.";
 
 export const SIMPAISA_PARTNER_SUCCESS_APPLIED_MESSAGE =
   "Simpaisa Inquire confirmed payment. Funding was applied through the existing partner payment path (idempotent). Provider fulfillment runs outside the payment transaction.";
@@ -75,8 +75,9 @@ export type SimpaisaPendingInvestigateEvidenceView = {
   releaseEligible: boolean;
   reservationReleased: boolean;
   /**
-   * Customer investigate never funds (always false).
+   * Check step: customer never funds here (always false).
    * Partner investigate may set true only after existing apply path succeeds.
+   * Customer apply is a separate confirmed action.
    */
   fundingApplied: boolean;
   vesimOrderCreated: boolean;
