@@ -262,35 +262,83 @@ export async function getAdminCustomerWalletSummary(
     _sum: { amountCents: true },
   });
 
-  const recent = await prisma.walletTransaction.findMany({
-    where: { walletId: wallet.id },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: ADMIN_CUSTOMER_RECENT_WALLET_TX_LIMIT,
-    select: {
-      id: true,
-      createdAt: true,
-      type: true,
-      direction: true,
-      status: true,
-      amountCents: true,
-      balanceAfterCents: true,
-      referenceType: true,
-      referenceId: true,
-      emailNotificationStatus: true,
-      purchaseAsDebit: {
-        select: {
-          id: true,
-          status: true,
-          orderId: true,
-          providerOrderId: true,
-          providerResultKind: true,
+  type RecentWalletTxRow = {
+    id: string;
+    createdAt: Date;
+    type: string;
+    direction: string;
+    status: string;
+    amountCents: number;
+    balanceAfterCents: number | null;
+    referenceType: string | null;
+    referenceId: string | null;
+    emailNotificationStatus: string | null;
+    purchaseAsDebit: {
+      id: string;
+      status: string;
+      orderId: string | null;
+      providerOrderId: string | null;
+      providerResultKind: string | null;
+    } | null;
+    purchaseAsRefund: { orderId: string | null } | null;
+  };
+
+  let recent: RecentWalletTxRow[];
+  try {
+    recent = await prisma.walletTransaction.findMany({
+      where: { walletId: wallet.id },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: ADMIN_CUSTOMER_RECENT_WALLET_TX_LIMIT,
+      select: {
+        id: true,
+        createdAt: true,
+        type: true,
+        direction: true,
+        status: true,
+        amountCents: true,
+        balanceAfterCents: true,
+        referenceType: true,
+        referenceId: true,
+        emailNotificationStatus: true,
+        purchaseAsDebit: {
+          select: {
+            id: true,
+            status: true,
+            orderId: true,
+            providerOrderId: true,
+            providerResultKind: true,
+          },
+        },
+        purchaseAsRefund: {
+          select: { orderId: true },
         },
       },
-      purchaseAsRefund: {
-        select: { orderId: true },
+    });
+  } catch {
+    // Fallback without purchase relation fields if relation projection fails.
+    const fallback = await prisma.walletTransaction.findMany({
+      where: { walletId: wallet.id },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: ADMIN_CUSTOMER_RECENT_WALLET_TX_LIMIT,
+      select: {
+        id: true,
+        createdAt: true,
+        type: true,
+        direction: true,
+        status: true,
+        amountCents: true,
+        balanceAfterCents: true,
+        referenceType: true,
+        referenceId: true,
+        emailNotificationStatus: true,
       },
-    },
-  });
+    });
+    recent = fallback.map((row) => ({
+      ...row,
+      purchaseAsDebit: null,
+      purchaseAsRefund: null,
+    }));
+  }
 
   const balanceCents =
     Number.isInteger(wallet.balanceCents) && wallet.balanceCents >= 0

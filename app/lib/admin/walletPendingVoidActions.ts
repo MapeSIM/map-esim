@@ -1,69 +1,113 @@
 "use server";
 
-import { redirect } from "next/navigation";
-import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
+import { revalidatePath } from "next/cache";
+import {
+  actorHasAdminPermission,
+} from "@/app/lib/admin/adminPermissionAccess";
 import { voidPendingWalletEsimPurchaseReservation } from "@/app/lib/admin/walletPendingVoid";
 import { requireRole } from "@/app/lib/auth/session";
 
-function safeReturnPath(customerUserId: string, returnToRaw: string): string {
-  const fallback = `/admin/customers/${encodeURIComponent(customerUserId)}`;
+export type VoidPendingWalletFormState =
+  | null
+  | { ok: true; message: string }
+  | { ok: false; error: string };
+
+function isRedirectError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "digest" in error &&
+    typeof (error as { digest?: unknown }).digest === "string" &&
+    String((error as { digest: string }).digest).startsWith("NEXT_REDIRECT")
+  );
+}
+
+function safeCustomerPaths(customerUserId: string, returnToRaw: string): {
+  customerPath: string;
+  ledgerPath: string | null;
+} {
+  const customerPath = `/admin/customers/${encodeURIComponent(customerUserId)}`;
   const returnTo = (returnToRaw ?? "").trim();
-  if (!returnTo.startsWith("/admin/customers/")) return fallback;
-  if (returnTo.includes("//") || returnTo.includes("\\")) return fallback;
-  if (!returnTo.includes(encodeURIComponent(customerUserId)) &&
-      !returnTo.includes(customerUserId)) {
-    return fallback;
+  if (
+    returnTo.startsWith(customerPath) &&
+    !returnTo.includes("//") &&
+    !returnTo.includes("\\") &&
+    returnTo.length <= 512
+  ) {
+    const pathOnly = returnTo.split("?")[0] ?? returnTo;
+    if (pathOnly.endsWith("/wallet") || pathOnly.includes("/wallet")) {
+      return { customerPath, ledgerPath: pathOnly };
+    }
   }
-  if (returnTo.length > 512) return fallback;
-  return returnTo;
+  return { customerPath, ledgerPath: null };
 }
 
-function withQuery(path: string, key: string, value: string): string {
-  const url = new URL(path, "https://admin.local");
-  url.searchParams.delete("walletVoid");
-  url.searchParams.delete("walletVoidError");
-  url.searchParams.set(key, value);
-  return `${url.pathname}${url.search}`;
-}
-
+/**
+ * Void a stuck pending WALLET_ESIM_PURCHASE debit.
+ * Returns inline form state (useActionState) — never silent-redirects on
+ * permission denial or validation errors.
+ */
 export async function voidPendingWalletReservationAction(
+  _prev: VoidPendingWalletFormState,
   formData: FormData
-): Promise<void> {
-  const admin = await requireRole("ADMIN");
-  await assertAdminPermission(admin.id, "WALLET_ADJUST");
+): Promise<VoidPendingWalletFormState> {
+  try {
+    const admin = await requireRole("ADMIN");
+    const allowed = await actorHasAdminPermission(admin.id, "WALLET_ADJUST");
+    if (!allowed) {
+      return {
+        ok: false,
+        error:
+          "You need Wallet adjustments (WALLET_ADJUST) permission to void pending reservations.",
+      };
+    }
 
-  const customerUserId = String(formData.get("customerUserId") ?? "").trim();
-  const walletTransactionId = String(
-    formData.get("walletTransactionId") ?? ""
-  ).trim();
-  const returnTo = safeReturnPath(
-    customerUserId,
-    String(formData.get("returnTo") ?? "")
-  );
-  const confirmed = formData.get("confirm") === "on";
+    const customerUserId = String(formData.get("customerUserId") ?? "").trim();
+    const walletTransactionId = String(
+      formData.get("walletTransactionId") ?? ""
+    ).trim();
+    const confirmed = formData.get("confirm") === "on";
 
-  if (!customerUserId || customerUserId.length > 64) {
-    redirect(withQuery(returnTo, "walletVoidError", "customer_unavailable"));
+    if (!customerUserId || customerUserId.length > 64) {
+      return { ok: false, error: "Customer is unavailable." };
+    }
+    if (!confirmed) {
+      return {
+        ok: false,
+        error: "Confirm the checkbox before voiding a pending reservation.",
+      };
+    }
+
+    const result = await voidPendingWalletEsimPurchaseReservation({
+      adminUserId: admin.id,
+      customerUserId,
+      walletTransactionId,
+    });
+
+    if (!result.ok) {
+      return { ok: false, error: result.error };
+    }
+
+    const { customerPath, ledgerPath } = safeCustomerPaths(
+      customerUserId,
+      String(formData.get("returnTo") ?? "")
+    );
+    revalidatePath(customerPath);
+    if (ledgerPath) revalidatePath(ledgerPath);
+    else revalidatePath(`${customerPath}/wallet`);
+
+    return {
+      ok: true,
+      message: result.alreadyReleased
+        ? "Pending wallet reservation was already released."
+        : "Pending wallet reservation voided and balance restored.",
+    };
+  } catch (error) {
+    if (isRedirectError(error)) throw error;
+    return {
+      ok: false,
+      error:
+        "Wallet reservation void is temporarily unavailable. Please try again shortly.",
+    };
   }
-  if (!confirmed) {
-    redirect(withQuery(returnTo, "walletVoidError", "confirm_required"));
-  }
-
-  const result = await voidPendingWalletEsimPurchaseReservation({
-    adminUserId: admin.id,
-    customerUserId,
-    walletTransactionId,
-  });
-
-  if (!result.ok) {
-    redirect(withQuery(returnTo, "walletVoidError", "void_failed"));
-  }
-
-  redirect(
-    withQuery(
-      returnTo,
-      "walletVoid",
-      result.alreadyReleased ? "already" : "ok"
-    )
-  );
 }

@@ -356,7 +356,8 @@ export async function getAdminPaymentDashboardKpis(): Promise<AdminPaymentDashbo
         webhookEventId: null,
       },
     }),
-    countPaymentRecoveryCandidates(),
+    // Isolate recovery counter — never blank the hub if this subquery fails.
+    countPaymentRecoveryCandidates().catch(() => 0),
   ]);
 
   return {
@@ -527,48 +528,54 @@ export async function listAdminPayments(input: {
   const merged: MergedListRow[] = [
     ...customerRows.map((row) => {
       const purchase = row.purchase ?? null;
+      const customer = purchase?.customer ?? null;
       return {
         ownerKind: "customer" as const,
         attemptId: row.id,
         purchaseId: row.purchaseId,
         orderId: (purchase?.orderId ?? "").trim() || null,
         status: row.status,
-        purchaseStatus: purchase?.status ?? "UNKNOWN",
-        gatewayProvider: row.gatewayProvider,
-        gatewayAmountCents: row.gatewayAmountCents,
-        currency: row.currency,
-        chargeAmountMinor: row.chargeAmountMinor,
-        chargeCurrency: row.chargeCurrency,
-        gatewayPaymentRef: row.gatewayPaymentRef,
-        webhookEventId: row.webhookEventId,
-        expiresAt: row.expiresAt,
+        purchaseStatus: String(purchase?.status ?? "UNKNOWN"),
+        gatewayProvider: row.gatewayProvider ?? null,
+        gatewayAmountCents: Number.isInteger(row.gatewayAmountCents)
+          ? row.gatewayAmountCents
+          : 0,
+        currency: (row.currency ?? "USD").trim() || "USD",
+        chargeAmountMinor: row.chargeAmountMinor ?? null,
+        chargeCurrency: row.chargeCurrency ?? null,
+        gatewayPaymentRef: row.gatewayPaymentRef ?? null,
+        webhookEventId: row.webhookEventId ?? null,
+        expiresAt: row.expiresAt ?? null,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
-        ownerUser: purchase?.customer ?? null,
-        ownerProfileId: purchase?.customer?.id ?? null,
+        ownerUser: customer,
+        ownerProfileId: customer?.id ?? null,
       };
     }),
     ...partnerRows.map((row) => {
       const purchase = row.purchase ?? null;
       const partner = purchase?.partner ?? null;
+      const partnerUser = partner?.user ?? null;
       return {
         ownerKind: "partner" as const,
         attemptId: row.id,
         purchaseId: row.purchaseId,
         orderId: (purchase?.orderId ?? "").trim() || null,
         status: row.status,
-        purchaseStatus: purchase?.status ?? "UNKNOWN",
-        gatewayProvider: row.gatewayProvider,
-        gatewayAmountCents: row.gatewayAmountCents,
-        currency: row.currency,
-        chargeAmountMinor: row.chargeAmountMinor,
-        chargeCurrency: row.chargeCurrency,
-        gatewayPaymentRef: row.gatewayPaymentRef,
-        webhookEventId: row.webhookEventId,
-        expiresAt: row.expiresAt,
+        purchaseStatus: String(purchase?.status ?? "UNKNOWN"),
+        gatewayProvider: row.gatewayProvider ?? null,
+        gatewayAmountCents: Number.isInteger(row.gatewayAmountCents)
+          ? row.gatewayAmountCents
+          : 0,
+        currency: (row.currency ?? "USD").trim() || "USD",
+        chargeAmountMinor: row.chargeAmountMinor ?? null,
+        chargeCurrency: row.chargeCurrency ?? null,
+        gatewayPaymentRef: row.gatewayPaymentRef ?? null,
+        webhookEventId: row.webhookEventId ?? null,
+        expiresAt: row.expiresAt ?? null,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
-        ownerUser: partner?.user ?? null,
+        ownerUser: partnerUser,
         ownerProfileId: partner?.id ?? null,
       };
     }),

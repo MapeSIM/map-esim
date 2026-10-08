@@ -93,11 +93,16 @@ function main() {
 
   assert.match(service, /refundReservedFundsInTx/);
   assert.match(service, /restoreReady:\s*true/);
-  assert.match(service, /WALLET_ADJUST|assisted:\s*true/);
-  assert.match(actions, /assertAdminPermission\([\s\S]*WALLET_ADJUST/);
+  assert.match(service, /assisted:\s*true/);
+  assert.match(actions, /actorHasAdminPermission/);
+  assert.match(actions, /WALLET_ADJUST/);
   assert.match(actions, /voidPendingWalletEsimPurchaseReservation/);
+  assert.match(actions, /VoidPendingWalletFormState/);
+  assert.match(form, /useActionState/);
   assert.match(form, /voidPendingWalletReservationAction/);
+  assert.match(form, /Processing/);
   assert.match(form, /Void \/ Cancel pending/);
+  assert.match(form, /role="alert"/);
   assert.match(customer, /AdminVoidPendingWalletForm/);
   assert.match(customer, /canVoidPending/);
   assert.match(ledgerPage, /AdminVoidPendingWalletForm/);

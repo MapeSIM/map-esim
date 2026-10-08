@@ -76,6 +76,7 @@ function main() {
   assert.match(hub, /failedCount/);
   assert.match(hub, /completedCount/);
   assert.match(service, /getAdminPaymentDashboardKpis/);
+  assert.match(service, /countPaymentRecoveryCandidates\(\)\.catch/);
   assert.match(service, /webhookMissingAmongPendingCount/);
   assert.match(service, /partnerEsimPurchasePaymentAttempt/);
   assert.match(service, /PAYMENT_CONFIRMED/);
