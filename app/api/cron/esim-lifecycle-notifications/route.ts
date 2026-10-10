@@ -124,32 +124,19 @@ async function handle(request: Request): Promise<Response> {
 
     // Default: piggyback stale unpaid gateway hold release after the lifecycle
     // batch (Hobby = 1 cron/day). Pass staleRelease=0 to skip.
+    //
+    // Best-effort only: empty scans, per-row concurrency skips, partial
+    // sub-job failures, and soft ok:false must NOT page Sentry / create
+    // lifecycle cron regressions (MAP-ESIM-4). Dedicated stale-release
+    // crons still report hard failures. Surface counts + errorCodes in JSON.
     let staleRelease: Awaited<
       ReturnType<typeof runGatewayStaleReservationRecovery>
     > | null = null;
     if (runStaleRelease) {
       try {
         staleRelease = await runGatewayStaleReservationRecovery({ dryRun });
-        if (staleRelease && !staleRelease.ok) {
-          await reportServerErrorAsync(
-            new Error("piggyback_stale_release_failed"),
-            {
-              operation: "cron_esim_lifecycle_stale_release",
-              cronJob: "esim-lifecycle-notifications",
-              errorCode:
-                staleRelease.customer.errorCode ??
-                staleRelease.partner.errorCode ??
-                staleRelease.fullWallet.errorCode ??
-                "stale_release_failed",
-            }
-          );
-        }
-      } catch (error) {
-        await reportServerErrorAsync(error, {
-          operation: "cron_esim_lifecycle_stale_release",
-          cronJob: "esim-lifecycle-notifications",
-          errorCode: "stale_release_unhandled",
-        });
+      } catch {
+        // Isolate piggyback: never fail / Sentry the primary lifecycle sync.
         staleRelease = null;
       }
     }
@@ -170,6 +157,13 @@ async function handle(request: Request): Promise<Response> {
                 partner: staleRelease.partner.counts,
                 fullWallet: staleRelease.fullWallet.counts,
                 partnerFullWallet: staleRelease.partnerFullWallet.counts,
+                errorCodes: {
+                  customer: staleRelease.customer.errorCode ?? null,
+                  partner: staleRelease.partner.errorCode ?? null,
+                  fullWallet: staleRelease.fullWallet.errorCode ?? null,
+                  partnerFullWallet:
+                    staleRelease.partnerFullWallet.errorCode ?? null,
+                },
               }
             : { ok: false, errorCode: "stale_release_failed" }
           : { ok: true, skipped: true },
