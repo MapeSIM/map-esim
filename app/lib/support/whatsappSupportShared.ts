@@ -227,3 +227,44 @@ export function buildPaymentReturnWhatsAppRecoveryHref(
     PAYMENT_RETURN_WHATSAPP_RECOVERY_MESSAGE
   );
 }
+
+/** Order fields for checkout "Buy via WhatsApp" prefilled message. */
+export type WhatsAppCheckoutOrderDetails = {
+  destination: string;
+  planName: string;
+  dataAllowance: string;
+  validity: string;
+  totalPriceLabel: string;
+};
+
+/** Prefill for customer checkout WhatsApp fallback (plain text, capped). */
+export function buildWhatsAppCheckoutOrderMessage(
+  details: WhatsAppCheckoutOrderDetails
+): string {
+  const line = (label: string, value: string) =>
+    `${label}: ${(value || "").trim() || "Not available"}`;
+  const message = [
+    "Hi! I'd like to buy an eSIM on mapesim.com.",
+    "",
+    line("Country/Destination", details.destination),
+    line("Plan Name", details.planName),
+    line("Data", details.dataAllowance),
+    line("Validity", details.validity),
+    line("Total Price", details.totalPriceLabel),
+  ].join("\n");
+  return message.slice(0, WHATSAPP_MESSAGE_MAX);
+}
+
+/**
+ * Checkout wa.me link. Uses the configured support number (digits-only).
+ * Returns null when the phone is invalid.
+ */
+export function buildWhatsAppCheckoutHref(
+  phoneDigits: string,
+  details: WhatsAppCheckoutOrderDetails
+): string | null {
+  return buildWhatsAppClickToChatUrl(
+    (phoneDigits ?? "").trim(),
+    buildWhatsAppCheckoutOrderMessage(details)
+  );
+}

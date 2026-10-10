@@ -1,5 +1,7 @@
 /**
  * Server-only WhatsApp support config reads (public + admin).
+ * Same singleton also drives customer checkout "Buy via WhatsApp" fallback
+ * (enabled + phoneE164). No separate checkout number — support number is used.
  */
 import "server-only";
 
@@ -55,6 +57,15 @@ export async function getPublicWhatsAppSupportConfig(): Promise<PublicWhatsAppSu
   } catch {
     return { enabled: false };
   }
+}
+
+/**
+ * Digits-only WhatsApp number for checkout fallback, or null when the
+ * public support button is disabled / unconfigured. Uses the same support number.
+ */
+export async function getWhatsAppCheckoutPhoneDigits(): Promise<string | null> {
+  const config = await getPublicWhatsAppSupportConfig();
+  return config.enabled ? config.phone : null;
 }
 
 export async function getAdminWhatsAppSupportView(): Promise<AdminWhatsAppSupportView> {

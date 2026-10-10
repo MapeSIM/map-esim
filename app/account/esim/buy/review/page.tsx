@@ -15,6 +15,7 @@ import {
 import { getWalletPurchaseReview } from "@/app/lib/esim/walletPurchaseRead";
 import { getSimpaisaWalletOperatorConfig } from "@/app/lib/payments/simpaisaWalletOperatorConfig";
 import { resolveCheckoutBackHref } from "@/app/lib/plans/checkoutBackHref";
+import { getWhatsAppCheckoutPhoneDigits } from "@/app/lib/support/whatsappSupport";
 import { WalletEsimPurchaseStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -123,7 +124,10 @@ export default async function AccountWalletBuyReviewPage({
     destinationCode: review.destinationCode,
     destinationName: review.destinationName,
   });
-  const simpaisaOperators = await getSimpaisaWalletOperatorConfig();
+  const [simpaisaOperators, whatsappCheckoutPhone] = await Promise.all([
+    getSimpaisaWalletOperatorConfig(),
+    getWhatsAppCheckoutPhoneDigits(),
+  ]);
 
   const bannerFromQuery = parseAddDataCheckoutBannerParam(query.addDataBanner);
   const isAddDataTopUp = Boolean(
@@ -166,6 +170,7 @@ export default async function AccountWalletBuyReviewPage({
         key={review.purchaseId}
         review={review}
         enabledSimpaisaOperatorIds={simpaisaOperators.enabledOperatorIds}
+        whatsappCheckoutPhone={whatsappCheckoutPhone}
       />
     </div>
   );

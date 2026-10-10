@@ -68,11 +68,12 @@ export function WhatsAppSupportPanel({
             id={`${formId}-heading`}
             className="text-base font-semibold tracking-tight text-[var(--heading)]"
           >
-            WhatsApp Support Button
+            WhatsApp Support &amp; Checkout
           </h2>
           <p className="mt-2 max-w-3xl text-sm text-[var(--text-muted)]">
-            Floating public support link (bottom-left). Changes apply to the
-            public website without redeploy.
+            Floating public support link (bottom-left) and customer checkout
+            &quot;Buy via WhatsApp&quot; fallback. Uses this same number — no
+            separate checkout number. Changes apply without redeploy.
           </p>
         </div>
         <span
@@ -121,7 +122,7 @@ export function WhatsAppSupportPanel({
             htmlFor={`${formId}-enabled`}
             className="text-sm font-semibold text-[var(--heading)]"
           >
-            Enabled
+            Enabled (support button + checkout WhatsApp fallback)
           </label>
         </div>
 
@@ -133,7 +134,8 @@ export function WhatsAppSupportPanel({
             WhatsApp number
           </label>
           <p className="mt-0.5 text-[11px] text-[var(--text-soft)]">
-            International format, e.g. +923001234567
+            International format, e.g. +923001234567. Also used for checkout
+            Buy via WhatsApp when enabled.
           </p>
           <input
             id={`${formId}-phone`}

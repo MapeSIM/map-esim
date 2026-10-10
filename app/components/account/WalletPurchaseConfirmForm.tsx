@@ -46,12 +46,40 @@ import {
 import { CheckoutTrustPanel } from "@/app/components/account/CheckoutTrustPanel";
 import { CheckoutCompatibilityCheck } from "@/app/components/account/CheckoutCompatibilityModal";
 import SimpaisaWalletFields from "@/app/components/account/SimpaisaWalletFields";
+import { buildWhatsAppCheckoutHref } from "@/app/lib/support/whatsappSupportShared";
 
 type Props = {
   review: WalletPurchaseReview;
   /** Admin-enabled Simpaisa operators (JazzCash / Easypaisa). */
   enabledSimpaisaOperatorIds?: readonly string[];
+  /**
+   * Digits-only WhatsApp number from Admin WhatsApp support config.
+   * When set, checkout can offer Buy via WhatsApp fallback.
+   */
+  whatsappCheckoutPhone?: string | null;
 };
+
+function BuyViaWhatsAppButton({
+  href,
+  className,
+}: {
+  href: string;
+  className?: string;
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={
+        className ??
+        "inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#25D366] px-5 text-sm font-semibold text-white transition hover:opacity-95"
+      }
+    >
+      Buy via WhatsApp
+    </a>
+  );
+}
 
 function defaultPaymentMode(
   review: WalletPurchaseReview
@@ -178,12 +206,14 @@ function previewPurchaseFunding(
 export default function WalletPurchaseConfirmForm({
   review,
   enabledSimpaisaOperatorIds,
+  whatsappCheckoutPhone = null,
 }: Props) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(
     confirmWalletEsimPurchaseAction,
     initialWalletPurchaseState
   );
+  const [whatsappSelected, setWhatsappSelected] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [paymentMode, setPaymentMode] = useState<CustomerEsimPaymentMode>(() =>
     defaultPaymentMode(review)
@@ -263,6 +293,29 @@ export default function WalletPurchaseConfirmForm({
   const showOnlinePaymentOption = cashPayablePreview > 0 && onlinePaymentsAllowed;
   const walletOnlyInsufficient =
     !onlinePaymentsAllowed && cashPayablePreview > 0 && !canFullWallet;
+  const whatsappPhone = (whatsappCheckoutPhone ?? "").trim();
+  const whatsappCheckoutAvailable =
+    Boolean(whatsappPhone) && cashPayablePreview > 0;
+  const whatsappCheckoutHref = whatsappCheckoutAvailable
+    ? buildWhatsAppCheckoutHref(whatsappPhone, {
+        destination: review.destination,
+        planName: review.planName,
+        dataAllowance: review.dataAllowance,
+        validity: review.validity,
+        totalPriceLabel: review.promoApplied
+          ? review.promoTotalLabel
+          : review.priceLabel,
+      })
+    : null;
+  // Show CTA when WhatsApp is selected, or as fallback when gateway is off/unavailable.
+  // Never compete with a zero-cash wallet confirm path.
+  const showWhatsAppCheckoutCta =
+    Boolean(whatsappCheckoutHref) &&
+    !zeroCashConfirm &&
+    (whatsappSelected ||
+      !onlinePaymentsAllowed ||
+      showGatewayUnavailable ||
+      walletOnlyInsufficient);
   const showRewardsSection =
     Math.max(0, Math.trunc(Number(review.rewardPointsBalance))) >= 100;
   const onlinePaymentLabel = simpaisaCheckout
@@ -347,8 +400,13 @@ export default function WalletPurchaseConfirmForm({
   }
 
   function onPaymentModeChange(next: CustomerEsimPaymentMode) {
+    setWhatsappSelected(false);
     setPaymentMode(next);
     persistFundingChoice(next, useRewards && !rewardsDisabled);
+  }
+
+  function onWhatsAppPaymentSelect() {
+    setWhatsappSelected(true);
   }
 
   function onUseRewardsChange(checked: boolean) {
@@ -680,8 +738,11 @@ export default function WalletPurchaseConfirmForm({
                 No online payment needed.
               </p>
             ) : walletOnlyInsufficient ? (
-              <div className="mt-3">
+              <div className="mt-3 space-y-3">
                 <InsufficientWalletCheckoutNotice />
+                {whatsappCheckoutHref ? (
+                  <BuyViaWhatsAppButton href={whatsappCheckoutHref} />
+                ) : null}
               </div>
             ) : (
               <div
@@ -692,14 +753,16 @@ export default function WalletPurchaseConfirmForm({
                 {showFullWalletOption ? (
                   <label
                     className={paymentOptionClass(
-                      paymentMode === "full_wallet"
+                      !whatsappSelected && paymentMode === "full_wallet"
                     )}
                   >
                     <input
                       type="radio"
                       name="paymentModeChoice"
                       value="full_wallet"
-                      checked={paymentMode === "full_wallet"}
+                      checked={
+                        !whatsappSelected && paymentMode === "full_wallet"
+                      }
                       disabled={busy}
                       onChange={() => onPaymentModeChange("full_wallet")}
                       className="shrink-0"
@@ -713,14 +776,17 @@ export default function WalletPurchaseConfirmForm({
                 {onlinePaymentsAllowed && showWalletAndOnlineOption ? (
                   <label
                     className={paymentOptionClass(
-                      paymentMode === "wallet_and_mobile"
+                      !whatsappSelected && paymentMode === "wallet_and_mobile"
                     )}
                   >
                     <input
                       type="radio"
                       name="paymentModeChoice"
                       value="wallet_and_mobile"
-                      checked={paymentMode === "wallet_and_mobile"}
+                      checked={
+                        !whatsappSelected &&
+                        paymentMode === "wallet_and_mobile"
+                      }
                       disabled={busy}
                       onChange={() => onPaymentModeChange("wallet_and_mobile")}
                       className="shrink-0"
@@ -734,20 +800,41 @@ export default function WalletPurchaseConfirmForm({
                 {showOnlinePaymentOption ? (
                   <label
                     className={paymentOptionClass(
-                      paymentMode === "mobile_only"
+                      !whatsappSelected && paymentMode === "mobile_only"
                     )}
                   >
                     <input
                       type="radio"
                       name="paymentModeChoice"
                       value="mobile_only"
-                      checked={paymentMode === "mobile_only"}
+                      checked={
+                        !whatsappSelected && paymentMode === "mobile_only"
+                      }
                       disabled={busy}
                       onChange={() => onPaymentModeChange("mobile_only")}
                       className="shrink-0"
                     />
                     <span className="font-semibold text-[var(--heading)]">
                       {onlinePaymentLabel}
+                    </span>
+                  </label>
+                ) : null}
+
+                {whatsappCheckoutAvailable && whatsappCheckoutHref ? (
+                  <label
+                    className={paymentOptionClass(whatsappSelected)}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentModeChoice"
+                      value="whatsapp"
+                      checked={whatsappSelected}
+                      disabled={busy}
+                      onChange={onWhatsAppPaymentSelect}
+                      className="shrink-0"
+                    />
+                    <span className="font-semibold text-[var(--heading)]">
+                      Buy via WhatsApp
                     </span>
                   </label>
                 ) : null}
@@ -761,7 +848,7 @@ export default function WalletPurchaseConfirmForm({
             ) : null}
           </section>
 
-          {gatewayRequired ? (
+          {gatewayRequired && !whatsappSelected ? (
             onlinePaymentsAllowed ? (
             <section
               id={onlinePaymentSectionId}
@@ -830,10 +917,32 @@ export default function WalletPurchaseConfirmForm({
                     Remaining due:{" "}
                     <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout} cents={preview.gatewayAmountCents} />.
                   </p>
+                  {whatsappCheckoutHref ? (
+                    <div className="mt-4">
+                      <BuyViaWhatsAppButton href={whatsappCheckoutHref} />
+                    </div>
+                  ) : null}
                 </>
               ) : null}
             </section>
             ) : null
+          ) : null}
+
+          {showWhatsAppCheckoutCta &&
+          whatsappCheckoutHref &&
+          !walletOnlyInsufficient ? (
+            <section
+              className={cardClass}
+              aria-label="WhatsApp checkout"
+            >
+              <p className="text-sm text-[var(--text-muted)]">
+                Complete this order with our team on WhatsApp. Your plan details
+                are pre-filled.
+              </p>
+              <div className="mt-3">
+                <BuyViaWhatsAppButton href={whatsappCheckoutHref} />
+              </div>
+            </section>
           ) : null}
         </div>
 
@@ -935,7 +1044,14 @@ export default function WalletPurchaseConfirmForm({
             >
               {confirmNoteText}
             </div>
-          ) : gatewayReady ? (
+          ) : whatsappSelected && whatsappCheckoutHref ? (
+            <div
+              className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-4 text-sm text-[var(--text-muted)]"
+              role="note"
+            >
+              Continue below to buy this plan via WhatsApp.
+            </div>
+          ) : gatewayReady && !whatsappSelected ? (
             <div
               className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-4 text-sm text-[var(--text-muted)]"
               role="note"
@@ -946,10 +1062,13 @@ export default function WalletPurchaseConfirmForm({
             </div>
           ) : walletOnlyInsufficient ? (
             <div
-              className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-4"
+              className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-4 space-y-3"
               role="status"
             >
               <InsufficientWalletCheckoutNotice />
+              {whatsappCheckoutHref ? (
+                <BuyViaWhatsAppButton href={whatsappCheckoutHref} />
+              ) : null}
             </div>
           ) : null}
 
@@ -1003,6 +1122,13 @@ export default function WalletPurchaseConfirmForm({
                 {pending ? primaryCtaPendingLabel : primaryCtaLabel}
               </button>
             </>
+          ) : showWhatsAppCheckoutCta && whatsappCheckoutHref ? (
+            <div
+              id={confirmSectionId}
+              className="scroll-mt-28 sm:scroll-mt-32 hidden lg:block"
+            >
+              <BuyViaWhatsAppButton href={whatsappCheckoutHref} />
+            </div>
           ) : gatewayReady ? (
             <div id={confirmSectionId} className="scroll-mt-28 sm:scroll-mt-32">
               <button
@@ -1102,6 +1228,11 @@ export default function WalletPurchaseConfirmForm({
             >
               {pending ? stickyCtaPendingLabel : primaryCtaLabel}
             </button>
+          ) : showWhatsAppCheckoutCta && whatsappCheckoutHref ? (
+            <BuyViaWhatsAppButton
+              href={whatsappCheckoutHref}
+              className="inline-flex h-11 w-full min-w-0 items-center justify-center rounded-2xl bg-[#25D366] px-4 text-sm font-semibold text-white transition hover:opacity-95"
+            />
           ) : gatewayReady ? (
             <button
               type="submit"
@@ -1119,7 +1250,8 @@ export default function WalletPurchaseConfirmForm({
               Continue to Payment
             </button>
           )}
-          {stickyDisabledReason ? (
+          {stickyDisabledReason &&
+          !(showWhatsAppCheckoutCta && whatsappCheckoutHref) ? (
             <p className="text-xs leading-snug text-[var(--text-muted)]" role="status">
               {stickyDisabledReason}
             </p>
