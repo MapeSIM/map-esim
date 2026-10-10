@@ -80,6 +80,12 @@ export function requiredAdminAccessForPath(pathname: string): AdminPathAccess {
   if (path.startsWith("/admin/orders")) {
     return { mode: "any-of", permissions: ["ORDERS_VIEW", "ORDERS_MANAGE"] };
   }
+  if (path.startsWith("/admin/whatsapp-orders")) {
+    return {
+      mode: "any-of",
+      permissions: ["ESIM_FULFILLMENT", "ORDERS_VIEW", "ORDERS_MANAGE"],
+    };
+  }
   if (path.startsWith("/admin/customers")) {
     if (path.includes("/esim/")) {
       return { mode: "any-of", permissions: ["ESIM_FULFILLMENT"] };
@@ -122,6 +128,7 @@ export const ADMIN_NAV_LINKS = [
   { href: "/admin", label: "Overview", exact: true },
   { href: "/admin/revenue", label: "Revenue", exact: false },
   { href: "/admin/orders", label: "Orders", exact: false },
+  { href: "/admin/whatsapp-orders", label: "WhatsApp Orders", exact: false },
   { href: "/admin/customers", label: "Customers", exact: false },
   { href: "/admin/countries", label: "Countries", exact: false },
   { href: "/admin/partners", label: "Partners", exact: false },

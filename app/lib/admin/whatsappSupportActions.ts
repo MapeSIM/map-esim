@@ -21,6 +21,7 @@ export async function saveWhatsAppSupportConfigAction(
     enabled: formData.get("enabled"),
     checkoutFallbackEnabled: formData.get("checkoutFallbackEnabled"),
     phone: formData.get("phone"),
+    checkoutPhone: formData.get("checkoutPhone"),
     message: formData.get("message"),
     expectedVersion: (() => {
       const raw = String(formData.get("expectedVersion") ?? "").trim();

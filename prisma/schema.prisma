@@ -162,6 +162,13 @@ enum PartnerEsimPurchaseStatus {
   RECONCILIATION_REQUIRED
 }
 
+/// Manual WhatsApp checkout pipeline (independent of wallet/gateway purchase status).
+enum WhatsAppCheckoutOrderStatus {
+  WHATSAPP_PENDING
+  FULFILLED
+  CANCELLED
+}
+
 enum OtpPurpose {
   EMAIL_VERIFICATION
   PASSWORD_RESET
@@ -421,6 +428,9 @@ model User {
   emailCampaignsCreated        EmailCampaign[]            @relation("EmailCampaignCreatedByAdmin")
   emailCampaignRecipients      EmailCampaignRecipient[]   @relation("EmailCampaignRecipientCustomer")
   adminPermissionGrants        AdminPermissionGrant[]
+  whatsAppCheckoutOrdersAsCustomer WhatsAppCheckoutOrder[] @relation("WhatsAppCheckoutCustomer")
+  whatsAppCheckoutOrdersFulfilled  WhatsAppCheckoutOrder[] @relation("WhatsAppCheckoutFulfilledBy")
+  whatsAppCheckoutOrdersCancelled  WhatsAppCheckoutOrder[] @relation("WhatsAppCheckoutCancelledBy")
 
   @@index([deletedAt])
   @@index([blockedAt])
@@ -744,6 +754,7 @@ model Order {
   promoRedemptions                 PromoCodeRedemption[]
   customerRewardTransactions       CustomerRewardTransaction[]
   lifecycleNotificationDeliveries  EsimLifecycleNotificationDelivery[]
+  whatsAppCheckoutOrder            WhatsAppCheckoutOrder?
 
   @@index([customerEmail])
   @@index([userId])
@@ -819,6 +830,7 @@ model AdminPackageAssignment {
   customer                         User                         @relation("AssignmentCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
   admin                            User                         @relation("AssignmentAdmin", fields: [adminUserId], references: [id], onDelete: Restrict)
   order                            Order?                       @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  whatsAppCheckoutOrder            WhatsAppCheckoutOrder?
 
   @@index([customerUserId])
   @@index([adminUserId])
@@ -1388,16 +1400,62 @@ model WhatsAppSupportConfig {
   id               String   @id
   /// Floating public support button (bottom-left).
   enabled          Boolean  @default(false)
-  /// Customer checkout "Buy via WhatsApp" fallback (independent of `enabled`).
+  /// WHATSAPP_CHECKOUT_ENABLED — customer checkout "Buy via WhatsApp" fallback.
   checkoutFallbackEnabled Boolean @default(true)
-  /// Digits-only international number for wa.me (no +). Null when unset.
+  /// Digits-only international number for floating support wa.me (no +).
   phoneE164        String?
+  /// WHATSAPP_CHECKOUT_NUMBER — optional checkout-only digits. Empty → fall back to phoneE164.
+  checkoutPhoneE164 String?
   /// Plain-text default chat message. Null/empty allowed when disabled.
   defaultMessage   String?
   version          Int      @default(1)
   updatedByAdminId String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+/// Pending WhatsApp checkout intent — admin verifies payment then issues eSIM.
+/// Does not mutate WalletEsimPurchase / gateway status machines.
+model WhatsAppCheckoutOrder {
+  id                      String                       @id @default(cuid())
+  /// Public reference shown in WhatsApp + admin hub (e.g. WA-83921).
+  reference               String                       @unique
+  status                  WhatsAppCheckoutOrderStatus  @default(WHATSAPP_PENDING)
+  /// Always "WHATSAPP" for this pipeline.
+  paymentMethod           String                       @default("WHATSAPP")
+  customerUserId          String
+  customerEmail           String
+  /// Optional customer contact digits (not required for checkout open).
+  whatsappPhone           String?
+  offerId                 String
+  destinationCode         String?
+  destinationName         String?
+  planName                String
+  dataAllowance           String?
+  validity                String?
+  amountCents             Int
+  currency                String                       @default("USD")
+  /// Source wallet checkout draft when created from /account/esim/buy/review.
+  walletEsimPurchaseId    String?
+  orderId                 String?                      @unique
+  adminPackageAssignmentId String?                     @unique
+  fulfilledAt             DateTime?
+  fulfilledByAdminId      String?
+  cancelledAt             DateTime?
+  cancelledByAdminId      String?
+  cancelReason            String?
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime                     @updatedAt
+  customer                User                         @relation("WhatsAppCheckoutCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
+  fulfilledByAdmin        User?                        @relation("WhatsAppCheckoutFulfilledBy", fields: [fulfilledByAdminId], references: [id], onDelete: SetNull)
+  cancelledByAdmin        User?                        @relation("WhatsAppCheckoutCancelledBy", fields: [cancelledByAdminId], references: [id], onDelete: SetNull)
+  order                   Order?                       @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  adminPackageAssignment  AdminPackageAssignment?      @relation(fields: [adminPackageAssignmentId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([customerUserId, createdAt])
+  @@index([customerEmail])
+  @@index([walletEsimPurchaseId])
 }
 
 /// Lifecycle state per deterministic Part B1 alert ID (activation cycles).

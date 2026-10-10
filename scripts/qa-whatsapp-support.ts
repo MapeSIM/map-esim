@@ -221,11 +221,13 @@ function main() {
   assert.match(mut, /version/);
   assert.match(
     mut,
-    /A valid WhatsApp number is required when support or checkout fallback is enabled/
+    /A valid WhatsApp support number is required when the support button is enabled/
   );
   assert.match(mut, /checkoutFallbackEnabled/);
+  assert.match(mut, /checkoutPhoneE164|checkoutPhone/);
   assert.match(actions, /requireRole\("ADMIN"\)/);
   assert.match(actions, /checkoutFallbackEnabled/);
+  assert.match(actions, /checkoutPhone/);
   assert.match(server, /upsert/);
   assert.match(server, /getWhatsAppCheckoutPhoneDigits/);
   assert.match(server, /resolveWhatsAppCheckoutPhoneDigits|checkoutFallbackEnabled/);
@@ -243,6 +245,14 @@ function main() {
     }),
     "923001234567"
   );
+  assert.equal(
+    resolveWhatsAppCheckoutPhoneDigits({
+      checkoutFallbackEnabled: true,
+      phoneE164: "923001234567",
+      checkoutPhoneE164: "923009998887",
+    }),
+    "923009998887"
+  );
   console.log("PASS admin_security_audit_cas");
 
   // --- Public API ---
@@ -255,7 +265,10 @@ function main() {
   assert.match(opsPage, /WhatsAppSupportPanel/);
   assert.match(panel, /WhatsApp Support Button/);
   assert.match(panel, /Enable WhatsApp Checkout Fallback/);
+  assert.match(panel, /WHATSAPP_CHECKOUT_ENABLED/);
+  assert.match(panel, /WHATSAPP_CHECKOUT_NUMBER/);
   assert.match(panel, /checkoutFallbackEnabled/);
+  assert.match(panel, /checkoutPhone/);
   assert.match(panel, /without redeploy/);
   assert.match(panel, /saveWhatsAppSupportConfigAction/);
   assert.match(layout, /WhatsAppSupportButton/);

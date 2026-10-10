@@ -41,6 +41,9 @@ export function WhatsAppSupportPanel({
     initial.checkoutFallbackEnabled
   );
   const [phone, setPhone] = useState(initial.phoneDisplay);
+  const [checkoutPhone, setCheckoutPhone] = useState(
+    initial.checkoutPhoneDisplay
+  );
   const [message, setMessage] = useState(initial.message);
   const [version, setVersion] = useState(initial.version);
   const [updatedAtLabel, setUpdatedAtLabel] = useState(initial.updatedAtLabel);
@@ -168,8 +171,8 @@ export function WhatsAppSupportPanel({
           </label>
         </div>
         <p className="-mt-2 text-[11px] text-[var(--text-soft)]">
-          When on, customer checkout can show Buy via WhatsApp (uses the number
-          below). Independent of the floating support button.
+          Setting key: WHATSAPP_CHECKOUT_ENABLED. Independent of the floating
+          support button.
         </p>
 
         <div>
@@ -177,11 +180,12 @@ export function WhatsAppSupportPanel({
             htmlFor={`${formId}-phone`}
             className="block text-xs font-semibold text-[var(--heading)]"
           >
-            WhatsApp number
+            WhatsApp support number
           </label>
           <p className="mt-0.5 text-[11px] text-[var(--text-soft)]">
-            International format, e.g. +923001234567. Shared by support and
-            checkout fallback.
+            International format, e.g. +923001234567. Used by the floating
+            support button; also the checkout fallback when checkout number is
+            empty.
           </p>
           <input
             id={`${formId}-phone`}
@@ -198,6 +202,36 @@ export function WhatsAppSupportPanel({
           {state && !state.ok && state.fieldErrors?.phone ? (
             <p className="mt-1 text-xs text-red-700 dark:text-red-300" role="alert">
               {state.fieldErrors.phone}
+            </p>
+          ) : null}
+        </div>
+
+        <div>
+          <label
+            htmlFor={`${formId}-checkout-phone`}
+            className="block text-xs font-semibold text-[var(--heading)]"
+          >
+            WhatsApp checkout number
+          </label>
+          <p className="mt-0.5 text-[11px] text-[var(--text-soft)]">
+            Setting key: WHATSAPP_CHECKOUT_NUMBER. Optional — leave empty to use
+            the support number above.
+          </p>
+          <input
+            id={`${formId}-checkout-phone`}
+            name="checkoutPhone"
+            type="tel"
+            autoComplete="tel"
+            inputMode="tel"
+            disabled={pending}
+            value={checkoutPhone}
+            onChange={(e) => setCheckoutPhone(e.target.value)}
+            placeholder="+923001234567 (optional)"
+            className="mt-1 w-full max-w-md rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+          />
+          {state && !state.ok && state.fieldErrors?.checkoutPhone ? (
+            <p className="mt-1 text-xs text-red-700 dark:text-red-300" role="alert">
+              {state.fieldErrors.checkoutPhone}
             </p>
           ) : null}
         </div>

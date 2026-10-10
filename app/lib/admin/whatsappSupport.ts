@@ -35,6 +35,7 @@ export type WhatsAppSupportMutationResult =
           | "enabled"
           | "checkoutFallbackEnabled"
           | "phone"
+          | "checkoutPhone"
           | "message"
           | "version",
           string
@@ -64,6 +65,7 @@ export async function updateWhatsAppSupportConfig(options: {
   enabled: boolean | string | FormDataEntryValue | null;
   checkoutFallbackEnabled?: boolean | string | FormDataEntryValue | null;
   phone: FormDataEntryValue | string | null;
+  checkoutPhone?: FormDataEntryValue | string | null;
   message: FormDataEntryValue | string | null;
   expectedVersion?: number | null;
 }): Promise<WhatsAppSupportMutationResult> {
@@ -137,13 +139,37 @@ export async function updateWhatsAppSupportConfig(options: {
     phoneDigits = phoneParsed.digits;
   }
 
-  if ((enabled || checkoutFallbackEnabled) && !phoneDigits) {
+  const checkoutPhoneRaw = String(options.checkoutPhone ?? "").trim();
+  let checkoutPhoneDigits: string | null = null;
+  if (checkoutPhoneRaw) {
+    const checkoutParsed = parseWhatsAppPhoneDigits(checkoutPhoneRaw);
+    if (!checkoutParsed.ok) {
+      return {
+        ok: false,
+        error: checkoutParsed.error,
+        fieldErrors: { checkoutPhone: checkoutParsed.error },
+      };
+    }
+    checkoutPhoneDigits = checkoutParsed.digits;
+  }
+
+  if (enabled && !phoneDigits) {
     const error =
-      "A valid WhatsApp number is required when support or checkout fallback is enabled.";
+      "A valid WhatsApp support number is required when the support button is enabled.";
     return {
       ok: false,
       error,
       fieldErrors: { phone: error },
+    };
+  }
+
+  if (checkoutFallbackEnabled && !phoneDigits && !checkoutPhoneDigits) {
+    const error =
+      "Set a checkout number or support number when WhatsApp checkout fallback is enabled.";
+    return {
+      ok: false,
+      error,
+      fieldErrors: { checkoutPhone: error },
     };
   }
 
@@ -177,6 +203,7 @@ export async function updateWhatsAppSupportConfig(options: {
       enabled,
       checkoutFallbackEnabled,
       phoneE164: phoneDigits,
+      checkoutPhoneE164: checkoutPhoneDigits,
       defaultMessage: messageParsed.message || null,
       version: { increment: 1 },
       updatedByAdminId: admin.id,
@@ -201,6 +228,7 @@ export async function updateWhatsAppSupportConfig(options: {
       enabled,
       checkoutFallbackEnabled,
       phoneE164: phoneDigits,
+      checkoutPhoneE164: checkoutPhoneDigits,
       messageLength: messageParsed.message.length,
       previousEnabled: current.enabled,
       previousCheckoutFallbackEnabled: current.checkoutFallbackEnabled,

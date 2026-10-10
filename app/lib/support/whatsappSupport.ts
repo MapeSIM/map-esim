@@ -73,6 +73,7 @@ export async function getWhatsAppCheckoutPhoneDigits(): Promise<string | null> {
       select: {
         checkoutFallbackEnabled: true,
         phoneE164: true,
+        checkoutPhoneE164: true,
       },
     });
     if (!row) return null;
@@ -82,16 +83,43 @@ export async function getWhatsAppCheckoutPhoneDigits(): Promise<string | null> {
   }
 }
 
+/** Server settings snapshot for WHATSAPP_CHECKOUT_ENABLED / NUMBER. */
+export async function getWhatsAppCheckoutSettings(): Promise<{
+  enabled: boolean;
+  phoneDigits: string | null;
+}> {
+  try {
+    const row = await prisma.whatsAppSupportConfig.findUnique({
+      where: { id: WHATSAPP_SUPPORT_CONFIG_ID },
+      select: {
+        checkoutFallbackEnabled: true,
+        phoneE164: true,
+        checkoutPhoneE164: true,
+      },
+    });
+    if (!row) return { enabled: false, phoneDigits: null };
+    const phoneDigits = resolveWhatsAppCheckoutPhoneDigits(row);
+    return {
+      enabled: Boolean(row.checkoutFallbackEnabled) && Boolean(phoneDigits),
+      phoneDigits,
+    };
+  } catch {
+    return { enabled: false, phoneDigits: null };
+  }
+}
+
 export async function getAdminWhatsAppSupportView(): Promise<AdminWhatsAppSupportView> {
   await ensureWhatsAppSupportConfig();
   const row = await prisma.whatsAppSupportConfig.findUniqueOrThrow({
     where: { id: WHATSAPP_SUPPORT_CONFIG_ID },
   });
   const digits = (row.phoneE164 ?? "").trim();
+  const checkoutDigits = (row.checkoutPhoneE164 ?? "").trim();
   return {
     enabled: row.enabled,
     checkoutFallbackEnabled: row.checkoutFallbackEnabled,
     phoneDisplay: digits ? `+${digits}` : "",
+    checkoutPhoneDisplay: checkoutDigits ? `+${checkoutDigits}` : "",
     message: row.defaultMessage ?? "",
     version: row.version,
     updatedAtLabel: formatUpdatedAt(row.updatedAt),

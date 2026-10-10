@@ -46,7 +46,7 @@ import {
 import { CheckoutTrustPanel } from "@/app/components/account/CheckoutTrustPanel";
 import { CheckoutCompatibilityCheck } from "@/app/components/account/CheckoutCompatibilityModal";
 import SimpaisaWalletFields from "@/app/components/account/SimpaisaWalletFields";
-import { buildWhatsAppCheckoutHref } from "@/app/lib/support/whatsappSupportShared";
+import { createWhatsAppPendingOrderAction } from "@/app/lib/esim/whatsappCheckoutOrderActions";
 
 type Props = {
   review: WalletPurchaseReview;
@@ -59,25 +59,77 @@ type Props = {
   whatsappCheckoutPhone?: string | null;
 };
 
-function BuyViaWhatsAppButton({
-  href,
+function BuyViaWhatsAppCheckoutButton({
+  purchaseId,
   className,
 }: {
-  href: string;
+  purchaseId: string;
   className?: string;
 }) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={
-        className ??
-        "inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#25D366] px-5 text-sm font-semibold text-white transition hover:opacity-95"
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [fallbackHref, setFallbackHref] = useState<string | null>(null);
+  const [reference, setReference] = useState<string | null>(null);
+
+  async function onClick() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await createWhatsAppPendingOrderAction({ purchaseId });
+      if (!result.success) {
+        setError(result.error);
+        return;
       }
-    >
-      Buy via WhatsApp
-    </a>
+      setReference(result.orderReference);
+      setFallbackHref(result.redirectUrl);
+      const opened = window.open(
+        result.redirectUrl,
+        "_blank",
+        "noopener,noreferrer"
+      );
+      if (!opened) {
+        setError(
+          "Popup blocked — use the link below to continue on WhatsApp."
+        );
+      }
+    } catch {
+      setError("Could not create the WhatsApp order. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={onClick}
+        className={
+          className ??
+          "inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#25D366] px-5 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+        }
+      >
+        {busy ? "Creating order…" : "Buy via WhatsApp"}
+      </button>
+      {error ? (
+        <p className="text-xs text-[var(--heading)]" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {fallbackHref ? (
+        <a
+          href={fallbackHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex text-xs font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+        >
+          Continue to WhatsApp
+          {reference ? ` (${reference})` : ""}
+        </a>
+      ) : null}
+    </div>
   );
 }
 
@@ -296,21 +348,10 @@ export default function WalletPurchaseConfirmForm({
   const whatsappPhone = (whatsappCheckoutPhone ?? "").trim();
   const whatsappCheckoutAvailable =
     Boolean(whatsappPhone) && cashPayablePreview > 0;
-  const whatsappCheckoutHref = whatsappCheckoutAvailable
-    ? buildWhatsAppCheckoutHref(whatsappPhone, {
-        destination: review.destination,
-        planName: review.planName,
-        dataAllowance: review.dataAllowance,
-        validity: review.validity,
-        totalPriceLabel: review.promoApplied
-          ? review.promoTotalLabel
-          : review.priceLabel,
-      })
-    : null;
   // Show CTA when WhatsApp is selected, or as fallback when gateway is off/unavailable.
   // Never compete with a zero-cash wallet confirm path.
   const showWhatsAppCheckoutCta =
-    Boolean(whatsappCheckoutHref) &&
+    whatsappCheckoutAvailable &&
     !zeroCashConfirm &&
     (whatsappSelected ||
       !onlinePaymentsAllowed ||
@@ -817,7 +858,7 @@ export default function WalletPurchaseConfirmForm({
                   </label>
                 ) : null}
 
-                {whatsappCheckoutAvailable && whatsappCheckoutHref ? (
+                {whatsappCheckoutAvailable ? (
                   <label
                     className={paymentOptionClass(whatsappSelected)}
                   >
@@ -1019,12 +1060,12 @@ export default function WalletPurchaseConfirmForm({
             >
               {confirmNoteText}
             </div>
-          ) : whatsappSelected && whatsappCheckoutHref ? (
+          ) : whatsappSelected && whatsappCheckoutAvailable ? (
             <div
               className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-4 text-sm text-[var(--text-muted)]"
               role="note"
             >
-              Continue below to buy this plan via WhatsApp.
+              Continue below to create a pending order and open WhatsApp.
             </div>
           ) : gatewayReady && !whatsappSelected ? (
             <div
@@ -1094,12 +1135,14 @@ export default function WalletPurchaseConfirmForm({
                 {pending ? primaryCtaPendingLabel : primaryCtaLabel}
               </button>
             </>
-          ) : showWhatsAppCheckoutCta && whatsappCheckoutHref ? (
+          ) : showWhatsAppCheckoutCta ? (
             <div
               id={confirmSectionId}
               className="scroll-mt-28 sm:scroll-mt-32 hidden lg:block"
             >
-              <BuyViaWhatsAppButton href={whatsappCheckoutHref} />
+              <BuyViaWhatsAppCheckoutButton
+                purchaseId={review.purchaseId}
+              />
             </div>
           ) : gatewayReady ? (
             <div id={confirmSectionId} className="scroll-mt-28 sm:scroll-mt-32">
@@ -1200,10 +1243,10 @@ export default function WalletPurchaseConfirmForm({
             >
               {pending ? stickyCtaPendingLabel : primaryCtaLabel}
             </button>
-          ) : showWhatsAppCheckoutCta && whatsappCheckoutHref ? (
-            <BuyViaWhatsAppButton
-              href={whatsappCheckoutHref}
-              className="inline-flex h-11 w-full min-w-0 items-center justify-center rounded-2xl bg-[#25D366] px-4 text-sm font-semibold text-white transition hover:opacity-95"
+          ) : showWhatsAppCheckoutCta ? (
+            <BuyViaWhatsAppCheckoutButton
+              purchaseId={review.purchaseId}
+              className="inline-flex h-11 w-full min-w-0 items-center justify-center rounded-2xl bg-[#25D366] px-4 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
             />
           ) : gatewayReady ? (
             <button
@@ -1222,8 +1265,7 @@ export default function WalletPurchaseConfirmForm({
               Continue to Payment
             </button>
           )}
-          {stickyDisabledReason &&
-          !(showWhatsAppCheckoutCta && whatsappCheckoutHref) ? (
+          {stickyDisabledReason && !showWhatsAppCheckoutCta ? (
             <p className="text-xs leading-snug text-[var(--text-muted)]" role="status">
               {stickyDisabledReason}
             </p>
