@@ -345,6 +345,8 @@ function main() {
     lifecycleCron,
     /partnerFullWallet:\s*staleRelease\.partnerFullWallet\.counts/
   );
+  assert.doesNotMatch(lifecycleCron, /piggyback_stale_release_failed/);
+  assert.doesNotMatch(lifecycleCron, /cron_esim_lifecycle_stale_release/);
   console.log("PASS stale_release_and_auto_recovery");
 
   assert.doesNotMatch(service, /applyVerifiedEsimPurchasePaymentEvent/);

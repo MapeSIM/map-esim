@@ -463,6 +463,11 @@ function main() {
     cron,
     /partnerFullWallet:\s*staleRelease\.partnerFullWallet\.counts/
   );
+  // MAP-ESIM-4: piggyback soft failures must not page Sentry / lifecycle regressions.
+  assert.doesNotMatch(cron, /piggyback_stale_release_failed/);
+  assert.doesNotMatch(cron, /cron_esim_lifecycle_stale_release/);
+  assert.match(cron, /errorCodes/);
+  assert.match(cron, /Best-effort only|must NOT page Sentry/i);
   assert.match(runner, /fetchProviderUsage/);
   assert.match(runner, /normalizeProviderUsagePayload/);
   assert.match(runner, /evaluateEsimLifecycleEvents/);
