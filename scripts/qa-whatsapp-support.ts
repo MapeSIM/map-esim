@@ -15,6 +15,7 @@ import {
   isWhatsAppSupportRoute,
   parseWhatsAppDefaultMessage,
   parseWhatsAppPhoneDigits,
+  resolveWhatsAppCheckoutPhoneDigits,
   toPublicWhatsAppSupportConfig,
   whatsAppFabBottomClass,
 } from "../app/lib/support/whatsappSupportShared";
@@ -50,6 +51,7 @@ function main() {
   // --- Schema / migration ---
   assert.match(schema, /model WhatsAppSupportConfig/);
   assert.match(schema, /enabled\s+Boolean\s+@default\(false\)/);
+  assert.match(schema, /checkoutFallbackEnabled\s+Boolean\s+@default\(true\)/);
   assert.match(schema, /phoneE164\s+String\?/);
   assert.match(schema, /defaultMessage\s+String\?/);
   assert.doesNotMatch(
@@ -58,6 +60,13 @@ function main() {
   );
   assert.match(migration, /CREATE TABLE "WhatsAppSupportConfig"/);
   assert.match(migration, /"enabled" BOOLEAN NOT NULL DEFAULT false/);
+  const checkoutMigration = read(
+    "prisma/migrations/20261011120000_add_whatsapp_checkout_fallback_enabled/migration.sql"
+  );
+  assert.match(
+    checkoutMigration,
+    /ADD COLUMN "checkoutFallbackEnabled" BOOLEAN NOT NULL DEFAULT true/
+  );
   assert.equal(WHATSAPP_SUPPORT_CONFIG_ID, "default");
   console.log("PASS schema_migration_default_off");
 
@@ -210,9 +219,30 @@ function main() {
   assert.match(mut, /support\.whatsapp_config_updated/);
   assert.match(mut, /support\.whatsapp_config_blocked/);
   assert.match(mut, /version/);
-  assert.match(mut, /A valid WhatsApp number is required when the button is enabled/);
+  assert.match(
+    mut,
+    /A valid WhatsApp number is required when support or checkout fallback is enabled/
+  );
+  assert.match(mut, /checkoutFallbackEnabled/);
   assert.match(actions, /requireRole\("ADMIN"\)/);
+  assert.match(actions, /checkoutFallbackEnabled/);
   assert.match(server, /upsert/);
+  assert.match(server, /getWhatsAppCheckoutPhoneDigits/);
+  assert.match(server, /resolveWhatsAppCheckoutPhoneDigits|checkoutFallbackEnabled/);
+  assert.equal(
+    resolveWhatsAppCheckoutPhoneDigits({
+      checkoutFallbackEnabled: false,
+      phoneE164: "923001234567",
+    }),
+    null
+  );
+  assert.equal(
+    resolveWhatsAppCheckoutPhoneDigits({
+      checkoutFallbackEnabled: true,
+      phoneE164: "923001234567",
+    }),
+    "923001234567"
+  );
   console.log("PASS admin_security_audit_cas");
 
   // --- Public API ---
@@ -224,6 +254,8 @@ function main() {
   // --- UI wiring ---
   assert.match(opsPage, /WhatsAppSupportPanel/);
   assert.match(panel, /WhatsApp Support Button/);
+  assert.match(panel, /Enable WhatsApp Checkout Fallback/);
+  assert.match(panel, /checkoutFallbackEnabled/);
   assert.match(panel, /without redeploy/);
   assert.match(panel, /saveWhatsAppSupportConfigAction/);
   assert.match(layout, /WhatsAppSupportButton/);

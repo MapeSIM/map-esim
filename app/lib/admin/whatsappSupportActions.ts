@@ -19,6 +19,7 @@ export async function saveWhatsAppSupportConfigAction(
   const result = await updateWhatsAppSupportConfig({
     adminUserId: admin.id,
     enabled: formData.get("enabled"),
+    checkoutFallbackEnabled: formData.get("checkoutFallbackEnabled"),
     phone: formData.get("phone"),
     message: formData.get("message"),
     expectedVersion: (() => {

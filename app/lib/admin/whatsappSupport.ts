@@ -24,13 +24,21 @@ export type WhatsAppSupportMutationResult =
       ok: true;
       message: string;
       enabled: boolean;
+      checkoutFallbackEnabled: boolean;
       version: number;
     }
   | {
       ok: false;
       error: string;
       fieldErrors?: Partial<
-        Record<"enabled" | "phone" | "message" | "version", string>
+        Record<
+          | "enabled"
+          | "checkoutFallbackEnabled"
+          | "phone"
+          | "message"
+          | "version",
+          string
+        >
       >;
     };
 
@@ -54,6 +62,7 @@ function parseEnabled(
 export async function updateWhatsAppSupportConfig(options: {
   adminUserId: string;
   enabled: boolean | string | FormDataEntryValue | null;
+  checkoutFallbackEnabled?: boolean | string | FormDataEntryValue | null;
   phone: FormDataEntryValue | string | null;
   message: FormDataEntryValue | string | null;
   expectedVersion?: number | null;
@@ -102,6 +111,9 @@ export async function updateWhatsAppSupportConfig(options: {
   }
 
   const enabled = parseEnabled(options.enabled);
+  const checkoutFallbackEnabled = parseEnabled(
+    options.checkoutFallbackEnabled ?? false
+  );
   const messageParsed = parseWhatsAppDefaultMessage(options.message);
   if (!messageParsed.ok) {
     return {
@@ -125,8 +137,9 @@ export async function updateWhatsAppSupportConfig(options: {
     phoneDigits = phoneParsed.digits;
   }
 
-  if (enabled && !phoneDigits) {
-    const error = "A valid WhatsApp number is required when the button is enabled.";
+  if ((enabled || checkoutFallbackEnabled) && !phoneDigits) {
+    const error =
+      "A valid WhatsApp number is required when support or checkout fallback is enabled.";
     return {
       ok: false,
       error,
@@ -162,6 +175,7 @@ export async function updateWhatsAppSupportConfig(options: {
     },
     data: {
       enabled,
+      checkoutFallbackEnabled,
       phoneE164: phoneDigits,
       defaultMessage: messageParsed.message || null,
       version: { increment: 1 },
@@ -185,19 +199,32 @@ export async function updateWhatsAppSupportConfig(options: {
     targetId: WHATSAPP_SUPPORT_CONFIG_ID,
     metadata: {
       enabled,
+      checkoutFallbackEnabled,
       phoneE164: phoneDigits,
       messageLength: messageParsed.message.length,
       previousEnabled: current.enabled,
+      previousCheckoutFallbackEnabled: current.checkoutFallbackEnabled,
       version: nextVersion,
     },
   });
 
+  const parts: string[] = [];
+  parts.push(
+    enabled
+      ? "Support button enabled."
+      : "Support button disabled."
+  );
+  parts.push(
+    checkoutFallbackEnabled
+      ? "Checkout WhatsApp fallback enabled."
+      : "Checkout WhatsApp fallback disabled."
+  );
+
   return {
     ok: true,
-    message: enabled
-      ? "WhatsApp support button is enabled on the public site."
-      : "WhatsApp support button is disabled on the public site.",
+    message: parts.join(" "),
     enabled,
+    checkoutFallbackEnabled,
     version: nextVersion,
   };
 }
