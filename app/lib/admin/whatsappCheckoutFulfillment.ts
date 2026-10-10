@@ -15,6 +15,7 @@ import {
   prepareAdminPackageAssignment,
 } from "@/app/lib/esim/adminPackageAssignment";
 import { formatUsdCents } from "@/app/lib/wallet/display";
+import { cleanWhatsAppCustomerPhoneDigits } from "@/app/lib/support/whatsappCheckoutOrderShared";
 
 export const WHATSAPP_CHECKOUT_FULFILLED_AUDIT =
   "whatsapp_checkout.fulfilled";
@@ -25,6 +26,8 @@ export type WhatsAppPendingOrderListItem = {
   id: string;
   reference: string;
   customerEmail: string;
+  /** Digits-only customer WhatsApp when captured; null when unavailable. */
+  customerPhone: string | null;
   planName: string;
   destination: string;
   amountLabel: string;
@@ -63,6 +66,7 @@ export async function listWhatsAppPendingOrders(options?: {
       id: true,
       reference: true,
       customerEmail: true,
+      whatsappPhone: true,
       planName: true,
       destinationName: true,
       destinationCode: true,
@@ -77,6 +81,7 @@ export async function listWhatsAppPendingOrders(options?: {
     id: row.id,
     reference: row.reference,
     customerEmail: row.customerEmail,
+    customerPhone: cleanWhatsAppCustomerPhoneDigits(row.whatsappPhone),
     planName: row.planName,
     destination:
       (row.destinationName || row.destinationCode || "").trim() || "—",

@@ -1,12 +1,14 @@
 "use client";
 
-import { useActionState, useEffect, useId } from "react";
+import { useActionState, useEffect, useId, useMemo } from "react";
+import { MessageCircle } from "lucide-react";
 import {
   cancelWhatsAppCheckoutOrderAction,
   fulfillWhatsAppCheckoutOrderAction,
   type WhatsAppFulfillFormState,
 } from "@/app/lib/admin/whatsappCheckoutFulfillmentActions";
 import type { WhatsAppPendingOrderListItem } from "@/app/lib/admin/whatsappCheckoutFulfillment";
+import { buildAdminWhatsAppOrderChatHref } from "@/app/lib/support/whatsappCheckoutOrderShared";
 
 function ActionMessage({ state }: { state: WhatsAppFulfillFormState }) {
   if (!state) return null;
@@ -27,7 +29,48 @@ function ActionMessage({ state }: { state: WhatsAppFulfillFormState }) {
   );
 }
 
-function RowActions({ orderId }: { orderId: string }) {
+function ChatOnWhatsAppButton({
+  order,
+}: {
+  order: WhatsAppPendingOrderListItem;
+}) {
+  const href = useMemo(
+    () =>
+      buildAdminWhatsAppOrderChatHref({
+        customerPhone: order.customerPhone,
+        status: order.status,
+        orderReference: order.reference,
+        packageName: order.planName,
+      }),
+    [order.customerPhone, order.status, order.reference, order.planName]
+  );
+
+  if (!href) {
+    return (
+      <span
+        title="Customer WhatsApp number is missing or invalid for this order."
+        className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-[#00F05A]/20 px-3 py-2 text-xs font-semibold text-[#00F05A]/45"
+      >
+        <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
+        Chat on WhatsApp
+      </span>
+    );
+  }
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 rounded-lg border border-[#00F05A]/40 px-3 py-2 text-xs font-semibold text-[#00F05A] transition hover:bg-[#00F05A]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00F05A]/50"
+    >
+      <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
+      Chat on WhatsApp
+    </a>
+  );
+}
+
+function RowActions({ order }: { order: WhatsAppPendingOrderListItem }) {
   const formId = useId();
   const [fulfillState, fulfillAction, fulfillPending] = useActionState(
     fulfillWhatsAppCheckoutOrderAction,
@@ -52,18 +95,21 @@ function RowActions({ orderId }: { orderId: string }) {
 
   return (
     <div className="space-y-2">
-      <form action={fulfillAction} className="flex flex-wrap gap-2">
-        <input type="hidden" name="whatsappOrderId" value={orderId} />
-        <button
-          type="submit"
-          disabled={busy}
-          className="rounded-lg bg-[var(--accent-strong)] px-3 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
-        >
-          {fulfillPending ? "Issuing eSIM…" : "Verify Payment & Issue eSIM"}
-        </button>
-      </form>
+      <div className="flex flex-wrap gap-2">
+        <form action={fulfillAction}>
+          <input type="hidden" name="whatsappOrderId" value={order.id} />
+          <button
+            type="submit"
+            disabled={busy}
+            className="rounded-lg bg-[var(--accent-strong)] px-3 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
+          >
+            {fulfillPending ? "Issuing eSIM…" : "Verify Payment & Issue eSIM"}
+          </button>
+        </form>
+        <ChatOnWhatsAppButton order={order} />
+      </div>
       <form action={cancelAction} className="flex flex-wrap items-end gap-2">
-        <input type="hidden" name="whatsappOrderId" value={orderId} />
+        <input type="hidden" name="whatsappOrderId" value={order.id} />
         <label className="sr-only" htmlFor={`${formId}-reason`}>
           Cancel reason
         </label>
@@ -138,6 +184,11 @@ export function WhatsAppPendingOrdersPanel({
               </td>
               <td className="px-4 py-3 text-[var(--heading)]">
                 {order.customerEmail}
+                {order.customerPhone ? (
+                  <div className="mt-0.5 text-[11px] text-[var(--text-soft)]">
+                    +{order.customerPhone}
+                  </div>
+                ) : null}
               </td>
               <td className="px-4 py-3 text-[var(--heading)]">
                 <div className="font-medium">{order.planName}</div>
@@ -157,7 +208,7 @@ export function WhatsAppPendingOrdersPanel({
                 </span>
               </td>
               <td className="px-4 py-3">
-                <RowActions orderId={order.id} />
+                <RowActions order={order} />
               </td>
             </tr>
           ))}
