@@ -5,9 +5,55 @@ import {
   WHATSAPP_MESSAGE_MAX,
   buildWhatsAppClickToChatUrl,
   parseWhatsAppPhoneDigits,
+  type WhatsAppPhoneParseResult,
 } from "@/app/lib/support/whatsappSupportShared";
 
 export const WHATSAPP_CHECKOUT_PAYMENT_METHOD = "WHATSAPP" as const;
+
+/** Common dial codes for WhatsApp checkout capture (digits only, no +). */
+export const WHATSAPP_CHECKOUT_DIAL_CODES = [
+  { code: "92", label: "Pakistan (+92)", short: "PK +92" },
+  { code: "1", label: "United States / Canada (+1)", short: "US/CA +1" },
+  { code: "44", label: "United Kingdom (+44)", short: "UK +44" },
+  { code: "971", label: "United Arab Emirates (+971)", short: "UAE +971" },
+  { code: "966", label: "Saudi Arabia (+966)", short: "SA +966" },
+  { code: "974", label: "Qatar (+974)", short: "QA +974" },
+  { code: "965", label: "Kuwait (+965)", short: "KW +965" },
+  { code: "973", label: "Bahrain (+973)", short: "BH +973" },
+  { code: "968", label: "Oman (+968)", short: "OM +968" },
+  { code: "91", label: "India (+91)", short: "IN +91" },
+  { code: "61", label: "Australia (+61)", short: "AU +61" },
+  { code: "49", label: "Germany (+49)", short: "DE +49" },
+  { code: "33", label: "France (+33)", short: "FR +33" },
+  { code: "39", label: "Italy (+39)", short: "IT +39" },
+  { code: "34", label: "Spain (+34)", short: "ES +34" },
+  { code: "90", label: "Turkey (+90)", short: "TR +90" },
+  { code: "60", label: "Malaysia (+60)", short: "MY +60" },
+  { code: "65", label: "Singapore (+65)", short: "SG +65" },
+] as const;
+
+export const WHATSAPP_CHECKOUT_DEFAULT_DIAL_CODE = "92";
+
+/**
+ * Combine dial code + local number into E.164-style digits (no + / spaces).
+ * Strips leading 0 from the local national number.
+ */
+export function composeWhatsAppCheckoutPhoneDigits(input: {
+  dialCode: string | null | undefined;
+  localNumber: string | null | undefined;
+}): WhatsAppPhoneParseResult {
+  const dial = String(input.dialCode ?? "").replace(/\D/g, "");
+  let local = String(input.localNumber ?? "").replace(/\D/g, "");
+  local = local.replace(/^0+/, "");
+  if (!dial) {
+    return { ok: false, error: "Select a country code." };
+  }
+  if (!local) {
+    return { ok: false, error: "Enter your WhatsApp number." };
+  }
+  const digits = local.startsWith(dial) ? local : `${dial}${local}`;
+  return parseWhatsAppPhoneDigits(digits);
+}
 
 /** Digits-only customer phone for admin → customer wa.me links. */
 export function cleanWhatsAppCustomerPhoneDigits(

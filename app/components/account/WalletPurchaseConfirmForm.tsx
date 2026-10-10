@@ -46,7 +46,12 @@ import {
 import { CheckoutTrustPanel } from "@/app/components/account/CheckoutTrustPanel";
 import { CheckoutCompatibilityCheck } from "@/app/components/account/CheckoutCompatibilityModal";
 import SimpaisaWalletFields from "@/app/components/account/SimpaisaWalletFields";
+import WhatsAppCheckoutPhoneField from "@/app/components/account/WhatsAppCheckoutPhoneField";
 import { createWhatsAppPendingOrderAction } from "@/app/lib/esim/whatsappCheckoutOrderActions";
+import {
+  WHATSAPP_CHECKOUT_DEFAULT_DIAL_CODE,
+  composeWhatsAppCheckoutPhoneDigits,
+} from "@/app/lib/support/whatsappCheckoutOrderShared";
 
 type Props = {
   review: WalletPurchaseReview;
@@ -61,9 +66,14 @@ type Props = {
 
 function BuyViaWhatsAppCheckoutButton({
   purchaseId,
+  customerWhatsAppDigits,
+  onRequirePhone,
   className,
 }: {
   purchaseId: string;
+  /** Sanitized E.164 digits without +; null when invalid/empty. */
+  customerWhatsAppDigits: string | null;
+  onRequirePhone: () => void;
   className?: string;
 }) {
   const [busy, setBusy] = useState(false);
@@ -73,10 +83,18 @@ function BuyViaWhatsAppCheckoutButton({
 
   async function onClick() {
     if (busy) return;
+    if (!customerWhatsAppDigits) {
+      onRequirePhone();
+      setError("Enter a valid WhatsApp number to continue.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      const result = await createWhatsAppPendingOrderAction({ purchaseId });
+      const result = await createWhatsAppPendingOrderAction({
+        purchaseId,
+        whatsappPhone: customerWhatsAppDigits,
+      });
       if (!result.success) {
         setError(result.error);
         return;
@@ -104,7 +122,7 @@ function BuyViaWhatsAppCheckoutButton({
     <div className="space-y-2">
       <button
         type="button"
-        disabled={busy}
+        disabled={busy || !customerWhatsAppDigits}
         onClick={onClick}
         className={
           className ??
@@ -266,6 +284,11 @@ export default function WalletPurchaseConfirmForm({
     initialWalletPurchaseState
   );
   const [whatsappSelected, setWhatsappSelected] = useState(false);
+  const [whatsappDialCode, setWhatsappDialCode] = useState(
+    WHATSAPP_CHECKOUT_DEFAULT_DIAL_CODE
+  );
+  const [whatsappLocalNumber, setWhatsappLocalNumber] = useState("");
+  const [whatsappPhoneTouched, setWhatsappPhoneTouched] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [paymentMode, setPaymentMode] = useState<CustomerEsimPaymentMode>(() =>
     defaultPaymentMode(review)
@@ -357,6 +380,13 @@ export default function WalletPurchaseConfirmForm({
       !onlinePaymentsAllowed ||
       showGatewayUnavailable ||
       walletOnlyInsufficient);
+  const customerWhatsAppParsed = composeWhatsAppCheckoutPhoneDigits({
+    dialCode: whatsappDialCode,
+    localNumber: whatsappLocalNumber,
+  });
+  const customerWhatsAppDigits = customerWhatsAppParsed.ok
+    ? customerWhatsAppParsed.digits
+    : null;
   const showRewardsSection =
     Math.max(0, Math.trunc(Number(review.rewardPointsBalance))) >= 100;
   const onlinePaymentLabel = simpaisaCheckout
@@ -710,6 +740,20 @@ export default function WalletPurchaseConfirmForm({
               disabled={busy}
               onBlockingChange={setDeliveryBlocksPurchase}
             />
+            {showWhatsAppCheckoutCta ||
+            (whatsappCheckoutAvailable && whatsappSelected) ? (
+              <WhatsAppCheckoutPhoneField
+                dialCode={whatsappDialCode}
+                localNumber={whatsappLocalNumber}
+                onDialCodeChange={setWhatsappDialCode}
+                onLocalNumberChange={(value) => {
+                  setWhatsappLocalNumber(value);
+                  setWhatsappPhoneTouched(true);
+                }}
+                disabled={busy}
+                showError={whatsappPhoneTouched}
+              />
+            ) : null}
           </section>
 
           <CheckoutPromoCodeSection
@@ -1142,6 +1186,8 @@ export default function WalletPurchaseConfirmForm({
             >
               <BuyViaWhatsAppCheckoutButton
                 purchaseId={review.purchaseId}
+                customerWhatsAppDigits={customerWhatsAppDigits}
+                onRequirePhone={() => setWhatsappPhoneTouched(true)}
               />
             </div>
           ) : gatewayReady ? (
@@ -1246,6 +1292,8 @@ export default function WalletPurchaseConfirmForm({
           ) : showWhatsAppCheckoutCta ? (
             <BuyViaWhatsAppCheckoutButton
               purchaseId={review.purchaseId}
+              customerWhatsAppDigits={customerWhatsAppDigits}
+              onRequirePhone={() => setWhatsappPhoneTouched(true)}
               className="inline-flex h-11 w-full min-w-0 items-center justify-center rounded-2xl bg-[#25D366] px-4 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
             />
           ) : gatewayReady ? (

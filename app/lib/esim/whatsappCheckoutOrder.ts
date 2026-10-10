@@ -15,9 +15,11 @@ import { formatUsdCents } from "@/app/lib/wallet/display";
 import {
   WHATSAPP_CHECKOUT_PAYMENT_METHOD,
   buildWhatsAppPendingOrderHref,
+  cleanWhatsAppCustomerPhoneDigits,
   generateWhatsAppOrderReference,
 } from "@/app/lib/support/whatsappCheckoutOrderShared";
 import { getWhatsAppCheckoutSettings } from "@/app/lib/support/whatsappSupport";
+import { parseWhatsAppPhoneDigits } from "@/app/lib/support/whatsappSupportShared";
 
 export type CreateWhatsAppPendingOrderResult =
   | {
@@ -53,6 +55,8 @@ async function allocateUniqueReference(): Promise<string> {
 export async function createWhatsAppPendingOrder(input: {
   customerUserId: string;
   purchaseId: string;
+  /** Digits-only customer WhatsApp (E.164 without +). Required. */
+  whatsappPhone: string;
 }): Promise<CreateWhatsAppPendingOrderResult> {
   const customerUserId = (input.customerUserId ?? "").trim();
   const purchaseId = (input.purchaseId ?? "").trim();
@@ -62,6 +66,12 @@ export async function createWhatsAppPendingOrder(input: {
   if (!purchaseId || purchaseId.length > 64) {
     return { success: false, error: "Checkout session is unavailable." };
   }
+
+  const phoneParsed = parseWhatsAppPhoneDigits(input.whatsappPhone);
+  if (!phoneParsed.ok) {
+    return { success: false, error: phoneParsed.error };
+  }
+  const whatsappPhone = phoneParsed.digits;
 
   const settings = await getWhatsAppCheckoutSettings();
   if (!settings.enabled || !settings.phoneDigits) {
@@ -153,6 +163,7 @@ export async function createWhatsAppPendingOrder(input: {
         paymentMethod: WHATSAPP_CHECKOUT_PAYMENT_METHOD,
         customerUserId: customer.id,
         customerEmail,
+        whatsappPhone,
         offerId: purchase.offerId,
         destinationCode: purchase.destinationCode,
         destinationName: purchase.destinationName,
@@ -163,6 +174,13 @@ export async function createWhatsAppPendingOrder(input: {
         currency,
         walletEsimPurchaseId: purchase.id,
       },
+    });
+  } else if (
+    cleanWhatsAppCustomerPhoneDigits(row.whatsappPhone) !== whatsappPhone
+  ) {
+    row = await prisma.whatsAppCheckoutOrder.update({
+      where: { id: row.id },
+      data: { whatsappPhone },
     });
   }
 

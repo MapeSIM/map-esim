@@ -14,10 +14,12 @@ export type CreateWhatsAppPendingOrderActionResult =
 
 export async function createWhatsAppPendingOrderAction(input: {
   purchaseId: string;
+  whatsappPhone: string;
 }): Promise<CreateWhatsAppPendingOrderActionResult> {
   const user = await requireRole("CUSTOMER");
   return createWhatsAppPendingOrder({
     customerUserId: user.id,
     purchaseId: input.purchaseId,
+    whatsappPhone: input.whatsappPhone,
   });
 }
