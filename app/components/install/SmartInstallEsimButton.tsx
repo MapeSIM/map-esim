@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { Smartphone } from "lucide-react";
 import SmartInstallFallbackSheet from "@/app/components/install/SmartInstallFallbackSheet";
 import {
   launchSmartEsimInstallPath,
@@ -110,6 +111,7 @@ export default function SmartInstallEsimButton({
         className={className}
         style={style}
       >
+        <Smartphone className="h-4 w-4 shrink-0" aria-hidden="true" />
         {pending ? "Preparing…" : SMART_INSTALL_BUTTON_LABEL}
       </button>
       <SmartInstallFallbackSheet

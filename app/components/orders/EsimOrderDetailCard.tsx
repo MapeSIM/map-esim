@@ -78,18 +78,25 @@ export type EsimOrderDetailCardProps = {
 
 function statusBadgeClass(label: string, isRefunded: boolean): string {
   if (isRefunded || /refund/i.test(label)) {
-    return "border-[var(--danger-border)] bg-[var(--danger-bg)] text-[var(--danger-text)]";
+    return "border-red-500/40 bg-red-500/15 text-red-100";
   }
   if (/expir/i.test(label)) {
-    return "border-[var(--danger-border)] bg-[var(--danger-bg)] text-[var(--danger-text)]";
+    return "border-red-500/40 bg-red-500/15 text-red-100";
   }
   if (/deplet|exhausted|no data/i.test(label)) {
-    return "border-[var(--warning-border)] bg-[var(--warning-bg)] text-[var(--warning-text)]";
+    return "border-amber-400/40 bg-amber-400/15 text-amber-100";
   }
   if (/active/i.test(label)) {
-    return "border-emerald-500/45 bg-emerald-500/15 text-emerald-100";
+    return "border-[#00F05A]/40 bg-[#00F05A]/12 text-white";
   }
-  return "border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--heading)]";
+  return "border-[#1E3A5F] bg-[#0A2340] text-white";
+}
+
+function statusDotClass(label: string, isRefunded: boolean): string {
+  if (isRefunded || /refund|expir/i.test(label)) return "bg-red-400";
+  if (/deplet|exhausted|no data/i.test(label)) return "bg-amber-400";
+  if (/active/i.test(label)) return "bg-[#00F05A]";
+  return "bg-[#00B8E6]";
 }
 
 function progressBarClass(
@@ -97,13 +104,13 @@ function progressBarClass(
 ): string {
   switch (tone) {
     case "depleted":
-      return "bg-[var(--danger-text)]";
+      return "bg-red-400";
     case "low":
       return "bg-amber-400";
     case "healthy":
-      return "bg-emerald-400";
+      return "bg-[#00F05A]";
     default:
-      return "bg-[var(--accent-strong)]";
+      return "bg-[#00B8E6]";
   }
 }
 
@@ -303,8 +310,11 @@ export default function EsimOrderDetailCard({
     }
   }
 
+  // View QR is owned by the install hero on customer detail — keep optional
+  // for partner/admin surfaces that still pass viewQrHref / onViewQr.
   const showViewQr = Boolean(onViewQr || viewQrHref) && !isRefunded;
-  const showShare = (enableShare || Boolean(shareUrl) || variant === "modal") && !isRefunded;
+  const showShare =
+    (enableShare || Boolean(shareUrl) || variant === "modal") && !isRefunded;
   const showDownload = Boolean(qrDownloadHref) && !isRefunded;
   const showAddData = Boolean(addDataHref) && !isRefunded;
   const showRaiseIssue = Boolean(raiseIssueHref);
@@ -319,8 +329,12 @@ export default function EsimOrderDetailCard({
 
   const shellClass =
     variant === "modal"
-      ? "relative mx-auto flex max-h-[min(92vh,880px)] w-full max-w-lg flex-col overflow-hidden rounded-[24px] border border-[var(--border-strong)] bg-[#12161c] shadow-[0_24px_64px_rgba(0,0,0,0.55)]"
-      : "overflow-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_14px_36px_rgba(0,0,0,0.22)]";
+      ? "relative mx-auto flex max-h-[min(92vh,880px)] w-full max-w-lg flex-col overflow-hidden rounded-[24px] border border-[#1E3A5F] bg-[#061A33] shadow-[0_24px_64px_rgba(6,26,51,0.55)]"
+      : "overflow-hidden rounded-[24px] border border-[#1E3A5F] bg-[#061A33] shadow-[0_14px_36px_rgba(6,26,51,0.35)]";
+
+  const expiresLabel = formatOrderDetailWhen(
+    usage?.expiresAt ?? lifecycle?.expiresAtIso ?? null
+  );
 
   return (
     <section
@@ -328,10 +342,10 @@ export default function EsimOrderDetailCard({
       className={shellClass}
       data-order-id={orderId}
     >
-      <header className="flex items-center justify-between gap-3 border-b border-white/8 bg-[#0e1218] px-4 py-3.5 sm:px-5">
+      <header className="flex items-center justify-between gap-3 border-b border-[#1E3A5F] bg-[#0A2340] px-4 py-3.5 sm:px-5">
         <h2
           id={headingId}
-          className="text-base font-bold tracking-tight text-white sm:text-lg"
+          className="font-[family-name:var(--font-heading,Poppins,Inter,system-ui,sans-serif)] text-base font-bold tracking-tight text-white sm:text-lg"
         >
           {title}
         </h2>
@@ -339,7 +353,7 @@ export default function EsimOrderDetailCard({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white/90 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#1E3A5F] bg-white/5 text-white/90 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B8E6]"
             aria-label="Close order details"
           >
             <X className="h-4 w-4" aria-hidden="true" />
@@ -371,9 +385,18 @@ export default function EsimOrderDetailCard({
               eSIM Status
             </p>
             <span
-              className={`mt-1.5 inline-flex max-w-full rounded-full border px-3 py-1 text-xs font-bold tracking-wide ${statusBadgeClass(statusText, isRefunded)}`}
+              className={`mt-1.5 inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold tracking-wide ${statusBadgeClass(statusText, isRefunded)}`}
             >
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${statusDotClass(statusText, isRefunded)}`}
+                aria-hidden="true"
+              />
               {statusText}
+              {daysBadge && !isRefunded && !/day/i.test(statusText) ? (
+                <span className="font-semibold text-white/70">
+                  ({daysBadge})
+                </span>
+              ) : null}
             </span>
           </div>
           {canUpdate ? (
@@ -381,7 +404,7 @@ export default function EsimOrderDetailCard({
               type="button"
               onClick={() => void loadUsage()}
               disabled={loading}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-3.5 text-sm font-semibold text-white transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 disabled:opacity-60"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#1E3A5F] bg-white/8 px-3.5 text-sm font-semibold text-white transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B8E6] disabled:opacity-60"
             >
               <RefreshCw
                 className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
@@ -401,39 +424,11 @@ export default function EsimOrderDetailCard({
           </p>
         ) : null}
 
-        <div className="grid grid-cols-2 gap-2.5">
-          <div className="rounded-2xl border border-white/10 bg-[#1a2029] px-3.5 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/45">
-              Activated
-            </p>
-            <p className="mt-1.5 text-sm font-semibold text-white">
-              {formatOrderDetailWhen(
-                usage?.activatedAt ?? lifecycle?.activatedAtIso ?? null
-              )}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-[#1a2029] px-3.5 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/45">
-              Expires
-            </p>
-            <p className="mt-1.5 text-sm font-semibold text-white">
-              {formatOrderDetailWhen(
-                usage?.expiresAt ?? lifecycle?.expiresAtIso ?? null
-              )}
-            </p>
-            {daysBadge && !isRefunded ? (
-              <span className="mt-2 inline-flex rounded-full border border-emerald-400/35 bg-emerald-400/15 px-2 py-0.5 text-[11px] font-bold text-emerald-200">
-                {daysBadge}
-              </span>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-white/10 bg-[#1a2029] px-3.5 py-3.5">
+        <div className="rounded-2xl border border-[#1E3A5F] bg-[#0A2340] px-3.5 py-3.5">
           {unlimited ? (
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-white">Data</p>
-              <span className="inline-flex items-center rounded-full border border-teal-400/40 bg-teal-400/15 px-2.5 py-0.5 text-xs font-bold text-teal-200">
+              <span className="inline-flex items-center rounded-full border border-[#00B8E6]/40 bg-[#00B8E6]/15 px-2.5 py-0.5 text-xs font-bold text-[#00B8E6]">
                 ∞ Unlimited
               </span>
             </div>
@@ -450,7 +445,7 @@ export default function EsimOrderDetailCard({
               </div>
               {usedPct != null ? (
                 <div
-                  className="mt-3 h-2.5 overflow-hidden rounded-full bg-white/10"
+                  className="mt-3 h-2.5 overflow-hidden rounded-full bg-[#061A33]"
                   role="progressbar"
                   aria-valuemin={0}
                   aria-valuemax={100}
@@ -459,11 +454,16 @@ export default function EsimOrderDetailCard({
                 >
                   <div
                     className={`h-full rounded-full transition-[width] duration-300 ${progressBarClass(tone)}`}
-                    style={{ width: `${Math.max(usedPct, tone === "depleted" ? 100 : usedPct)}%` }}
+                    style={{
+                      width: `${Math.max(
+                        usedPct,
+                        tone === "depleted" ? 100 : usedPct
+                      )}%`,
+                    }}
                   />
                 </div>
               ) : (
-                <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white/10" />
+                <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[#061A33]" />
               )}
               <p className="mt-2 text-xs text-white/55">
                 {formatOrderDetailGb(usage?.usedDataGB ?? null)} used of{" "}
@@ -478,8 +478,8 @@ export default function EsimOrderDetailCard({
           ) : null}
         </div>
 
-        <dl className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+        <dl className="grid grid-cols-2 gap-2.5">
+          <div className="rounded-xl border border-[#1E3A5F] bg-[#0A2340] px-3 py-2.5">
             <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/45">
               Data Plan
             </dt>
@@ -487,15 +487,15 @@ export default function EsimOrderDetailCard({
               {dataPlan}
             </dd>
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+          <div className="rounded-xl border border-[#1E3A5F] bg-[#0A2340] px-3 py-2.5">
             <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/45">
-              Validity Period
+              Validity
             </dt>
             <dd className="mt-1 text-sm font-semibold text-white break-words">
               {validityPeriod}
             </dd>
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+          <div className="rounded-xl border border-[#1E3A5F] bg-[#0A2340] px-3 py-2.5">
             <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/45">
               Amount Paid
             </dt>
@@ -503,66 +503,70 @@ export default function EsimOrderDetailCard({
               {amountPaid}
             </dd>
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+          <div className="rounded-xl border border-[#1E3A5F] bg-[#0A2340] px-3 py-2.5">
             <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/45">
-              Purchased
+              Expiry Date
             </dt>
             <dd className="mt-1 text-sm font-semibold text-white break-words">
-              {purchasedAt}
+              {expiresLabel}
             </dd>
           </div>
         </dl>
 
         {showActionBar ? (
-          <div className="space-y-2.5 border-t border-white/8 pt-4">
-            <div className="grid min-w-0 gap-2 sm:grid-cols-3">
-              {showViewQr ? (
-                onViewQr ? (
+          <div className="space-y-2.5 border-t border-[#1E3A5F] pt-4">
+            {showViewQr || showShare || showDownload ? (
+              <div className="flex flex-wrap items-center gap-2">
+                {showViewQr ? (
+                  onViewQr ? (
+                    <button
+                      type="button"
+                      onClick={onViewQr}
+                      className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-[#1E3A5F] bg-white/5 px-3 text-xs font-semibold text-white/85 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B8E6]"
+                    >
+                      <QrCode className="h-3.5 w-3.5" aria-hidden="true" />
+                      View QR
+                    </button>
+                  ) : (
+                    <Link
+                      href={viewQrHref!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-[#1E3A5F] bg-white/5 px-3 text-xs font-semibold text-white/85 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B8E6]"
+                    >
+                      <QrCode className="h-3.5 w-3.5" aria-hidden="true" />
+                      View QR
+                    </Link>
+                  )
+                ) : null}
+                {showShare ? (
                   <button
                     type="button"
-                    onClick={onViewQr}
-                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+                    onClick={() => void onShare()}
+                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-[#1E3A5F] bg-white/5 px-3 text-xs font-semibold text-white/85 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B8E6]"
+                    aria-label="Share"
                   >
-                    <QrCode className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    View QR Code
+                    <Share2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    {shareCopied ? "Copied" : "Share"}
                   </button>
-                ) : (
-                  <Link
-                    href={viewQrHref!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+                ) : null}
+                {showDownload ? (
+                  <a
+                    href={qrDownloadHref!}
+                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-[#1E3A5F] bg-white/5 px-3 text-xs font-semibold text-white/85 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B8E6]"
+                    aria-label="Download QR"
                   >
-                    <QrCode className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    View QR Code
-                  </Link>
-                )
-              ) : null}
-              {showShare ? (
-                <button
-                  type="button"
-                  onClick={() => void onShare()}
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
-                >
-                  <Share2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  {shareCopied ? "Link copied" : "Share QR"}
-                </button>
-              ) : null}
-              {showDownload ? (
-                <a
-                  href={qrDownloadHref!}
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
-                >
-                  <Download className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  Download QR
-                </a>
-              ) : null}
-            </div>
+                    <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                    Download
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
 
             {showAddData ? (
               <Link
                 href={addDataHref!}
-                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 text-sm font-bold text-[#062016] shadow-[0_10px_24px_rgba(16,185,129,0.28)] transition hover:bg-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#00F05A] px-4 text-sm font-bold text-[#061A33] shadow-[0_10px_24px_rgba(0,240,90,0.28)] transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B8E6]"
               >
                 <Plus className="h-4 w-4" aria-hidden="true" />
                 Add data to this eSIM
@@ -573,7 +577,7 @@ export default function EsimOrderDetailCard({
               {showRaiseIssue ? (
                 <Link
                   href={raiseIssueHref!}
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-white/12 bg-transparent px-3.5 text-sm font-semibold text-white/80 transition hover:bg-white/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-[#1E3A5F] bg-transparent px-3.5 text-sm font-semibold text-white/80 transition hover:bg-white/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B8E6]"
                 >
                   Raise issue
                 </Link>
