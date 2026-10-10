@@ -1,13 +1,14 @@
 /**
  * Server-only WhatsApp support config reads (public + admin).
- * Same singleton also drives customer checkout "Buy via WhatsApp" fallback
- * (enabled + phoneE164). No separate checkout number — support number is used.
+ * Floating support (`enabled`) and checkout fallback (`checkoutFallbackEnabled`)
+ * are independent; both share `phoneE164`.
  */
 import "server-only";
 
 import { prisma } from "@/app/lib/db";
 import {
   WHATSAPP_SUPPORT_CONFIG_ID,
+  resolveWhatsAppCheckoutPhoneDigits,
   toPublicWhatsAppSupportConfig,
   type AdminWhatsAppSupportView,
   type PublicWhatsAppSupportConfig,
@@ -27,13 +28,14 @@ function formatUpdatedAt(value: Date | null | undefined): string | null {
   }
 }
 
-/** Ensure singleton row exists (disabled by default). */
+/** Ensure singleton row exists (support off; checkout fallback on by default). */
 export async function ensureWhatsAppSupportConfig(): Promise<void> {
   await prisma.whatsAppSupportConfig.upsert({
     where: { id: WHATSAPP_SUPPORT_CONFIG_ID },
     create: {
       id: WHATSAPP_SUPPORT_CONFIG_ID,
       enabled: false,
+      checkoutFallbackEnabled: true,
       phoneE164: null,
       defaultMessage: null,
       version: 1,
@@ -60,12 +62,24 @@ export async function getPublicWhatsAppSupportConfig(): Promise<PublicWhatsAppSu
 }
 
 /**
- * Digits-only WhatsApp number for checkout fallback, or null when the
- * public support button is disabled / unconfigured. Uses the same support number.
+ * Digits-only WhatsApp number for checkout fallback, or null when
+ * `checkoutFallbackEnabled` is off / phone unconfigured.
+ * Independent of the floating support button `enabled` flag.
  */
 export async function getWhatsAppCheckoutPhoneDigits(): Promise<string | null> {
-  const config = await getPublicWhatsAppSupportConfig();
-  return config.enabled ? config.phone : null;
+  try {
+    const row = await prisma.whatsAppSupportConfig.findUnique({
+      where: { id: WHATSAPP_SUPPORT_CONFIG_ID },
+      select: {
+        checkoutFallbackEnabled: true,
+        phoneE164: true,
+      },
+    });
+    if (!row) return null;
+    return resolveWhatsAppCheckoutPhoneDigits(row);
+  } catch {
+    return null;
+  }
 }
 
 export async function getAdminWhatsAppSupportView(): Promise<AdminWhatsAppSupportView> {
@@ -76,6 +90,7 @@ export async function getAdminWhatsAppSupportView(): Promise<AdminWhatsAppSuppor
   const digits = (row.phoneE164 ?? "").trim();
   return {
     enabled: row.enabled,
+    checkoutFallbackEnabled: row.checkoutFallbackEnabled,
     phoneDisplay: digits ? `+${digits}` : "",
     message: row.defaultMessage ?? "",
     version: row.version,

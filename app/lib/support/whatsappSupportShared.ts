@@ -184,12 +184,28 @@ export type PublicWhatsAppSupportConfig =
 /** Sanitized admin UI view — no secrets beyond public phone/message. */
 export type AdminWhatsAppSupportView = {
   enabled: boolean;
+  /** Independent of floating support button `enabled`. */
+  checkoutFallbackEnabled: boolean;
   phoneDisplay: string;
   message: string;
   version: number;
   updatedAtLabel: string | null;
   updatedByAdminIdSafe: string | null;
 };
+
+/**
+ * Digits-only phone for checkout fallback, or null when the checkout toggle
+ * is off / phone invalid. Independent of the floating support button.
+ */
+export function resolveWhatsAppCheckoutPhoneDigits(input: {
+  checkoutFallbackEnabled: boolean;
+  phoneE164: string | null | undefined;
+}): string | null {
+  if (!input.checkoutFallbackEnabled) return null;
+  const phone = (input.phoneE164 ?? "").trim();
+  if (!/^[1-9]\d{7,14}$/.test(phone)) return null;
+  return phone;
+}
 
 export function toPublicWhatsAppSupportConfig(input: {
   enabled: boolean;

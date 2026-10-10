@@ -53,8 +53,8 @@ type Props = {
   /** Admin-enabled Simpaisa operators (JazzCash / Easypaisa). */
   enabledSimpaisaOperatorIds?: readonly string[];
   /**
-   * Digits-only WhatsApp number from Admin WhatsApp support config.
-   * When set, checkout can offer Buy via WhatsApp fallback.
+   * Digits-only WhatsApp number when Admin `checkoutFallbackEnabled` is on
+   * (from getWhatsAppCheckoutPhoneDigits). Null hides Buy via WhatsApp.
    */
   whatsappCheckoutPhone?: string | null;
 };
@@ -738,11 +738,8 @@ export default function WalletPurchaseConfirmForm({
                 No online payment needed.
               </p>
             ) : walletOnlyInsufficient ? (
-              <div className="mt-3 space-y-3">
+              <div className="mt-3">
                 <InsufficientWalletCheckoutNotice />
-                {whatsappCheckoutHref ? (
-                  <BuyViaWhatsAppButton href={whatsappCheckoutHref} />
-                ) : null}
               </div>
             ) : (
               <div
@@ -917,32 +914,10 @@ export default function WalletPurchaseConfirmForm({
                     Remaining due:{" "}
                     <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout} cents={preview.gatewayAmountCents} />.
                   </p>
-                  {whatsappCheckoutHref ? (
-                    <div className="mt-4">
-                      <BuyViaWhatsAppButton href={whatsappCheckoutHref} />
-                    </div>
-                  ) : null}
                 </>
               ) : null}
             </section>
             ) : null
-          ) : null}
-
-          {showWhatsAppCheckoutCta &&
-          whatsappCheckoutHref &&
-          !walletOnlyInsufficient ? (
-            <section
-              className={cardClass}
-              aria-label="WhatsApp checkout"
-            >
-              <p className="text-sm text-[var(--text-muted)]">
-                Complete this order with our team on WhatsApp. Your plan details
-                are pre-filled.
-              </p>
-              <div className="mt-3">
-                <BuyViaWhatsAppButton href={whatsappCheckoutHref} />
-              </div>
-            </section>
           ) : null}
         </div>
 
@@ -1062,13 +1037,10 @@ export default function WalletPurchaseConfirmForm({
             </div>
           ) : walletOnlyInsufficient ? (
             <div
-              className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-4 space-y-3"
+              className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-4"
               role="status"
             >
               <InsufficientWalletCheckoutNotice />
-              {whatsappCheckoutHref ? (
-                <BuyViaWhatsAppButton href={whatsappCheckoutHref} />
-              ) : null}
             </div>
           ) : null}
 

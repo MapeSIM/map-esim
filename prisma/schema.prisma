@@ -1386,7 +1386,10 @@ model OperationalControl {
 model WhatsAppSupportConfig {
   /// Fixed singleton id — always "default".
   id               String   @id
+  /// Floating public support button (bottom-left).
   enabled          Boolean  @default(false)
+  /// Customer checkout "Buy via WhatsApp" fallback (independent of `enabled`).
+  checkoutFallbackEnabled Boolean @default(true)
   /// Digits-only international number for wa.me (no +). Null when unset.
   phoneE164        String?
   /// Plain-text default chat message. Null/empty allowed when disabled.

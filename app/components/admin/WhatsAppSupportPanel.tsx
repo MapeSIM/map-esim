@@ -37,6 +37,9 @@ export function WhatsAppSupportPanel({
     null
   );
   const [enabled, setEnabled] = useState(initial.enabled);
+  const [checkoutFallbackEnabled, setCheckoutFallbackEnabled] = useState(
+    initial.checkoutFallbackEnabled
+  );
   const [phone, setPhone] = useState(initial.phoneDisplay);
   const [message, setMessage] = useState(initial.message);
   const [version, setVersion] = useState(initial.version);
@@ -46,6 +49,7 @@ export function WhatsAppSupportPanel({
     if (state?.ok) {
       setVersion(state.version);
       setEnabled(state.enabled);
+      setCheckoutFallbackEnabled(state.checkoutFallbackEnabled);
       setUpdatedAtLabel(
         new Intl.DateTimeFormat(undefined, {
           dateStyle: "medium",
@@ -55,7 +59,10 @@ export function WhatsAppSupportPanel({
     }
   }, [state]);
 
-  const statusLabel = enabled ? "Enabled" : "Disabled";
+  const supportLabel = enabled ? "Support ON" : "Support OFF";
+  const checkoutLabel = checkoutFallbackEnabled
+    ? "Checkout ON"
+    : "Checkout OFF";
 
   return (
     <section
@@ -68,23 +75,34 @@ export function WhatsAppSupportPanel({
             id={`${formId}-heading`}
             className="text-base font-semibold tracking-tight text-[var(--heading)]"
           >
-            WhatsApp Support &amp; Checkout
+            WhatsApp Support Button
           </h2>
           <p className="mt-2 max-w-3xl text-sm text-[var(--text-muted)]">
-            Floating public support link (bottom-left) and customer checkout
-            &quot;Buy via WhatsApp&quot; fallback. Uses this same number — no
-            separate checkout number. Changes apply without redeploy.
+            Floating public support link (bottom-left) and optional checkout
+            &quot;Buy via WhatsApp&quot; fallback. Toggles are independent; both
+            share this number. Changes apply without redeploy.
           </p>
         </div>
-        <span
-          className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] ${
-            enabled
-              ? "bg-[var(--accent-strong)]/12 text-[var(--accent-strong)]"
-              : "bg-[var(--surface)] text-[var(--heading)] border border-[var(--border)]"
-          }`}
-        >
-          {statusLabel}
-        </span>
+        <div className="flex flex-wrap gap-2">
+          <span
+            className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] ${
+              enabled
+                ? "bg-[var(--accent-strong)]/12 text-[var(--accent-strong)]"
+                : "bg-[var(--surface)] text-[var(--heading)] border border-[var(--border)]"
+            }`}
+          >
+            {supportLabel}
+          </span>
+          <span
+            className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] ${
+              checkoutFallbackEnabled
+                ? "bg-[var(--accent-strong)]/12 text-[var(--accent-strong)]"
+                : "bg-[var(--surface)] text-[var(--heading)] border border-[var(--border)]"
+            }`}
+          >
+            {checkoutLabel}
+          </span>
+        </div>
       </div>
 
       <dl className="grid gap-2 text-xs text-[var(--text-muted)] sm:grid-cols-2">
@@ -92,7 +110,9 @@ export function WhatsAppSupportPanel({
           <dt className="font-semibold uppercase tracking-[0.06em] text-[var(--text-soft)]">
             Current status
           </dt>
-          <dd className="mt-0.5 text-[var(--heading)]">{statusLabel}</dd>
+          <dd className="mt-0.5 text-[var(--heading)]">
+            {supportLabel} · {checkoutLabel}
+          </dd>
         </div>
         <div>
           <dt className="font-semibold uppercase tracking-[0.06em] text-[var(--text-soft)]">
@@ -108,6 +128,11 @@ export function WhatsAppSupportPanel({
         <input type="hidden" name="expectedVersion" value={String(version)} />
         {/* unchecked checkbox is omitted from FormData — always send explicit value */}
         <input type="hidden" name="enabled" value={enabled ? "true" : "false"} />
+        <input
+          type="hidden"
+          name="checkoutFallbackEnabled"
+          value={checkoutFallbackEnabled ? "true" : "false"}
+        />
 
         <div className="flex items-center gap-3">
           <input
@@ -122,9 +147,30 @@ export function WhatsAppSupportPanel({
             htmlFor={`${formId}-enabled`}
             className="text-sm font-semibold text-[var(--heading)]"
           >
-            Enabled (support button + checkout WhatsApp fallback)
+            Enable WhatsApp Support Button
           </label>
         </div>
+
+        <div className="flex items-center gap-3">
+          <input
+            id={`${formId}-checkout-fallback`}
+            type="checkbox"
+            checked={checkoutFallbackEnabled}
+            disabled={pending}
+            onChange={(e) => setCheckoutFallbackEnabled(e.target.checked)}
+            className="h-4 w-4 rounded border-[var(--border)]"
+          />
+          <label
+            htmlFor={`${formId}-checkout-fallback`}
+            className="text-sm font-semibold text-[var(--heading)]"
+          >
+            Enable WhatsApp Checkout Fallback
+          </label>
+        </div>
+        <p className="-mt-2 text-[11px] text-[var(--text-soft)]">
+          When on, customer checkout can show Buy via WhatsApp (uses the number
+          below). Independent of the floating support button.
+        </p>
 
         <div>
           <label
@@ -134,8 +180,8 @@ export function WhatsAppSupportPanel({
             WhatsApp number
           </label>
           <p className="mt-0.5 text-[11px] text-[var(--text-soft)]">
-            International format, e.g. +923001234567. Also used for checkout
-            Buy via WhatsApp when enabled.
+            International format, e.g. +923001234567. Shared by support and
+            checkout fallback.
           </p>
           <input
             id={`${formId}-phone`}
@@ -164,7 +210,8 @@ export function WhatsAppSupportPanel({
             Default message
           </label>
           <p className="mt-0.5 text-[11px] text-[var(--text-soft)]">
-            Optional plain text prefilled in WhatsApp (max 500 characters)
+            Optional plain text prefilled for the floating support button (max
+            500 characters). Checkout uses a plan-specific message.
           </p>
           <textarea
             id={`${formId}-message`}
