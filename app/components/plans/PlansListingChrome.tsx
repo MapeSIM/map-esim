@@ -5,9 +5,11 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useState,
   type ReactNode,
 } from "react";
 import Link from "next/link";
+import { Loader2 } from "lucide-react";
 import type { VesimOffer } from "@/app/lib/vesim/offers";
 
 type PlansListingChromeValue = {
@@ -98,6 +100,7 @@ export function PlanBuyNowLink({
   destinationCode: string;
 }) {
   const { getOffer, resolveCheckoutHref } = usePlansListingChrome();
+  const [isNavigating, setIsNavigating] = useState(false);
   const offer = getOffer(offerId);
   const href = offer
     ? resolveCheckoutHref(offer, destinationCode)
@@ -110,14 +113,31 @@ export function PlanBuyNowLink({
   return (
     <Link
       href={href}
-      className="
-        order-1 inline-flex min-h-11 items-center justify-center
+      prefetch
+      aria-disabled={isNavigating || undefined}
+      onClick={(event) => {
+        if (isNavigating) {
+          event.preventDefault();
+          return;
+        }
+        setIsNavigating(true);
+      }}
+      className={`
+        order-1 inline-flex min-h-11 items-center justify-center gap-2
         rounded-xl bg-[var(--accent-strong)] px-3 text-sm font-bold
         text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)]
         min-[400px]:order-2
-      "
+        ${isNavigating ? "pointer-events-none opacity-80" : ""}
+      `}
     >
-      Buy Now
+      {isNavigating ? (
+        <>
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          Preparing Checkout...
+        </>
+      ) : (
+        "Buy Now"
+      )}
     </Link>
   );
 }

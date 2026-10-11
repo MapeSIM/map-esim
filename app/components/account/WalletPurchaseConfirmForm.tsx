@@ -10,6 +10,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import {
   confirmWalletEsimPurchaseAction,
   cancelPendingEsimGatewayCheckoutAction,
@@ -68,12 +69,17 @@ function BuyViaWhatsAppCheckoutButton({
   purchaseId,
   customerWhatsAppDigits,
   onRequirePhone,
+  onBusyChange,
+  locked = false,
   className,
 }: {
   purchaseId: string;
   /** Sanitized E.164 digits without +; null when invalid/empty. */
   customerWhatsAppDigits: string | null;
   onRequirePhone: () => void;
+  onBusyChange?: (busy: boolean) => void;
+  /** Parent form lock (funding/gateway pending). */
+  locked?: boolean;
   className?: string;
 }) {
   const [busy, setBusy] = useState(false);
@@ -82,13 +88,14 @@ function BuyViaWhatsAppCheckoutButton({
   const [reference, setReference] = useState<string | null>(null);
 
   async function onClick() {
-    if (busy) return;
+    if (busy || locked) return;
     if (!customerWhatsAppDigits) {
       onRequirePhone();
       setError("Enter a valid WhatsApp number to continue.");
       return;
     }
     setBusy(true);
+    onBusyChange?.(true);
     setError(null);
     try {
       const result = await createWhatsAppPendingOrderAction({
@@ -115,6 +122,7 @@ function BuyViaWhatsAppCheckoutButton({
       setError("Could not create the WhatsApp order. Please try again.");
     } finally {
       setBusy(false);
+      onBusyChange?.(false);
     }
   }
 
@@ -122,14 +130,21 @@ function BuyViaWhatsAppCheckoutButton({
     <div className="space-y-2">
       <button
         type="button"
-        disabled={busy || !customerWhatsAppDigits}
+        disabled={busy || locked || !customerWhatsAppDigits}
         onClick={onClick}
         className={
           className ??
-          "inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#25D366] px-5 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+          "inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#25D366] px-5 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
         }
       >
-        {busy ? "Creating order…" : "Buy via WhatsApp"}
+        {busy ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            Creating WhatsApp Order...
+          </>
+        ) : (
+          "Buy via WhatsApp"
+        )}
       </button>
       {error ? (
         <p className="text-xs text-[var(--heading)]" role="alert">
@@ -284,6 +299,7 @@ export default function WalletPurchaseConfirmForm({
     initialWalletPurchaseState
   );
   const [whatsappSelected, setWhatsappSelected] = useState(false);
+  const [whatsappOrderBusy, setWhatsappOrderBusy] = useState(false);
   const [whatsappDialCode, setWhatsappDialCode] = useState(
     WHATSAPP_CHECKOUT_DEFAULT_DIAL_CODE
   );
@@ -332,8 +348,10 @@ export default function WalletPurchaseConfirmForm({
     : "Continue to Payment";
   const primaryCtaPendingLabel = isFullWalletMode
     ? "Buying with wallet…"
-    : "Starting payment…";
-  const stickyCtaPendingLabel = isFullWalletMode ? "Buying…" : "Starting…";
+    : "Connecting to Payment Gateway...";
+  const stickyCtaPendingLabel = isFullWalletMode
+    ? "Buying…"
+    : "Connecting to Payment Gateway...";
   const rewardsDisabled = !review.rewardEligible;
   const walletDisabled = review.balanceCents <= 0;
   const hasWalletBalance = !walletDisabled;
@@ -399,7 +417,7 @@ export default function WalletPurchaseConfirmForm({
     0,
     review.balanceCents - preview.walletAppliedCents
   );
-  const busy = pending || fundingPending;
+  const busy = pending || fundingPending || whatsappOrderBusy;
   const purchaseBlocked = busy || deliveryBlocksPurchase;
   const dueOnline = preview.gatewayAmountCents > 0;
   const dueLabel = dueOnline
@@ -1174,9 +1192,16 @@ export default function WalletPurchaseConfirmForm({
               <button
                 type="submit"
                 disabled={purchaseBlocked || !confirmed}
-                className="hidden min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60 lg:inline-flex"
+                className="hidden min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60 lg:inline-flex"
               >
-                {pending ? primaryCtaPendingLabel : primaryCtaLabel}
+                {pending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    {primaryCtaPendingLabel}
+                  </>
+                ) : (
+                  primaryCtaLabel
+                )}
               </button>
             </>
           ) : showWhatsAppCheckoutCta ? (
@@ -1188,6 +1213,8 @@ export default function WalletPurchaseConfirmForm({
                 purchaseId={review.purchaseId}
                 customerWhatsAppDigits={customerWhatsAppDigits}
                 onRequirePhone={() => setWhatsappPhoneTouched(true)}
+                onBusyChange={setWhatsappOrderBusy}
+                locked={pending || fundingPending}
               />
             </div>
           ) : gatewayReady ? (
@@ -1198,9 +1225,16 @@ export default function WalletPurchaseConfirmForm({
                   purchaseBlocked ||
                   (gatewayNeedsSimpaisaFields && !simpaisaFieldsReady)
                 }
-                className="hidden min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60 lg:inline-flex"
+                className="hidden min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60 lg:inline-flex"
               >
-                {pending ? primaryCtaPendingLabel : primaryCtaLabel}
+                {pending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    {primaryCtaPendingLabel}
+                  </>
+                ) : (
+                  primaryCtaLabel
+                )}
               </button>
             </div>
           ) : walletOnlyInsufficient ? (
@@ -1285,24 +1319,40 @@ export default function WalletPurchaseConfirmForm({
             <button
               type="submit"
               disabled={stickyCtaDisabled}
-              className="inline-flex h-11 w-full min-w-0 items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
+              className="inline-flex h-11 w-full min-w-0 items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
             >
-              {pending ? stickyCtaPendingLabel : primaryCtaLabel}
+              {pending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  {stickyCtaPendingLabel}
+                </>
+              ) : (
+                primaryCtaLabel
+              )}
             </button>
           ) : showWhatsAppCheckoutCta ? (
             <BuyViaWhatsAppCheckoutButton
               purchaseId={review.purchaseId}
               customerWhatsAppDigits={customerWhatsAppDigits}
               onRequirePhone={() => setWhatsappPhoneTouched(true)}
-              className="inline-flex h-11 w-full min-w-0 items-center justify-center rounded-2xl bg-[#25D366] px-4 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+              onBusyChange={setWhatsappOrderBusy}
+              locked={pending || fundingPending}
+              className="inline-flex h-11 w-full min-w-0 items-center justify-center gap-2 rounded-2xl bg-[#25D366] px-4 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
             />
           ) : gatewayReady ? (
             <button
               type="submit"
               disabled={stickyCtaDisabled}
-              className="inline-flex h-11 w-full min-w-0 items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
+              className="inline-flex h-11 w-full min-w-0 items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
             >
-              {pending ? stickyCtaPendingLabel : primaryCtaLabel}
+              {pending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  {stickyCtaPendingLabel}
+                </>
+              ) : (
+                primaryCtaLabel
+              )}
             </button>
           ) : walletOnlyInsufficient ? null : (
             <button

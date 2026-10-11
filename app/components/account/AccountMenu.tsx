@@ -114,6 +114,7 @@ export default function AccountMenu({ userName, userEmail, links }: Props) {
                   <Link
                     key={link.href}
                     href={link.href}
+                    prefetch
                     aria-current={active ? "page" : undefined}
                     onClick={() => setOpen(false)}
                     className={

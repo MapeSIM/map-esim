@@ -1,9 +1,17 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { X, Globe2, Signal, Clock3, Wifi, MapPinned } from "lucide-react";
+import {
+  X,
+  Globe2,
+  Signal,
+  Clock3,
+  Wifi,
+  MapPinned,
+  Loader2,
+} from "lucide-react";
 import type { VesimOffer } from "@/app/lib/vesim/offers";
 import type { VesimDestination } from "@/app/lib/vesim/destinations";
 import {
@@ -65,6 +73,11 @@ export default function PlanDetailsModal({
   purchaseTrustLine = PLAN_PURCHASE_TRUST_LINE_GUEST,
 }: PlanDetailsModalProps) {
   const { formatPrice } = useCurrency();
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  useEffect(() => {
+    setIsNavigating(false);
+  }, [offer?.id]);
 
   useEffect(() => {
     if (!offer) return;
@@ -364,13 +377,30 @@ export default function PlanDetailsModal({
         <div className="space-y-2 border-t border-[var(--border)] px-5 py-4 sm:px-6">
           <Link
             href={checkoutHref(offer, destination.code)}
-            className="
-              flex w-full items-center justify-center rounded-2xl
+            prefetch
+            aria-disabled={isNavigating || undefined}
+            onClick={(event) => {
+              if (isNavigating) {
+                event.preventDefault();
+                return;
+              }
+              setIsNavigating(true);
+            }}
+            className={`
+              flex w-full items-center justify-center gap-2 rounded-2xl
               bg-[var(--accent-strong)] px-5 py-3.5 text-sm font-bold text-[var(--accent-ink)]
               transition hover:bg-[var(--accent-strong)]
-            "
+              ${isNavigating ? "pointer-events-none opacity-80" : ""}
+            `}
           >
-            Buy Now
+            {isNavigating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                Preparing Checkout...
+              </>
+            ) : (
+              "Buy Now"
+            )}
           </Link>
           {purchaseTrustLine ? (
             <p className="text-center text-[11px] leading-snug text-[var(--text-soft)]">

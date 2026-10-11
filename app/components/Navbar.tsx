@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Gift,
+  Loader2,
   Menu,
   Shield,
   ShoppingBag,
@@ -125,17 +126,24 @@ export default function Navbar({
 }: NavbarProps) {
   const [open, setOpen] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
+  const [accountNavPending, setAccountNavPending] = useState(false);
   const pathname = usePathname();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const isCustomer = Boolean(customer);
   const isPartner = Boolean(partner);
   const isLoggedOut = authHref === "/signin";
+  const isAccountPortalHref =
+    authHref === "/account" || authHref === "/partner";
 
   useEffect(() => {
     // Client-only portal target for the mobile drawer.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- document portal gate
     setPortalReady(true);
   }, []);
+
+  useEffect(() => {
+    setAccountNavPending(false);
+  }, [pathname]);
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -240,6 +248,7 @@ export default function Navbar({
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch
                 className={`
                   relative inline-flex shrink-0 items-center justify-center
                   rounded-lg px-1.5 py-1.5 text-center text-xs font-medium
@@ -278,16 +287,37 @@ export default function Navbar({
 
             <Link
               href={authHref}
-              className="
-                shrink-0 whitespace-nowrap rounded-lg px-2 py-2 text-xs
-                font-medium text-[var(--text-muted)] transition-colors
+              prefetch={isAccountPortalHref ? true : undefined}
+              aria-busy={accountNavPending || undefined}
+              onClick={() => {
+                if (isAccountPortalHref) setAccountNavPending(true);
+              }}
+              className={`
+                inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap
+                rounded-lg px-2 py-2 text-xs font-medium transition-colors
                 xl:px-3 xl:text-[13px] 2xl:text-sm
-                hover:text-[var(--heading)]
                 focus-visible:outline-none focus-visible:ring-2
                 focus-visible:ring-[var(--accent-strong)]/60
-              "
+                ${
+                  accountNavPending ||
+                  (!isLoggedOut && isActive(authHref))
+                    ? "text-[var(--heading)]"
+                    : "text-[var(--text-muted)] hover:text-[var(--heading)]"
+                }
+                ${accountNavPending ? "opacity-90" : ""}
+              `}
             >
-              {authLabel}
+              {accountNavPending ? (
+                <>
+                  <Loader2
+                    className="h-3.5 w-3.5 animate-spin text-[var(--accent-strong)]"
+                    aria-hidden="true"
+                  />
+                  Opening…
+                </>
+              ) : (
+                authLabel
+              )}
             </Link>
 
             <Link
@@ -409,6 +439,7 @@ export default function Navbar({
                           <Link
                             key={link.href}
                             href={link.href}
+                            prefetch
                             onClick={closeMenu}
                             aria-current={active ? "page" : undefined}
                             className={`flex min-h-12 items-center rounded-2xl px-4 text-[15px] font-semibold tracking-[-0.01em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 ${mobileNavClass(active)}`}
@@ -511,10 +542,20 @@ export default function Navbar({
                         </Link>
                         <Link
                           href="/account"
-                          onClick={closeMenu}
-                          className={`rounded-[14px] px-4 py-3 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 ${mobileNavClass(pathname === "/account")}`}
+                          prefetch
+                          onClick={() => {
+                            setAccountNavPending(true);
+                            closeMenu();
+                          }}
+                          className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-3 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 ${mobileNavClass(pathname === "/account" || accountNavPending)}`}
                         >
-                          My Account
+                          {accountNavPending ? (
+                            <Loader2
+                              className="h-4 w-4 animate-spin text-[var(--accent-strong)]"
+                              aria-hidden="true"
+                            />
+                          ) : null}
+                          {accountNavPending ? "Opening…" : "My Account"}
                         </Link>
                       </nav>
 

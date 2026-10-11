@@ -124,12 +124,17 @@ export default async function AccountWalletBuyPage({
   // Display names (e.g. country=Pakistan) normalize to ISO; invalid stay null.
   const countryHint = normalizeCustomerBuyCountryHint(query.country);
   const fromOrderId = normalizeAddDataFromOrderId(query.fromOrder);
-  const controlsSoft = await loadOperationalControlPausedMapSoft();
-  const gatewayCheckoutPaused =
-    controlsSoft.ok &&
-    isPaymentGatewayCheckoutPausedInMap(controlsSoft.map);
-  const gatewayReady =
-    isPaymentGatewayConfigured() && !gatewayCheckoutPaused;
+
+  // Defer pause-map lookup until recovery/error UI — avoid an extra DB round-trip
+  // on the happy-path Buy Now prepare → review redirect.
+  async function resolveGatewayReadyForRecovery(): Promise<boolean> {
+    if (!isPaymentGatewayConfigured()) return false;
+    const controlsSoft = await loadOperationalControlPausedMapSoft();
+    const gatewayCheckoutPaused =
+      controlsSoft.ok &&
+      isPaymentGatewayCheckoutPausedInMap(controlsSoft.map);
+    return !gatewayCheckoutPaused;
+  }
 
   let destinations: Awaited<
     ReturnType<typeof listCustomerWalletBuyDestinations>
@@ -169,6 +174,7 @@ export default async function AccountWalletBuyPage({
   let directPurchaseId: string | null = null;
   if (!loadError && offerIdHint) {
     if (!hasWallet) {
+      const gatewayReady = await resolveGatewayReadyForRecovery();
       return (
         <div className="space-y-6">
           <Link
@@ -326,7 +332,7 @@ export default async function AccountWalletBuyPage({
           <p className="text-sm text-[var(--heading)]">{directOfferError}</p>
           <BuyRecoveryActions
             countryHint={countryHint}
-            showAddFunds={gatewayReady}
+            showAddFunds={await resolveGatewayReadyForRecovery()}
           />
         </div>
       ) : null}
