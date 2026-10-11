@@ -89,26 +89,29 @@ export function prismaErrorCode(error: unknown): string {
   return typeof code === "string" && code.trim() ? code.trim() : "unknown";
 }
 
+/**
+ * Read the public-offer snapshot cutover switch.
+ * Soft-fails to publicReadsOn=false (live cached path) when the control row,
+ * table, or property is missing — never emits console errors for that path.
+ */
 export async function readPublicOfferSnapshotControl(
   client: SnapshotPrisma
-): Promise<
-  | { ok: true; publicReadsOn: boolean }
-  | { ok: false; missingTable: boolean; code: string }
-> {
+): Promise<{ ok: true; publicReadsOn: boolean }> {
   try {
     const row = await client.publicOfferSnapshotControl.findUnique({
       where: { id: "default" },
       select: { publicReadsOn: true },
     });
-    return { ok: true, publicReadsOn: row?.publicReadsOn === true };
-  } catch (error) {
-    const missingTable = isMissingSnapshotTableError(error);
-    const code = prismaErrorCode(error);
-    logPublicOfferSnapshotFailure(
-      missingTable ? "missing_table" : "control_read",
-      code
-    );
-    return { ok: false, missingTable, code };
+    // Missing row or non-boolean publicReadsOn → treat as flag-off (live cache).
+    const publicReadsOn =
+      row != null && typeof row.publicReadsOn === "boolean"
+        ? row.publicReadsOn === true
+        : false;
+    return { ok: true, publicReadsOn };
+  } catch {
+    // Soft failure: missing table / control read errors are non-fatal. Callers
+    // already fall back to flag-off cached live lists — do not console.error.
+    return { ok: true, publicReadsOn: false };
   }
 }
 
