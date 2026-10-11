@@ -43,6 +43,8 @@ function main() {
   assert.match(src, /buildCountriesDefaultGridBodyHtml/);
   assert.match(src, /safeDestinationCardHref/);
   assert.match(src, /safeFlagImageSrc/);
+  // Soft nav wrapper enables App Router loading.tsx for default A–Z cards.
+  assert.match(src, /DestinationCardSoftNav/);
   // Generated markup must never emit handlers; rejection regexes in source are OK.
   assert.doesNotMatch(src, /\son\w+\s*=\s*["'`]/);
   assert.doesNotMatch(src, /href=\{[^}]*destination\.(name|flag|code)/);

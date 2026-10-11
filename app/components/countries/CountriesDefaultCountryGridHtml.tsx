@@ -1,3 +1,4 @@
+import DestinationCardSoftNav from "@/app/components/countries/DestinationCardSoftNav";
 import DestinationGridPrices from "@/app/components/countries/DestinationGridPrices";
 import {
   type DestinationCard,
@@ -152,23 +153,25 @@ export default function CountriesDefaultCountryGridHtml({
 
   return (
     <DestinationGridPrices>
-      <section className="mx-auto max-w-[1200px] px-4 pb-16 pt-4 sm:px-6 sm:pb-20 sm:pt-8">
-        <div className="mb-4 flex flex-col gap-2 sm:mb-7 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight text-[var(--heading)] sm:text-[1.75rem]">
-              All countries
-            </h2>
-            <p className="mt-1.5 text-sm text-[var(--text-muted)] sm:text-[15px]">
-              Browse destinations in alphabetical order.
+      <DestinationCardSoftNav>
+        <section className="mx-auto max-w-[1200px] px-4 pb-16 pt-4 sm:px-6 sm:pb-20 sm:pt-8">
+          <div className="mb-4 flex flex-col gap-2 sm:mb-7 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight text-[var(--heading)] sm:text-[1.75rem]">
+                All countries
+              </h2>
+              <p className="mt-1.5 text-sm text-[var(--text-muted)] sm:text-[15px]">
+                Browse destinations in alphabetical order.
+              </p>
+            </div>
+            <p className="text-sm text-[var(--text-soft)]">
+              {filteredCount}{" "}
+              {filteredCount === 1 ? "destination" : "destinations"}
             </p>
           </div>
-          <p className="text-sm text-[var(--text-soft)]">
-            {filteredCount}{" "}
-            {filteredCount === 1 ? "destination" : "destinations"}
-          </p>
-        </div>
-        <div dangerouslySetInnerHTML={{ __html: body }} />
-      </section>
+          <div dangerouslySetInnerHTML={{ __html: body }} />
+        </section>
+      </DestinationCardSoftNav>
     </DestinationGridPrices>
   );
 }
