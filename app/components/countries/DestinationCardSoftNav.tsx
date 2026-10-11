@@ -2,7 +2,10 @@
 
 import {
   useCallback,
+  useEffect,
   useRef,
+  useState,
+  useTransition,
   type MouseEvent,
   type PointerEvent,
   type ReactNode,
@@ -10,9 +13,8 @@ import {
 import { useRouter } from "next/navigation";
 
 /**
- * Soft-navigate destination cards rendered as plain <a.map-dest-card> HTML
- * (default /countries A–Z grid) so App Router `loading.tsx` shows instantly.
- * Filtered React grids already use next/link.
+ * Soft-navigate destination cards (`a.map-dest-card`) so App Router
+ * `loading.tsx` / Suspense skeletons show instantly with 0ms click feedback.
  */
 function isSafeCountriesHref(href: string): boolean {
   return /^\/countries\/[A-Za-z0-9][A-Za-z0-9_-]*(?:\?[A-Za-z0-9_=&.-]*)?$/.test(
@@ -26,7 +28,10 @@ export default function DestinationCardSoftNav({
   children: ReactNode;
 }) {
   const router = useRouter();
+  const rootRef = useRef<HTMLDivElement>(null);
   const prefetched = useRef(new Set<string>());
+  const [isPending, startTransition] = useTransition();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
 
   const prefetchHref = useCallback(
     (href: string) => {
@@ -36,6 +41,24 @@ export default function DestinationCardSoftNav({
     },
     [router]
   );
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const cards = root.querySelectorAll<HTMLAnchorElement>("a.map-dest-card");
+    for (const card of cards) {
+      const href = card.getAttribute("href");
+      const active = Boolean(
+        isPending && pendingHref && href && href === pendingHref
+      );
+      card.classList.toggle("map-dest-card--pending", active);
+      if (active) {
+        card.setAttribute("aria-busy", "true");
+      } else {
+        card.removeAttribute("aria-busy");
+      }
+    }
+  }, [isPending, pendingHref, children]);
 
   const onPointerOverCapture = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
@@ -59,15 +82,27 @@ export default function DestinationCardSoftNav({
       if (!(anchor instanceof HTMLAnchorElement)) return;
       const href = anchor.getAttribute("href");
       if (!href || !isSafeCountriesHref(href)) return;
+
+      // Block native hard navigation so App Router soft-nav + loading UI win.
       event.preventDefault();
+      event.stopPropagation();
+      if (isPending) return;
+
+      setPendingHref(href);
+      anchor.classList.add("map-dest-card--pending");
+      anchor.setAttribute("aria-busy", "true");
       prefetchHref(href);
-      router.push(href);
+      startTransition(() => {
+        router.push(href);
+      });
     },
-    [prefetchHref, router]
+    [isPending, prefetchHref, router]
   );
 
   return (
     <div
+      ref={rootRef}
+      aria-busy={isPending || undefined}
       onPointerOverCapture={onPointerOverCapture}
       onClickCapture={onClickCapture}
     >

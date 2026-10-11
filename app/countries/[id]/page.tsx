@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { CountrySeoContent } from "@/app/components/countries/CountrySeoContent";
+import DestinationPlansSkeleton from "@/app/components/plans/DestinationPlansSkeleton";
 import PlansListing from "@/app/components/plans/PlansListing";
 import { countries as staticCountries } from "@/app/data/countries";
 import { toPublicVesimOffers, type VesimOffer } from "@/app/lib/vesim/offers";
@@ -105,17 +107,12 @@ function earlyOfferCodeHint(
   return null;
 }
 
-export default async function CountryDetailPage({
-  params,
-}: CountryDetailPageProps) {
-  const { id: rawId } = await params;
-  const id = typeof rawId === "string" ? rawId.trim() : "";
-  const fallbackDestination = id ? staticToDestination(id) : undefined;
-
-  if (!id) {
-    notFound();
-  }
-
+/**
+ * Heavy catalog/offer work — streamed behind Suspense so destination
+ * navigations show DestinationPlansSkeleton immediately.
+ */
+async function CountryPlansContent({ id }: { id: string }) {
+  const fallbackDestination = staticToDestination(id);
   const earlyCode = earlyOfferCodeHint(id, fallbackDestination);
   const destinationsPromise = loadPublicDestinations();
   const earlyOffersPromise = earlyCode ? loadPublicOffers(earlyCode) : null;
@@ -172,5 +169,22 @@ export default async function CountryDetailPage({
     >
       <CountrySeoContent destination={destination} offers={offers} />
     </PlansListing>
+  );
+}
+
+export default async function CountryDetailPage({
+  params,
+}: CountryDetailPageProps) {
+  const { id: rawId } = await params;
+  const id = typeof rawId === "string" ? rawId.trim() : "";
+
+  if (!id) {
+    notFound();
+  }
+
+  return (
+    <Suspense fallback={<DestinationPlansSkeleton />}>
+      <CountryPlansContent id={id} />
+    </Suspense>
   );
 }

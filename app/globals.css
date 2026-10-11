@@ -298,6 +298,33 @@ video {
   color: var(--heading);
 }
 
+/* Instant click feedback while soft-navigating to /countries/[id]. */
+.map-dest-card--pending {
+  pointer-events: none;
+  border-color: color-mix(in srgb, var(--accent-strong) 72%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent-strong) 50%, transparent),
+    0 0 28px color-mix(in srgb, #00e676 30%, transparent),
+    0 0 16px color-mix(in srgb, #0066ff 18%, transparent);
+}
+
+.map-dest-card--pending .map-dest-card__arrow {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  border: 2px solid color-mix(in srgb, var(--accent-strong) 30%, transparent);
+  border-top-color: var(--accent-strong);
+  color: transparent;
+  transform: none;
+  animation: map-dest-card-spin 0.65s linear infinite;
+}
+
+@keyframes map-dest-card-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .map-dest-flag {
   display: flex;
   height: 2rem;
