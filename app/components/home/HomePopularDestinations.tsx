@@ -33,6 +33,7 @@ export function HomePopularDestinations() {
           </div>
           <Link
             href="/countries?filter=Popular"
+            prefetch
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent-strong)] transition hover:opacity-90"
           >
             View all popular
@@ -47,6 +48,7 @@ export function HomePopularDestinations() {
               <li key={destination.id}>
                 <Link
                   href={`/countries/${destination.id}`}
+                  prefetch
                   className="
                     group flex h-full items-center gap-3 rounded-[24px] border
                     border-[var(--border)] bg-[var(--surface)] p-4

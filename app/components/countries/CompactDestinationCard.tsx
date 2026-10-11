@@ -77,7 +77,7 @@ export default function CompactDestinationCard({
       : "";
 
   return (
-    <Link href={href} className="map-dest-card">
+    <Link href={href} prefetch className="map-dest-card">
       <div className="map-dest-card__main">
         <DestinationFlagMark destination={destination} />
 

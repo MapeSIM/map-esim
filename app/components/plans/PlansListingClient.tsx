@@ -1,6 +1,11 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import {
+  useMemo,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import type { VesimOffer } from "@/app/lib/vesim/offers";
@@ -68,6 +73,7 @@ export default function PlansListingClient({
   const [sort, setSort] = useState<SortOption>(DEFAULT_SORT);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState<VesimOffer | null>(null);
+  const [, startFilterTransition] = useTransition();
   const { signedIn, isPartner: partnerCheckout } = useShellAuth();
   const purchaseTrustLine = planPurchaseTrustLine(signedIn);
 
@@ -129,10 +135,20 @@ export default function PlansListingClient({
 
   function selectCategory(next: CategoryFilter) {
     if (next === "unlimited" && !model.unlimitedTabEnabled) return;
-    setCategory(next);
-    setDataAmounts([]);
-    setValidities([]);
-    setCoveredCountries([]);
+    startFilterTransition(() => {
+      setCategory(next);
+      setDataAmounts([]);
+      setValidities([]);
+      setCoveredCountries([]);
+    });
+  }
+
+  function selectPlanType(next: PlanTypeFilter) {
+    startFilterTransition(() => setPlanType(next));
+  }
+
+  function selectSort(next: SortOption) {
+    startFilterTransition(() => setSort(next));
   }
 
   const activeFilterCount =
@@ -196,7 +212,7 @@ export default function PlansListingClient({
             <PlansListingControls
               showPlanTypeToggle={model.showPlanTypeToggle}
               planType={planType}
-              onPlanTypeChange={setPlanType}
+              onPlanTypeChange={selectPlanType}
               planTypeSummary={model.planTypeSummary}
               showPackageTabs={model.showPackageTabs}
               activeCategory={model.activeCategory}
@@ -207,40 +223,48 @@ export default function PlansListingClient({
               onToggleFiltersOpen={() => setFiltersOpen((open) => !open)}
               activeFilterCount={activeFilterCount}
               sort={sort}
-              onSortChange={setSort}
+              onSortChange={selectSort}
               sortOptions={SORT_OPTIONS}
               dataOptions={dataOptions}
               dataAmounts={dataAmounts}
               onToggleDataAmount={(value) =>
-                setDataAmounts((current) =>
-                  current.includes(value)
-                    ? current.filter((item) => item !== value)
-                    : [...current, value]
+                startFilterTransition(() =>
+                  setDataAmounts((current) =>
+                    current.includes(value)
+                      ? current.filter((item) => item !== value)
+                      : [...current, value]
+                  )
                 )
               }
               validityOptions={validityOptions}
               validities={validities}
               onToggleValidity={(value) =>
-                setValidities((current) =>
-                  current.includes(value)
-                    ? current.filter((item) => item !== value)
-                    : [...current, value]
+                startFilterTransition(() =>
+                  setValidities((current) =>
+                    current.includes(value)
+                      ? current.filter((item) => item !== value)
+                      : [...current, value]
+                  )
                 )
               }
               coverageOptions={coverageOptions}
               coveredCountries={coveredCountries}
               onToggleCoverage={(value) =>
-                setCoveredCountries((current) =>
-                  current.includes(value)
-                    ? current.filter((item) => item !== value)
-                    : [...current, value]
+                startFilterTransition(() =>
+                  setCoveredCountries((current) =>
+                    current.includes(value)
+                      ? current.filter((item) => item !== value)
+                      : [...current, value]
+                  )
                 )
               }
               countryNames={countryNames}
               onClearFilters={() => {
-                setDataAmounts([]);
-                setValidities([]);
-                setCoveredCountries([]);
+                startFilterTransition(() => {
+                  setDataAmounts([]);
+                  setValidities([]);
+                  setCoveredCountries([]);
+                });
               }}
             />
 

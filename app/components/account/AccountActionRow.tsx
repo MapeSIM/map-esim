@@ -20,6 +20,7 @@ export default function AccountActionRow({
   return (
     <Link
       href={href}
+      prefetch
       className={
         emphasize
           ? "flex items-center gap-3 rounded-2xl border border-[var(--accent-strong)]/40 bg-[var(--accent-strong)]/10 px-4 py-4 transition hover:bg-[var(--accent-strong)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"

@@ -63,6 +63,7 @@ export default function PartnerMenu({
               <li key={link.href}>
                 <Link
                   href={link.href}
+                  prefetch
                   aria-current={active ? "page" : undefined}
                   className={`inline-flex h-9 items-center rounded-xl px-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] ${
                     active

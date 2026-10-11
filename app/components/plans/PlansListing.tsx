@@ -149,6 +149,7 @@ export default function PlansListing({
             </h2>
             <Link
               href={relatedRegionalHref}
+              prefetch
               className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 transition hover:border-[var(--border-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
             >
               <div className="min-w-0">

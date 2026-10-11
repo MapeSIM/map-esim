@@ -139,7 +139,7 @@ function main() {
   assert.match(catalogRead, /fundingDisplay/);
   assert.doesNotMatch(catalogRead, /retailPriceLabel:/);
   assert.match(buyPage, /listPartnerCatalogOffers|requireRole\(["']PARTNER["']\)/);
-  assert.match(buyPage, /Partner price|your Partner price|Confirm purchase/i);
+  assert.match(buyPage, /Partner price|your Partner price|Issue eSIM|Confirm purchase/i);
   assert.match(buyPage, /redirect\([\s\S]*\/partner\/catalog/);
   assert.doesNotMatch(
     buyPage,
@@ -166,7 +166,7 @@ function main() {
     offerPaymentForm,
     /Wallet Balance:[\s\S]*Plan Cost:|Total amount|Wallet applied|Remaining to pay/
   );
-  assert.match(offerPaymentForm, /Confirm purchase/);
+  assert.match(offerPaymentForm, /Issue eSIM|Confirm purchase/);
   assert.match(addDataPage, /partnerDebitLabel|Partner price/);
   assert.doesNotMatch(addDataPage, /Retail\s+|retailPriceLabel/);
   assert.match(plansListing, /buildPartnerCheckoutHref/);

@@ -5,6 +5,7 @@ import {
   useId,
   useRef,
   useState,
+  useTransition,
   type KeyboardEvent,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -141,6 +142,7 @@ function DestinationCard({
 
       <Link
         href={href}
+        prefetch
         className="
           mt-8 block rounded-xl bg-[var(--accent)] py-4
           font-bold text-[var(--accent-ink)] hover:opacity-90
@@ -161,6 +163,7 @@ function PriorityChip({ destination }: { destination: VesimDestination }) {
   return (
     <Link
       href={href}
+      prefetch
       className="
         inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full
         border border-[var(--border-strong)] bg-[var(--surface)]
@@ -189,6 +192,7 @@ function DestinationSearchCombobox({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [, startNavTransition] = useTransition();
 
   const filtered = filterPlansDiscoveryDestinations(options, query);
   const showList = open && options.length > 0;
@@ -210,7 +214,9 @@ function DestinationSearchCombobox({
   function navigateTo(destination: VesimDestination) {
     setOpen(false);
     setQuery(destinationDisplayName(destination));
-    router.push(plansDestinationHref(destination));
+    startNavTransition(() => {
+      router.push(plansDestinationHref(destination));
+    });
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -386,6 +392,7 @@ export default function PlansDiscovery({
           <DestinationSearchCombobox options={selectorOptions} />
           <Link
             href="/countries"
+            prefetch
             className="
               inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl
               border border-[var(--border-strong)] bg-[var(--surface)]
@@ -456,6 +463,7 @@ export default function PlansDiscovery({
             </p>
             <Link
               href="/countries"
+              prefetch
               className="
                 mt-8 inline-flex rounded-xl bg-[var(--accent)] px-6 py-3
                 font-bold text-[var(--accent-ink)] hover:opacity-90

@@ -381,9 +381,28 @@ export default function PartnerCatalogBuy({
             Select a destination to view Partner plans.
           </p>
         ) : offersLoading ? (
-          <p className="mt-3 text-sm text-[var(--text-muted)]" role="status">
-            Loading plans…
-          </p>
+          <ul
+            className="mt-4 space-y-3"
+            role="status"
+            aria-busy="true"
+            aria-label="Loading plans"
+          >
+            {Array.from({ length: 3 }).map((_, index) => (
+              <li
+                key={index}
+                className="animate-pulse rounded-2xl border border-[var(--border)] bg-[#0F172A]/70 p-4 sm:p-5"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="h-5 w-40 rounded bg-[color-mix(in_srgb,#0F172A_50%,#1e293b)]" />
+                    <div className="h-4 w-32 rounded bg-[color-mix(in_srgb,#0F172A_50%,#1e293b)]" />
+                    <div className="h-6 w-24 rounded bg-[color-mix(in_srgb,#00E676_18%,#0F172A)]" />
+                  </div>
+                  <div className="h-11 w-full rounded-xl bg-[color-mix(in_srgb,#00E676_22%,#0F172A)] sm:w-40" />
+                </div>
+              </li>
+            ))}
+          </ul>
         ) : offersError ? (
           <p className="mt-3 text-sm text-[var(--heading)]" role="alert">
             {offersError}

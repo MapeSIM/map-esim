@@ -6,9 +6,11 @@ import {
   useMemo,
   useRef,
   useState,
+  useTransition,
   type ReactNode,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import CountriesListingSkeleton from "@/app/components/countries/CountriesListingSkeleton";
 import {
   parsePublicDestinations,
   shouldAcceptPublicDestinationCatalog,
@@ -58,6 +60,7 @@ function CountriesListingClientInner({
   // Soft refresh only — never clear SSR/catalog cards while updating.
   const [updating, setUpdating] = useState(false);
   const [catalogReplaced, setCatalogReplaced] = useState(false);
+  const [, startFilterTransition] = useTransition();
   const destinationsRef = useRef(destinations);
   const sourceRef = useRef(source);
 
@@ -75,9 +78,11 @@ function CountriesListingClientInner({
   }, [searchParams]);
 
   function setFilter(next: CountryListingFilterId) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("filter", next);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    startFilterTransition(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("filter", next);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    });
   }
 
   useEffect(() => {
@@ -226,13 +231,7 @@ export default function CountriesListingClient(
   props: CountriesListingClientProps
 ) {
   return (
-    <Suspense
-      fallback={
-        <main className="flex min-h-screen items-center justify-center bg-[var(--page-bg)] text-[var(--heading)]">
-          Loading destinations...
-        </main>
-      }
-    >
+    <Suspense fallback={<CountriesListingSkeleton />}>
       <CountriesListingClientInner {...props} />
     </Suspense>
   );

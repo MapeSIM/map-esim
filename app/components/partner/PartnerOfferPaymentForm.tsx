@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useState } from "react";
+import { Loader2 } from "lucide-react";
 import type { PartnerPurchaseActionState } from "@/app/lib/partner/partnerPurchaseFormState";
 import type { PartnerEsimPaymentMode } from "@/app/lib/partner/partnerPurchaseValidation";
 import {
@@ -107,10 +108,10 @@ export default function PartnerOfferPaymentForm({
     !splitPaymentEnabled && payableCents > 0 && !walletCoversPlan;
   const ctaLabel = gatewayRequired
     ? "Continue to payment"
-    : "Confirm purchase";
+    : "Issue eSIM";
   const ctaPendingLabel = gatewayRequired
-    ? "Starting payment…"
-    : "Purchasing…";
+    ? "Connecting to Payment Gateway..."
+    : "Issuing eSIM...";
 
   const submitDisabled =
     buyPending ||
@@ -305,9 +306,17 @@ export default function PartnerOfferPaymentForm({
       <button
         type="submit"
         disabled={submitDisabled}
-        className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+        aria-busy={buyPending || undefined}
+        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
       >
-        {buyPending ? ctaPendingLabel : ctaLabel}
+        {buyPending ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            {ctaPendingLabel}
+          </>
+        ) : (
+          ctaLabel
+        )}
       </button>
     </form>
   );
