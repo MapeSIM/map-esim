@@ -10,8 +10,16 @@ import {
   applyPakistanRetailOverride,
   isHiddenPakistanCatalogOffer,
   isPakistanDestinationCode,
+  PAKISTAN_DAY1_10GB_RETAIL_CENTS,
+  PAKISTAN_DAY1_1GB_RETAIL_CENTS,
+  PAKISTAN_DAY1_2GB_RETAIL_CENTS,
+  PAKISTAN_DAY1_3GB_RETAIL_CENTS,
+  PAKISTAN_DAY1_500MB_RETAIL_CENTS,
+  PAKISTAN_DAY7_1GB_RETAIL_CENTS,
+  PAKISTAN_DAY7_500MB_RETAIL_CENTS,
   PAKISTAN_UNLIMITED_30_RETAIL_CENTS,
   PAKISTAN_UNLIMITED_30_RETAIL_USD,
+  resolvePakistanPinnedRetailUsd,
 } from "../app/lib/plans/pakistanCatalogPolicy";
 import type { VesimOffer } from "../app/lib/vesim/offers";
 
@@ -34,11 +42,78 @@ function offer(partial: Partial<VesimOffer> & Pick<VesimOffer, "id">): VesimOffe
 function main() {
   assert.equal(PAKISTAN_UNLIMITED_30_RETAIL_CENTS, 2999);
   assert.equal(PAKISTAN_UNLIMITED_30_RETAIL_USD, 29.99);
+  assert.equal(PAKISTAN_DAY1_500MB_RETAIL_CENTS, 99);
+  assert.equal(PAKISTAN_DAY1_1GB_RETAIL_CENTS, 129);
+  assert.equal(PAKISTAN_DAY1_2GB_RETAIL_CENTS, 199);
+  assert.equal(PAKISTAN_DAY1_3GB_RETAIL_CENTS, 330);
+  assert.equal(PAKISTAN_DAY1_10GB_RETAIL_CENTS, 499);
+  assert.equal(PAKISTAN_DAY7_500MB_RETAIL_CENTS, 130);
+  assert.equal(PAKISTAN_DAY7_1GB_RETAIL_CENTS, 156);
   assert.equal(isPakistanDestinationCode("PK"), true);
   assert.equal(isPakistanDestinationCode("pakistan"), true);
   assert.equal(isPakistanDestinationCode("AE"), false);
   console.log("PASS pakistan_retail_constants");
 
+  const day1_500 = offer({
+    id: "ESIM-PK-500MB-1D",
+    country: "PK",
+    dataFormatted: "500 MB",
+    dataMB: 500,
+    durationDays: 1,
+    priceUSD: 2.5,
+    providerPriceUSD: 1.8,
+    currency: "USD",
+  });
+  const day1_1gb = offer({
+    id: "ESIM-PK-1GB-1D",
+    country: "PK",
+    dataFormatted: "1 GB",
+    dataGB: 1,
+    durationDays: 1,
+    priceUSD: 3.1,
+    providerPriceUSD: 2.4,
+    currency: "USD",
+  });
+  const day1_2gb = offer({
+    id: "ESIM-PK-2GB-1D",
+    country: "PK",
+    dataFormatted: "2 GB",
+    dataGB: 2,
+    durationDays: 1,
+    priceUSD: 4.2,
+    providerPriceUSD: 3.1,
+    currency: "USD",
+  });
+  const day1_3gb = offer({
+    id: "ESIM-PK-3GB-1D",
+    country: "PK",
+    dataFormatted: "3 GB",
+    dataGB: 3,
+    durationDays: 1,
+    priceUSD: 5.5,
+    providerPriceUSD: 4.0,
+    currency: "USD",
+  });
+  const day1_10gb = offer({
+    id: "ESIM-PK-10GB-1D",
+    country: "PK",
+    dataFormatted: "10 GB",
+    dataGB: 10,
+    durationDays: 1,
+    priceUSD: 8.0,
+    providerPriceUSD: 6.0,
+    currency: "USD",
+  });
+  const day7_502 = offer({
+    id: "ESIM-PK-502MB-7D",
+    country: "PK",
+    dataFormatted: "502 MB",
+    dataMB: 502,
+    durationDays: 7,
+    priceUSD: 3.0,
+    providerPriceUSD: 2.2,
+    currency: "USD",
+  });
   const gb1 = offer({
     id: "ESIM-PK-1GB",
     country: "PK",
@@ -47,6 +122,7 @@ function main() {
     durationDays: 7,
     priceUSD: 4.83,
     providerPriceUSD: 4.2,
+    currency: "USD",
   });
   const gb20 = offer({
     id: "ESIM-PK-20GB",
@@ -123,6 +199,17 @@ function main() {
     providerPriceUSD: 34,
   });
 
+  assert.equal(resolvePakistanPinnedRetailUsd(day1_500), 0.99);
+  assert.equal(resolvePakistanPinnedRetailUsd(day1_1gb), 1.29);
+  assert.equal(resolvePakistanPinnedRetailUsd(day1_2gb), 1.99);
+  assert.equal(resolvePakistanPinnedRetailUsd(day1_3gb), 3.3);
+  assert.equal(resolvePakistanPinnedRetailUsd(day1_10gb), 4.99);
+  assert.equal(resolvePakistanPinnedRetailUsd(day7_502), 1.3);
+  assert.equal(resolvePakistanPinnedRetailUsd(gb1), 1.56);
+  assert.equal(resolvePakistanPinnedRetailUsd(gb20), null);
+  assert.equal(resolvePakistanPinnedRetailUsd(unlimited7), null);
+  console.log("PASS day1_day7_pin_resolution");
+
   assert.equal(isHiddenPakistanCatalogOffer(gb50), true);
   assert.equal(isHiddenPakistanCatalogOffer(unlimited10), true);
   assert.equal(isHiddenPakistanCatalogOffer(gb1), false);
@@ -132,6 +219,12 @@ function main() {
   console.log("PASS hide_50gb_and_unlimited_10_day");
 
   const pkCatalog = applyPakistanPublicCatalog("PK", [
+    day1_500,
+    day1_1gb,
+    day1_2gb,
+    day1_3gb,
+    day1_10gb,
+    day7_502,
     gb1,
     gb20,
     gb50,
@@ -140,7 +233,40 @@ function main() {
     unlimited7,
   ]);
   const pkIds = pkCatalog.map((item) => item.id);
-  assert.deepEqual(pkIds, ["ESIM-PK-1GB", "ESIM-PK-20GB", "ESIM-PK-UL-30", "ESIM-PK-UL-7"]);
+  assert.deepEqual(pkIds, [
+    "ESIM-PK-500MB-1D",
+    "ESIM-PK-1GB-1D",
+    "ESIM-PK-2GB-1D",
+    "ESIM-PK-3GB-1D",
+    "ESIM-PK-10GB-1D",
+    "ESIM-PK-502MB-7D",
+    "ESIM-PK-1GB",
+    "ESIM-PK-20GB",
+    "ESIM-PK-UL-30",
+    "ESIM-PK-UL-7",
+  ]);
+
+  function assertPinned(
+    id: string,
+    expectedUsd: number,
+    providerUsd: number
+  ) {
+    const row = pkCatalog.find((item) => item.id === id);
+    assert.ok(row, id);
+    assert.equal(row!.priceUSD, expectedUsd);
+    assert.equal(row!.price, expectedUsd);
+    assert.equal(row!.displayPrice, expectedUsd);
+    assert.equal(row!.providerPriceUSD, providerUsd);
+  }
+
+  assertPinned("ESIM-PK-500MB-1D", 0.99, 1.8);
+  assertPinned("ESIM-PK-1GB-1D", 1.29, 2.4);
+  assertPinned("ESIM-PK-2GB-1D", 1.99, 3.1);
+  assertPinned("ESIM-PK-3GB-1D", 3.3, 4.0);
+  assertPinned("ESIM-PK-10GB-1D", 4.99, 6.0);
+  assertPinned("ESIM-PK-502MB-7D", 1.3, 2.2);
+  assertPinned("ESIM-PK-1GB", 1.56, 4.2);
+
   const pinned = pkCatalog.find((item) => item.id === "ESIM-PK-UL-30");
   assert.ok(pinned);
   assert.equal(pinned!.priceUSD, 29.99);
@@ -151,13 +277,11 @@ function main() {
   assert.equal(pinned!.durationDays, 30);
   assert.equal(pinned!.dataFormatted, "Unlimited");
 
-  const kept1 = pkCatalog.find((item) => item.id === "ESIM-PK-1GB");
-  assert.equal(kept1!.priceUSD, 4.83);
   const kept20 = pkCatalog.find((item) => item.id === "ESIM-PK-20GB");
   assert.equal(kept20!.priceUSD, 18.5);
   const kept7 = pkCatalog.find((item) => item.id === "ESIM-PK-UL-7");
   assert.equal(kept7!.priceUSD, 9);
-  console.log("PASS pk_catalog_hide_and_unlimited_30_price");
+  console.log("PASS pk_catalog_hide_and_day1_day7_unlimited30_price");
 
   const aeCatalog = applyPakistanPublicCatalog("AE", [
     ae50,
@@ -173,6 +297,9 @@ function main() {
   const checkout = applyPakistanRetailOverride(unlimited30, "PK");
   assert.equal(checkout.priceUSD, 29.99);
   assert.equal(checkout.providerPriceUSD, 36);
+  const checkoutDay1 = applyPakistanRetailOverride(day1_1gb, "PK");
+  assert.equal(checkoutDay1.priceUSD, 1.29);
+  assert.equal(checkoutDay1.providerPriceUSD, 2.4);
   const stillVisible = applyPakistanRetailOverride(gb50, "PK");
   assert.equal(stillVisible.id, "ESIM-PK-50GB");
   assert.equal(stillVisible.priceUSD, 22);
@@ -187,6 +314,8 @@ function main() {
   const pkg = read("package.json");
 
   assert.match(policy, /Does not mutate orders/);
+  assert.match(policy, /PAKISTAN_DAY1_500MB_RETAIL_CENTS/);
+  assert.match(policy, /PAKISTAN_DAY7_1GB_RETAIL_CENTS/);
   assert.match(server, /applyPakistanPublicCatalog/);
   assert.match(server, /applyPakistanRetailOverride/);
   assert.match(server, /fetchPublicOffersForCountry/);
