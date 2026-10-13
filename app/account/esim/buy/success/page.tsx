@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Star } from "lucide-react";
 import { OrderFundingSource } from "@prisma/client";
 import { requireRole } from "@/app/lib/auth/session";
 import { getCompletedWalletPurchase } from "@/app/lib/esim/walletPurchaseRead";
 
 export const dynamic = "force-dynamic";
+
+const GOOGLE_REVIEW_HREF = "https://g.page/r/CTOQlYhu_e49EAI/review";
 
 function parsePurchaseId(raw: string | undefined): string | null {
   const id = (raw ?? "").trim();
@@ -146,6 +149,47 @@ export default async function AccountWalletBuySuccessPage({
           </dd>
         </div>
       </dl>
+
+      <section
+        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-5 text-center sm:px-5"
+        aria-labelledby="google-review-heading"
+      >
+        <div
+          className="mb-3 flex items-center justify-center gap-1 text-[#FBBC04]"
+          aria-hidden="true"
+        >
+          {Array.from({ length: 5 }).map((_, index) => (
+            <Star
+              key={index}
+              className="h-5 w-5 fill-current"
+              strokeWidth={0}
+            />
+          ))}
+        </div>
+        <p
+          id="google-review-heading"
+          className="text-sm font-medium text-[var(--heading)] sm:text-[15px]"
+        >
+          Happy with your MAP eSIM? Leave us a 5-star review on Google!
+        </p>
+        <a
+          href={GOOGLE_REVIEW_HREF}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="
+            mt-4 inline-flex h-11 w-full items-center justify-center gap-2
+            rounded-[14px] bg-[#4285F4] px-5 text-sm font-semibold text-white
+            shadow-[0_8px_20px_rgba(66,133,244,0.28)] transition
+            hover:bg-[#3367D6] focus-visible:outline-none
+            focus-visible:ring-2 focus-visible:ring-[#4285F4]/60
+            focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--page-bg)]
+            sm:w-auto
+          "
+        >
+          <Star className="h-4 w-4 fill-current" strokeWidth={0} aria-hidden="true" />
+          Rate Us on Google
+        </a>
+      </section>
 
       <div className="flex flex-col gap-3 text-sm sm:flex-row sm:flex-wrap">
         <Link
