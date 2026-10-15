@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Deep-link confirm for a single Partner-priced offer.
- * Primary browse+buy lives at /partner/catalog — missing params redirect there.
+ * Browse stays on public /countries; missing params return there.
  */
 export default async function PartnerStorefrontBuyPage({
   searchParams,
@@ -31,11 +31,7 @@ export default async function PartnerStorefrontBuyPage({
   const country = sanitizeCountryHint(query.country);
 
   if (!offerId || !country) {
-    const params = new URLSearchParams();
-    if (country) params.set("country", country);
-    if (offerId) params.set("offerId", offerId);
-    const qs = params.toString();
-    redirect(qs ? `/partner/catalog?${qs}` : "/partner/catalog");
+    redirect("/countries");
   }
 
   if (!actor) {
@@ -72,7 +68,11 @@ export default async function PartnerStorefrontBuyPage({
   const offer = offers.find((row) => row.offerId === offerId) ?? null;
 
   if (!offer) {
-    redirect(`/partner/catalog?country=${encodeURIComponent(country)}`);
+    redirect(
+      country
+        ? `/countries?q=${encodeURIComponent(country)}`
+        : "/countries"
+    );
   }
 
   return (

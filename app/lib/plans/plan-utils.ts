@@ -73,7 +73,10 @@ export function buildCheckoutHref(
   return `/account/esim/buy?${params.toString()}`;
 }
 
-/** Partner wallet buy — lands on unified catalog with destination preselected. */
+/**
+ * Partner wallet buy — confirm page for a single Partner-priced offer.
+ * Do not use /partner/catalog here: that route redirects to /countries (browse).
+ */
 export function buildPartnerCheckoutHref(
   offer: VesimOffer,
   destinationCode: string
@@ -84,7 +87,7 @@ export function buildPartnerCheckoutHref(
   if (destinationCode.trim()) {
     params.set("country", destinationCode.trim());
   }
-  return `/partner/catalog?${params.toString()}`;
+  return `/partner/buy?${params.toString()}`;
 }
 
 export function summarizePlanTypes(offers: VesimOffer[]) {

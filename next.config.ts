@@ -32,11 +32,8 @@ const nextConfig: NextConfig = {
         destination: "/countries",
         permanent: true,
       },
-      {
-        source: "/partner/catalog",
-        destination: "/countries",
-        permanent: true,
-      },
+      // /partner/catalog is handled in-app: offerId+country → /partner/buy,
+      // otherwise → /countries. Do not 308 here — that strips checkout deep-links.
     ];
   },
 };

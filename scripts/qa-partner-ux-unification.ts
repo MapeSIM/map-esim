@@ -60,9 +60,12 @@ function main() {
   assert.doesNotMatch(partnerHome, /Reward Points|rewardPoints/i);
 
   const catalogPage = read("app/partner/(portal)/catalog/page.tsx");
+  // Deep-link checkout params → confirm page; bare catalog → destinations browse.
+  assert.match(catalogPage, /\/partner\/buy\?/);
   assert.match(catalogPage, /redirect\(\s*["']\/countries["']\s*\)/);
   const nextConfig = read("next.config.ts");
-  assert.match(
+  // Must not 308 /partner/catalog → /countries (that broke Buy Now deep-links).
+  assert.doesNotMatch(
     nextConfig,
     /source:\s*["']\/partner\/catalog["'][\s\S]*destination:\s*["']\/countries["']/
   );
@@ -140,7 +143,7 @@ function main() {
   assert.doesNotMatch(catalogRead, /retailPriceLabel:/);
   assert.match(buyPage, /listPartnerCatalogOffers|requireRole\(["']PARTNER["']\)/);
   assert.match(buyPage, /Partner price|your Partner price|Issue eSIM|Confirm purchase/i);
-  assert.match(buyPage, /redirect\([\s\S]*\/partner\/catalog/);
+  assert.match(buyPage, /redirect\(\s*["']\/countries["']\s*\)/);
   assert.doesNotMatch(
     buyPage,
     /Retail price is shown|Partner discount is applied server-side/
@@ -170,7 +173,7 @@ function main() {
   assert.match(addDataPage, /partnerDebitLabel|Partner price/);
   assert.doesNotMatch(addDataPage, /Retail\s+|retailPriceLabel/);
   assert.match(plansListing, /buildPartnerCheckoutHref/);
-  assert.match(authConfig, /\/partner\/catalog/);
+  assert.match(authConfig, /\/partner\/buy/);
   assert.match(authConfig, /\/account\/esim\/buy/);
   assert.equal(isTawkEnabledRoute("/partner"), false);
 
@@ -187,9 +190,10 @@ function main() {
   );
   assert.equal(
     buildPartnerCheckoutHref(offer, "JP"),
-    "/partner/catalog?offerId=ESIM-QA-1&country=JP"
+    "/partner/buy?offerId=ESIM-QA-1&country=JP"
   );
   assert.doesNotMatch(buildPartnerCheckoutHref(offer, "JP"), /discount|partnerCharge|providerCost/);
+  assert.doesNotMatch(buildPartnerCheckoutHref(offer, "JP"), /\/partner\/catalog/);
 
   console.log("ALL_QA_PASSED=partner-ux-unification");
 }

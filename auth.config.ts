@@ -106,7 +106,8 @@ export const authConfig = {
             pathname === "/account/esim/buy" ||
             pathname.startsWith("/account/esim/buy/")
           ) {
-            const dest = new URL("/partner/catalog", request.nextUrl);
+            // Partner Buy Now / shared buy links → confirm purchase, not destinations.
+            const dest = new URL("/partner/buy", request.nextUrl);
             dest.search = request.nextUrl.search;
             return Response.redirect(dest);
           }
