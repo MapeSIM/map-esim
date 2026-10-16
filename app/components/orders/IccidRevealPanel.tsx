@@ -10,6 +10,11 @@ type Props = {
   unavailableLabel?: string;
   /** Single-row ICCID + Copy for compact Partner install cards. */
   compact?: boolean;
+  /**
+   * Optional provider sync when ICCID is still pending.
+   * Parent owns the fetch; on success it should pass the new `iccid` prop.
+   */
+  onRefreshFromProvider?: () => Promise<string | null>;
 };
 
 /**
@@ -21,12 +26,17 @@ export default function IccidRevealPanel({
   iccid,
   unavailableLabel = "Pending from provider",
   compact = false,
+  onRefreshFromProvider,
 }: Props) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const value = (iccid ?? "").trim();
+  const [localIccid, setLocalIccid] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const value = (localIccid ?? iccid ?? "").trim();
   const hasIccid = value.length > 0;
   const display = hasIccid ? value : unavailableLabel;
+  const canRefresh = !hasIccid && typeof onRefreshFromProvider === "function";
 
   async function copy() {
     if (!hasIccid) return;
@@ -37,6 +47,25 @@ export default function IccidRevealPanel({
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
       setError("Unable to copy ICCID.");
+    }
+  }
+
+  async function refresh() {
+    if (!onRefreshFromProvider || refreshing) return;
+    setRefreshing(true);
+    setError(null);
+    try {
+      const next = await onRefreshFromProvider();
+      const trimmed = (next ?? "").trim();
+      if (!trimmed) {
+        setError("ICCID is not available from the provider yet. Try again shortly.");
+        return;
+      }
+      setLocalIccid(trimmed);
+    } catch {
+      setError("Unable to refresh ICCID from the provider.");
+    } finally {
+      setRefreshing(false);
     }
   }
 
@@ -51,6 +80,21 @@ export default function IccidRevealPanel({
       }
     >
       {copied ? "Copied" : compact ? "Copy" : "Copy ICCID"}
+    </button>
+  ) : null;
+
+  const refreshButton = canRefresh ? (
+    <button
+      type="button"
+      onClick={() => void refresh()}
+      disabled={refreshing}
+      className={
+        compact
+          ? "inline-flex h-10 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 text-xs font-semibold text-[var(--heading)] transition hover:bg-[var(--page-bg-soft)] disabled:opacity-60"
+          : "inline-flex h-9 items-center justify-center rounded-xl border border-[var(--border-strong)] px-3 text-xs font-semibold text-[var(--heading)] transition hover:bg-[var(--surface)] disabled:opacity-60"
+      }
+    >
+      {refreshing ? "Refreshing…" : "Refresh from provider"}
     </button>
   ) : null;
 
@@ -70,7 +114,10 @@ export default function IccidRevealPanel({
           >
             {display}
           </p>
-          <div className="flex flex-wrap gap-2">{copyButton}</div>
+          <div className="flex flex-wrap gap-2">
+            {copyButton}
+            {refreshButton}
+          </div>
           {error ? (
             <p
               className="text-xs font-normal text-amber-700 dark:text-amber-200"
@@ -96,7 +143,10 @@ export default function IccidRevealPanel({
         >
           {display}
         </p>
-        <div className="flex flex-wrap gap-2">{copyButton}</div>
+        <div className="flex flex-wrap gap-2">
+          {copyButton}
+          {refreshButton}
+        </div>
         {!hasIccid ? (
           <p className="text-xs font-normal text-[var(--text-muted)]">
             Full ICCID is unavailable until it is stored for this order.

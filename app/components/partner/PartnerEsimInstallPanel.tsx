@@ -279,6 +279,26 @@ export default function PartnerEsimInstallPanel({
         iccid={iccid}
         unavailableLabel={iccidMasked}
         compact
+        onRefreshFromProvider={async () => {
+          const res = await fetch(
+            `/api/partner/orders/${encodeURIComponent(orderId)}/iccid`,
+            {
+              method: "POST",
+              cache: "no-store",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ sync: true }),
+            }
+          );
+          const json = (await res.json().catch(() => null)) as {
+            success?: boolean;
+            iccid?: string;
+          } | null;
+          if (!res.ok || !json?.success || !json.iccid) {
+            return null;
+          }
+          return json.iccid;
+        }}
       />
     </div>
   );

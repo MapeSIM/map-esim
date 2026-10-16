@@ -20,9 +20,11 @@ import { extractInstallDetails, hasInstallDetails } from "@/app/lib/email/extrac
 import { isValidInstallQrValue } from "@/app/lib/email/qr";
 import { prisma } from "@/app/lib/db";
 import {
+  isIccidEncryptionConfigured,
   normalizeIccid,
   validateIccid,
 } from "@/app/lib/orders/iccidCrypto";
+import { captureIccidForProviderOrder } from "@/app/lib/orders/iccidCapture";
 import {
   fetchBrokerOrderPayload,
   type CustomerSessionInstallActions,
@@ -288,11 +290,107 @@ export async function loadPartnerOrderInstallForAuthorized(
     return { ok: false, code: "UNAVAILABLE" };
   }
 
+  // Best-effort: persist ICCID from broker payload when Order row is still empty.
+  await persistPartnerIccidFromBrokerPayload({
+    providerOrderId: order.providerOrderId,
+    brokerPayload: orderData,
+  });
+
   const dto = toPartnerOrderInstallDto(order.localOrderId, orderData);
   if (!dto.hasInstallDetails) {
     return { ok: false, code: "MISSING_INSTALL" };
   }
   return { ok: true, dto };
+}
+
+/**
+ * Persist ICCID from a VeSIM broker payload when missing locally.
+ * Never throws to callers — capture failures must not block install UI.
+ */
+async function persistPartnerIccidFromBrokerPayload(options: {
+  providerOrderId: string;
+  brokerPayload: Record<string, unknown>;
+}): Promise<string | null> {
+  if (!isIccidEncryptionConfigured()) return null;
+  const extracted = normalizeIccid(
+    extractInstallDetails(options.brokerPayload).iccid ?? ""
+  );
+  if (!extracted || !validateIccid(extracted)) return null;
+  try {
+    await captureIccidForProviderOrder(
+      {
+        providerOrderId: options.providerOrderId,
+        iccid: extracted,
+        checkoutPayload: options.brokerPayload,
+      },
+      prisma
+    );
+  } catch {
+    console.error("partner_iccid_capture_failed");
+    return null;
+  }
+  return extracted;
+}
+
+export type PartnerIccidSyncResult =
+  | { ok: true; iccid: string; synced: boolean }
+  | { ok: false; code: "NOT_FOUND" | "PENDING" | "UNAVAILABLE" | "RATE_LIMITED" };
+
+/**
+ * Partner-owned order ICCID: return stored value, or GET provider + fill-once capture.
+ * Never places/retries VeSIM purchases.
+ */
+export async function syncPartnerOrderIccidFromProvider(
+  partnerUserId: string,
+  orderId: string,
+  options?: { fetchBrokerPayload?: PartnerBrokerLookup }
+): Promise<PartnerIccidSyncResult> {
+  const authz = await authorizePartnerOwnedOrderInstall(partnerUserId, orderId);
+  if (!authz.ok) return { ok: false, code: "NOT_FOUND" };
+
+  const existing = await resolveOrderIccidPlaintext(authz.order.localOrderId);
+  if (existing) {
+    return { ok: true, iccid: existing, synced: false };
+  }
+
+  if (!isIccidEncryptionConfigured()) {
+    return { ok: false, code: "UNAVAILABLE" };
+  }
+
+  const rate = consumeRateLimit({
+    key: `partner-iccid-sync:${authz.order.localOrderId}`,
+    limit: 6,
+    windowMs: 60_000,
+  });
+  if (!rate.ok) {
+    return { ok: false, code: "RATE_LIMITED" };
+  }
+
+  const fetchBroker = options?.fetchBrokerPayload ?? fetchBrokerOrderPayload;
+  let broker: Record<string, unknown> | null;
+  try {
+    broker = await fetchBroker(authz.order.providerOrderId);
+  } catch {
+    return { ok: false, code: "UNAVAILABLE" };
+  }
+  if (!broker) {
+    return { ok: false, code: "UNAVAILABLE" };
+  }
+
+  const captured = await persistPartnerIccidFromBrokerPayload({
+    providerOrderId: authz.order.providerOrderId,
+    brokerPayload: broker,
+  });
+  if (!captured) {
+    return { ok: false, code: "PENDING" };
+  }
+
+  const again = await resolveOrderIccidPlaintext(authz.order.localOrderId);
+  if (!again) {
+    // Capture may have raced; still return provider-extracted ICCID for display.
+    return { ok: true, iccid: captured, synced: true };
+  }
+  return { ok: true, iccid: again, synced: true };
 }
 
 export async function getPartnerOwnedOrderInstall(
@@ -339,7 +437,7 @@ export async function getPartnerOwnedOrderUsage(
   const fetchBroker = options?.fetchBrokerPayload ?? fetchBrokerOrderPayload;
   const fetchUsage = options?.fetchUsage ?? fetchProviderUsage;
 
-  const localIccid = await resolveLocalIccid(authz.order.localOrderId);
+  let localIccid = await resolveLocalIccid(authz.order.localOrderId);
   const broker = await fetchBroker(authz.order.providerOrderId);
   if (!broker && !localIccid) {
     return { ok: false, code: "TEMPORARY_ERROR" };
@@ -349,6 +447,13 @@ export async function getPartnerOwnedOrderUsage(
     const capability = readUsageCapability(broker);
     if (capability === false) {
       return { ok: false, code: "USAGE_UNAVAILABLE" };
+    }
+    if (!localIccid) {
+      const captured = await persistPartnerIccidFromBrokerPayload({
+        providerOrderId: authz.order.providerOrderId,
+        brokerPayload: broker,
+      });
+      if (captured) localIccid = captured;
     }
   }
 
