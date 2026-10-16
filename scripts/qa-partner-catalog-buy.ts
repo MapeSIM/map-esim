@@ -498,7 +498,7 @@ async function main() {
     );
     console.log("PASS J_confirmed_failure_refund_ui");
 
-    // K. uncertain → recon message, no auto-refund (funds remain reserved)
+    // K. uncertain without provider order id → auto-refund (safe; no eSIM evidence)
     providerCalls = 0;
     nextCheckout = {
       kind: "uncertain",
@@ -519,18 +519,15 @@ async function main() {
       providerCheckout,
     });
     assert.equal(resultK.ok, false);
-    if (resultK.ok) throw new Error("expected recon");
-    assert.equal(resultK.kind, "reconciliation_required");
-    assert.equal(resultK.message, PARTNER_RECONCILIATION_MESSAGE);
+    if (resultK.ok) throw new Error("expected failed_refunded");
+    assert.equal(resultK.kind, "failed_refunded");
+    assert.equal(resultK.message, PARTNER_FAILED_REFUNDED_MESSAGE);
     assert.equal(providerCalls, 1);
     const rowK = await prisma.partnerEsimPurchase.findUniqueOrThrow({
       where: { id: resultK.purchaseId! },
     });
-    assert.equal(
-      rowK.status,
-      PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED
-    );
-    assert.equal(rowK.refundTransactionId, null);
+    assert.equal(rowK.status, PartnerEsimPurchaseStatus.FAILED_REFUNDED);
+    assert.ok(rowK.refundTransactionId);
     assert.equal(rowK.partnerChargeCents, 950);
     assert.equal(
       (
@@ -538,7 +535,7 @@ async function main() {
           where: { partnerId },
         })
       ).balanceCents,
-      balBeforeK - rowK.partnerChargeCents
+      balBeforeK
     );
     assert.equal(
       await prisma.partnerWalletTransaction.count({
@@ -548,9 +545,53 @@ async function main() {
           referenceId: resultK.purchaseId!,
         },
       }),
-      0
+      1
     );
-    console.log("PASS K_uncertain_recon_no_refund");
+    console.log("PASS K_uncertain_no_order_auto_refund");
+
+    // K2. uncertain WITH provider order id → recon, no auto-refund
+    providerCalls = 0;
+    nextCheckout = {
+      kind: "uncertain",
+      category: "provider_timeout",
+      code: "checkout_timeout",
+      providerOrderId: `PO-QA-CAT-${stamp}-K2`,
+    };
+    const balBeforeK2 = (
+      await prisma.partnerWalletAccount.findUniqueOrThrow({
+        where: { partnerId },
+      })
+    ).balanceCents;
+    const resultK2 = await buyPartnerEsimPurchase({
+      partnerUserId,
+      offerId: offerState.offerId,
+      idempotencyKey: idem("k2"),
+      countryHint: "PK",
+      verifyOffer,
+      providerCheckout,
+    });
+    assert.equal(resultK2.ok, false);
+    if (resultK2.ok) throw new Error("expected recon");
+    assert.equal(resultK2.kind, "reconciliation_required");
+    assert.equal(resultK2.message, PARTNER_RECONCILIATION_MESSAGE);
+    assert.equal(providerCalls, 1);
+    const rowK2 = await prisma.partnerEsimPurchase.findUniqueOrThrow({
+      where: { id: resultK2.purchaseId! },
+    });
+    assert.equal(
+      rowK2.status,
+      PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED
+    );
+    assert.equal(rowK2.refundTransactionId, null);
+    assert.equal(
+      (
+        await prisma.partnerWalletAccount.findUniqueOrThrow({
+          where: { partnerId },
+        })
+      ).balanceCents,
+      balBeforeK2 - rowK2.partnerChargeCents
+    );
+    console.log("PASS K2_uncertain_with_order_recon_no_refund");
 
     // L. customer wallet untouched
     assert.equal(

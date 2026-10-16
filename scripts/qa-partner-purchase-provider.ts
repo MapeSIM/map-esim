@@ -123,6 +123,15 @@ async function main() {
       /PARTNER_PURCHASE_CRITICAL_TX\s*=\s*\{[\s\S]*?timeout:\s*15_000/
     );
     assert.match(criticalTx, /PARTNER_PURCHASE_CRITICAL_TX/);
+    // VeSIM checkout must not nest inside an interactive $transaction callback.
+    assert.doesNotMatch(
+      providerService,
+      /\$transaction\s*\(\s*async\s*\([^)]*\)\s*=>\s*\{[\s\S]*?checkoutFn\s*\(/
+    );
+    assert.doesNotMatch(
+      providerService,
+      /\$transaction\s*\(\s*async\s*\([^)]*\)\s*=>\s*\{[\s\S]*?executeCreditCheckout\s*\(/
+    );
     assert.doesNotMatch(
       providerService.slice(
         providerService.indexOf("async function refundConfirmedProviderFailure")
@@ -419,7 +428,53 @@ async function main() {
     });
     console.log("PASS E_refund_ignores_current_discount");
 
-    // F. uncertain timeout → RECON, no refund
+    // F0. uncertain timeout WITHOUT provider order id → auto-refund
+    providerCalls = 0;
+    nextCheckout = {
+      kind: "uncertain",
+      category: "provider_timeout",
+      code: "checkout_transport_error",
+    };
+    const purchaseF0 = await prepareAndReserve("f0");
+    const snapF0 = await prisma.partnerEsimPurchase.findUniqueOrThrow({
+      where: { id: purchaseF0 },
+      select: { partnerChargeCents: true },
+    });
+    const balBeforeF0 = (
+      await prisma.partnerWalletAccount.findUniqueOrThrow({
+        where: { partnerId },
+      })
+    ).balanceCents;
+    try {
+      await executePartnerEsimProviderPurchase({
+        partnerUserId,
+        purchaseId: purchaseF0,
+        providerCheckout,
+      });
+      assert.fail("expected PROVIDER_FAILED");
+    } catch (error) {
+      assert.ok(error instanceof PartnerEsimPurchaseError);
+      assert.equal(error.code, "PROVIDER_FAILED");
+    }
+    assert.equal(providerCalls, 1);
+    const rowF0 = await prisma.partnerEsimPurchase.findUniqueOrThrow({
+      where: { id: purchaseF0 },
+    });
+    assert.equal(rowF0.status, PartnerEsimPurchaseStatus.FAILED_REFUNDED);
+    assert.ok(rowF0.refundTransactionId);
+    assert.equal(rowF0.providerResultKind, "uncertain");
+    assert.equal(rowF0.safeProviderStatusCode, "checkout_transport_error");
+    assert.equal(
+      (
+        await prisma.partnerWalletAccount.findUniqueOrThrow({
+          where: { partnerId },
+        })
+      ).balanceCents,
+      balBeforeF0 + snapF0.partnerChargeCents
+    );
+    console.log("PASS F0_uncertain_no_order_auto_refund");
+
+    // F. uncertain timeout WITH provider order id → RECON, no refund
     providerCalls = 0;
     nextCheckout = {
       kind: "uncertain",

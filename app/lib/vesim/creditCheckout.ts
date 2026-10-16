@@ -127,6 +127,22 @@ export async function executeCreditCheckout(options: {
   const providerOrderId = extractOrderId(payload);
   if (!response.ok && !providerOrderId) {
     const status = response.status;
+    const safeMessageKeys = ["error", "message", "Message", "code", "Code", "reason"];
+    const safeHints: Record<string, string> = {};
+    for (const key of safeMessageKeys) {
+      const value = payload[key];
+      if (typeof value === "string" && value.trim()) {
+        safeHints[key] = value.slice(0, 300);
+      }
+    }
+    console.error("vesim_credit_checkout_response", {
+      ok: false,
+      httpStatus: status,
+      offerId: offerId.slice(0, 120),
+      hasProviderOrderId: false,
+      hints: safeHints,
+      payloadKeys: Object.keys(payload).slice(0, 20),
+    });
     if (status >= 500 || status === 408 || status === 429) {
       return {
         kind: "uncertain",
@@ -143,6 +159,14 @@ export async function executeCreditCheckout(options: {
   }
 
   if (!providerOrderId) {
+    console.error("vesim_credit_checkout_response", {
+      ok: response.ok,
+      httpStatus: response.status,
+      offerId: offerId.slice(0, 120),
+      hasProviderOrderId: false,
+      code: "missing_provider_order_id",
+      payloadKeys: Object.keys(payload).slice(0, 20),
+    });
     return {
       kind: "uncertain",
       category: "provider_uncertain",

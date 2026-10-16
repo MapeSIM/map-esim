@@ -1,6 +1,7 @@
 /**
  * Partner eSIM purchase prepare + reserve (funds only).
  * No provider PURCHASE/write, no Order, no UI.
+ * Live offer verify and VeSIM PURCHASE stay outside Prisma $transaction.
  */
 import "server-only";
 
@@ -635,7 +636,7 @@ export async function reservePartnerEsimPurchase(
     );
   }
 
-  // Offer/pricing race check before any money movement.
+  // Offer/pricing race check before any money movement (outside $transaction).
   const verified = await verifyOffer({
     offerId: purchase.offerId,
     countryHint: countryHint ?? purchase.destinationCode,
@@ -667,7 +668,8 @@ export async function reservePartnerEsimPurchase(
   }
 
   try {
-    const reserved = await prisma.$transaction(async (tx) => {
+    const reserved = await prisma.$transaction(
+      async (tx) => {
       const profile = await tx.partnerProfile.findUnique({
         where: { id: partner.partnerId },
         select: {
@@ -758,7 +760,9 @@ export async function reservePartnerEsimPurchase(
         duplicate: false as const,
         debitTransactionId: debit.transactionId,
       };
-    });
+      },
+      { maxWait: 5000, timeout: 15000 }
+    );
 
     return {
       purchaseId: purchase.id,

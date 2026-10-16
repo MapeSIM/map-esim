@@ -1,6 +1,9 @@
 /**
  * Partner eSIM provider execution + success / confirmed-failure / reconciliation.
- * Debit already happened at reserve. Never debits again. Never auto-refunds uncertain.
+ * Debit already happened at reserve. Never debits again.
+ * VeSIM fetch runs outside Prisma $transaction; finalize/refund use separate short txs.
+ * Confirmed decline or uncertain without a provider order id → auto-refund wallet.
+ * Uncertain with a provider order id → RECONCILIATION_REQUIRED (no auto-refund).
  */
 import "server-only";
 
@@ -363,12 +366,115 @@ async function markPartnerReconciliationRequired(options: {
   );
 }
 
+/** Clip VeSIM JSON for logs — never dump secrets or huge bodies. */
+function summarizeVesimPayload(
+  payload: Record<string, unknown> | undefined
+): Record<string, unknown> | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const out: Record<string, unknown> = {};
+  for (const key of [
+    "error",
+    "message",
+    "Message",
+    "msg",
+    "code",
+    "Code",
+    "status",
+    "Status",
+    "reason",
+    "detail",
+    "details",
+    "orderId",
+    "OrderId",
+    "offerId",
+    "OfferId",
+  ]) {
+    if (!(key in payload)) continue;
+    const value = payload[key];
+    if (typeof value === "string") {
+      out[key] = value.slice(0, 300);
+    } else if (typeof value === "number" || typeof value === "boolean") {
+      out[key] = value;
+    } else if (value == null) {
+      out[key] = value;
+    } else {
+      out[key] = String(value).slice(0, 120);
+    }
+  }
+  if (Object.keys(out).length === 0) {
+    out.keys = Object.keys(payload).slice(0, 20);
+  }
+  return out;
+}
+
+function logPartnerVesimCheckoutResult(options: {
+  purchaseId: string;
+  partnerId: string;
+  offerId: string;
+  checkout: CreditCheckoutResult;
+}): void {
+  const { purchaseId, partnerId, offerId, checkout } = options;
+  const base = {
+    step: "vesim_credit_checkout",
+    purchaseId,
+    partnerId,
+    offerId,
+    kind: checkout.kind,
+  };
+  if (checkout.kind === "success") {
+    console.info("partner_vesim_checkout", {
+      ...base,
+      providerOrderId: checkout.providerOrderId.slice(0, 64),
+    });
+    return;
+  }
+  if (checkout.kind === "declined") {
+    const payloadSummary = summarizeVesimPayload(checkout.payload);
+    // Expected business decline (e.g. invalid package) — log payload, skip Sentry noise.
+    console.error("partner_vesim_checkout", {
+      ...base,
+      httpStatus: checkout.httpStatus,
+      payload: payloadSummary,
+    });
+    return;
+  }
+  const payloadSummary = summarizeVesimPayload(checkout.payload);
+  console.error("partner_vesim_checkout", {
+    ...base,
+    category: checkout.category,
+    code: checkout.code,
+    providerOrderId: checkout.providerOrderId?.slice(0, 64) ?? null,
+    payload: payloadSummary,
+  });
+  reportServerError(
+    new Error(
+      `VeSIM credit checkout ${checkout.category}:${checkout.code}`
+    ),
+    {
+      operation: "partner_vesim_checkout",
+      purchaseType: "partner",
+      purchaseId,
+      provider: "VESIM",
+      errorCode: checkout.code.slice(0, 64),
+      extras: {
+        offerId,
+        kind: "uncertain",
+        category: checkout.category,
+        providerOrderId: checkout.providerOrderId?.slice(0, 64) ?? null,
+        payloadSummary: JSON.stringify(payloadSummary ?? {}).slice(0, 500),
+      },
+    }
+  );
+}
+
 async function refundConfirmedProviderFailure(options: {
   purchaseId: string;
   partnerId: string;
   partnerUserId: string;
   /** Immutable snapshot — never recalculate. */
   partnerChargeCents: number;
+  failureCategory?: string;
+  failureCode?: string;
   providerObservation: {
     providerOrderId?: string | null;
     providerResultKind: ProviderResultKind;
@@ -381,6 +487,9 @@ async function refundConfirmedProviderFailure(options: {
     providerResultKind: options.providerObservation.providerResultKind,
     safeProviderStatusCode: options.providerObservation.safeProviderStatusCode,
   });
+
+  const failureCategory = options.failureCategory ?? "provider_declined";
+  const failureCode = options.failureCode ?? "refunded";
 
   try {
     const refundTransactionId = await prisma.$transaction(async (tx) => {
@@ -452,8 +561,8 @@ async function refundConfirmedProviderFailure(options: {
         data: {
           status: PartnerEsimPurchaseStatus.FAILED_REFUNDED,
           refundTransactionId,
-          failureCategory: "provider_declined",
-          failureCode: "refunded",
+          failureCategory,
+          failureCode,
           providerRefreshClaimedAt: null,
         },
       });
@@ -471,6 +580,8 @@ async function refundConfirmedProviderFailure(options: {
             walletAppliedCents: refundAmountCents,
             refundTransactionId,
             refundOutcome,
+            failureCategory,
+            failureCode,
           } satisfies Prisma.InputJsonValue,
         },
       });
@@ -485,9 +596,52 @@ async function refundConfirmedProviderFailure(options: {
 }
 
 /**
+ * Confirmed decline / safe uncertain (no provider order id) → restore wallet.
+ * If refund tx fails → escalate to reconciliation (never leave silent debit).
+ */
+async function refundPartnerProviderFailureOrReconcile(options: {
+  purchaseId: string;
+  partnerId: string;
+  partnerUserId: string;
+  partnerChargeCents: number;
+  failureCategory: string;
+  failureCode: string;
+  providerObservation: {
+    providerOrderId?: string | null;
+    providerResultKind: ProviderResultKind;
+    safeProviderStatusCode?: string | null;
+  };
+  afterRefundInTx?: (tx: Prisma.TransactionClient) => Promise<void>;
+  partnerMessage: string;
+}): Promise<never> {
+  try {
+    await refundConfirmedProviderFailure({
+      purchaseId: options.purchaseId,
+      partnerId: options.partnerId,
+      partnerUserId: options.partnerUserId,
+      partnerChargeCents: options.partnerChargeCents,
+      failureCategory: options.failureCategory,
+      failureCode: options.failureCode,
+      providerObservation: options.providerObservation,
+      afterRefundInTx: options.afterRefundInTx,
+    });
+  } catch (error) {
+    if (error instanceof PartnerEsimPurchaseError) throw error;
+    await markPartnerReconciliationRequired({
+      purchaseId: options.purchaseId,
+      partnerUserId: options.partnerUserId,
+      category: "refund_failed",
+      code: "partner_refund_tx_error",
+      providerObservation: options.providerObservation,
+    });
+  }
+  throw new PartnerEsimPurchaseError("PROVIDER_FAILED", options.partnerMessage);
+}
+
+/**
  * Execute provider PURCHASE for an existing PROVIDER_PENDING Partner purchase.
- * Never debits. Confirmed decline → exact partnerChargeCents refund.
- * Uncertain → RECONCILIATION_REQUIRED (no refund).
+ * Never debits. Confirmed decline / uncertain without provider order id →
+ * exact walletAppliedCents refund. Uncertain with provider order id → recon.
  */
 export async function executePartnerEsimProviderPurchase(
   input: ExecutePartnerEsimProviderPurchaseInput
@@ -676,84 +830,166 @@ async function executeClaimedPartnerEsimProviderPurchase(options: {
 }): Promise<ExecutePartnerEsimProviderPurchaseResult> {
   const { purchase, partner, checkoutFn } = options;
 
-  // External provider write — outside Prisma transaction. Never blind-retry.
+  // External VeSIM write — outside Prisma $transaction. Never blind-retry.
   // Add More Data only: bind VeSIM recharge from adddata_ idempotency key.
-  // Normal Partner Buy eSIM never sets that prefix → no rechargeOrderId.
-  let rechargeOrderId: string | null = null;
-  const addDataSourceOrderId = parseAddDataSourceOrderId(
-    purchase.idempotencyKey
-  );
-  if (addDataSourceOrderId) {
-    rechargeOrderId = await resolvePartnerOwnedRechargeOrderId({
-      partnerUserId: partner.partnerUserId,
-      localOrderId: addDataSourceOrderId,
-    });
-    if (!rechargeOrderId) {
-      throw new PartnerEsimPurchaseError(
-        "INVALID_STATE",
-        "Add More Data is not available for this eSIM."
-      );
-    }
-  }
-
-  const checkout = await checkoutFn({
-    offerId: purchase.offerId,
-    customerEmail: partner.partnerEmail,
-    ...(rechargeOrderId ? { rechargeOrderId } : {}),
-  });
-
-  if (checkout.kind === "declined") {
+  const addDataSourceOrderId = parseAddDataSourceOrderId(purchase.idempotencyKey);
+  const successCheckout = await (async (): Promise<
+    Extract<CreditCheckoutResult, { kind: "success" }>
+  > => {
     try {
-      await refundConfirmedProviderFailure({
+      let rechargeOrderId: string | null = null;
+      if (addDataSourceOrderId) {
+        rechargeOrderId = await resolvePartnerOwnedRechargeOrderId({
+          partnerUserId: partner.partnerUserId,
+          localOrderId: addDataSourceOrderId,
+        });
+        if (!rechargeOrderId) {
+          throw new PartnerEsimPurchaseError(
+            "INVALID_STATE",
+            "Add More Data is not available for this eSIM."
+          );
+        }
+      }
+
+      const checkout = await checkoutFn({
+        offerId: purchase.offerId,
+        customerEmail: partner.partnerEmail,
+        ...(rechargeOrderId ? { rechargeOrderId } : {}),
+      });
+      logPartnerVesimCheckoutResult({
+        purchaseId: purchase.id,
+        partnerId: partner.partnerId,
+        offerId: purchase.offerId,
+        checkout,
+      });
+
+      if (checkout.kind === "declined") {
+        return await refundPartnerProviderFailureOrReconcile({
+          purchaseId: purchase.id,
+          partnerId: partner.partnerId,
+          partnerUserId: partner.partnerUserId,
+          partnerChargeCents: purchase.partnerChargeCents,
+          failureCategory: "provider_declined",
+          failureCode: `http_${checkout.httpStatus}`,
+          providerObservation: {
+            providerOrderId: null,
+            providerResultKind: "declined",
+            safeProviderStatusCode: `http_${checkout.httpStatus}`,
+          },
+          afterRefundInTx: options.afterRefundInTx,
+          partnerMessage:
+            "The provider could not complete this purchase. The Partner wallet amount was restored.",
+        });
+      }
+
+      if (checkout.kind === "uncertain") {
+        const observedProviderOrderId = (checkout.providerOrderId ?? "").trim();
+        if (observedProviderOrderId) {
+          // Provider may have created an eSIM — never auto-refund; manual review.
+          return await markPartnerReconciliationRequired({
+            purchaseId: purchase.id,
+            partnerUserId: partner.partnerUserId,
+            category: checkout.category,
+            code: checkout.code,
+            providerObservation: {
+              providerOrderId: observedProviderOrderId,
+              providerResultKind: "uncertain",
+              safeProviderStatusCode: checkout.code,
+            },
+          });
+        }
+
+        // No provider order id — safe to restore balance (timeout / transport).
+        return await refundPartnerProviderFailureOrReconcile({
+          purchaseId: purchase.id,
+          partnerId: partner.partnerId,
+          partnerUserId: partner.partnerUserId,
+          partnerChargeCents: purchase.partnerChargeCents,
+          failureCategory: checkout.category,
+          failureCode: checkout.code,
+          providerObservation: {
+            providerOrderId: null,
+            providerResultKind: "uncertain",
+            safeProviderStatusCode: checkout.code,
+          },
+          afterRefundInTx: options.afterRefundInTx,
+          partnerMessage:
+            "The provider did not confirm this purchase. The Partner wallet amount was restored.",
+        });
+      }
+
+      return checkout;
+    } catch (error) {
+      if (error instanceof PartnerEsimPurchaseError) {
+        if (
+          error.code === "RECONCILIATION_REQUIRED" ||
+          error.code === "PROVIDER_FAILED"
+        ) {
+          throw error;
+        }
+        // Pre-checkout validation (e.g. Add More Data bind) — restore wallet.
+        console.error("partner_vesim_checkout", {
+          step: "vesim_precheck_failed",
+          purchaseId: purchase.id,
+          partnerId: partner.partnerId,
+          offerId: purchase.offerId,
+          code: error.code,
+          message: error.message.slice(0, 500),
+        });
+        return await refundPartnerProviderFailureOrReconcile({
+          purchaseId: purchase.id,
+          partnerId: partner.partnerId,
+          partnerUserId: partner.partnerUserId,
+          partnerChargeCents: purchase.partnerChargeCents,
+          failureCategory: "provider_precheck_failed",
+          failureCode: error.code.slice(0, 64),
+          providerObservation: {
+            providerOrderId: null,
+            providerResultKind: "declined",
+            safeProviderStatusCode: error.code.slice(0, 64),
+          },
+          afterRefundInTx: options.afterRefundInTx,
+          partnerMessage:
+            "The provider could not complete this purchase. The Partner wallet amount was restored.",
+        });
+      }
+      console.error("partner_vesim_checkout", {
+        step: "vesim_checkout_threw",
+        purchaseId: purchase.id,
+        partnerId: partner.partnerId,
+        offerId: purchase.offerId,
+        name: error instanceof Error ? error.name : typeof error,
+        message:
+          error instanceof Error
+            ? error.message.slice(0, 500)
+            : String(error).slice(0, 500),
+      });
+      reportServerError(error, {
+        operation: "partner_vesim_checkout",
+        purchaseType: "partner",
+        purchaseId: purchase.id,
+        provider: "VESIM",
+        extras: { offerId: purchase.offerId, step: "checkout_threw" },
+      });
+      return await refundPartnerProviderFailureOrReconcile({
         purchaseId: purchase.id,
         partnerId: partner.partnerId,
         partnerUserId: partner.partnerUserId,
         partnerChargeCents: purchase.partnerChargeCents,
+        failureCategory: "provider_execution_error",
+        failureCode: "checkout_threw",
         providerObservation: {
           providerOrderId: null,
-          providerResultKind: "declined",
-          safeProviderStatusCode: `http_${checkout.httpStatus}`,
+          providerResultKind: "uncertain",
+          safeProviderStatusCode: "checkout_threw",
         },
         afterRefundInTx: options.afterRefundInTx,
-      });
-    } catch (error) {
-      if (error instanceof PartnerEsimPurchaseError) throw error;
-      await markPartnerReconciliationRequired({
-        purchaseId: purchase.id,
-        partnerUserId: partner.partnerUserId,
-        category: "refund_failed",
-        code: "partner_refund_tx_error",
-        providerObservation: {
-          providerOrderId: null,
-          providerResultKind: "declined",
-          safeProviderStatusCode: `http_${checkout.httpStatus}`,
-        },
+        partnerMessage:
+          "The provider could not complete this purchase. The Partner wallet amount was restored.",
       });
     }
-    throw new PartnerEsimPurchaseError(
-      "PROVIDER_FAILED",
-      "The provider could not complete this purchase. The Partner wallet amount was restored."
-    );
-  }
+  })();
 
-  if (checkout.kind !== "success") {
-    await markPartnerReconciliationRequired({
-      purchaseId: purchase.id,
-      partnerUserId: partner.partnerUserId,
-      category: checkout.category,
-      code: checkout.code,
-      providerObservation: {
-        providerOrderId: checkout.providerOrderId ?? null,
-        providerResultKind: "uncertain",
-        safeProviderStatusCode: checkout.code,
-      },
-    });
-  }
-
-  const successCheckout = checkout as Extract<
-    typeof checkout,
-    { kind: "success" }
-  >;
   const verifiedOffer = verifiedOfferFromPartnerPurchase(purchase);
 
   // Durable provider-success evidence before local order/purchase finalization.

@@ -304,7 +304,8 @@ async function reservePartnerSplitBeforeGateway(options: {
   fundingSource: OrderFundingSource;
 }): Promise<{ debitTransactionId: string | null; alreadyReserved: boolean }> {
   try {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(
+      async (tx) => {
       const current = await tx.partnerEsimPurchase.findUnique({
         where: { id: options.purchaseId },
         select: {
@@ -393,7 +394,9 @@ async function reservePartnerSplitBeforeGateway(options: {
         debitTransactionId: debit.transactionId,
         alreadyReserved: debit.outcome === "already_applied",
       };
-    });
+      },
+      { maxWait: 5000, timeout: 15000 }
+    );
   } catch (error) {
     if (error instanceof PartnerEsimPurchaseGatewayCheckoutError) throw error;
     if (error instanceof PartnerEsimPurchaseError) {

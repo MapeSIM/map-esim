@@ -1,6 +1,6 @@
 import { cache } from "react";
 import type { ConsentDbFields } from "@/app/lib/auth/legalConsentPolicy";
-import { prisma } from "@/app/lib/db";
+import { authPrisma } from "@/app/lib/db";
 
 export {
   deriveNeedsLegalConsent,
@@ -26,7 +26,7 @@ export const loadConsentGateUser = cache(
       })
     | null
   > => {
-    const user = await prisma.user.findUnique({
+    const user = await authPrisma.user.findUnique({
       where: { id: userId },
       select: {
         role: true,

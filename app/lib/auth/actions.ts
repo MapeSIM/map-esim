@@ -36,6 +36,7 @@ import {
 } from "@/app/lib/auth/resetAuth";
 import { getSessionUser } from "@/app/lib/auth/session";
 import {
+  authPrisma,
   isPrismaPoolTimeout,
   PRISMA_TEMPORARY_UNAVAILABLE,
   prisma,
@@ -289,7 +290,8 @@ export async function signinAction(
   } | null;
 
   try {
-    user = await prisma.user.findUnique({
+    // Auth path uses DIRECT_URL client — avoid PgBouncer pool starvation.
+    user = await authPrisma.user.findUnique({
       where: { email },
       select: {
         id: true,

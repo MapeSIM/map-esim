@@ -2,6 +2,9 @@
  * Partner catalog buy orchestration (prepare → reserve → provider).
  * Server-authoritative — never trusts client money fields.
  *
+ * Wallet-only: reserve (DB debit) commits before VeSIM; provider finalize/refund
+ * are separate DB txs. VeSIM fetch never runs inside Prisma $transaction.
+ *
  * Phase 2: when PARTNER_ESIM_SPLIT_PAYMENT_ENABLED and gateway remainder > 0,
  * start hosted checkout instead of VeSIM. Wallet-only path unchanged when
  * flag off or wallet covers partnerChargeCents.

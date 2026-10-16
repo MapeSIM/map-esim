@@ -26,7 +26,7 @@ import { writeAuditLog } from "@/app/lib/auth/audit";
 import { MapEsimPrismaAdapter } from "@/app/lib/auth/prismaAdapter";
 import { verifyPassword } from "@/app/lib/auth/password";
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
-import { prisma } from "@/app/lib/db";
+import { authPrisma } from "@/app/lib/db";
 
 const credentialsSchema = z.object({
   email: z.string().email(),
@@ -43,7 +43,8 @@ const googleConfigured = Boolean(
 
 export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   ...authConfig,
-  adapter: MapEsimPrismaAdapter(prisma),
+  // Auth uses non-pooled DIRECT_URL client — avoid PgBouncer pool starvation (P2024).
+  adapter: MapEsimPrismaAdapter(authPrisma),
   session: {
     strategy: "jwt",
     // Cookie upper bound; JWT `exp` is shortened when remember-me is off.
@@ -69,7 +70,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         });
         if (!rate.ok) return null;
 
-        const user = await prisma.user.findUnique({ where: { email } });
+        const user = await authPrisma.user.findUnique({ where: { email } });
         // Null passwordHash (OAuth-only) → same failure as unknown user.
         if (!user?.passwordHash) return null;
         if (user.deletedAt) return null;
@@ -78,7 +79,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         if (user.role === "ADMIN" && user.adminDisabledAt) return null;
         // Disabled partners must not sign in.
         if (user.role === "PARTNER") {
-          const partner = await prisma.partnerProfile.findUnique({
+          const partner = await authPrisma.partnerProfile.findUnique({
             where: { userId: user.id },
             select: { disabledAt: true },
           });
@@ -91,7 +92,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
 
         // Single active ADMIN session: rotate generation before JWT is issued.
         if (user.role === "ADMIN") {
-          await prisma.user.update({
+          await authPrisma.user.update({
             where: { id: user.id },
             data: { adminSessionVersion: { increment: 1 } },
           });
@@ -162,7 +163,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       // already-signed-in MAP session (would merge ACCOUNT_B into ACCOUNT_A).
       const existingSession = await auth();
       if (existingSession?.user?.id && account.providerAccountId) {
-        const linked = await prisma.account.findUnique({
+        const linked = await authPrisma.account.findUnique({
           where: {
             provider_providerAccountId: {
               provider: "google",
@@ -182,7 +183,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         }
       }
 
-      const dbUser = await prisma.user.findUnique({
+      const dbUser = await authPrisma.user.findUnique({
         where: { email },
         select: {
           id: true,
@@ -227,7 +228,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
 
       // LINKED_CUSTOMER — Null legal consent must not deny the OAuth callback.
       if (dbUser && !dbUser.emailVerifiedAt) {
-        await prisma.user.update({
+        await authPrisma.user.update({
           where: { id: dbUser.id },
           data: { emailVerifiedAt: new Date() },
         });
@@ -290,7 +291,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
 
       // Disabled PARTNER: deny immediately.
       if (dbUser.role === "PARTNER") {
-        const partner = await prisma.partnerProfile.findUnique({
+        const partner = await authPrisma.partnerProfile.findUnique({
           where: { userId: userId },
           select: { disabledAt: true },
         });
@@ -344,7 +345,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         if (dbUser.role === "ADMIN") {
           token.adminSessionVersion = dbUser.adminSessionVersion;
           try {
-            await prisma.user.update({
+            await authPrisma.user.update({
               where: { id: userId },
               data: { lastAdminLoginAt: new Date() },
             });
