@@ -181,8 +181,6 @@ export type AdminPartnerRefundRequestDetail = {
   canExecute: boolean;
   localExecutionBlocker: string | null;
   localExecutionBlockerLabel: string | null;
-  /** Soft evidence blocker — admin may force execute after ICCID/provider check. */
-  localExecutionBlockerOverridable: boolean;
 };
 
 function hasReconciliationCase(purchase: {
@@ -281,7 +279,6 @@ export async function getAdminPartnerRefundRequestDetail(
   const debitLabel = moneyLabel(row.partnerChargeCents, currency);
   const localExec = evaluatePartnerRefundRequestExecutionEligibility({
     requestStatus: row.status,
-    requestReason: row.reason,
     requestPartnerId: row.partnerId,
     requestPartnerChargeCents: row.partnerChargeCents,
     purchasePartnerId: row.purchase.partnerId,
@@ -291,24 +288,12 @@ export async function getAdminPartnerRefundRequestDetail(
     debitTransactionId: row.purchase.debitTransactionId,
     debitAmountCents: row.purchase.debitTransaction?.amountCents ?? null,
     refundTransactionId: row.purchase.refundTransactionId,
-    orderId: order?.id ?? null,
-    orderStatus: order?.status ?? null,
-    iccidPresent: Boolean(
-      last4.length === 4 ||
-        (order?.iccidHash ?? "").trim() ||
-        order?.iccidCapturedAt
-    ),
-    installEvidencePresent:
-      (row.purchase.providerRefreshInstallData ?? "").trim().toLowerCase() ===
-      "yes",
   });
   const localExecutionBlocker =
     row.status === RefundRequestStatus.APPROVED_PENDING_EXECUTION &&
     !localExec.ok
       ? localExec.blocker
       : null;
-  const localExecutionBlockerOverridable =
-    !localExec.ok && localExec.overridable === true;
 
   return {
     id: row.id,
@@ -349,7 +334,6 @@ export async function getAdminPartnerRefundRequestDetail(
     localExecutionBlockerLabel: localExecutionBlocker
       ? partnerRefundExecutionBlockerLabel(localExecutionBlocker)
       : null,
-    localExecutionBlockerOverridable,
   };
 }
 

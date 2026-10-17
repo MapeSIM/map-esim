@@ -17,19 +17,10 @@ export type AdminPartnerRefundExecuteFormState =
       ok: false;
       error: string;
       blocker?: string;
-      fieldErrors?: { confirmPhrase?: string; forceEvidenceOverride?: string };
+      fieldErrors?: { confirmPhrase?: string };
     };
 
-function readForceEvidenceOverride(value: FormDataEntryValue | null): boolean {
-  if (typeof value !== "string") return false;
-  const v = value.trim().toLowerCase();
-  return v === "true" || v === "on" || v === "1" || v === "yes";
-}
-
-/**
- * Duck-type across Next server-action module boundaries where `instanceof`
- * can fail on duplicate class copies.
- */
+/** Duck-type across Next server-action module boundaries. */
 function asPartnerRefundExecutionError(error: unknown): {
   code: string;
   message: string;
@@ -45,25 +36,9 @@ function asPartnerRefundExecutionError(error: unknown): {
   if (typeof error !== "object" || error === null) return null;
   const name =
     "name" in error ? String((error as { name: unknown }).name ?? "") : "";
+  if (name !== "PartnerRefundRequestExecutionError") return null;
   const code =
     "code" in error ? String((error as { code: unknown }).code ?? "") : "";
-  if (name !== "PartnerRefundRequestExecutionError" && !code) return null;
-  if (
-    name !== "PartnerRefundRequestExecutionError" &&
-    code !== "INVALID_PHRASE" &&
-    code !== "UNAVAILABLE" &&
-    code !== "PROVIDER_UNCERTAIN" &&
-    code !== "ORDER_ALREADY_FULFILLED" &&
-    code !== "INSTALL_DETAILS_PRESENT" &&
-    code !== "ICCID_PRESENT" &&
-    code !== "INSTALL_RECOVERY_REQUIRED" &&
-    code !== "ALREADY_REFUNDED" &&
-    code !== "FINANCIAL_STATE_MISMATCH" &&
-    code !== "NOT_APPROVED" &&
-    code !== "PARTNER_UNAVAILABLE"
-  ) {
-    return null;
-  }
   const message =
     "message" in error &&
     typeof (error as { message: unknown }).message === "string"
@@ -75,9 +50,12 @@ function asPartnerRefundExecutionError(error: unknown): {
     typeof blockerRaw === "string" && blockerRaw.trim()
       ? blockerRaw.trim()
       : null;
-  return { code: code || name, message, blocker };
+  return { code, message, blocker };
 }
 
+/**
+ * Mirrors adminCustomerRefundRequestExecuteAction: origin + admin + phrase + execute.
+ */
 export async function adminPartnerRefundRequestExecuteAction(
   _prev: AdminPartnerRefundExecuteFormState,
   formData: FormData
@@ -98,28 +76,19 @@ export async function adminPartnerRefundRequestExecuteAction(
   void formData.get("status");
   void formData.get("execute");
   void formData.get("providerResult");
+  void formData.get("forceEvidenceOverride");
 
   const requestId = String(formData.get("requestId") ?? "").trim();
   const confirmPhrase = String(formData.get("confirmPhrase") ?? "");
-  const forceEvidenceOverride = readForceEvidenceOverride(
-    formData.get("forceEvidenceOverride")
-  );
   if (!requestId) {
     return { ok: false, error: "This Partner refund request is unavailable." };
   }
-
-  console.info("partner_refund_execute_action", {
-    requestId: requestId.slice(0, 64),
-    forceEvidenceOverride,
-    confirmPhraseLen: confirmPhrase.trim().length,
-  });
 
   try {
     const result = await executeAdminPartnerRefundRequest({
       adminUserId: admin.id,
       requestId,
       confirmPhrase,
-      forceEvidenceOverride,
       amount: formData.get("amount"),
       amountCents: formData.get("amountCents"),
       partnerId: formData.get("partnerId"),
@@ -150,13 +119,6 @@ export async function adminPartnerRefundRequestExecuteAction(
           fieldErrors: { confirmPhrase: mapped.message },
         };
       }
-      console.error("partner_refund_execute_blocked", {
-        requestId: requestId.slice(0, 64),
-        forceEvidenceOverride,
-        code: mapped.code,
-        blocker: mapped.blocker,
-        message: mapped.message.slice(0, 300),
-      });
       return {
         ok: false,
         error: mapped.message,
@@ -165,7 +127,6 @@ export async function adminPartnerRefundRequestExecuteAction(
     }
     console.error("partner_refund_execute_action_unexpected", {
       requestId: requestId.slice(0, 64),
-      forceEvidenceOverride,
       name: error instanceof Error ? error.name : typeof error,
       message:
         error instanceof Error

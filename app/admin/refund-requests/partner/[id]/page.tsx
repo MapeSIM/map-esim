@@ -110,7 +110,8 @@ export default async function AdminPartnerRefundRequestDetailPage({
           className="rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-bg)] px-4 py-3 text-sm text-[var(--warning-text)]"
           role="status"
         >
-          Recover installation details before considering a refund.
+          Partner reported missing install details. Prefer recovering the eSIM
+          when possible; an approved refund may still be executed.
         </p>
       ) : null}
 
@@ -120,9 +121,7 @@ export default async function AdminPartnerRefundRequestDetailPage({
           role="status"
         >
           This order appears provisioned (ICCID or install evidence present).
-          Prefer recovering install details for the Partner. An approved refund
-          can still be force-executed after you verify the ICCID and provider
-          status.
+          Confirm manually before executing an approved Partner wallet refund.
         </p>
       ) : null}
 
@@ -173,7 +172,6 @@ export default async function AdminPartnerRefundRequestDetailPage({
           debitLabel={detail.debitLabel}
           refundBasisLabel={detail.refundBasisLabel}
           localBlockerLabel={detail.localExecutionBlockerLabel}
-          evidenceOverrideRequired={detail.localExecutionBlockerOverridable}
         />
       ) : null}
     </div>

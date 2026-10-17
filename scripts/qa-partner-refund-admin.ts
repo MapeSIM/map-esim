@@ -188,7 +188,11 @@ function runOfflineChecks(): void {
     partnerDetail,
     /This order appears provisioned/
   );
-  assert.match(partnerDetail, /force-executed after you verify the ICCID/);
+  assert.match(
+    partnerDetail,
+    /Confirm manually before executing an approved Partner wallet refund/
+  );
+  assert.doesNotMatch(partnerDetail, /force-executed/);
   assert.doesNotMatch(
     partnerDetail,
     /Refund execution will remain blocked/

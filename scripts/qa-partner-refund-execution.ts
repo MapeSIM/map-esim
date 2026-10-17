@@ -204,30 +204,39 @@ function runOfflineChecks(): void {
   assert.match(exec, /refundPartnerPurchaseFundsInTx/);
   assert.match(exec, /void input\.amount/);
   assert.match(exec, /void input\.partnerId/);
-  assert.match(exec, /confirmProviderFailure/);
+  // Customer-parity: no live provider confirm on request execution.
+  assert.doesNotMatch(exec, /confirmProviderFailure\(/);
   assert.doesNotMatch(exec, /method:\s*["']POST["']/);
   assert.doesNotMatch(exec, /checkoutPartner|createProvider|purchaseOffer/);
   assert.match(actions, /requireRole\("ADMIN"\)/);
   assert.match(actions, /assertSameOriginAdminRequest/);
   assert.match(actions, /void formData\.get\("amount"\)/);
   assert.match(form, /Execute Partner refund/);
-  assert.match(form, /forceEvidenceOverride/);
-  assert.match(form, /Force execute Partner refund/);
-  assert.match(form, /handleSubmit|startTransition|formAction\(formData\)/);
+  assert.doesNotMatch(form, /forceEvidenceOverride/);
+  assert.doesNotMatch(form, /Force execute/);
   assert.match(form, /REFUND_PARTNER_FUNDS_PHRASE/);
   assert.doesNotMatch(form, /name=["']amount["']/);
-  // Submit must not stay disabled based on React checkbox state.
-  assert.doesNotMatch(
-    form,
-    /disabled=\{pending \|\| \(evidenceOverrideRequired && !forceChecked\)\}/
-  );
   assert.match(wallet, /Disabled Partners may still receive ESIM_PURCHASE_REFUND/);
   assert.match(customer, /applyAdminRefundRequestDecision/);
   assert.doesNotMatch(customer, /executeAdminPartnerRefundRequest/);
 
-  const blocked = evaluatePartnerRefundRequestExecutionEligibility({
+  const allowed = evaluatePartnerRefundRequestExecutionEligibility({
     requestStatus: "APPROVED_PENDING_EXECUTION",
-    requestReason: "INSTALL_DETAILS_UNAVAILABLE",
+    requestPartnerId: "p1",
+    requestPartnerChargeCents: 66,
+    purchasePartnerId: "p1",
+    purchaseStatus: "COMPLETED",
+    fundingSource: "PARTNER_BALANCE",
+    purchasePartnerChargeCents: 66,
+    debitTransactionId: "d1",
+    debitAmountCents: 66,
+    refundTransactionId: null,
+  });
+  assert.equal(allowed.ok, true);
+  if (allowed.ok) assert.equal(allowed.alreadyRefunded, false);
+
+  const notApproved = evaluatePartnerRefundRequestExecutionEligibility({
+    requestStatus: "UNDER_REVIEW",
     requestPartnerId: "p1",
     requestPartnerChargeCents: 66,
     purchasePartnerId: "p1",
@@ -237,45 +246,15 @@ function runOfflineChecks(): void {
     debitTransactionId: "d1",
     debitAmountCents: 66,
     refundTransactionId: null,
-    orderId: null,
-    orderStatus: null,
-    iccidPresent: false,
-    installEvidencePresent: false,
   });
-  assert.equal(blocked.ok, false);
-  if (!blocked.ok) {
-    assert.equal(blocked.blocker, "INSTALL_RECOVERY_REQUIRED");
-    assert.equal(blocked.overridable, true);
-  }
-  const forced = evaluatePartnerRefundRequestExecutionEligibility(
-    {
-      requestStatus: "APPROVED_PENDING_EXECUTION",
-      requestReason: "INSTALL_DETAILS_UNAVAILABLE",
-      requestPartnerId: "p1",
-      requestPartnerChargeCents: 66,
-      purchasePartnerId: "p1",
-      purchaseStatus: "RECONCILIATION_REQUIRED",
-      fundingSource: "PARTNER_BALANCE",
-      purchasePartnerChargeCents: 66,
-      debitTransactionId: "d1",
-      debitAmountCents: 66,
-      refundTransactionId: null,
-      orderId: null,
-      orderStatus: null,
-      iccidPresent: true,
-      installEvidencePresent: true,
-    },
-    { allowEvidenceOverride: true }
-  );
-  assert.equal(forced.ok, true);
-  if (forced.ok) {
-    assert.ok((forced.overriddenBlockers?.length ?? 0) >= 1);
-  }
+  assert.equal(notApproved.ok, false);
+  if (!notApproved.ok) assert.equal(notApproved.blocker, "NOT_APPROVED");
+
   assert.match(
-    partnerRefundExecutionBlockerLabel("ICCID_PRESENT"),
-    /ICCID evidence exists/
+    partnerRefundExecutionBlockerLabel("FINANCIAL_STATE_MISMATCH"),
+    /debit evidence/
   );
-  console.log("PASS offline_execution_gates_no_provider_write");
+  console.log("PASS offline_execution_gates_customer_parity");
 }
 
 async function main() {
@@ -287,12 +266,6 @@ async function main() {
   const prisma = new PrismaClient();
   const stamp = Date.now();
   const pw = await hashPassword(`Uat${randomBytes(18).toString("base64url")}!9`);
-  const confirmOk = async () => ({ ok: true as const });
-  const confirmUncertain = async () => ({
-    ok: false as const,
-    blocker: "provider_uncertain",
-  });
-
   try {
     const admin = await prisma.user.create({
       data: {
@@ -354,7 +327,6 @@ async function main() {
           adminUserId: admin.id,
           requestId,
           confirmPhrase: "WRONG PHRASE",
-          confirmProviderFailureFn: confirmOk,
         }),
       "INVALID_PHRASE"
     );
@@ -364,7 +336,6 @@ async function main() {
           adminUserId: customer.id,
           requestId,
           confirmPhrase: REFUND_PARTNER_FUNDS_PHRASE,
-          confirmProviderFailureFn: confirmOk,
         }),
       "UNAVAILABLE"
     );
@@ -385,7 +356,6 @@ async function main() {
           adminUserId: admin.id,
           requestId: createdOnly.requestId,
           confirmPhrase: REFUND_PARTNER_FUNDS_PHRASE,
-          confirmProviderFailureFn: confirmOk,
         }),
       "NOT_APPROVED"
     );
@@ -399,7 +369,6 @@ async function main() {
       amountCents: 1,
       partnerId: "forged",
       execute: true,
-      confirmProviderFailureFn: confirmOk,
     });
     assert.equal(first.status, RefundRequestStatus.COMPLETED);
     assert.equal(first.amountCents, 66);
@@ -454,7 +423,6 @@ async function main() {
       adminUserId: admin.id,
       requestId,
       confirmPhrase: REFUND_PARTNER_FUNDS_PHRASE,
-      confirmProviderFailureFn: confirmOk,
     });
     assert.equal(second.idempotent, true);
     assert.equal(second.refundTransactionId, first.refundTransactionId);
@@ -473,97 +441,26 @@ async function main() {
     assert.equal(walletAgain.balanceCents, walletAfter.balanceCents);
     console.log("PASS I_J_duplicate_execution_idempotent");
 
-    const uncertain = await seedEligiblePurchase(prisma, {
-      partnerId,
-      tag: "unc",
-    });
-    const uncertainId = await approveRequest(
-      admin.id,
-      partner.id,
-      uncertain.purchaseId
-    );
-    const balBeforeUnc = (
-      await prisma.partnerWalletAccount.findUniqueOrThrow({
-        where: { partnerId },
-      })
-    ).balanceCents;
-    await expectExec(
-      () =>
-        executeAdminPartnerRefundRequest({
-          adminUserId: admin.id,
-          requestId: uncertainId,
-          confirmPhrase: REFUND_PARTNER_FUNDS_PHRASE,
-          confirmProviderFailureFn: confirmUncertain,
-        }),
-      "PROVIDER_UNCERTAIN"
-    );
-    const uncReq = await prisma.partnerRefundRequest.findUniqueOrThrow({
-      where: { id: uncertainId },
-      select: { status: true, executedRefundTransactionId: true },
-    });
-    assert.equal(uncReq.status, RefundRequestStatus.APPROVED_PENDING_EXECUTION);
-    assert.equal(uncReq.executedRefundTransactionId, null);
-    assert.equal(
-      (
-        await prisma.partnerWalletAccount.findUniqueOrThrow({
-          where: { partnerId },
-        })
-      ).balanceCents,
-      balBeforeUnc
-    );
-    console.log("PASS L_uncertain_provider_zero_money");
-
     const completed = await seedEligiblePurchase(prisma, {
       partnerId,
       tag: "cmp",
       status: PartnerEsimPurchaseStatus.COMPLETED,
       withCompletedOrder: true,
+      iccidLast4: "9999",
     });
     const completedId = await approveRequest(
       admin.id,
       partner.id,
       completed.purchaseId
     );
-    await expectExec(
-      () =>
-        executeAdminPartnerRefundRequest({
-          adminUserId: admin.id,
-          requestId: completedId,
-          confirmPhrase: REFUND_PARTNER_FUNDS_PHRASE,
-          confirmProviderFailureFn: confirmOk,
-        }),
-      "ORDER_ALREADY_FULFILLED"
-    );
-    console.log("PASS M_completed_order_blocked");
-
-    const iccid = await seedEligiblePurchase(prisma, {
-      partnerId,
-      tag: "icc",
-      withCompletedOrder: true,
-      iccidLast4: "4321",
-      status: PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED,
-    });
-    const iccidId = await approveRequest(admin.id, partner.id, iccid.purchaseId);
-    await expectExec(
-      () =>
-        executeAdminPartnerRefundRequest({
-          adminUserId: admin.id,
-          requestId: iccidId,
-          confirmPhrase: REFUND_PARTNER_FUNDS_PHRASE,
-          confirmProviderFailureFn: confirmOk,
-        }),
-      "ICCID_PRESENT"
-    );
-    const iccidForced = await executeAdminPartnerRefundRequest({
+    const completedRes = await executeAdminPartnerRefundRequest({
       adminUserId: admin.id,
-      requestId: iccidId,
+      requestId: completedId,
       confirmPhrase: REFUND_PARTNER_FUNDS_PHRASE,
-      forceEvidenceOverride: true,
-      confirmProviderFailureFn: confirmOk,
     });
-    assert.equal(iccidForced.status, "COMPLETED");
-    assert.equal(iccidForced.idempotent, false);
-    console.log("PASS N_iccid_blocked_then_force_ok");
+    assert.equal(completedRes.status, "COMPLETED");
+    assert.equal(completedRes.idempotent, false);
+    console.log("PASS M_completed_order_refund_ok");
 
     const install = await seedEligiblePurchase(prisma, {
       partnerId,
@@ -575,25 +472,13 @@ async function main() {
       partner.id,
       install.purchaseId
     );
-    await expectExec(
-      () =>
-        executeAdminPartnerRefundRequest({
-          adminUserId: admin.id,
-          requestId: installId,
-          confirmPhrase: REFUND_PARTNER_FUNDS_PHRASE,
-          confirmProviderFailureFn: confirmOk,
-        }),
-      "INSTALL_DETAILS_PRESENT"
-    );
-    const installForced = await executeAdminPartnerRefundRequest({
+    const installRes = await executeAdminPartnerRefundRequest({
       adminUserId: admin.id,
       requestId: installId,
       confirmPhrase: REFUND_PARTNER_FUNDS_PHRASE,
-      forceEvidenceOverride: true,
-      confirmProviderFailureFn: confirmOk,
     });
-    assert.equal(installForced.status, "COMPLETED");
-    console.log("PASS O_install_data_blocked_then_force_ok");
+    assert.equal(installRes.status, "COMPLETED");
+    console.log("PASS O_install_data_refund_ok");
 
     const missing = await seedEligiblePurchase(prisma, {
       partnerId,
@@ -610,32 +495,12 @@ async function main() {
         where: { partnerId },
       })
     ).balanceCents;
-    await expectExec(
-      () =>
-        executeAdminPartnerRefundRequest({
-          adminUserId: admin.id,
-          requestId: missingId,
-          confirmPhrase: REFUND_PARTNER_FUNDS_PHRASE,
-          confirmProviderFailureFn: confirmOk,
-        }),
-      "INSTALL_RECOVERY_REQUIRED"
-    );
-    assert.equal(
-      (
-        await prisma.partnerWalletAccount.findUniqueOrThrow({
-          where: { partnerId },
-        })
-      ).balanceCents,
-      balBeforeMis
-    );
-    const missingForced = await executeAdminPartnerRefundRequest({
+    const missingRes = await executeAdminPartnerRefundRequest({
       adminUserId: admin.id,
       requestId: missingId,
       confirmPhrase: REFUND_PARTNER_FUNDS_PHRASE,
-      forceEvidenceOverride: true,
-      confirmProviderFailureFn: confirmOk,
     });
-    assert.equal(missingForced.status, "COMPLETED");
+    assert.equal(missingRes.status, "COMPLETED");
     assert.equal(
       (
         await prisma.partnerWalletAccount.findUniqueOrThrow({
@@ -644,7 +509,7 @@ async function main() {
       ).balanceCents,
       balBeforeMis + 66
     );
-    console.log("PASS P_missing_install_recovery_required");
+    console.log("PASS P_missing_install_reason_refund_ok");
 
     const already = await seedEligiblePurchase(prisma, {
       partnerId,
@@ -678,7 +543,6 @@ async function main() {
       adminUserId: admin.id,
       requestId: alreadyId,
       confirmPhrase: REFUND_PARTNER_FUNDS_PHRASE,
-      confirmProviderFailureFn: confirmOk,
     });
     assert.equal(synced.idempotent, true);
     assert.equal(synced.refundTransactionId, prior.transactionId);
@@ -738,7 +602,6 @@ async function main() {
       adminUserId: admin.id,
       requestId: disabledReq,
       confirmPhrase: REFUND_PARTNER_FUNDS_PHRASE,
-      confirmProviderFailureFn: confirmOk,
     });
     assert.equal(disResult.amountCents, 66);
     assert.equal(
@@ -793,7 +656,6 @@ async function main() {
           adminUserId: admin.id,
           requestId: goneReq,
           confirmPhrase: REFUND_PARTNER_FUNDS_PHRASE,
-          confirmProviderFailureFn: confirmOk,
         }),
       "PARTNER_UNAVAILABLE"
     );

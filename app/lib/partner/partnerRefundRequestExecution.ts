@@ -1,7 +1,7 @@
 /**
- * Evidence-gated Partner refund-request execution.
+ * Partner refund-request execution (customer-parity).
  * Credits only via refundPartnerPurchaseFundsInTx (exact Partner debit).
- * Never accepts a client amount. Never purchases from the provider.
+ * Never accepts a client amount. Never calls the provider. Never purchases.
  */
 import "server-only";
 
@@ -13,15 +13,13 @@ import {
   Role,
 } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
-import { parseConfirmPhrase, REFUND_PARTNER_FUNDS_PHRASE } from "@/app/lib/admin/reconciliationCaseShared";
-import { confirmProviderFailure } from "@/app/lib/admin/reconciliationPartnerRefund";
 import {
-  PARTNER_REFUND_AUDIT,
-} from "@/app/lib/partner/partnerRefundRequestConstants";
+  parseConfirmPhrase,
+  REFUND_PARTNER_FUNDS_PHRASE,
+} from "@/app/lib/admin/reconciliationCaseShared";
+import { PARTNER_REFUND_AUDIT } from "@/app/lib/partner/partnerRefundRequestConstants";
 import {
   evaluatePartnerRefundRequestExecutionEligibility,
-  isPartnerRefundProviderOverridableBlocker,
-  mapProviderEvidenceBlocker,
   partnerRefundExecutionBlockerLabel,
   type PartnerRefundExecutionBlocker,
 } from "@/app/lib/partner/partnerRefundRequestExecutionShared";
@@ -35,8 +33,17 @@ import {
   refundPartnerPurchaseFundsInTx,
 } from "@/app/lib/partner/partnerPurchaseWallet";
 
+/** Production DB latency — match customer refund tx budget. */
+const PARTNER_REFUND_EXECUTION_TX = {
+  maxWait: 10_000,
+  timeout: 20_000,
+} as const;
+
 export class PartnerRefundRequestExecutionError extends Error {
-  readonly code: PartnerRefundExecutionBlocker | "UNAVAILABLE" | "INVALID_PHRASE";
+  readonly code:
+    | PartnerRefundExecutionBlocker
+    | "UNAVAILABLE"
+    | "INVALID_PHRASE";
   readonly blocker: PartnerRefundExecutionBlocker | null;
 
   constructor(
@@ -55,10 +62,7 @@ export type ExecuteAdminPartnerRefundRequestInput = {
   adminUserId: string;
   requestId: string;
   confirmPhrase?: unknown;
-  /**
-   * When true, allow refund despite provisioned/install/ICCID evidence after
-   * the admin confirms they verified provider/ICCID status.
-   */
+  /** Ignored — kept for older form posts / QA seams. */
   forceEvidenceOverride?: unknown;
   amount?: unknown;
   amountCents?: unknown;
@@ -67,7 +71,8 @@ export type ExecuteAdminPartnerRefundRequestInput = {
   status?: unknown;
   execute?: unknown;
   providerResult?: unknown;
-  confirmProviderFailureFn?: typeof confirmProviderFailure;
+  /** @deprecated No longer used — provider GET removed from request execution. */
+  confirmProviderFailureFn?: unknown;
 };
 
 export type ExecuteAdminPartnerRefundRequestResult = {
@@ -122,9 +127,37 @@ async function audit(
   });
 }
 
+function evidenceFromPurchase(options: {
+  requestStatus: string;
+  requestPartnerId: string;
+  requestPartnerChargeCents: number;
+  purchase: {
+    partnerId: string;
+    status: string;
+    fundingSource: string;
+    partnerChargeCents: number;
+    debitTransactionId: string | null;
+    refundTransactionId: string | null;
+    debitTransaction: { amountCents: number } | null;
+  };
+}) {
+  return {
+    requestStatus: options.requestStatus,
+    requestPartnerId: options.requestPartnerId,
+    requestPartnerChargeCents: options.requestPartnerChargeCents,
+    purchasePartnerId: options.purchase.partnerId,
+    purchaseStatus: options.purchase.status,
+    fundingSource: options.purchase.fundingSource,
+    purchasePartnerChargeCents: options.purchase.partnerChargeCents,
+    debitTransactionId: options.purchase.debitTransactionId,
+    debitAmountCents: options.purchase.debitTransaction?.amountCents ?? null,
+    refundTransactionId: options.purchase.refundTransactionId,
+  };
+}
+
 /**
- * Execute an approved Partner refund request after fail-closed evidence checks.
- * Amount is always the stored Partner debit snapshot.
+ * Execute an approved Partner refund request by restoring the exact Partner debit.
+ * Same shape as customer MAP Wallet credit: admin + confirm phrase + financial CAS.
  */
 export async function executeAdminPartnerRefundRequest(
   input: ExecuteAdminPartnerRefundRequestInput
@@ -136,12 +169,8 @@ export async function executeAdminPartnerRefundRequest(
   void input.status;
   void input.execute;
   void input.providerResult;
-
-  const forceEvidenceOverride =
-    input.forceEvidenceOverride === true ||
-    input.forceEvidenceOverride === "true" ||
-    input.forceEvidenceOverride === "on" ||
-    input.forceEvidenceOverride === "1";
+  void input.forceEvidenceOverride;
+  void input.confirmProviderFailureFn;
 
   const adminUserId = (input.adminUserId ?? "").trim();
   const requestId = (input.requestId ?? "").trim();
@@ -151,7 +180,11 @@ export async function executeAdminPartnerRefundRequest(
       "Admin session is unavailable."
     );
   }
-  if (!requestId || requestId.length > 64 || !/^[A-Za-z0-9_-]+$/.test(requestId)) {
+  if (
+    !requestId ||
+    requestId.length > 64 ||
+    !/^[A-Za-z0-9_-]+$/.test(requestId)
+  ) {
     throw new PartnerRefundRequestExecutionError(
       "UNAVAILABLE",
       "This Partner refund request is unavailable."
@@ -175,7 +208,6 @@ export async function executeAdminPartnerRefundRequest(
     select: {
       id: true,
       status: true,
-      reason: true,
       partnerId: true,
       partnerEsimPurchaseId: true,
       orderId: true,
@@ -191,7 +223,10 @@ export async function executeAdminPartnerRefundRequest(
     );
   }
 
-  if (request.status === RefundRequestStatus.COMPLETED && request.executedRefundTransactionId) {
+  if (
+    request.status === RefundRequestStatus.COMPLETED &&
+    request.executedRefundTransactionId
+  ) {
     return {
       requestId: request.id,
       status: RefundRequestStatus.COMPLETED,
@@ -209,55 +244,22 @@ export async function executeAdminPartnerRefundRequest(
       status: true,
       fundingSource: true,
       partnerChargeCents: true,
-      offerId: true,
-      providerOrderId: true,
       debitTransactionId: true,
       refundTransactionId: true,
-      providerRefreshInstallData: true,
       debitTransaction: { select: { amountCents: true } },
-      order: {
-        select: {
-          id: true,
-          status: true,
-          iccidLast4: true,
-          iccidHash: true,
-          iccidCapturedAt: true,
-        },
-      },
     },
   });
   if (!purchase) {
     throwBlocked("FINANCIAL_STATE_MISMATCH");
   }
 
-  const last4 = (purchase.order?.iccidLast4 ?? "").replace(/\D+/g, "");
-  const iccidPresent = Boolean(
-    last4.length === 4 ||
-      (purchase.order?.iccidHash ?? "").trim() ||
-      purchase.order?.iccidCapturedAt
-  );
-  const installEvidencePresent =
-    (purchase.providerRefreshInstallData ?? "").trim().toLowerCase() === "yes";
-
   const local = evaluatePartnerRefundRequestExecutionEligibility(
-    {
+    evidenceFromPurchase({
       requestStatus: request.status,
-      requestReason: request.reason,
       requestPartnerId: request.partnerId,
       requestPartnerChargeCents: request.partnerChargeCents,
-      purchasePartnerId: purchase.partnerId,
-      purchaseStatus: purchase.status,
-      fundingSource: purchase.fundingSource,
-      purchasePartnerChargeCents: purchase.partnerChargeCents,
-      debitTransactionId: purchase.debitTransactionId,
-      debitAmountCents: purchase.debitTransaction?.amountCents ?? null,
-      refundTransactionId: purchase.refundTransactionId,
-      orderId: purchase.order?.id ?? request.orderId,
-      orderStatus: purchase.order?.status ?? null,
-      iccidPresent,
-      installEvidencePresent,
-    },
-    { allowEvidenceOverride: forceEvidenceOverride }
+      purchase,
+    })
   );
 
   const baseMeta = {
@@ -267,14 +269,14 @@ export async function executeAdminPartnerRefundRequest(
     orderId: request.orderId,
     partnerChargeCents: request.partnerChargeCents,
     currency: request.currency,
-    forceEvidenceOverride,
+    moneyMoved: false,
+    providerRefundCalled: false,
   };
 
   if (!local.ok) {
     await audit(admin.id, PARTNER_REFUND_AUDIT.EXECUTION_BLOCKED, request.id, {
       ...baseMeta,
       blocker: local.blocker,
-      overridable: local.overridable,
     });
     throwBlocked(local.blocker);
   }
@@ -282,7 +284,6 @@ export async function executeAdminPartnerRefundRequest(
   await audit(admin.id, PARTNER_REFUND_AUDIT.EXECUTION_STARTED, request.id, {
     ...baseMeta,
     fromStatus: request.status,
-    overriddenBlockers: local.overriddenBlockers ?? [],
   });
 
   if (local.alreadyRefunded) {
@@ -297,7 +298,7 @@ export async function executeAdminPartnerRefundRequest(
         refundTransactionId,
         actorUserId: admin.id,
       });
-    });
+    }, PARTNER_REFUND_EXECUTION_TX);
     const completedIds =
       synced.completedRequestIds.length > 0
         ? synced.completedRequestIds
@@ -313,43 +314,6 @@ export async function executeAdminPartnerRefundRequest(
   }
 
   try {
-    const confirmFn = input.confirmProviderFailureFn ?? confirmProviderFailure;
-    const providerOk = await confirmFn({
-      providerOrderId: (purchase.providerOrderId ?? "").trim(),
-      expectedOfferId: purchase.offerId,
-      allowEvidenceOverride: forceEvidenceOverride,
-    });
-    if (!providerOk.ok) {
-      const providerBlocker = providerOk.blocker;
-      if (
-        forceEvidenceOverride &&
-        isPartnerRefundProviderOverridableBlocker(providerBlocker)
-      ) {
-        await audit(
-          admin.id,
-          PARTNER_REFUND_AUDIT.EXECUTION_STARTED,
-          request.id,
-          {
-            ...baseMeta,
-            providerEvidenceOverride: providerBlocker,
-          }
-        );
-      } else {
-        const blocker = mapProviderEvidenceBlocker(providerBlocker);
-        await audit(
-          admin.id,
-          PARTNER_REFUND_AUDIT.EXECUTION_BLOCKED,
-          request.id,
-          {
-            ...baseMeta,
-            blocker,
-            providerBlocker,
-          }
-        );
-        throwBlocked(blocker);
-      }
-    }
-
     const result = await prisma.$transaction(async (tx) => {
       const freshRequest = await tx.partnerRefundRequest.findUnique({
         where: { id: request.id },
@@ -369,50 +333,34 @@ export async function executeAdminPartnerRefundRequest(
           partnerChargeCents: true,
           debitTransactionId: true,
           refundTransactionId: true,
-          providerRefreshInstallData: true,
           debitTransaction: { select: { amountCents: true } },
-          order: {
-            select: {
-              id: true,
-              status: true,
-              iccidLast4: true,
-              iccidHash: true,
-              iccidCapturedAt: true,
-            },
-          },
         },
       });
       if (!freshRequest || !freshPurchase) {
-        return { status: "blocked" as const, blocker: "FINANCIAL_STATE_MISMATCH" as const };
+        return {
+          status: "blocked" as const,
+          blocker: "FINANCIAL_STATE_MISMATCH" as const,
+        };
       }
 
-      const freshLast4 = (freshPurchase.order?.iccidLast4 ?? "").replace(/\D+/g, "");
+      if (
+        freshRequest.status === RefundRequestStatus.COMPLETED &&
+        freshRequest.executedRefundTransactionId
+      ) {
+        return {
+          status: "refunded" as const,
+          refundTransactionId: freshRequest.executedRefundTransactionId,
+          outcome: "already_applied" as const,
+        };
+      }
+
       const again = evaluatePartnerRefundRequestExecutionEligibility(
-        {
+        evidenceFromPurchase({
           requestStatus: freshRequest.status,
-          requestReason: request.reason,
           requestPartnerId: freshRequest.partnerId,
           requestPartnerChargeCents: freshRequest.partnerChargeCents,
-          purchasePartnerId: freshPurchase.partnerId,
-          purchaseStatus: freshPurchase.status,
-          fundingSource: freshPurchase.fundingSource,
-          purchasePartnerChargeCents: freshPurchase.partnerChargeCents,
-          debitTransactionId: freshPurchase.debitTransactionId,
-          debitAmountCents: freshPurchase.debitTransaction?.amountCents ?? null,
-          refundTransactionId: freshPurchase.refundTransactionId,
-          orderId: freshPurchase.order?.id ?? request.orderId,
-          orderStatus: freshPurchase.order?.status ?? null,
-          iccidPresent: Boolean(
-            freshLast4.length === 4 ||
-              (freshPurchase.order?.iccidHash ?? "").trim() ||
-              freshPurchase.order?.iccidCapturedAt
-          ),
-          installEvidencePresent:
-            (freshPurchase.providerRefreshInstallData ?? "")
-              .trim()
-              .toLowerCase() === "yes",
-        },
-        { allowEvidenceOverride: forceEvidenceOverride }
+          purchase: freshPurchase,
+        })
       );
       if (!again.ok) {
         return { status: "blocked" as const, blocker: again.blocker };
@@ -422,15 +370,7 @@ export async function executeAdminPartnerRefundRequest(
       let outcome: "created" | "already_applied" = "already_applied";
 
       if (!again.alreadyRefunded) {
-        const claimStatuses: PartnerEsimPurchaseStatus[] = [
-          PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED,
-          PartnerEsimPurchaseStatus.PROVIDER_PENDING,
-          PartnerEsimPurchaseStatus.FUNDS_RESERVED,
-        ];
-        // Force override may refund after local COMPLETED when admin verified ICCID.
-        if (forceEvidenceOverride) {
-          claimStatuses.push(PartnerEsimPurchaseStatus.COMPLETED);
-        }
+        // CAS: claim unrefunded purchase before credit (status-agnostic like customer).
         const claim = await tx.partnerEsimPurchase.updateMany({
           where: {
             id: purchase.id,
@@ -438,7 +378,6 @@ export async function executeAdminPartnerRefundRequest(
             refundTransactionId: null,
             partnerChargeCents: request.partnerChargeCents,
             fundingSource: OrderFundingSource.PARTNER_BALANCE,
-            status: { in: claimStatuses },
           },
           data: { updatedAt: new Date() },
         });
@@ -462,7 +401,8 @@ export async function executeAdminPartnerRefundRequest(
             amountCents: request.partnerChargeCents,
           });
           refundTransactionId = refund.transactionId;
-          outcome = refund.outcome;
+          outcome =
+            refund.outcome === "created" ? "created" : "already_applied";
           const linked = await tx.partnerEsimPurchase.updateMany({
             where: {
               id: purchase.id,
@@ -472,7 +412,7 @@ export async function executeAdminPartnerRefundRequest(
             data: {
               status: PartnerEsimPurchaseStatus.FAILED_REFUNDED,
               refundTransactionId: refund.transactionId,
-              failureCategory: "provider_declined",
+              failureCategory: "admin_refund",
               failureCode: "refunded",
               reconciliationState: "refund_completed",
             },
@@ -482,7 +422,9 @@ export async function executeAdminPartnerRefundRequest(
               where: { id: purchase.id },
               select: { refundTransactionId: true },
             });
-            if ((raced?.refundTransactionId ?? "").trim() !== refund.transactionId) {
+            if (
+              (raced?.refundTransactionId ?? "").trim() !== refund.transactionId
+            ) {
               throw new PartnerPurchaseWalletError(
                 "IDEMPOTENCY_CONFLICT",
                 "Partner refund link changed concurrently."
@@ -495,12 +437,16 @@ export async function executeAdminPartnerRefundRequest(
       }
 
       if (!refundTransactionId) {
-        return { status: "blocked" as const, blocker: "FINANCIAL_STATE_MISMATCH" as const };
+        return {
+          status: "blocked" as const,
+          blocker: "FINANCIAL_STATE_MISMATCH" as const,
+        };
       }
 
       await syncPartnerRefundRequestsForPurchase(tx, {
         purchaseId: purchase.id,
         refundTransactionId,
+        actorUserId: admin.id,
       });
 
       return {
@@ -508,7 +454,7 @@ export async function executeAdminPartnerRefundRequest(
         refundTransactionId,
         outcome,
       };
-    });
+    }, PARTNER_REFUND_EXECUTION_TX);
 
     if (result.status === "blocked") {
       await audit(admin.id, PARTNER_REFUND_AUDIT.EXECUTION_BLOCKED, request.id, {
@@ -523,11 +469,13 @@ export async function executeAdminPartnerRefundRequest(
       ...baseMeta,
       refundTransactionId: result.refundTransactionId,
       idempotent,
+      moneyMoved: !idempotent,
     });
     await audit(admin.id, PARTNER_REFUND_AUDIT.REQUEST_COMPLETED, request.id, {
       ...baseMeta,
       refundTransactionId: result.refundTransactionId,
       toStatus: RefundRequestStatus.COMPLETED,
+      moneyMoved: !idempotent,
     });
 
     schedulePartnerRefundStatusNotification(request.id, "completed");
@@ -562,7 +510,6 @@ export async function executeAdminPartnerRefundRequest(
     }
     console.error("partner_refund_execute_unexpected", {
       requestId,
-      forceEvidenceOverride,
       name: error instanceof Error ? error.name : typeof error,
       message:
         error instanceof Error
