@@ -4,7 +4,7 @@ import {
   getIphoneInstallGuideUrl,
 } from "@/app/lib/email/activation";
 import type { OrderEmailPayload } from "@/app/lib/email/types";
-import { isValidInstallQrValue } from "@/app/lib/email/qr";
+import { isValidInstallQrValue } from "@/app/lib/email/qrValidate";
 import type { VerifiedCheckoutOffer } from "@/app/lib/vesim/server";
 import { getOrderAccessQrImageUrl } from "@/app/lib/vesim/orderAccess";
 

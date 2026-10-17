@@ -9,7 +9,7 @@ import {
   isOfficialAppleEsimActivationUrl,
 } from "@/app/lib/email/activation";
 import { extractInstallDetails, hasInstallDetails } from "@/app/lib/email/extract";
-import { isValidInstallQrValue } from "@/app/lib/email/qr";
+import { isValidInstallQrValue } from "@/app/lib/email/qrValidate";
 import { prisma } from "@/app/lib/db";
 import {
   getVesimBaseUrl,

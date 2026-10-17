@@ -8,7 +8,7 @@ import {
   extractInstallDetails,
   hasInstallDetails,
 } from "@/app/lib/email/extract";
-import { isValidInstallQrValue } from "@/app/lib/email/qr";
+import { isValidInstallQrValue } from "@/app/lib/email/qrValidate";
 import { buildAuthorizedOrderPath } from "@/app/lib/vesim/orderAccess";
 
 export type SafeInstallActions = {

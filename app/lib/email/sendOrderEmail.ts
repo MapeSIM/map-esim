@@ -10,8 +10,8 @@ import {
 import { buildDownloadableQrFilename } from "@/app/lib/email/format";
 import {
   generateEsimQrPngBuffer,
-  resolveInstallQrValue,
 } from "@/app/lib/email/qr";
+import { resolveInstallQrValue } from "@/app/lib/email/qrValidate";
 import {
   renderOrderEmailHtml,
   renderOrderEmailText,

@@ -3,7 +3,8 @@
  * Not part of CI — run with: npx tsx scripts/write-esim-ready-email-preview.ts
  */
 import { mkdirSync, writeFileSync } from "fs";
-import { generateEsimQrDataUrl, resolveInstallQrValue } from "../app/lib/email/qr";
+import { generateEsimQrDataUrl } from "../app/lib/email/qr";
+import { resolveInstallQrValue } from "../app/lib/email/qrValidate";
 import { EMAIL_LOGO_PUBLIC_PATH } from "../app/lib/email/logo";
 import {
   getSampleOrderEmailPayload,

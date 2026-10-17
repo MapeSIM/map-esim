@@ -14,8 +14,8 @@ import {
 import { extractInstallDetails, hasInstallDetails } from "@/app/lib/email/extract";
 import {
   generateEsimQrDataUrl,
-  isValidInstallQrValue,
 } from "@/app/lib/email/qr";
+import { isValidInstallQrValue } from "@/app/lib/email/qrValidate";
 import { prisma } from "@/app/lib/db";
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
 import {

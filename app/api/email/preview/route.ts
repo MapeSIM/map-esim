@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildDownloadableQrFilename } from "@/app/lib/email/format";
 import {
   generateEsimQrDataUrl,
-  resolveInstallQrValue,
 } from "@/app/lib/email/qr";
+import { resolveInstallQrValue } from "@/app/lib/email/qrValidate";
 import { EMAIL_LOGO_PUBLIC_PATH } from "@/app/lib/email/logo";
 import {
   getSampleOrderEmailPayload,

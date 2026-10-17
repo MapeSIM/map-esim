@@ -3,8 +3,8 @@ import { buildDownloadableQrFilename } from "@/app/lib/email/format";
 import { extractInstallDetails } from "@/app/lib/email/extract";
 import {
   generateEsimQrPngBuffer,
-  isValidInstallQrValue,
 } from "@/app/lib/email/qr";
+import { isValidInstallQrValue } from "@/app/lib/email/qrValidate";
 import { authorizeOrderAccess } from "@/app/lib/vesim/orderAccess";
 import {
   getBrokerToken,

@@ -3,6 +3,17 @@ import { buildNextConfigHeaderSources } from "./app/lib/security/headers";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["sharp"],
+  // Keep unused Prisma engines / generate junk out of serverless NFT bundles.
+  outputFileTracingExcludes: {
+    "*": [
+      "**/.prisma/client/*.tmp*",
+      "**/@prisma/client/runtime/*mysql*",
+      "**/@prisma/client/runtime/*sqlite*",
+      "**/@prisma/client/runtime/*sqlserver*",
+      "**/@prisma/client/runtime/*cockroach*",
+      "**/@prisma/engines/schema-engine*",
+    ],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "2mb",
