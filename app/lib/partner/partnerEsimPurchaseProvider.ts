@@ -145,8 +145,9 @@ function assertPositiveCommercial(purchase: {
     purchase.providerCostCents < 0 ||
     !Number.isInteger(purchase.discountBps) ||
     purchase.discountBps < 0 ||
+    // PartnerProfile.discountVersion defaults to 0; 0 is a valid CAS baseline.
     !Number.isInteger(purchase.discountVersion) ||
-    purchase.discountVersion < 1
+    purchase.discountVersion < 0
   ) {
     throw new PartnerEsimPurchaseError(
       "INVALID_STATE",

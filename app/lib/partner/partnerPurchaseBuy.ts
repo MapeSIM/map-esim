@@ -86,19 +86,35 @@ async function releaseUnclaimedPartnerDebitAfterProviderFailure(options: {
       return false;
     }
 
-    await prisma.$transaction(async (tx) => {
-      await releasePartnerFullWalletStaleReservationInTx(tx, {
+    const releaseOutcome = await prisma.$transaction(async (tx) => {
+      return releasePartnerFullWalletStaleReservationInTx(tx, {
         partnerId,
         partnerEsimPurchaseId: purchaseId,
         amountCents: purchase.walletAppliedCents,
       });
     });
+    const after = await prisma.partnerEsimPurchase.findUnique({
+      where: { id: purchaseId },
+      select: {
+        status: true,
+        debitTransactionId: true,
+        refundTransactionId: true,
+      },
+    });
+    const released =
+      after?.status === PartnerEsimPurchaseStatus.READY &&
+      !after.debitTransactionId;
     console.error("partner_buy", {
-      step: "released_unclaimed_provider_pending",
+      step: released
+        ? "released_unclaimed_provider_pending"
+        : "release_unclaimed_provider_pending_noop",
       purchaseId,
       partnerId,
+      outcome: releaseOutcome.outcome,
+      refundTransactionId: releaseOutcome.refundTransactionId,
+      statusAfter: after?.status ?? null,
     });
-    return true;
+    return released;
   } catch (error) {
     console.error("partner_buy", {
       step: "release_unclaimed_provider_pending_failed",
@@ -131,7 +147,10 @@ async function releaseStaleUnclaimedPartnerDebits(partnerId: string): Promise<nu
       providerOrderId: null,
       debitTransactionId: { not: null },
       providerRefreshClaimedAt: null,
-      NOT: { providerResultKind: "success" },
+      OR: [
+        { providerResultKind: null },
+        { providerResultKind: { not: "success" } },
+      ],
     },
     orderBy: { updatedAt: "asc" },
     take: 25,

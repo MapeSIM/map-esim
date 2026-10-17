@@ -916,7 +916,11 @@ export async function releasePartnerFullWalletStaleReservationInTx(
         status: { in: releasableStatuses },
         orderId: null,
         providerOrderId: null,
-        NOT: { providerResultKind: "success" },
+        // SQL NULL <> 'success' is unknown — include null explicitly.
+        OR: [
+          { providerResultKind: null },
+          { providerResultKind: { not: "success" } },
+        ],
       },
       data: restoreData,
     });
@@ -941,7 +945,11 @@ export async function releasePartnerFullWalletStaleReservationInTx(
       orderId: null,
       providerOrderId: null,
       gatewayAmountCents: 0,
-      NOT: { providerResultKind: "success" },
+      // SQL NULL <> 'success' is unknown — include null explicitly.
+      OR: [
+        { providerResultKind: null },
+        { providerResultKind: { not: "success" } },
+      ],
     },
     data: restoreData,
   });

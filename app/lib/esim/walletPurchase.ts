@@ -1042,7 +1042,11 @@ export async function refundReservedFundsInTx(
         status: { in: restoreReadyStatuses },
         orderId: null,
         providerOrderId: null,
-        NOT: { providerResultKind: "success" },
+        // SQL NULL <> 'success' is unknown — include null explicitly.
+        OR: [
+          { providerResultKind: null },
+          { providerResultKind: { not: "success" } },
+        ],
       },
       data: {
         status: WalletEsimPurchaseStatus.READY,
@@ -1226,7 +1230,11 @@ async function rollbackUnconfirmedWalletReservation(options: {
               WalletEsimPurchaseStatus.PROVIDER_PENDING,
             ],
           },
-          NOT: { providerResultKind: "success" },
+          // SQL NULL <> 'success' is unknown — include null explicitly.
+          OR: [
+            { providerResultKind: null },
+            { providerResultKind: { not: "success" } },
+          ],
         },
         data: {
           status: WalletEsimPurchaseStatus.READY,

@@ -78,11 +78,21 @@ export async function runPartnerFullWalletStaleReservationRelease(options?: {
             PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED,
           ],
         },
-        NOT: { providerResultKind: "success" },
         updatedAt: { lte: staleBefore },
-        OR: [
-          { providerRefreshClaimedAt: null },
-          { providerRefreshClaimedAt: { lte: staleBefore } },
+        AND: [
+          {
+            // SQL NULL <> 'success' is unknown — include null explicitly.
+            OR: [
+              { providerResultKind: null },
+              { providerResultKind: { not: "success" } },
+            ],
+          },
+          {
+            OR: [
+              { providerRefreshClaimedAt: null },
+              { providerRefreshClaimedAt: { lte: staleBefore } },
+            ],
+          },
         ],
       },
       orderBy: [{ updatedAt: "asc" }, { id: "asc" }],

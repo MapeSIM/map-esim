@@ -76,7 +76,11 @@ export async function runFullWalletStaleReservationRelease(options?: {
             WalletEsimPurchaseStatus.FUNDS_RESERVED,
           ],
         },
-        NOT: { providerResultKind: "success" },
+        // SQL NULL <> 'success' is unknown — include null explicitly.
+        OR: [
+          { providerResultKind: null },
+          { providerResultKind: { not: "success" } },
+        ],
         updatedAt: { lte: staleBefore },
       },
       orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
