@@ -101,6 +101,21 @@ export async function executeCreditCheckout(options: {
     });
     payload = await readJsonSafe(response);
   } catch (error) {
+    console.error("vesim_credit_checkout_response", {
+      ok: false,
+      offerId: offerId.slice(0, 120),
+      recharge: Boolean(rechargeOrderId),
+      code: isAbortError(error)
+        ? "checkout_timeout"
+        : error instanceof VesimEnvironmentError
+          ? "vesim_env_invalid"
+          : "checkout_transport_error",
+      name: error instanceof Error ? error.name : typeof error,
+      message:
+        error instanceof Error
+          ? error.message.slice(0, 300)
+          : String(error).slice(0, 300),
+    });
     if (error instanceof VesimEnvironmentError) {
       return {
         kind: "uncertain",
@@ -125,20 +140,32 @@ export async function executeCreditCheckout(options: {
   }
 
   const providerOrderId = extractOrderId(payload);
+  const safeMessageKeys = [
+    "error",
+    "message",
+    "Message",
+    "code",
+    "Code",
+    "reason",
+    "success",
+  ];
+  const safeHints: Record<string, string> = {};
+  for (const key of safeMessageKeys) {
+    const value = payload[key];
+    if (typeof value === "string" && value.trim()) {
+      safeHints[key] = value.slice(0, 300);
+    } else if (typeof value === "boolean" || typeof value === "number") {
+      safeHints[key] = String(value);
+    }
+  }
+
   if (!response.ok && !providerOrderId) {
     const status = response.status;
-    const safeMessageKeys = ["error", "message", "Message", "code", "Code", "reason"];
-    const safeHints: Record<string, string> = {};
-    for (const key of safeMessageKeys) {
-      const value = payload[key];
-      if (typeof value === "string" && value.trim()) {
-        safeHints[key] = value.slice(0, 300);
-      }
-    }
     console.error("vesim_credit_checkout_response", {
       ok: false,
       httpStatus: status,
       offerId: offerId.slice(0, 120),
+      recharge: Boolean(rechargeOrderId),
       hasProviderOrderId: false,
       hints: safeHints,
       payloadKeys: Object.keys(payload).slice(0, 20),
@@ -163,8 +190,10 @@ export async function executeCreditCheckout(options: {
       ok: response.ok,
       httpStatus: response.status,
       offerId: offerId.slice(0, 120),
+      recharge: Boolean(rechargeOrderId),
       hasProviderOrderId: false,
       code: "missing_provider_order_id",
+      hints: safeHints,
       payloadKeys: Object.keys(payload).slice(0, 20),
     });
     return {
@@ -180,6 +209,15 @@ export async function executeCreditCheckout(options: {
     returnedOfferId &&
     returnedOfferId.trim().toUpperCase() !== offerId.trim().toUpperCase()
   ) {
+    console.error("vesim_credit_checkout_response", {
+      ok: response.ok,
+      httpStatus: response.status,
+      offerId: offerId.slice(0, 120),
+      returnedOfferId: returnedOfferId.slice(0, 120),
+      providerOrderId: providerOrderId.slice(0, 64),
+      code: "offer_mismatch",
+      hints: safeHints,
+    });
     return {
       kind: "uncertain",
       category: "provider_uncertain",
@@ -188,6 +226,15 @@ export async function executeCreditCheckout(options: {
       payload,
     };
   }
+
+  console.info("vesim_credit_checkout_response", {
+    ok: true,
+    httpStatus: response.status,
+    offerId: offerId.slice(0, 120),
+    providerOrderId: providerOrderId.slice(0, 64),
+    recharge: Boolean(rechargeOrderId),
+    hints: safeHints,
+  });
 
   return {
     kind: "success",

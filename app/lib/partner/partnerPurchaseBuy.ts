@@ -128,6 +128,166 @@ export type BuyPartnerEsimPurchaseInput = {
   providerCheckout?: PartnerProviderCheckoutExecutor;
 };
 
+type ProviderResumeResult =
+  | {
+      kind: "completed";
+      purchaseId: string;
+      duplicate: boolean;
+    }
+  | {
+      kind: "released_ready";
+    }
+  | {
+      kind: "failed_mapped";
+      state: PartnerPurchaseActionState;
+    };
+
+/**
+ * Resume a stuck PROVIDER_PENDING purchase, or refund the unclaimed debit so
+ * the same buy click can reserve + call VeSIM again.
+ */
+async function tryCompleteOrHealUnclaimedProviderPending(options: {
+  partnerUserId: string;
+  purchaseId: string;
+  partnerId: string;
+  providerCheckout?: PartnerProviderCheckoutExecutor;
+}): Promise<ProviderResumeResult> {
+  const purchaseId = options.purchaseId.trim();
+  const partnerId = options.partnerId.trim();
+
+  const row = await prisma.partnerEsimPurchase.findUnique({
+    where: { id: purchaseId },
+    select: {
+      status: true,
+      partnerId: true,
+      debitTransactionId: true,
+      orderId: true,
+      providerOrderId: true,
+      providerResultKind: true,
+      providerRefreshClaimedAt: true,
+      gatewayAmountCents: true,
+    },
+  });
+
+  if (!row || row.partnerId !== partnerId) {
+    return {
+      kind: "failed_mapped",
+      state: mapPartnerPurchaseErrorCode("INVALID_STATE", purchaseId),
+    };
+  }
+
+  if (row.status === PartnerEsimPurchaseStatus.COMPLETED && row.orderId) {
+    return { kind: "completed", purchaseId, duplicate: true };
+  }
+
+  if (row.status === PartnerEsimPurchaseStatus.FAILED_REFUNDED) {
+    return {
+      kind: "failed_mapped",
+      state: mapPartnerPurchaseErrorCode("PROVIDER_FAILED", purchaseId),
+    };
+  }
+
+  if (row.status === PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED) {
+    return {
+      kind: "failed_mapped",
+      state: mapPartnerPurchaseErrorCode("RECONCILIATION_REQUIRED", purchaseId),
+    };
+  }
+
+  if (row.status === PartnerEsimPurchaseStatus.READY) {
+    return { kind: "released_ready" };
+  }
+
+  if (row.status !== PartnerEsimPurchaseStatus.PROVIDER_PENDING) {
+    return {
+      kind: "failed_mapped",
+      state: mapPartnerPurchaseErrorCode("INVALID_STATE", purchaseId),
+    };
+  }
+
+  const hasProviderEvidence =
+    Boolean((row.providerOrderId ?? "").trim()) ||
+    (row.providerResultKind ?? "").trim() === "success" ||
+    Boolean(row.providerRefreshClaimedAt);
+
+  try {
+    const executed = await executePartnerEsimProviderPurchase({
+      partnerUserId: options.partnerUserId,
+      purchaseId,
+      providerCheckout: options.providerCheckout,
+    });
+    if (executed.status === PartnerEsimPurchaseStatus.COMPLETED) {
+      return {
+        kind: "completed",
+        purchaseId: executed.purchaseId,
+        duplicate: executed.duplicate,
+      };
+    }
+    return {
+      kind: "failed_mapped",
+      state: mapPartnerPurchaseErrorCode("UNAVAILABLE", executed.purchaseId),
+    };
+  } catch (error) {
+    // Re-read after execute: claim may have been set mid-call.
+    const after = await prisma.partnerEsimPurchase.findUnique({
+      where: { id: purchaseId },
+      select: {
+        status: true,
+        providerRefreshClaimedAt: true,
+        providerOrderId: true,
+        providerResultKind: true,
+        orderId: true,
+      },
+    });
+    if (after?.status === PartnerEsimPurchaseStatus.READY) {
+      return { kind: "released_ready" };
+    }
+    if (
+      after?.status === PartnerEsimPurchaseStatus.COMPLETED &&
+      after.orderId
+    ) {
+      return { kind: "completed", purchaseId, duplicate: true };
+    }
+
+    const claimedNow =
+      hasProviderEvidence ||
+      Boolean(after?.providerRefreshClaimedAt) ||
+      Boolean((after?.providerOrderId ?? "").trim()) ||
+      (after?.providerResultKind ?? "").trim() === "success";
+
+    // Claimed / provider-evidence rows must not be auto-released.
+    if (!claimedNow) {
+      const released = await releaseUnclaimedPartnerDebitAfterProviderFailure({
+        purchaseId,
+        partnerId,
+      });
+      if (released) {
+        console.error("partner_buy", {
+          step: "healed_unclaimed_provider_pending_to_ready",
+          purchaseId,
+          partnerId,
+          code:
+            error instanceof PartnerEsimPurchaseError
+              ? error.code
+              : undefined,
+          message:
+            error instanceof Error
+              ? error.message.slice(0, 300)
+              : String(error).slice(0, 300),
+        });
+        return { kind: "released_ready" };
+      }
+    }
+    if (error instanceof PartnerEsimPurchaseError) {
+      return {
+        kind: "failed_mapped",
+        state: mapPartnerPurchaseErrorCode(error.code, purchaseId),
+      };
+    }
+    throw error;
+  }
+}
+
 function mapGatewayCheckoutError(
   error: PartnerEsimPurchaseGatewayCheckoutError,
   purchaseId?: string
@@ -240,6 +400,39 @@ export async function buyPartnerEsimPurchase(
     }
 
     let status: PartnerEsimPurchaseStatus = prepared.status;
+    // Only skip the second live offer fetch when prepare just created this READY row.
+    let skipLiveOfferRecheck =
+      !prepared.duplicate && status === PartnerEsimPurchaseStatus.READY;
+
+    // Stuck PROVIDER_PENDING (prior timeout / failed VeSIM before claim): try to
+    // finish VeSIM once; if that fails with no provider evidence, refund wallet
+    // back to READY and continue reserve→provider in this same click.
+    if (status === PartnerEsimPurchaseStatus.PROVIDER_PENDING) {
+      lastStep = "provider_resume";
+      const resume = await tryCompleteOrHealUnclaimedProviderPending({
+        partnerUserId: actor.userId,
+        purchaseId: prepared.purchaseId,
+        partnerId: prepared.partnerId,
+        providerCheckout: input.providerCheckout,
+      });
+      if (resume.kind === "completed") {
+        return {
+          ok: true,
+          kind: resume.duplicate ? "duplicate_success" : "success",
+          purchaseId: resume.purchaseId,
+          message: resume.duplicate
+            ? "This eSIM purchase was already completed."
+            : "Your eSIM purchase completed successfully.",
+        };
+      }
+      if (resume.kind === "failed_mapped") {
+        return resume.state;
+      }
+      // Released to READY — fall through to reserve + provider with live re-verify.
+      status = PartnerEsimPurchaseStatus.READY;
+      skipLiveOfferRecheck = false;
+      purchaseId = prepared.purchaseId;
+    }
 
     // Phase 2 split: remainder via gateway — never VeSIM before payment confirmation.
     if (
@@ -330,9 +523,7 @@ export async function buyPartnerEsimPurchase(
         purchaseId: prepared.purchaseId,
         countryHint: input.countryHint,
         verifyOffer: input.verifyOffer,
-        // Fresh prepare in this request already verified the live offer.
-        skipLiveOfferRecheck:
-          !prepared.duplicate && status === PartnerEsimPurchaseStatus.READY,
+        skipLiveOfferRecheck,
       });
       purchaseId = reserved.purchaseId;
       status = reserved.status;

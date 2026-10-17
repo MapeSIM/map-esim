@@ -379,6 +379,11 @@ export async function preparePartnerEsimPurchase(
     applyAsiaTemporaryMarkup: false,
   });
   if (!verified) {
+    console.error("partner_esim_prepare", {
+      step: "offer_unavailable",
+      offerId: offerId.slice(0, 120),
+      countryHint: (countryHint ?? "").slice(0, 32),
+    });
     throw new PartnerEsimPurchaseError(
       "OFFER_UNAVAILABLE",
       "The selected package is unavailable."
