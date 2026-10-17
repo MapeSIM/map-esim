@@ -5,6 +5,8 @@ import AccountMenu, {
 import { requireRole } from "@/app/lib/auth/session";
 
 export const dynamic = "force-dynamic";
+/** Partner buy runs prepare + reserve + VeSIM credit checkout (up to ~25s). */
+export const maxDuration = 60;
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false, nocache: true },

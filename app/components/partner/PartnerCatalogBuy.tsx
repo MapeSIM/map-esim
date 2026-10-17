@@ -275,17 +275,24 @@ export default function PartnerCatalogBuy({
             {"message" in buyState ? buyState.message : null}
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
+            {buyState.ok ? (
+              <Link
+                href="/partner/orders"
+                className="inline-flex h-10 items-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+              >
+                My eSIMs
+              </Link>
+            ) : (
+              <p className="w-full text-xs text-[var(--text-muted)]">
+                Try the same plan again below — the same purchase attempt is
+                resumed so your Partner balance is not charged twice.
+              </p>
+            )}
             <Link
               href="/partner"
-              className="inline-flex h-10 items-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-            >
-              Back to dashboard
-            </Link>
-            <Link
-              href="/partner/catalog"
               className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] outline-none hover:bg-[var(--surface)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
             >
-              Browse catalog again
+              Back to dashboard
             </Link>
           </div>
         </div>

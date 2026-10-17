@@ -63,6 +63,11 @@ export type ReservePartnerEsimPurchaseInput = {
   purchaseId: string;
   countryHint?: string | null;
   verifyOffer?: PartnerOfferVerifier;
+  /**
+   * When true, skip a second live VeSIM offer fetch (same-request prepare→reserve).
+   * Still enforces Partner discount snapshot consistency inside the debit tx.
+   */
+  skipLiveOfferRecheck?: boolean;
 };
 
 export type ReservePartnerEsimPurchaseResult = {
@@ -637,34 +642,37 @@ export async function reservePartnerEsimPurchase(
   }
 
   // Offer/pricing race check before any money movement (outside $transaction).
-  const verified = await verifyOffer({
-    offerId: purchase.offerId,
-    countryHint: countryHint ?? purchase.destinationCode,
-    applyAsiaTemporaryMarkup: false,
-  });
-  if (!verified) {
-    throw new PartnerEsimPurchaseError(
-      "PRICING_CHANGED",
-      "Package pricing changed. Please refresh and try again."
-    );
-  }
+  // Same-request prepare→reserve may skip the second live VeSIM round-trip.
+  if (!input.skipLiveOfferRecheck) {
+    const verified = await verifyOffer({
+      offerId: purchase.offerId,
+      countryHint: countryHint ?? purchase.destinationCode,
+      applyAsiaTemporaryMarkup: false,
+    });
+    if (!verified) {
+      throw new PartnerEsimPurchaseError(
+        "PRICING_CHANGED",
+        "Package pricing changed. Please refresh and try again."
+      );
+    }
 
-  // Recompute charge with *purchase* discount snapshot vs live offer retail/cost.
-  // Discount version/active Partner are enforced again inside the transaction.
-  const liveFromOffer = commercialFromVerifiedOffer(
-    verified,
-    purchase.discountBps,
-    purchase.discountVersion
-  );
-  if (
-    !snapshotsMatchOffer(purchase, liveFromOffer) ||
-    liveFromOffer.partnerChargeCents !== purchase.partnerChargeCents ||
-    liveFromOffer.discountBps !== purchase.discountBps
-  ) {
-    throw new PartnerEsimPurchaseError(
-      "PRICING_CHANGED",
-      "Package pricing changed. Please refresh and try again."
+    // Recompute charge with *purchase* discount snapshot vs live offer retail/cost.
+    // Discount version/active Partner are enforced again inside the transaction.
+    const liveFromOffer = commercialFromVerifiedOffer(
+      verified,
+      purchase.discountBps,
+      purchase.discountVersion
     );
+    if (
+      !snapshotsMatchOffer(purchase, liveFromOffer) ||
+      liveFromOffer.partnerChargeCents !== purchase.partnerChargeCents ||
+      liveFromOffer.discountBps !== purchase.discountBps
+    ) {
+      throw new PartnerEsimPurchaseError(
+        "PRICING_CHANGED",
+        "Package pricing changed. Please refresh and try again."
+      );
+    }
   }
 
   try {

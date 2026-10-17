@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { buyPartnerEsimAction } from "@/app/lib/partner/partnerPurchaseActions";
 import type { PartnerCatalogOffer } from "@/app/lib/partner/partnerCatalogRead";
@@ -35,7 +35,9 @@ export default function PartnerStorefrontBuy({
     buyPartnerEsimAction,
     initialPartnerPurchaseActionState
   );
-  const idempotencyKey = useMemo(() => newIdempotencyKey(), []);
+  // Keep stable across failed attempts so PROVIDER_PENDING can resume.
+  // Rotate only after a completed purchase.
+  const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey);
   const payableCents =
     offer.partnerPriceCents > 0
       ? offer.partnerPriceCents
@@ -43,11 +45,49 @@ export default function PartnerStorefrontBuy({
         ? offer.fundingDisplay.totalCents
         : 0;
 
-  const showResult =
-    buyState.kind !== "idle" &&
-    (buyState.ok === true
-      ? buyState.kind === "success" || buyState.kind === "duplicate_success"
-      : true);
+  const purchaseSucceeded =
+    buyState.ok === true &&
+    (buyState.kind === "success" || buyState.kind === "duplicate_success");
+
+  useEffect(() => {
+    if (purchaseSucceeded) {
+      setIdempotencyKey(newIdempotencyKey());
+    }
+  }, [purchaseSucceeded]);
+
+  if (purchaseSucceeded) {
+    return (
+      <div className="space-y-6">
+        <div
+          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4"
+          role="status"
+        >
+          <p className="text-sm font-semibold text-[var(--heading)]">
+            {buyState.kind === "duplicate_success"
+              ? "Already completed"
+              : "Purchase complete"}
+          </p>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">
+            {"message" in buyState ? buyState.message : null}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link
+              href="/partner/orders"
+              className="inline-flex h-10 items-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)]"
+            >
+              My eSIMs
+            </Link>
+            <Link
+              href="/partner/catalog"
+              className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)]"
+            >
+              Browse catalog
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -69,65 +109,51 @@ export default function PartnerStorefrontBuy({
         ) : null}
       </div>
 
-      {showResult ? (
+      {!buyState.ok ? (
         <div
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4"
+          className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 py-4"
           role="status"
+          aria-live="polite"
         >
           <p className="text-sm font-semibold text-[var(--heading)]">
-            {buyState.ok
-              ? buyState.kind === "duplicate_success"
-                ? "Already completed"
-                : "Purchase complete"
-              : "Unable to purchase"}
+            Unable to purchase
           </p>
           <p className="mt-2 text-sm text-[var(--text-muted)]">
             {"message" in buyState ? buyState.message : null}
           </p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Link
-              href="/partner/orders"
-              className="inline-flex h-10 items-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)]"
-            >
-              My eSIMs
-            </Link>
-            <Link
-              href="/partner/catalog"
-              className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)]"
-            >
-              Browse catalog
-            </Link>
-          </div>
+          <p className="mt-2 text-xs text-[var(--text-muted)]">
+            You can try again below — your Partner balance is not charged twice
+            for the same attempt.
+          </p>
         </div>
-      ) : (
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5">
-          <p className="text-base font-semibold text-[var(--heading)]">
-            {offer.name}
-          </p>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            {offer.dataLabel} · {offer.validityLabel}
-          </p>
-          <p className="mt-2 text-lg font-bold tabular-nums text-[var(--heading)]">
-            {offer.partnerPriceLabel}
-          </p>
-          <div className="mt-5">
-            <PartnerOfferPaymentForm
-              offerId={offer.offerId}
-              destinationCode={destinationCode}
-              idempotencyKey={idempotencyKey}
-              payableCents={payableCents}
-              balanceCents={balanceCents}
-              splitPaymentEnabled={splitPaymentEnabled}
-              paymentGatewayConfigured={paymentGatewayConfigured}
-              enabledSimpaisaOperatorIds={enabledSimpaisaOperatorIds}
-              buyAction={buyAction}
-              buyPending={buyPending}
-              buyState={buyState}
-            />
-          </div>
+      ) : null}
+
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5">
+        <p className="text-base font-semibold text-[var(--heading)]">
+          {offer.name}
+        </p>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">
+          {offer.dataLabel} · {offer.validityLabel}
+        </p>
+        <p className="mt-2 text-lg font-bold tabular-nums text-[var(--heading)]">
+          {offer.partnerPriceLabel}
+        </p>
+        <div className="mt-5">
+          <PartnerOfferPaymentForm
+            offerId={offer.offerId}
+            destinationCode={destinationCode}
+            idempotencyKey={idempotencyKey}
+            payableCents={payableCents}
+            balanceCents={balanceCents}
+            splitPaymentEnabled={splitPaymentEnabled}
+            paymentGatewayConfigured={paymentGatewayConfigured}
+            enabledSimpaisaOperatorIds={enabledSimpaisaOperatorIds}
+            buyAction={buyAction}
+            buyPending={buyPending}
+            buyState={buyState}
+          />
         </div>
-      )}
+      </div>
     </div>
   );
 }
-

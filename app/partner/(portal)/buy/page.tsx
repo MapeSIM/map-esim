@@ -14,6 +14,7 @@ import {
 import { formatUsdCents } from "@/app/lib/wallet/display";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /**
  * Deep-link confirm for a single Partner-priced offer.
