@@ -213,8 +213,14 @@ function runOfflineChecks(): void {
   assert.match(form, /Execute Partner refund/);
   assert.match(form, /forceEvidenceOverride/);
   assert.match(form, /Force execute Partner refund/);
+  assert.match(form, /handleSubmit|startTransition|formAction\(formData\)/);
   assert.match(form, /REFUND_PARTNER_FUNDS_PHRASE/);
   assert.doesNotMatch(form, /name=["']amount["']/);
+  // Submit must not stay disabled based on React checkbox state.
+  assert.doesNotMatch(
+    form,
+    /disabled=\{pending \|\| \(evidenceOverrideRequired && !forceChecked\)\}/
+  );
   assert.match(wallet, /Disabled Partners may still receive ESIM_PURCHASE_REFUND/);
   assert.match(customer, /applyAdminRefundRequestDecision/);
   assert.doesNotMatch(customer, /executeAdminPartnerRefundRequest/);

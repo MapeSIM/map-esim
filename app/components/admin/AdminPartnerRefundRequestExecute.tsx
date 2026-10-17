@@ -1,6 +1,11 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import {
+  useActionState,
+  useState,
+  useTransition,
+  type FormEvent,
+} from "react";
 import { REFUND_PARTNER_FUNDS_PHRASE } from "@/app/lib/admin/reconciliationCaseShared";
 import {
   adminPartnerRefundRequestExecuteAction,
@@ -25,11 +30,53 @@ export default function AdminPartnerRefundRequestExecute({
   localBlockerLabel,
   evidenceOverrideRequired,
 }: Props) {
-  const [state, formAction, pending] = useActionState(
+  const [state, formAction, actionPending] = useActionState(
     adminPartnerRefundRequestExecuteAction,
     initialState
   );
-  const [forceChecked, setForceChecked] = useState(false);
+  const [transitionPending, startTransition] = useTransition();
+  const [clientError, setClientError] = useState<string | null>(null);
+  const pending = actionPending || transitionPending;
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+
+    // Always send a stable request id from props (not only the hidden input).
+    formData.set("requestId", requestId);
+
+    if (evidenceOverrideRequired) {
+      const checked =
+        formData.get("forceEvidenceOverride") === "true" ||
+        (
+          form.elements.namedItem(
+            "forceEvidenceOverride"
+          ) as HTMLInputElement | null
+        )?.checked === true;
+      if (!checked) {
+        setClientError(
+          "Check the verification box to confirm you verified the ICCID and provider status before forcing this refund."
+        );
+        return;
+      }
+      // Ensure the server always receives an explicit override flag.
+      formData.set("forceEvidenceOverride", "true");
+    } else {
+      formData.delete("forceEvidenceOverride");
+    }
+
+    const phrase = String(formData.get("confirmPhrase") ?? "").trim();
+    if (!phrase) {
+      setClientError(`Type ${REFUND_PARTNER_FUNDS_PHRASE} to confirm.`);
+      return;
+    }
+
+    setClientError(null);
+    startTransition(() => {
+      formAction(formData);
+    });
+  }
 
   return (
     <section className="min-w-0 space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
@@ -65,7 +112,11 @@ export default function AdminPartnerRefundRequestExecute({
         </p>
       ) : null}
 
-      <form action={formAction} className="min-w-0 space-y-3">
+      <form
+        action={formAction}
+        onSubmit={handleSubmit}
+        className="min-w-0 space-y-3"
+      >
         <input type="hidden" name="requestId" value={requestId} />
         {evidenceOverrideRequired ? (
           <label className="flex min-w-0 cursor-pointer items-start gap-3 rounded-xl border border-[var(--warning-border)] bg-[var(--warning-bg)] px-3 py-3 text-sm text-[var(--warning-text)]">
@@ -73,11 +124,8 @@ export default function AdminPartnerRefundRequestExecute({
               type="checkbox"
               name="forceEvidenceOverride"
               value="true"
-              checked={forceChecked}
-              onChange={(e) => setForceChecked(e.target.checked)}
               disabled={pending}
               className="mt-1 h-4 w-4 shrink-0"
-              required
             />
             <span>
               I verified the ICCID and provider status and still want to force
@@ -108,8 +156,7 @@ export default function AdminPartnerRefundRequestExecute({
         </div>
         <button
           type="submit"
-          disabled={pending || (evidenceOverrideRequired && !forceChecked)}
-          aria-disabled={pending || (evidenceOverrideRequired && !forceChecked)}
+          disabled={pending}
           className="inline-flex h-10 min-w-0 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-white disabled:opacity-60"
         >
           {pending
@@ -118,6 +165,11 @@ export default function AdminPartnerRefundRequestExecute({
               ? "Force execute Partner refund"
               : "Execute Partner refund"}
         </button>
+        {clientError ? (
+          <p className="text-sm text-[var(--danger-text)]" role="alert">
+            {clientError}
+          </p>
+        ) : null}
         {state && !state.ok && state.error && !state.fieldErrors ? (
           <p className="text-sm text-[var(--danger-text)]" role="alert">
             {state.error}
