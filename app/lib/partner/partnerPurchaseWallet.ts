@@ -416,7 +416,7 @@ export async function refundPartnerPurchaseFundsInTx(
         purchaseId,
         amountCents,
         idempotencyKey,
-        reason: options.reason ?? "Partner eSIM purchase refund",
+        reason: options.reason ?? "Refund for incomplete purchase attempt",
       });
     } catch (error) {
       if (
@@ -774,7 +774,7 @@ export async function releasePartnerGatewayReservationInTx(
     partnerEsimPurchaseId: purchaseId,
     amountCents,
     idempotencyKey: releaseKey,
-    reason: "Partner eSIM gateway reservation release",
+    reason: "Released pending purchase hold",
   });
 
   return {
@@ -962,7 +962,7 @@ export async function releasePartnerFullWalletStaleReservationInTx(
     partnerEsimPurchaseId: purchaseId,
     amountCents,
     idempotencyKey: releaseKey,
-    reason: "Partner eSIM full-wallet stale reservation release",
+    reason: "Released pending purchase hold",
   });
 
   return {
