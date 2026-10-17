@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { REFUND_PARTNER_FUNDS_PHRASE } from "@/app/lib/admin/reconciliationCaseShared";
 import {
   adminPartnerRefundRequestExecuteAction,
@@ -14,6 +14,8 @@ type Props = {
   debitLabel: string;
   refundBasisLabel: string;
   localBlockerLabel: string | null;
+  /** Soft evidence blocker — require explicit force acknowledgment. */
+  evidenceOverrideRequired: boolean;
 };
 
 export default function AdminPartnerRefundRequestExecute({
@@ -21,11 +23,13 @@ export default function AdminPartnerRefundRequestExecute({
   debitLabel,
   refundBasisLabel,
   localBlockerLabel,
+  evidenceOverrideRequired,
 }: Props) {
   const [state, formAction, pending] = useActionState(
     adminPartnerRefundRequestExecuteAction,
     initialState
   );
+  const [forceChecked, setForceChecked] = useState(false);
 
   return (
     <section className="min-w-0 space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
@@ -36,7 +40,7 @@ export default function AdminPartnerRefundRequestExecute({
         Approved — refund pending
       </p>
       <p className="text-sm text-[var(--text-muted)]">
-        Provider/order evidence must pass before funds are returned. This
+        Provider/order evidence is re-checked before funds are returned. This
         credits the exact Partner debit to the Partner wallet only. It does not
         refund a card or create a provider purchase.
       </p>
@@ -55,11 +59,32 @@ export default function AdminPartnerRefundRequestExecute({
           role="status"
         >
           {localBlockerLabel}
+          {evidenceOverrideRequired
+            ? " You may force execute after verifying the ICCID and provider status."
+            : ""}
         </p>
       ) : null}
 
       <form action={formAction} className="min-w-0 space-y-3">
         <input type="hidden" name="requestId" value={requestId} />
+        {evidenceOverrideRequired ? (
+          <label className="flex min-w-0 cursor-pointer items-start gap-3 rounded-xl border border-[var(--warning-border)] bg-[var(--warning-bg)] px-3 py-3 text-sm text-[var(--warning-text)]">
+            <input
+              type="checkbox"
+              name="forceEvidenceOverride"
+              value="true"
+              checked={forceChecked}
+              onChange={(e) => setForceChecked(e.target.checked)}
+              disabled={pending}
+              className="mt-1 h-4 w-4 shrink-0"
+              required
+            />
+            <span>
+              I verified the ICCID and provider status and still want to force
+              this Partner wallet refund.
+            </span>
+          </label>
+        ) : null}
         <div className="min-w-0">
           <label
             htmlFor="partner-refund-execute-confirm"
@@ -83,10 +108,14 @@ export default function AdminPartnerRefundRequestExecute({
         </div>
         <button
           type="submit"
-          disabled={pending}
+          disabled={
+            pending || (evidenceOverrideRequired && !forceChecked)
+          }
           className="inline-flex h-10 min-w-0 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-white disabled:opacity-60"
         >
-          Execute Partner refund
+          {evidenceOverrideRequired
+            ? "Force execute Partner refund"
+            : "Execute Partner refund"}
         </button>
         {state && !state.ok && state.error && !state.fieldErrors ? (
           <p className="text-sm text-[var(--danger-text)]" role="alert">

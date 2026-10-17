@@ -20,7 +20,7 @@ import {
 } from "@/app/lib/admin/reconciliationCaseManagement";
 import {
   evaluatePartnerRefundLocalEligibility,
-  evaluateProviderRefundEvidence,
+  evaluateProviderRefundEvidenceWithOverride,
   isPartnerRefundSourceType,
   normalizeCaseManagementSourceType,
   parseCaseReason,
@@ -211,35 +211,41 @@ async function loadPurchaseContext(
 
 function localEligibilityFromContext(
   ctx: PurchaseContext,
-  currentAdminId: string
+  currentAdminId: string,
+  options?: { allowEvidenceOverride?: boolean }
 ): PartnerRefundEligibility {
-  return evaluatePartnerRefundLocalEligibility({
-    sourceType: "partner_purchase",
-    alreadyResolved: ctx.caseResolved,
-    locked: ctx.caseLocked,
-    lockedByAdminId: ctx.lockedByAdminId,
-    currentAdminId,
-    status: ctx.status,
-    fundingSource: ctx.fundingSource,
-    orderId: ctx.orderId,
-    orderStatus: ctx.orderStatus,
-    providerOrderId: ctx.providerOrderId,
-    offerId: ctx.offerId,
-    partnerId: ctx.partnerId,
-    partnerChargeCents: ctx.partnerChargeCents,
-    debitAmountCents: ctx.debitAmountCents,
-    debitStatus: ctx.debitStatus,
-    debitTransactionId: ctx.debitTransactionId,
-    refundTransactionId: ctx.refundTransactionId,
-    fulfilmentIccidPresent: ctx.fulfilmentIccidPresent,
-    providerInstallDataPresent: ctx.providerInstallDataPresent,
-    providerRefreshInProgress: ctx.providerRefreshInProgress,
-  });
+  return evaluatePartnerRefundLocalEligibility(
+    {
+      sourceType: "partner_purchase",
+      alreadyResolved: ctx.caseResolved,
+      locked: ctx.caseLocked,
+      lockedByAdminId: ctx.lockedByAdminId,
+      currentAdminId,
+      status: ctx.status,
+      fundingSource: ctx.fundingSource,
+      orderId: ctx.orderId,
+      orderStatus: ctx.orderStatus,
+      providerOrderId: ctx.providerOrderId,
+      offerId: ctx.offerId,
+      partnerId: ctx.partnerId,
+      partnerChargeCents: ctx.partnerChargeCents,
+      debitAmountCents: ctx.debitAmountCents,
+      debitStatus: ctx.debitStatus,
+      debitTransactionId: ctx.debitTransactionId,
+      refundTransactionId: ctx.refundTransactionId,
+      fulfilmentIccidPresent: ctx.fulfilmentIccidPresent,
+      providerInstallDataPresent: ctx.providerInstallDataPresent,
+      providerRefreshInProgress: ctx.providerRefreshInProgress,
+    },
+    options
+  );
 }
 
 export async function confirmProviderFailure(options: {
   providerOrderId: string;
   expectedOfferId: string;
+  /** Allow install/fulfilled evidence override after admin ICCID verification. */
+  allowEvidenceOverride?: boolean;
 }): Promise<{ ok: true } | { ok: false; blocker: string }> {
   const providerOrderId = options.providerOrderId.trim();
   if (
@@ -317,14 +323,17 @@ export async function confirmProviderFailure(options: {
   });
   payload = {};
 
-  return evaluateProviderRefundEvidence({
-    lookupKind: classified.kind,
-    orderExists: classified.orderExists,
-    offerMatch: classified.offerMatch,
-    installDataPresent: classified.installDataPresent,
-    safeProviderState: classified.safeProviderState,
-    hasExpectedOfferId: Boolean(options.expectedOfferId.trim()),
-  });
+  return evaluateProviderRefundEvidenceWithOverride(
+    {
+      lookupKind: classified.kind,
+      orderExists: classified.orderExists,
+      offerMatch: classified.offerMatch,
+      installDataPresent: classified.installDataPresent,
+      safeProviderState: classified.safeProviderState,
+      hasExpectedOfferId: Boolean(options.expectedOfferId.trim()),
+    },
+    { allowEvidenceOverride: options.allowEvidenceOverride === true }
+  );
 }
 
 async function auditBlocked(options: {
@@ -354,6 +363,11 @@ export async function refundReconciliationPartnerPurchase(options: {
   attemptId: string;
   reason: string;
   confirmPhrase: string;
+  /**
+   * When true, allow refund despite provisioned/install/ICCID evidence after
+   * the admin confirms they verified provider/ICCID status.
+   */
+  forceEvidenceOverride?: boolean | string | null;
   /** Test seam only — defaults to GET-only provider failure confirmation. */
   confirmProviderFailureFn?: typeof confirmProviderFailure;
 }): Promise<CaseActionResult> {
@@ -415,6 +429,12 @@ export async function refundReconciliationPartnerPurchase(options: {
     };
   }
 
+  const forceEvidenceOverride =
+    options.forceEvidenceOverride === true ||
+    options.forceEvidenceOverride === "true" ||
+    options.forceEvidenceOverride === "on" ||
+    options.forceEvidenceOverride === "1";
+
   const ctx = await loadPurchaseContext(ids);
   if (!ctx) {
     await auditBlocked({
@@ -426,7 +446,9 @@ export async function refundReconciliationPartnerPurchase(options: {
     return { ok: false, error: PUBLIC_ERROR };
   }
 
-  const localEligibility = localEligibilityFromContext(ctx, admin.id);
+  const localEligibility = localEligibilityFromContext(ctx, admin.id, {
+    allowEvidenceOverride: forceEvidenceOverride,
+  });
   if (!localEligibility.allowed) {
     const failureCode = localEligibility.blockers[0] ?? "blocked";
     await auditBlocked({
@@ -482,6 +504,7 @@ export async function refundReconciliationPartnerPurchase(options: {
   const providerOk = await confirmFn({
     providerOrderId: ctx.providerOrderId,
     expectedOfferId: ctx.offerId,
+    allowEvidenceOverride: forceEvidenceOverride,
   });
   if (!providerOk.ok) {
     await auditBlocked({
@@ -502,7 +525,9 @@ export async function refundReconciliationPartnerPurchase(options: {
           failureCode: "missing_local_attempt",
         };
       }
-      const again = localEligibilityFromContext(fresh, admin.id);
+      const again = localEligibilityFromContext(fresh, admin.id, {
+        allowEvidenceOverride: forceEvidenceOverride,
+      });
       if (!again.allowed) {
         return {
           status: "blocked" as const,
@@ -543,19 +568,21 @@ export async function refundReconciliationPartnerPurchase(options: {
         };
       }
 
+      const claimStatuses: PartnerEsimPurchaseStatus[] = [
+        PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED,
+        PartnerEsimPurchaseStatus.PROVIDER_PENDING,
+        PartnerEsimPurchaseStatus.FUNDS_RESERVED,
+      ];
+      if (forceEvidenceOverride) {
+        claimStatuses.push(PartnerEsimPurchaseStatus.COMPLETED);
+      }
       const lockCas = await tx.partnerEsimPurchase.updateMany({
         where: {
           id: ids.recordId,
           reconciliationResolvedAt: null,
           reconciliationLockedByAdminId: admin.id,
           NOT: { reconciliationLockedAt: null },
-          status: {
-            in: [
-              PartnerEsimPurchaseStatus.RECONCILIATION_REQUIRED,
-              PartnerEsimPurchaseStatus.PROVIDER_PENDING,
-              PartnerEsimPurchaseStatus.FUNDS_RESERVED,
-            ],
-          },
+          status: { in: claimStatuses },
           refundTransactionId: null,
           partnerChargeCents: fresh.partnerChargeCents,
           fundingSource: OrderFundingSource.PARTNER_BALANCE,

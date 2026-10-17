@@ -118,6 +118,7 @@ export default function CaseManagementPanel(props: {
   walletRefundMessage: string;
   partnerRefundSupported: boolean;
   partnerRefundAllowed: boolean;
+  partnerRefundRequiresEvidenceOverride: boolean;
   partnerRefundMessage: string;
   fundFulfillRecoverySupported: boolean;
   fundFulfillRecoveryAllowed: boolean;
@@ -892,6 +893,22 @@ export default function CaseManagementPanel(props: {
               </p>
               <input type="hidden" name="sourceType" value={props.sourceType} />
               <input type="hidden" name="attemptId" value={props.attemptId} />
+              {props.partnerRefundRequiresEvidenceOverride ? (
+                <label className="flex min-w-0 cursor-pointer items-start gap-3 rounded-xl border border-[var(--warning-border)] bg-[var(--warning-bg)] px-3 py-3 text-sm text-[var(--warning-text)]">
+                  <input
+                    type="checkbox"
+                    name="forceEvidenceOverride"
+                    value="true"
+                    required
+                    disabled={busy || !props.partnerRefundAllowed}
+                    className="mt-1 h-4 w-4 shrink-0"
+                  />
+                  <span>
+                    I verified the ICCID and provider status and still want to
+                    force this Partner wallet refund.
+                  </span>
+                </label>
+              ) : null}
               <div>
                 <label
                   htmlFor="partner-refund-reason"
@@ -935,7 +952,11 @@ export default function CaseManagementPanel(props: {
                 disabled={busy || !props.partnerRefundAllowed}
                 className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {partnerRefundPending ? "Refunding…" : "Refund Partner funds"}
+                {partnerRefundPending
+                  ? "Refunding…"
+                  : props.partnerRefundRequiresEvidenceOverride
+                    ? "Force refund Partner funds"
+                    : "Refund Partner funds"}
               </button>
             </form>
           ) : null}

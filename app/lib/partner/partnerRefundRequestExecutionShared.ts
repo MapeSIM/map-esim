@@ -18,6 +18,41 @@ export const PARTNER_REFUND_EXECUTION_BLOCKERS = [
 export type PartnerRefundExecutionBlocker =
   (typeof PARTNER_REFUND_EXECUTION_BLOCKERS)[number];
 
+/**
+ * Evidence/fulfilment warnings admins may force-override after manual ICCID /
+ * provider verification. Financial integrity blockers stay hard.
+ */
+export const PARTNER_REFUND_EVIDENCE_OVERRIDABLE_BLOCKERS = [
+  "ORDER_ALREADY_FULFILLED",
+  "INSTALL_DETAILS_PRESENT",
+  "ICCID_PRESENT",
+  "INSTALL_RECOVERY_REQUIRED",
+] as const satisfies readonly PartnerRefundExecutionBlocker[];
+
+export type PartnerRefundEvidenceOverridableBlocker =
+  (typeof PARTNER_REFUND_EVIDENCE_OVERRIDABLE_BLOCKERS)[number];
+
+const OVERRIDABLE_SET = new Set<string>(PARTNER_REFUND_EVIDENCE_OVERRIDABLE_BLOCKERS);
+
+export function isPartnerRefundEvidenceOverridableBlocker(
+  code: string
+): code is PartnerRefundEvidenceOverridableBlocker {
+  return OVERRIDABLE_SET.has(code);
+}
+
+/** Provider-confirm blockers that map to the same overridable evidence class. */
+export const PARTNER_REFUND_PROVIDER_OVERRIDABLE_BLOCKERS = [
+  "fulfilment_install_evidence",
+  "fulfilment_iccid_present",
+  "provider_still_fulfilled",
+] as const;
+
+export function isPartnerRefundProviderOverridableBlocker(code: string): boolean {
+  return (PARTNER_REFUND_PROVIDER_OVERRIDABLE_BLOCKERS as readonly string[]).includes(
+    code
+  );
+}
+
 export type PartnerRefundExecutionEvidence = {
   requestStatus: string;
   requestReason: string;
@@ -37,8 +72,18 @@ export type PartnerRefundExecutionEvidence = {
 };
 
 export type PartnerRefundExecutionLocalResult =
-  | { ok: true; alreadyRefunded: boolean }
-  | { ok: false; blocker: PartnerRefundExecutionBlocker };
+  | {
+      ok: true;
+      alreadyRefunded: boolean;
+      /** Soft evidence warnings cleared only when forceEvidenceOverride is set. */
+      overriddenBlockers?: PartnerRefundEvidenceOverridableBlocker[];
+    }
+  | {
+      ok: false;
+      blocker: PartnerRefundExecutionBlocker;
+      /** True when an admin may force-execute after verifying ICCID/provider. */
+      overridable: boolean;
+    };
 
 export function partnerRefundExecutionBlockerLabel(
   code: PartnerRefundExecutionBlocker
@@ -47,13 +92,13 @@ export function partnerRefundExecutionBlockerLabel(
     case "PROVIDER_UNCERTAIN":
       return "Provider result is uncertain. Refresh/reconcile before refunding.";
     case "ORDER_ALREADY_FULFILLED":
-      return "A usable local order exists. Refund execution is blocked.";
+      return "A usable local order exists. Verify ICCID/provider status before forcing a refund.";
     case "INSTALL_DETAILS_PRESENT":
-      return "Installation data exists. Refund execution is blocked.";
+      return "Installation data exists. Verify ICCID/provider status before forcing a refund.";
     case "ICCID_PRESENT":
-      return "ICCID evidence exists. Refund execution is blocked.";
+      return "ICCID evidence exists. Verify the ICCID and provider status before forcing a refund.";
     case "INSTALL_RECOVERY_REQUIRED":
-      return "Installation details may be recoverable. Recover the eSIM before considering a refund.";
+      return "Installation details may be recoverable. Prefer recovery; force refund only after verifying ICCID/provider status.";
     case "ALREADY_REFUNDED":
       return "This purchase was already refunded.";
     case "FINANCIAL_STATE_MISMATCH":
@@ -83,13 +128,42 @@ export function mapProviderEvidenceBlocker(
   }
 }
 
+function collectEvidenceWarnings(
+  input: PartnerRefundExecutionEvidence
+): PartnerRefundEvidenceOverridableBlocker[] {
+  const warnings: PartnerRefundEvidenceOverridableBlocker[] = [];
+  if ((input.requestReason ?? "").trim() === "INSTALL_DETAILS_UNAVAILABLE") {
+    warnings.push("INSTALL_RECOVERY_REQUIRED");
+  }
+  if (input.iccidPresent) {
+    warnings.push("ICCID_PRESENT");
+  }
+  if (input.installEvidencePresent) {
+    warnings.push("INSTALL_DETAILS_PRESENT");
+  }
+  const orderId = (input.orderId ?? "").trim();
+  const orderStatus = (input.orderStatus ?? "").trim().toUpperCase();
+  const purchaseStatus = (input.purchaseStatus ?? "").trim().toUpperCase();
+  if (purchaseStatus === "COMPLETED") {
+    warnings.push("ORDER_ALREADY_FULFILLED");
+  } else if (orderId && orderStatus && orderStatus !== "FAILED") {
+    warnings.push("ORDER_ALREADY_FULFILLED");
+  }
+  return warnings;
+}
+
 /**
  * Local fail-closed gates for Partner refund-request execution.
  * Provider GET confirmation is applied separately by the server executor.
+ *
+ * When `allowEvidenceOverride` is true, provisioned/install/ICCID warnings are
+ * recorded but do not block. Financial integrity gates remain hard.
  */
 export function evaluatePartnerRefundRequestExecutionEligibility(
-  input: PartnerRefundExecutionEvidence
+  input: PartnerRefundExecutionEvidence,
+  options?: { allowEvidenceOverride?: boolean }
 ): PartnerRefundExecutionLocalResult {
+  const allowEvidenceOverride = options?.allowEvidenceOverride === true;
   const requestStatus = (input.requestStatus ?? "").trim().toUpperCase();
   const purchaseStatus = (input.purchaseStatus ?? "").trim().toUpperCase();
   const hasRefund = Boolean((input.refundTransactionId ?? "").trim());
@@ -101,7 +175,7 @@ export function evaluatePartnerRefundRequestExecutionEligibility(
     return { ok: true, alreadyRefunded: true };
   }
   if (requestStatus !== "APPROVED_PENDING_EXECUTION") {
-    return { ok: false, blocker: "NOT_APPROVED" };
+    return { ok: false, blocker: "NOT_APPROVED", overridable: false };
   }
 
   const requestPartnerId = (input.requestPartnerId ?? "").trim();
@@ -111,10 +185,18 @@ export function evaluatePartnerRefundRequestExecutionEligibility(
     !purchasePartnerId ||
     requestPartnerId !== purchasePartnerId
   ) {
-    return { ok: false, blocker: "FINANCIAL_STATE_MISMATCH" };
+    return {
+      ok: false,
+      blocker: "FINANCIAL_STATE_MISMATCH",
+      overridable: false,
+    };
   }
   if ((input.fundingSource ?? "").trim().toUpperCase() !== "PARTNER_BALANCE") {
-    return { ok: false, blocker: "FINANCIAL_STATE_MISMATCH" };
+    return {
+      ok: false,
+      blocker: "FINANCIAL_STATE_MISMATCH",
+      overridable: false,
+    };
   }
   if (
     !Number.isInteger(input.requestPartnerChargeCents) ||
@@ -123,43 +205,56 @@ export function evaluatePartnerRefundRequestExecutionEligibility(
     input.purchasePartnerChargeCents <= 0 ||
     input.requestPartnerChargeCents !== input.purchasePartnerChargeCents
   ) {
-    return { ok: false, blocker: "FINANCIAL_STATE_MISMATCH" };
+    return {
+      ok: false,
+      blocker: "FINANCIAL_STATE_MISMATCH",
+      overridable: false,
+    };
   }
   if (!(input.debitTransactionId ?? "").trim()) {
-    return { ok: false, blocker: "FINANCIAL_STATE_MISMATCH" };
+    return {
+      ok: false,
+      blocker: "FINANCIAL_STATE_MISMATCH",
+      overridable: false,
+    };
   }
   if (
     !Number.isInteger(input.debitAmountCents) ||
     input.debitAmountCents !== input.purchasePartnerChargeCents
   ) {
-    return { ok: false, blocker: "FINANCIAL_STATE_MISMATCH" };
+    return {
+      ok: false,
+      blocker: "FINANCIAL_STATE_MISMATCH",
+      overridable: false,
+    };
   }
 
   if (alreadyRefunded) {
     return { ok: true, alreadyRefunded: true };
   }
   if (hasRefund) {
-    return { ok: false, blocker: "FINANCIAL_STATE_MISMATCH" };
+    return {
+      ok: false,
+      blocker: "FINANCIAL_STATE_MISMATCH",
+      overridable: false,
+    };
   }
 
-  if ((input.requestReason ?? "").trim() === "INSTALL_DETAILS_UNAVAILABLE") {
-    return { ok: false, blocker: "INSTALL_RECOVERY_REQUIRED" };
-  }
-  if (input.iccidPresent) {
-    return { ok: false, blocker: "ICCID_PRESENT" };
-  }
-  if (input.installEvidencePresent) {
-    return { ok: false, blocker: "INSTALL_DETAILS_PRESENT" };
-  }
-
-  const orderId = (input.orderId ?? "").trim();
-  const orderStatus = (input.orderStatus ?? "").trim().toUpperCase();
-  if (purchaseStatus === "COMPLETED") {
-    return { ok: false, blocker: "ORDER_ALREADY_FULFILLED" };
-  }
-  if (orderId && orderStatus && orderStatus !== "FAILED") {
-    return { ok: false, blocker: "ORDER_ALREADY_FULFILLED" };
+  const evidenceWarnings = collectEvidenceWarnings(input);
+  if (evidenceWarnings.length > 0 && !allowEvidenceOverride) {
+    return {
+      ok: false,
+      blocker: evidenceWarnings[0]!,
+      overridable: true,
+    };
   }
 
-  return { ok: true, alreadyRefunded: false };
+  return {
+    ok: true,
+    alreadyRefunded: false,
+    overriddenBlockers:
+      allowEvidenceOverride && evidenceWarnings.length > 0
+        ? evidenceWarnings
+        : undefined,
+  };
 }

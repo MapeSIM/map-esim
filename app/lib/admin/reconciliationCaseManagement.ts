@@ -152,6 +152,7 @@ export type CaseManagementUiState = {
   walletRefundMessage: string;
   partnerRefundSupported: boolean;
   partnerRefundAllowed: boolean;
+  partnerRefundRequiresEvidenceOverride: boolean;
   partnerRefundMessage: string;
   fundFulfillRecoverySupported: boolean;
   fundFulfillRecoveryAllowed: boolean;
@@ -818,11 +819,29 @@ export async function getCaseManagementEligibility(options: {
 
   let partnerRefundMessage =
     "Partner balance refund recovery is not available for this case type.";
+  const partnerHardBlockers = (partnerRefundEligibility?.blockers ?? []).filter(
+    (code) =>
+      !(partnerRefundEligibility?.evidenceWarnings ?? []).includes(code)
+  );
+  const partnerRefundRequiresEvidenceOverride = Boolean(
+    partnerRefundEligibility &&
+      partnerRefundEligibility.evidenceWarnings.length > 0 &&
+      partnerHardBlockers.length === 0
+  );
+  // Allow submit when clean, or when only overridable evidence warnings remain.
+  const partnerRefundAllowed = Boolean(
+    partnerRefundEligibility &&
+      (partnerRefundEligibility.allowed || partnerRefundRequiresEvidenceOverride)
+  );
   if (partnerRefundEligibility) {
-    if (!partnerRefundEligibility.allowed) {
+    if (partnerHardBlockers.length > 0) {
       partnerRefundMessage = partnerRefundEligibility.blockers
         .map(partnerRefundBlockerLabel)
         .join(" ");
+    } else if (partnerRefundRequiresEvidenceOverride) {
+      partnerRefundMessage = `${partnerRefundEligibility.evidenceWarnings
+        .map(partnerRefundBlockerLabel)
+        .join(" ")} Confirm ICCID/provider verification below to force the refund.`;
     } else if (partnerRefundEligibility.alreadyRefunded) {
       partnerRefundMessage =
         "Partner funds already refunded. Submit only confirms idempotent success.";
@@ -962,7 +981,8 @@ export async function getCaseManagementEligibility(options: {
     walletRefundAllowed: Boolean(walletRefundEligibility?.allowed),
     walletRefundMessage,
     partnerRefundSupported,
-    partnerRefundAllowed: Boolean(partnerRefundEligibility?.allowed),
+    partnerRefundAllowed,
+    partnerRefundRequiresEvidenceOverride,
     partnerRefundMessage,
     fundFulfillRecoverySupported: fundFulfillSupported,
     fundFulfillRecoveryAllowed: Boolean(fundFulfillEligibility?.allowed),

@@ -211,6 +211,8 @@ function runOfflineChecks(): void {
   assert.match(actions, /assertSameOriginAdminRequest/);
   assert.match(actions, /void formData\.get\("amount"\)/);
   assert.match(form, /Execute Partner refund/);
+  assert.match(form, /forceEvidenceOverride/);
+  assert.match(form, /Force execute Partner refund/);
   assert.match(form, /REFUND_PARTNER_FUNDS_PHRASE/);
   assert.doesNotMatch(form, /name=["']amount["']/);
   assert.match(wallet, /Disabled Partners may still receive ESIM_PURCHASE_REFUND/);
@@ -237,6 +239,31 @@ function runOfflineChecks(): void {
   assert.equal(blocked.ok, false);
   if (!blocked.ok) {
     assert.equal(blocked.blocker, "INSTALL_RECOVERY_REQUIRED");
+    assert.equal(blocked.overridable, true);
+  }
+  const forced = evaluatePartnerRefundRequestExecutionEligibility(
+    {
+      requestStatus: "APPROVED_PENDING_EXECUTION",
+      requestReason: "INSTALL_DETAILS_UNAVAILABLE",
+      requestPartnerId: "p1",
+      requestPartnerChargeCents: 66,
+      purchasePartnerId: "p1",
+      purchaseStatus: "RECONCILIATION_REQUIRED",
+      fundingSource: "PARTNER_BALANCE",
+      purchasePartnerChargeCents: 66,
+      debitTransactionId: "d1",
+      debitAmountCents: 66,
+      refundTransactionId: null,
+      orderId: null,
+      orderStatus: null,
+      iccidPresent: true,
+      installEvidencePresent: true,
+    },
+    { allowEvidenceOverride: true }
+  );
+  assert.equal(forced.ok, true);
+  if (forced.ok) {
+    assert.ok((forced.overriddenBlockers?.length ?? 0) >= 1);
   }
   assert.match(
     partnerRefundExecutionBlockerLabel("ICCID_PRESENT"),
@@ -521,7 +548,16 @@ async function main() {
         }),
       "ICCID_PRESENT"
     );
-    console.log("PASS N_iccid_blocked");
+    const iccidForced = await executeAdminPartnerRefundRequest({
+      adminUserId: admin.id,
+      requestId: iccidId,
+      confirmPhrase: REFUND_PARTNER_FUNDS_PHRASE,
+      forceEvidenceOverride: true,
+      confirmProviderFailureFn: confirmOk,
+    });
+    assert.equal(iccidForced.status, "COMPLETED");
+    assert.equal(iccidForced.idempotent, false);
+    console.log("PASS N_iccid_blocked_then_force_ok");
 
     const install = await seedEligiblePurchase(prisma, {
       partnerId,
@@ -543,7 +579,15 @@ async function main() {
         }),
       "INSTALL_DETAILS_PRESENT"
     );
-    console.log("PASS O_install_data_blocked");
+    const installForced = await executeAdminPartnerRefundRequest({
+      adminUserId: admin.id,
+      requestId: installId,
+      confirmPhrase: REFUND_PARTNER_FUNDS_PHRASE,
+      forceEvidenceOverride: true,
+      confirmProviderFailureFn: confirmOk,
+    });
+    assert.equal(installForced.status, "COMPLETED");
+    console.log("PASS O_install_data_blocked_then_force_ok");
 
     const missing = await seedEligiblePurchase(prisma, {
       partnerId,
@@ -577,6 +621,22 @@ async function main() {
         })
       ).balanceCents,
       balBeforeMis
+    );
+    const missingForced = await executeAdminPartnerRefundRequest({
+      adminUserId: admin.id,
+      requestId: missingId,
+      confirmPhrase: REFUND_PARTNER_FUNDS_PHRASE,
+      forceEvidenceOverride: true,
+      confirmProviderFailureFn: confirmOk,
+    });
+    assert.equal(missingForced.status, "COMPLETED");
+    assert.equal(
+      (
+        await prisma.partnerWalletAccount.findUniqueOrThrow({
+          where: { partnerId },
+        })
+      ).balanceCents,
+      balBeforeMis + 66
     );
     console.log("PASS P_missing_install_recovery_required");
 

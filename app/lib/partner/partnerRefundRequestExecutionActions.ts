@@ -17,7 +17,7 @@ export type AdminPartnerRefundExecuteFormState =
       ok: false;
       error: string;
       blocker?: string;
-      fieldErrors?: { confirmPhrase?: string };
+      fieldErrors?: { confirmPhrase?: string; forceEvidenceOverride?: string };
     };
 
 export async function adminPartnerRefundRequestExecuteAction(
@@ -43,6 +43,7 @@ export async function adminPartnerRefundRequestExecuteAction(
 
   const requestId = String(formData.get("requestId") ?? "").trim();
   const confirmPhrase = formData.get("confirmPhrase");
+  const forceEvidenceOverride = formData.get("forceEvidenceOverride");
   if (!requestId) {
     return { ok: false, error: "This Partner refund request is unavailable." };
   }
@@ -52,6 +53,7 @@ export async function adminPartnerRefundRequestExecuteAction(
       adminUserId: admin.id,
       requestId,
       confirmPhrase,
+      forceEvidenceOverride,
       amount: formData.get("amount"),
       amountCents: formData.get("amountCents"),
       partnerId: formData.get("partnerId"),

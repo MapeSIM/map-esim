@@ -119,8 +119,10 @@ export default async function AdminPartnerRefundRequestDetailPage({
           className="rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-bg)] px-4 py-3 text-sm text-[var(--warning-text)]"
           role="status"
         >
-          This order appears provisioned. Refund execution will remain blocked
-          unless later eligibility checks pass.
+          This order appears provisioned (ICCID or install evidence present).
+          Prefer recovering install details for the Partner. An approved refund
+          can still be force-executed after you verify the ICCID and provider
+          status.
         </p>
       ) : null}
 
@@ -171,6 +173,7 @@ export default async function AdminPartnerRefundRequestDetailPage({
           debitLabel={detail.debitLabel}
           refundBasisLabel={detail.refundBasisLabel}
           localBlockerLabel={detail.localExecutionBlockerLabel}
+          evidenceOverrideRequired={detail.localExecutionBlockerOverridable}
         />
       ) : null}
     </div>

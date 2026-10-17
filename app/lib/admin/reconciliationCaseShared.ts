@@ -1214,12 +1214,35 @@ export type PartnerRefundLocalInput = Omit<
   partnerChargeCents?: number | null;
 };
 
-export type PartnerRefundEligibility = WalletRefundEligibility;
+/** Soft fulfilment evidence — admin may force-override after ICCID/provider check. */
+export const PARTNER_REFUND_LOCAL_EVIDENCE_OVERRIDABLE_BLOCKERS = [
+  "fulfilment_iccid_present",
+  "fulfilment_install_evidence",
+  "usable_local_order_exists",
+  "purchase_already_completed",
+] as const;
+
+export function isPartnerRefundLocalEvidenceOverridableBlocker(
+  code: string
+): boolean {
+  return (
+    PARTNER_REFUND_LOCAL_EVIDENCE_OVERRIDABLE_BLOCKERS as readonly string[]
+  ).includes(code);
+}
+
+export type PartnerRefundEligibility = WalletRefundEligibility & {
+  /** Soft evidence warnings present; force override required to proceed. */
+  requiresEvidenceOverride: boolean;
+  evidenceWarnings: string[];
+};
 
 export function evaluatePartnerRefundLocalEligibility(
-  input: PartnerRefundLocalInput
+  input: PartnerRefundLocalInput,
+  options?: { allowEvidenceOverride?: boolean }
 ): PartnerRefundEligibility {
+  const allowEvidenceOverride = options?.allowEvidenceOverride === true;
   const blockers: string[] = [];
+  const evidenceWarnings: string[] = [];
   const status = (input.status ?? "").trim().toUpperCase();
   const hasRefund = Boolean((input.refundTransactionId ?? "").trim());
   const alreadyRefunded = status === "FAILED_REFUNDED" && hasRefund;
@@ -1230,6 +1253,8 @@ export function evaluatePartnerRefundLocalEligibility(
       blockers: ["unsupported_source"],
       supported: false,
       alreadyRefunded: false,
+      requiresEvidenceOverride: false,
+      evidenceWarnings: [],
     };
   }
 
@@ -1272,32 +1297,42 @@ export function evaluatePartnerRefundLocalEligibility(
   }
 
   if (input.fulfilmentIccidPresent) {
-    blockers.push("fulfilment_iccid_present");
+    evidenceWarnings.push("fulfilment_iccid_present");
   }
   if (input.providerInstallDataPresent) {
-    blockers.push("fulfilment_install_evidence");
+    evidenceWarnings.push("fulfilment_install_evidence");
   }
 
   const orderId = (input.orderId ?? "").trim();
   const orderStatus = (input.orderStatus ?? "").trim().toUpperCase();
   if (orderId && orderStatus !== "FAILED") {
-    blockers.push("usable_local_order_exists");
+    evidenceWarnings.push("usable_local_order_exists");
   }
 
   if (alreadyRefunded) {
+    const all = [...blockers, ...(allowEvidenceOverride ? [] : evidenceWarnings)];
     return {
-      allowed: blockers.length === 0,
-      blockers,
+      allowed: all.length === 0,
+      blockers: all,
       supported: true,
       alreadyRefunded: true,
+      requiresEvidenceOverride: evidenceWarnings.length > 0,
+      evidenceWarnings,
     };
   }
 
   if (hasRefund) blockers.push("incomplete_or_conflicting_refund");
   if (!isRefundRecoveryStatus(status)) {
-    blockers.push("not_refund_recovery_state");
+    // COMPLETED is overridable evidence when admin force-refunds a provisioned order.
+    if (status === "COMPLETED") {
+      evidenceWarnings.push("purchase_already_completed");
+    } else {
+      blockers.push("not_refund_recovery_state");
+    }
   }
-  if (status === "COMPLETED") blockers.push("purchase_already_completed");
+  if (status === "COMPLETED" && !evidenceWarnings.includes("purchase_already_completed")) {
+    evidenceWarnings.push("purchase_already_completed");
+  }
 
   const debitStatus = (input.debitStatus ?? "").trim().toUpperCase();
   if (debitStatus && debitStatus !== "COMPLETED") {
@@ -1305,11 +1340,18 @@ export function evaluatePartnerRefundLocalEligibility(
   }
   if (!debitStatus) blockers.push("missing_debit_reservation");
 
+  const effectiveBlockers = [
+    ...blockers,
+    ...(allowEvidenceOverride ? [] : evidenceWarnings),
+  ];
+
   return {
-    allowed: blockers.length === 0,
-    blockers,
+    allowed: effectiveBlockers.length === 0,
+    blockers: effectiveBlockers,
     supported: true,
     alreadyRefunded: false,
+    requiresEvidenceOverride: evidenceWarnings.length > 0,
+    evidenceWarnings,
   };
 }
 
@@ -1395,6 +1437,27 @@ export function evaluateProviderRefundEvidence(
   return { ok: true };
 }
 
+/**
+ * Same as {@link evaluateProviderRefundEvidence}, but treats install/ICCID /
+ * still-fulfilled evidence as overridable when `allowEvidenceOverride` is set.
+ */
+export function evaluateProviderRefundEvidenceWithOverride(
+  input: ProviderRefundEvidenceInput,
+  options?: { allowEvidenceOverride?: boolean }
+): ProviderRefundEvidenceResult {
+  const result = evaluateProviderRefundEvidence(input);
+  if (result.ok) return result;
+  if (
+    options?.allowEvidenceOverride === true &&
+    (result.blocker === "fulfilment_install_evidence" ||
+      result.blocker === "provider_still_fulfilled")
+  ) {
+    // ICCID is checked on the local eligibility path; install/fulfilled may be overridden.
+    return { ok: true };
+  }
+  return result;
+}
+
 export function walletRefundBlockerLabel(code: string): string {
   switch (code) {
     case "unsupported_source":
@@ -1422,11 +1485,11 @@ export function walletRefundBlockerLabel(code: string): string {
     case "debit_amount_mismatch":
       return "Debit amount does not match the purchase price.";
     case "fulfilment_iccid_present":
-      return "Fulfilment ICCID evidence exists; automatic refund is blocked.";
+      return "Fulfilment ICCID evidence exists. Verify the ICCID before forcing a refund.";
     case "fulfilment_install_evidence":
-      return "Provider install/fulfilment evidence exists; automatic refund is blocked.";
+      return "Provider install/fulfilment evidence exists. Verify provider status before forcing a refund.";
     case "usable_local_order_exists":
-      return "A usable local order exists; automatic refund is blocked.";
+      return "A usable local order exists. Verify ICCID/provider status before forcing a refund.";
     case "incomplete_or_conflicting_refund":
       return "An incomplete or conflicting refund already exists.";
     case "not_refund_recovery_state":

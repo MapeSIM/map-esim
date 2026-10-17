@@ -181,6 +181,8 @@ export type AdminPartnerRefundRequestDetail = {
   canExecute: boolean;
   localExecutionBlocker: string | null;
   localExecutionBlockerLabel: string | null;
+  /** Soft evidence blocker — admin may force execute after ICCID/provider check. */
+  localExecutionBlockerOverridable: boolean;
 };
 
 function hasReconciliationCase(purchase: {
@@ -305,6 +307,8 @@ export async function getAdminPartnerRefundRequestDetail(
     !localExec.ok
       ? localExec.blocker
       : null;
+  const localExecutionBlockerOverridable =
+    !localExec.ok && localExec.overridable === true;
 
   return {
     id: row.id,
@@ -345,6 +349,7 @@ export async function getAdminPartnerRefundRequestDetail(
     localExecutionBlockerLabel: localExecutionBlocker
       ? partnerRefundExecutionBlockerLabel(localExecutionBlocker)
       : null,
+    localExecutionBlockerOverridable,
   };
 }
 

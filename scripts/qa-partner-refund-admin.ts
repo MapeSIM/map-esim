@@ -188,6 +188,11 @@ function runOfflineChecks(): void {
     partnerDetail,
     /This order appears provisioned/
   );
+  assert.match(partnerDetail, /force-executed after you verify the ICCID/);
+  assert.doesNotMatch(
+    partnerDetail,
+    /Refund execution will remain blocked/
+  );
   assert.doesNotMatch(partnerDetail, /name=["']amount["']/);
   assert.doesNotMatch(form, /name=["']amount["']/);
   assert.match(form, /Start review/);

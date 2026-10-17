@@ -282,6 +282,9 @@ export async function refundReconciliationPartnerPurchaseAction(
     attemptId,
     reason: String(formData.get("reason") ?? ""),
     confirmPhrase: String(formData.get("confirmPhrase") ?? ""),
+    forceEvidenceOverride: String(
+      formData.get("forceEvidenceOverride") ?? ""
+    ),
   });
   if (result.ok) revalidateCase(sourceType, attemptId);
   return result;

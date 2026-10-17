@@ -272,6 +272,9 @@ export default async function AdminReconciliationDetailPage({
           walletRefundMessage={caseUi.walletRefundMessage}
           partnerRefundSupported={caseUi.partnerRefundSupported}
           partnerRefundAllowed={caseUi.partnerRefundAllowed}
+          partnerRefundRequiresEvidenceOverride={
+            caseUi.partnerRefundRequiresEvidenceOverride
+          }
           partnerRefundMessage={caseUi.partnerRefundMessage}
           fundFulfillRecoverySupported={caseUi.fundFulfillRecoverySupported}
           fundFulfillRecoveryAllowed={caseUi.fundFulfillRecoveryAllowed}
