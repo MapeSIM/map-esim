@@ -40,11 +40,18 @@ export function isPartnerRefundEvidenceOverridableBlocker(
   return OVERRIDABLE_SET.has(code);
 }
 
-/** Provider-confirm blockers that map to the same overridable evidence class. */
+/**
+ * Provider-confirm blockers an admin may force-override after verifying
+ * ICCID / provider console status. Auth / environment failures stay hard.
+ */
 export const PARTNER_REFUND_PROVIDER_OVERRIDABLE_BLOCKERS = [
   "fulfilment_install_evidence",
   "fulfilment_iccid_present",
   "provider_still_fulfilled",
+  "provider_failure_not_conclusive",
+  "provider_not_found",
+  "provider_order_not_confirmed",
+  "missing_provider_reference",
 ] as const;
 
 export function isPartnerRefundProviderOverridableBlocker(code: string): boolean {

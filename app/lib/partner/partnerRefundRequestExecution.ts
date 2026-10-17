@@ -312,33 +312,44 @@ export async function executeAdminPartnerRefundRequest(
     };
   }
 
-  const confirmFn = input.confirmProviderFailureFn ?? confirmProviderFailure;
-  const providerOk = await confirmFn({
-    providerOrderId: (purchase.providerOrderId ?? "").trim(),
-    expectedOfferId: purchase.offerId,
-  });
-  if (!providerOk.ok) {
-    const providerBlocker = providerOk.blocker;
-    if (
-      forceEvidenceOverride &&
-      isPartnerRefundProviderOverridableBlocker(providerBlocker)
-    ) {
-      await audit(admin.id, PARTNER_REFUND_AUDIT.EXECUTION_STARTED, request.id, {
-        ...baseMeta,
-        providerEvidenceOverride: providerBlocker,
-      });
-    } else {
-      const blocker = mapProviderEvidenceBlocker(providerBlocker);
-      await audit(admin.id, PARTNER_REFUND_AUDIT.EXECUTION_BLOCKED, request.id, {
-        ...baseMeta,
-        blocker,
-        providerBlocker,
-      });
-      throwBlocked(blocker);
-    }
-  }
-
   try {
+    const confirmFn = input.confirmProviderFailureFn ?? confirmProviderFailure;
+    const providerOk = await confirmFn({
+      providerOrderId: (purchase.providerOrderId ?? "").trim(),
+      expectedOfferId: purchase.offerId,
+      allowEvidenceOverride: forceEvidenceOverride,
+    });
+    if (!providerOk.ok) {
+      const providerBlocker = providerOk.blocker;
+      if (
+        forceEvidenceOverride &&
+        isPartnerRefundProviderOverridableBlocker(providerBlocker)
+      ) {
+        await audit(
+          admin.id,
+          PARTNER_REFUND_AUDIT.EXECUTION_STARTED,
+          request.id,
+          {
+            ...baseMeta,
+            providerEvidenceOverride: providerBlocker,
+          }
+        );
+      } else {
+        const blocker = mapProviderEvidenceBlocker(providerBlocker);
+        await audit(
+          admin.id,
+          PARTNER_REFUND_AUDIT.EXECUTION_BLOCKED,
+          request.id,
+          {
+            ...baseMeta,
+            blocker,
+            providerBlocker,
+          }
+        );
+        throwBlocked(blocker);
+      }
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       const freshRequest = await tx.partnerRefundRequest.findUnique({
         where: { id: request.id },
@@ -530,6 +541,14 @@ export async function executeAdminPartnerRefundRequest(
     };
   } catch (error) {
     if (error instanceof PartnerRefundRequestExecutionError) throw error;
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "name" in error &&
+      (error as { name: unknown }).name === "PartnerRefundRequestExecutionError"
+    ) {
+      throw error;
+    }
     if (error instanceof PartnerPurchaseWalletError) {
       const blocker: PartnerRefundExecutionBlocker =
         error.code === "PARTNER_UNAVAILABLE"
@@ -541,6 +560,15 @@ export async function executeAdminPartnerRefundRequest(
       });
       throwBlocked(blocker);
     }
+    console.error("partner_refund_execute_unexpected", {
+      requestId,
+      forceEvidenceOverride,
+      name: error instanceof Error ? error.name : typeof error,
+      message:
+        error instanceof Error
+          ? error.message.slice(0, 500)
+          : String(error).slice(0, 500),
+    });
     throw new PartnerRefundRequestExecutionError(
       "UNAVAILABLE",
       "Partner refund execution is temporarily unavailable."

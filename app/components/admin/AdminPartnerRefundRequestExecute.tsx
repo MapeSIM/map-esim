@@ -108,18 +108,24 @@ export default function AdminPartnerRefundRequestExecute({
         </div>
         <button
           type="submit"
-          disabled={
-            pending || (evidenceOverrideRequired && !forceChecked)
-          }
+          disabled={pending || (evidenceOverrideRequired && !forceChecked)}
+          aria-disabled={pending || (evidenceOverrideRequired && !forceChecked)}
           className="inline-flex h-10 min-w-0 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-white disabled:opacity-60"
         >
-          {evidenceOverrideRequired
-            ? "Force execute Partner refund"
-            : "Execute Partner refund"}
+          {pending
+            ? "Refunding…"
+            : evidenceOverrideRequired
+              ? "Force execute Partner refund"
+              : "Execute Partner refund"}
         </button>
         {state && !state.ok && state.error && !state.fieldErrors ? (
           <p className="text-sm text-[var(--danger-text)]" role="alert">
             {state.error}
+            {state.blocker ? (
+              <span className="mt-1 block text-xs opacity-80">
+                Code: {state.blocker}
+              </span>
+            ) : null}
           </p>
         ) : null}
         {state && state.ok ? (

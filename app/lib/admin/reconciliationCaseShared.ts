@@ -1437,9 +1437,20 @@ export function evaluateProviderRefundEvidence(
   return { ok: true };
 }
 
+const PROVIDER_EVIDENCE_OVERRIDABLE_BLOCKERS = new Set([
+  "fulfilment_install_evidence",
+  "fulfilment_iccid_present",
+  "provider_still_fulfilled",
+  "provider_failure_not_conclusive",
+  "provider_not_found",
+  "provider_order_not_confirmed",
+  "missing_provider_reference",
+]);
+
 /**
- * Same as {@link evaluateProviderRefundEvidence}, but treats install/ICCID /
- * still-fulfilled evidence as overridable when `allowEvidenceOverride` is set.
+ * Same as {@link evaluateProviderRefundEvidence}, but treats install /
+ * fulfilled / inconclusive evidence as overridable when forced by an admin
+ * who verified ICCID / provider console status.
  */
 export function evaluateProviderRefundEvidenceWithOverride(
   input: ProviderRefundEvidenceInput,
@@ -1449,10 +1460,8 @@ export function evaluateProviderRefundEvidenceWithOverride(
   if (result.ok) return result;
   if (
     options?.allowEvidenceOverride === true &&
-    (result.blocker === "fulfilment_install_evidence" ||
-      result.blocker === "provider_still_fulfilled")
+    PROVIDER_EVIDENCE_OVERRIDABLE_BLOCKERS.has(result.blocker)
   ) {
-    // ICCID is checked on the local eligibility path; install/fulfilled may be overridden.
     return { ok: true };
   }
   return result;
