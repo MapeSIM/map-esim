@@ -7,6 +7,7 @@ import {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
   useTransition,
 } from "react";
@@ -152,6 +153,21 @@ export default function PartnerCatalogBuy({
   const [idempotencyByOffer, setIdempotencyByOffer] = useState<
     Record<string, string>
   >({});
+  const buyWasPending = useRef(false);
+
+  // After each Issue eSIM attempt, mint fresh keys so the next click is a new VeSIM order.
+  useEffect(() => {
+    if (buyWasPending.current && !buyPending) {
+      setIdempotencyByOffer((prev) => {
+        const next: Record<string, string> = {};
+        for (const offerId of Object.keys(prev)) {
+          next[offerId] = newIdempotencyKey();
+        }
+        return next;
+      });
+    }
+    buyWasPending.current = buyPending;
+  }, [buyPending]);
 
   const searchDestinations = useMemo(
     () => destinations.map(toSearchDestination),
@@ -284,8 +300,8 @@ export default function PartnerCatalogBuy({
               </Link>
             ) : (
               <p className="w-full text-xs text-[var(--text-muted)]">
-                Try the same plan again below — the same purchase attempt is
-                resumed so your Partner balance is not charged twice.
+                Failed attempts refund Partner balance automatically. Issue eSIM
+                again below to create a brand-new provider order.
               </p>
             )}
             <Link

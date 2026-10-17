@@ -51,8 +51,8 @@ export const PARTNER_ESIM_PURCHASE_RECONCILIATION_AUDIT =
 
 /** Interactive tx bounds for local finalize/refund (DB-only; provider stays outside). */
 const PARTNER_PURCHASE_CRITICAL_TX = {
-  maxWait: 5_000,
-  timeout: 15_000,
+  maxWait: 8_000,
+  timeout: 20_000,
 } as const;
 
 export type PartnerProviderCheckoutExecutor = (options: {
@@ -1010,135 +1010,154 @@ async function executeClaimedPartnerEsimProviderPurchase(options: {
   }
 
   let orderId: string | null = null;
-  try {
-    const finalized = await prisma.$transaction(async (tx) => {
-      const current = await tx.partnerEsimPurchase.findUnique({
-        where: { id: purchase.id },
-        select: {
-          status: true,
-          orderId: true,
-          debitTransactionId: true,
-          partnerChargeCents: true,
-        },
-      });
-      if (
-        current?.status === PartnerEsimPurchaseStatus.COMPLETED &&
-        current.orderId
-      ) {
-        return { id: current.orderId };
-      }
-      if (current?.status !== PartnerEsimPurchaseStatus.PROVIDER_PENDING) {
-        throw new PartnerEsimPurchaseError(
-          "RECONCILIATION_REQUIRED",
-          "This purchase requires reconciliation. Do not retry."
-        );
-      }
+  let lastFinalizeError: unknown = null;
+  const maxFinalizeAttempts = 2;
 
-      const order = await persistAssignedOrder(tx, {
-        providerOrderId: successCheckout.providerOrderId,
-        customerUserId: partner.partnerUserId,
-        customerEmail: partner.partnerEmail,
-        verifiedOffer,
-        fundingSource: OrderFundingSource.PARTNER_BALANCE,
-        status: OrderStatus.COMPLETED,
-        checkoutPayload: successCheckout.payload,
-        allowSharedIccid: Boolean(addDataSourceOrderId),
-      });
+  for (let attempt = 1; attempt <= maxFinalizeAttempts; attempt += 1) {
+    try {
+      const finalized = await prisma.$transaction(async (tx) => {
+        const current = await tx.partnerEsimPurchase.findUnique({
+          where: { id: purchase.id },
+          select: {
+            status: true,
+            orderId: true,
+            debitTransactionId: true,
+            partnerChargeCents: true,
+          },
+        });
+        if (
+          current?.status === PartnerEsimPurchaseStatus.COMPLETED &&
+          current.orderId
+        ) {
+          return { id: current.orderId };
+        }
+        if (current?.status !== PartnerEsimPurchaseStatus.PROVIDER_PENDING) {
+          throw new PartnerEsimPurchaseError(
+            "RECONCILIATION_REQUIRED",
+            "This purchase requires reconciliation. Do not retry."
+          );
+        }
 
-      if (options.afterOrderPersistInTx) {
-        await options.afterOrderPersistInTx(tx);
-      }
+        const order = await persistAssignedOrder(tx, {
+          providerOrderId: successCheckout.providerOrderId,
+          customerUserId: partner.partnerUserId,
+          customerEmail: partner.partnerEmail,
+          verifiedOffer,
+          fundingSource: OrderFundingSource.PARTNER_BALANCE,
+          status: OrderStatus.COMPLETED,
+          checkoutPayload: successCheckout.payload,
+          allowSharedIccid: Boolean(addDataSourceOrderId),
+        });
 
-      await tx.partnerEsimPurchase.update({
-        where: { id: purchase.id },
-        data: {
-          status: PartnerEsimPurchaseStatus.COMPLETED,
-          orderId: order.id,
-          providerOrderId: order.providerOrderId,
-          completedAt: new Date(),
-          failureCategory: null,
-          failureCode: null,
-          reconciliationState: null,
-          providerRefreshClaimedAt: null,
-        },
-      });
+        if (options.afterOrderPersistInTx) {
+          await options.afterOrderPersistInTx(tx);
+        }
 
-      await tx.auditLog.create({
-        data: {
-          actorUserId: partner.partnerUserId,
-          action: PARTNER_ESIM_PURCHASE_COMPLETED_AUDIT,
-          targetType: "PartnerEsimPurchase",
-          targetId: purchase.id,
-          metadata: {
-            purchaseId: purchase.id,
+        await tx.partnerEsimPurchase.update({
+          where: { id: purchase.id },
+          data: {
+            status: PartnerEsimPurchaseStatus.COMPLETED,
             orderId: order.id,
-            offerId: purchase.offerId,
-            fundingSource: OrderFundingSource.PARTNER_BALANCE,
-            partnerChargeCents: purchase.partnerChargeCents,
-            retailPriceCents: purchase.retailPriceCents,
-            debitTransactionId: current.debitTransactionId,
-          } satisfies Prisma.InputJsonValue,
+            providerOrderId: order.providerOrderId,
+            completedAt: new Date(),
+            failureCategory: null,
+            failureCode: null,
+            reconciliationState: null,
+            providerRefreshClaimedAt: null,
+          },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            actorUserId: partner.partnerUserId,
+            action: PARTNER_ESIM_PURCHASE_COMPLETED_AUDIT,
+            targetType: "PartnerEsimPurchase",
+            targetId: purchase.id,
+            metadata: {
+              purchaseId: purchase.id,
+              orderId: order.id,
+              offerId: purchase.offerId,
+              fundingSource: OrderFundingSource.PARTNER_BALANCE,
+              partnerChargeCents: purchase.partnerChargeCents,
+              retailPriceCents: purchase.retailPriceCents,
+              debitTransactionId: current.debitTransactionId,
+              providerOrderId: order.providerOrderId,
+            } satisfies Prisma.InputJsonValue,
+          },
+        });
+
+        return order;
+      }, PARTNER_PURCHASE_CRITICAL_TX);
+      orderId = finalized.id;
+      lastFinalizeError = null;
+      break;
+    } catch (error) {
+      lastFinalizeError = error;
+      if (error instanceof PartnerEsimPurchaseError) throw error;
+      const persistDiagnostic = classifyOrderPersistError(error);
+      const retryable =
+        attempt < maxFinalizeAttempts &&
+        (persistDiagnostic.persistErrorCode === "transaction_conflict" ||
+          persistDiagnostic.persistErrorCode === "order_persist_unknown");
+      console.error("partner_esim_finalize", {
+        step: "finalize_failed",
+        attempt,
+        retryable,
+        purchaseId: purchase.id,
+        partnerId: partner.partnerId,
+        offerId: purchase.offerId,
+        providerOrderId: successCheckout.providerOrderId.slice(0, 64),
+        persistErrorCode: persistDiagnostic.persistErrorCode,
+        name: error instanceof Error ? error.name : typeof error,
+        message:
+          error instanceof Error
+            ? error.message.slice(0, 500)
+            : String(error).slice(0, 500),
+      });
+      if (retryable) {
+        await new Promise((resolve) => setTimeout(resolve, 150 * attempt));
+        continue;
+      }
+      reportServerError(error, {
+        operation: "partner_esim_finalize",
+        purchaseType: "partner",
+        purchaseId: purchase.id,
+        provider: "VESIM",
+        errorCode: persistDiagnostic.persistErrorCode,
+        extras: {
+          offerId: purchase.offerId,
+          providerOrderId: successCheckout.providerOrderId.slice(0, 64),
         },
       });
+      await markPartnerReconciliationRequired({
+        purchaseId: purchase.id,
+        partnerUserId: partner.partnerUserId,
+        category: "local_finalize_failed",
+        code: "order_persist_error",
+        persistDiagnostic: {
+          persistErrorCode: persistDiagnostic.persistErrorCode,
+          family: persistDiagnostic.family,
+          targetEntity: persistDiagnostic.targetEntity,
+          providerOrderId: successCheckout.providerOrderId,
+        },
+        providerObservation: {
+          providerOrderId: successCheckout.providerOrderId,
+          providerResultKind: "success",
+          safeProviderStatusCode: "local_finalize_failed",
+        },
+      });
+    }
+  }
 
-      return order;
-    }, PARTNER_PURCHASE_CRITICAL_TX);
-    orderId = finalized.id;
-  } catch (error) {
-    console.error("partner_esim_finalize", {
-      step: "finalize_failed",
-      purchaseId: purchase.id,
-      partnerId: partner.partnerId,
-      offerId: purchase.offerId,
-      status: PartnerEsimPurchaseStatus.PROVIDER_PENDING,
-      name: error instanceof Error ? error.name : typeof error,
-      code:
-        error instanceof PartnerEsimPurchaseError
-          ? error.code
-          : error && typeof error === "object" && "code" in error
-            ? String((error as { code?: unknown }).code ?? "").slice(0, 64)
-            : undefined,
-      message:
-        error instanceof Error
-          ? error.message.slice(0, 500)
-          : String(error).slice(0, 500),
-    });
-    reportServerError(error, {
-      operation: "partner_esim_finalize",
-      purchaseType: "partner",
-      purchaseId: purchase.id,
-      provider: "VESIM",
-      errorCode:
-        error instanceof PartnerEsimPurchaseError
-          ? error.code
-          : error && typeof error === "object" && "code" in error
-            ? String((error as { code?: unknown }).code ?? "").slice(0, 64)
-            : undefined,
-      extras: { offerId: purchase.offerId },
-    });
-    if (error instanceof PartnerEsimPurchaseError) throw error;
-    const persistDiagnostic = classifyOrderPersistError(error);
-    console.error(
-      "Partner local finalize persist failed",
-      persistDiagnostic.persistErrorCode
+  if (!orderId) {
+    // markPartnerReconciliationRequired throws; defensive fallback.
+    if (lastFinalizeError instanceof PartnerEsimPurchaseError) {
+      throw lastFinalizeError;
+    }
+    throw new PartnerEsimPurchaseError(
+      "RECONCILIATION_REQUIRED",
+      "This purchase requires reconciliation. Do not retry."
     );
-    await markPartnerReconciliationRequired({
-      purchaseId: purchase.id,
-      partnerUserId: partner.partnerUserId,
-      category: "local_finalize_failed",
-      code: "order_persist_error",
-      persistDiagnostic: {
-        persistErrorCode: persistDiagnostic.persistErrorCode,
-        family: persistDiagnostic.family,
-        targetEntity: persistDiagnostic.targetEntity,
-        providerOrderId: successCheckout.providerOrderId,
-      },
-      providerObservation: {
-        providerOrderId: successCheckout.providerOrderId,
-        providerResultKind: "success",
-        safeProviderStatusCode: "local_finalize_failed",
-      },
-    });
   }
 
   return {

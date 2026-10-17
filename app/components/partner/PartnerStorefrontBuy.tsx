@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { buyPartnerEsimAction } from "@/app/lib/partner/partnerPurchaseActions";
 import type { PartnerCatalogOffer } from "@/app/lib/partner/partnerCatalogRead";
@@ -35,9 +35,9 @@ export default function PartnerStorefrontBuy({
     buyPartnerEsimAction,
     initialPartnerPurchaseActionState
   );
-  // Keep stable across failed attempts so PROVIDER_PENDING can resume.
-  // Rotate only after a completed purchase.
+  // Fresh key for every Issue eSIM click (new VeSIM order). Stable only while pending.
   const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey);
+  const wasPending = useRef(false);
   const payableCents =
     offer.partnerPriceCents > 0
       ? offer.partnerPriceCents
@@ -45,49 +45,13 @@ export default function PartnerStorefrontBuy({
         ? offer.fundingDisplay.totalCents
         : 0;
 
-  const purchaseSucceeded =
-    buyState.ok === true &&
-    (buyState.kind === "success" || buyState.kind === "duplicate_success");
-
   useEffect(() => {
-    if (purchaseSucceeded) {
+    if (wasPending.current && !buyPending) {
+      // Attempt finished (success redirects away; failure stays) — next click is unique.
       setIdempotencyKey(newIdempotencyKey());
     }
-  }, [purchaseSucceeded]);
-
-  if (purchaseSucceeded) {
-    return (
-      <div className="space-y-6">
-        <div
-          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4"
-          role="status"
-        >
-          <p className="text-sm font-semibold text-[var(--heading)]">
-            {buyState.kind === "duplicate_success"
-              ? "Already completed"
-              : "Purchase complete"}
-          </p>
-          <p className="mt-2 text-sm text-[var(--text-muted)]">
-            {"message" in buyState ? buyState.message : null}
-          </p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Link
-              href="/partner/orders"
-              className="inline-flex h-10 items-center rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)]"
-            >
-              My eSIMs
-            </Link>
-            <Link
-              href="/partner/catalog"
-              className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)]"
-            >
-              Browse catalog
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
+    wasPending.current = buyPending;
+  }, [buyPending]);
 
   return (
     <div className="space-y-6">
@@ -98,7 +62,8 @@ export default function PartnerStorefrontBuy({
           ).
         </p>
         <p className="mt-1 text-[var(--text-muted)]">
-          The price below is your Partner price for this plan.
+          The price below is your Partner price for this plan. Each Issue eSIM
+          creates a new provider order.
         </p>
         {splitPaymentEnabled ? (
           <p className="mt-2 text-xs text-[var(--text-muted)]">
@@ -122,9 +87,17 @@ export default function PartnerStorefrontBuy({
             {"message" in buyState ? buyState.message : null}
           </p>
           <p className="mt-2 text-xs text-[var(--text-muted)]">
-            You can try again below — your Partner balance is not charged twice
-            for the same attempt.
+            Failed attempts refund Partner balance automatically. Try again to
+            issue a new eSIM.
           </p>
+          <div className="mt-4">
+            <Link
+              href="/partner/orders"
+              className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)]"
+            >
+              My eSIMs
+            </Link>
+          </div>
         </div>
       ) : null}
 

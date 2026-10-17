@@ -39,6 +39,8 @@ export type PartnerPurchaseActionState =
       ok: true;
       kind: "success" | "duplicate_success";
       purchaseId: string;
+      /** Local Order id when linked — used to open /partner/orders. */
+      orderId?: string | null;
       message: string;
     }
   | {

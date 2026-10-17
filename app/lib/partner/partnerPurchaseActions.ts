@@ -203,6 +203,18 @@ export async function buyPartnerEsimAction(
       // Must stay outside try/catch — redirect() throws NEXT_REDIRECT.
       redirect(result.checkoutUrl);
     }
+    if (
+      result.ok &&
+      (result.kind === "success" || result.kind === "duplicate_success")
+    ) {
+      // Land on My eSIMs immediately so the new Order is visible.
+      const orderId = (result.orderId ?? "").trim();
+      redirect(
+        orderId && /^[A-Za-z0-9_-]+$/.test(orderId)
+          ? `/partner/orders/${orderId}`
+          : "/partner/orders"
+      );
+    }
     return result;
   });
 }
