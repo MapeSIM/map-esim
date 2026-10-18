@@ -158,7 +158,7 @@ export async function sendAlertNotificationEmails(input: {
       result = await Promise.race([mailPromise, timeoutPromise]);
     } catch (timeoutError) {
       console.warn("Email dispatch timed out safely, continuing execution...");
-      return { ok: false, errorCode: "network_error" };
+      return { ok: false, errorCode: "send_failed" };
     }
 
     if (!result.ok) {
