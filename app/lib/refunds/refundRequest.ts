@@ -261,7 +261,6 @@ export async function createCustomerRefundRequest(
           gatewayAmountCents,
           fundingSource: fundingSource as OrderFundingSource | null,
           openOrderKey: order.id,
-          // Explicit timestamps — migration column has no SQL default.
           createdAt: now,
           updatedAt: now,
         },
@@ -465,10 +464,7 @@ export async function applyAdminRefundRequestDecision(options: {
         refundAmountCents: current.refundAmountCents,
       },
     });
-    // Email only on authoritative REQUESTED → UNDER_REVIEW (not idempotent re-mark).
-    if (fromStatus === RefundRequestStatus.REQUESTED) {
-      scheduleRefundStatusNotification(current.id, "under_review");
-    }
+    // Email removed for mark_under_review as requested.
     return {
       requestId: current.id,
       status: RefundRequestStatus.UNDER_REVIEW,
@@ -516,14 +512,8 @@ export async function applyAdminRefundRequestDecision(options: {
       metadata: {
         orderId: current.orderId,
         fromStatus: current.status,
-        toStatus: RefundRequestStatus.APPROVED_PENDING_EXECUTION,
-        refundAmountCents: current.refundAmountCents,
-        moneyMoved: false,
-        gatewayRefundCalled: false,
-        providerRefundCalled: false,
       },
     });
-    // After successful approve CAS — email failure must not undo status.
     scheduleRefundStatusNotification(current.id, "approved_pending_execution");
     return {
       requestId: current.id,
@@ -583,7 +573,6 @@ export async function applyAdminRefundRequestDecision(options: {
       moneyMoved: false,
     },
   });
-  // After successful reject CAS — email failure must not undo status.
   scheduleRefundStatusNotification(current.id, "rejected");
   return { requestId: current.id, status: RefundRequestStatus.REJECTED };
 }
