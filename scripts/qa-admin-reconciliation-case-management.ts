@@ -111,6 +111,10 @@ function main() {
   assert.match(service, /consumeRateLimit/);
   assert.match(service, /updateMany/);
   assert.match(service, /\$transaction/);
+  assert.match(service, /timeout:\s*15000/);
+  // Audit must run after commit — nested prisma writes inside the interactive
+  // tx deadlock under serverless connection_limit=1 (P2028).
+  assert.match(service, /uses the global prisma pool/);
   assert.match(service, /CASE_LOCKED|reconciliation\.case_locked/);
   assert.match(service, /reconciliation\.case_unlocked/);
   assert.match(service, /reconciliation\.case_escalated/);

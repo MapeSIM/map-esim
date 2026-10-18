@@ -609,6 +609,9 @@ export async function backfillReconciliationIccid(options: {
         tx
       );
       return { status: "capture" as const, capture: result.status };
+    }, {
+      maxWait: 10000,
+      timeout: 15000,
     });
 
     if (captureResult.status === "blocked") {

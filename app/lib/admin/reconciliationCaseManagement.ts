@@ -1798,258 +1798,252 @@ export async function resolveReconciliationCase(options: {
   });
   if (!limited.ok) return limited;
 
-  return prisma.$transaction(async (tx) => {
-    // Reload inside transaction for eligibility re-check.
-    let row: LoadedCase | null = null;
-    if (ids.sourceType === "partner_purchase") {
-      const r = await tx.partnerEsimPurchase.findUnique({
-        where: { id: ids.recordId },
-        select: {
-          ...CASE_FIELD_SELECT,
-          status: true,
-          providerResultKind: true,
-          providerOrderId: true,
-          failureCategory: true,
-          failureCode: true,
-          debitTransactionId: true,
-          refundTransactionId: true,
-          orderId: true,
-          providerRefreshResult: true,
-          providerRefreshClaimedAt: true,
-          providerRefreshCompletedAt: true,
-          debitTransaction: { select: { id: true } },
-        },
-      });
-      if (r) {
-        row = {
-          ...r,
-          debitStatus: r.debitTransaction ? "COMPLETED" : null,
-        };
+  // Keep the interactive transaction to CAS-only DB work. Never call
+  // writeAuditLog (uses the global prisma pool) inside the tx — with a
+  // serverless connection_limit of 1 that deadlocks until P2028 timeout.
+  type ResolveTxOutcome =
+    | {
+        kind: "not_found";
       }
-    } else if (
-      ids.sourceType === "wallet_purchase" ||
-      (ids.sourceType === "order_email" && !ids.orderEmailOnAssignment)
-    ) {
-      const r = await tx.walletEsimPurchase.findUnique({
-        where: { id: ids.recordId },
-        select: {
-          ...CASE_FIELD_SELECT,
-          status: true,
-          providerResultKind: true,
-          providerOrderId: true,
-          failureCategory: true,
-          failureCode: true,
-          refundTransactionId: true,
-          orderId: true,
-          emailDeliveryStatus: true,
-          providerRefreshResult: true,
-          providerRefreshClaimedAt: true,
-          providerRefreshCompletedAt: true,
-          debitTransaction: { select: { status: true } },
-        },
-      });
-      if (r) {
-        row = { ...r, debitStatus: r.debitTransaction?.status ?? null };
+    | {
+        kind: "idempotent";
       }
-    } else if (
-      ids.sourceType === "assignment" ||
-      (ids.sourceType === "order_email" && ids.orderEmailOnAssignment)
-    ) {
-      row = await tx.adminPackageAssignment.findUnique({
-        where: { id: ids.recordId },
-        select: {
-          ...CASE_FIELD_SELECT,
-          status: true,
-          providerResultKind: true,
-          providerOrderId: true,
-          failureCategory: true,
-          failureCode: true,
-          orderId: true,
-          emailDeliveryStatus: true,
-          providerRefreshResult: true,
-          providerRefreshClaimedAt: true,
-          providerRefreshCompletedAt: true,
-        },
-      });
-    } else if (ids.sourceType === "topup") {
-      const r = await tx.walletTopup.findUnique({
-        where: { id: ids.recordId },
-        select: {
-          ...CASE_FIELD_SELECT,
-          status: true,
-          failureCategory: true,
-          failureCode: true,
-          walletTransactionId: true,
-        },
-      });
-      if (r) row = { ...r, orderId: r.walletTransactionId };
-    } else if (ids.sourceType === "wallet_email") {
-      row = await tx.walletTransaction.findUnique({
-        where: { id: ids.recordId },
-        select: {
-          ...CASE_FIELD_SELECT,
-          status: true,
-          emailNotificationStatus: true,
-        },
-      });
-    } else if (ids.sourceType === "iccid") {
-      row = await tx.order.findUnique({
-        where: { id: ids.recordId },
-        select: {
-          ...CASE_FIELD_SELECT,
-          status: true,
-          providerOrderId: true,
-          iccidHash: true,
-          iccidCapturedAt: true,
-        },
-      });
-    }
-
-    if (!row) {
-      await writeAuditLog({
-        actorUserId: admin.id,
-        action: CASE_ACTION_BLOCKED,
-        targetType: ids.targetType,
-        targetId: ids.recordId,
-        metadata: {
-          sourceType: ids.sourceType,
-          attemptId: ids.attemptId,
-          action: "resolve",
-          failureCode: "not_found",
-          reason: reasonParsed.reason.slice(0, 80),
-        },
-      });
-      return { ok: false, error: PUBLIC_ERROR };
-    }
-
-    if (row.reconciliationResolvedAt) {
-      await writeAuditLog({
-        actorUserId: admin.id,
-        action: CASE_RESOLVED,
-        targetType: ids.targetType,
-        targetId: ids.recordId,
-        metadata: {
-          sourceType: ids.sourceType,
-          attemptId: ids.attemptId,
-          action: "resolve",
-          reason: reasonParsed.reason.slice(0, 80),
-          resolutionCode: codeParsed.code,
-          idempotent: true,
-        },
-      });
-      return { ok: true, idempotent: true };
-    }
-
-    const eligibility = eligibilityFromRow(
-      ids.sourceType,
-      row,
-      codeParsed.code
-    );
-    if (!eligibility.allowed) {
-      await writeAuditLog({
-        actorUserId: admin.id,
-        action: CASE_ACTION_BLOCKED,
-        targetType: ids.targetType,
-        targetId: ids.recordId,
-        metadata: {
-          sourceType: ids.sourceType,
-          attemptId: ids.attemptId,
-          action: "resolve",
-          failureCode: eligibility.blockers[0] ?? "ineligible",
-          blockers: eligibility.blockers.slice(0, 8),
-          reason: reasonParsed.reason.slice(0, 80),
-          resolutionCode: codeParsed.code,
-        },
-      });
-      return {
-        ok: false,
-        error:
-          eligibility.blockers.map(resolutionBlockerLabel).join(" ") ||
-          "This case cannot be resolved yet. For stuck/test cases choose ALREADY_RECOVERED or CANCELLED_NO_REFUND_DUE.",
+    | {
+        kind: "ineligible";
+        blockers: string[];
+      }
+    | {
+        kind: "cas_conflict";
+      }
+    | {
+        kind: "resolved";
+        resolvedAtIso: string;
       };
+
+  const outcome = await prisma.$transaction(
+    async (tx): Promise<ResolveTxOutcome> => {
+      // Reload inside transaction for eligibility re-check.
+      let row: LoadedCase | null = null;
+      if (ids.sourceType === "partner_purchase") {
+        const r = await tx.partnerEsimPurchase.findUnique({
+          where: { id: ids.recordId },
+          select: {
+            ...CASE_FIELD_SELECT,
+            status: true,
+            providerResultKind: true,
+            providerOrderId: true,
+            failureCategory: true,
+            failureCode: true,
+            debitTransactionId: true,
+            refundTransactionId: true,
+            orderId: true,
+            providerRefreshResult: true,
+            providerRefreshClaimedAt: true,
+            providerRefreshCompletedAt: true,
+            debitTransaction: { select: { id: true } },
+          },
+        });
+        if (r) {
+          row = {
+            ...r,
+            debitStatus: r.debitTransaction ? "COMPLETED" : null,
+          };
+        }
+      } else if (
+        ids.sourceType === "wallet_purchase" ||
+        (ids.sourceType === "order_email" && !ids.orderEmailOnAssignment)
+      ) {
+        const r = await tx.walletEsimPurchase.findUnique({
+          where: { id: ids.recordId },
+          select: {
+            ...CASE_FIELD_SELECT,
+            status: true,
+            providerResultKind: true,
+            providerOrderId: true,
+            failureCategory: true,
+            failureCode: true,
+            refundTransactionId: true,
+            orderId: true,
+            emailDeliveryStatus: true,
+            providerRefreshResult: true,
+            providerRefreshClaimedAt: true,
+            providerRefreshCompletedAt: true,
+            debitTransaction: { select: { status: true } },
+          },
+        });
+        if (r) {
+          row = { ...r, debitStatus: r.debitTransaction?.status ?? null };
+        }
+      } else if (
+        ids.sourceType === "assignment" ||
+        (ids.sourceType === "order_email" && ids.orderEmailOnAssignment)
+      ) {
+        row = await tx.adminPackageAssignment.findUnique({
+          where: { id: ids.recordId },
+          select: {
+            ...CASE_FIELD_SELECT,
+            status: true,
+            providerResultKind: true,
+            providerOrderId: true,
+            failureCategory: true,
+            failureCode: true,
+            orderId: true,
+            emailDeliveryStatus: true,
+            providerRefreshResult: true,
+            providerRefreshClaimedAt: true,
+            providerRefreshCompletedAt: true,
+          },
+        });
+      } else if (ids.sourceType === "topup") {
+        const r = await tx.walletTopup.findUnique({
+          where: { id: ids.recordId },
+          select: {
+            ...CASE_FIELD_SELECT,
+            status: true,
+            failureCategory: true,
+            failureCode: true,
+            walletTransactionId: true,
+          },
+        });
+        if (r) row = { ...r, orderId: r.walletTransactionId };
+      } else if (ids.sourceType === "wallet_email") {
+        row = await tx.walletTransaction.findUnique({
+          where: { id: ids.recordId },
+          select: {
+            ...CASE_FIELD_SELECT,
+            status: true,
+            emailNotificationStatus: true,
+          },
+        });
+      } else if (ids.sourceType === "iccid") {
+        row = await tx.order.findUnique({
+          where: { id: ids.recordId },
+          select: {
+            ...CASE_FIELD_SELECT,
+            status: true,
+            providerOrderId: true,
+            iccidHash: true,
+            iccidCapturedAt: true,
+          },
+        });
+      }
+
+      if (!row) return { kind: "not_found" };
+      if (row.reconciliationResolvedAt) return { kind: "idempotent" };
+
+      const eligibility = eligibilityFromRow(
+        ids.sourceType,
+        row,
+        codeParsed.code
+      );
+      if (!eligibility.allowed) {
+        return { kind: "ineligible", blockers: eligibility.blockers };
+      }
+
+      const now = new Date();
+      const data = {
+        reconciliationResolvedAt: now,
+        reconciliationResolvedByAdminId: admin.id,
+        reconciliationResolutionReason: reasonParsed.reason,
+        reconciliationResolutionCode: codeParsed.code as ResolutionCode,
+      };
+
+      let count = 0;
+      if (ids.sourceType === "partner_purchase") {
+        const r = await tx.partnerEsimPurchase.updateMany({
+          where: {
+            id: ids.recordId,
+            reconciliationResolvedAt: null,
+            reconciliationLockedAt: null,
+          },
+          data,
+        });
+        count = r.count;
+      } else if (
+        ids.sourceType === "wallet_purchase" ||
+        (ids.sourceType === "order_email" && !ids.orderEmailOnAssignment)
+      ) {
+        const r = await tx.walletEsimPurchase.updateMany({
+          where: {
+            id: ids.recordId,
+            reconciliationResolvedAt: null,
+            reconciliationLockedAt: null,
+          },
+          data,
+        });
+        count = r.count;
+      } else if (
+        ids.sourceType === "assignment" ||
+        (ids.sourceType === "order_email" && ids.orderEmailOnAssignment)
+      ) {
+        const r = await tx.adminPackageAssignment.updateMany({
+          where: {
+            id: ids.recordId,
+            reconciliationResolvedAt: null,
+            reconciliationLockedAt: null,
+          },
+          data,
+        });
+        count = r.count;
+      } else if (ids.sourceType === "topup") {
+        const r = await tx.walletTopup.updateMany({
+          where: {
+            id: ids.recordId,
+            reconciliationResolvedAt: null,
+            reconciliationLockedAt: null,
+          },
+          data,
+        });
+        count = r.count;
+      } else if (ids.sourceType === "wallet_email") {
+        const r = await tx.walletTransaction.updateMany({
+          where: {
+            id: ids.recordId,
+            reconciliationResolvedAt: null,
+            reconciliationLockedAt: null,
+          },
+          data,
+        });
+        count = r.count;
+      } else {
+        const r = await tx.order.updateMany({
+          where: {
+            id: ids.recordId,
+            reconciliationResolvedAt: null,
+            reconciliationLockedAt: null,
+          },
+          data,
+        });
+        count = r.count;
+      }
+
+      if (count === 0) return { kind: "cas_conflict" };
+      return { kind: "resolved", resolvedAtIso: now.toISOString() };
+    },
+    {
+      maxWait: 10000,
+      timeout: 15000,
     }
+  );
 
-    const now = new Date();
-    const data = {
-      reconciliationResolvedAt: now,
-      reconciliationResolvedByAdminId: admin.id,
-      reconciliationResolutionReason: reasonParsed.reason,
-      reconciliationResolutionCode: codeParsed.code as ResolutionCode,
-    };
+  if (outcome.kind === "not_found") {
+    await writeAuditLog({
+      actorUserId: admin.id,
+      action: CASE_ACTION_BLOCKED,
+      targetType: ids.targetType,
+      targetId: ids.recordId,
+      metadata: {
+        sourceType: ids.sourceType,
+        attemptId: ids.attemptId,
+        action: "resolve",
+        failureCode: "not_found",
+        reason: reasonParsed.reason.slice(0, 80),
+      },
+    });
+    return { ok: false, error: PUBLIC_ERROR };
+  }
 
-    let count = 0;
-    if (ids.sourceType === "partner_purchase") {
-      const r = await tx.partnerEsimPurchase.updateMany({
-        where: {
-          id: ids.recordId,
-          reconciliationResolvedAt: null,
-          reconciliationLockedAt: null,
-        },
-        data,
-      });
-      count = r.count;
-    } else if (
-      ids.sourceType === "wallet_purchase" ||
-      (ids.sourceType === "order_email" && !ids.orderEmailOnAssignment)
-    ) {
-      const r = await tx.walletEsimPurchase.updateMany({
-        where: {
-          id: ids.recordId,
-          reconciliationResolvedAt: null,
-          reconciliationLockedAt: null,
-        },
-        data,
-      });
-      count = r.count;
-    } else if (
-      ids.sourceType === "assignment" ||
-      (ids.sourceType === "order_email" && ids.orderEmailOnAssignment)
-    ) {
-      const r = await tx.adminPackageAssignment.updateMany({
-        where: {
-          id: ids.recordId,
-          reconciliationResolvedAt: null,
-          reconciliationLockedAt: null,
-        },
-        data,
-      });
-      count = r.count;
-    } else if (ids.sourceType === "topup") {
-      const r = await tx.walletTopup.updateMany({
-        where: {
-          id: ids.recordId,
-          reconciliationResolvedAt: null,
-          reconciliationLockedAt: null,
-        },
-        data,
-      });
-      count = r.count;
-    } else if (ids.sourceType === "wallet_email") {
-      const r = await tx.walletTransaction.updateMany({
-        where: {
-          id: ids.recordId,
-          reconciliationResolvedAt: null,
-          reconciliationLockedAt: null,
-        },
-        data,
-      });
-      count = r.count;
-    } else {
-      const r = await tx.order.updateMany({
-        where: {
-          id: ids.recordId,
-          reconciliationResolvedAt: null,
-          reconciliationLockedAt: null,
-        },
-        data,
-      });
-      count = r.count;
-    }
-
-    if (count === 0) {
-      return { ok: false, error: PUBLIC_ERROR };
-    }
-
+  if (outcome.kind === "idempotent") {
     await writeAuditLog({
       actorUserId: admin.id,
       action: CASE_RESOLVED,
@@ -2061,12 +2055,56 @@ export async function resolveReconciliationCase(options: {
         action: "resolve",
         reason: reasonParsed.reason.slice(0, 80),
         resolutionCode: codeParsed.code,
-        previousResolved: false,
-        newResolved: true,
-        resolvedAt: now.toISOString(),
+        idempotent: true,
       },
     });
+    return { ok: true, idempotent: true };
+  }
 
-    return { ok: true };
+  if (outcome.kind === "ineligible") {
+    await writeAuditLog({
+      actorUserId: admin.id,
+      action: CASE_ACTION_BLOCKED,
+      targetType: ids.targetType,
+      targetId: ids.recordId,
+      metadata: {
+        sourceType: ids.sourceType,
+        attemptId: ids.attemptId,
+        action: "resolve",
+        failureCode: outcome.blockers[0] ?? "ineligible",
+        blockers: outcome.blockers.slice(0, 8),
+        reason: reasonParsed.reason.slice(0, 80),
+        resolutionCode: codeParsed.code,
+      },
+    });
+    return {
+      ok: false,
+      error:
+        outcome.blockers.map(resolutionBlockerLabel).join(" ") ||
+        "This case cannot be resolved yet. For stuck/test cases choose ALREADY_RECOVERED or CANCELLED_NO_REFUND_DUE.",
+    };
+  }
+
+  if (outcome.kind === "cas_conflict") {
+    return { ok: false, error: PUBLIC_ERROR };
+  }
+
+  await writeAuditLog({
+    actorUserId: admin.id,
+    action: CASE_RESOLVED,
+    targetType: ids.targetType,
+    targetId: ids.recordId,
+    metadata: {
+      sourceType: ids.sourceType,
+      attemptId: ids.attemptId,
+      action: "resolve",
+      reason: reasonParsed.reason.slice(0, 80),
+      resolutionCode: codeParsed.code,
+      previousResolved: false,
+      newResolved: true,
+      resolvedAt: outcome.resolvedAtIso,
+    },
   });
+
+  return { ok: true };
 }

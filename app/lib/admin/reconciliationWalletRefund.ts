@@ -450,34 +450,37 @@ export async function refundReconciliationWalletPurchase(options: {
     const existingRefundId = ctx.refundTransactionId;
     if (existingRefundId) {
       try {
-        await prisma.$transaction(async (tx) => {
-          let creditedAmountCents = ctx.priceCents;
-          const existingTx = await tx.walletTransaction.findUnique({
-            where: { id: existingRefundId },
-            select: { amountCents: true },
-          });
-          if (
-            existingTx &&
-            Number.isInteger(existingTx.amountCents) &&
-            existingTx.amountCents > 0
-          ) {
-            creditedAmountCents = existingTx.amountCents;
-          }
-          await applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx(tx, {
-            customerUserId: ctx.customerUserId,
-            purchaseId: ids.recordId,
-            purchasePriceCents: ctx.priceCents,
-            refundedAmountCents: creditedAmountCents,
-            actorUserId: admin.id,
-          });
-          await syncCustomerRefundRequestsForPurchase(tx, {
-            purchaseId: ids.recordId,
-            orderId: ctx.orderId,
-            refundTransactionId: existingRefundId,
-            creditedAmountCents,
-            actorUserId: admin.id,
-          });
-        });
+        await prisma.$transaction(
+          async (tx) => {
+            let creditedAmountCents = ctx.priceCents;
+            const existingTx = await tx.walletTransaction.findUnique({
+              where: { id: existingRefundId },
+              select: { amountCents: true },
+            });
+            if (
+              existingTx &&
+              Number.isInteger(existingTx.amountCents) &&
+              existingTx.amountCents > 0
+            ) {
+              creditedAmountCents = existingTx.amountCents;
+            }
+            await applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx(tx, {
+              customerUserId: ctx.customerUserId,
+              purchaseId: ids.recordId,
+              purchasePriceCents: ctx.priceCents,
+              refundedAmountCents: creditedAmountCents,
+              actorUserId: admin.id,
+            });
+            await syncCustomerRefundRequestsForPurchase(tx, {
+              purchaseId: ids.recordId,
+              orderId: ctx.orderId,
+              refundTransactionId: existingRefundId,
+              creditedAmountCents,
+              actorUserId: admin.id,
+            });
+          },
+          { maxWait: 10000, timeout: 15000 }
+        );
       } catch {
         // Idempotent path: never fail the already-refunded success response.
       }
@@ -668,6 +671,9 @@ export async function refundReconciliationWalletPurchase(options: {
         amountCents: creditedAmountCents,
         currency: fresh.currency,
       };
+    }, {
+      maxWait: 10000,
+      timeout: 15000,
     });
 
     if (result.status === "blocked") {

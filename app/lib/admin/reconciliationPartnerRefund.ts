@@ -627,6 +627,9 @@ export async function refundReconciliationPartnerPurchase(options: {
         amountCents: fresh.partnerChargeCents,
         currency: fresh.currency,
       };
+    }, {
+      maxWait: 10000,
+      timeout: 15000,
     });
 
     if (result.status === "blocked") {

@@ -589,6 +589,9 @@ export async function recoverReconciliationFundAndFulfill(options: {
         });
 
         return { ok: true as const };
+      }, {
+        maxWait: 10000,
+        timeout: 15000,
       });
 
       if (!cas.ok) {
