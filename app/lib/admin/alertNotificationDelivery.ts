@@ -135,7 +135,7 @@ export async function sendAlertNotificationEmails(input: {
   // the provider accepts the message but before durable SENT is recorded.
   // Unique eventKey + CAS claim minimize normal concurrent/restart duplication.
   for (const to of input.recipients) {
-    const result = await sendChannelMail({
+    const mailPromise = sendChannelMail({
       channel: "support",
       to,
       subject: content.subject,
@@ -147,6 +147,20 @@ export async function sendAlertNotificationEmails(input: {
         "X-MAP-ESIM-Alert-Code": String(input.alert.code).slice(0, 80),
       },
     });
+
+    // 8-second timeout wrapper to prevent hanging on slow SMTP connections
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("SMTP Timeout")), 8000)
+    );
+
+    let result: any;
+    try {
+      result = await Promise.race([mailPromise, timeoutPromise]);
+    } catch (timeoutError) {
+      console.warn("Email dispatch timed out safely, continuing execution...");
+      return { ok: false, errorCode: "network_error" };
+    }
+
     if (!result.ok) {
       return {
         ok: false,
