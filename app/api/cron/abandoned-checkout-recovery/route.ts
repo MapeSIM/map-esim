@@ -17,7 +17,6 @@
  */
 import { NextResponse } from "next/server";
 import { runAbandonedCheckoutRecovery } from "@/app/lib/esim/abandonedCheckoutRecoveryRunner";
-import { reportServerErrorAsync } from "@/app/lib/monitoring/serverErrorMonitoring";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -64,15 +63,16 @@ async function handle(request: Request): Promise<Response> {
 
   try {
     const result = await runAbandonedCheckoutRecovery({ dryRun });
+    // Best-effort recovery emails: soft ok:false (DB blip, empty scan race,
+    // runner_error) must NOT page Sentry. Surface errorCode in JSON + logs.
     if (!result.ok) {
-      await reportServerErrorAsync(
-        new Error("abandoned_checkout_recovery_failed"),
-        {
-          operation: "cron_abandoned_checkout_recovery",
-          cronJob: "abandoned-checkout-recovery",
-          errorCode: result.errorCode ?? "recovery_failed",
-        }
-      );
+      console.error("abandoned_checkout_recovery_failed", {
+        errorCode: result.errorCode ?? "recovery_failed",
+        counts: result.counts,
+        idleMs: result.idleMs,
+        maxAgeMs: result.maxAgeMs,
+        dryRun,
+      });
     }
     const status = result.ok ? 200 : 500;
     return NextResponse.json(
@@ -87,11 +87,8 @@ async function handle(request: Request): Promise<Response> {
       { status }
     );
   } catch (error) {
-    await reportServerErrorAsync(error, {
-      operation: "cron_abandoned_checkout_recovery",
-      cronJob: "abandoned-checkout-recovery",
-      errorCode: "unhandled",
-    });
+    // Isolate unhandled throws — never throw / report to Sentry from this cron.
+    console.error("abandoned_checkout_recovery", "unhandled", error);
     return NextResponse.json({ ok: false, error: "internal" }, { status: 500 });
   }
 }

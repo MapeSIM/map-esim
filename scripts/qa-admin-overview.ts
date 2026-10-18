@@ -81,6 +81,9 @@ function main() {
   assert.match(dbSrc, /globalThis/);
   assert.match(dbSrc, /globalForPrisma\.prisma/);
   assert.equal((dbSrc.match(/new PrismaClient/g) || []).length, 1);
+  assert.match(dbSrc, /withPrismaRetry/);
+  assert.match(dbSrc, /isPrismaTransientError/);
+  assert.match(dbSrc, /connection_limit/);
   console.log("PASS prisma_singleton_db_module");
 
   const pageSrc = readFileSync(join(root, "app/admin/page.tsx"), "utf8");

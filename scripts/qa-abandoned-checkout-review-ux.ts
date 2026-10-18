@@ -211,6 +211,14 @@ function main() {
   assert.match(cron, /Not registered in vercel\.json/);
   assert.match(cron, /30 and 90 minutes/);
   assert.match(cron, /runAbandonedCheckoutRecovery/);
+  // Soft failures must not page Sentry (best-effort recovery emails).
+  assert.doesNotMatch(
+    cron,
+    /new Error\(\s*["']abandoned_checkout_recovery_failed["']\s*\)/
+  );
+  assert.doesNotMatch(cron, /reportServerErrorAsync/);
+  assert.match(cron, /must NOT page Sentry/i);
+  assert.match(runner, /withPrismaRetry|db_unavailable/);
   assert.match(
     sample,
     /\/account\/esim\/buy\/review\?purchase=/

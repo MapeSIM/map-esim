@@ -26,7 +26,11 @@ import { writeAuditLog } from "@/app/lib/auth/audit";
 import { MapEsimPrismaAdapter } from "@/app/lib/auth/prismaAdapter";
 import { verifyPassword } from "@/app/lib/auth/password";
 import { consumeRateLimit } from "@/app/lib/auth/rateLimit";
-import { authPrisma } from "@/app/lib/db";
+import {
+  authPrisma,
+  isPrismaTransientError,
+  withPrismaRetry,
+} from "@/app/lib/db";
 
 const credentialsSchema = z.object({
   email: z.string().email(),
@@ -70,7 +74,18 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         });
         if (!rate.ok) return null;
 
-        const user = await authPrisma.user.findUnique({ where: { email } });
+        let user: Awaited<
+          ReturnType<typeof authPrisma.user.findUnique>
+        > = null;
+        try {
+          user = await withPrismaRetry(() =>
+            authPrisma.user.findUnique({ where: { email } })
+          );
+        } catch (error) {
+          // Brief Neon/pool blips after retries — deny without unhandled throw.
+          if (isPrismaTransientError(error)) return null;
+          throw error;
+        }
         // Null passwordHash (OAuth-only) → same failure as unknown user.
         if (!user?.passwordHash) return null;
         if (user.deletedAt) return null;
@@ -79,10 +94,12 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         if (user.role === "ADMIN" && user.adminDisabledAt) return null;
         // Disabled partners must not sign in.
         if (user.role === "PARTNER") {
-          const partner = await authPrisma.partnerProfile.findUnique({
-            where: { userId: user.id },
-            select: { disabledAt: true },
-          });
+          const partner = await withPrismaRetry(() =>
+            authPrisma.partnerProfile.findUnique({
+              where: { userId: user!.id },
+              select: { disabledAt: true },
+            })
+          );
           if (!partner || partner.disabledAt) return null;
         }
 
@@ -183,20 +200,22 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         }
       }
 
-      const dbUser = await authPrisma.user.findUnique({
-        where: { email },
-        select: {
-          id: true,
-          role: true,
-          deletedAt: true,
-          emailVerifiedAt: true,
-          accounts: {
-            where: { provider: "google" },
-            select: { id: true },
-            take: 1,
+      const dbUser = await withPrismaRetry(() =>
+        authPrisma.user.findUnique({
+          where: { email },
+          select: {
+            id: true,
+            role: true,
+            deletedAt: true,
+            emailVerifiedAt: true,
+            accounts: {
+              where: { provider: "google" },
+              select: { id: true },
+              take: 1,
+            },
           },
-        },
-      });
+        })
+      );
 
       const category = classifyGoogleSignInUser({
         userExists: Boolean(dbUser),

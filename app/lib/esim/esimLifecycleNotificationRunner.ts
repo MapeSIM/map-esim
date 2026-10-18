@@ -7,7 +7,11 @@ import "server-only";
 
 import { OrderFundingSource, OrderStatus, Role } from "@prisma/client";
 import { randomBytes } from "node:crypto";
-import { prisma } from "@/app/lib/db";
+import {
+  isPrismaTransientError,
+  prisma,
+  withPrismaRetry,
+} from "@/app/lib/db";
 import {
   countCompletedAddDataForSourceOrder,
   notifyEsimLifecycleEmail,
@@ -141,36 +145,49 @@ export async function claimEsimLifecycleRunnerLock(
   // Treat locks older than TTL as crashed/stale even if claimExpiresAt was wrong.
   const staleBefore = new Date(now.getTime() - ESIM_LIFECYCLE_RUNNER_LOCK_TTL_MS);
 
-  await prisma.esimLifecycleNotificationRunnerLock.upsert({
-    where: { id: "default" },
-    create: {
-      id: "default",
-      claimToken: null,
-      claimedAt: null,
-      claimExpiresAt: null,
-    },
-    update: {},
-  });
+  try {
+    await withPrismaRetry(() =>
+      prisma.esimLifecycleNotificationRunnerLock.upsert({
+        where: { id: "default" },
+        create: {
+          id: "default",
+          claimToken: null,
+          claimedAt: null,
+          claimExpiresAt: null,
+        },
+        update: {},
+      })
+    );
 
-  const claimed = await prisma.esimLifecycleNotificationRunnerLock.updateMany({
-    where: {
-      id: "default",
-      OR: [
-        { claimToken: null },
-        { claimExpiresAt: null },
-        { claimExpiresAt: { lte: now } },
-        { claimedAt: null },
-        { claimedAt: { lte: staleBefore } },
-      ],
-    },
-    data: {
-      claimToken,
-      claimedAt: now,
-      claimExpiresAt,
-    },
-  });
-  if (claimed.count !== 1) return { ok: false };
-  return { ok: true, claimToken };
+    const claimed = await withPrismaRetry(() =>
+      prisma.esimLifecycleNotificationRunnerLock.updateMany({
+        where: {
+          id: "default",
+          OR: [
+            { claimToken: null },
+            { claimExpiresAt: null },
+            { claimExpiresAt: { lte: now } },
+            { claimedAt: null },
+            { claimedAt: { lte: staleBefore } },
+          ],
+        },
+        data: {
+          claimToken,
+          claimedAt: now,
+          claimExpiresAt,
+        },
+      })
+    );
+    if (claimed.count !== 1) return { ok: false };
+    return { ok: true, claimToken };
+  } catch (error) {
+    // Pool/init blips → treat as busy so the cron soft-fails without Sentry.
+    if (isPrismaTransientError(error)) {
+      console.error("esim_lifecycle_lock_claim", "db_unavailable", error);
+      return { ok: false };
+    }
+    throw error;
+  }
 }
 
 export async function releaseEsimLifecycleRunnerLock(
@@ -178,14 +195,21 @@ export async function releaseEsimLifecycleRunnerLock(
 ): Promise<void> {
   const token = (claimToken ?? "").trim();
   if (!token) return;
-  await prisma.esimLifecycleNotificationRunnerLock.updateMany({
-    where: { id: "default", claimToken: token },
-    data: {
-      claimToken: null,
-      claimedAt: null,
-      claimExpiresAt: null,
-    },
-  });
+  try {
+    await withPrismaRetry(() =>
+      prisma.esimLifecycleNotificationRunnerLock.updateMany({
+        where: { id: "default", claimToken: token },
+        data: {
+          claimToken: null,
+          claimedAt: null,
+          claimExpiresAt: null,
+        },
+      })
+    );
+  } catch (error) {
+    // Never mask the runner result — lock TTL recovers stuck claims.
+    console.error("esim_lifecycle_lock_release", "failed", error);
+  }
 }
 
 /**
@@ -195,20 +219,22 @@ export async function releaseEsimLifecycleRunnerLock(
 export async function forceClearEsimLifecycleRunnerLock(): Promise<{
   cleared: boolean;
 }> {
-  await prisma.esimLifecycleNotificationRunnerLock.upsert({
-    where: { id: "default" },
-    create: {
-      id: "default",
-      claimToken: null,
-      claimedAt: null,
-      claimExpiresAt: null,
-    },
-    update: {
-      claimToken: null,
-      claimedAt: null,
-      claimExpiresAt: null,
-    },
-  });
+  await withPrismaRetry(() =>
+    prisma.esimLifecycleNotificationRunnerLock.upsert({
+      where: { id: "default" },
+      create: {
+        id: "default",
+        claimToken: null,
+        claimedAt: null,
+        claimExpiresAt: null,
+      },
+      update: {
+        claimToken: null,
+        claimedAt: null,
+        claimExpiresAt: null,
+      },
+    })
+  );
   return { cleared: true };
 }
 
@@ -458,18 +484,20 @@ export async function runEsimLifecycleNotifications(options?: {
       ? options.checkedAt
       : new Date();
   const counts = emptyCounts();
-
-  const lock = await claimEsimLifecycleRunnerLock(now);
-  if (!lock.ok) {
-    return {
-      ok: false,
-      runnerClaimed: false,
-      counts,
-      errorCode: "runner_busy",
-    };
-  }
+  let claimToken: string | null = null;
 
   try {
+    const lock = await claimEsimLifecycleRunnerLock(now);
+    if (!lock.ok) {
+      return {
+        ok: false,
+        runnerClaimed: false,
+        counts,
+        errorCode: "runner_busy",
+      };
+    }
+    claimToken = lock.claimToken;
+
     if (!isIccidEncryptionConfigured()) {
       return {
         ok: false,
@@ -509,13 +537,21 @@ export async function runEsimLifecycleNotifications(options?: {
     }
 
     return { ok: true, runnerClaimed: true, counts };
+  } catch (error) {
+    console.error("esim_lifecycle_notifications", "runner_error", error);
+    return {
+      ok: false,
+      runnerClaimed: Boolean(claimToken),
+      counts,
+      errorCode: isPrismaTransientError(error)
+        ? "db_unavailable"
+        : "runner_error",
+    };
   } finally {
     // Always release — even on early returns / thrown errors. Swallow release
     // failures so they never mask the original result/error.
-    try {
-      await releaseEsimLifecycleRunnerLock(lock.claimToken);
-    } catch {
-      // ignore
+    if (claimToken) {
+      await releaseEsimLifecycleRunnerLock(claimToken);
     }
   }
 }

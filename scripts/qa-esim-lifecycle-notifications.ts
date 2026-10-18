@@ -468,6 +468,11 @@ function main() {
   assert.doesNotMatch(cron, /cron_esim_lifecycle_stale_release/);
   assert.match(cron, /errorCodes/);
   assert.match(cron, /Best-effort only|must NOT page Sentry/i);
+  assert.match(cron, /db_unavailable/);
+  assert.match(cron, /softLifecycleFailure/);
+  assert.match(runner, /withPrismaRetry/);
+  assert.match(runner, /isPrismaTransientError/);
+  assert.match(runner, /db_unavailable/);
   assert.match(runner, /fetchProviderUsage/);
   assert.match(runner, /normalizeProviderUsagePayload/);
   assert.match(runner, /evaluateEsimLifecycleEvents/);

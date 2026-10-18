@@ -111,7 +111,11 @@ async function handle(request: Request): Promise<Response> {
 
   try {
     const result = await runEsimLifecycleNotifications({ dryRun });
-    if (!result.ok && result.errorCode !== "runner_busy") {
+    // Soft / expected: lock contention + transient Prisma pool/init blips.
+    const softLifecycleFailure =
+      result.errorCode === "runner_busy" ||
+      result.errorCode === "db_unavailable";
+    if (!result.ok && !softLifecycleFailure) {
       await reportServerErrorAsync(
         new Error("esim_lifecycle_notifications_failed"),
         {
@@ -120,6 +124,11 @@ async function handle(request: Request): Promise<Response> {
           errorCode: result.errorCode ?? "lifecycle_failed",
         }
       );
+    } else if (!result.ok && softLifecycleFailure) {
+      console.warn("esim_lifecycle_notifications_soft_failure", {
+        errorCode: result.errorCode,
+        dryRun,
+      });
     }
 
     // Default: piggyback stale unpaid gateway hold release after the lifecycle

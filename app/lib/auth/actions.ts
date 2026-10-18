@@ -37,9 +37,10 @@ import {
 import { getSessionUser } from "@/app/lib/auth/session";
 import {
   authPrisma,
-  isPrismaPoolTimeout,
+  isPrismaTransientError,
   PRISMA_TEMPORARY_UNAVAILABLE,
   prisma,
+  withPrismaRetry,
 } from "@/app/lib/db";
 import { softDeleteCustomerAccount } from "@/app/lib/auth/accountDeletion";
 import {
@@ -156,7 +157,17 @@ export async function signupAction(
   }
 
   const email = normalizeEmail(parsed.data.email);
-  const existing = await prisma.user.findUnique({ where: { email } });
+  let existing: { id: string } | null;
+  try {
+    existing = await withPrismaRetry(() =>
+      prisma.user.findUnique({ where: { email }, select: { id: true } })
+    );
+  } catch (error) {
+    if (isPrismaTransientError(error)) {
+      return { ok: false, error: PRISMA_TEMPORARY_UNAVAILABLE };
+    }
+    throw error;
+  }
   if (existing) {
     return { ok: false, error: "Unable to create an account with that email." };
   }
@@ -291,18 +302,20 @@ export async function signinAction(
 
   try {
     // Auth path uses DIRECT_URL client — avoid PgBouncer pool starvation.
-    user = await authPrisma.user.findUnique({
-      where: { email },
-      select: {
-        id: true,
-        role: true,
-        passwordHash: true,
-        emailVerifiedAt: true,
-        deletedAt: true,
-      },
-    });
+    user = await withPrismaRetry(() =>
+      authPrisma.user.findUnique({
+        where: { email },
+        select: {
+          id: true,
+          role: true,
+          passwordHash: true,
+          emailVerifiedAt: true,
+          deletedAt: true,
+        },
+      })
+    );
   } catch (error) {
-    if (isPrismaPoolTimeout(error)) {
+    if (isPrismaTransientError(error)) {
       return { ok: false, error: PRISMA_TEMPORARY_UNAVAILABLE };
     }
     throw error;
@@ -344,7 +357,7 @@ export async function signinAction(
       redirectTo,
     });
   } catch (error) {
-    if (isPrismaPoolTimeout(error)) {
+    if (isPrismaTransientError(error)) {
       return { ok: false, error: PRISMA_TEMPORARY_UNAVAILABLE };
     }
     if (error instanceof AuthError) {

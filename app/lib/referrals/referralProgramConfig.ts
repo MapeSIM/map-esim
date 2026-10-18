@@ -5,7 +5,7 @@ import {
   ReferralRewardType,
   type CustomerReferralProgramConfig,
 } from "@prisma/client";
-import { prisma } from "@/app/lib/db";
+import { prisma, withPrismaRetry } from "@/app/lib/db";
 import { formatUsdCents } from "@/app/lib/wallet/display";
 import {
   REFERRAL_PROGRAM_CONFIG_ID,
@@ -13,6 +13,18 @@ import {
   formatReferralRewardCopy,
   type ReferralProgramSettings,
 } from "@/app/lib/referrals/referralProgramShared";
+
+function referralProgramDefaultCreateData() {
+  return {
+    id: REFERRAL_PROGRAM_CONFIG_ID,
+    enabled: REFERRAL_PROGRAM_DEFAULTS.enabled,
+    rewardType: ReferralRewardType.FIXED_AMOUNT,
+    rewardValue: REFERRAL_PROGRAM_DEFAULTS.rewardValue,
+    minPurchaseCents: REFERRAL_PROGRAM_DEFAULTS.minPurchaseCents,
+    maxRewardCents: REFERRAL_PROGRAM_DEFAULTS.maxRewardCents,
+    version: 1,
+  };
+}
 
 export type ReferralProgramConfigRow = Pick<
   CustomerReferralProgramConfig,
@@ -50,56 +62,50 @@ export function toReferralProgramSettings(
 }
 
 export async function ensureReferralProgramConfig(): Promise<void> {
-  await prisma.customerReferralProgramConfig.createMany({
-    data: [
-      {
-        id: REFERRAL_PROGRAM_CONFIG_ID,
-        enabled: REFERRAL_PROGRAM_DEFAULTS.enabled,
-        rewardType: ReferralRewardType.FIXED_AMOUNT,
-        rewardValue: REFERRAL_PROGRAM_DEFAULTS.rewardValue,
-        minPurchaseCents: REFERRAL_PROGRAM_DEFAULTS.minPurchaseCents,
-        maxRewardCents: REFERRAL_PROGRAM_DEFAULTS.maxRewardCents,
-        version: 1,
-      },
-    ],
-    skipDuplicates: true,
-  });
+  // Read-first: avoid a write on every ensure when the singleton row exists.
+  const existing = await withPrismaRetry(() =>
+    prisma.customerReferralProgramConfig.findUnique({
+      where: { id: REFERRAL_PROGRAM_CONFIG_ID },
+      select: { id: true },
+    })
+  );
+  if (existing) return;
+  await withPrismaRetry(() =>
+    prisma.customerReferralProgramConfig.createMany({
+      data: [referralProgramDefaultCreateData()],
+      skipDuplicates: true,
+    })
+  );
 }
 
 export async function getReferralProgramConfig(
   db: Prisma.TransactionClient | typeof prisma = prisma
 ): Promise<ReferralProgramConfigRow> {
-  await db.customerReferralProgramConfig.createMany({
-    data: [
-      {
-        id: REFERRAL_PROGRAM_CONFIG_ID,
-        enabled: REFERRAL_PROGRAM_DEFAULTS.enabled,
-        rewardType: ReferralRewardType.FIXED_AMOUNT,
-        rewardValue: REFERRAL_PROGRAM_DEFAULTS.rewardValue,
-        minPurchaseCents: REFERRAL_PROGRAM_DEFAULTS.minPurchaseCents,
-        maxRewardCents: REFERRAL_PROGRAM_DEFAULTS.maxRewardCents,
-        version: 1,
-      },
-    ],
-    skipDuplicates: true,
-  });
-  const row = await db.customerReferralProgramConfig.findUnique({
-    where: { id: REFERRAL_PROGRAM_CONFIG_ID },
-  });
-  if (!row) {
-    return db.customerReferralProgramConfig.create({
-      data: {
-        id: REFERRAL_PROGRAM_CONFIG_ID,
-        enabled: REFERRAL_PROGRAM_DEFAULTS.enabled,
-        rewardType: ReferralRewardType.FIXED_AMOUNT,
-        rewardValue: REFERRAL_PROGRAM_DEFAULTS.rewardValue,
-        minPurchaseCents: REFERRAL_PROGRAM_DEFAULTS.minPurchaseCents,
-        maxRewardCents: REFERRAL_PROGRAM_DEFAULTS.maxRewardCents,
-        version: 1,
-      },
+  // Prefer findUnique — createMany on every settings read was amplifying
+  // pool pressure under signup/checkout traffic (Sentry createMany noise).
+  const run = async () => {
+    const existing = await db.customerReferralProgramConfig.findUnique({
+      where: { id: REFERRAL_PROGRAM_CONFIG_ID },
     });
-  }
-  return row;
+    if (existing) return existing;
+
+    await db.customerReferralProgramConfig.createMany({
+      data: [referralProgramDefaultCreateData()],
+      skipDuplicates: true,
+    });
+    const row = await db.customerReferralProgramConfig.findUnique({
+      where: { id: REFERRAL_PROGRAM_CONFIG_ID },
+    });
+    if (row) return row;
+
+    return db.customerReferralProgramConfig.create({
+      data: referralProgramDefaultCreateData(),
+    });
+  };
+
+  // Transactions already own a connection — do not layer pool retries inside.
+  if (db !== prisma) return run();
+  return withPrismaRetry(run);
 }
 
 export async function getReferralProgramSettings(

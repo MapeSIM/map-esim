@@ -13,7 +13,11 @@
 import "server-only";
 
 import { WalletEsimPurchaseStatus } from "@prisma/client";
-import { prisma } from "@/app/lib/db";
+import {
+  isPrismaTransientError,
+  prisma,
+  withPrismaRetry,
+} from "@/app/lib/db";
 import {
   ABANDONED_CHECKOUT_EMAIL_FAILED,
   ABANDONED_CHECKOUT_EMAIL_NOT_CONFIGURED,
@@ -79,35 +83,37 @@ export async function listAbandonedCheckoutRecoveryCandidates(options: {
   const idleBefore = new Date(now.getTime() - idleMs);
   const notOlderThan = new Date(now.getTime() - maxAgeMs);
 
-  const rows = await prisma.walletEsimPurchase.findMany({
-    where: {
-      adminUserId: null,
-      status: {
-        in: [
-          WalletEsimPurchaseStatus.READY,
-          WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+  const rows = await withPrismaRetry(() =>
+    prisma.walletEsimPurchase.findMany({
+      where: {
+        adminUserId: null,
+        status: {
+          in: [
+            WalletEsimPurchaseStatus.READY,
+            WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
+          ],
+        },
+        createdAt: {
+          lte: idleBefore,
+          gte: notOlderThan,
+        },
+        OR: [
+          { abandonedCheckoutEmailNotificationStatus: null },
+          {
+            abandonedCheckoutEmailNotificationStatus: {
+              in: [
+                ABANDONED_CHECKOUT_EMAIL_FAILED,
+                ABANDONED_CHECKOUT_EMAIL_NOT_CONFIGURED,
+              ],
+            },
+          },
         ],
       },
-      createdAt: {
-        lte: idleBefore,
-        gte: notOlderThan,
-      },
-      OR: [
-        { abandonedCheckoutEmailNotificationStatus: null },
-        {
-          abandonedCheckoutEmailNotificationStatus: {
-            in: [
-              ABANDONED_CHECKOUT_EMAIL_FAILED,
-              ABANDONED_CHECKOUT_EMAIL_NOT_CONFIGURED,
-            ],
-          },
-        },
-      ],
-    },
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-    take,
-    select: { id: true, customerUserId: true, updatedAt: true },
-  });
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take,
+      select: { id: true, customerUserId: true, updatedAt: true },
+    })
+  );
 
   return rows.map((row) => ({
     id: row.id,
@@ -166,7 +172,9 @@ export async function runAbandonedCheckoutRecovery(options?: {
       counts,
       idleMs,
       maxAgeMs,
-      errorCode: "runner_error",
+      errorCode: isPrismaTransientError(error)
+        ? "db_unavailable"
+        : "runner_error",
     };
   }
 }

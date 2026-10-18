@@ -1,6 +1,6 @@
 import { cache } from "react";
 import type { ConsentDbFields } from "@/app/lib/auth/legalConsentPolicy";
-import { authPrisma } from "@/app/lib/db";
+import { authPrisma, withPrismaRetry } from "@/app/lib/db";
 
 export {
   deriveNeedsLegalConsent,
@@ -26,27 +26,29 @@ export const loadConsentGateUser = cache(
       })
     | null
   > => {
-    const user = await authPrisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        role: true,
-        emailVerifiedAt: true,
-        credentialsChangedAt: true,
-        deletedAt: true,
-        adminSessionVersion: true,
-        adminDisabledAt: true,
-        termsAcceptedAt: true,
-        privacyAcknowledgedAt: true,
-        termsVersion: true,
-        privacyVersion: true,
-        passwordHash: true,
-        accounts: {
-          where: { provider: "google" },
-          select: { id: true },
-          take: 1,
+    const user = await withPrismaRetry(() =>
+      authPrisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          role: true,
+          emailVerifiedAt: true,
+          credentialsChangedAt: true,
+          deletedAt: true,
+          adminSessionVersion: true,
+          adminDisabledAt: true,
+          termsAcceptedAt: true,
+          privacyAcknowledgedAt: true,
+          termsVersion: true,
+          privacyVersion: true,
+          passwordHash: true,
+          accounts: {
+            where: { provider: "google" },
+            select: { id: true },
+            take: 1,
+          },
         },
-      },
-    });
+      })
+    );
     if (!user) return null;
     return {
       role: user.role,
