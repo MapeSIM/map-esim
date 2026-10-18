@@ -14,7 +14,10 @@ import {
 import { redirect } from "next/navigation";
 import { prisma } from "@/app/lib/db";
 import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
-import { probeAdminDatabase } from "@/app/lib/admin/adminDatabaseProbe";
+import {
+  probeAdminDatabase,
+  readLatestPrismaMigration,
+} from "@/app/lib/admin/adminDatabaseProbe";
 import { requireRole } from "@/app/lib/auth/session";
 import { getEmailChannelsReadiness } from "@/app/lib/email/config";
 import { isIccidEncryptionConfigured } from "@/app/lib/orders/iccidCrypto";
@@ -920,24 +923,8 @@ async function readLatestMigration(): Promise<{
   name: string | null;
   finishedAt: Date | null;
 }> {
-  try {
-    const rows = await prisma.$queryRaw<
-      { migration_name: string; finished_at: Date | null }[]
-    >`SELECT migration_name, finished_at
-      FROM "_prisma_migrations"
-      WHERE finished_at IS NOT NULL
-      ORDER BY finished_at DESC
-      LIMIT 1`;
-    const row = rows[0];
-    if (!row) return { name: null, finishedAt: null };
-    const name = String(row.migration_name ?? "").trim().slice(0, 120);
-    if (!name || !/^[A-Za-z0-9_]+$/.test(name)) {
-      return { name: null, finishedAt: null };
-    }
-    return { name, finishedAt: row.finished_at ?? null };
-  } catch {
-    return { name: null, finishedAt: null };
-  }
+  const row = await readLatestPrismaMigration();
+  return { name: row.name, finishedAt: row.finishedAt };
 }
 
 /**
@@ -984,19 +971,46 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
   >;
 
   if (db.status === "HEALTHY") {
-    const [{ cases, truncated }, emailTs, providerTs, mig, controls] =
-      await Promise.all([
-        collectReconciliationCases(checkedAt),
-        collectEmailTimestamps(checkedAt),
-        collectProviderObservationTimestamps(),
-        readLatestMigration(),
-        getOperationalControlsHealthSnapshot(),
-      ]);
-    reconciliation = summarizeReconciliation(cases, truncated, checkedAt);
-    emailExtra = emailTs;
-    providerObs = providerTs;
-    migration = mig;
-    operationalControls = controls;
+    try {
+      const [{ cases, truncated }, emailTs, providerTs, controls] =
+        await Promise.all([
+          collectReconciliationCases(checkedAt),
+          collectEmailTimestamps(checkedAt),
+          collectProviderObservationTimestamps(),
+          getOperationalControlsHealthSnapshot(),
+        ]);
+      reconciliation = summarizeReconciliation(cases, truncated, checkedAt);
+      emailExtra = emailTs;
+      providerObs = providerTs;
+      operationalControls = controls;
+    } catch {
+      reconciliation = {
+        checkedAtLabel: nowLabel(checkedAt),
+        freshness: "NOT_AVAILABLE",
+        actionableCount: 0,
+        openCount: 0,
+        lockedCount: 0,
+        resolvedCount: 0,
+        highPriorityCount: 0,
+        criticalPriorityCount: 0,
+        providerUncertainCount: 0,
+        finalizationFailedCount: 0,
+        refundPendingCount: 0,
+        failedEmailCount: 0,
+        orderEmailFailedCount: 0,
+        walletNotificationFailedCount: 0,
+        iccidPendingCount: 0,
+        oldestUnresolvedAgeLabel: "—",
+        refreshOrRecoveryInProgressCount: 0,
+        truncated: false,
+      };
+      operationalControls = await getOperationalControlsHealthSnapshot();
+    }
+    try {
+      migration = await readLatestMigration();
+    } catch {
+      migration = { name: null, finishedAt: null };
+    }
   } else {
     reconciliation = {
       checkedAtLabel: nowLabel(checkedAt),

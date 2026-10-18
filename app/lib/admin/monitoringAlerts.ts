@@ -17,7 +17,10 @@ import {
 import { redirect } from "next/navigation";
 import { prisma } from "@/app/lib/db";
 import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
-import { probeAdminDatabase } from "@/app/lib/admin/adminDatabaseProbe";
+import {
+  probeAdminDatabase,
+  readLatestPrismaMigration,
+} from "@/app/lib/admin/adminDatabaseProbe";
 import { requireRole } from "@/app/lib/auth/session";
 import { loadConsentGateUser } from "@/app/lib/auth/legalConsentGate";
 import { getEmailChannelsReadiness } from "@/app/lib/email/config";
@@ -171,22 +174,7 @@ async function readLatestMigration(): Promise<{
   finishedAt: Date | null;
   unknown: boolean;
 }> {
-  try {
-    const rows = await prisma.$queryRaw<
-      Array<{ migration_name: string; finished_at: Date | null }>
-    >`SELECT migration_name, finished_at FROM _prisma_migrations ORDER BY finished_at DESC NULLS LAST LIMIT 1`;
-    const row = rows[0];
-    if (!row?.migration_name) {
-      return { name: null, finishedAt: null, unknown: true };
-    }
-    return {
-      name: row.migration_name,
-      finishedAt: row.finished_at,
-      unknown: !row.finished_at,
-    };
-  } catch {
-    return { name: null, finishedAt: null, unknown: true };
-  }
+  return readLatestPrismaMigration();
 }
 
 function pushUnique(alerts: MonitoringAlert[], alert: MonitoringAlert) {
