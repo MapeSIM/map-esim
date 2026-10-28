@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/app/lib/db";
+import { prisma as db } from "@/app/lib/db";
 import { requireActiveAdminForOperations } from "@/app/lib/admin/operationsHealth";
 
 export async function POST(req: Request) {
