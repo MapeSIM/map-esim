@@ -66,7 +66,7 @@ export function SafepayConfigPanel({ initial }: SafepayConfigProps) {
           type="button"
           onClick={toggleSafepay}
           disabled={loading}
-          variant={enabled ? "destructive" : "primary"}
+          variant="secondary"
           size="sm"
         >
           {loading ? "Updating..." : enabled ? "Disable Safepay" : "Enable Safepay"}
