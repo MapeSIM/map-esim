@@ -1,3 +1,4 @@
+import { SafepayConfigPanel } from "@/app/components/admin/SafepayConfigPanel";
 import { Suspense, cache, type ReactNode } from "react";
 import {
   getOperationsHealthDashboard,
@@ -383,6 +384,8 @@ function OperationsDeferredView({
       <WhatsAppSupportPanel initial={whatsappSupport} />
 
       <SimpaisaWalletOperatorsPanel initial={simpaisaWalletOperators} />
+
+      <SafepayConfigPanel initial={{ enabled: true, updatedAt: null, updatedByEmail: null }} />
 
       <ProviderWalletPanel />
 

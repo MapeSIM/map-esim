@@ -22,6 +22,7 @@ type CheckoutResponse = {
   success?: boolean;
   orderId?: string;
   accessToken?: string;
+  paymentUrl?: string; // Safepay URL ke liye naya field
   error?: string;
   message?: string;
   replayed?: boolean;
@@ -158,7 +159,8 @@ function CheckoutContent() {
     submitLockRef.current = true;
 
     try {
-      const response = await fetch("/api/vesim/checkout", {
+      // Naya API endpoint jo Safepay link generate karega
+      const response = await fetch("/api/payments/safepay/init", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -173,26 +175,9 @@ function CheckoutContent() {
 
       const data: CheckoutResponse = await response.json();
 
-      if (response.ok && data.success && data.orderId && data.accessToken) {
-        const params = new URLSearchParams({
-          orderId: data.orderId,
-          access: data.accessToken,
-        });
-        if (data.emailDelivery) {
-          params.set("emailDelivery", data.emailDelivery);
-        }
-        if (data.customerEmail || cleanEmail) {
-          params.set("customerEmail", data.customerEmail || cleanEmail);
-        }
-        router.push(`/success?${params.toString()}`);
-        return;
-      }
-
-      if (response.ok && data.success && data.orderId && !data.accessToken) {
-        setMessage(
-          data.error ||
-            "Order created, but secure access could not be authorized. Contact support with your Order ID."
-        );
+      // Agar backend ne Safepay ka payment URL bhej diya, toh redirect karein
+      if (response.ok && data.success && data.paymentUrl) {
+        window.location.href = data.paymentUrl;
         return;
       }
 
@@ -204,7 +189,7 @@ function CheckoutContent() {
         return;
       }
 
-      setMessage(data.error || data.message || "eSIM purchase failed");
+      setMessage(data.error || data.message || "Payment initialization failed");
       idempotencyKeyRef.current =
         typeof crypto !== "undefined" && "randomUUID" in crypto
           ? crypto.randomUUID()
@@ -353,10 +338,9 @@ function CheckoutContent() {
               aria-busy={payLoading}
               className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 py-3 font-bold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:bg-[var(--accent)]"
             >
-              {payLoading ? "Creating eSIM..." : "Purchase eSIM"}
+              {payLoading ? "Redirecting to Safepay..." : "Pay with Safepay"}
             </button>
 
-            {/* Compatibility + trust sit below Pay CTA (parity with logged-in checkout). */}
             <CheckoutCompatibilityCheck />
             <CheckoutTrustPanel />
 
