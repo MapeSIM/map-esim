@@ -216,10 +216,6 @@ function InsufficientWalletCheckoutNotice() {
   );
 }
 
-/**
- * Live checkout funding preview from the same rules as the server.
- * Never falls back to a fake gateway-only breakdown when the wallet is selected.
- */
 function previewPurchaseFunding(
   review: WalletPurchaseReview,
   useWallet: boolean,
@@ -332,13 +328,39 @@ export default function WalletPurchaseConfirmForm({
   const mobileDueSummaryId = "checkout-mobile-due-summary";
   const errorState = state as WalletPurchaseActionState;
 
+  const isSafepayMode = safepayEnabled && paymentMode === "safepay";
+
+  // Safepay Form Submit Interceptor
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    if (isSafepayMode) {
+      event.preventDefault();
+      setWhatsappOrderBusy(true);
+      try {
+        const res = await fetch("/api/payments/safepay/init", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ purchaseId: review.purchaseId }),
+        });
+        const data = await res.json();
+        if (data.url || data.redirectUrl) {
+          window.location.href = data.url || data.redirectUrl;
+        } else {
+          alert(data.error || "Could not initialize Safepay checkout.");
+          setWhatsappOrderBusy(false);
+        }
+      } catch {
+        alert("Network error connecting to Safepay.");
+        setWhatsappOrderBusy(false);
+      }
+    }
+  }
+
   const useWallet = useWalletFromPaymentMode(paymentMode);
   const preview = previewPurchaseFunding(review, useWallet, useRewards);
   const gatewayRequired = preview.gatewayAmountCents > 0;
   const walletFundsApplied = preview.walletAppliedCents > 0;
   const fullWallet = !gatewayRequired && walletFundsApplied;
   const zeroCashConfirm = !gatewayRequired;
-  // Display-only: confirmation + CTA copy follows selected payment mode.
   const isFullWalletMode = paymentMode === "full_wallet";
   const confirmNoteText = isFullWalletMode
     ? "Confirm below to complete this purchase with your wallet."
@@ -360,10 +382,10 @@ export default function WalletPurchaseConfirmForm({
   const hasWalletBalance = !walletDisabled;
   const paymentGatewayConfigured = review.paymentGatewayConfigured === true;
   const onlinePaymentsAllowed = paymentGatewayConfigured;
-  const simpaisaCheckout = review.activePaymentProvider === "SIMPAISA";
-  const gatewayReady = gatewayRequired && paymentGatewayConfigured;
+  const simpaisaCheckout = review.activePaymentProvider === "SIMPAISA" && !isSafepayMode;
+  const gatewayReady = (gatewayRequired && paymentGatewayConfigured) || isSafepayMode;
   const showGatewayUnavailable =
-    onlinePaymentsAllowed && gatewayRequired && !paymentGatewayConfigured;
+    onlinePaymentsAllowed && gatewayRequired && !paymentGatewayConfigured && !safepayEnabled;
   const afterPromoCents = Math.max(
     0,
     Math.trunc(Number(review.payableCents ?? review.priceCents))
@@ -380,20 +402,14 @@ export default function WalletPurchaseConfirmForm({
     hasWalletBalance &&
     review.balanceCents > 0 &&
     review.balanceCents < cashPayablePreview;
-  // UI visibility only (funding math unchanged):
-  // - Balance >= payable → Full wallet + Online (no Wallet + online).
-  // - 0 < balance < payable → Wallet + online + Online (Full wallet only if canFullWallet).
-  // - Balance = 0 → Online payment only.
   const showFullWalletOption = hasWalletBalance && canFullWallet;
-  const showWalletAndOnlineOption = canWalletAndMobile;
+  const showWalletAndOnlineOption = canWalletAndMobile && !isSafepayMode;
   const showOnlinePaymentOption = cashPayablePreview > 0 && onlinePaymentsAllowed;
   const walletOnlyInsufficient =
-    !onlinePaymentsAllowed && cashPayablePreview > 0 && !canFullWallet;
+    !onlinePaymentsAllowed && cashPayablePreview > 0 && !canFullWallet && !safepayEnabled;
   const whatsappPhone = (whatsappCheckoutPhone ?? "").trim();
   const whatsappCheckoutAvailable =
     Boolean(whatsappPhone) && cashPayablePreview > 0;
-  // Show CTA when WhatsApp is selected, or as fallback when gateway is off/unavailable.
-  // Never compete with a zero-cash wallet confirm path.
   const showWhatsAppCheckoutCta =
     whatsappCheckoutAvailable &&
     !zeroCashConfirm &&
@@ -444,7 +460,6 @@ export default function WalletPurchaseConfirmForm({
     if (deliveryBlocksPurchase) {
       return "Save or cancel the delivery email to continue.";
     }
-    // Zero-cash confirm is shown in the sticky bar itself on mobile.
     if (zeroCashConfirm && !confirmed) {
       return null;
     }
@@ -506,10 +521,9 @@ export default function WalletPurchaseConfirmForm({
     persistFundingChoice(paymentMode, checked);
   }
 
-  // Keep selection on a visible option when rewards/balance change.
   useEffect(() => {
     let next: CustomerEsimPaymentMode = paymentMode;
-    if (!onlinePaymentsAllowed || cashPayablePreview <= 0) {
+    if (!onlinePaymentsAllowed && !safepayEnabled || cashPayablePreview <= 0) {
       next = "full_wallet";
     } else if (paymentMode === "full_wallet" && !showFullWalletOption) {
       next = showWalletAndOnlineOption ? "wallet_and_mobile" : "mobile_only";
@@ -523,12 +537,13 @@ export default function WalletPurchaseConfirmForm({
       setPaymentMode(next);
       persistFundingChoice(next, useRewards && !rewardsDisabled);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only when option visibility changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     cashPayablePreview,
     onlinePaymentsAllowed,
     showFullWalletOption,
     showWalletAndOnlineOption,
+    safepayEnabled,
   ]);
 
   const cardClass =
@@ -546,8 +561,6 @@ export default function WalletPurchaseConfirmForm({
     review.status === WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT;
 
   const stickyBarVisible = !awaitingGatewayPayment;
-  // Tallest sticky bar ≈ confirm checkbox + due row + full-width CTA + helper + safe-area.
-  // Spacer (not form padding alone) keeps mobile number / amount above the CTA.
   const stickySpacerClass =
     stickyShowConfirm || Boolean(stickyDisabledReason)
       ? "pointer-events-none h-[calc(14rem+env(safe-area-inset-bottom,0px))] lg:hidden"
@@ -599,6 +612,7 @@ export default function WalletPurchaseConfirmForm({
 
     <form
       action={formAction}
+      onSubmit={handleSubmit}
       className="space-y-6"
       noValidate
     >
@@ -651,7 +665,6 @@ export default function WalletPurchaseConfirmForm({
             </dl>
           </section>
 
-          {/* Mobile-only: surface amount due early after plan (desktop uses sticky aside). */}
           <section
             id={mobileDueSummaryId}
             className={`${cardClass} lg:hidden`}
@@ -680,7 +693,6 @@ export default function WalletPurchaseConfirmForm({
                   if (!el) return;
                   event.preventDefault();
                   el.scrollIntoView({ behavior: "smooth", block: "start" });
-                  // Keep hash for accessibility / share without fighting scroll-mt.
                   if (typeof history !== "undefined") {
                     history.replaceState(null, "", `#${targetId}`);
                   }
@@ -926,18 +938,18 @@ export default function WalletPurchaseConfirmForm({
                 {safepayEnabled ? (
                   <label
                     className={paymentOptionClass(
-                      !whatsappSelected && paymentMode === "mobile_only"
+                      !whatsappSelected && paymentMode === "safepay"
                     )}
                   >
                     <input
                       type="radio"
                       name="paymentModeChoice"
-                      value="mobile_only"
+                      value="safepay"
                       checked={
-                        !whatsappSelected && paymentMode === "mobile_only"
+                        !whatsappSelected && paymentMode === "safepay"
                       }
                       disabled={busy}
-                      onChange={() => onPaymentModeChange("mobile_only")}
+                      onChange={() => onPaymentModeChange("safepay")}
                       className="shrink-0"
                     />
                     <span className="font-semibold text-[var(--heading)]">
@@ -975,7 +987,7 @@ export default function WalletPurchaseConfirmForm({
           </section>
 
           {gatewayRequired && !whatsappSelected ? (
-            onlinePaymentsAllowed ? (
+            onlinePaymentsAllowed || isSafepayMode ? (
             <section
               id={onlinePaymentSectionId}
               className={`${cardClass} scroll-mt-28 sm:scroll-mt-32`}
@@ -985,7 +997,7 @@ export default function WalletPurchaseConfirmForm({
                 id={paymentHeadingId}
                 className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
               >
-                Online payment
+                {isSafepayMode ? "Card payment" : "Online payment"}
               </h2>
               {gatewayReady ? (
                 <>
@@ -1023,7 +1035,7 @@ export default function WalletPurchaseConfirmForm({
                     />
                   ) : (
                     <p className="mt-3 text-sm font-semibold text-[var(--heading)]">
-                      Continue to online payment.
+                      {isSafepayMode ? "Click continue below to pay securely with Safepay." : "Continue to online payment."}
                     </p>
                   )}
                 </>
@@ -1051,7 +1063,6 @@ export default function WalletPurchaseConfirmForm({
         </div>
 
         <aside className="space-y-5 lg:sticky lg:top-6">
-          {/* Desktop/tablet: full order summary. Mobile uses early Amount due + sticky due. */}
           <section
             className={`${cardClass} hidden lg:block`}
             aria-labelledby={orderHeadingId}
@@ -1160,9 +1171,11 @@ export default function WalletPurchaseConfirmForm({
               className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-4 text-sm text-[var(--text-muted)]"
               role="note"
             >
-              {paymentMode === "wallet_and_mobile"
-                ? "Continue below to complete the remaining amount with online payment."
-                : "Continue below to complete this purchase with online payment."}
+              {isSafepayMode
+                ? "Continue below to pay securely with Safepay."
+                : paymentMode === "wallet_and_mobile"
+                  ? "Continue below to complete the remaining amount with online payment."
+                  : "Continue below to complete this purchase with online payment."}
             </div>
           ) : walletOnlyInsufficient ? (
             <div
@@ -1253,7 +1266,7 @@ export default function WalletPurchaseConfirmForm({
                 }
                 className="hidden min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60 lg:inline-flex"
               >
-                {pending ? (
+                {pending || whatsappOrderBusy ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                     {primaryCtaPendingLabel}
@@ -1280,13 +1293,11 @@ export default function WalletPurchaseConfirmForm({
             </div>
           )}
 
-          {/* Compatibility + trust sit below Pay CTA so mobile users see action first. */}
           <CheckoutCompatibilityCheck />
           <CheckoutTrustPanel />
         </aside>
       </div>
 
-      {/* Mobile spacer: keeps final payment fields clear of the fixed sticky CTA. */}
       {stickyBarVisible ? (
         <div
           className={stickySpacerClass}
@@ -1295,7 +1306,6 @@ export default function WalletPurchaseConfirmForm({
         />
       ) : null}
 
-      {/* Mobile sticky pay action — sole mobile CTA; aside buttons stay desktop-only. */}
       {stickyBarVisible ? (
       <div
         className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/95 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] backdrop-blur supports-[padding:max(0px)]:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4 lg:hidden"
@@ -1371,7 +1381,7 @@ export default function WalletPurchaseConfirmForm({
               disabled={stickyCtaDisabled}
               className="inline-flex h-11 w-full min-w-0 items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
             >
-              {pending ? (
+              {pending || whatsappOrderBusy ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                   {stickyCtaPendingLabel}

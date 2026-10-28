@@ -9,7 +9,8 @@ export type ParseResult<T> =
 export type CustomerEsimPaymentMode =
   | "full_wallet"
   | "wallet_and_mobile"
-  | "mobile_only";
+  | "mobile_only"
+  | "safepay";
 
 export function parseWalletPurchaseIdempotencyKey(
   raw: unknown
@@ -59,7 +60,8 @@ export function parseCustomerEsimPaymentMode(
   if (
     value === "full_wallet" ||
     value === "wallet_and_mobile" ||
-    value === "mobile_only"
+    value === "mobile_only" ||
+    value === "safepay"
   ) {
     return { ok: true, value };
   }
