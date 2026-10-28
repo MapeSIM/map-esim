@@ -63,6 +63,8 @@ type Props = {
    * (from getWhatsAppCheckoutPhoneDigits). Null hides Buy via WhatsApp.
    */
   whatsappCheckoutPhone?: string | null;
+  /** Safepay gateway toggle status from admin config */
+  safepayEnabled?: boolean;
 };
 
 function BuyViaWhatsAppCheckoutButton({
@@ -292,6 +294,7 @@ export default function WalletPurchaseConfirmForm({
   review,
   enabledSimpaisaOperatorIds,
   whatsappCheckoutPhone = null,
+  safepayEnabled = false,
 }: Props) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(
@@ -916,6 +919,29 @@ export default function WalletPurchaseConfirmForm({
                     />
                     <span className="font-semibold text-[var(--heading)]">
                       {onlinePaymentLabel}
+                    </span>
+                  </label>
+                ) : null}
+
+                {safepayEnabled ? (
+                  <label
+                    className={paymentOptionClass(
+                      !whatsappSelected && paymentMode === "mobile_only"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentModeChoice"
+                      value="mobile_only"
+                      checked={
+                        !whatsappSelected && paymentMode === "mobile_only"
+                      }
+                      disabled={busy}
+                      onChange={() => onPaymentModeChange("mobile_only")}
+                      className="shrink-0"
+                    />
+                    <span className="font-semibold text-[var(--heading)]">
+                      Credit / Debit Card (Safepay)
                     </span>
                   </label>
                 ) : null}

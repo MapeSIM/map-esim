@@ -17,6 +17,7 @@ import { getSimpaisaWalletOperatorConfig } from "@/app/lib/payments/simpaisaWall
 import { resolveCheckoutBackHref } from "@/app/lib/plans/checkoutBackHref";
 import { getWhatsAppCheckoutPhoneDigits } from "@/app/lib/support/whatsappSupport";
 import { WalletEsimPurchaseStatus } from "@prisma/client";
+import { prisma as db } from "@/app/lib/db"; // Safepay config check ke liye import
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,6 @@ export default async function AccountWalletBuyReviewPage({
 }) {
   const query = await searchParams;
   const purchaseId = parsePurchaseId(query.purchase);
-  // Preserve review resume URL across sign-in (abandoned checkout email CTA).
   const user = await requireRole(
     "CUSTOMER",
     buildWalletBuyReviewReturnPath(purchaseId)
@@ -71,7 +71,6 @@ export default async function AccountWalletBuyReviewPage({
     );
   }
 
-  // Invalid id shape already 404'd above; missing / wrong-owner rows stay 404.
   if (!review) notFound();
 
   if (review.status === WalletEsimPurchaseStatus.COMPLETED) {
@@ -80,9 +79,6 @@ export default async function AccountWalletBuyReviewPage({
   if (review.status === WalletEsimPurchaseStatus.FAILED_REFUNDED) {
     redirect(`/account/esim/buy/failed?purchase=${encodeURIComponent(review.purchaseId)}`);
   }
-  // Processing (FUNDED / PROVIDER_PENDING / FUNDS_RESERVED) and
-  // Review Needed (RECONCILIATION_REQUIRED) share this route; copy is
-  // chosen from durable purchase status on the destination page.
   if (
     review.status === WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED ||
     review.status === WalletEsimPurchaseStatus.PROVIDER_PENDING ||
@@ -94,9 +90,6 @@ export default async function AccountWalletBuyReviewPage({
     );
   }
 
-  // AWAITING_GATEWAY_PAYMENT stays on checkout so the customer can resume/cancel safely.
-
-  // Owned but non-confirmable (e.g. DRAFT): friendly explanation, not a bare 404.
   if (!review.canConfirm) {
     const nonConfirmable = resolveAbandonedCheckoutNonConfirmableGuidance(
       review.status
@@ -124,6 +117,13 @@ export default async function AccountWalletBuyReviewPage({
     destinationCode: review.destinationCode,
     destinationName: review.destinationName,
   });
+
+  // Safepay config database se fetch karna
+  const safepayConfigRow = await db.safepayConfig.findUnique({
+    where: { id: "default" },
+  });
+  const safepayEnabled = safepayConfigRow ? safepayConfigRow.enabled : false;
+
   const [simpaisaOperators, whatsappCheckoutPhone] = await Promise.all([
     getSimpaisaWalletOperatorConfig(),
     getWhatsAppCheckoutPhoneDigits(),
@@ -171,6 +171,7 @@ export default async function AccountWalletBuyReviewPage({
         review={review}
         enabledSimpaisaOperatorIds={simpaisaOperators.enabledOperatorIds}
         whatsappCheckoutPhone={whatsappCheckoutPhone}
+        safepayEnabled={safepayEnabled} // Form component ko safepay status pass kar diya
       />
     </div>
   );
