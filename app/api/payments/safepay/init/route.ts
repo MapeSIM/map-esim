@@ -5,7 +5,6 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { offerId, customerEmail } = body;
 
-    // 1. Base price & 8% Fee Calculation
     const baseAmountUSD = 0.99; 
     const feePercentage = 0.08; 
     const finalUSD = baseAmountUSD * (1 + feePercentage);
@@ -22,15 +21,11 @@ export async function POST(req: Request) {
       ? 'https://sandbox.api.getsafepay.com' 
       : 'https://api.getsafepay.com';
 
-    // Amount in lowest currency units (cents/paisas as integer)
     const calculatedAmount = Math.round(finalUSD * 100);
-
-    // Get origin URL dynamically for success/cancel redirects
     const origin = req.headers.get("origin") || "https://mapesim.com";
 
-    console.log("Initializing Safepay Tracker...");
+    console.log("Initializing Safepay Tracker (Without Cybersource intent)...");
 
-    // 2. Safepay Tracker Request with success & cancel URLs
     const trackerResponse = await fetch(`${apiUrl}/order/v1/init`, {
       method: 'POST',
       headers: {
@@ -42,7 +37,6 @@ export async function POST(req: Request) {
         environment: environment,
         amount: calculatedAmount,
         currency: 'USD',
-        intent: 'CYBERSOURCE',
         success_url: `${origin}/account/esim/buy/success`,
         cancel_url: `${origin}/account/esim/buy/cancel`
       })
@@ -55,8 +49,8 @@ export async function POST(req: Request) {
       const trackerToken = trackerData.data.token;
       
       const checkoutBase = environment === 'sandbox' 
-        ? 'https://sandbox.api.getsafepay.com/checkout/pay' 
-        : 'https://getsafepay.com/checkout/pay';
+        ? 'https://sandbox.getsafepay.com/checkout/pay' 
+        : 'https://www.getsafepay.com/checkout/pay';
         
       const paymentUrl = `${checkoutBase}?env=${environment}&tracker=${trackerToken}`;
 
