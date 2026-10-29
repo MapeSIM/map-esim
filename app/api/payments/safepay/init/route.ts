@@ -3,7 +3,18 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { offerId, customerEmail, amount = 0.99 } = body; // Dynamic amount ya default $0.99
+    const { offerId, customerEmail } = body;
+
+    // 1. Base package price in USD (misal ke taur par $0.99)
+    const baseAmountUSD = 0.99; 
+
+    // 2. Custom Exchange Rate ($1 = 293 PKR)
+    const exchangeRate = 293;
+    const amountInPKR = baseAmountUSD * exchangeRate; // e.g., 0.99 * 293 = ~290.07 PKR
+
+    // 3. 8% Fee Add Karein
+    const feePercentage = 0.08; 
+    const finalPKR = amountInPKR * (1 + feePercentage); // ~290.07 + 8% = ~313.27 PKR
 
     const environment = process.env.SAFEPAY_ENVIRONMENT || 'sandbox';
     const apiKey = process.env.SAFEPAY_API_KEY;
@@ -17,11 +28,11 @@ export async function POST(req: Request) {
       ? 'https://sandbox.api.getsafepay.com' 
       : 'https://api.getsafepay.com';
 
-    // Safepay expects amount in lowest currency unit (e.g. cents/paisas as integer)
-    // For $0.99, amount should be 99. If $10.00, it should be 1000.
-    const calculatedAmount = Math.round(Number(amount) * 100);
+    // Safepay expects amount in lowest currency unit (paisas as integer for PKR)
+    // 1 PKR = 100 paisas, isliye amount ko 100 se multiply karein aur round off karein
+    const calculatedAmount = Math.round(finalPKR * 100);
 
-    // 1. Safepay Tracker Initialize Karein
+    // 4. Safepay Tracker Initialize Karein (Currency = PKR)
     const trackerResponse = await fetch(`${apiUrl}/order/v1/init`, {
       method: 'POST',
       headers: {
@@ -32,7 +43,7 @@ export async function POST(req: Request) {
         client: apiKey,
         environment: environment,
         amount: calculatedAmount,
-        currency: 'USD',
+        currency: 'PKR', // Currency ab PKR ho gayi hai
         intent: 'CYBERSOURCE'
       })
     });
@@ -42,7 +53,7 @@ export async function POST(req: Request) {
     if (trackerData && trackerData.data && trackerData.data.token) {
       const trackerToken = trackerData.data.token;
       
-      // 2. Checkout URL Generate Karein
+      // 5. Checkout URL Generate Karein
       const checkoutBase = environment === 'sandbox' 
         ? 'https://sandbox.api.getsafepay.com/checkout/pay' 
         : 'https://getsafepay.com/checkout/pay';
