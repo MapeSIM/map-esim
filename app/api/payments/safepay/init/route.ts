@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { offerId, customerEmail } = body;
+    const { offerId, customerEmail, amount = 0.99 } = body; // Dynamic amount ya default $0.99
 
     const environment = process.env.SAFEPAY_ENVIRONMENT || 'sandbox';
     const apiKey = process.env.SAFEPAY_API_KEY;
@@ -17,6 +17,10 @@ export async function POST(req: Request) {
       ? 'https://sandbox.api.getsafepay.com' 
       : 'https://api.getsafepay.com';
 
+    // Safepay expects amount in lowest currency unit (e.g. cents/paisas as integer)
+    // For $0.99, amount should be 99. If $10.00, it should be 1000.
+    const calculatedAmount = Math.round(Number(amount) * 100);
+
     // 1. Safepay Tracker Initialize Karein
     const trackerResponse = await fetch(`${apiUrl}/order/v1/init`, {
       method: 'POST',
@@ -27,8 +31,9 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         client: apiKey,
         environment: environment,
-        amount: 10.00, // Testing amount ($10)
-        currency: 'USD'
+        amount: calculatedAmount,
+        currency: 'USD',
+        intent: 'CYBERSOURCE'
       })
     });
 
@@ -46,11 +51,12 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         success: true,
-        url: paymentUrl,          // Frontend redirection ke liye
-        paymentUrl: paymentUrl,   // Backwards compatibility ke liye
+        url: paymentUrl,
+        paymentUrl: paymentUrl,
         orderId: trackerToken
       });
     } else {
+      console.error("Safepay Tracker Error Response:", trackerData);
       return NextResponse.json({ success: false, error: "Safepay tracker creation failed" }, { status: 400 });
     }
   } catch (error) {
