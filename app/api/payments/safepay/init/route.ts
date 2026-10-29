@@ -24,8 +24,6 @@ export async function POST(req: Request) {
     const calculatedAmount = Math.round(finalUSD * 100);
     const origin = req.headers.get("origin") || "https://mapesim.com";
 
-    console.log("Initializing Safepay Tracker (Without Cybersource intent)...");
-
     const trackerResponse = await fetch(`${apiUrl}/order/v1/init`, {
       method: 'POST',
       headers: {
@@ -43,13 +41,13 @@ export async function POST(req: Request) {
     });
 
     const trackerData = await trackerResponse.json();
-    console.log("Safepay Full Response:", trackerData);
 
     if (trackerData && trackerData.data && trackerData.data.token) {
       const trackerToken = trackerData.data.token;
       
+      // FIXED: Use correct checkout base URL with sandbox api domain
       const checkoutBase = environment === 'sandbox' 
-        ? 'https://sandbox.getsafepay.com/checkout/pay' 
+        ? 'https://sandbox.api.getsafepay.com/checkout/pay' 
         : 'https://www.getsafepay.com/checkout/pay';
         
       const paymentUrl = `${checkoutBase}?env=${environment}&tracker=${trackerToken}`;
