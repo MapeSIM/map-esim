@@ -46,7 +46,8 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         success: true,
-        paymentUrl: paymentUrl,
+        url: paymentUrl,          // Frontend redirection ke liye
+        paymentUrl: paymentUrl,   // Backwards compatibility ke liye
         orderId: trackerToken
       });
     } else {
