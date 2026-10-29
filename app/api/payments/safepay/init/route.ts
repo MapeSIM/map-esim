@@ -5,9 +5,10 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { offerId, customerEmail } = body;
 
-    const baseAmountUSD = 0.99; 
+    // 1. Price in PKR (misal ke taur par Rs. 275 ya jo bhi aapka package ho)
+    const baseAmountPKR = 275; 
     const feePercentage = 0.08; 
-    const finalUSD = baseAmountUSD * (1 + feePercentage);
+    const finalPKR = baseAmountPKR * (1 + feePercentage);
 
     const environment = process.env.SAFEPAY_ENVIRONMENT || 'sandbox';
     const apiKey = process.env.SAFEPAY_API_KEY;
@@ -21,8 +22,11 @@ export async function POST(req: Request) {
       ? 'https://sandbox.api.getsafepay.com' 
       : 'https://api.getsafepay.com';
 
-    const calculatedAmount = Math.round(finalUSD * 100);
+    // Safepay expects amount in lowest currency units (paisas as integer for PKR)
+    const calculatedAmount = Math.round(finalPKR * 100);
     const origin = req.headers.get("origin") || "https://mapesim.com";
+
+    console.log("Initializing Safepay Tracker with PKR:", calculatedAmount);
 
     const trackerResponse = await fetch(`${apiUrl}/order/v1/init`, {
       method: 'POST',
@@ -34,18 +38,18 @@ export async function POST(req: Request) {
         client: apiKey,
         environment: environment,
         amount: calculatedAmount,
-        currency: 'USD',
+        currency: 'PKR',
         success_url: `${origin}/account/esim/buy/success`,
         cancel_url: `${origin}/account/esim/buy/cancel`
       })
     });
 
     const trackerData = await trackerResponse.json();
+    console.log("Safepay Full Response:", trackerData);
 
     if (trackerData && trackerData.data && trackerData.data.token) {
       const trackerToken = trackerData.data.token;
       
-      // FIXED: Use correct checkout base URL with sandbox api domain
       const checkoutBase = environment === 'sandbox' 
         ? 'https://sandbox.api.getsafepay.com/checkout/pay' 
         : 'https://www.getsafepay.com/checkout/pay';
