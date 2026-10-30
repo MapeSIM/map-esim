@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import dynamic from "next/dynamic";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import NavbarShell from "./components/NavbarShell";
 import Footer from "./components/Footer";
@@ -22,11 +22,6 @@ import {
 } from "@/app/lib/seo/siteGraph";
 import { defaultSocialShareImages } from "@/app/lib/seo/socialShareMeta";
 
-const SpeedInsights = dynamic(
-  () => import("@vercel/speed-insights/next").then((mod) => mod.SpeedInsights),
-  { ssr: false }
-);
-
 const { openGraphImages, twitterImages } = defaultSocialShareImages();
 
 const googleSiteVerification =
@@ -45,8 +40,6 @@ export const metadata: Metadata = {
   openGraph: {
     title: BRAND_NAME,
     description: BRAND_TAGLINE,
-    // Do not set openGraph.url here — a root homepage URL was leaking into
-    // child routes that omit their own og:url and confused crawler canonicals.
     siteName: BRAND_NAME,
     type: "website",
     images: openGraphImages,
@@ -59,19 +52,12 @@ export const metadata: Metadata = {
   },
 };
 
-/** Fit all phone widths; pinch-zoom remains available for accessibility. */
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
 };
 
-/**
- * Public shell intentionally avoids server session and request-cookie reads so
- * marketing and catalog routes can use ISR/CDN caching. Session, consent, and
- * preference values are rehydrated in client islands (NavbarShell,
- * CookieConsentProvider, theme/currency providers).
- */
 export default function RootLayout({
   children,
 }: Readonly<{
