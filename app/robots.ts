@@ -21,7 +21,7 @@ export default function robots(): MetadataRoute.Robots {
         "/verify-reset-code",
         "/oauth-consent",
         "/dashboard",
-        "/esim",
+        // "/esim", removed so device-compatibility and related public pages can be indexed
         "/partner",
         "/partner/setup-password",
         "/partner/setup-password/exchange",
