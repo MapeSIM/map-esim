@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
+import dynamic from "next/dynamic";
 import "./globals.css";
 import NavbarShell from "./components/NavbarShell";
 import Footer from "./components/Footer";
@@ -21,6 +21,11 @@ import {
   websiteNode,
 } from "@/app/lib/seo/siteGraph";
 import { defaultSocialShareImages } from "@/app/lib/seo/socialShareMeta";
+
+const SpeedInsights = dynamic(
+  () => import("@vercel/speed-insights/next").then((mod) => mod.SpeedInsights),
+  { ssr: false }
+);
 
 const { openGraphImages, twitterImages } = defaultSocialShareImages();
 
