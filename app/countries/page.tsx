@@ -1,4 +1,5 @@
 import CountriesListing from "@/app/components/countries/CountriesListing";
+import JsonLd from "@/app/components/seo/JsonLd";
 import { countries as staticCountries } from "@/app/data/countries";
 import {
   retailMinFromProviderStartingPrice,
@@ -60,10 +61,28 @@ async function loadInitialCatalog(): Promise<{
 export default async function CountriesPage() {
   const { destinations, source } = await loadInitialCatalog();
 
+  // Structured Data Schema for Search Engines (ItemList)
+  const jsonLdData = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "name": "MAP eSIM Destinations",
+    "description": "Explore mobile eSIM data plans for international travel and country destinations.",
+    "url": "https://mapesim.com/countries",
+    "itemListElement": destinations.map((dest, index) => ({
+      "@type": "ListItem",
+      "position": index + 1,
+      "name": dest.name,
+      "url": `https://mapesim.com/countries/${dest.slug}`,
+    })),
+  };
+
   return (
-    <CountriesListing
-      initialDestinations={destinations}
-      initialSource={source}
-    />
+    <>
+      <JsonLd data={jsonLdData} />
+      <CountriesListing
+        initialDestinations={destinations}
+        initialSource={source}
+      />
+    </>
   );
 }

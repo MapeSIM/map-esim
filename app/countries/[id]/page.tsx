@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { CountrySeoContent } from "@/app/components/countries/CountrySeoContent";
 import DestinationPlansSkeleton from "@/app/components/plans/DestinationPlansSkeleton";
 import PlansListing from "@/app/components/plans/PlansListing";
+import JsonLd from "@/app/components/seo/JsonLd";
 import { countries as staticCountries } from "@/app/data/countries";
 import { toPublicVesimOffers, type VesimOffer } from "@/app/lib/vesim/offers";
 import type { VesimDestination } from "@/app/lib/vesim/destinations";
@@ -158,17 +159,40 @@ async function CountryPlansContent({ id }: { id: string }) {
     ? toPublicPlanDestination(relatedRegional)
     : null;
 
+  // Product & AggregateOffer Schema Markup for Google Rich Results
+  const jsonLdData = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": `${destination.name} eSIM Data Plan`,
+    "description": `High-speed mobile data eSIM plans for ${destination.name}. Instant activation with multiple package options starting from ${destination.minPriceFormatted || "low rates"}.`,
+    "brand": {
+      "@type": "Brand",
+      "name": "MAP eSIM"
+    },
+    "offers": {
+      "@type": "AggregateOffer",
+      "priceCurrency": "USD",
+      "lowPrice": destination.minPrice || 1,
+      "highPrice": destination.minPrice ? destination.minPrice * 10 : 100,
+      "offerCount": offers.length,
+      "url": `https://mapesim.com/countries/${destination.slug}`
+    }
+  };
+
   return (
-    <PlansListing
-      destination={destination}
-      offers={offers}
-      loading={false}
-      error={error}
-      countryNames={countryNames}
-      relatedRegional={publicRelatedRegional}
-    >
-      <CountrySeoContent destination={destination} offers={offers} />
-    </PlansListing>
+    <>
+      <JsonLd data={jsonLdData} />
+      <PlansListing
+        destination={destination}
+        offers={offers}
+        loading={false}
+        error={error}
+        countryNames={countryNames}
+        relatedRegional={publicRelatedRegional}
+      >
+        <CountrySeoContent destination={destination} offers={offers} />
+      </PlansListing>
+    </>
   );
 }
 
