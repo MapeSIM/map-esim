@@ -22,12 +22,22 @@ type CheckoutResponse = {
   success?: boolean;
   orderId?: string;
   accessToken?: string;
-  paymentUrl?: string; // Safepay URL ke liye naya field
+  paymentUrl?: string;
   error?: string;
   message?: string;
   replayed?: boolean;
   emailDelivery?: string;
   customerEmail?: string;
+};
+
+type ManualSettings = {
+  enabled: boolean;
+  accountTitle: string;
+  jazzcash: string;
+  easypaisa: string;
+  bankName: string;
+  bankAccountTitle: string;
+  bankAccountNumber: string;
 };
 
 function CheckoutUnavailable() {
@@ -67,6 +77,13 @@ function CheckoutContent() {
   const [payLoading, setPayLoading] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
   const [message, setMessage] = useState("");
+
+  // Manual Payment States
+  const [paymentMethod, setPaymentMethod] = useState<"safepay" | "manual">("safepay");
+  const [manualSettings, setManualSettings] = useState<ManualSettings | null>(null);
+  const [senderName, setSenderName] = useState("");
+  const [proofFile, setProofFile] = useState<File | null>(null);
+
   const idempotencyKeyRef = useRef<string>("");
   const submitLockRef = useRef(false);
 
@@ -82,7 +99,7 @@ function CheckoutContent() {
   useEffect(() => {
     let cancelled = false;
 
-    async function loadOffer() {
+    async function loadData() {
       setLoading(true);
       setMessage("");
       setUnavailable(false);
@@ -103,21 +120,41 @@ function CheckoutContent() {
           params.set("country", countryHint);
         }
 
-        const response = await fetch(`/api/vesim/offer?${params.toString()}`, {
-          cache: "no-store",
-        });
-        const data = await response.json();
+        const [offerRes, manualRes] = await Promise.all([
+          fetch(`/api/vesim/offer?${params.toString()}`, { cache: "no-store" }),
+          fetch(`/api/admin/manual-payment-settings`, { cache: "no-store" }).catch(() => null),
+        ]);
 
-        if (!response.ok || !data?.success || !data?.offer) {
+        const offerData = await offerRes.json();
+        const manualData = manualRes ? await manualRes.json().catch(() => null) : null;
+
+        if (!offerRes.ok || !offerData?.success || !offerData?.offer) {
           if (!cancelled) {
             setUnavailable(true);
-            setMessage(data?.error || "Plan unavailable");
+            setMessage(offerData?.error || "Plan unavailable");
           }
           return;
         }
 
         if (!cancelled) {
-          setOffer(data.offer as VerifiedOffer);
+          setOffer(offerData.offer as VerifiedOffer);
+          if (manualData?.success && manualData?.settings) {
+            const s = manualData.settings;
+            const isManualOn = s.MANUAL_PAYMENTS_ENABLED === "true";
+            setManualSettings({
+              enabled: isManualOn,
+              accountTitle: s.MANUAL_ACCOUNT_TITLE || "",
+              jazzcash: s.JAZZCASH_NUMBER || "",
+              easypaisa: s.EASYPAISA_NUMBER || "",
+              bankName: s.BANK_NAME || "",
+              bankAccountTitle: s.BANK_ACCOUNT_TITLE || "",
+              bankAccountNumber: s.BANK_ACCOUNT_NUMBER || "",
+            });
+            // Agar manual payment on hai aur safepay ka option bypass karna ho ya default set karna ho
+            if (isManualOn) {
+              setPaymentMethod("manual");
+            }
+          }
         }
       } catch {
         if (!cancelled) {
@@ -131,7 +168,7 @@ function CheckoutContent() {
       }
     }
 
-    loadOffer();
+    loadData();
     return () => {
       cancelled = true;
     };
@@ -154,12 +191,47 @@ function CheckoutContent() {
       return;
     }
 
+    if (paymentMethod === "manual") {
+      if (!senderName.trim()) {
+        setMessage("Please enter the account/sender name used for payment");
+        return;
+      }
+      if (!proofFile) {
+        setMessage("Please upload your payment screenshot or slip");
+        return;
+      }
+    }
+
     setMessage("");
     setPayLoading(true);
     submitLockRef.current = true;
 
     try {
-      // Naya API endpoint jo Safepay link generate karega
+      if (paymentMethod === "manual") {
+        // 1. Pehle screenshot upload karein
+        const formData = new FormData();
+        formData.append("file", proofFile);
+
+        const uploadRes = await fetch("/api/upload-payment-proof", {
+          method: "POST",
+          body: formData,
+        });
+        const uploadData = await uploadRes.json();
+
+        if (!uploadRes.ok || !uploadData.success) {
+          throw new Error(uploadData.error || "Failed to upload payment screenshot");
+        }
+
+        const proofUrl = uploadData.fileUrl;
+
+        // 2. Manual payment order submit API call (Aap isko apne order API se link karenge)
+        // Filhal hum success message ya thank you page par redirect kar rahe hain
+        alert("Manual payment submitted successfully! We will verify your payment and email your eSIM shortly.");
+        router.push("/account");
+        return;
+      }
+
+      // Safepay Flow
       const response = await fetch("/api/payments/safepay/init", {
         method: "POST",
         headers: {
@@ -175,7 +247,6 @@ function CheckoutContent() {
 
       const data: CheckoutResponse = await response.json();
 
-      // Agar backend ne Safepay ka payment URL bhej diya, toh redirect karein
       if (response.ok && data.success && data.paymentUrl) {
         window.location.href = data.paymentUrl;
         return;
@@ -194,8 +265,8 @@ function CheckoutContent() {
         typeof crypto !== "undefined" && "randomUUID" in crypto
           ? crypto.randomUUID()
           : `checkout-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    } catch {
-      setMessage("Unable to process the order");
+    } catch (err: any) {
+      setMessage(err.message || "Unable to process the order");
       idempotencyKeyRef.current =
         typeof crypto !== "undefined" && "randomUUID" in crypto
           ? crypto.randomUUID()
@@ -239,7 +310,7 @@ function CheckoutContent() {
           Checkout
         </h1>
         <p className="mt-2 max-w-xl text-sm text-[var(--text-muted)] sm:text-base">
-          Review your eSIM plan
+          Review your eSIM plan and complete payment
         </p>
 
         <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
@@ -282,6 +353,94 @@ function CheckoutContent() {
                 </div>
               </dl>
             </section>
+
+            {/* Payment Method Selection */}
+            {manualSettings?.enabled && (
+              <section className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6">
+                <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)] mb-3">
+                  Select Payment Method
+                </h2>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("safepay")}
+                    className={`p-3 rounded-xl border text-sm font-semibold transition ${
+                      paymentMethod === "safepay"
+                        ? "border-[var(--accent-strong)] bg-[var(--accent-strong)]/10 text-[var(--heading)]"
+                        : "border-[var(--border)] text-[var(--text-muted)]"
+                    }`}
+                  >
+                    Online Payment (Safepay)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("manual")}
+                    className={`p-3 rounded-xl border text-sm font-semibold transition ${
+                      paymentMethod === "manual"
+                        ? "border-[var(--accent-strong)] bg-[var(--accent-strong)]/10 text-[var(--heading)]"
+                        : "border-[var(--border)] text-[var(--text-muted)]"
+                    }`}
+                  >
+                    Manual (JazzCash / Bank)
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {/* Manual Payment Details & Upload Box */}
+            {paymentMethod === "manual" && manualSettings?.enabled && (
+              <section className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6 space-y-4">
+                <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--accent-strong)]">
+                  Manual Bank / Wallet Transfer Details
+                </h2>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Please transfer the exact amount using any of the channels below and upload your payment proof.
+                </p>
+                <div className="bg-[var(--page-bg)] p-4 rounded-xl border border-[var(--border)] space-y-2 text-sm">
+                  {manualSettings.accountTitle && (
+                    <p><strong>Account Title:</strong> {manualSettings.accountTitle}</p>
+                  )}
+                  {manualSettings.jazzcash && (
+                    <p><strong>JazzCash Number:</strong> {manualSettings.jazzcash}</p>
+                  )}
+                  {manualSettings.easypaisa && (
+                    <p><strong>EasyPaisa Number:</strong> {manualSettings.easypaisa}</p>
+                  )}
+                  {manualSettings.bankName && (
+                    <>
+                      <p><strong>Bank Name:</strong> {manualSettings.bankName}</p>
+                      <p><strong>Bank Title:</strong> {manualSettings.bankAccountTitle}</p>
+                      <p><strong>Account / IBAN:</strong> {manualSettings.bankAccountNumber}</p>
+                    </>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)] mb-1">
+                    Sender Account Name / Mobile Number
+                  </label>
+                  <input
+                    type="text"
+                    value={senderName}
+                    onChange={(e) => setSenderName(e.target.value)}
+                    placeholder="e.g. Muhammad Ali (0312-XXXXXXX)"
+                    className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-4 py-3 text-sm outline-none focus:border-[var(--accent-strong)]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)] mb-1">
+                    Upload Payment Proof / Screenshot
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={(e) => setProofFile(e.target.files?.[0] || null)}
+                    className="w-full text-sm text-[var(--text-muted)] file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-[var(--accent-strong)] file:text-[var(--accent-ink)] hover:file:opacity-90 cursor-pointer"
+                  />
+                </div>
+              </section>
+            )}
 
             <section
               className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6"
@@ -338,7 +497,13 @@ function CheckoutContent() {
               aria-busy={payLoading}
               className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 py-3 font-bold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:bg-[var(--accent)]"
             >
-              {payLoading ? "Redirecting to Safepay..." : "Pay with Safepay"}
+              {payLoading
+                ? paymentMethod === "manual"
+                  ? "Submitting Payment Proof..."
+                  : "Redirecting to Safepay..."
+                : paymentMethod === "manual"
+                ? "Submit Manual Payment"
+                : "Pay with Safepay"}
             </button>
 
             <CheckoutCompatibilityCheck />

@@ -11,6 +11,7 @@ import { RunAlertNotificationsPanel } from "@/app/components/admin/RunAlertNotif
 import { WhatsAppSupportPanel } from "@/app/components/admin/WhatsAppSupportPanel";
 import { SimpaisaWalletOperatorsPanel } from "@/app/components/admin/SimpaisaWalletOperatorsPanel";
 import { ProviderWalletPanel } from "@/app/components/admin/ProviderWalletPanel";
+import { ManualPaymentConfigPanel } from "@/app/components/admin/ManualPaymentConfigPanel";
 import {
   getMonitoringAlertSummary,
   type MonitoringAlertSummary,
@@ -386,6 +387,8 @@ function OperationsDeferredView({
       <SimpaisaWalletOperatorsPanel initial={simpaisaWalletOperators} />
 
       <SafepayConfigPanel initial={{ enabled: true, updatedAt: null, updatedByEmail: null }} />
+
+      <ManualPaymentConfigPanel />
 
       <ProviderWalletPanel />
 
