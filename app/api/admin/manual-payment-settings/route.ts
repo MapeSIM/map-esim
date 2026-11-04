@@ -1,21 +1,23 @@
-import { sendEmail } from '@/app/lib/email'; // Aapke project ka email sender utility
+import { NextResponse } from 'next/server';
+import { prisma } from '@/app/lib/db';
 
-// Jab customer manual payment submit karay:
-await sendEmail({
-  to: 'admin@mapesim.com', // Aapka admin email address
-  subject: `🔔 New Manual Payment Submitted - Reference: ${orderReference}`,
-  html: `
-    <div style="font-family: Arial, sans-serif; color: #333;">
-      <h2>New Manual Payment Pending Verification</h2>
-      <p>A customer has submitted manual payment details for review.</p>
-      <ul>
-        <li><strong>Reference:</strong> ${orderReference}</li>
-        <li><strong>Customer Email:</strong> ${customerEmail}</li>
-        <li><strong>Package:</strong> ${packageName}</li>
-        <li><strong>Amount:</strong> $${amount}</li>
-        <li><strong>Sender Name:</strong> ${senderName}</li>
-      </ul>
-      <p>Please log in to the <a href="https://mapesim.com/admin/whatsapp-orders">Admin Dashboard</a> to verify the payment and issue the eSIM.</p>
-    </div>
-  `
-});
+// GET: Admin manual payment settings fetch karne ke liye
+export async function GET() {
+  try {
+    // Agar aap database ya settings table use kar rahe hain, yahan se fetch karein
+    // Filhal hum environment variables ya default settings return kar rahe hain
+    const settings = {
+      MANUAL_PAYMENTS_ENABLED: process.env.MANUAL_PAYMENTS_ENABLED || "true",
+      MANUAL_ACCOUNT_TITLE: process.env.MANUAL_ACCOUNT_TITLE || "MAP eSIM",
+      JAZZCASH_NUMBER: process.env.JAZZCASH_NUMBER || "",
+      EASYPAISA_NUMBER: process.env.EASYPAISA_NUMBER || "",
+      BANK_NAME: process.env.BANK_NAME || "",
+      BANK_ACCOUNT_TITLE: process.env.BANK_ACCOUNT_TITLE || "",
+      BANK_ACCOUNT_NUMBER: process.env.BANK_ACCOUNT_NUMBER || "",
+    };
+
+    return NextResponse.json({ success: true, settings });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}

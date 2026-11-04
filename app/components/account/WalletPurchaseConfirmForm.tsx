@@ -10,7 +10,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Loader2, Upload, CheckCircle2, Copy } from "lucide-react";
 import {
   confirmWalletEsimPurchaseAction,
   cancelPendingEsimGatewayCheckoutAction,
@@ -56,15 +56,10 @@ import {
 
 type Props = {
   review: WalletPurchaseReview;
-  /** Admin-enabled Simpaisa operators (JazzCash / Easypaisa). */
   enabledSimpaisaOperatorIds?: readonly string[];
-  /**
-   * Digits-only WhatsApp number when Admin `checkoutFallbackEnabled` is on
-   * (from getWhatsAppCheckoutPhoneDigits). Null hides Buy via WhatsApp.
-   */
   whatsappCheckoutPhone?: string | null;
-  /** Safepay gateway toggle status from admin config */
   safepayEnabled?: boolean;
+  manualConfig?: any;
 };
 
 function BuyViaWhatsAppCheckoutButton({
@@ -76,11 +71,9 @@ function BuyViaWhatsAppCheckoutButton({
   className,
 }: {
   purchaseId: string;
-  /** Sanitized E.164 digits without +; null when invalid/empty. */
   customerWhatsAppDigits: string | null;
   onRequirePhone: () => void;
   onBusyChange?: (busy: boolean) => void;
-  /** Parent form lock (funding/gateway pending). */
   locked?: boolean;
   className?: string;
 }) {
@@ -257,7 +250,7 @@ function previewPurchaseFunding(
         useWallet: review.useWallet,
         walletAppliedCents: review.walletAppliedCents,
         gatewayAmountCents: review.gatewayAmountCents,
-        rewardPointsRedeemed: review.rewardPointsRedeemed,
+        rewardPointsRedeemed,
       };
     }
     const priceCents = payableCents;
@@ -291,12 +284,23 @@ export default function WalletPurchaseConfirmForm({
   enabledSimpaisaOperatorIds,
   whatsappCheckoutPhone = null,
   safepayEnabled = false,
+  manualConfig,
 }: Props) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(
     confirmWalletEsimPurchaseAction,
     initialWalletPurchaseState
   );
+
+  const [manualSelected, setManualSelected] = useState(false);
+  const [manualSenderName, setManualSenderName] = useState("");
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofUrl, setProofUrl] = useState("");
+  const [uploadingProof, setUploadingProof] = useState(false);
+  const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [selectingPayment, setSelectingPayment] = useState(false);
+
   const [whatsappSelected, setWhatsappSelected] = useState(false);
   const [whatsappOrderBusy, setWhatsappOrderBusy] = useState(false);
   const [whatsappDialCode, setWhatsappDialCode] = useState(
@@ -330,7 +334,68 @@ export default function WalletPurchaseConfirmForm({
 
   const isSafepayMode = safepayEnabled && paymentMode === "safepay";
 
-  // Safepay Form Submit Interceptor
+  function copyToClipboard(text: string, fieldKey: string) {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldKey);
+    setTimeout(() => setCopiedField(null), 2000);
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setProofFile(file);
+    setUploadingProof(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload-payment-proof", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success) {
+        setProofUrl(data.fileUrl || data.url);
+      } else {
+        alert(data.error || "Failed to upload payment proof");
+      }
+    } catch {
+      alert("Error uploading file");
+    } finally {
+      setUploadingProof(false);
+    }
+  }
+
+  async function handleManualSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!manualSenderName || !proofUrl) {
+      alert("Please enter sender name and upload payment proof screenshot.");
+      return;
+    }
+    setManualSubmitting(true);
+    try {
+      const res = await fetch("/checkout/manual-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          purchaseId: review.purchaseId,
+          customerEmail: review.customerEmail,
+          senderName: manualSenderName,
+          proofUrl: proofUrl,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        router.push(`/account/esim/buy/success?purchase=${encodeURIComponent(review.purchaseId)}`);
+      } else {
+        alert(data.error || "Failed to submit manual order");
+      }
+    } catch {
+      alert("Network error submitting manual order");
+    } finally {
+      setManualSubmitting(false);
+    }
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     if (isSafepayMode) {
       event.preventDefault();
@@ -371,12 +436,18 @@ export default function WalletPurchaseConfirmForm({
   const primaryCtaLabel = isFullWalletMode
     ? "Buy eSIM with Wallet"
     : "Continue to Payment";
-  const primaryCtaPendingLabel = isFullWalletMode
-    ? "Buying with wallet…"
-    : "Connecting to Payment Gateway...";
-  const stickyCtaPendingLabel = isFullWalletMode
-    ? "Buying…"
-    : "Connecting to Payment Gateway...";
+  
+  const primaryCtaPendingLabel = fundingPending || selectingPayment ? (
+    <>
+      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+      Updating payment method...
+    </>
+  ) : isFullWalletMode ? (
+    "Buying with wallet…"
+  ) : (
+    "Connecting to Payment Gateway..."
+  );
+
   const rewardsDisabled = !review.rewardEligible;
   const walletDisabled = review.balanceCents <= 0;
   const hasWalletBalance = !walletDisabled;
@@ -436,7 +507,7 @@ export default function WalletPurchaseConfirmForm({
     0,
     review.balanceCents - preview.walletAppliedCents
   );
-  const busy = pending || fundingPending || whatsappOrderBusy;
+  const busy = pending || fundingPending || whatsappOrderBusy || manualSubmitting || selectingPayment;
   const purchaseBlocked = busy || deliveryBlocksPurchase;
   const dueOnline = preview.gatewayAmountCents > 0;
   const dueLabel = dueOnline
@@ -456,7 +527,7 @@ export default function WalletPurchaseConfirmForm({
         : true;
   const stickyShowConfirm = zeroCashConfirm && !pending;
   const stickyDisabledReason = (() => {
-    if (pending) return null;
+    if (pending || selectingPayment) return "Updating payment method...";
     if (deliveryBlocksPurchase) {
       return "Save or cancel the delivery email to continue.";
     }
@@ -474,17 +545,6 @@ export default function WalletPurchaseConfirmForm({
     }
     return null;
   })();
-  const alertError =
-    errorState.ok === false && errorState.error
-      ? errorState.error === CARD_PAYMENT_UNAVAILABLE_MESSAGE ||
-        errorState.error === CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE
-        ? null
-        : errorState.fieldErrors?.walletOperatorId ||
-            errorState.fieldErrors?.customerMsisdn ||
-            errorState.fieldErrors?.paymentMode
-          ? null
-          : errorState.error
-      : null;
 
   function persistFundingChoice(
     nextMode: CustomerEsimPaymentMode,
@@ -507,13 +567,26 @@ export default function WalletPurchaseConfirmForm({
   }
 
   function onPaymentModeChange(next: CustomerEsimPaymentMode) {
+    setSelectingPayment(true);
     setWhatsappSelected(false);
+    setManualSelected(false);
     setPaymentMode(next);
     persistFundingChoice(next, useRewards && !rewardsDisabled);
+    setTimeout(() => setSelectingPayment(false), 1200);
   }
 
   function onWhatsAppPaymentSelect() {
+    setSelectingPayment(true);
     setWhatsappSelected(true);
+    setManualSelected(false);
+    setTimeout(() => setSelectingPayment(false), 800);
+  }
+
+  function onManualPaymentSelect() {
+    setSelectingPayment(true);
+    setManualSelected(true);
+    setWhatsappSelected(false);
+    setTimeout(() => setSelectingPayment(false), 800);
   }
 
   function onUseRewardsChange(checked: boolean) {
@@ -560,12 +633,6 @@ export default function WalletPurchaseConfirmForm({
   const awaitingGatewayPayment =
     review.status === WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT;
 
-  const stickyBarVisible = !awaitingGatewayPayment;
-  const stickySpacerClass =
-    stickyShowConfirm || Boolean(stickyDisabledReason)
-      ? "pointer-events-none h-[calc(14rem+env(safe-area-inset-bottom,0px))] lg:hidden"
-      : "pointer-events-none h-[calc(10rem+env(safe-area-inset-bottom,0px))] lg:hidden";
-
   return (
     <div className="min-w-0 space-y-6 max-lg:[scroll-padding-bottom:calc(10rem+env(safe-area-inset-bottom,0px))]">
       {awaitingGatewayPayment ? (
@@ -611,8 +678,8 @@ export default function WalletPurchaseConfirmForm({
       ) : null}
 
     <form
-      action={formAction}
-      onSubmit={handleSubmit}
+      action={manualSelected ? undefined : formAction}
+      onSubmit={manualSelected ? handleManualSubmit : handleSubmit}
       className="space-y-6"
       noValidate
     >
@@ -833,16 +900,26 @@ export default function WalletPurchaseConfirmForm({
             </section>
           ) : null}
 
+          {/* PAYMENT OPTIONS SECTION */}
           <section
             className={cardClass}
             aria-labelledby={paymentModeHeadingId}
           >
-            <h2
-              id={paymentModeHeadingId}
-              className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
-            >
-              Payment
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2
+                id={paymentModeHeadingId}
+                className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]"
+              >
+                Payment
+              </h2>
+              {selectingPayment && (
+                <div className="flex items-center gap-1.5 text-xs text-indigo-400 font-medium animate-pulse">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Updating...</span>
+                </div>
+              )}
+            </div>
+            
             <p className="mt-2 text-sm text-[var(--text-muted)]">
               Wallet:{" "}
               <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout}
@@ -868,7 +945,7 @@ export default function WalletPurchaseConfirmForm({
                 {showFullWalletOption ? (
                   <label
                     className={paymentOptionClass(
-                      !whatsappSelected && paymentMode === "full_wallet"
+                      !whatsappSelected && !manualSelected && paymentMode === "full_wallet"
                     )}
                   >
                     <input
@@ -876,7 +953,7 @@ export default function WalletPurchaseConfirmForm({
                       name="paymentModeChoice"
                       value="full_wallet"
                       checked={
-                        !whatsappSelected && paymentMode === "full_wallet"
+                        !whatsappSelected && !manualSelected && paymentMode === "full_wallet"
                       }
                       disabled={busy}
                       onChange={() => onPaymentModeChange("full_wallet")}
@@ -891,7 +968,7 @@ export default function WalletPurchaseConfirmForm({
                 {onlinePaymentsAllowed && showWalletAndOnlineOption ? (
                   <label
                     className={paymentOptionClass(
-                      !whatsappSelected && paymentMode === "wallet_and_mobile"
+                      !whatsappSelected && !manualSelected && paymentMode === "wallet_and_mobile"
                     )}
                   >
                     <input
@@ -900,6 +977,7 @@ export default function WalletPurchaseConfirmForm({
                       value="wallet_and_mobile"
                       checked={
                         !whatsappSelected &&
+                        !manualSelected &&
                         paymentMode === "wallet_and_mobile"
                       }
                       disabled={busy}
@@ -915,7 +993,7 @@ export default function WalletPurchaseConfirmForm({
                 {showOnlinePaymentOption ? (
                   <label
                     className={paymentOptionClass(
-                      !whatsappSelected && paymentMode === "mobile_only"
+                      !whatsappSelected && !manualSelected && paymentMode === "mobile_only"
                     )}
                   >
                     <input
@@ -923,7 +1001,7 @@ export default function WalletPurchaseConfirmForm({
                       name="paymentModeChoice"
                       value="mobile_only"
                       checked={
-                        !whatsappSelected && paymentMode === "mobile_only"
+                        !whatsappSelected && !manualSelected && paymentMode === "mobile_only"
                       }
                       disabled={busy}
                       onChange={() => onPaymentModeChange("mobile_only")}
@@ -938,7 +1016,7 @@ export default function WalletPurchaseConfirmForm({
                 {safepayEnabled ? (
                   <label
                     className={paymentOptionClass(
-                      !whatsappSelected && paymentMode === "safepay"
+                      !whatsappSelected && !manualSelected && paymentMode === "safepay"
                     )}
                   >
                     <input
@@ -946,7 +1024,7 @@ export default function WalletPurchaseConfirmForm({
                       name="paymentModeChoice"
                       value="safepay"
                       checked={
-                        !whatsappSelected && paymentMode === "safepay"
+                        !whatsappSelected && !manualSelected && paymentMode === "safepay"
                       }
                       disabled={busy}
                       onChange={() => onPaymentModeChange("safepay")}
@@ -957,6 +1035,22 @@ export default function WalletPurchaseConfirmForm({
                     </span>
                   </label>
                 ) : null}
+
+                {/* MANUAL PAYMENT PORTION IN LINE */}
+                <label className={paymentOptionClass(manualSelected)}>
+                  <input
+                    type="radio"
+                    name="paymentModeChoice"
+                    value="manual_payment"
+                    checked={manualSelected}
+                    disabled={busy}
+                    onChange={onManualPaymentSelect}
+                    className="shrink-0"
+                  />
+                  <span className="font-semibold text-[var(--heading)]">
+                    Manual Payment (JazzCash / EasyPaisa / Bank Transfer)
+                  </span>
+                </label>
 
                 {whatsappCheckoutAvailable ? (
                   <label
@@ -979,6 +1073,140 @@ export default function WalletPurchaseConfirmForm({
               </div>
             )}
 
+            {/* PROFESSIONAL 2-COLUMN MANUAL PAYMENT BOX WITH COPY BUTTONS */}
+            {manualSelected && (
+              <div className="mt-4 rounded-3xl border border-indigo-500/30 bg-slate-950/90 p-5 space-y-6 shadow-2xl">
+                <div>
+                  <h3 className="text-base font-bold text-white">Complete manual payment</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Transfer the exact amount using the configured details below, then submit your proof.
+                  </p>
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  
+                  {/* Left Column: Accounts with Copy Buttons */}
+                  <div className="space-y-4 rounded-2xl bg-slate-900/90 p-4 border border-slate-800">
+                    <div>
+                      <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400">Mobile Wallets</span>
+                      <p className="text-xs text-slate-300 font-medium mt-0.5">Title: {manualConfig?.accountTitle || "MAP eSIM"}</p>
+                    </div>
+
+                    <div className="space-y-2.5 text-xs">
+                      <div className="flex items-center justify-between bg-slate-950/60 px-3 py-2 rounded-xl border border-slate-800/80">
+                        <div>
+                          <span className="text-slate-400 block">JazzCash</span>
+                          <span className="font-mono text-white font-semibold text-sm">{manualConfig?.jazzcashNumber || "N/A"}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(manualConfig?.jazzcashNumber || "", "jazzcash")}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-xs font-semibold transition border border-indigo-500/30"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          {copiedField === "jazzcash" ? "Copied!" : "Copy"}
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between bg-slate-950/60 px-3 py-2 rounded-xl border border-slate-800/80">
+                        <div>
+                          <span className="text-slate-400 block">EasyPaisa</span>
+                          <span className="font-mono text-white font-semibold text-sm">{manualConfig?.easypaisaNumber || "N/A"}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(manualConfig?.easypaisaNumber || "", "easypaisa")}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-xs font-semibold transition border border-indigo-500/30"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          {copiedField === "easypaisa" ? "Copied!" : "Copy"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Bank Account Section */}
+                    <div className="pt-2 border-t border-slate-800 space-y-2.5">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400">Bank Account ({manualConfig?.bankName || "Bank"})</span>
+                      
+                      <div className="space-y-2 text-xs">
+                        <div className="flex items-center justify-between bg-slate-950/60 px-3 py-2 rounded-xl border border-slate-800/80">
+                          <div>
+                            <span className="text-slate-400 block">Account Title</span>
+                            <span className="text-white font-medium">{manualConfig?.bankAccountTitle || "N/A"}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(manualConfig?.bankAccountTitle || "", "bankTitle")}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-xs font-semibold transition border border-indigo-500/30"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            {copiedField === "bankTitle" ? "Copied!" : "Copy"}
+                          </button>
+                        </div>
+
+                        <div className="flex items-center justify-between bg-slate-950/60 px-3 py-2 rounded-xl border border-slate-800/80">
+                          <div>
+                            <span className="text-slate-400 block">Account Number</span>
+                            <span className="font-mono text-white font-semibold text-sm">{manualConfig?.bankAccountNumber || "N/A"}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(manualConfig?.bankAccountNumber || "", "bankAcc")}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-xs font-semibold transition border border-indigo-500/30"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            {copiedField === "bankAcc" ? "Copied!" : "Copy"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Sender Name & Screenshot Upload */}
+                  <div className="space-y-4 rounded-2xl bg-slate-900/90 p-4 border border-slate-800 flex flex-col justify-between">
+                    <div className="space-y-4">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400">Submit payment details</span>
+                      
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Sender Account Name / Mobile Number</label>
+                        <input
+                          type="text"
+                          value={manualSenderName}
+                          onChange={(e) => setManualSenderName(e.target.value)}
+                          placeholder="e.g. Ali Khan (03001234567)"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Screenshot or proof of payment</label>
+                        <div className="flex items-center gap-3">
+                          <label className="flex-1 flex items-center justify-center gap-2 border border-dashed border-slate-700 hover:border-indigo-500 rounded-xl px-4 py-3 bg-slate-950 cursor-pointer text-xs text-slate-300 transition">
+                            <Upload className="w-4 h-4 text-indigo-400" />
+                            <span className="truncate">{proofFile ? proofFile.name : "Choose file..."}</span>
+                            <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                          </label>
+                          {uploadingProof && <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />}
+                          {proofUrl && <CheckCircle2 className="w-5 h-5 text-emerald-400" />}
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-1">Supported mimes: jpg, jpeg, png, webp</p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleManualSubmit}
+                      disabled={manualSubmitting || !manualSenderName || !proofUrl}
+                      className="w-full mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-5 py-3 text-sm font-semibold text-white transition disabled:opacity-50 shadow-lg shadow-indigo-600/30"
+                    >
+                      {manualSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit payment"}
+                    </button>
+                  </div>
+
+                </div>
+              </div>
+            )}
+
             {errorState.ok === false && errorState.fieldErrors?.paymentMode ? (
               <p className="mt-3 text-sm text-[var(--heading)]" role="alert">
                 {errorState.fieldErrors.paymentMode}
@@ -986,7 +1214,7 @@ export default function WalletPurchaseConfirmForm({
             ) : null}
           </section>
 
-          {gatewayRequired && !whatsappSelected ? (
+          {!manualSelected && gatewayRequired && !whatsappSelected ? (
             onlinePaymentsAllowed || isSafepayMode ? (
             <section
               id={onlinePaymentSectionId}
@@ -1152,56 +1380,16 @@ export default function WalletPurchaseConfirmForm({
 
           <CheckoutDisplayCurrencyNote />
 
-          {zeroCashConfirm ? (
-            <div
-              className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-4 text-sm text-[var(--text-muted)]"
-              role="note"
+          {manualSelected ? (
+            <button
+              type="button"
+              onClick={handleManualSubmit}
+              disabled={manualSubmitting || !manualSenderName || !proofUrl}
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
             >
-              {confirmNoteText}
-            </div>
-          ) : whatsappSelected && whatsappCheckoutAvailable ? (
-            <div
-              className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-4 text-sm text-[var(--text-muted)]"
-              role="note"
-            >
-              Continue below to create a pending order and open WhatsApp.
-            </div>
-          ) : gatewayReady && !whatsappSelected ? (
-            <div
-              className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-4 text-sm text-[var(--text-muted)]"
-              role="note"
-            >
-              {isSafepayMode
-                ? "Continue below to pay securely with Safepay."
-                : paymentMode === "wallet_and_mobile"
-                  ? "Continue below to complete the remaining amount with online payment."
-                  : "Continue below to complete this purchase with online payment."}
-            </div>
-          ) : walletOnlyInsufficient ? (
-            <div
-              className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-4"
-              role="status"
-            >
-              <InsufficientWalletCheckoutNotice />
-            </div>
-          ) : null}
-
-          {alertError ? (
-            <div
-              className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--heading)]"
-              role="alert"
-            >
-              {alertError}
-            </div>
-          ) : null}
-
-          {deliveryBlocksPurchase ? (
-            <p className="text-sm text-[var(--text-muted)]" role="status">
-              Save or cancel the delivery email before continuing this purchase.
-            </p>
-          ) : null}
-
-          {zeroCashConfirm ? (
+              {manualSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit payment"}
+            </button>
+          ) : zeroCashConfirm ? (
             <>
               <div id={confirmSectionId} className="scroll-mt-28 sm:scroll-mt-32 space-y-2">
                 <label
@@ -1233,10 +1421,10 @@ export default function WalletPurchaseConfirmForm({
                 disabled={purchaseBlocked || !confirmed}
                 className="hidden min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60 lg:inline-flex"
               >
-                {pending ? (
+                {pending || selectingPayment ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    {primaryCtaPendingLabel}
+                    Updating payment method...
                   </>
                 ) : (
                   primaryCtaLabel
@@ -1266,10 +1454,10 @@ export default function WalletPurchaseConfirmForm({
                 }
                 className="hidden min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60 lg:inline-flex"
               >
-                {pending || whatsappOrderBusy ? (
+                {pending || whatsappOrderBusy || selectingPayment ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    {primaryCtaPendingLabel}
+                    Updating payment method...
                   </>
                 ) : (
                   primaryCtaLabel
@@ -1297,116 +1485,6 @@ export default function WalletPurchaseConfirmForm({
           <CheckoutTrustPanel />
         </aside>
       </div>
-
-      {stickyBarVisible ? (
-        <div
-          className={stickySpacerClass}
-          aria-hidden="true"
-          data-checkout-sticky-spacer="true"
-        />
-      ) : null}
-
-      {stickyBarVisible ? (
-      <div
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/95 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] backdrop-blur supports-[padding:max(0px)]:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4 lg:hidden"
-        role="region"
-        aria-label="Checkout payment action"
-      >
-        <div className="mx-auto flex max-w-5xl min-w-0 flex-col gap-2">
-          {stickyShowConfirm ? (
-            <label
-              htmlFor={confirmStickyId}
-              className="flex items-start gap-2.5 text-xs leading-snug text-[var(--heading)]"
-            >
-              <input
-                id={confirmStickyId}
-                type="checkbox"
-                checked={confirmed}
-                onChange={(event) => setConfirmed(event.target.checked)}
-                disabled={purchaseBlocked}
-                className="mt-0.5"
-                aria-controls={confirmSectionId}
-              />
-              <span className="min-w-0 break-words">
-                {confirmCheckboxText}{" "}
-                <a
-                  href={`#${confirmSectionId}`}
-                  className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  Details
-                </a>
-              </span>
-            </label>
-          ) : null}
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-              {dueLabel}
-            </p>
-            <p className="truncate text-sm font-semibold text-[var(--heading)]">
-              {dueOnline ? (
-                <CheckoutMoney exactSimpaisaPkrCharge={simpaisaCheckout} cents={preview.gatewayAmountCents} />
-              ) : (
-                "Covered"
-              )}
-            </p>
-          </div>
-          {zeroCashConfirm ? (
-            <button
-              type="submit"
-              disabled={stickyCtaDisabled}
-              className="inline-flex h-11 w-full min-w-0 items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
-            >
-              {pending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                  {stickyCtaPendingLabel}
-                </>
-              ) : (
-                primaryCtaLabel
-              )}
-            </button>
-          ) : showWhatsAppCheckoutCta ? (
-            <BuyViaWhatsAppCheckoutButton
-              purchaseId={review.purchaseId}
-              customerWhatsAppDigits={customerWhatsAppDigits}
-              onRequirePhone={() => setWhatsappPhoneTouched(true)}
-              onBusyChange={setWhatsappOrderBusy}
-              locked={pending || fundingPending}
-              className="inline-flex h-11 w-full min-w-0 items-center justify-center gap-2 rounded-2xl bg-[#25D366] px-4 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
-            />
-          ) : gatewayReady ? (
-            <button
-              type="submit"
-              disabled={stickyCtaDisabled}
-              className="inline-flex h-11 w-full min-w-0 items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
-            >
-              {pending || whatsappOrderBusy ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                  {stickyCtaPendingLabel}
-                </>
-              ) : (
-                primaryCtaLabel
-              )}
-            </button>
-          ) : walletOnlyInsufficient ? null : (
-            <button
-              type="button"
-              disabled
-              className="inline-flex h-11 w-full min-w-0 items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 text-sm font-semibold text-[var(--heading)] opacity-60"
-            >
-              Continue to Payment
-            </button>
-          )}
-          {stickyDisabledReason && !showWhatsAppCheckoutCta ? (
-            <p className="text-xs leading-snug text-[var(--text-muted)]" role="status">
-              {stickyDisabledReason}
-            </p>
-          ) : null}
-        </div>
-      </div>
-      ) : null}
     </form>
     </div>
   );

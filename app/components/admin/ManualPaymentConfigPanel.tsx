@@ -9,6 +9,8 @@ export function ManualPaymentConfigPanel() {
   const [bankName, setBankName] = useState('');
   const [bankAccountTitle, setBankAccountTitle] = useState('');
   const [bankAccountNumber, setBankAccountNumber] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
 
   useEffect(() => {
     fetchSettings();
@@ -32,15 +34,37 @@ export function ManualPaymentConfigPanel() {
     }
   };
 
-  const saveSetting = async (key: string, value: string | boolean) => {
+  const handleSaveAll = async () => {
+    setSaving(true);
+    setStatusMessage('');
     try {
-      await fetch('/api/admin/manual-payment-settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value: String(value) })
-      });
+      const settingsToSave = [
+        { key: 'MANUAL_PAYMENTS_ENABLED', value: String(enabled) },
+        { key: 'MANUAL_ACCOUNT_TITLE', value: accountTitle },
+        { key: 'JAZZCASH_NUMBER', value: jazzcash },
+        { key: 'EASYPAISA_NUMBER', value: easypaisa },
+        { key: 'BANK_NAME', value: bankName },
+        { key: 'BANK_ACCOUNT_TITLE', value: bankAccountTitle },
+        { key: 'BANK_ACCOUNT_NUMBER', value: bankAccountNumber },
+      ];
+
+      await Promise.all(
+        settingsToSave.map((s) =>
+          fetch('/api/admin/manual-payment-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(s),
+          })
+        )
+      );
+
+      setStatusMessage('Settings saved successfully!');
+      setTimeout(() => setStatusMessage(''), 3000);
     } catch (err) {
-      console.error('Error saving setting', err);
+      console.error('Error saving settings', err);
+      setStatusMessage('Failed to save settings.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -59,11 +83,7 @@ export function ManualPaymentConfigPanel() {
             <input 
               type="checkbox" 
               checked={enabled} 
-              onChange={async (e) => {
-                const val = e.target.checked;
-                setEnabled(val);
-                await saveSetting('MANUAL_PAYMENTS_ENABLED', val);
-              }}
+              onChange={(e) => setEnabled(e.target.checked)}
               className="sr-only peer" 
             />
             <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
@@ -78,7 +98,6 @@ export function ManualPaymentConfigPanel() {
             type="text" 
             value={accountTitle} 
             onChange={(e) => setAccountTitle(e.target.value)}
-            onBlur={() => saveSetting('MANUAL_ACCOUNT_TITLE', accountTitle)}
             placeholder="e.g. Muhammad Waqas" 
             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
           />
@@ -90,7 +109,6 @@ export function ManualPaymentConfigPanel() {
             type="text" 
             value={jazzcash} 
             onChange={(e) => setJazzcash(e.target.value)}
-            onBlur={() => saveSetting('JAZZCASH_NUMBER', jazzcash)}
             placeholder="03124448025" 
             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
           />
@@ -102,7 +120,6 @@ export function ManualPaymentConfigPanel() {
             type="text" 
             value={easypaisa} 
             onChange={(e) => setEasypaisa(e.target.value)}
-            onBlur={() => saveSetting('EASYPAISA_NUMBER', easypaisa)}
             placeholder="03124448025" 
             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
           />
@@ -114,7 +131,6 @@ export function ManualPaymentConfigPanel() {
             type="text" 
             value={bankName} 
             onChange={(e) => setBankName(e.target.value)}
-            onBlur={() => saveSetting('BANK_NAME', bankName)}
             placeholder="Meezan Bank" 
             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
           />
@@ -126,7 +142,6 @@ export function ManualPaymentConfigPanel() {
             type="text" 
             value={bankAccountTitle} 
             onChange={(e) => setBankAccountTitle(e.target.value)}
-            onBlur={() => saveSetting('BANK_ACCOUNT_TITLE', bankAccountTitle)}
             placeholder="Muhammad Ayaz" 
             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
           />
@@ -138,11 +153,28 @@ export function ManualPaymentConfigPanel() {
             type="text" 
             value={bankAccountNumber} 
             onChange={(e) => setBankAccountNumber(e.target.value)}
-            onBlur={() => saveSetting('BANK_ACCOUNT_NUMBER', bankAccountNumber)}
             placeholder="02350113417568" 
             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
           />
         </div>
+      </div>
+
+      <div className="mt-6 flex items-center justify-between border-t border-slate-800 pt-4">
+        <div>
+          {statusMessage && (
+            <p className={`text-xs font-semibold ${statusMessage.includes('success') ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {statusMessage}
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={handleSaveAll}
+          disabled={saving}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+        >
+          {saving ? 'Saving Changes...' : 'Save Changes'}
+        </button>
       </div>
     </div>
   );

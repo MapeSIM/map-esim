@@ -17,7 +17,7 @@ import { getSimpaisaWalletOperatorConfig } from "@/app/lib/payments/simpaisaWall
 import { resolveCheckoutBackHref } from "@/app/lib/plans/checkoutBackHref";
 import { getWhatsAppCheckoutPhoneDigits } from "@/app/lib/support/whatsappSupport";
 import { WalletEsimPurchaseStatus } from "@prisma/client";
-import { prisma as db } from "@/app/lib/db"; // Safepay config check ke liye import
+import { prisma as db } from "@/app/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -118,12 +118,16 @@ export default async function AccountWalletBuyReviewPage({
     destinationName: review.destinationName,
   });
 
-  // Safepay config database se fetch karna
-  const safepayConfigRow = await db.safepayConfig.findUnique({
-    where: { id: "default" },
-  });
+const safepayConfigRow = await db.safepayConfig.findUnique({ where: { id: "default" } });
   const safepayEnabled = safepayConfigRow ? safepayConfigRow.enabled : false;
 
+  let manualConfigRow = null;
+  try {
+    manualConfigRow = await (db as any).manualPaymentConfig?.findUnique({ where: { id: "default" } }) || 
+                      await (db as any).manualPayment?.findUnique({ where: { id: "default" } }) || null;
+  } catch {
+    manualConfigRow = null;
+  }
   const [simpaisaOperators, whatsappCheckoutPhone] = await Promise.all([
     getSimpaisaWalletOperatorConfig(),
     getWhatsAppCheckoutPhoneDigits(),
@@ -171,7 +175,8 @@ export default async function AccountWalletBuyReviewPage({
         review={review}
         enabledSimpaisaOperatorIds={simpaisaOperators.enabledOperatorIds}
         whatsappCheckoutPhone={whatsappCheckoutPhone}
-        safepayEnabled={safepayEnabled} // Form component ko safepay status pass kar diya
+        safepayEnabled={safepayEnabled}
+        manualConfig={manualConfigRow}
       />
     </div>
   );

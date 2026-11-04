@@ -150,7 +150,6 @@ function CheckoutContent() {
               bankAccountTitle: s.BANK_ACCOUNT_TITLE || "",
               bankAccountNumber: s.BANK_ACCOUNT_NUMBER || "",
             });
-            // Agar manual payment on hai aur safepay ka option bypass karna ho ya default set karna ho
             if (isManualOn) {
               setPaymentMethod("manual");
             }
@@ -208,6 +207,10 @@ function CheckoutContent() {
 
     try {
       if (paymentMethod === "manual") {
+        if (!proofFile) {
+          throw new Error("Please upload your payment screenshot");
+        }
+
         // 1. Pehle screenshot upload karein
         const formData = new FormData();
         formData.append("file", proofFile);
@@ -224,9 +227,25 @@ function CheckoutContent() {
 
         const proofUrl = uploadData.fileUrl;
 
-        // 2. Manual payment order submit API call (Aap isko apne order API se link karenge)
-        // Filhal hum success message ya thank you page par redirect kar rahe hain
-        alert("Manual payment submitted successfully! We will verify your payment and email your eSIM shortly.");
+        // 2. Manual payment order submit API call
+        const orderRes = await fetch("/api/checkout/manual-payment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            offerId: offer.offerId,
+            customerEmail: cleanEmail,
+            senderName,
+            proofUrl,
+            country: offer.countryCode || countryHint || undefined,
+          }),
+        });
+
+        const orderData = await orderRes.json();
+        if (!orderRes.ok || !orderData.success) {
+          throw new Error(orderData.error || "Failed to submit manual payment order");
+        }
+
+        alert("Manual payment submitted successfully! We have notified the admin and will email your eSIM shortly.");
         router.push("/account");
         return;
       }
