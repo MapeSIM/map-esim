@@ -443,39 +443,6 @@ export default function WalletPurchaseConfirmForm({
     }
   }
 
-  /**
-   * Safepay only — preventDefault + client fetch.
-   * Simpaisa / wallet must NOT attach an onSubmit handler: a no-op async
-   * onSubmit alongside action={formAction} can block the server action, so
-   * Verify never runs and the UI hangs on "Continue to Payment".
-   */
-  async function handleSafepaySubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setWhatsappOrderBusy(true);
-    try {
-      const res = await fetch("/api/payments/safepay/init", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ purchaseId: review.purchaseId }),
-      });
-      const data = await res.json().catch(() => null);
-      if (data?.url || data?.redirectUrl) {
-        window.location.href = data.url || data.redirectUrl;
-        return;
-      }
-      const message =
-        (data && typeof data.error === "string" && data.error) ||
-        "Could not initialize Safepay checkout.";
-      console.error("checkout_safepay_init_failed", message);
-      alert(message);
-      setWhatsappOrderBusy(false);
-    } catch (error) {
-      console.error("checkout_safepay_init_network", error);
-      alert("Network error connecting to Safepay.");
-      setWhatsappOrderBusy(false);
-    }
-  }
-
   const useWallet = useWalletFromPaymentMode(paymentMode);
   const preview = previewPurchaseFunding(review, useWallet, useRewards);
   const gatewayRequired = preview.gatewayAmountCents > 0;
@@ -519,6 +486,50 @@ export default function WalletPurchaseConfirmForm({
   );
 
   const rewardsDisabled = !review.rewardEligible;
+
+  /**
+   * Safepay only — preventDefault + client fetch.
+   * Simpaisa / wallet must NOT attach an onSubmit handler: a no-op async
+   * onSubmit alongside action={formAction} can block the server action, so
+   * Verify never runs and the UI hangs on "Continue to Payment".
+   * Amount/currency are resolved server-side from the purchase — never sent here.
+   */
+  async function handleSafepaySubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!confirmed) {
+      alert("Please confirm this purchase before continuing to payment.");
+      return;
+    }
+    setWhatsappOrderBusy(true);
+    try {
+      const res = await fetch("/api/payments/safepay/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          purchaseId: review.purchaseId,
+          useWallet,
+          useRewards: useRewards && !rewardsDisabled,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (data?.success && (data?.url || data?.paymentUrl || data?.redirectUrl)) {
+        window.location.href =
+          data.url || data.paymentUrl || data.redirectUrl;
+        return;
+      }
+      const message =
+        (data && typeof data.error === "string" && data.error) ||
+        "Could not initialize Safepay checkout.";
+      console.error("checkout_safepay_init_failed");
+      alert(message);
+      setWhatsappOrderBusy(false);
+    } catch {
+      console.error("checkout_safepay_init_network");
+      alert("Network error connecting to Safepay.");
+      setWhatsappOrderBusy(false);
+    }
+  }
+
   const walletDisabled = review.balanceCents <= 0;
   const hasWalletBalance = !walletDisabled;
   const showGatewayUnavailable =
@@ -699,7 +710,7 @@ export default function WalletPurchaseConfirmForm({
   ]);
 
   const cardClass =
-    "rounded-[24px] border border-[var(--border)] bg-[var(--surface)] px-5 py-5 sm:px-6";
+    "min-w-0 overflow-x-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-3 sm:p-6";
 
   const paymentOptionClass = (selected: boolean) =>
     [
@@ -712,14 +723,15 @@ export default function WalletPurchaseConfirmForm({
   const awaitingGatewayPayment =
     review.status === WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT;
 
-  const stickyBarVisible = !awaitingGatewayPayment;
+  // Manual payment uses only the in-form green Submit — hide sticky duplicate CTA.
+  const stickyBarVisible = !awaitingGatewayPayment && !manualSelected;
   const stickySpacerClass =
-    stickyShowConfirm || Boolean(stickyDisabledReason) || manualSelected
+    stickyShowConfirm || Boolean(stickyDisabledReason)
       ? "pointer-events-none h-[calc(14rem+env(safe-area-inset-bottom,0px))] lg:hidden"
       : "pointer-events-none h-[calc(10rem+env(safe-area-inset-bottom,0px))] lg:hidden";
 
   return (
-    <div className="min-w-0 space-y-6 max-lg:[scroll-padding-bottom:calc(10rem+env(safe-area-inset-bottom,0px))]">
+    <div className="min-w-0 overflow-x-hidden space-y-6 pb-28 max-lg:[scroll-padding-bottom:calc(10rem+env(safe-area-inset-bottom,0px))]">
       {awaitingGatewayPayment ? (
         <div
           className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 py-4 sm:px-5"
@@ -797,8 +809,8 @@ export default function WalletPurchaseConfirmForm({
         </div>
       ) : null}
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
-        <div className="space-y-5">
+      <div className="grid min-w-0 items-start gap-6 overflow-x-hidden lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
+        <div className="min-w-0 space-y-5 overflow-x-hidden">
           <section className={cardClass} aria-labelledby={planHeadingId}>
             <h2
               id={planHeadingId}
@@ -1192,8 +1204,8 @@ export default function WalletPurchaseConfirmForm({
             )}
 
             {manualPaymentsEnabled && manualSelected ? (
-              <div className="mt-4 space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5">
-                <div>
+              <div className="mt-4 min-w-0 space-y-4 overflow-x-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 sm:p-6">
+                <div className="min-w-0">
                   <h3 className="text-base font-bold text-[var(--heading)]">
                     Complete manual payment
                   </h3>
@@ -1203,12 +1215,12 @@ export default function WalletPurchaseConfirmForm({
                   </p>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid min-w-0 gap-4 md:grid-cols-2">
                   <ManualPaymentDetailsBox config={liveManualConfig} />
 
 
-                  <div className="flex flex-col justify-between space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
-                    <div className="space-y-4">
+                  <div className="flex min-w-0 flex-col justify-between space-y-4 overflow-x-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-3 sm:p-6">
+                    <div className="min-w-0 space-y-4">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--accent-strong)]">
                         Submit payment details
                       </p>
@@ -1358,7 +1370,7 @@ export default function WalletPurchaseConfirmForm({
           ) : null}
         </div>
 
-        <aside className="space-y-5 lg:sticky lg:top-6">
+        <aside className="min-w-0 space-y-5 overflow-x-hidden lg:sticky lg:top-6">
           {/* Desktop/tablet: full order summary. Mobile uses early Amount due + sticky due. */}
           <section
             className={`${cardClass} hidden lg:block`}
@@ -1449,16 +1461,7 @@ export default function WalletPurchaseConfirmForm({
 
           <CheckoutDisplayCurrencyNote />
 
-          {manualSelected ? (
-            <button
-              type="button"
-              onClick={handleManualSubmit}
-              disabled={manualSubmitting || !manualSenderName || !proofUrl}
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {manualSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit payment"}
-            </button>
-          ) : zeroCashConfirm ? (
+          {manualSelected ? null : zeroCashConfirm ? (
             <>
               <div id={confirmSectionId} className="scroll-mt-28 sm:scroll-mt-32 space-y-2">
                 <label
@@ -1612,23 +1615,7 @@ export default function WalletPurchaseConfirmForm({
                 )}
               </p>
             </div>
-            {manualSelected ? (
-              <button
-                type="button"
-                onClick={handleManualSubmit}
-                disabled={stickyCtaDisabled}
-                className="inline-flex h-11 w-full min-w-0 items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
-              >
-                {manualSubmitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    Submitting…
-                  </>
-                ) : (
-                  "Submit payment"
-                )}
-              </button>
-            ) : zeroCashConfirm ? (
+            {zeroCashConfirm ? (
               <button
                 type="submit"
                 disabled={stickyCtaDisabled}
@@ -1676,7 +1663,7 @@ export default function WalletPurchaseConfirmForm({
                 Continue to Payment
               </button>
             )}
-            {stickyDisabledReason && !showWhatsAppCheckoutCta && !manualSelected ? (
+            {stickyDisabledReason && !showWhatsAppCheckoutCta ? (
               <p
                 className="text-xs leading-snug text-[var(--text-muted)]"
                 role="status"

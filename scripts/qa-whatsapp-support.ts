@@ -204,13 +204,11 @@ function main() {
     whatsAppFabBottomClass("/account/esim/buy"),
     /14rem.*safe-area-inset-bottom/
   );
-  assert.match(
-    whatsAppFabBottomClass("/"),
-    /max\(1\.25rem,\s*env\(safe-area-inset-bottom/
-  );
+  assert.match(whatsAppFabBottomClass("/"), /bottom-24/);
+  assert.match(whatsAppFabBottomClass("/checkout"), /bottom-24/);
   assert.match(button, /whatsAppFabBottomClass/);
   assert.match(button, /data-whatsapp-sticky-clearance/);
-  assert.match(button, /safe-area-inset-left/);
+  assert.match(button, /left-4/);
   console.log("PASS sticky_payment_fab_clearance");
 
   // --- Admin write path security markers ---

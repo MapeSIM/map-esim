@@ -397,7 +397,7 @@ function main() {
   assert.match(disabled, /PAYMENT_GATEWAY_ENABLED/);
   assert.match(disabled, /getActivePaymentAdapter/);
   assert.match(disabled, /isPaymentGatewayConfigured/);
-  assert.match(guestGate, /ENABLE_GUEST_VESIM_CHECKOUT === "true"/);
+  assert.match(guestGate, /guestCheckoutConfig/);
   assert.doesNotMatch(walletPurchase, /startEsimPurchaseHostedCheckout/);
   assert.equal(
     CARD_PAYMENT_UNAVAILABLE_MESSAGE,

@@ -38,7 +38,7 @@ function envBag(): NodeJS.ProcessEnv {
 /**
  * Resolve Safepay adapter config from process.env.
  * Fail-closed when gateway flag is off or credentials/intent invalid.
- * Production is fail-closed until allowProduction is explicitly enabled later.
+ * Production is allowed when SAFEPAY_ENVIRONMENT=production (same as Simpaisa).
  */
 export function resolveSafepayAdapterConfig(
   env: NodeJS.ProcessEnv = envBag()
@@ -51,7 +51,7 @@ export function resolveSafepayAdapterConfig(
     apiKeyRaw: env.SAFEPAY_API_KEY,
     secretKeyRaw: env.SAFEPAY_SECRET_KEY,
     intentRaw: env.SAFEPAY_INTENT,
-    allowProduction: false,
+    allowProduction: true,
   });
 }
 

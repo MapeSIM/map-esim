@@ -4,6 +4,10 @@ import {
   createManualPendingOrderFromGuest,
   createManualPendingOrderFromPurchase,
 } from "@/app/lib/esim/manualCheckoutOrder";
+import {
+  GUEST_CHECKOUT_UNAVAILABLE_MESSAGE,
+  isGuestVesimCheckoutEnabled,
+} from "@/app/lib/vesim/guestCheckoutGate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,6 +81,14 @@ export async function POST(req: Request) {
             "All fields including payment proof screenshot are required",
         },
         { status: 400 }
+      );
+    }
+
+    // Guest (unauthenticated offerId) path — blocked when admin disables guest checkout.
+    if (!(await isGuestVesimCheckoutEnabled())) {
+      return NextResponse.json(
+        { success: false, error: GUEST_CHECKOUT_UNAVAILABLE_MESSAGE },
+        { status: 503 }
       );
     }
 

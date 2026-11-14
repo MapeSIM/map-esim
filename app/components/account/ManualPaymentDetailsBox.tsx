@@ -16,8 +16,8 @@ export function ManualPaymentDetailsBox({ config }: Props) {
   const bankAccountNumber = config?.bankAccountNumber?.trim() ?? "";
 
   return (
-    <div className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
-      <div>
+    <div className="min-w-0 space-y-4 overflow-x-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-3 sm:p-6">
+      <div className="min-w-0">
         <h3 className="text-sm font-bold text-[var(--heading)]">
           Transfer details
         </h3>
@@ -27,7 +27,7 @@ export function ManualPaymentDetailsBox({ config }: Props) {
         </p>
       </div>
 
-      <div className="space-y-2">
+      <div className="min-w-0 space-y-2">
         <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--accent-strong)]">
           Mobile wallets
         </p>
@@ -50,7 +50,7 @@ export function ManualPaymentDetailsBox({ config }: Props) {
         />
       </div>
 
-      <div className="space-y-2 border-t border-[var(--border)] pt-4">
+      <div className="min-w-0 space-y-2 border-t border-[var(--border)] pt-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--accent-strong)]">
           Bank transfer
         </p>

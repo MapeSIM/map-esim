@@ -291,7 +291,7 @@ function main() {
   assert.match(walletPurchase, /restoreReady/);
   assert.match(persist, /CUSTOMER_SPLIT/);
   assert.match(persist, /DIRECT_PAYMENT/);
-  assert.match(guestGate, /ENABLE_GUEST_VESIM_CHECKOUT === "true"/);
+  assert.match(guestGate, /guestCheckoutConfig/);
   assert.match(pkg, /"qa:esim-purchase-pg4-funding"/);
   console.log("PASS adapter_wallet_guest_contracts");
 

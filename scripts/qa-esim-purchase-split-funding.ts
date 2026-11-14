@@ -218,7 +218,7 @@ function main() {
   assert.match(disabledAdapter, /isPaymentGatewayEnabledFlag|PAYMENT_GATEWAY_ENABLED/);
   assert.match(disabledAdapter, /tryCreateSafepayAdapter/);
   assert.match(disabledAdapter, /return false/);
-  assert.match(guestGate, /ENABLE_GUEST_VESIM_CHECKOUT === "true"/);
+  assert.match(guestGate, /guestCheckoutConfig/);
   assert.match(paymentPage, /Card checkout unavailable/);
   assert.match(pkg, /"qa:esim-purchase-split-funding"/);
   console.log("PASS no_gateway_session_gateway_still_disabled");

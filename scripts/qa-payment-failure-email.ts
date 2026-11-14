@@ -154,7 +154,7 @@ function main() {
   assert.doesNotMatch(orderEmail, /schedulePaymentFailureNotification/);
   assert.ok(existsSync(join(root, "app/lib/email/deliverAfterCheckout.ts")));
   assert.match(vesimEmail, /VESIM_PROVIDER_CUSTOMER_EMAIL|orders@mapesim\.com/);
-  assert.match(guestGate, /ENABLE_GUEST_VESIM_CHECKOUT === "true"/);
+  assert.match(guestGate, /guestCheckoutConfig/);
   assert.match(pkg, /"qa:payment-failure-email"/);
   console.log("   ok");
 

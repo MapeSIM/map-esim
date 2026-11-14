@@ -171,10 +171,11 @@ export function isWhatsAppSupportRoute(pathname: string): boolean {
  */
 export function whatsAppFabBottomClass(pathname: string): string {
   if (isWhatsAppStickyPaymentClearanceRoute(pathname)) {
-    // 14rem sticky + 1.25rem gap above the bar; safe-area already in sticky spacer.
-    return "bottom-[calc(14rem+1.25rem+env(safe-area-inset-bottom,0px))] lg:bottom-[max(1.25rem,env(safe-area-inset-bottom,0px))]";
+    // Clear sticky pay bar on mobile; on lg (no sticky) sit at bottom-24.
+    return "bottom-[calc(14rem+1.25rem+env(safe-area-inset-bottom,0px))] lg:bottom-24";
   }
-  return "bottom-[max(1.25rem,env(safe-area-inset-bottom,0px))]";
+  // Guest checkout + other routes: clear trust strip / page footer on mobile.
+  return "bottom-24";
 }
 
 export type PublicWhatsAppSupportConfig =

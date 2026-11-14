@@ -133,3 +133,29 @@ export function isPaymentGatewayConfigured(): boolean {
   const created = tryCreateSafepayAdapter();
   return created.ok;
 }
+
+/**
+ * Safepay card checkout adapter when credentials are valid.
+ * Independent of PAYMENT_GATEWAY_PROVIDER so card can run alongside Simpaisa
+ * when admin enables Safepay (DB toggle) or provider is SAFEPAY.
+ */
+export function getSafepayCheckoutAdapter(): PaymentGatewayAdapter {
+  if (!isPaymentGatewayEnabledFlag(process.env.PAYMENT_GATEWAY_ENABLED)) {
+    return disabledPaymentAdapter;
+  }
+  const created = tryCreateSafepayAdapter();
+  if (!created.ok) {
+    return created.code === "GATEWAY_DISABLED"
+      ? disabledPaymentAdapter
+      : misconfiguredPaymentAdapter;
+  }
+  return created.adapter;
+}
+
+/** True when PAYMENT_GATEWAY_ENABLED and Safepay adapter credentials are valid. */
+export function isSafepayCheckoutConfigured(): boolean {
+  if (!isPaymentGatewayEnabledFlag(process.env.PAYMENT_GATEWAY_ENABLED)) {
+    return false;
+  }
+  return tryCreateSafepayAdapter().ok;
+}

@@ -223,10 +223,23 @@ function main() {
   assert.ok(!/SafepayHttpClient/.test(actions));
   assert.ok(!/tryCreateSafepayAdapter\(/.test(actions));
   assert.ok(!/fetch\("https:\/\/sandbox\.api\.getsafepay\.com/.test(adapter));
-  assert.match(guestGate, /ENABLE_GUEST_VESIM_CHECKOUT === "true"/);
+  assert.match(guestGate, /guestCheckoutConfig/);
   assert.doesNotMatch(pkg, /@sfpy\/node-core|@sfpy\/node-sdk/);
   assert.match(pkg, /"qa:safepay-foundation"/);
   console.log("PASS no_customer_route_network_or_sdk_dep");
+
+  const initRoute = read("app/api/payments/safepay/init/route.ts");
+  assert.match(initRoute, /preferredGateway:\s*"SAFEPAY"/);
+  assert.match(initRoute, /startEsimPurchaseHostedCheckout/);
+  assert.match(initRoute, /isSafepayCheckoutConfigured/);
+  assert.doesNotMatch(initRoute, /baseAmountPKR|275|feePercentage/);
+  assert.doesNotMatch(initRoute, /order\/v1\/init|Safepay Full Response/);
+  assert.match(config, /allowProduction:\s*true/);
+  assert.match(disabled, /getSafepayCheckoutAdapter|isSafepayCheckoutConfigured/);
+  const gatewayCheckout = read("app/lib/esim/esimPurchaseGatewayCheckout.ts");
+  assert.match(gatewayCheckout, /preferredGateway\?:\s*"SAFEPAY"/);
+  assert.match(gatewayCheckout, /getSafepayCheckoutAdapter/);
+  console.log("PASS safepay_init_uses_hosted_checkout_adapter");
 
   console.log("ALL_PG3A_CHECKS_PASSED");
 }

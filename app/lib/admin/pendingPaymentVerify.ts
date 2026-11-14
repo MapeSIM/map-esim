@@ -65,7 +65,7 @@ function resolveReporterClient(): SafepayHttpClient | null {
     apiKeyRaw: process.env.SAFEPAY_API_KEY,
     secretKeyRaw: process.env.SAFEPAY_SECRET_KEY,
     intentRaw: process.env.SAFEPAY_INTENT,
-    allowProduction: false,
+    allowProduction: true,
   });
   if (!validated.ok) return null;
   return new SafepayHttpClient(validated.config);

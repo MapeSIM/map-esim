@@ -6,10 +6,11 @@
  * 1) Set CUSTOMER_PAYMENT_CHECKOUT_HARD_DISABLED = false below, OR
  * 2) Ensure CUSTOMER_PAYMENT_CHECKOUT_DISABLED is not exact "true".
  *
- * Revert Safepay customer hosted-checkout kill switch later:
- * 1) Set CUSTOMER_SAFEPAY_CHECKOUT_HARD_DISABLED = false below, AND
- * 2) Ensure CUSTOMER_SAFEPAY_CHECKOUT_DISABLED is not exact "true", AND
- * 3) Set PAYMENT_GATEWAY_PROVIDER=SAFEPAY when card checkout should be active.
+ * Safepay customer hosted-checkout kill switch (optional):
+ * 1) Set CUSTOMER_SAFEPAY_CHECKOUT_HARD_DISABLED = true below, OR
+ * 2) Set CUSTOMER_SAFEPAY_CHECKOUT_DISABLED=true in env.
+ * Admin DB Safepay toggle + preferredGateway card path also respect this flag.
+ * PAYMENT_GATEWAY_PROVIDER=SAFEPAY selects Safepay as the primary hosted provider.
  */
 
 /** Flip to false to re-enable customer payment initiation in code. */
@@ -25,7 +26,7 @@ export const CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE =
  * When true, customer hosted checkout never selects Safepay.
  * Default Simpaisa remains; Safepay webhook + admin tools stay intact.
  */
-export const CUSTOMER_SAFEPAY_CHECKOUT_HARD_DISABLED = true;
+export const CUSTOMER_SAFEPAY_CHECKOUT_HARD_DISABLED = false;
 
 export const CUSTOMER_SAFEPAY_CHECKOUT_DISABLED_ENV =
   "CUSTOMER_SAFEPAY_CHECKOUT_DISABLED";

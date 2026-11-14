@@ -1,77 +1,186 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+import {
+  EsimPurchaseGatewayCheckoutError,
+  startEsimPurchaseHostedCheckout,
+} from "@/app/lib/esim/esimPurchaseGatewayCheckout";
+import {
+  setWalletPurchaseFundingChoice,
+  WalletEsimPurchaseError,
+} from "@/app/lib/esim/walletPurchase";
+import { CARD_PAYMENT_UNAVAILABLE_MESSAGE } from "@/app/lib/esim/walletPurchaseFormState";
+import {
+  parseUseRewardsChoice,
+  parseUseWalletChoice,
+} from "@/app/lib/esim/walletPurchaseValidation";
+import { prisma as db } from "@/app/lib/db";
+import {
+  CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE,
+  isCustomerPaymentCheckoutDisabled,
+  isCustomerSafepayCheckoutDisabled,
+} from "@/app/lib/payments/customerPaymentCheckoutPolicy";
+import { isSafepayCheckoutConfigured } from "@/app/lib/payments/disabledAdapter";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+/**
+ * Authenticated Safepay card checkout initiation for an owned WalletEsimPurchase.
+ * Amount/currency come from server-side funding — never from the request body.
+ * Guest offerId init is intentionally rejected (no durable attempt / wrong amount).
+ * Never logs checkout URLs, trackers, or secrets.
+ */
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { offerId, customerEmail } = body;
-
-    // 1. Price in PKR (misal ke taur par Rs. 275 ya jo bhi aapka package ho)
-    const baseAmountPKR = 275; 
-    const feePercentage = 0.08; 
-    const finalPKR = baseAmountPKR * (1 + feePercentage);
-
-    const environment = process.env.SAFEPAY_ENVIRONMENT || 'sandbox';
-    const apiKey = process.env.SAFEPAY_API_KEY;
-    const secretKey = process.env.SAFEPAY_SECRET_KEY;
-
-    if (!apiKey || !secretKey) {
-      return NextResponse.json({ success: false, error: "Safepay keys are missing from server" }, { status: 500 });
+    const session = await auth();
+    const customerUserId = session?.user?.id?.trim() ?? "";
+    if (!customerUserId || session?.user?.role !== "CUSTOMER") {
+      return NextResponse.json(
+        { success: false, error: "Please sign in to continue to card payment." },
+        { status: 401 }
+      );
     }
 
-    const apiUrl = environment === 'sandbox' 
-      ? 'https://sandbox.api.getsafepay.com' 
-      : 'https://api.getsafepay.com';
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Invalid request." },
+        { status: 400 }
+      );
+    }
 
-    // Safepay expects amount in lowest currency units (paisas as integer for PKR)
-    const calculatedAmount = Math.round(finalPKR * 100);
-    const origin = req.headers.get("origin") || "https://mapesim.com";
+    const record =
+      body && typeof body === "object" && !Array.isArray(body)
+        ? (body as Record<string, unknown>)
+        : null;
+    if (!record) {
+      return NextResponse.json(
+        { success: false, error: "Invalid request." },
+        { status: 400 }
+      );
+    }
 
-    console.log("Initializing Safepay Tracker with PKR:", calculatedAmount);
+    // Reject legacy guest/hardcoded path — amounts must come from a purchase.
+    if (record.offerId != null && String(record.offerId).trim() !== "") {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Card payment requires a signed-in account checkout. Please sign in and buy from your account.",
+        },
+        { status: 400 }
+      );
+    }
 
-    const trackerResponse = await fetch(`${apiUrl}/order/v1/init`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-SFPY-MERCHANT-SECRET': secretKey
-      },
-      body: JSON.stringify({
-        client: apiKey,
-        environment: environment,
-        amount: calculatedAmount,
-        currency: 'PKR',
-        success_url: `${origin}/account/esim/buy/success`,
-        cancel_url: `${origin}/account/esim/buy/cancel`
-      })
+    const purchaseId = String(record.purchaseId ?? "").trim();
+    if (!purchaseId || purchaseId.length > 64) {
+      return NextResponse.json(
+        { success: false, error: "This purchase is unavailable." },
+        { status: 400 }
+      );
+    }
+
+    if (isCustomerPaymentCheckoutDisabled()) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE,
+        },
+        { status: 503 }
+      );
+    }
+    if (isCustomerSafepayCheckoutDisabled()) {
+      return NextResponse.json(
+        { success: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE },
+        { status: 503 }
+      );
+    }
+
+    const safepayRow = await db.safepayConfig.findUnique({
+      where: { id: "default" },
+      select: { enabled: true },
+    });
+    if (!safepayRow?.enabled) {
+      return NextResponse.json(
+        { success: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE },
+        { status: 503 }
+      );
+    }
+
+    if (!isSafepayCheckoutConfigured()) {
+      return NextResponse.json(
+        { success: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE },
+        { status: 503 }
+      );
+    }
+
+    const useWallet = parseUseWalletChoice(record.useWallet);
+    const useRewards = parseUseRewardsChoice(record.useRewards);
+
+    try {
+      await setWalletPurchaseFundingChoice({
+        customerUserId,
+        purchaseId,
+        useWallet,
+        useRewards,
+      });
+    } catch (error) {
+      if (
+        error instanceof WalletEsimPurchaseError &&
+        error.code === "INVALID_STATE"
+      ) {
+        // Already AWAITING_GATEWAY_PAYMENT — continue into hosted checkout.
+      } else if (error instanceof WalletEsimPurchaseError) {
+        return NextResponse.json(
+          { success: false, error: error.message },
+          { status: 400 }
+        );
+      } else {
+        console.error("safepay_init", "FUNDING_CHOICE_FAILED");
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Wallet purchase is temporarily unavailable. Please try again shortly.",
+          },
+          { status: 503 }
+        );
+      }
+    }
+
+    const checkout = await startEsimPurchaseHostedCheckout({
+      customerUserId,
+      purchaseId,
+      useWallet,
+      useRewards,
+      preferredGateway: "SAFEPAY",
     });
 
-    const trackerData = await trackerResponse.json();
-    console.log("Safepay Full Response:", trackerData);
-
-    if (trackerData && trackerData.data && trackerData.data.token) {
-      const trackerToken = trackerData.data.token;
-      
-      const checkoutBase = environment === 'sandbox' 
-        ? 'https://sandbox.api.getsafepay.com/checkout/pay' 
-        : 'https://www.getsafepay.com/checkout/pay';
-        
-      const paymentUrl = `${checkoutBase}?env=${environment}&tracker=${trackerToken}`;
-
-      return NextResponse.json({
-        success: true,
-        url: paymentUrl,
-        paymentUrl: paymentUrl,
-        orderId: trackerToken
-      });
-    } else {
-      console.error("Safepay Tracker Error Response:", trackerData);
-      return NextResponse.json({ 
-        success: false, 
-        error: trackerData.error?.message || "Safepay tracker creation failed",
-        details: trackerData 
-      }, { status: 400 });
-    }
+    return NextResponse.json({
+      success: true,
+      url: checkout.checkoutUrl,
+      paymentUrl: checkout.checkoutUrl,
+      paymentAttemptId: checkout.paymentAttemptId,
+    });
   } catch (error) {
-    console.error("Safepay Init Error:", error);
-    return NextResponse.json({ success: false, error: "Server error during payment init" }, { status: 500 });
+    if (error instanceof EsimPurchaseGatewayCheckoutError) {
+      const status =
+        error.code === "GATEWAY_UNAVAILABLE" || error.code === "UNAVAILABLE"
+          ? 503
+          : error.code === "CUSTOMER_UNAVAILABLE"
+            ? 401
+            : 400;
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status }
+      );
+    }
+    console.error("safepay_init", "INIT_FAILED");
+    return NextResponse.json(
+      { success: false, error: CARD_PAYMENT_UNAVAILABLE_MESSAGE },
+      { status: 503 }
+    );
   }
 }

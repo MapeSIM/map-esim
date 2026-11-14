@@ -30,11 +30,14 @@ import { CARD_PAYMENT_UNAVAILABLE_MESSAGE } from "@/app/lib/esim/walletPurchaseF
 import { WalletEsimPurchaseError } from "@/app/lib/esim/walletPurchase";
 import {
   getActivePaymentAdapter,
+  getSafepayCheckoutAdapter,
   isPaymentGatewayConfigured,
+  isSafepayCheckoutConfigured,
 } from "@/app/lib/payments/disabledAdapter";
 import {
   CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE,
   isCustomerPaymentCheckoutDisabled,
+  isCustomerSafepayCheckoutDisabled,
 } from "@/app/lib/payments/customerPaymentCheckoutPolicy";
 import {
   esimPurchasePaymentCancelPath,
@@ -84,6 +87,11 @@ export type StartEsimPurchaseHostedCheckoutInput = {
   walletOperatorId?: string;
   /** Required for Simpaisa mobile-wallet remainder; ignored by Safepay. */
   customerMsisdn?: string;
+  /**
+   * Force Safepay card checkout (admin-toggled card option alongside Simpaisa).
+   * When unset, uses the active hosted-checkout provider.
+   */
+  preferredGateway?: "SAFEPAY";
 };
 
 export type StartEsimPurchaseHostedCheckoutResult = {
@@ -152,7 +160,15 @@ export async function getOwnedEsimPurchasePaymentAttempt(
   };
 }
 
-function gatewayCheckoutIdempotencyKey(purchaseIdempotencyKey: string): string {
+function gatewayCheckoutIdempotencyKey(
+  purchaseIdempotencyKey: string,
+  preferredGateway?: "SAFEPAY"
+): string {
+  // Separate durable keys so switching Simpaisa ↔ Safepay does not reuse
+  // a mismatched provider attempt / tracker.
+  if (preferredGateway === "SAFEPAY") {
+    return `${purchaseIdempotencyKey}:esim-gw:safepay`;
+  }
   return `${purchaseIdempotencyKey}:esim-gw`;
 }
 
@@ -183,7 +199,21 @@ export async function startEsimPurchaseHostedCheckout(
     );
   }
 
-  if (!isPaymentGatewayConfigured()) {
+  const preferSafepay = input.preferredGateway === "SAFEPAY";
+  if (preferSafepay) {
+    if (isCustomerSafepayCheckoutDisabled()) {
+      throw new EsimPurchaseGatewayCheckoutError(
+        "GATEWAY_UNAVAILABLE",
+        CARD_PAYMENT_UNAVAILABLE_MESSAGE
+      );
+    }
+    if (!isSafepayCheckoutConfigured()) {
+      throw new EsimPurchaseGatewayCheckoutError(
+        "GATEWAY_UNAVAILABLE",
+        CARD_PAYMENT_UNAVAILABLE_MESSAGE
+      );
+    }
+  } else if (!isPaymentGatewayConfigured()) {
     throw new EsimPurchaseGatewayCheckoutError(
       "GATEWAY_UNAVAILABLE",
       CARD_PAYMENT_UNAVAILABLE_MESSAGE
@@ -356,8 +386,16 @@ export async function startEsimPurchaseHostedCheckout(
     );
   }
 
-  const adapter = getActivePaymentAdapter();
+  const adapter = preferSafepay
+    ? getSafepayCheckoutAdapter()
+    : getActivePaymentAdapter();
   if (!adapter.enabled) {
+    throw new EsimPurchaseGatewayCheckoutError(
+      "GATEWAY_UNAVAILABLE",
+      CARD_PAYMENT_UNAVAILABLE_MESSAGE
+    );
+  }
+  if (preferSafepay && adapter.provider !== "SAFEPAY") {
     throw new EsimPurchaseGatewayCheckoutError(
       "GATEWAY_UNAVAILABLE",
       CARD_PAYMENT_UNAVAILABLE_MESSAGE
@@ -504,7 +542,10 @@ export async function startEsimPurchaseHostedCheckout(
     }
   }
 
-  const checkoutKey = gatewayCheckoutIdempotencyKey(purchase.idempotencyKey);
+  const checkoutKey = gatewayCheckoutIdempotencyKey(
+    purchase.idempotencyKey,
+    preferSafepay ? "SAFEPAY" : undefined
+  );
   let attempt = await prisma.esimPurchasePaymentAttempt.findUnique({
     where: { checkoutIdempotencyKey: checkoutKey },
     select: {
@@ -547,6 +588,15 @@ export async function startEsimPurchaseHostedCheckout(
       throw new EsimPurchaseGatewayCheckoutError(
         "INVALID_STATE",
         "Payment amount changed. Please reload checkout and try again."
+      );
+    }
+    if (
+      attempt.gatewayProvider != null &&
+      attempt.gatewayProvider !== gatewayProvider
+    ) {
+      throw new EsimPurchaseGatewayCheckoutError(
+        "INVALID_STATE",
+        "Payment method changed. Please reload checkout and try again."
       );
     }
   } else {

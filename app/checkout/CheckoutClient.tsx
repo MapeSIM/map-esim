@@ -299,8 +299,8 @@ function CheckoutContent() {
   }
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[var(--page-bg)] px-4 py-10 text-[var(--heading)] sm:px-6 sm:py-16">
-      <div className="mx-auto w-full max-w-5xl">
+    <main className="min-h-screen overflow-x-hidden bg-[var(--page-bg)] px-4 py-10 pb-28 text-[var(--heading)] sm:px-6 sm:py-16">
+      <div className="mx-auto w-full min-w-0 max-w-5xl overflow-x-hidden">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)]">
           MAP eSIM checkout
         </p>
@@ -311,10 +311,10 @@ function CheckoutContent() {
           Review your eSIM plan and complete payment
         </p>
 
-        <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
-          <div className="space-y-5">
+        <div className="mt-8 grid min-w-0 items-start gap-6 overflow-x-hidden lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
+          <div className="min-w-0 space-y-5 overflow-x-hidden">
             <section
-              className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6"
+              className="min-w-0 overflow-x-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-3 sm:p-6"
               aria-labelledby="guest-plan-heading"
             >
               <h2
@@ -354,11 +354,11 @@ function CheckoutContent() {
 
             {/* Payment Method Selection */}
             {manualSettings?.enabled && (
-              <section className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6">
+              <section className="min-w-0 overflow-x-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-3 sm:p-6">
                 <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)] mb-3">
                   Select Payment Method
                 </h2>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid min-w-0 grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => {
@@ -392,7 +392,7 @@ function CheckoutContent() {
 
             {/* Manual Payment Details & Upload Box */}
             {paymentMethod === "manual" && manualSettings?.enabled && (
-              <section className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6 space-y-4">
+              <section className="min-w-0 space-y-4 overflow-x-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-3 sm:p-6">
                 <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--accent-strong)]">
                   Manual Bank / Wallet Transfer Details
                 </h2>
@@ -401,8 +401,8 @@ function CheckoutContent() {
                 </p>
                 <ManualPaymentDetailsBox config={manualSettings} />
 
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)] mb-1">
+                <div className="min-w-0">
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
                     Sender Account Name / Mobile Number
                   </label>
                   <input
@@ -410,26 +410,37 @@ function CheckoutContent() {
                     value={senderName}
                     onChange={(e) => setSenderName(e.target.value)}
                     placeholder="e.g. Muhammad Ali (0312-XXXXXXX)"
-                    className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-4 py-3 text-sm outline-none focus:border-[var(--accent-strong)]"
+                    className="w-full min-w-0 rounded-xl border border-[var(--border-strong)] bg-[var(--page-bg)] px-4 py-3 text-sm outline-none focus:border-[var(--accent-strong)]"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)] mb-1">
+                <div className="min-w-0">
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
                     Upload Payment Proof / Screenshot
                   </label>
                   <input
                     type="file"
                     accept="image/*,.pdf"
                     onChange={(e) => setProofFile(e.target.files?.[0] || null)}
-                    className="w-full text-sm text-[var(--text-muted)] file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-[var(--accent-strong)] file:text-[var(--accent-ink)] hover:file:opacity-90 cursor-pointer"
+                    className="w-full min-w-0 max-w-full text-sm text-[var(--text-muted)] file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-[var(--accent-strong)] file:text-[var(--accent-ink)] hover:file:opacity-90 cursor-pointer"
                   />
                 </div>
+
+                {/* Sole Submit CTA when Manual Payment is selected (hide aside duplicate). */}
+                <button
+                  type="button"
+                  onClick={pay}
+                  disabled={payLoading}
+                  aria-busy={payLoading}
+                  className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 py-3 font-bold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {payLoading ? "Submitting Payment Proof..." : "Submit payment"}
+                </button>
               </section>
             )}
 
             <section
-              className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6"
+              className="min-w-0 overflow-x-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-3 sm:p-6"
               aria-labelledby="guest-email-heading"
             >
               <h2
@@ -457,9 +468,9 @@ function CheckoutContent() {
             </section>
           </div>
 
-          <aside className="space-y-5 lg:sticky lg:top-6">
+          <aside className="min-w-0 space-y-5 overflow-x-hidden lg:sticky lg:top-6">
             <section
-              className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6"
+              className="min-w-0 overflow-x-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-3 sm:p-6"
               aria-labelledby="guest-summary-heading"
             >
               <h2
@@ -476,21 +487,17 @@ function CheckoutContent() {
               </p>
             </section>
 
-            <button
-              type="button"
-              onClick={pay}
-              disabled={payLoading}
-              aria-busy={payLoading}
-              className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 py-3 font-bold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:bg-[var(--accent)]"
-            >
-              {payLoading
-                ? paymentMethod === "manual"
-                  ? "Submitting Payment Proof..."
-                  : "Redirecting to Safepay..."
-                : paymentMethod === "manual"
-                ? "Submit Manual Payment"
-                : "Pay with Safepay"}
-            </button>
+            {paymentMethod === "manual" && manualSettings?.enabled ? null : (
+              <button
+                type="button"
+                onClick={pay}
+                disabled={payLoading}
+                aria-busy={payLoading}
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 py-3 font-bold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:bg-[var(--accent)]"
+              >
+                {payLoading ? "Redirecting to Safepay..." : "Pay with Safepay"}
+              </button>
+            )}
 
             <CheckoutCompatibilityCheck />
             <CheckoutTrustPanel />

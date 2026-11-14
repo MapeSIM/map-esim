@@ -143,8 +143,8 @@ export default async function AccountWalletBuyReviewPage({
         : null;
 
   return (
-    <div className="min-w-0 space-y-8">
-      <div>
+    <div className="min-w-0 space-y-8 overflow-x-hidden pb-28">
+      <div className="min-w-0">
         <Link
           href={back.href}
           className="text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"

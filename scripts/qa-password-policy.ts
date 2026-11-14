@@ -61,7 +61,7 @@ function main() {
   assert.match(actions, /Role\.ADMIN/);
   assert.match(seed, /isAdminPasswordValid/);
   assert.doesNotMatch(seed, /isPasswordValid\(/);
-  assert.match(guest, /ENABLE_GUEST_VESIM_CHECKOUT === "true"/);
+  assert.match(guest, /guestCheckoutConfig/);
   assert.match(google, /GOOGLE_AUTH_METHOD|Google/);
 
   console.log("PASS customer_min_length_6");

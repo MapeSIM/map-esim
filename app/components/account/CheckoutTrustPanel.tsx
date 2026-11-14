@@ -17,7 +17,7 @@ const CHECKOUT_TRUST_HIGHLIGHTS = [
 export function CheckoutTrustPanel() {
   return (
     <section
-      className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3.5 sm:px-5"
+      className="min-w-0 overflow-x-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 sm:p-6"
       aria-labelledby="checkout-trust-heading"
     >
       <h2

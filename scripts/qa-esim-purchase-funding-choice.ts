@@ -294,7 +294,7 @@ function main() {
       disabledAdapter
     )
   );
-  assert.match(guestGate, /ENABLE_GUEST_VESIM_CHECKOUT === "true"/);
+  assert.match(guestGate, /guestCheckoutConfig/);
   assert.match(pkg, /"qa:esim-purchase-funding-choice"/);
   assert.equal(
     CARD_PAYMENT_UNAVAILABLE_MESSAGE,

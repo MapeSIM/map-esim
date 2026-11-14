@@ -32,9 +32,9 @@ export function ManualPaymentCopyField({
   }
 
   return (
-    <div className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--page-bg)] px-3 py-2.5">
-      <div className="min-w-0">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+    <div className="flex w-full min-w-0 max-w-full items-center justify-between gap-2 overflow-x-hidden rounded-xl border border-[var(--border)] bg-[var(--page-bg)] px-2.5 py-2 sm:gap-3 sm:px-3 sm:py-2.5">
+      <div className="min-w-0 flex-1 overflow-hidden">
+        <p className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
           {label}
         </p>
         <p
@@ -52,7 +52,7 @@ export function ManualPaymentCopyField({
         onClick={copyValue}
         disabled={!canCopy}
         aria-label={copied ? `${label} copied` : `Copy ${label}`}
-        className="relative inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)] hover:text-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-40"
+        className="relative inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-2 py-1.5 text-[11px] font-semibold text-[var(--heading)] transition hover:border-[var(--accent-strong)] hover:text-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-40 sm:px-2.5"
       >
         {copied ? (
           <Check className="h-3.5 w-3.5 text-emerald-500" aria-hidden />

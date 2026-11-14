@@ -185,14 +185,23 @@ function main() {
   assert.match(guest, /lg:grid-cols-\[minmax\(0,1\.2fr\)_minmax\(18rem,0\.8fr\)\]/);
   assert.match(guest, /CheckoutTrustPanel/);
   assert.match(guest, /\/api\/vesim\/offer/);
-  assert.match(guest, /Pay with Safepay|Submit Manual Payment|Purchase eSIM/);
+  assert.match(guest, /Pay with Safepay|Submit payment|Purchase eSIM/);
   assert.match(guest, /customerEmail/);
   assert.match(guest, /guestCheckoutEnabled/);
   // Sprint B0: guest Pay CTA before trust (parity with logged-in).
   assert.match(
     guest,
-    /(?:Pay with Safepay|Submit Manual Payment|Purchase eSIM)[\s\S]*?CheckoutTrustPanel/
+    /(?:Pay with Safepay|Submit payment|Purchase eSIM)[\s\S]*?CheckoutTrustPanel/
   );
+  // Manual Payment: sole in-form Submit; hide aside/sticky duplicates.
+  assert.match(confirm, /stickyBarVisible = !awaitingGatewayPayment && !manualSelected/);
+  assert.match(confirm, /manualSelected \? null : zeroCashConfirm/);
+  assert.match(guest, /Sole Submit CTA when Manual Payment/);
+  assert.match(guest, /paymentMethod === "manual" && manualSettings\?\.enabled \? null/);
+  assert.match(confirm, /pb-28/);
+  assert.match(guest, /pb-28/);
+  assert.match(confirm, /p-3 sm:p-6/);
+  assert.match(copyField, /min-w-0 flex-1|w-full min-w-0 max-w-full/);
   assert.match(guest, /CheckoutCompatibilityCheck/);
   assert.match(confirm, /CheckoutCompatibilityCheck/);
   console.log("PASS guest_checkout_two_column");

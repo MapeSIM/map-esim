@@ -76,7 +76,7 @@ function main() {
   assert.match(dispatch, /applyVerifiedEsimPurchasePaymentEvent/);
   assert.match(dispatch, /signatureVerified/);
   assert.match(topup, /if \(!event\.signatureVerified\)/);
-  assert.match(config, /allowProduction:\s*false/);
+  assert.match(config, /allowProduction:\s*true/);
   console.log("PASS signed_webhook_dispatch");
 
   // 4) Successful credit path + ledger.
