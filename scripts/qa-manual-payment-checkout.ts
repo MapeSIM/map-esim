@@ -64,6 +64,14 @@ function main() {
   assert.match(confirm, /\/api\/checkout\/manual-payment-config/);
   assert.match(confirm, /\/api\/checkout\/manual-payment/);
   assert.match(confirm, /manual-pending/);
+  // Manual Payment must stay visible when the online gateway is paused.
+  assert.match(confirm, /alternateCashCheckoutAvailable/);
+  assert.match(confirm, /showInsufficientWalletOnly/);
+  assert.match(
+    confirm,
+    /walletOnlyInsufficient && !alternateCashCheckoutAvailable|showInsufficientWalletOnly/
+  );
+  assert.match(confirm, /manualPaymentsEnabled \?\s*\(/);
 
   const guest = read("app/checkout/CheckoutClient.tsx");
   assert.match(guest, /\/api\/checkout\/manual-payment-config/);

@@ -506,6 +506,11 @@ export default function WalletPurchaseConfirmForm({
   const whatsappPhone = (whatsappCheckoutPhone ?? "").trim();
   const whatsappCheckoutAvailable =
     Boolean(whatsappPhone) && cashPayablePreview > 0;
+  // Manual Payment is independent of gateway pause / online availability.
+  const alternateCashCheckoutAvailable =
+    manualPaymentsEnabled || whatsappCheckoutAvailable;
+  const showInsufficientWalletOnly =
+    walletOnlyInsufficient && !alternateCashCheckoutAvailable;
   const showWhatsAppCheckoutCta =
     !manualSelected &&
     whatsappCheckoutAvailable &&
@@ -971,7 +976,7 @@ export default function WalletPurchaseConfirmForm({
               <p className="mt-3 text-sm text-[var(--text-muted)]">
                 No online payment needed.
               </p>
-            ) : walletOnlyInsufficient ? (
+            ) : showInsufficientWalletOnly ? (
               <div className="mt-3">
                 <InsufficientWalletCheckoutNotice />
               </div>
@@ -981,6 +986,13 @@ export default function WalletPurchaseConfirmForm({
                 aria-labelledby={paymentModeHeadingId}
                 className="mt-3 space-y-2"
               >
+                {walletOnlyInsufficient && alternateCashCheckoutAvailable ? (
+                  <p className="text-sm text-[var(--text-muted)]" role="status">
+                    Online payment is unavailable right now. You can continue
+                    with Manual Payment
+                    {whatsappCheckoutAvailable ? " or WhatsApp" : ""}.
+                  </p>
+                ) : null}
                 {showFullWalletOption ? (
                   <label
                     className={paymentOptionClass(
