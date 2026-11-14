@@ -433,6 +433,12 @@ export async function confirmWalletEsimPurchaseAction(
     }
 
     try {
+      console.error("esim_checkout", "HOSTED_CHECKOUT_START", {
+        provider: selected ?? "unknown",
+        purchaseIdLength: purchaseId.length,
+        hasWalletOperator: Boolean(walletOperatorId),
+        hasMsisdn: Boolean(customerMsisdn),
+      });
       const checkout = await startEsimPurchaseHostedCheckout({
         customerUserId: customer.id,
         purchaseId,
@@ -441,8 +447,19 @@ export async function confirmWalletEsimPurchaseAction(
         walletOperatorId,
         customerMsisdn,
       });
+      console.error("esim_checkout", "HOSTED_CHECKOUT_OK", {
+        provider: selected ?? "unknown",
+        hasCheckoutUrl: Boolean(checkout.checkoutUrl),
+      });
       return { ok: true, checkout };
     } catch (error) {
+      console.error("esim_checkout", "HOSTED_CHECKOUT_FAILED", {
+        provider: selected ?? "unknown",
+        code:
+          error instanceof EsimPurchaseGatewayCheckoutError
+            ? error.code
+            : "UNKNOWN",
+      });
       if (error instanceof EsimPurchaseGatewayCheckoutError) {
         if (error.message === "Select Easypaisa or JazzCash.") {
           return {

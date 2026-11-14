@@ -42,6 +42,15 @@ function main() {
   assert.match(confirm, /confirmCheckboxText|confirmNoteText/);
   assert.match(confirm, /confirmWalletEsimPurchaseAction/);
   assert.match(confirm, /setWalletPurchaseFundingChoiceAction/);
+  // Simpaisa must use server action only — no no-op onSubmit that blocks Verify.
+  assert.match(confirm, /handleSafepaySubmit/);
+  assert.match(confirm, /isSafepayMode\s*\?\s*handleSafepaySubmit/);
+  assert.match(
+    confirm,
+    /Simpaisa \/ wallet must NOT attach an onSubmit|must NOT attach an onSubmit handler/
+  );
+  assert.match(confirm, /Contacting JazzCash \/ Easypaisa/);
+  assert.match(confirm, /checkout_confirm_action_failed/);
   // Sprint A: Pay CTA above trust; mobile sticky pay bar (lg:hidden).
   // Inline aside pay buttons are desktop-only (hidden lg:inline-flex).
   assert.match(

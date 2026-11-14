@@ -337,6 +337,28 @@ export default function WalletPurchaseConfirmForm({
 
   const isSafepayMode = safepayEnabled && paymentMode === "safepay";
 
+  const alertError =
+    errorState.ok === false && errorState.error
+      ? errorState.error === CARD_PAYMENT_UNAVAILABLE_MESSAGE ||
+        errorState.error === CUSTOMER_PAYMENT_TEMPORARILY_UNAVAILABLE_MESSAGE
+        ? null
+        : errorState.fieldErrors?.walletOperatorId ||
+            errorState.fieldErrors?.customerMsisdn ||
+            errorState.fieldErrors?.paymentMode ||
+            errorState.fieldErrors?.confirm
+          ? null
+          : errorState.error
+      : null;
+
+  useEffect(() => {
+    if (errorState.ok === false && errorState.error) {
+      console.error("checkout_confirm_action_failed", {
+        error: errorState.error,
+        fieldErrors: errorState.fieldErrors ?? null,
+      });
+    }
+  }, [errorState]);
+
   useEffect(() => {
     let cancelled = false;
     async function refreshManualConfig() {
@@ -421,27 +443,36 @@ export default function WalletPurchaseConfirmForm({
     }
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    if (isSafepayMode) {
-      event.preventDefault();
-      setWhatsappOrderBusy(true);
-      try {
-        const res = await fetch("/api/payments/safepay/init", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ purchaseId: review.purchaseId }),
-        });
-        const data = await res.json();
-        if (data.url || data.redirectUrl) {
-          window.location.href = data.url || data.redirectUrl;
-        } else {
-          alert(data.error || "Could not initialize Safepay checkout.");
-          setWhatsappOrderBusy(false);
-        }
-      } catch {
-        alert("Network error connecting to Safepay.");
-        setWhatsappOrderBusy(false);
+  /**
+   * Safepay only — preventDefault + client fetch.
+   * Simpaisa / wallet must NOT attach an onSubmit handler: a no-op async
+   * onSubmit alongside action={formAction} can block the server action, so
+   * Verify never runs and the UI hangs on "Continue to Payment".
+   */
+  async function handleSafepaySubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setWhatsappOrderBusy(true);
+    try {
+      const res = await fetch("/api/payments/safepay/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ purchaseId: review.purchaseId }),
+      });
+      const data = await res.json().catch(() => null);
+      if (data?.url || data?.redirectUrl) {
+        window.location.href = data.url || data.redirectUrl;
+        return;
       }
+      const message =
+        (data && typeof data.error === "string" && data.error) ||
+        "Could not initialize Safepay checkout.";
+      console.error("checkout_safepay_init_failed", message);
+      alert(message);
+      setWhatsappOrderBusy(false);
+    } catch (error) {
+      console.error("checkout_safepay_init_network", error);
+      alert("Network error connecting to Safepay.");
+      setWhatsappOrderBusy(false);
     }
   }
 
@@ -452,6 +483,12 @@ export default function WalletPurchaseConfirmForm({
   const fullWallet = !gatewayRequired && walletFundsApplied;
   const zeroCashConfirm = !gatewayRequired;
   const isFullWalletMode = paymentMode === "full_wallet";
+  const paymentGatewayConfigured = review.paymentGatewayConfigured === true;
+  const onlinePaymentsAllowed = paymentGatewayConfigured;
+  const simpaisaCheckout =
+    review.activePaymentProvider === "SIMPAISA" && !isSafepayMode;
+  const gatewayReady =
+    (gatewayRequired && paymentGatewayConfigured) || isSafepayMode;
   const confirmNoteText = isFullWalletMode
     ? "Confirm below to complete this purchase with your wallet."
     : "Confirm below to continue to online payment.";
@@ -461,7 +498,7 @@ export default function WalletPurchaseConfirmForm({
   const primaryCtaLabel = isFullWalletMode
     ? "Buy eSIM with Wallet"
     : "Continue to Payment";
-  
+
   const primaryCtaPendingLabel = fundingPending || selectingPayment ? (
     <>
       <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -469,17 +506,21 @@ export default function WalletPurchaseConfirmForm({
     </>
   ) : isFullWalletMode ? (
     "Buying with wallet…"
+  ) : simpaisaCheckout ? (
+    <>
+      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+      Contacting JazzCash / Easypaisa…
+    </>
   ) : (
-    "Connecting to Payment Gateway..."
+    <>
+      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+      Connecting to payment…
+    </>
   );
 
   const rewardsDisabled = !review.rewardEligible;
   const walletDisabled = review.balanceCents <= 0;
   const hasWalletBalance = !walletDisabled;
-  const paymentGatewayConfigured = review.paymentGatewayConfigured === true;
-  const onlinePaymentsAllowed = paymentGatewayConfigured;
-  const simpaisaCheckout = review.activePaymentProvider === "SIMPAISA" && !isSafepayMode;
-  const gatewayReady = (gatewayRequired && paymentGatewayConfigured) || isSafepayMode;
   const showGatewayUnavailable =
     onlinePaymentsAllowed && gatewayRequired && !paymentGatewayConfigured && !safepayEnabled;
   const afterPromoCents = Math.max(
@@ -722,14 +763,39 @@ export default function WalletPurchaseConfirmForm({
       ) : null}
 
     <form
-      action={manualSelected ? undefined : formAction}
-      onSubmit={manualSelected ? handleManualSubmit : handleSubmit}
+      action={manualSelected || isSafepayMode ? undefined : formAction}
+      onSubmit={
+        manualSelected
+          ? handleManualSubmit
+          : isSafepayMode
+            ? handleSafepaySubmit
+            : undefined
+      }
       className="space-y-6"
       noValidate
     >
       <input type="hidden" name="purchaseId" value={review.purchaseId} />
       <input type="hidden" name="idempotencyKey" value={review.idempotencyKey} />
       <input type="hidden" name="paymentMode" value={paymentMode} />
+
+      {alertError ? (
+        <div
+          className="rounded-2xl border border-[var(--danger-border)] bg-[var(--danger-bg)] px-4 py-3 text-sm text-[var(--danger-text)]"
+          role="alert"
+        >
+          {alertError}
+        </div>
+      ) : null}
+
+      {pending && gatewayRequired && simpaisaCheckout ? (
+        <div
+          className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--heading)]"
+          role="status"
+          aria-live="polite"
+        >
+          Contacting JazzCash / Easypaisa to start your payment…
+        </div>
+      ) : null}
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
         <div className="space-y-5">
