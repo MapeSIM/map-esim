@@ -18,6 +18,7 @@ import { resolveCheckoutBackHref } from "@/app/lib/plans/checkoutBackHref";
 import { getWhatsAppCheckoutPhoneDigits } from "@/app/lib/support/whatsappSupport";
 import { WalletEsimPurchaseStatus } from "@prisma/client";
 import { prisma as db } from "@/app/lib/db";
+import { getPublicManualPaymentConfig } from "@/app/lib/payments/manualPaymentConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -118,20 +119,17 @@ export default async function AccountWalletBuyReviewPage({
     destinationName: review.destinationName,
   });
 
-const safepayConfigRow = await db.safepayConfig.findUnique({ where: { id: "default" } });
+  const safepayConfigRow = await db.safepayConfig.findUnique({
+    where: { id: "default" },
+  });
   const safepayEnabled = safepayConfigRow ? safepayConfigRow.enabled : false;
 
-  let manualConfigRow = null;
-  try {
-    manualConfigRow = await (db as any).manualPaymentConfig?.findUnique({ where: { id: "default" } }) || 
-                      await (db as any).manualPayment?.findUnique({ where: { id: "default" } }) || null;
-  } catch {
-    manualConfigRow = null;
-  }
-  const [simpaisaOperators, whatsappCheckoutPhone] = await Promise.all([
-    getSimpaisaWalletOperatorConfig(),
-    getWhatsAppCheckoutPhoneDigits(),
-  ]);
+  const [simpaisaOperators, whatsappCheckoutPhone, manualConfig] =
+    await Promise.all([
+      getSimpaisaWalletOperatorConfig(),
+      getWhatsAppCheckoutPhoneDigits(),
+      getPublicManualPaymentConfig(),
+    ]);
 
   const bannerFromQuery = parseAddDataCheckoutBannerParam(query.addDataBanner);
   const isAddDataTopUp = Boolean(
@@ -176,7 +174,7 @@ const safepayConfigRow = await db.safepayConfig.findUnique({ where: { id: "defau
         enabledSimpaisaOperatorIds={simpaisaOperators.enabledOperatorIds}
         whatsappCheckoutPhone={whatsappCheckoutPhone}
         safepayEnabled={safepayEnabled}
-        manualConfig={manualConfigRow}
+        manualConfig={manualConfig}
       />
     </div>
   );

@@ -1942,3 +1942,21 @@ model SafepayConfig {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
+
+/// Singleton admin config for customer manual payment (JazzCash / EasyPaisa / bank).
+/// Public checkout reads only these display fields — never secrets.
+model ManualPaymentConfig {
+  /// Fixed singleton id — always "default".
+  id                 String   @id @default("default")
+  enabled            Boolean  @default(false)
+  accountTitle       String   @default("")
+  jazzcashNumber     String   @default("")
+  easypaisaNumber    String   @default("")
+  bankName           String   @default("")
+  bankAccountTitle   String   @default("")
+  bankAccountNumber  String   @default("")
+  version            Int      @default(1)
+  updatedByAdminId   String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}

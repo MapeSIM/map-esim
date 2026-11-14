@@ -38,25 +38,23 @@ export function ManualPaymentConfigPanel() {
     setSaving(true);
     setStatusMessage('');
     try {
-      const settingsToSave = [
-        { key: 'MANUAL_PAYMENTS_ENABLED', value: String(enabled) },
-        { key: 'MANUAL_ACCOUNT_TITLE', value: accountTitle },
-        { key: 'JAZZCASH_NUMBER', value: jazzcash },
-        { key: 'EASYPAISA_NUMBER', value: easypaisa },
-        { key: 'BANK_NAME', value: bankName },
-        { key: 'BANK_ACCOUNT_TITLE', value: bankAccountTitle },
-        { key: 'BANK_ACCOUNT_NUMBER', value: bankAccountNumber },
-      ];
-
-      await Promise.all(
-        settingsToSave.map((s) =>
-          fetch('/api/admin/manual-payment-settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(s),
-          })
-        )
-      );
+      const res = await fetch('/api/admin/manual-payment-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled,
+          accountTitle,
+          jazzcashNumber: jazzcash,
+          easypaisaNumber: easypaisa,
+          bankName,
+          bankAccountTitle,
+          bankAccountNumber,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to save');
+      }
 
       setStatusMessage('Settings saved successfully!');
       setTimeout(() => setStatusMessage(''), 3000);

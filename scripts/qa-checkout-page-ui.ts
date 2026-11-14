@@ -147,6 +147,23 @@ function main() {
   assert.match(review, />Checkout</);
   assert.match(review, /Review your plan and choose how to fund/);
   assert.match(review, /WalletPurchaseConfirmForm/);
+  assert.match(review, /getPublicManualPaymentConfig/);
+  assert.match(confirm, /ManualPaymentDetailsBox/);
+  assert.match(confirm, /\/api\/checkout\/manual-payment-config/);
+  assert.match(guest, /\/api\/checkout\/manual-payment-config/);
+  assert.match(guest, /ManualPaymentDetailsBox/);
+  const copyField = read("app/components/account/ManualPaymentCopyField.tsx");
+  assert.match(copyField, /navigator\.clipboard\.writeText/);
+  assert.match(copyField, /Copied!/);
+  assert.match(copyField, /JazzCash|Copy/);
+  const detailsBox = read("app/components/account/ManualPaymentDetailsBox.tsx");
+  assert.match(detailsBox, /Account title/);
+  assert.match(detailsBox, /JazzCash number/);
+  assert.match(detailsBox, /EasyPaisa number/);
+  assert.match(detailsBox, /Bank name/);
+  assert.match(detailsBox, /Bank account title/);
+  assert.match(detailsBox, /Account number \/ IBAN/);
+  console.log("PASS manual_payment_copy_fields");
   assert.match(review, /resolveAbandonedCheckoutReviewGuidance/);
   assert.match(review, /AbandonedCheckoutReviewGuidanceBanner/);
   assert.match(review, /if \(!purchaseId\) notFound\(\)/);
@@ -155,7 +172,7 @@ function main() {
 
   assert.match(guest, /lg:grid-cols-\[minmax\(0,1\.2fr\)_minmax\(18rem,0\.8fr\)\]/);
   assert.match(guest, /CheckoutTrustPanel/);
-  assert.match(guest, /\/api\/vesim\/checkout/);
+  assert.match(guest, /\/api\/vesim\/offer/);
   assert.match(guest, /Purchase eSIM/);
   assert.match(guest, /customerEmail/);
   assert.match(guest, /guestCheckoutEnabled/);

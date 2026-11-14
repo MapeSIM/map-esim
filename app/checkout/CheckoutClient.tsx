@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCurrency } from "@/app/components/currency/CurrencyProvider";
 import { CheckoutTrustPanel } from "@/app/components/account/CheckoutTrustPanel";
 import { CheckoutCompatibilityCheck } from "@/app/components/account/CheckoutCompatibilityModal";
+import { ManualPaymentDetailsBox } from "@/app/components/account/ManualPaymentDetailsBox";
+import type { PublicManualPaymentConfig } from "@/app/lib/payments/manualPaymentConfigShared";
 
 type VerifiedOffer = {
   offerId: string;
@@ -30,15 +32,7 @@ type CheckoutResponse = {
   customerEmail?: string;
 };
 
-type ManualSettings = {
-  enabled: boolean;
-  accountTitle: string;
-  jazzcash: string;
-  easypaisa: string;
-  bankName: string;
-  bankAccountTitle: string;
-  bankAccountNumber: string;
-};
+type ManualSettings = PublicManualPaymentConfig;
 
 function CheckoutUnavailable() {
   return (
@@ -122,7 +116,7 @@ function CheckoutContent() {
 
         const [offerRes, manualRes] = await Promise.all([
           fetch(`/api/vesim/offer?${params.toString()}`, { cache: "no-store" }),
-          fetch(`/api/admin/manual-payment-settings`, { cache: "no-store" }).catch(() => null),
+          fetch(`/api/checkout/manual-payment-config`, { cache: "no-store" }).catch(() => null),
         ]);
 
         const offerData = await offerRes.json();
@@ -138,19 +132,10 @@ function CheckoutContent() {
 
         if (!cancelled) {
           setOffer(offerData.offer as VerifiedOffer);
-          if (manualData?.success && manualData?.settings) {
-            const s = manualData.settings;
-            const isManualOn = s.MANUAL_PAYMENTS_ENABLED === "true";
-            setManualSettings({
-              enabled: isManualOn,
-              accountTitle: s.MANUAL_ACCOUNT_TITLE || "",
-              jazzcash: s.JAZZCASH_NUMBER || "",
-              easypaisa: s.EASYPAISA_NUMBER || "",
-              bankName: s.BANK_NAME || "",
-              bankAccountTitle: s.BANK_ACCOUNT_TITLE || "",
-              bankAccountNumber: s.BANK_ACCOUNT_NUMBER || "",
-            });
-            if (isManualOn) {
+          if (manualData?.success && manualData?.config) {
+            const config = manualData.config as PublicManualPaymentConfig;
+            setManualSettings(config);
+            if (config.enabled) {
               setPaymentMethod("manual");
             }
           }
@@ -415,24 +400,7 @@ function CheckoutContent() {
                 <p className="text-xs text-[var(--text-muted)]">
                   Please transfer the exact amount using any of the channels below and upload your payment proof.
                 </p>
-                <div className="bg-[var(--page-bg)] p-4 rounded-xl border border-[var(--border)] space-y-2 text-sm">
-                  {manualSettings.accountTitle && (
-                    <p><strong>Account Title:</strong> {manualSettings.accountTitle}</p>
-                  )}
-                  {manualSettings.jazzcash && (
-                    <p><strong>JazzCash Number:</strong> {manualSettings.jazzcash}</p>
-                  )}
-                  {manualSettings.easypaisa && (
-                    <p><strong>EasyPaisa Number:</strong> {manualSettings.easypaisa}</p>
-                  )}
-                  {manualSettings.bankName && (
-                    <>
-                      <p><strong>Bank Name:</strong> {manualSettings.bankName}</p>
-                      <p><strong>Bank Title:</strong> {manualSettings.bankAccountTitle}</p>
-                      <p><strong>Account / IBAN:</strong> {manualSettings.bankAccountNumber}</p>
-                    </>
-                  )}
-                </div>
+                <ManualPaymentDetailsBox config={manualSettings} />
 
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)] mb-1">

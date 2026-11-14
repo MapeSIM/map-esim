@@ -1,23 +1,48 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/app/lib/db';
+import { NextResponse } from "next/server";
+import { requireActiveAdminForOperations } from "@/app/lib/admin/operationsHealth";
+import {
+  getPublicManualPaymentConfig,
+  upsertManualPaymentConfig,
+} from "@/app/lib/payments/manualPaymentConfig";
+import {
+  parseManualPaymentConfigBody,
+  toManualPaymentSettingsMap,
+} from "@/app/lib/payments/manualPaymentConfigShared";
 
-// GET: Admin manual payment settings fetch karne ke liye
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
-    // Agar aap database ya settings table use kar rahe hain, yahan se fetch karein
-    // Filhal hum environment variables ya default settings return kar rahe hain
-    const settings = {
-      MANUAL_PAYMENTS_ENABLED: process.env.MANUAL_PAYMENTS_ENABLED || "true",
-      MANUAL_ACCOUNT_TITLE: process.env.MANUAL_ACCOUNT_TITLE || "MAP eSIM",
-      JAZZCASH_NUMBER: process.env.JAZZCASH_NUMBER || "",
-      EASYPAISA_NUMBER: process.env.EASYPAISA_NUMBER || "",
-      BANK_NAME: process.env.BANK_NAME || "",
-      BANK_ACCOUNT_TITLE: process.env.BANK_ACCOUNT_TITLE || "",
-      BANK_ACCOUNT_NUMBER: process.env.BANK_ACCOUNT_NUMBER || "",
-    };
+    await requireActiveAdminForOperations();
+    const config = await getPublicManualPaymentConfig();
+    return NextResponse.json({
+      success: true,
+      config,
+      settings: toManualPaymentSettingsMap(config),
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unable to load settings";
+    return NextResponse.json({ success: false, error: message }, { status: 401 });
+  }
+}
 
-    return NextResponse.json({ success: true, settings });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+export async function POST(req: Request) {
+  try {
+    const { admin } = await requireActiveAdminForOperations();
+    const body = await req.json();
+    const current = await getPublicManualPaymentConfig();
+    const next = parseManualPaymentConfigBody(body, current);
+    const config = await upsertManualPaymentConfig(next, admin.id);
+    return NextResponse.json({
+      success: true,
+      config,
+      settings: toManualPaymentSettingsMap(config),
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unable to save settings";
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
