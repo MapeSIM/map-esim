@@ -452,7 +452,7 @@ function main() {
   assert.match(adminWalletLib, /relatedOrderId/);
   console.log("PASS admin_customer_orders_preserved");
 
-  assert.match(guestGate, /ENABLE_GUEST_VESIM_CHECKOUT/);
+  assert.match(guestGate, /GUEST_CHECKOUT_FORCE_OFF/);
   assert.match(pkg, /qa:customer-my-esims/);
   console.log("PASS package_and_guest_gate_present");
 

@@ -239,7 +239,7 @@ function main() {
   assert.match(offers, /fetchPublicOffersForCountry/);
   console.log("PASS shared_boundary_wired");
 
-  assert.match(guestGate, /ENABLE_GUEST_VESIM_CHECKOUT/);
+  assert.match(guestGate, /GUEST_CHECKOUT_FORCE_OFF/);
   assert.match(walletPurchase, /executeCreditCheckout/);
   assert.match(adminAssign, /getBrokerToken/);
   console.log("PASS existing_flows_structurally_unchanged");
@@ -252,7 +252,8 @@ function main() {
   assert.match(envExample, /www\.vesim\.world/);
   assert.match(readme, /www\.vesim\.xyz/);
   assert.match(readme, /www\.vesim\.world/);
-  assert.match(readme, /Keep `ENABLE_GUEST_VESIM_CHECKOUT=false` in production/);
+  assert.match(readme, /GUEST_CHECKOUT_FORCE_OFF=true/);
+  assert.match(readme, /GuestCheckoutConfig|Guest Checkout/);
   assert.match(pkg, /"qa:vesim-environment"/);
   console.log("PASS docs_and_package_script");
 

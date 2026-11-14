@@ -13,6 +13,7 @@ import PlansListingClient from "@/app/components/plans/PlansListingClient";
 import PlansListingFlag from "@/app/components/plans/PlansListingFlag";
 import PlansOfferGroups from "@/app/components/plans/PlansOfferGroups";
 import { buildDefaultPlansListingModel } from "@/app/lib/plans/planListingModel";
+import { isGuestVesimCheckoutEnabled } from "@/app/lib/vesim/guestCheckoutGate";
 
 export type PlansListingProps = {
   destination: VesimDestination;
@@ -29,7 +30,7 @@ export type PlansListingProps = {
  * Default plan cards render as RSC HTML; filters/sort/modal stay in client islands.
  * Do not load the main plan grid with next/dynamic ssr:false.
  */
-export default function PlansListing({
+export default async function PlansListing({
   destination,
   offers,
   loading = false,
@@ -38,6 +39,7 @@ export default function PlansListing({
   relatedRegional = null,
   children,
 }: PlansListingProps) {
+  const guestCheckoutEnabled = await isGuestVesimCheckoutEnabled();
   const defaultModel = buildDefaultPlansListingModel(offers, destination);
   const displayName = destinationDisplayName(destination);
   const heading = `${displayName} eSIM Plans`;
@@ -133,6 +135,7 @@ export default function PlansListing({
         error={error}
         countryNames={countryNames}
         defaultGrid={defaultGrid}
+        guestCheckoutEnabled={guestCheckoutEnabled}
       />
 
       {relatedRegional && relatedRegionalHref && relatedRegionalName ? (

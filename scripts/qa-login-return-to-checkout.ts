@@ -189,11 +189,8 @@ function main() {
   assert.match(accountLayout, /x-map-pathname/);
   assert.match(accountLayout, /x-map-search/);
   assert.match(middleware, /x-map-search/);
-  assert.match(
-    guestGate,
-    /process\.env\.ENABLE_GUEST_VESIM_CHECKOUT\s*===\s*"true"/
-  );
-  assert.doesNotMatch(buyPage, /ENABLE_GUEST_VESIM_CHECKOUT/);
+  assert.match(guestGate, /GUEST_CHECKOUT_FORCE_OFF\s*===\s*"true"/);
+  assert.doesNotMatch(buyPage, /GUEST_CHECKOUT_FORCE_OFF/);
   console.log("PASS wiring_and_guest_checkout_unchanged");
 
   console.log("OK qa-login-return-to-checkout");

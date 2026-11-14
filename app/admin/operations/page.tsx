@@ -34,6 +34,7 @@ import {
   AdminStatusPill,
 } from "@/app/components/admin/ui";
 import { prisma } from "@/app/lib/db";
+import { getGuestCheckoutConfigView } from "@/app/lib/vesim/guestCheckoutGate";
 
 export const dynamic = "force-dynamic";
 
@@ -377,6 +378,8 @@ function OperationsDeferredView({
   };
   guestCheckoutConfig: {
     enabled: boolean;
+    dbEnabled: boolean;
+    envForcedOff: boolean;
     updatedAt: string | null;
   };
 }) {
@@ -712,11 +715,18 @@ async function OperationsDeferredSection() {
   } = { enabled: false, updatedAt: null, updatedByEmail: null };
   let guestCheckoutConfig: {
     enabled: boolean;
+    dbEnabled: boolean;
+    envForcedOff: boolean;
     updatedAt: string | null;
-  } = { enabled: true, updatedAt: null };
+  } = {
+    enabled: true,
+    dbEnabled: true,
+    envForcedOff: false,
+    updatedAt: null,
+  };
   let failed = false;
   try {
-    const [health, whatsapp, operators, safepayRow, guestRow] =
+    const [health, whatsapp, operators, safepayRow, guestView] =
       await Promise.all([
         loadOpsHealth(),
         getAdminWhatsAppSupportView(),
@@ -725,10 +735,7 @@ async function OperationsDeferredSection() {
           where: { id: "default" },
           select: { enabled: true, updatedAt: true },
         }),
-        prisma.guestCheckoutConfig.findUnique({
-          where: { id: "default" },
-          select: { enabled: true, updatedAt: true },
-        }),
+        getGuestCheckoutConfigView(),
       ]);
     data = health;
     whatsappSupport = whatsapp;
@@ -738,10 +745,7 @@ async function OperationsDeferredSection() {
       updatedAt: safepayRow?.updatedAt?.toISOString() ?? null,
       updatedByEmail: null,
     };
-    guestCheckoutConfig = {
-      enabled: guestRow ? guestRow.enabled === true : true,
-      updatedAt: guestRow?.updatedAt?.toISOString() ?? null,
-    };
+    guestCheckoutConfig = guestView;
   } catch {
     failed = true;
   }

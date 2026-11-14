@@ -230,8 +230,9 @@ export const getOperationalControlsHealthSnapshot = cache(
         select: { enabled: true },
       }),
     ]);
+    // Same effective rule as isGuestVesimCheckoutEnabled (admin DB + force-off env).
     const guestCheckoutStatus: "ENABLED" | "DISABLED" =
-      process.env.ENABLE_GUEST_VESIM_CHECKOUT === "false"
+      process.env.GUEST_CHECKOUT_FORCE_OFF === "true"
         ? "DISABLED"
         : guestRow
           ? guestRow.enabled

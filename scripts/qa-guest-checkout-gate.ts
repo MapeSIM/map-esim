@@ -17,9 +17,12 @@ function main() {
   const gate = read("app/lib/vesim/guestCheckoutGate.ts");
   assert.match(gate, /import\s+"server-only"/);
   assert.match(gate, /guestCheckoutConfig/);
-  assert.match(gate, /ENABLE_GUEST_VESIM_CHECKOUT\s*===\s*"false"/);
+  assert.match(gate, /GUEST_CHECKOUT_FORCE_OFF\s*===\s*"true"/);
   assert.match(gate, /isGuestVesimCheckoutEnabled/);
+  assert.match(gate, /getGuestCheckoutConfigView/);
   assert.doesNotMatch(gate, /NEXT_PUBLIC_ENABLE_GUEST/);
+  // Legacy fail-closed env must not override the admin toggle.
+  assert.match(gate, /ENABLE_GUEST_VESIM_CHECKOUT[\s\S]{0,120}ignored|Legacy[\s\S]{0,80}ENABLE_GUEST_VESIM_CHECKOUT/i);
 
   console.log("2) Prisma model + migration present");
   const schema = read("prisma/schema.prisma");
@@ -69,17 +72,30 @@ function main() {
   assert.match(client, /href="\/signup/);
   assert.doesNotMatch(client, /NEXT_PUBLIC_ENABLE_GUEST/);
 
-  console.log("6) Admin panel + API toggle");
+  console.log("6) Admin panel + API toggle use effective status");
   const panel = read("app/components/admin/GuestCheckoutConfigPanel.tsx");
   assert.match(panel, /Guest Checkout/);
   assert.match(panel, /\/api\/admin\/operations\/guest-checkout/);
+  assert.match(panel, /envForcedOff|GUEST_CHECKOUT_FORCE_OFF/);
   const adminApi = read("app/api/admin/operations/guest-checkout/route.ts");
   assert.match(adminApi, /guestCheckoutConfig\.upsert/);
   assert.match(adminApi, /requireActiveAdminForOperations/);
   const opsPage = read("app/admin/operations/page.tsx");
   assert.match(opsPage, /GuestCheckoutConfigPanel/);
+  assert.match(opsPage, /getGuestCheckoutConfigView/);
 
-  console.log("7) Wallet/admin paths do not use the guest API route");
+  console.log("7) Signed-out Buy Now uses /checkout when guest enabled");
+  const planUtils = read("app/lib/plans/plan-utils.ts");
+  assert.match(planUtils, /buildGuestPublicCheckoutHref/);
+  assert.match(planUtils, /\/checkout\?/);
+  const listing = read("app/components/plans/PlansListing.tsx");
+  assert.match(listing, /isGuestVesimCheckoutEnabled/);
+  assert.match(listing, /guestCheckoutEnabled/);
+  const listingClient = read("app/components/plans/PlansListingClient.tsx");
+  assert.match(listingClient, /buildGuestPublicCheckoutHref/);
+  assert.match(listingClient, /guestCheckoutEnabled/);
+
+  console.log("8) Wallet/admin paths do not use the guest API route");
   const wallet = read("app/lib/esim/walletPurchase.ts");
   assert.match(wallet, /executeCreditCheckout/);
   assert.doesNotMatch(wallet, /\/api\/vesim\/checkout/);
@@ -87,16 +103,16 @@ function main() {
 
   const credit = read("app/lib/vesim/creditCheckout.ts");
   assert.doesNotMatch(credit, /isGuestVesimCheckoutEnabled/);
-  assert.doesNotMatch(credit, /ENABLE_GUEST_VESIM_CHECKOUT/);
+  assert.doesNotMatch(credit, /GUEST_CHECKOUT_FORCE_OFF/);
 
-  console.log("8) Env docs — emergency kill switch only");
+  console.log("9) Env docs — emergency kill switch only");
   const envExample = read(".env.example");
-  assert.match(envExample, /ENABLE_GUEST_VESIM_CHECKOUT/);
+  assert.match(envExample, /GUEST_CHECKOUT_FORCE_OFF/);
   assert.match(envExample, /emergency|kill switch|Admin ON\/OFF/i);
 
   const readme = read("README.md");
   assert.match(readme, /GuestCheckoutConfig|Guest Checkout/);
-  assert.match(readme, /ENABLE_GUEST_VESIM_CHECKOUT=false/);
+  assert.match(readme, /GUEST_CHECKOUT_FORCE_OFF=true/);
 
   console.log("qa-guest-checkout-gate: OK");
 }

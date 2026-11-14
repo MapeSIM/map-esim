@@ -36,9 +36,11 @@ Public guest checkout (`POST /api/vesim/checkout` and `/checkout`) is controlled
 
 | Control | Behavior |
 |---|---|
-| Admin Guest Checkout **ON** | Guests may use `/checkout` |
+| Admin Guest Checkout **ON** | Guests may use `/checkout`; Buy Now for signed-out visitors goes to `/checkout` |
 | Admin Guest Checkout **OFF** | Guests see sign-in / register; APIs return HTTP 503 |
-| `ENABLE_GUEST_VESIM_CHECKOUT=false` | Emergency env kill switch — forces OFF regardless of admin toggle |
+| `GUEST_CHECKOUT_FORCE_OFF=true` | Emergency env kill switch — forces OFF regardless of admin toggle |
+
+Legacy `ENABLE_GUEST_VESIM_CHECKOUT` is ignored so an old Production `=false` value cannot override the admin toggle.
 
 Do not use a `NEXT_PUBLIC_*` variable to authorize guest checkout. Client requests cannot override the gate.
 

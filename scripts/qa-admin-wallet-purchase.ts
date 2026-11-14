@@ -158,7 +158,7 @@ function main() {
   assert.doesNotMatch(adminAssign, /WalletEsimPurchase/);
   console.log("PASS company_funded_assignment_unchanged");
 
-  assert.match(guestGate, /ENABLE_GUEST_VESIM_CHECKOUT/);
+  assert.match(guestGate, /GUEST_CHECKOUT_FORCE_OFF/);
   assert.match(persist, /captureIccidForProviderOrder/);
   assert.match(capture, /import "server-only"/);
   assert.match(service, /checkoutPayload:\s*successCheckout\.payload/);

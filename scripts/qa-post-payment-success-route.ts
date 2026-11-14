@@ -107,7 +107,7 @@ function main() {
 
   assert.match(
     guestGate,
-    /process\.env\.ENABLE_GUEST_VESIM_CHECKOUT\s*===\s*"true"/
+    /GUEST_CHECKOUT_FORCE_OFF\s*===\s*"true"/
   );
   assert.match(pkg, /qa:post-payment-success-route/);
   console.log("PASS guest_checkout_unchanged");

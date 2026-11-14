@@ -12,6 +12,7 @@ import type { VesimOffer } from "@/app/lib/vesim/offers";
 import type { VesimDestination } from "@/app/lib/vesim/destinations";
 import {
   buildCheckoutHref,
+  buildGuestPublicCheckoutHref,
   buildPartnerCheckoutHref,
   uniqueCoveredCountries,
   uniqueDataAmounts,
@@ -55,6 +56,8 @@ export type PlansListingClientProps = {
   countryNames?: Record<string, string>;
   /** RSC default card grid — shown until filters/sort diverge from defaults. */
   defaultGrid: ReactNode;
+  /** Server gate: when true, signed-out Buy Now goes to /checkout (not /account). */
+  guestCheckoutEnabled?: boolean;
 };
 
 export default function PlansListingClient({
@@ -64,6 +67,7 @@ export default function PlansListingClient({
   error = "",
   countryNames = {},
   defaultGrid,
+  guestCheckoutEnabled = false,
 }: PlansListingClientProps) {
   const [planType, setPlanType] = useState<PlanTypeFilter>(DEFAULT_PLAN_TYPE);
   const [category, setCategory] = useState<CategoryFilter>(DEFAULT_CATEGORY);
@@ -79,7 +83,9 @@ export default function PlansListingClient({
 
   const resolveCheckoutHref = partnerCheckout
     ? buildPartnerCheckoutHref
-    : buildCheckoutHref;
+    : !signedIn && guestCheckoutEnabled
+      ? buildGuestPublicCheckoutHref
+      : buildCheckoutHref;
 
   const model = useMemo(
     () =>

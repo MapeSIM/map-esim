@@ -44,16 +44,14 @@ export function dataAmountKey(offer: VesimOffer): string {
 }
 
 /**
- * Soft-launch purchase entry: authenticated wallet buy (not guest checkout).
- * Unauthenticated users are redirected to sign-in by /account middleware with
- * this path as callbackUrl. Never creates a provider order by itself.
- * offerId/country are lookup hints only — never trusted for price.
+ * Shared offerId/country query for buy / guest checkout paths.
+ * Values are lookup hints only — never trusted for price.
  */
-export function buildCheckoutHref(
+export function buildOfferCheckoutSearchParams(
   offer: VesimOffer,
   destinationCode: string,
   options?: { fromOrder?: string | null }
-): string {
+): URLSearchParams {
   const params = new URLSearchParams({
     offerId: offer.id,
   });
@@ -69,8 +67,38 @@ export function buildCheckoutHref(
   ) {
     params.set("fromOrder", fromOrder);
   }
+  return params;
+}
 
-  return `/account/esim/buy?${params.toString()}`;
+/**
+ * Authenticated customer buy path (`/account/esim/buy`).
+ * Unauthenticated users hitting this path are redirected to sign-in by middleware.
+ */
+export function buildCheckoutHref(
+  offer: VesimOffer,
+  destinationCode: string,
+  options?: { fromOrder?: string | null }
+): string {
+  return `/account/esim/buy?${buildOfferCheckoutSearchParams(
+    offer,
+    destinationCode,
+    options
+  ).toString()}`;
+}
+
+/**
+ * Public guest checkout (`/checkout`) when Admin Guest Checkout toggle is ON.
+ */
+export function buildGuestPublicCheckoutHref(
+  offer: VesimOffer,
+  destinationCode: string,
+  options?: { fromOrder?: string | null }
+): string {
+  return `/checkout?${buildOfferCheckoutSearchParams(
+    offer,
+    destinationCode,
+    options
+  ).toString()}`;
 }
 
 /**
