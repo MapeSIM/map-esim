@@ -2,7 +2,9 @@
  * Pure Simpaisa wallet webhook → NormalizedPaymentEvent mapping.
  * Postback payload is a trigger only — never authoritative for funding.
  * 0037 Transaction-Pending is never treated as paid.
+ * Accepts JSON and application/x-www-form-urlencoded postbacks.
  */
+import { parseSimpaisaPostbackBody } from "@/app/lib/payments/simpaisaPostbackBody";
 import {
   classifySimpaisaWalletResponseCode,
   mapSimpaisaClassificationToPaymentStatus,
@@ -45,16 +47,6 @@ function firstString(
   return null;
 }
 
-function parseBody(rawBody: string): Record<string, unknown> | null {
-  const trimmed = rawBody.trim();
-  if (!trimmed.startsWith("{")) return null;
-  try {
-    return asRecord(JSON.parse(trimmed));
-  } catch {
-    return null;
-  }
-}
-
 function resolvePurpose(userKey: string): PaymentCheckoutPurpose {
   // Partner Add Funds uses distinct ptop_ merchant userKey namespace.
   if (userKey.trim().startsWith("ptop_")) {
@@ -69,7 +61,7 @@ function resolvePurpose(userKey: string): PaymentCheckoutPurpose {
 }
 
 /**
- * Parse a JSON Simpaisa payin postback payload.
+ * Parse a Simpaisa payin postback payload (JSON or form-urlencoded).
  * Returns null for malformed bodies or missing required fields.
  * signatureVerified on the returned event reflects caller verification only.
  * Nested `transaction` fields (official Inquire-style envelopes) are accepted
@@ -82,7 +74,7 @@ export function parseSimpaisaWebhookEvent(input: {
   signatureVerified: boolean;
 }): NormalizedPaymentEvent | null {
   void input.headers;
-  const root = parseBody(input.rawBody);
+  const root = parseSimpaisaPostbackBody(input.rawBody);
   if (!root) return null;
   const nestedTxn = asRecord(root.transaction);
   const data = asRecord(root.data) ?? nestedTxn ?? root;
@@ -138,10 +130,25 @@ export function parseSimpaisaWebhookEvent(input: {
   if (!userKey || userKey.length > 64) return null;
 
   const transactionId =
-    firstString(data, ["transactionId", "transaction_id"]) ??
-    firstString(root, ["transactionId", "transaction_id"]) ??
+    firstString(data, [
+      "transactionId",
+      "transaction_id",
+      "merchantTransactionId",
+      "merchant_transaction_id",
+    ]) ??
+    firstString(root, [
+      "transactionId",
+      "transaction_id",
+      "merchantTransactionId",
+      "merchant_transaction_id",
+    ]) ??
     (nestedTxn
-      ? firstString(nestedTxn, ["transactionId", "transaction_id"])
+      ? firstString(nestedTxn, [
+          "transactionId",
+          "transaction_id",
+          "merchantTransactionId",
+          "merchant_transaction_id",
+        ])
       : null);
   if (!transactionId || transactionId.length > 190) return null;
 
@@ -213,7 +220,7 @@ export function parseSimpaisaWebhookEvent(input: {
 }
 
 export function peekSimpaisaWebhookResponseCode(rawBody: string): string | null {
-  const root = parseBody(rawBody);
+  const root = parseSimpaisaPostbackBody(rawBody);
   if (!root) return null;
   const nestedTxn = asRecord(root.transaction);
   const data = asRecord(root.data) ?? nestedTxn ?? root;

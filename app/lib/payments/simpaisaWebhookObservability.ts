@@ -4,6 +4,7 @@
  * Does not apply payment events.
  */
 
+import { parseSimpaisaPostbackBody } from "@/app/lib/payments/simpaisaPostbackBody";
 import { normalizeSimpaisaHeader } from "@/app/lib/payments/simpaisaWebhookCrypto";
 import { normalizeSimpaisaResponseCode } from "@/app/lib/payments/simpaisaPolicy";
 
@@ -96,28 +97,6 @@ function firstString(
   return null;
 }
 
-function parseBody(rawBody: string): Record<string, unknown> | null {
-  const trimmed = rawBody.trim();
-  if (!trimmed) return null;
-  if (trimmed.startsWith("{")) {
-    try {
-      return asRecord(JSON.parse(trimmed));
-    } catch {
-      return null;
-    }
-  }
-  try {
-    const params = new URLSearchParams(rawBody);
-    const record: Record<string, unknown> = {};
-    for (const [key, value] of params.entries()) {
-      if (key) record[key] = value;
-    }
-    return Object.keys(record).length > 0 ? record : null;
-  } catch {
-    return null;
-  }
-}
-
 export function clipSimpaisaWebhookToken(
   value: string | null | undefined,
   max = 64
@@ -152,14 +131,34 @@ export function peekSimpaisaWebhookLogFields(
   headers: Record<string, string | string[] | undefined> = {}
 ): SimpaisaWebhookPeek {
   void headers;
-  const root = parseBody(rawBody);
+  const root = parseSimpaisaPostbackBody(rawBody);
   if (!root) return { eventId: null, eventType: null, tracker: null };
-  const data = asRecord(root.data) ?? root;
+  const nestedTxn = asRecord(root.transaction);
+  const data = asRecord(root.data) ?? nestedTxn ?? root;
   const transactionId =
-    firstString(data, ["transactionId", "transaction_id"]) ??
-    firstString(root, ["transactionId", "transaction_id"]);
+    firstString(data, [
+      "transactionId",
+      "transaction_id",
+      "merchantTransactionId",
+      "merchant_transaction_id",
+    ]) ??
+    firstString(root, [
+      "transactionId",
+      "transaction_id",
+      "merchantTransactionId",
+      "merchant_transaction_id",
+    ]) ??
+    (nestedTxn
+      ? firstString(nestedTxn, [
+          "transactionId",
+          "transaction_id",
+          "merchantTransactionId",
+          "merchant_transaction_id",
+        ])
+      : null);
   const responseCode = normalizeSimpaisaResponseCode(
-    firstString(data, ["responseCode", "response_code"]) ??
+    firstString(nestedTxn ?? data, ["responseCode", "response_code"]) ??
+      firstString(data, ["responseCode", "response_code"]) ??
       firstString(root, ["responseCode", "response_code"])
   );
   return {
@@ -179,11 +178,14 @@ export function classifySimpaisaWebhookParseIgnore(
   void headers;
   const trimmed = rawBody.trim();
   if (!trimmed) return "MALFORMED_BODY";
-  const root = parseBody(rawBody);
+  const root = parseSimpaisaPostbackBody(rawBody);
   if (!root) return "MALFORMED_BODY";
-  const data = asRecord(root.data) ?? root;
+  const nestedTxn = asRecord(root.transaction);
+  const data = asRecord(root.data) ?? nestedTxn ?? root;
+  const amountSource = nestedTxn ?? data;
   const responseCode = normalizeSimpaisaResponseCode(
-    firstString(data, ["responseCode", "response_code", "status"]) ??
+    firstString(nestedTxn ?? data, ["responseCode", "response_code", "status"]) ??
+      firstString(data, ["responseCode", "response_code", "status"]) ??
       firstString(root, ["responseCode", "response_code", "status"])
   );
   if (!responseCode) return "MISSING_RESPONSE_CODE";
@@ -199,25 +201,42 @@ export function classifySimpaisaWebhookParseIgnore(
       "transaction_id",
       "merchantTransactionId",
       "merchant_transaction_id",
-    ]);
+    ]) ??
+    (nestedTxn
+      ? firstString(nestedTxn, [
+          "transactionId",
+          "transaction_id",
+          "merchantTransactionId",
+          "merchant_transaction_id",
+        ])
+      : null);
   if (!transactionId || transactionId.length > 190) {
     return "MISSING_TRANSACTION_ID";
   }
   const userKey =
     firstString(data, ["userKey", "user_key"]) ??
-    firstString(root, ["userKey", "user_key"]);
+    firstString(root, ["userKey", "user_key"]) ??
+    (nestedTxn ? firstString(nestedTxn, ["userKey", "user_key"]) : null);
   if (!userKey || userKey.length > 64) {
     return "MISSING_TRANSACTION_ID";
   }
   const merchantId =
     firstString(data, ["merchantId", "merchant_id"]) ??
-    firstString(root, ["merchantId", "merchant_id"]);
+    firstString(root, ["merchantId", "merchant_id"]) ??
+    (nestedTxn
+      ? firstString(nestedTxn, ["merchantId", "merchant_id"])
+      : null);
   if (!merchantId) return "MISSING_AMOUNT";
   const operatorId =
     firstString(data, ["operatorId", "operator_id", "operatorID"]) ??
-    firstString(root, ["operatorId", "operator_id", "operatorID"]);
+    firstString(root, ["operatorId", "operator_id", "operatorID"]) ??
+    (nestedTxn
+      ? firstString(nestedTxn, ["operatorId", "operator_id", "operatorID"])
+      : null);
   if (!operatorId) return "MISSING_AMOUNT";
   const amountRaw =
+    amountSource.amount ??
+    amountSource.transactionAmount ??
     data.amount ??
     data.transactionAmount ??
     root.amount ??
