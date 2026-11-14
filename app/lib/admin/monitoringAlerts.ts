@@ -25,7 +25,6 @@ import { requireRole } from "@/app/lib/auth/session";
 import { loadConsentGateUser } from "@/app/lib/auth/legalConsentGate";
 import { getEmailChannelsReadiness } from "@/app/lib/email/config";
 import { isIccidEncryptionConfigured } from "@/app/lib/orders/iccidCrypto";
-import { isGuestVesimCheckoutEnabled } from "@/app/lib/vesim/guestCheckoutGate";
 import {
   isVesimEnvironmentConfigured,
   resolveLiveBrokerHosts,
@@ -403,22 +402,25 @@ function buildConfigAlerts(input: {
       })
     );
   }
-  pushUnique(
-    alerts,
-    makeAlert({
-      category: "PAYMENT",
-      code: "GUEST_CHECKOUT_NOT_IMPLEMENTED",
-      severity: "INFO",
-      title: "Guest checkout disabled / not implemented",
-      description:
-        "Guest checkout remains NOT_IMPLEMENTED / DISABLED. Operational controls cannot enable it.",
-      sourceAt: now,
-      now,
-      freshness: "CONFIGURATION_DERIVED",
-      href: "/admin/operations",
-      recommendedAction: "Keep guest checkout disabled until a dedicated implementation phase.",
-    })
-  );
+  if (input.controls.guestCheckoutStatus === "DISABLED") {
+    pushUnique(
+      alerts,
+      makeAlert({
+        category: "PAYMENT",
+        code: "GUEST_CHECKOUT_NOT_IMPLEMENTED",
+        severity: "INFO",
+        title: "Guest checkout is OFF",
+        description:
+          "Public guest checkout is disabled. Unauthenticated visitors must sign in or register. Account and partner purchases are unaffected.",
+        sourceAt: now,
+        now,
+        freshness: "CONFIGURATION_DERIVED",
+        href: "/admin/operations",
+        recommendedAction:
+          "Use Admin → Operations → Guest Checkout to turn it ON when ready.",
+      })
+    );
+  }
 
   if (!input.controls.readOk) {
     pushUnique(
@@ -1679,7 +1681,7 @@ async function collectMonitoringAlertsImpl(options?: {
       overallTransactionsStatus: "UNKNOWN",
       controls: [],
       pausedControlKeys: [],
-      guestCheckoutStatus: "NOT_IMPLEMENTED / DISABLED",
+      guestCheckoutStatus: "DISABLED",
       readOk: false,
     };
   }
@@ -1783,9 +1785,6 @@ async function collectMonitoringAlertsImpl(options?: {
 
   for (const a of configAlerts) pushUnique(alerts, a);
   for (const a of recordPart.alerts) pushUnique(alerts, a);
-
-  // Silence unused guest gate read — still consulted so enablement cannot drift unnoticed.
-  void isGuestVesimCheckoutEnabled();
 
   const completeness = buildAggregationCompleteness({
     sectionErrors,

@@ -343,7 +343,8 @@ export function buildOperationsWarnings(input: OpsWarningInput): OpsWarning[] {
     warnings.push({
       code: "GUEST_CHECKOUT_DISABLED",
       severity: "info",
-      message: "Guest VeSIM checkout is NOT_IMPLEMENTED / DISABLED.",
+      message:
+        "Guest checkout is disabled (admin toggle or env kill switch). Guests must sign in.",
     });
   }
 
@@ -445,7 +446,8 @@ export type PaymentGatewayCardDefaults = {
   productionCredentials: HealthStatus;
   webhookVerification: HealthStatus;
   paymentReconciliation: HealthStatus;
-  guestCheckout: "NOT_IMPLEMENTED / DISABLED";
+  /** Overridden by Operations health with the live GuestCheckoutConfig status. */
+  guestCheckout: "DISABLED" | "ENABLED";
 };
 
 /**
@@ -477,7 +479,7 @@ export function paymentGatewayCardDefaults(
     productionCredentials: credentialsOk ? "HEALTHY" : "NOT_CONFIGURED",
     webhookVerification: paymentWebhookVerificationStatus(webhookOk),
     paymentReconciliation: reconOk ? "HEALTHY" : "NOT_CONFIGURED",
-    guestCheckout: "NOT_IMPLEMENTED / DISABLED",
+    guestCheckout: "DISABLED",
   };
 }
 
@@ -488,7 +490,7 @@ export function paymentGatewayCardUnknownFallback(): PaymentGatewayCardDefaults 
     productionCredentials: "UNKNOWN",
     webhookVerification: "UNKNOWN",
     paymentReconciliation: "UNKNOWN",
-    guestCheckout: "NOT_IMPLEMENTED / DISABLED",
+    guestCheckout: "DISABLED",
   };
 }
 

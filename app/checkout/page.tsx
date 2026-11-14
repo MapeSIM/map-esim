@@ -3,10 +3,9 @@ import { isGuestVesimCheckoutEnabled } from "@/app/lib/vesim/guestCheckoutGate";
 
 /**
  * Server entry — guest purchase authorization is evaluated only on the server.
- * Clients cannot override ENABLE_GUEST_VESIM_CHECKOUT.
+ * Clients cannot override GuestCheckoutConfig or the env kill switch.
  */
-export default function CheckoutPage() {
-  return (
-    <CheckoutClient guestCheckoutEnabled={isGuestVesimCheckoutEnabled()} />
-  );
+export default async function CheckoutPage() {
+  const guestCheckoutEnabled = await isGuestVesimCheckoutEnabled();
+  return <CheckoutClient guestCheckoutEnabled={guestCheckoutEnabled} />;
 }

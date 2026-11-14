@@ -257,16 +257,16 @@ export function OperationalControlsPanel({
           <span className="font-semibold">{overallStatus}</span>
         </p>
         <p className="mt-1 text-xs text-[var(--text-soft)]">
-          Guest checkout: {guestCheckoutStatus}. Payment gateway remains not
-          implemented. These controls cannot enable incomplete features.
+          Guest checkout (admin toggle): {guestCheckoutStatus}. Use the Guest
+          Checkout panel below to turn public /checkout on or off — these pause
+          switches do not control that feature.
         </p>
         <p
           className="mt-3 rounded-xl border border-red-600/30 bg-red-500/5 px-3 py-2 text-xs text-red-800 dark:text-red-200"
           role="note"
         >
           Financial / provider warning: pausing stops new risky initiation.
-          Confirm phrases are required. Wrong phrases are rejected. Do not use
-          these controls to unlock guest checkout or payment gateway.
+          Confirm phrases are required. Wrong phrases are rejected.
         </p>
       </div>
 

@@ -203,7 +203,7 @@ export type PaymentReadinessHealth = HealthCardMeta & {
   productionCredentials: HealthStatus;
   webhookVerification: HealthStatus;
   paymentReconciliation: HealthStatus;
-  guestCheckout: "NOT_IMPLEMENTED / DISABLED" | "DISABLED" | "ENABLED";
+  guestCheckout: "DISABLED" | "ENABLED";
 };
 
 export type SecurityReadinessHealth = HealthCardMeta & {
@@ -1100,7 +1100,7 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
     balanceSupport: "ON_DEMAND",
   };
 
-  const guestEnabled = isGuestVesimCheckoutEnabled();
+  const guestEnabled = await isGuestVesimCheckoutEnabled();
   // Crash-safe: never let payment env/parsing failures 500 the Operations page.
   const paymentDefaults = safePaymentGatewayCardDefaults(() =>
     resolvePaymentGatewayCardInputFromEnv(process.env)
@@ -1109,8 +1109,7 @@ export async function getOperationsHealthDashboard(): Promise<OperationsHealthDa
     checkedAtLabel: nowLabel(checkedAt),
     freshness: "CONFIGURATION_DERIVED",
     ...paymentDefaults,
-    // Guest checkout is not implemented — controls must never enable it.
-    guestCheckout: "NOT_IMPLEMENTED / DISABLED",
+    guestCheckout: guestEnabled ? "ENABLED" : "DISABLED",
   };
 
   const authSecretConfigured = Boolean((process.env.AUTH_SECRET ?? "").trim());

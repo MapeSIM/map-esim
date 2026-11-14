@@ -32,22 +32,17 @@ Confirmed live/production broker base URL: `https://www.vesim.world` (official V
 
 ## Production safety — guest VeSIM checkout
 
-Public guest checkout (`POST /api/vesim/checkout` and `/checkout`) can create **real** VeSIM provider credit orders when enabled.
+Public guest checkout (`POST /api/vesim/checkout` and `/checkout`) is controlled by the **Admin → Operations → Guest Checkout** toggle (`GuestCheckoutConfig.enabled` in the database, default ON).
 
-| Variable | Behavior |
+| Control | Behavior |
 |---|---|
-| `ENABLE_GUEST_VESIM_CHECKOUT=true` | Guest checkout allowed only when intentionally enabled for controlled verification |
-| Missing, `false`, or any other value | **Disabled** — API returns HTTP 503; UI hides purchase |
+| Admin Guest Checkout **ON** | Guests may use `/checkout` |
+| Admin Guest Checkout **OFF** | Guests see sign-in / register; APIs return HTTP 503 |
+| `ENABLE_GUEST_VESIM_CHECKOUT=false` | Emergency env kill switch — forces OFF regardless of admin toggle |
 
-**Keep `ENABLE_GUEST_VESIM_CHECKOUT=false` in production** until public commerce hardening is complete:
+Do not use a `NEXT_PUBLIC_*` variable to authorize guest checkout. Client requests cannot override the gate.
 
-1. Payment integration is live and approved
-2. Durable (multi-instance) checkout idempotency exists
-3. Proper rate limiting protects the public checkout endpoint
-
-This flag is **server-only**. Do not use a `NEXT_PUBLIC_*` variable to authorize provider orders. Client requests cannot override the gate.
-
-Authenticated wallet purchase and admin package-assignment flows do **not** use this flag; they use separate server paths. They still require a valid `VESIM_ENVIRONMENT` + matching `VESIM_BASE_URL`.
+Authenticated wallet purchase and admin/partner package flows do **not** use this gate; they use separate server paths. They still require a valid `VESIM_ENVIRONMENT` + matching `VESIM_BASE_URL`.
 
 ## ICCID storage (server-only)
 

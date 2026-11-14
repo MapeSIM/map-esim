@@ -1947,6 +1947,20 @@ model SafepayConfig {
   updatedAt        DateTime @updatedAt
 }
 
+/// Singleton admin config for public guest checkout (/checkout).
+/// When disabled, unauthenticated guests must sign in; account/partner buys unaffected.
+/// Never stores secrets.
+model GuestCheckoutConfig {
+  /// Fixed singleton id — always "default".
+  id               String   @id @default("default")
+  /// ENABLE_GUEST_CHECKOUT — admin ON/OFF. Default on when seeded.
+  enabled          Boolean  @default(true)
+  version          Int      @default(1)
+  updatedByAdminId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
 /// Singleton admin config for customer manual payment (JazzCash / EasyPaisa / bank).
 /// Public checkout reads only these display fields — never secrets.
 model ManualPaymentConfig {

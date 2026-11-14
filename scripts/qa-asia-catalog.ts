@@ -1,7 +1,7 @@
 /**
  * Offline QA for Asia regional retail overlay.
  * Temporary % markup and the 500 MB / 3 Days pin stay disabled.
- * Only Region Asia / Asialink / 1 GB / 7 Days is pinned to Rs 849.
+ * Pins: Asialink 1 GB / 7 Days → Rs 849; Asia Link 10 GB / 30 Days → Rs 2149.
  * Does not call VeSIM, mutate orders, or rewrite snapshots.
  */
 import assert from "node:assert/strict";
@@ -16,11 +16,15 @@ import {
   applyAsiaRetailOverride,
   applyAsiaTemporaryRetailMarkup,
   applyAsiaTemporaryRetailMarkupUsd,
+  ASIA_10GB_30DAY_RETAIL_PKR,
+  ASIA_10GB_30DAY_RETAIL_USD,
+  ASIA_1GB_7DAY_RETAIL_PKR,
   ASIA_1GB_7DAY_RETAIL_USD,
   ASIA_500MB_3DAY_RETAIL_CENTS,
   ASIA_500MB_3DAY_RETAIL_USD,
   ASIA_REGIONAL_DESTINATION_CODE,
   ASIA_TEMPORARY_RETAIL_MARKUP_PERCENT,
+  isAsia10Gb30DayAsialinkPackage,
   isAsia1Gb7DayAsialinkPackage,
   isAsia500Mb3DayPackage,
   isAsiaRegionalDestinationCode,
@@ -54,10 +58,14 @@ function main() {
   assert.equal(isAsiaTemporaryRetailMarkupActive(0), false);
   assert.equal(ASIA_500MB_3DAY_RETAIL_CENTS, 341);
   assert.equal(ASIA_500MB_3DAY_RETAIL_USD, 3.41);
+  assert.equal(ASIA_1GB_7DAY_RETAIL_PKR, 849);
   assert.equal(ASIA_1GB_7DAY_RETAIL_USD, 849 / 293);
+  assert.equal(ASIA_10GB_30DAY_RETAIL_PKR, 2149);
+  assert.equal(ASIA_10GB_30DAY_RETAIL_USD, 2149 / 293);
   assert.equal(FALLBACK_USD_RATES.PKR, 293);
   assert.equal(formatMoney(2.66, "PKR"), "Rs 779");
   assert.equal(formatMoney(ASIA_1GB_7DAY_RETAIL_USD, "PKR"), "Rs 849");
+  assert.equal(formatMoney(ASIA_10GB_30DAY_RETAIL_USD, "PKR"), "Rs 2,149");
   console.log("PASS asia_markup_constants");
 
   assert.equal(applyAsiaTemporaryRetailMarkupUsd(10), 10);
@@ -159,6 +167,18 @@ function main() {
     priceUSD: 2.66,
     providerPriceUSD: 1.9,
   });
+  const asia10gb30d = offer({
+    id: "asialink-30-days-10gb",
+    offerId: "asialink-30-days-10gb",
+    country: "region-asia",
+    name: "Asia Link (10 GB - Valid for 30 days)",
+    network: "Asia Link",
+    dataFormatted: "10 GB",
+    dataGB: 10,
+    durationDays: 30,
+    priceUSD: 9.99,
+    providerPriceUSD: 6.5,
+  });
   const asia502mb1d = offer({
     id: "SEA-0.49GB",
     country: "region-asia",
@@ -198,6 +218,10 @@ function main() {
   assert.equal(isAsia1Gb7DayAsialinkPackage(asia500), false);
   assert.equal(isAsia1Gb7DayAsialinkPackage(asiaUnlimited3d), false);
   assert.equal(isAsia1Gb7DayAsialinkPackage(europe), false);
+  assert.equal(isAsia10Gb30DayAsialinkPackage(asia10gb30d), true);
+  assert.equal(isAsia10Gb30DayAsialinkPackage(asia1gb7d), false);
+  assert.equal(isAsia10Gb30DayAsialinkPackage(asiaUnlimited3d), false);
+  assert.equal(isAsia10Gb30DayAsialinkPackage(europe), false);
 
   const marked500 = applyAsiaCustomerRetailPrice(asia500, "region-asia");
   assert.equal(marked500.priceUSD, 2.7);
@@ -237,9 +261,31 @@ function main() {
   );
   console.log("PASS asia_1gb_7d_asialink_pinned_rs849");
 
+  const pinned10gb30d = applyAsiaCustomerRetailPrice(asia10gb30d, "region-asia");
+  assert.equal(pinned10gb30d.priceUSD, ASIA_10GB_30DAY_RETAIL_USD);
+  assert.equal(pinned10gb30d.price, ASIA_10GB_30DAY_RETAIL_USD);
+  assert.equal(pinned10gb30d.displayPrice, ASIA_10GB_30DAY_RETAIL_USD);
+  assert.equal(pinned10gb30d.providerPriceUSD, 6.5);
+  assert.equal(asia10gb30d.priceUSD, 9.99);
+  assert.equal(formatMoney(pinned10gb30d.priceUSD, "PKR"), "Rs 2,149");
+  assert.equal(
+    formatMoney(pinned10gb30d.priceUSD, "USD"),
+    formatMoney(ASIA_10GB_30DAY_RETAIL_USD, "USD")
+  );
+  assert.equal(
+    applyAsiaRetailOverride(asia10gb30d, "region-asia").priceUSD,
+    pinned10gb30d.priceUSD
+  );
+  assert.equal(
+    applyAsiaPublicCatalog("region-asia", [asia10gb30d])[0].priceUSD,
+    pinned10gb30d.priceUSD
+  );
+  console.log("PASS asia_10gb_30d_asialink_pinned_rs2149");
+
   const catalogMix = applyAsiaPublicCatalog("region-asia", [
     asia500,
     asia1gb7d,
+    asia10gb30d,
     asia502mb1d,
     asiaUnlimited3d,
     standard,
@@ -249,9 +295,12 @@ function main() {
   assert.equal(catalogMix[1].priceUSD, ASIA_1GB_7DAY_RETAIL_USD);
   assert.equal(catalogMix[1].providerPriceUSD, 1.9);
   assert.equal(formatMoney(catalogMix[1].priceUSD, "PKR"), "Rs 849");
-  assert.equal(catalogMix[2].priceUSD, 1.62);
-  assert.equal(catalogMix[3].priceUSD, 6.6);
-  assert.equal(catalogMix[4].priceUSD, 4.83);
+  assert.equal(catalogMix[2].priceUSD, ASIA_10GB_30DAY_RETAIL_USD);
+  assert.equal(catalogMix[2].providerPriceUSD, 6.5);
+  assert.equal(formatMoney(catalogMix[2].priceUSD, "PKR"), "Rs 2,149");
+  assert.equal(catalogMix[3].priceUSD, 1.62);
+  assert.equal(catalogMix[4].priceUSD, 6.6);
+  assert.equal(catalogMix[5].priceUSD, 4.83);
   assert.equal(
     applyAsiaCustomerRetailPrice(asia500, "region-asia").priceUSD,
     catalogMix[0].priceUSD
@@ -263,6 +312,10 @@ function main() {
   assert.equal(
     applyAsiaCustomerRetailPrice(asia1gb7d, "region-asia").priceUSD,
     catalogMix[1].priceUSD
+  );
+  assert.equal(
+    applyAsiaCustomerRetailPrice(asia10gb30d, "region-asia").priceUSD,
+    catalogMix[2].priceUSD
   );
   console.log("PASS asia_catalog_other_plans_unchanged");
 
@@ -283,7 +336,9 @@ function main() {
 
   assert.match(policy, /ASIA_TEMPORARY_RETAIL_MARKUP_PERCENT = 0/);
   assert.match(policy, /ASIA_500MB_3DAY_RETAIL_CENTS = 341/);
-  assert.match(policy, /ASIA_1GB_7DAY_RETAIL_USD = 849 \/ 293/);
+  assert.match(policy, /ASIA_1GB_7DAY_RETAIL_PKR = 849/);
+  assert.match(policy, /ASIA_10GB_30DAY_RETAIL_PKR = 2149/);
+  assert.match(policy, /ASIA_10GB_30DAY_RETAIL_USD/);
   assert.match(policy, /Does not mutate provider cost/);
   assert.match(server, /applyAsiaPublicCatalog/);
   assert.match(server, /applyAsiaCustomerRetailPrice/);

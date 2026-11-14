@@ -605,7 +605,7 @@ async function main() {
         `balanceSupport=${dashboard.provider.balanceSupport}`
       );
 
-      // Payment / guest — guest remains NOT_IMPLEMENTED / DISABLED (controls cannot enable it).
+      // Payment / guest — guest status comes from GuestCheckoutConfig (admin toggle).
       // Integration / credentials / webhook are env-derived (Simpaisa-focused).
       assert.ok(
         [
@@ -632,19 +632,23 @@ async function main() {
           dashboard.payment.paymentReconciliation
         )
       );
-      const guestEnabled = isGuestVesimCheckoutEnabled();
+      const guestEnabled = await isGuestVesimCheckoutEnabled();
+      assert.ok(
+        dashboard.payment.guestCheckout === "ENABLED" ||
+          dashboard.payment.guestCheckout === "DISABLED"
+      );
       assert.equal(
         dashboard.payment.guestCheckout,
-        "NOT_IMPLEMENTED / DISABLED"
+        guestEnabled ? "ENABLED" : "DISABLED"
       );
       assert.equal(
         dashboard.security.guestCheckoutEnabled,
         guestEnabled ? "yes" : "no"
       );
       assert.ok(dashboard.operationalControls);
-      assert.equal(
-        dashboard.operationalControls.guestCheckoutStatus,
-        "NOT_IMPLEMENTED / DISABLED"
+      assert.ok(
+        dashboard.operationalControls.guestCheckoutStatus === "ENABLED" ||
+          dashboard.operationalControls.guestCheckoutStatus === "DISABLED"
       );
       assert.equal(dashboard.operationalControls.controls.length, 8);
       record(

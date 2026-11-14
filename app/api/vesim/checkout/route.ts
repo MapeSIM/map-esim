@@ -28,7 +28,7 @@ import {
 
 export async function POST(req: NextRequest) {
   // Fail closed before any VeSIM auth, offer verification, or order creation.
-  if (!isGuestVesimCheckoutEnabled()) {
+  if (!(await isGuestVesimCheckoutEnabled())) {
     return NextResponse.json(
       {
         success: false,

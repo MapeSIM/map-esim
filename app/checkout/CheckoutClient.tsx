@@ -38,15 +38,29 @@ function CheckoutUnavailable() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-[var(--page-bg)] px-4 text-[var(--heading)] sm:px-6">
       <h1 className="text-center text-2xl font-bold sm:text-4xl">
-        Checkout unavailable
+        Sign in to checkout
       </h1>
       <p className="mt-3 max-w-md text-center text-sm text-[var(--text-muted)] sm:text-base">
-        Online checkout is temporarily unavailable. Please contact support for
-        assistance.
+        Guest checkout is currently unavailable. Please sign in or create an
+        account to buy an eSIM from your account.
       </p>
+      <div className="mt-8 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:flex-row">
+        <Link
+          href="/signin?callbackUrl=%2Faccount%2Fesim%2Fbuy"
+          className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-6 text-sm font-bold text-[var(--accent-ink)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+        >
+          Sign in
+        </Link>
+        <Link
+          href="/signup?callbackUrl=%2Faccount%2Fesim%2Fbuy"
+          className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-6 text-sm font-bold text-[var(--heading)] transition hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+        >
+          Create account
+        </Link>
+      </div>
       <Link
         href="/contact"
-        className="mt-8 inline-flex min-h-12 w-full max-w-sm items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-6 text-sm font-bold text-[var(--accent-ink)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 sm:w-auto"
+        className="mt-6 text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
       >
         Contact support
       </Link>
@@ -72,8 +86,10 @@ function CheckoutContent() {
   const [unavailable, setUnavailable] = useState(false);
   const [message, setMessage] = useState("");
 
-  // Manual Payment States
-  const [paymentMethod, setPaymentMethod] = useState<"safepay" | "manual">("safepay");
+  // Manual Payment States — guest card (Safepay) requires account checkout.
+  const [paymentMethod, setPaymentMethod] = useState<"safepay" | "manual">(
+    "manual"
+  );
   const [manualSettings, setManualSettings] = useState<ManualSettings | null>(null);
   const [senderName, setSenderName] = useState("");
   const [proofFile, setProofFile] = useState<File | null>(null);
@@ -175,7 +191,7 @@ function CheckoutContent() {
       return;
     }
 
-    if (paymentMethod === "manual") {
+    if (paymentMethod === "manual" && manualSettings?.enabled) {
       if (!senderName.trim()) {
         setMessage("Please enter the account/sender name used for payment");
         return;
@@ -191,7 +207,7 @@ function CheckoutContent() {
     submitLockRef.current = true;
 
     try {
-      if (paymentMethod === "manual") {
+      if (paymentMethod === "manual" && manualSettings?.enabled) {
         if (!proofFile) {
           throw new Error("Please upload your payment screenshot");
         }
@@ -241,40 +257,12 @@ function CheckoutContent() {
         return;
       }
 
-      // Safepay Flow
-      const response = await fetch("/api/payments/safepay/init", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          offerId: offer.offerId,
-          customerEmail: cleanEmail,
-          country: offer.countryCode || countryHint || undefined,
-          idempotencyKey: idempotencyKeyRef.current,
-        }),
-      });
-
-      const data: CheckoutResponse = await response.json();
-
-      if (response.ok && data.success && data.paymentUrl) {
-        window.location.href = data.paymentUrl;
-        return;
-      }
-
-      if (response.status === 503) {
-        setMessage(
-          data.error ||
-            "Online checkout is temporarily unavailable. Please contact support for assistance."
-        );
-        return;
-      }
-
-      setMessage(data.error || data.message || "Payment initialization failed");
-      idempotencyKeyRef.current =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : `checkout-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      // Guest Safepay is not supported — durable attempts + authoritative
+      // amounts require signed-in account checkout.
+      setMessage(
+        "Card payment requires a signed-in account. Please sign in and buy this plan from your account, or use manual payment below."
+      );
+      return;
     } catch (err: any) {
       setMessage(err.message || "Unable to process the order");
       idempotencyKeyRef.current =
@@ -373,14 +361,19 @@ function CheckoutContent() {
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod("safepay")}
+                    onClick={() => {
+                      setPaymentMethod("safepay");
+                      setMessage(
+                        "Card payment requires a signed-in account. Please sign in from your account checkout, or choose Manual payment."
+                      );
+                    }}
                     className={`p-3 rounded-xl border text-sm font-semibold transition ${
                       paymentMethod === "safepay"
                         ? "border-[var(--accent-strong)] bg-[var(--accent-strong)]/10 text-[var(--heading)]"
                         : "border-[var(--border)] text-[var(--text-muted)]"
                     }`}
                   >
-                    Online Payment (Safepay)
+                    Online Payment (Sign in)
                   </button>
                   <button
                     type="button"

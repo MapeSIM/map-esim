@@ -1,4 +1,5 @@
 import { SafepayConfigPanel } from "@/app/components/admin/SafepayConfigPanel";
+import { GuestCheckoutConfigPanel } from "@/app/components/admin/GuestCheckoutConfigPanel";
 import { Suspense, cache, type ReactNode } from "react";
 import {
   getOperationsHealthDashboard,
@@ -26,11 +27,13 @@ import {
 import { isSafeAdminHref } from "@/app/lib/admin/monitoringAlertShared";
 import { getAdminWhatsAppSupportView } from "@/app/lib/support/whatsappSupport";
 import { getAdminSimpaisaWalletOperatorView } from "@/app/lib/payments/simpaisaWalletOperatorConfig";
+import { prisma as db } from "@/app/lib/db";
 import {
   AdminButton,
   AdminKpiCard,
   AdminStatusPill,
 } from "@/app/components/admin/ui";
+import { prisma } from "@/app/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -359,12 +362,23 @@ function OperationsDeferredView({
   data,
   whatsappSupport,
   simpaisaWalletOperators,
+  safepayConfig,
+  guestCheckoutConfig,
 }: {
   data: OperationsHealthDashboard;
   whatsappSupport: Awaited<ReturnType<typeof getAdminWhatsAppSupportView>>;
   simpaisaWalletOperators: Awaited<
     ReturnType<typeof getAdminSimpaisaWalletOperatorView>
   >;
+  safepayConfig: {
+    enabled: boolean;
+    updatedAt: string | null;
+    updatedByEmail: string | null;
+  };
+  guestCheckoutConfig: {
+    enabled: boolean;
+    updatedAt: string | null;
+  };
 }) {
   const app = data.applicationDatabase;
   const recon = data.reconciliation;
@@ -386,7 +400,9 @@ function OperationsDeferredView({
 
       <SimpaisaWalletOperatorsPanel initial={simpaisaWalletOperators} />
 
-      <SafepayConfigPanel initial={{ enabled: true, updatedAt: null, updatedByEmail: null }} />
+      <SafepayConfigPanel initial={safepayConfig} />
+
+      <GuestCheckoutConfigPanel initial={guestCheckoutConfig} />
 
       <ManualPaymentConfigPanel />
 
@@ -689,16 +705,43 @@ async function OperationsDeferredSection() {
   let simpaisaWalletOperators: Awaited<
     ReturnType<typeof getAdminSimpaisaWalletOperatorView>
   > | null = null;
+  let safepayConfig: {
+    enabled: boolean;
+    updatedAt: string | null;
+    updatedByEmail: string | null;
+  } = { enabled: false, updatedAt: null, updatedByEmail: null };
+  let guestCheckoutConfig: {
+    enabled: boolean;
+    updatedAt: string | null;
+  } = { enabled: true, updatedAt: null };
   let failed = false;
   try {
-    const [health, whatsapp, operators] = await Promise.all([
-      loadOpsHealth(),
-      getAdminWhatsAppSupportView(),
-      getAdminSimpaisaWalletOperatorView(),
-    ]);
+    const [health, whatsapp, operators, safepayRow, guestRow] =
+      await Promise.all([
+        loadOpsHealth(),
+        getAdminWhatsAppSupportView(),
+        getAdminSimpaisaWalletOperatorView(),
+        prisma.safepayConfig.findUnique({
+          where: { id: "default" },
+          select: { enabled: true, updatedAt: true },
+        }),
+        prisma.guestCheckoutConfig.findUnique({
+          where: { id: "default" },
+          select: { enabled: true, updatedAt: true },
+        }),
+      ]);
     data = health;
     whatsappSupport = whatsapp;
     simpaisaWalletOperators = operators;
+    safepayConfig = {
+      enabled: safepayRow?.enabled ?? false,
+      updatedAt: safepayRow?.updatedAt?.toISOString() ?? null,
+      updatedByEmail: null,
+    };
+    guestCheckoutConfig = {
+      enabled: guestRow ? guestRow.enabled === true : true,
+      updatedAt: guestRow?.updatedAt?.toISOString() ?? null,
+    };
   } catch {
     failed = true;
   }
@@ -709,6 +752,8 @@ async function OperationsDeferredSection() {
         data={data}
         whatsappSupport={whatsappSupport}
         simpaisaWalletOperators={simpaisaWalletOperators}
+        safepayConfig={safepayConfig}
+        guestCheckoutConfig={guestCheckoutConfig}
       />
     );
   }

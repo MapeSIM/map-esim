@@ -168,7 +168,10 @@ async function main() {
       const snap = await getOperationalControlsHealthSnapshot();
       assert.equal(snap.readOk, true);
       assert.equal(snap.controls.length, 8);
-      assert.equal(snap.guestCheckoutStatus, "NOT_IMPLEMENTED / DISABLED");
+      assert.ok(
+        snap.guestCheckoutStatus === "ENABLED" ||
+          snap.guestCheckoutStatus === "DISABLED"
+      );
       assert.equal(snap.overallTransactionsStatus, "ACTIVE");
       record(
         "active admin loads controls",
@@ -305,13 +308,13 @@ async function main() {
       );
       assert.match(
         JSON.stringify(dash),
-        /NOT_IMPLEMENTED \/ DISABLED/
+        /"guestCheckoutStatus":"(ENABLED|DISABLED)"/
       );
       assert.doesNotMatch(JSON.stringify(dash), /DATABASE_URL|access_token/);
       record(
         "warning display + sanitized health",
         "PASS",
-        "paused warning present; guest NOT_IMPLEMENTED / DISABLED; no secrets in dashboard JSON"
+        "paused warning present; guest checkout status present; no secrets in dashboard JSON"
       );
       await setOperationalControlPaused({
         adminUserId: admin.id,
@@ -635,20 +638,19 @@ async function main() {
       );
     }
 
-    // Guest remains disabled (static + snapshot)
+    // Guest checkout is a dedicated admin toggle (not an operational pause switch)
     try {
       const page = read("app/admin/operations/page.tsx");
-      assert.match(page, /NOT_IMPLEMENTED \/ DISABLED/);
+      assert.match(page, /GuestCheckoutConfigPanel/);
       assert.match(page, /OperationalControlsPanel/);
-      assert.doesNotMatch(page, /enable guest checkout/i);
       record(
-        "guest checkout remains disabled",
+        "guest checkout admin toggle present",
         "PASS",
-        "page shows NOT_IMPLEMENTED / DISABLED; no enable toggle"
+        "page wires GuestCheckoutConfigPanel separately from pause controls"
       );
     } catch (e) {
       record(
-        "guest checkout remains disabled",
+        "guest checkout admin toggle present",
         "FAIL",
         e instanceof Error ? e.message : String(e)
       );

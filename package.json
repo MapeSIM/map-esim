@@ -106,6 +106,8 @@
     "qa:vesim-refund-review-email": "tsx scripts/qa-vesim-refund-review-email.ts",
     "qa:customer-refund-execution": "tsx scripts/qa-customer-refund-execution.ts",
     "qa:guest-checkout-gate": "tsx scripts/qa-guest-checkout-gate.ts",
+    "qa:pwa-manifest": "tsx scripts/qa-pwa-manifest.ts",
+    "qa:destination-currency": "tsx scripts/qa-destination-currency.ts",
     "qa:vesim-environment": "tsx scripts/qa-vesim-environment.ts",
     "qa:vesim-broker-auth": "tsx -r ./scripts/smoke-stubs/register.cjs scripts/qa-vesim-broker-auth.ts",
     "qa:admin-esim-usage": "tsx scripts/qa-admin-esim-usage.ts",

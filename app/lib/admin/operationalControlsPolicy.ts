@@ -163,7 +163,7 @@ export type OperationalControlsHealthSnapshot = {
     | "UNKNOWN";
   controls: SanitizedOperationalControlView[];
   pausedControlKeys: OperationalControlKeyName[];
-  guestCheckoutStatus: "NOT_IMPLEMENTED / DISABLED";
+  guestCheckoutStatus: "ENABLED" | "DISABLED";
   readOk: boolean;
 };
 
@@ -207,24 +207,38 @@ export const getOperationalControlsHealthSnapshot = cache(
   async (): Promise<OperationalControlsHealthSnapshot> => {
   const checkedAt = new Date();
   const checkedAtLabel = formatUtcTimestamp(checkedAt);
-  const guestCheckoutStatus = "NOT_IMPLEMENTED / DISABLED" as const;
 
   try {
-    const rows = await prisma.operationalControl.findMany({
-      where: {
-        key: {
-          in: [...OPERATIONAL_CONTROL_KEYS] as OperationalControlKey[],
+    const [rows, guestRow] = await Promise.all([
+      prisma.operationalControl.findMany({
+        where: {
+          key: {
+            in: [...OPERATIONAL_CONTROL_KEYS] as OperationalControlKey[],
+          },
         },
-      },
-      select: {
-        key: true,
-        paused: true,
-        version: true,
-        reason: true,
-        updatedByAdminId: true,
-        updatedAt: true,
-      },
-    });
+        select: {
+          key: true,
+          paused: true,
+          version: true,
+          reason: true,
+          updatedByAdminId: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.guestCheckoutConfig.findUnique({
+        where: { id: "default" },
+        select: { enabled: true },
+      }),
+    ]);
+    const guestCheckoutStatus: "ENABLED" | "DISABLED" =
+      process.env.ENABLE_GUEST_VESIM_CHECKOUT === "false"
+        ? "DISABLED"
+        : guestRow
+          ? guestRow.enabled
+            ? "ENABLED"
+            : "DISABLED"
+          : "ENABLED";
+
     const byKey = new Map(
       rows.map((r) => [r.key as OperationalControlKeyName, r])
     );
@@ -258,7 +272,7 @@ export const getOperationalControlsHealthSnapshot = cache(
       overallTransactionsStatus: "UNKNOWN",
       controls: OPERATIONAL_CONTROL_KEYS.map((key) => viewForKey(key, null)),
       pausedControlKeys: [],
-      guestCheckoutStatus,
+      guestCheckoutStatus: "DISABLED",
       readOk: false,
     };
   }

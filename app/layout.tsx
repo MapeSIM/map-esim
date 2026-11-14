@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import NavbarShell from "./components/NavbarShell";
@@ -16,6 +17,7 @@ import {
   DEFAULT_THEME,
   themePreferenceToHtmlClass,
 } from "@/app/lib/cookies/preferenceCookies";
+import { PWA_THEME_COLOR } from "@/app/lib/pwa/pwaIconResponse";
 import {
   organizationNode,
   websiteNode,
@@ -37,6 +39,18 @@ export const metadata: Metadata = {
   ...(googleSiteVerification
     ? { verification: { google: googleSiteVerification } }
     : {}),
+  appleWebApp: {
+    capable: true,
+    title: BRAND_NAME,
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/apple-icon", sizes: "180x180", type: "image/png" }],
+  },
   openGraph: {
     title: BRAND_NAME,
     description: BRAND_TAGLINE,
@@ -50,12 +64,20 @@ export const metadata: Metadata = {
     description: BRAND_TAGLINE,
     images: twitterImages,
   },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f4f7fb" },
+    { media: "(prefers-color-scheme: dark)", color: PWA_THEME_COLOR },
+  ],
+  colorScheme: "dark light",
 };
 
 export default function RootLayout({
@@ -79,19 +101,21 @@ export default function RootLayout({
         >
           <ThemeProvider>
             <PreferenceStorageSync />
-            <CurrencyProvider>
-              <ShellAuthProvider>
-                <HideOnShare>
-                  <JsonLd data={siteGraph} />
-                  <NavbarShell />
-                </HideOnShare>
-                {children}
-                <HideOnShare>
-                  <Footer />
-                  <DeferredWhatsAppSupportButton />
-                </HideOnShare>
-              </ShellAuthProvider>
-            </CurrencyProvider>
+            <Suspense fallback={null}>
+              <CurrencyProvider>
+                <ShellAuthProvider>
+                  <HideOnShare>
+                    <JsonLd data={siteGraph} />
+                    <NavbarShell />
+                  </HideOnShare>
+                  {children}
+                  <HideOnShare>
+                    <Footer />
+                    <DeferredWhatsAppSupportButton />
+                  </HideOnShare>
+                </ShellAuthProvider>
+              </CurrencyProvider>
+            </Suspense>
           </ThemeProvider>
         </CookieConsentProvider>
         <SpeedInsights />

@@ -321,17 +321,14 @@ function main() {
   console.log("PASS purchase_assignment_integration");
 
   // --- Enablement safety ---
-  assert.match(guestGate, /ENABLE_GUEST_VESIM_CHECKOUT/);
+  // Guest checkout ON/OFF is a dedicated Admin panel (GuestCheckoutConfig), not
+  // these operational pause switches.
+  assert.match(guestGate, /guestCheckoutConfig/);
   assert.doesNotMatch(mut, /ENABLE_GUEST|guest checkout.*enable/i);
-  assert.doesNotMatch(panel, /enable guest|payment gateway.*enable/i);
-  assert.match(panel, /cannot enable incomplete features/i);
+  assert.match(panel, /Guest[\s\S]*Checkout panel below/i);
   assert.match(page, /guestCheckoutStatus/);
-  assert.match(healthShared, /NOT_IMPLEMENTED \/ DISABLED/);
-  assert.equal(
-    paymentGatewayCardDefaults().guestCheckout,
-    "NOT_IMPLEMENTED / DISABLED"
-  );
-  assert.match(health, /guestCheckout: "NOT_IMPLEMENTED \/ DISABLED"/);
+  assert.equal(paymentGatewayCardDefaults().guestCheckout, "DISABLED");
+  assert.match(health, /guestCheckout:/);
   console.log("PASS enablement_safety");
 
   // --- Dashboard / UI ---

@@ -149,7 +149,7 @@ function main() {
   assert.equal(payOff.productionCredentials, "NOT_CONFIGURED");
   assert.equal(payOff.webhookVerification, "NOT_CONFIGURED");
   assert.equal(payOff.paymentReconciliation, "NOT_CONFIGURED");
-  assert.equal(payOff.guestCheckout, "NOT_IMPLEMENTED / DISABLED");
+  assert.equal(payOff.guestCheckout, "DISABLED");
   const payOn = paymentGatewayCardDefaults({
     gatewayEnabled: true,
     provider: "SIMPAISA",
@@ -170,9 +170,9 @@ function main() {
   assert.equal(payCrash.productionCredentials, "UNKNOWN");
   assert.equal(payCrash.webhookVerification, "UNKNOWN");
   assert.equal(payCrash.paymentReconciliation, "UNKNOWN");
-  assert.equal(payCrash.guestCheckout, "NOT_IMPLEMENTED / DISABLED");
+  assert.equal(payCrash.guestCheckout, "DISABLED");
   assert.match(page, /payment\.integrationStatus/);
-  assert.match(shared, /NOT_IMPLEMENTED \/ DISABLED/);
+  assert.match(shared, /guestCheckout:\s*"DISABLED"/);
   assert.match(shared, /safePaymentGatewayCardDefaults/);
   assert.match(service, /safePaymentGatewayCardDefaults/);
   assert.match(service, /isGuestVesimCheckoutEnabled/);

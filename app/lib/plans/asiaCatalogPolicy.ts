@@ -1,10 +1,13 @@
 /**
  * Asia regional storefront overlay (pure, no I/O).
  * Temporary % markup and the 500 MB / 3 Days retail pin stay disabled.
- * Only the Asialink 1 GB / 7 Days customer retail pin is applied.
+ * Customer retail pins:
+ * - Asialink 1 GB / 7 Days → PKR 849
+ * - Asia Link 10 GB / 30 Days → PKR 2149
  * Does not mutate provider cost, base retail bands, orders, or snapshots at source.
  */
 
+import { FALLBACK_USD_RATES } from "@/app/lib/currency/currencies";
 import { roundUpToNextCent } from "@/app/lib/pricing/retailPrice";
 import {
   formatOfferPrice,
@@ -16,6 +19,9 @@ export const ASIA_TEMPORARY_RETAIL_MARKUP_PERCENT = 0;
 
 export const ASIA_REGIONAL_DESTINATION_CODE = "region-asia";
 
+/** Fixed MAP retail PKR↔USD display rate (same as currency engine). */
+const ASIA_PKR_USD_RATE = FALLBACK_USD_RATES.PKR;
+
 /**
  * Former Asia 500 MB / 3 Days pin. Not applied — that SKU uses default MAP retail.
  */
@@ -26,7 +32,17 @@ export const ASIA_500MB_3DAY_RETAIL_USD = ASIA_500MB_3DAY_RETAIL_CENTS / 100;
  * Customer MAP retail for Region Asia / Asialink / 1 GB / 7 Days.
  * 849 PKR at the fixed 293 PKR/USD display rate. Provider cost is unchanged.
  */
-export const ASIA_1GB_7DAY_RETAIL_USD = 849 / 293;
+export const ASIA_1GB_7DAY_RETAIL_PKR = 849;
+export const ASIA_1GB_7DAY_RETAIL_USD =
+  ASIA_1GB_7DAY_RETAIL_PKR / ASIA_PKR_USD_RATE;
+
+/**
+ * Customer MAP retail for Region Asia / Asia Link / 10 GB / 30 Days.
+ * 2149 PKR at the fixed 293 PKR/USD display rate. Provider cost is unchanged.
+ */
+export const ASIA_10GB_30DAY_RETAIL_PKR = 2149;
+export const ASIA_10GB_30DAY_RETAIL_USD =
+  ASIA_10GB_30DAY_RETAIL_PKR / ASIA_PKR_USD_RATE;
 
 function trimmed(value: string | null | undefined): string {
   return (value ?? "").trim();
@@ -103,7 +119,18 @@ function isAsialinkOffer(offer: VesimOffer): boolean {
     offer.network,
     ...(Array.isArray(offer.networks) ? offer.networks : []),
   ];
-  return parts.some((value) => /asialink/i.test(trimmed(value)));
+  // "Asialink" and "Asia Link" both count.
+  return parts.some((value) => /asia\s*link/i.test(trimmed(value)));
+}
+
+function isTenGbPackage(offer: VesimOffer): boolean {
+  if (offer.dataUnlimited === true) return false;
+  if (offer.dataGB === 10) return true;
+  if (typeof offer.dataGB === "number" && Number.isFinite(offer.dataGB)) {
+    return false;
+  }
+  if (offer.dataMB === 10240) return true;
+  return /^10(?:\.0+)?\s*GB$/i.test(trimmed(offer.dataFormatted));
 }
 
 export function isAsia1Gb7DayAsialinkPackage(offer: VesimOffer): boolean {
@@ -112,6 +139,20 @@ export function isAsia1Gb7DayAsialinkPackage(offer: VesimOffer): boolean {
     isOneGbPackage(offer) &&
     asiaOfferDurationDays(offer) === 7
   );
+}
+
+export function isAsia10Gb30DayAsialinkPackage(offer: VesimOffer): boolean {
+  return (
+    isAsialinkOffer(offer) &&
+    isTenGbPackage(offer) &&
+    asiaOfferDurationDays(offer) === 30
+  );
+}
+
+function resolveAsiaPinnedRetailUsd(offer: VesimOffer): number | null {
+  if (isAsia1Gb7DayAsialinkPackage(offer)) return ASIA_1GB_7DAY_RETAIL_USD;
+  if (isAsia10Gb30DayAsialinkPackage(offer)) return ASIA_10GB_30DAY_RETAIL_USD;
+  return null;
 }
 
 function resolveRetailUsd(offer: VesimOffer): number | null {
@@ -158,7 +199,7 @@ export function applyAsiaTemporaryRetailMarkup(
 }
 
 /**
- * Pin customer retail for Region Asia / Asialink / 1 GB / 7 Days only.
+ * Pin customer retail for Asia Link SKUs with fixed PKR targets.
  * Other Asia SKUs and non-Asia destinations keep default MAP retail.
  * Provider cost (`providerPriceUSD`) is preserved unchanged.
  */
@@ -172,21 +213,22 @@ export function applyAsiaRetailOverride(
   ) {
     return offer;
   }
-  if (!isAsia1Gb7DayAsialinkPackage(offer)) return offer;
+  const pinnedUsd = resolveAsiaPinnedRetailUsd(offer);
+  if (pinnedUsd == null) return offer;
 
   const currency = trimmed(offer.currency) || "USD";
   return {
     ...offer,
-    priceUSD: ASIA_1GB_7DAY_RETAIL_USD,
-    price: ASIA_1GB_7DAY_RETAIL_USD,
-    displayPrice: ASIA_1GB_7DAY_RETAIL_USD,
-    priceFormatted: formatOfferPrice(ASIA_1GB_7DAY_RETAIL_USD, currency),
+    priceUSD: pinnedUsd,
+    price: pinnedUsd,
+    displayPrice: pinnedUsd,
+    priceFormatted: formatOfferPrice(pinnedUsd, currency),
   };
 }
 
 /**
  * Customer storefront Asia retail. Same function is used for catalog and checkout.
- * Applies only the Asialink 1 GB / 7 Days pin; % markup stays disabled.
+ * Applies Asia Link retail pins; % markup stays disabled.
  */
 export function applyAsiaCustomerRetailPrice(
   offer: VesimOffer,
@@ -200,7 +242,7 @@ export function applyAsiaCustomerRetailPrice(
 
 /**
  * Customer storefront Asia regional catalog overlay.
- * Only the Asialink 1 GB / 7 Days SKU is pinned; other plans keep default MAP retail.
+ * Asia Link pinned SKUs only; other plans keep default MAP retail.
  */
 export function applyAsiaPublicCatalog(
   destination: string,

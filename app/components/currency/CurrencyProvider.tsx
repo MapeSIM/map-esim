@@ -10,7 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useCookieConsent } from "@/app/components/cookies/CookieConsentProvider";
 import { readBrowserCookie } from "@/app/lib/cookies/browserCookie";
 import {
@@ -19,6 +19,7 @@ import {
   type CurrencyCode,
 } from "@/app/lib/currency/currencies";
 import { pathnameNeedsLiveCurrencyRates } from "@/app/lib/currency/currencyRatesScope";
+import { resolveAutoDisplayCurrency } from "@/app/lib/currency/destinationCurrency";
 import { formatMoney, type CurrencyRates } from "@/app/lib/currency/format";
 import { setCurrencyPreferenceAction } from "@/app/lib/cookies/preferenceActions";
 import {
@@ -40,6 +41,12 @@ type CurrencyContextValue = {
 
 const CurrencyContext = createContext<CurrencyContextValue | null>(null);
 
+function readManualCurrencyPreference(): CurrencyCode | null {
+  return parseCurrencyPreferenceCookie(
+    readBrowserCookie(CURRENCY_PREFERENCE_COOKIE)
+  );
+}
+
 export function CurrencyProvider({
   children,
   initialCurrency = DEFAULT_CURRENCY,
@@ -49,6 +56,12 @@ export function CurrencyProvider({
   initialCurrency?: CurrencyCode;
 }) {
   const pathname = usePathname() || "/";
+  const searchParams = useSearchParams();
+  const countryQuery =
+    searchParams?.get("country") ??
+    searchParams?.get("destination") ??
+    null;
+
   const { canLoad } = useCookieConsent();
   const persistPreferences = canLoad("preferences");
   const previousPersist = useRef<boolean | null>(null);
@@ -57,26 +70,47 @@ export function CurrencyProvider({
     useState<CurrencyCode>(initialCurrency);
   const [rates, setRates] = useState<CurrencyRates>(FALLBACK_USD_RATES);
   const currencyRef = useRef(currency);
-  const hydratedPreference = useRef(false);
+  /** True after an explicit header selection (preference cookie written/read). */
+  const manualOverrideRef = useRef(false);
+  const softHydratedRef = useRef(false);
   const liveRatesLoadedRef = useRef(false);
 
   useEffect(() => {
     currencyRef.current = currency;
   }, [currency]);
 
-  // Cacheable public shell cannot read preference cookies on the server.
+  const applyAutoCurrency = useCallback(() => {
+    if (manualOverrideRef.current) return;
+    const next = resolveAutoDisplayCurrency({
+      pathname,
+      countryQuery,
+    });
+    setCurrencyState((prev) => (prev === next ? prev : next));
+  }, [pathname, countryQuery]);
+
+  // Preference cookie = manual override. Soft destination default otherwise.
   useEffect(() => {
-    if (!persistPreferences || hydratedPreference.current) return;
-    hydratedPreference.current = true;
-    const stored = parseCurrencyPreferenceCookie(
-      readBrowserCookie(CURRENCY_PREFERENCE_COOKIE)
-    );
-    if (stored) {
-      // Intentional: client-only preference cookie rehydrate after cacheable SSR.
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser cookie sync
-      setCurrencyState(stored);
+    if (persistPreferences) {
+      const stored = readManualCurrencyPreference();
+      if (stored) {
+        manualOverrideRef.current = true;
+        // Intentional: client-only preference cookie rehydrate after cacheable SSR.
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- browser cookie sync
+        setCurrencyState(stored);
+        softHydratedRef.current = true;
+        return;
+      }
     }
-  }, [persistPreferences]);
+
+    softHydratedRef.current = true;
+    applyAutoCurrency();
+  }, [persistPreferences, applyAutoCurrency]);
+
+  // Destination-based soft default when the user has not manually chosen.
+  useEffect(() => {
+    if (!softHydratedRef.current) return;
+    applyAutoCurrency();
+  }, [applyAutoCurrency]);
 
   // Live FX only on routes that display converted prices; elsewhere keep fallbacks.
   useEffect(() => {
@@ -120,20 +154,37 @@ export function CurrencyProvider({
     }
 
     if (prev && !persistPreferences) {
-      setCurrencyState(DEFAULT_CURRENCY);
+      manualOverrideRef.current = false;
+      setCurrencyState(
+        resolveAutoDisplayCurrency({ pathname, countryQuery })
+      );
     } else if (!prev && persistPreferences) {
-      void setCurrencyPreferenceAction(currencyRef.current);
+      // Persist only an explicit manual choice — never lock in auto-PKR.
+      if (manualOverrideRef.current) {
+        void setCurrencyPreferenceAction(currencyRef.current);
+      }
     }
 
     previousPersist.current = persistPreferences;
-  }, [persistPreferences]);
+  }, [persistPreferences, pathname, countryQuery]);
 
   useEffect(() => {
     const onReset = () => {
-      setCurrencyState(DEFAULT_CURRENCY);
+      manualOverrideRef.current = false;
+      const path =
+        typeof window !== "undefined" ? window.location.pathname : "/";
+      const country =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("country")
+          : null;
+      setCurrencyState(
+        resolveAutoDisplayCurrency({ pathname: path, countryQuery: country })
+      );
     };
     const onGranted = () => {
-      void setCurrencyPreferenceAction(currencyRef.current);
+      if (manualOverrideRef.current) {
+        void setCurrencyPreferenceAction(currencyRef.current);
+      }
     };
     window.addEventListener(CURRENCY_RESET_EVENT, onReset);
     window.addEventListener(PREFERENCES_GRANTED_EVENT, onGranted);
@@ -145,6 +196,7 @@ export function CurrencyProvider({
 
   const setCurrency = useCallback(
     (next: CurrencyCode) => {
+      manualOverrideRef.current = true;
       setCurrencyState(next);
       if (persistPreferences) {
         void setCurrencyPreferenceAction(next);

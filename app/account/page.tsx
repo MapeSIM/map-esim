@@ -9,9 +9,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import AccountActionRow from "@/app/components/account/AccountActionRow";
+import MobileActiveEsimSnapshot from "@/app/components/account/MobileActiveEsimSnapshot";
 import ReferralShareCard from "@/app/components/account/ReferralShareCard";
 import { loadConsentGateUser } from "@/app/lib/auth/legalConsentGate";
 import { requireSession } from "@/app/lib/auth/session";
+import { getCustomerMobileEsimSnapshot } from "@/app/lib/orders/customerMobileEsimSnapshot";
 import { getCustomerReferralSummary } from "@/app/lib/referrals/referralRead";
 import { getCustomerWalletSummary } from "@/app/lib/wallet/read";
 import { getCustomerRewardSummary } from "@/app/lib/rewards/rewardRead";
@@ -26,25 +28,37 @@ export default async function AccountOverviewPage() {
   let referralSummary: Awaited<
     ReturnType<typeof getCustomerReferralSummary>
   > = null;
+  let mobileEsimSnapshot: Awaited<
+    ReturnType<typeof getCustomerMobileEsimSnapshot>
+  > = null;
 
   let consentUser: Awaited<ReturnType<typeof loadConsentGateUser>>;
   if (user.role === "CUSTOMER") {
-    const [consent, walletSettled, rewardsSettled, referralSettled] =
-      await Promise.all([
-        consentUserPromise,
-        getCustomerWalletSummary(user.id).then(
-          (value) => ({ ok: true as const, value }),
-          () => ({ ok: false as const })
-        ),
-        getCustomerRewardSummary(user.id).then(
-          (value) => ({ ok: true as const, value }),
-          () => ({ ok: false as const })
-        ),
-        getCustomerReferralSummary(user.id).then(
-          (value) => ({ ok: true as const, value }),
-          () => ({ ok: false as const })
-        ),
-      ]);
+    const [
+      consent,
+      walletSettled,
+      rewardsSettled,
+      referralSettled,
+      esimSettled,
+    ] = await Promise.all([
+      consentUserPromise,
+      getCustomerWalletSummary(user.id).then(
+        (value) => ({ ok: true as const, value }),
+        () => ({ ok: false as const })
+      ),
+      getCustomerRewardSummary(user.id).then(
+        (value) => ({ ok: true as const, value }),
+        () => ({ ok: false as const })
+      ),
+      getCustomerReferralSummary(user.id).then(
+        (value) => ({ ok: true as const, value }),
+        () => ({ ok: false as const })
+      ),
+      getCustomerMobileEsimSnapshot(user.id).then(
+        (value) => ({ ok: true as const, value }),
+        () => ({ ok: false as const })
+      ),
+    ]);
     consentUser = consent;
     // Preserve prior try/catch semantics (success → label; throw → null).
     walletBalanceLabel = walletSettled.ok
@@ -56,6 +70,7 @@ export default async function AccountOverviewPage() {
         : "0 points"
       : null;
     referralSummary = referralSettled.ok ? referralSettled.value : null;
+    mobileEsimSnapshot = esimSettled.ok ? esimSettled.value : null;
   } else {
     consentUser = await consentUserPromise;
   }
@@ -106,6 +121,10 @@ export default async function AccountOverviewPage() {
           </div>
         )}
       </div>
+
+      {user.role === "CUSTOMER" && mobileEsimSnapshot ? (
+        <MobileActiveEsimSnapshot snapshot={mobileEsimSnapshot} />
+      ) : null}
 
       {user.role === "CUSTOMER" && referralSummary ? (
         <ReferralShareCard
