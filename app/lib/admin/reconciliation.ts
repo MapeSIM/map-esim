@@ -7,6 +7,7 @@ import {
   AdminPackageAssignmentStatus,
   OrderStatus,
   PartnerEsimPurchaseStatus,
+  RefundRequestStatus,
   Role,
   WalletEsimPurchaseStatus,
   WalletTopupStatus,
@@ -529,6 +530,40 @@ export async function getReconciliationListPage(options: {
           iccidHash: null,
           iccidCapturedAt: null,
           providerOrderId: { not: "" },
+          // Refunded / lifecycle-released orders are not ICCID-pending warnings.
+          reconciliationResolvedAt: null,
+          AND: [
+            {
+              refundRequests: {
+                none: { status: RefundRequestStatus.COMPLETED },
+              },
+            },
+            {
+              partnerRefundRequests: {
+                none: { status: RefundRequestStatus.COMPLETED },
+              },
+            },
+            {
+              OR: [
+                { walletEsimPurchase: null },
+                {
+                  walletEsimPurchase: {
+                    status: { not: WalletEsimPurchaseStatus.FAILED_REFUNDED },
+                  },
+                },
+              ],
+            },
+            {
+              OR: [
+                { partnerEsimPurchase: null },
+                {
+                  partnerEsimPurchase: {
+                    status: { not: PartnerEsimPurchaseStatus.FAILED_REFUNDED },
+                  },
+                },
+              ],
+            },
+          ],
         },
         orderBy: { updatedAt: "desc" },
         take: RECONCILIATION_LIST_LIMIT,
@@ -1711,27 +1746,50 @@ export async function getReconciliationDetail(
         displayCurrency: true,
         iccidHash: true,
         iccidCapturedAt: true,
-          reconciliationResolvedAt: true,
-          reconciliationLockedAt: true,
-          reconciliationEscalatedAt: true,
-          reconciliationEscalationPriority: true,
-          reconciliationResolutionReason: true,
-          createdAt: true,
+        reconciliationResolvedAt: true,
+        reconciliationLockedAt: true,
+        reconciliationEscalatedAt: true,
+        reconciliationEscalationPriority: true,
+        reconciliationResolutionReason: true,
+        createdAt: true,
         updatedAt: true,
         user: { select: { id: true, name: true, email: true } },
+        refundRequests: {
+          where: { status: RefundRequestStatus.COMPLETED },
+          select: { id: true },
+          take: 1,
+        },
+        partnerRefundRequests: {
+          where: { status: RefundRequestStatus.COMPLETED },
+          select: { id: true },
+          take: 1,
+        },
+        walletEsimPurchase: { select: { status: true } },
+        partnerEsimPurchase: { select: { status: true } },
       },
     });
     if (!row) return null;
     if (row.status !== OrderStatus.COMPLETED) return null;
     const iccidPending = !row.iccidHash && !row.iccidCapturedAt;
     if (!iccidPending && !row.reconciliationResolvedAt) return null;
+    const refundReleased =
+      row.refundRequests.length > 0 ||
+      row.partnerRefundRequests.length > 0 ||
+      row.walletEsimPurchase?.status ===
+        WalletEsimPurchaseStatus.FAILED_REFUNDED ||
+      row.partnerEsimPurchase?.status ===
+        PartnerEsimPurchaseStatus.FAILED_REFUNDED;
+    // Refunded orders are not stuck ICCID warnings (provider may have unbound ICCID).
+    const resolvedAt =
+      row.reconciliationResolvedAt ??
+      (refundReleased ? row.updatedAt : null);
     const category = classifyReconciliationCase({
       sourceType: "iccid",
       status: "COMPLETED",
       providerOrderId: row.providerOrderId,
       iccidHash: row.iccidHash,
       iccidCapturedAt: row.iccidCapturedAt,
-      reconciliationResolvedAt: row.reconciliationResolvedAt,
+      reconciliationResolvedAt: resolvedAt,
       updatedAt: row.updatedAt,
     });
     return {
@@ -1758,15 +1816,19 @@ export async function getReconciliationDetail(
       hasProviderRef: Boolean((row.providerOrderId ?? "").trim()),
       localOrderLabel: row.id,
       localOrderHref: `/admin/orders/${row.id}`,
-      failureLabel: "iccid / pending_capture",
+      failureLabel: refundReleased
+        ? "iccid / refund_released"
+        : "iccid / pending_capture",
       createdAtLabel: formatTs(row.createdAt),
       updatedAtLabel: formatTs(row.updatedAt),
       resolutionLabel: resolutionLabel({
-        resolvedAt: row.reconciliationResolvedAt,
+        resolvedAt,
         lockedAt: row.reconciliationLockedAt,
         escalatedAt: row.reconciliationEscalatedAt,
         escalationPriority: row.reconciliationEscalationPriority,
-        reason: row.reconciliationResolutionReason,
+        reason:
+          row.reconciliationResolutionReason ??
+          (refundReleased ? "Refund completed — ICCID lifecycle released" : null),
       }),
       locked: Boolean(row.reconciliationLockedAt),
       escalated: Boolean(row.reconciliationEscalatedAt),
@@ -1779,8 +1841,14 @@ export async function getReconciliationDetail(
         ),
         timelineEvent(
           "ICCID capture state",
-          row.iccidHash || row.iccidCapturedAt ? "done" : "pending",
-          row.iccidHash || row.iccidCapturedAt ? "Captured" : "Pending from provider"
+          row.iccidHash || row.iccidCapturedAt || refundReleased
+            ? "done"
+            : "pending",
+          row.iccidHash || row.iccidCapturedAt
+            ? "Captured"
+            : refundReleased
+              ? "Released after refund"
+              : "Pending from provider"
         ),
       ],
       relatedLinks: [

@@ -100,10 +100,24 @@ export function shortCustomerOrderReference(orderId: string): string {
 export function customerFundingLabel(
   fundingSource: string | null | undefined
 ): string {
-  if (fundingSource === "COMPANY_FUNDED") return "Company-funded";
-  if (fundingSource === "CUSTOMER_WALLET") return "Wallet";
-  if (fundingSource === "DIRECT_PAYMENT") return "Card payment";
-  return "Not available";
+  switch ((fundingSource ?? "").trim()) {
+    case "COMPANY_FUNDED":
+      return "Company-funded";
+    case "CUSTOMER_WALLET":
+      return "Wallet";
+    case "CUSTOMER_SPLIT":
+      return "Wallet + card";
+    case "DIRECT_PAYMENT":
+      return "Card payment";
+    case "PARTNER_BALANCE":
+      return "Partner Account";
+    case "PARTNER_SPLIT":
+      return "Partner Account + card";
+    case "PARTNER_GATEWAY":
+      return "Partner API";
+    default:
+      return "Not available";
+  }
 }
 
 export function customerEmailDeliveryLabel(

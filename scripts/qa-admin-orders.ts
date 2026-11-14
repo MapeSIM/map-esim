@@ -96,6 +96,12 @@ function main() {
   assert.match(ordersSrc, /hasCompletedRefund|RefundRequestStatus\.COMPLETED/);
   assert.match(ordersSrc, /providerLifecycleStatus|displayStatusBadge/);
   assert.match(ordersSrc, /customerEsimInstallAllowed|customerEsimLifecycleIsPrimaryBadge/);
+  assert.match(ordersSrc, /Partner Account/);
+  assert.match(ordersSrc, /Partner API/);
+  assert.match(ordersSrc, /PARTNER_BALANCE/);
+  assert.match(ordersSrc, /PARTNER_GATEWAY/);
+  assert.match(ordersSrc, /resolveAdminOrderFundingSource/);
+  assert.match(ordersSrc, /partnerEsimPurchase[\s\S]*fundingSource/);
   const displaySrc = readFileSync(
     join(root, "app/lib/orders/customerOrderDisplay.ts"),
     "utf8"

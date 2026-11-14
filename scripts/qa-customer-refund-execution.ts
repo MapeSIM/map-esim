@@ -246,6 +246,15 @@ function main() {
   assert.match(pkg, /"qa:customer-refund-execution"/);
   console.log("   ok");
 
+  console.log("9) Refund completes release ICCID lifecycle sync");
+  assert.match(execution, /releaseOrderLifecycleAfterCompletedRefund/);
+  assert.match(recon, /releaseOrderLifecycleAfterCompletedRefund/);
+  assert.match(partnerExec, /releaseOrderLifecycleAfterCompletedRefund/);
+  const lifecycleRelease = read("app/lib/orders/orderRefundLifecycle.ts");
+  assert.match(lifecycleRelease, /ORDER_REFUND_LIFECYCLE_STATUS/);
+  assert.match(lifecycleRelease, /CANCELLED/);
+  console.log("   ok");
+
   console.log("ALL_QA_PASSED=customer-refund-execution");
 }
 

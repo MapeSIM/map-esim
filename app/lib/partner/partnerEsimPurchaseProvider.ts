@@ -673,6 +673,7 @@ export async function executePartnerEsimProviderPurchase(
       currency: true,
       walletAppliedCents: true,
       gatewayAmountCents: true,
+      fundingSource: true,
       debitTransactionId: true,
       refundTransactionId: true,
       orderId: true,
@@ -812,6 +813,7 @@ async function executeClaimedPartnerEsimProviderPurchase(options: {
     currency: string;
     walletAppliedCents: number;
     gatewayAmountCents: number;
+    fundingSource: OrderFundingSource;
     debitTransactionId: string | null;
     planName: string | null;
     destinationCode: string | null;
@@ -1039,12 +1041,19 @@ async function executeClaimedPartnerEsimProviderPurchase(options: {
           );
         }
 
+        const orderFundingSource =
+          purchase.fundingSource === OrderFundingSource.PARTNER_GATEWAY ||
+          purchase.fundingSource === OrderFundingSource.PARTNER_SPLIT ||
+          purchase.fundingSource === OrderFundingSource.PARTNER_BALANCE
+            ? purchase.fundingSource
+            : OrderFundingSource.PARTNER_BALANCE;
+
         const order = await persistAssignedOrder(tx, {
           providerOrderId: successCheckout.providerOrderId,
           customerUserId: partner.partnerUserId,
           customerEmail: partner.partnerEmail,
           verifiedOffer,
-          fundingSource: OrderFundingSource.PARTNER_BALANCE,
+          fundingSource: orderFundingSource,
           status: OrderStatus.COMPLETED,
           checkoutPayload: successCheckout.payload,
           allowSharedIccid: Boolean(addDataSourceOrderId),
@@ -1078,7 +1087,7 @@ async function executeClaimedPartnerEsimProviderPurchase(options: {
               purchaseId: purchase.id,
               orderId: order.id,
               offerId: purchase.offerId,
-              fundingSource: OrderFundingSource.PARTNER_BALANCE,
+              fundingSource: orderFundingSource,
               partnerChargeCents: purchase.partnerChargeCents,
               retailPriceCents: purchase.retailPriceCents,
               debitTransactionId: current.debitTransactionId,

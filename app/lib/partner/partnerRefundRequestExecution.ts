@@ -32,6 +32,7 @@ import {
   PartnerPurchaseWalletError,
   refundPartnerPurchaseFundsInTx,
 } from "@/app/lib/partner/partnerPurchaseWallet";
+import { releaseOrderLifecycleAfterCompletedRefund } from "@/app/lib/orders/orderRefundLifecycle";
 
 /** Production DB latency — match customer refund tx budget. */
 const PARTNER_REFUND_EXECUTION_TX = {
@@ -293,11 +294,16 @@ export async function executeAdminPartnerRefundRequest(
       throwBlocked("FINANCIAL_STATE_MISMATCH");
     }
     const synced = await prisma.$transaction(async (tx) => {
-      return syncPartnerRefundRequestsForPurchase(tx, {
+      const result = await syncPartnerRefundRequestsForPurchase(tx, {
         purchaseId: purchase.id,
         refundTransactionId,
         actorUserId: admin.id,
       });
+      await releaseOrderLifecycleAfterCompletedRefund(tx, {
+        orderId: request.orderId,
+        actorUserId: admin.id,
+      });
+      return result;
     }, PARTNER_REFUND_EXECUTION_TX);
     const completedIds =
       synced.completedRequestIds.length > 0
@@ -446,6 +452,11 @@ export async function executeAdminPartnerRefundRequest(
       await syncPartnerRefundRequestsForPurchase(tx, {
         purchaseId: purchase.id,
         refundTransactionId,
+        actorUserId: admin.id,
+      });
+
+      await releaseOrderLifecycleAfterCompletedRefund(tx, {
+        orderId: request.orderId,
         actorUserId: admin.id,
       });
 

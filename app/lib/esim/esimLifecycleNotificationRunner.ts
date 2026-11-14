@@ -40,6 +40,11 @@ import {
   persistOrderProviderLifecycleCache,
   type CustomerUsageSnapshot,
 } from "@/app/lib/orders/customerEsimUsage";
+import {
+  orderHasCompletedRefundSignal,
+  orderNotCompletedRefundWhere,
+  releaseOrderLifecycleAfterCompletedRefund,
+} from "@/app/lib/orders/orderRefundLifecycle";
 
 export type EsimLifecycleRunCounts = {
   candidates: number;
@@ -301,6 +306,8 @@ export async function listEsimLifecycleCandidateOrders(options?: {
             { user: { role: { not: Role.PARTNER }, deletedAt: null } },
           ],
         },
+        // Completed refunds: ICCID may already be unbound at VeSIM — do not poll.
+        orderNotCompletedRefundWhere(),
       ],
     },
     orderBy: [
@@ -420,6 +427,15 @@ export async function processEsimLifecycleOrder(options: {
   results: Array<{ kind: EsimLifecycleKind; status: string }>;
 }> {
   const now = options.now instanceof Date ? options.now : new Date();
+
+  // Refunded orders: release lifecycle locally — never warn on missing provider ICCID.
+  if (await orderHasCompletedRefundSignal(options.orderId)) {
+    await releaseOrderLifecycleAfterCompletedRefund(prisma, {
+      orderId: options.orderId,
+    });
+    return { polled: false, usageOk: false, kinds: [], results: [] };
+  }
+
   const iccid = await resolveOrderIccid(options.iccidEncrypted);
   if (!iccid) {
     await markOrderChecked(options.orderId, now);
@@ -429,6 +445,15 @@ export async function processEsimLifecycleOrder(options: {
   const usageRes = await fetchProviderUsage(iccid);
   await markOrderChecked(options.orderId, now);
   if (!usageRes.ok) {
+    // Provider unbound/cancelled ICCID after refund raced in — release quietly.
+    if (
+      usageRes.kind === "not_found" &&
+      (await orderHasCompletedRefundSignal(options.orderId))
+    ) {
+      await releaseOrderLifecycleAfterCompletedRefund(prisma, {
+        orderId: options.orderId,
+      });
+    }
     return { polled: true, usageOk: false, kinds: [], results: [] };
   }
   const snapshot = normalizeProviderUsagePayload(usageRes.payload);

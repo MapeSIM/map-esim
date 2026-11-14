@@ -38,6 +38,7 @@ import {
   WalletEsimPurchaseError,
 } from "@/app/lib/esim/walletPurchase";
 import { syncCustomerRefundRequestsForPurchase } from "@/app/lib/refunds/refundRequestSync";
+import { releaseOrderLifecycleAfterCompletedRefund } from "@/app/lib/orders/orderRefundLifecycle";
 import { applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx } from "@/app/lib/rewards/rewardRefund";
 import { VesimEnvironmentError } from "@/app/lib/vesim/environment";
 import {
@@ -663,6 +664,11 @@ export async function refundReconciliationWalletPurchase(options: {
           actorUserId: admin.id,
         });
       }
+
+      await releaseOrderLifecycleAfterCompletedRefund(tx, {
+        orderId: fresh.orderId,
+        actorUserId: admin.id,
+      });
 
       return {
         status: "refunded" as const,

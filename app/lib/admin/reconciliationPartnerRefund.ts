@@ -38,6 +38,7 @@ import {
 } from "@/app/lib/partner/partnerPurchaseWallet";
 import { syncPartnerRefundRequestsForPurchase } from "@/app/lib/partner/partnerRefundRequestSync";
 import { schedulePartnerRefundCompletedNotifications } from "@/app/lib/partner/partnerRefundRequestNotification";
+import { releaseOrderLifecycleAfterCompletedRefund } from "@/app/lib/orders/orderRefundLifecycle";
 import { VesimEnvironmentError } from "@/app/lib/vesim/environment";
 import {
   classifyProviderOrderResponse,
@@ -619,6 +620,11 @@ export async function refundReconciliationPartnerPurchase(options: {
           "Partner refund link changed concurrently."
         );
       }
+
+      await releaseOrderLifecycleAfterCompletedRefund(tx, {
+        orderId: fresh.orderId,
+        actorUserId: admin.id,
+      });
 
       return {
         status: "refunded" as const,

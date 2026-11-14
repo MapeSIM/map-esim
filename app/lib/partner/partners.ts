@@ -571,11 +571,11 @@ function partnerPurchaseStoredLabel(raw: string | null | undefined): string {
 function partnerFundingSourceLabel(fundingSource: string | null | undefined): string {
   switch ((fundingSource ?? "").trim()) {
     case "PARTNER_BALANCE":
-      return "Partner wallet";
+      return "Partner Account";
     case "PARTNER_SPLIT":
-      return "Wallet + gateway";
+      return "Partner Account + card";
     case "PARTNER_GATEWAY":
-      return "Gateway";
+      return "Partner API";
     default: {
       const value = (fundingSource ?? "").trim();
       return value ? value.replace(/_/g, " ") : "—";

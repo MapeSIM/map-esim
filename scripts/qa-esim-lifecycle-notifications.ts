@@ -606,6 +606,20 @@ function main() {
   assert.match(pkg, /"qa:esim-lifecycle-notifications"/);
   console.log("   ok");
 
+  console.log("8) Refunded orders release ICCID lifecycle without stuck warnings");
+  const refundLifecycle = read("app/lib/orders/orderRefundLifecycle.ts");
+  assert.match(refundLifecycle, /releaseOrderLifecycleAfterCompletedRefund/);
+  assert.match(refundLifecycle, /orderNotCompletedRefundWhere/);
+  assert.match(refundLifecycle, /ORDER_REFUND_LIFECYCLE_STATUS/);
+  assert.match(refundLifecycle, /CANCELLED/);
+  assert.match(runner, /orderNotCompletedRefundWhere/);
+  assert.match(runner, /orderHasCompletedRefundSignal/);
+  assert.match(runner, /releaseOrderLifecycleAfterCompletedRefund/);
+  assert.match(refunds, /releaseOrderLifecycleAfterCompletedRefund/);
+  const sharedLifecycle = read("app/lib/orders/providerLifecycleShared.ts");
+  assert.match(sharedLifecycle, /CANCELLED/);
+  console.log("   ok");
+
   console.log("ALL_QA_PASSED=esim-lifecycle-notifications");
 }
 

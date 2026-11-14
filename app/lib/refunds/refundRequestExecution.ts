@@ -32,6 +32,7 @@ import {
 } from "@/app/lib/refunds/refundRequestExecutionShared";
 import { scheduleRefundStatusNotification } from "@/app/lib/refunds/refundRequestNotification";
 import { syncCustomerRefundRequestsForOrder } from "@/app/lib/refunds/refundRequestSync";
+import { releaseOrderLifecycleAfterCompletedRefund } from "@/app/lib/orders/orderRefundLifecycle";
 import { applyCustomerRewardEffectsForEligibleFullPurchaseRefundInTx } from "@/app/lib/rewards/rewardRefund";
 import { scheduleWalletTransactionNotification } from "@/app/lib/wallet/transactionNotification";
 
@@ -374,6 +375,10 @@ export async function executeAdminCustomerRefundRequest(
           openOrderKey: null,
         },
       });
+      await releaseOrderLifecycleAfterCompletedRefund(tx, {
+        orderId: request.orderId,
+        actorUserId: admin.id,
+      });
     }, CUSTOMER_REFUND_EXECUTION_TX);
     scheduleRefundStatusNotification(request.id, "completed");
     return {
@@ -688,6 +693,12 @@ export async function executeAdminCustomerRefundRequest(
             gatewayRefundCalled: false,
           },
         },
+      });
+
+      // Unbind lifecycle sync / auto-clear ICCID recon warnings (provider may drop ICCID).
+      await releaseOrderLifecycleAfterCompletedRefund(tx, {
+        orderId: fresh.orderId,
+        actorUserId: admin.id,
       });
 
       return {

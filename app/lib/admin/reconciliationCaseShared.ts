@@ -735,7 +735,7 @@ export function iccidBackfillBlockerLabel(code: string): string {
     case "provider_state_unusable":
       return "Provider order state is pending, failed, or cancelled.";
     case "provider_iccid_missing":
-      return "Provider evidence does not include an ICCID.";
+      return "ICCID missing from provider.";
     case "provider_iccid_malformed":
       return "Provider ICCID is malformed.";
     case "iccid_conflict":

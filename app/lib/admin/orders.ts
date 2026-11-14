@@ -23,7 +23,7 @@ import {
 } from "@/app/lib/admin/display";
 import { prisma } from "@/app/lib/db";
 import { resolveAddDataPurchaseLabel } from "@/app/lib/esim/addDataCheckout";
-  import {
+import {
   customerEsimInstallAllowed,
   customerEsimLifecycleIsPrimaryBadge,
   customerEsimStatusLabel,
@@ -153,10 +153,35 @@ export type AdminOrderDetail = {
 function fundingSourceLabel(
   fundingSource: string | null | undefined
 ): string {
-  if (fundingSource === "COMPANY_FUNDED") return "Company-funded";
-  if (fundingSource === "CUSTOMER_WALLET") return "Wallet-funded";
-  if (fundingSource === "DIRECT_PAYMENT") return "Direct payment";
-  return "Not available";
+  switch ((fundingSource ?? "").trim()) {
+    case "COMPANY_FUNDED":
+      return "Company-funded";
+    case "CUSTOMER_WALLET":
+      return "Wallet-funded";
+    case "CUSTOMER_SPLIT":
+      return "Wallet + card";
+    case "DIRECT_PAYMENT":
+      return "Direct payment";
+    case "PARTNER_BALANCE":
+      return "Partner Account";
+    case "PARTNER_SPLIT":
+      return "Partner Account + card";
+    case "PARTNER_GATEWAY":
+      return "Partner API";
+    default:
+      return "Not available";
+  }
+}
+
+/** Prefer PartnerEsimPurchase.fundingSource when present (authoritative for partner buys). */
+function resolveAdminOrderFundingSource(
+  orderFunding: string | null | undefined,
+  partnerFunding: string | null | undefined
+): string | null {
+  const partner = (partnerFunding ?? "").trim();
+  if (partner) return partner;
+  const order = (orderFunding ?? "").trim();
+  return order || null;
 }
 
 function displayOrUnavailable(value: string | null | undefined): string {
@@ -336,7 +361,7 @@ export async function getAdminOrdersPage(
         select: { idempotencyKey: true, status: true },
       },
       partnerEsimPurchase: {
-        select: { idempotencyKey: true, status: true },
+        select: { idempotencyKey: true, status: true, fundingSource: true },
       },
       adminPackageAssignment: {
         select: { status: true },
@@ -393,7 +418,12 @@ export async function getAdminOrdersPage(
       iccidMasked: iccid ?? iccidUnavailableLabel(row.status),
       iccid,
       associationLabel: row.userId ? "Linked customer" : "Guest order",
-      fundingLabel: fundingSourceLabel(row.fundingSource),
+      fundingLabel: fundingSourceLabel(
+        resolveAdminOrderFundingSource(
+          row.fundingSource,
+          row.partnerEsimPurchase?.fundingSource
+        )
+      ),
       isAddDataPurchase: addDataPurchase.isAddDataPurchase,
       addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
       displayStatusBadge,
@@ -470,6 +500,7 @@ export async function getAdminOrderDetail(
         select: {
           idempotencyKey: true,
           status: true,
+          fundingSource: true,
         },
       },
       adminPackageAssignment: {
@@ -588,7 +619,12 @@ export async function getAdminOrderDetail(
     providerRefMasked: maskProviderOrderRef(row.providerOrderId),
     offerId: displayOrUnavailable(row.offerId),
     associationLabel: row.userId ? "Linked customer" : "Guest order",
-    fundingLabel: fundingSourceLabel(row.fundingSource),
+    fundingLabel: fundingSourceLabel(
+      resolveAdminOrderFundingSource(
+        row.fundingSource,
+        row.partnerEsimPurchase?.fundingSource
+      )
+    ),
     customerEmail: displayOrUnavailable(row.customerEmail),
     accountStatusLabel,
     claimStatusLabel: displayOrUnavailable(row.claimStatus),
@@ -674,6 +710,7 @@ export async function getAdminCustomerRecentOrders(
       providerAmount: true,
       providerCurrency: true,
       fundingSource: true,
+      partnerEsimPurchase: { select: { fundingSource: true } },
     },
   });
 
@@ -693,7 +730,12 @@ export async function getAdminCustomerRecentOrders(
       localStatus: displayOrUnavailable(row.status),
       amountLabel: formatOrderAmount(amount, currencyCode),
       currencyLabel: currencyCode,
-      fundingLabel: fundingSourceLabel(row.fundingSource),
+      fundingLabel: fundingSourceLabel(
+        resolveAdminOrderFundingSource(
+          row.fundingSource,
+          row.partnerEsimPurchase?.fundingSource
+        )
+      ),
       purchasedAtLabel: formatCreatedAt(row.createdAt),
       iccidMasked: iccid ?? iccidUnavailableLabel(row.status),
     };

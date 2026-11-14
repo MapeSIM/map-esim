@@ -8,6 +8,8 @@ export const PROVIDER_LIFECYCLE_STATUSES = [
   "ACTIVE",
   "EXPIRED",
   "DEPLETED",
+  /** Local terminal state after completed refund (ICCID unbound / sync released). */
+  "CANCELLED",
   "UNKNOWN",
 ] as const;
 
@@ -66,6 +68,9 @@ export function classifyProviderLifecycleStatus(input: {
   ) {
     return "ACTIVE";
   }
+  if (/cancel|refund|unbound|unbind|void/i.test(blob)) {
+    return "CANCELLED";
+  }
   if (
     input.isActivated === false ||
     /not[_ ]?active|inactive|pending|ready|installed|released/i.test(blob)
@@ -87,6 +92,8 @@ export function providerLifecycleLabel(
       return "Expired";
     case "DEPLETED":
       return "Depleted";
+    case "CANCELLED":
+      return "Cancelled";
     default:
       return null;
   }
