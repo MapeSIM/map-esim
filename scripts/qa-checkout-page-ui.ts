@@ -57,7 +57,10 @@ function main() {
   assert.match(confirm, /stickySpacerClass|14rem\+env\(safe-area-inset-bottom/);
   assert.match(confirm, /10rem\+env\(safe-area-inset-bottom/);
   assert.match(confirm, /scroll-padding-bottom/);
-  assert.match(confirm, /w-full min-w-0 items-center justify-center rounded-2xl bg-\[var\(--accent-strong\)\]/);
+  assert.match(
+    confirm,
+    /w-full min-w-0 items-center justify-center(?: gap-2)? rounded-2xl bg-\[var\(--accent-strong\)\]/
+  );
   assert.doesNotMatch(confirm, /max-w-\[58%\]/);
   // Spacer clears sticky CTA (+ safe-area) at common mobile widths.
   const stickyClearancePx = 14 * 16;
@@ -173,11 +176,14 @@ function main() {
   assert.match(guest, /lg:grid-cols-\[minmax\(0,1\.2fr\)_minmax\(18rem,0\.8fr\)\]/);
   assert.match(guest, /CheckoutTrustPanel/);
   assert.match(guest, /\/api\/vesim\/offer/);
-  assert.match(guest, /Purchase eSIM/);
+  assert.match(guest, /Pay with Safepay|Submit Manual Payment|Purchase eSIM/);
   assert.match(guest, /customerEmail/);
   assert.match(guest, /guestCheckoutEnabled/);
   // Sprint B0: guest Pay CTA before trust (parity with logged-in).
-  assert.match(guest, /Purchase eSIM[\s\S]*?CheckoutTrustPanel/);
+  assert.match(
+    guest,
+    /(?:Pay with Safepay|Submit Manual Payment|Purchase eSIM)[\s\S]*?CheckoutTrustPanel/
+  );
   assert.match(guest, /CheckoutCompatibilityCheck/);
   assert.match(confirm, /CheckoutCompatibilityCheck/);
   console.log("PASS guest_checkout_two_column");

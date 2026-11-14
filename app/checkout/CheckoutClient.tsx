@@ -230,7 +230,13 @@ function CheckoutContent() {
           throw new Error(orderData.error || "Failed to submit manual payment order");
         }
 
-        alert("Manual payment submitted successfully! We have notified the admin and will email your eSIM shortly.");
+        const ref =
+          typeof orderData.reference === "string" ? orderData.reference : "";
+        alert(
+          ref
+            ? `Payment proof submitted (ref ${ref}). We will verify and email your eSIM shortly.`
+            : "Payment proof submitted. We will verify and email your eSIM shortly."
+        );
         router.push("/account");
         return;
       }

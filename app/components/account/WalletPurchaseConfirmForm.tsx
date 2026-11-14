@@ -393,7 +393,7 @@ export default function WalletPurchaseConfirmForm({
     }
     setManualSubmitting(true);
     try {
-      const res = await fetch("/checkout/manual-payment", {
+      const res = await fetch("/api/checkout/manual-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -405,7 +405,12 @@ export default function WalletPurchaseConfirmForm({
       });
       const data = await res.json();
       if (data.success) {
-        router.push(`/account/esim/buy/success?purchase=${encodeURIComponent(review.purchaseId)}`);
+        const ref = typeof data.reference === "string" ? data.reference : "";
+        const params = new URLSearchParams({
+          purchase: review.purchaseId,
+        });
+        if (ref) params.set("ref", ref);
+        router.push(`/account/esim/buy/manual-pending?${params.toString()}`);
       } else {
         alert(data.error || "Failed to submit manual order");
       }
@@ -502,6 +507,7 @@ export default function WalletPurchaseConfirmForm({
   const whatsappCheckoutAvailable =
     Boolean(whatsappPhone) && cashPayablePreview > 0;
   const showWhatsAppCheckoutCta =
+    !manualSelected &&
     whatsappCheckoutAvailable &&
     !zeroCashConfirm &&
     (whatsappSelected ||
@@ -538,14 +544,15 @@ export default function WalletPurchaseConfirmForm({
       ? "Wallet"
       : "Covered";
   const gatewayNeedsSimpaisaFields = gatewayReady && simpaisaCheckout;
-  const stickyCtaDisabled =
-    zeroCashConfirm
+  const stickyCtaDisabled = manualSelected
+    ? manualSubmitting || !manualSenderName || !proofUrl
+    : zeroCashConfirm
       ? purchaseBlocked || !confirmed
       : gatewayReady
         ? purchaseBlocked ||
           (gatewayNeedsSimpaisaFields && !simpaisaFieldsReady)
         : true;
-  const stickyShowConfirm = zeroCashConfirm && !pending;
+  const stickyShowConfirm = zeroCashConfirm && !pending && !manualSelected;
   const stickyDisabledReason = (() => {
     if (pending || selectingPayment) return "Updating payment method...";
     if (deliveryBlocksPurchase) {
@@ -554,11 +561,17 @@ export default function WalletPurchaseConfirmForm({
     if (zeroCashConfirm && !confirmed) {
       return null;
     }
-    if (walletOnlyInsufficient) {
+    if (manualSelected) {
+      return null;
+    }
+    if (walletOnlyInsufficient && !manualPaymentsEnabled) {
       return INSUFFICIENT_WALLET_CHECKOUT_MESSAGE;
     }
-    if (!zeroCashConfirm && !gatewayReady) {
+    if (!zeroCashConfirm && !gatewayReady && !manualPaymentsEnabled) {
       return "Online payment is unavailable right now.";
+    }
+    if (!zeroCashConfirm && !gatewayReady && manualPaymentsEnabled) {
+      return "Select Manual Payment (or WhatsApp) to continue.";
     }
     if (gatewayNeedsSimpaisaFields && !simpaisaFieldsReady) {
       return "Select JazzCash or Easypaisa and enter a valid mobile number.";
@@ -652,6 +665,12 @@ export default function WalletPurchaseConfirmForm({
 
   const awaitingGatewayPayment =
     review.status === WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT;
+
+  const stickyBarVisible = !awaitingGatewayPayment;
+  const stickySpacerClass =
+    stickyShowConfirm || Boolean(stickyDisabledReason) || manualSelected
+      ? "pointer-events-none h-[calc(14rem+env(safe-area-inset-bottom,0px))] lg:hidden"
+      : "pointer-events-none h-[calc(10rem+env(safe-area-inset-bottom,0px))] lg:hidden";
 
   return (
     <div className="min-w-0 space-y-6 max-lg:[scroll-padding-bottom:calc(10rem+env(safe-area-inset-bottom,0px))]">
@@ -1262,6 +1281,7 @@ export default function WalletPurchaseConfirmForm({
         </div>
 
         <aside className="space-y-5 lg:sticky lg:top-6">
+          {/* Desktop/tablet: full order summary. Mobile uses early Amount due + sticky due. */}
           <section
             className={`${cardClass} hidden lg:block`}
             aria-labelledby={orderHeadingId}
@@ -1456,6 +1476,139 @@ export default function WalletPurchaseConfirmForm({
           <CheckoutTrustPanel />
         </aside>
       </div>
+
+      {stickyBarVisible ? (
+        <div
+          className={stickySpacerClass}
+          aria-hidden="true"
+          data-checkout-sticky-spacer="true"
+        />
+      ) : null}
+
+      {stickyBarVisible ? (
+        <div
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/95 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] backdrop-blur supports-[padding:max(0px)]:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4 lg:hidden"
+          role="region"
+          aria-label="Checkout payment action"
+        >
+          <div className="mx-auto flex max-w-5xl min-w-0 flex-col gap-2">
+            {/* Mobile sticky pay action — sole mobile CTA (desktop uses aside). */}
+            {stickyShowConfirm ? (
+              <label
+                htmlFor={confirmStickyId}
+                className="flex items-start gap-2.5 text-xs leading-snug text-[var(--heading)]"
+              >
+                <input
+                  id={confirmStickyId}
+                  type="checkbox"
+                  checked={confirmed}
+                  onChange={(event) => setConfirmed(event.target.checked)}
+                  disabled={purchaseBlocked}
+                  className="mt-0.5"
+                  aria-controls={confirmSectionId}
+                />
+                <span className="min-w-0 break-words">
+                  {confirmCheckboxText}{" "}
+                  <a
+                    href={`#${confirmSectionId}`}
+                    className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    Details
+                  </a>
+                </span>
+              </label>
+            ) : null}
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                {dueLabel}
+              </p>
+              <p className="truncate text-sm font-semibold text-[var(--heading)]">
+                {dueOnline ? (
+                  <CheckoutMoney
+                    exactSimpaisaPkrCharge={simpaisaCheckout}
+                    cents={preview.gatewayAmountCents}
+                  />
+                ) : (
+                  "Covered"
+                )}
+              </p>
+            </div>
+            {manualSelected ? (
+              <button
+                type="button"
+                onClick={handleManualSubmit}
+                disabled={stickyCtaDisabled}
+                className="inline-flex h-11 w-full min-w-0 items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+              >
+                {manualSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    Submitting…
+                  </>
+                ) : (
+                  "Submit payment"
+                )}
+              </button>
+            ) : zeroCashConfirm ? (
+              <button
+                type="submit"
+                disabled={stickyCtaDisabled}
+                className="inline-flex h-11 w-full min-w-0 items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
+              >
+                {pending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    {primaryCtaPendingLabel}
+                  </>
+                ) : (
+                  primaryCtaLabel
+                )}
+              </button>
+            ) : showWhatsAppCheckoutCta ? (
+              <BuyViaWhatsAppCheckoutButton
+                purchaseId={review.purchaseId}
+                customerWhatsAppDigits={customerWhatsAppDigits}
+                onRequirePhone={() => setWhatsappPhoneTouched(true)}
+                onBusyChange={setWhatsappOrderBusy}
+                locked={pending || fundingPending}
+                className="inline-flex h-11 w-full min-w-0 items-center justify-center gap-2 rounded-2xl bg-[#25D366] px-4 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+              />
+            ) : gatewayReady ? (
+              <button
+                type="submit"
+                disabled={stickyCtaDisabled}
+                className="inline-flex h-11 w-full min-w-0 items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
+              >
+                {pending || whatsappOrderBusy ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    {primaryCtaPendingLabel}
+                  </>
+                ) : (
+                  primaryCtaLabel
+                )}
+              </button>
+            ) : walletOnlyInsufficient && !manualPaymentsEnabled ? null : (
+              <button
+                type="button"
+                disabled
+                className="inline-flex h-11 w-full min-w-0 items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 text-sm font-semibold text-[var(--heading)] opacity-60"
+              >
+                Continue to Payment
+              </button>
+            )}
+            {stickyDisabledReason && !showWhatsAppCheckoutCta && !manualSelected ? (
+              <p
+                className="text-xs leading-snug text-[var(--text-muted)]"
+                role="status"
+              >
+                {stickyDisabledReason}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </form>
     </div>
   );

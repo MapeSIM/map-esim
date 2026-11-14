@@ -202,6 +202,27 @@ export default async function AdminOrderDetailPage({
           }
         />
         <DetailRow label="Customer email" value={detail.customerEmail} />
+        {detail.paymentMethod ? (
+          <DetailRow label="Payment method" value={detail.paymentMethod} />
+        ) : null}
+        {detail.senderName ? (
+          <DetailRow label="Sender name" value={detail.senderName} />
+        ) : null}
+        {detail.paymentProofUrl ? (
+          <DetailRow
+            label="Payment proof"
+            value={
+              <a
+                href={detail.paymentProofUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+              >
+                Open proof
+              </a>
+            }
+          />
+        ) : null}
         <DetailRow
           label="Account status"
           value={

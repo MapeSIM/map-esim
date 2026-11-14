@@ -1,5 +1,6 @@
 /**
- * Offline QA: admin-saved ManualPaymentConfig is fetched and copyable on checkout.
+ * Offline QA: admin-saved ManualPaymentConfig is fetched and copyable on checkout,
+ * and manual payment submit persists pending fulfillable orders.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -10,6 +11,11 @@ import {
   toManualPaymentSettingsMap,
   EMPTY_MANUAL_PAYMENT_CONFIG,
 } from "../app/lib/payments/manualPaymentConfigShared";
+import {
+  MANUAL_CHECKOUT_PAYMENT_METHOD,
+  clipManualSenderName,
+  generateManualOrderReference,
+} from "../app/lib/support/manualCheckoutOrderShared";
 
 const root = join(__dirname, "..");
 
@@ -23,6 +29,18 @@ function main() {
   assert.match(schema, /jazzcashNumber/);
   assert.match(schema, /easypaisaNumber/);
   assert.match(schema, /bankAccountNumber/);
+  assert.match(schema, /paymentProofUrl/);
+  assert.match(schema, /senderName/);
+
+  const migration = read(
+    "prisma/migrations/20261114090000_add_manual_payment_config/migration.sql"
+  );
+  assert.match(migration, /ManualPaymentConfig/);
+  const orderMigration = read(
+    "prisma/migrations/20261114120000_add_manual_payment_order_fields/migration.sql"
+  );
+  assert.match(orderMigration, /paymentProofUrl/);
+  assert.match(orderMigration, /WhatsAppCheckoutOrder/);
 
   const adminApi = read("app/api/admin/manual-payment-settings/route.ts");
   assert.match(adminApi, /getPublicManualPaymentConfig/);
@@ -33,6 +51,10 @@ function main() {
   assert.match(publicApi, /getPublicManualPaymentConfig/);
   assert.doesNotMatch(publicApi, /requireActiveAdminForOperations/);
 
+  const submitApi = read("app/api/checkout/manual-payment/route.ts");
+  assert.match(submitApi, /createManualPendingOrderFromPurchase/);
+  assert.match(submitApi, /createManualPendingOrderFromGuest/);
+
   const review = read("app/account/esim/buy/review/page.tsx");
   assert.match(review, /getPublicManualPaymentConfig/);
   assert.doesNotMatch(review, /as any\)\.manualPaymentConfig/);
@@ -40,10 +62,13 @@ function main() {
   const confirm = read("app/components/account/WalletPurchaseConfirmForm.tsx");
   assert.match(confirm, /ManualPaymentDetailsBox/);
   assert.match(confirm, /\/api\/checkout\/manual-payment-config/);
+  assert.match(confirm, /\/api\/checkout\/manual-payment/);
+  assert.match(confirm, /manual-pending/);
 
   const guest = read("app/checkout/CheckoutClient.tsx");
   assert.match(guest, /\/api\/checkout\/manual-payment-config/);
   assert.match(guest, /ManualPaymentDetailsBox/);
+  assert.match(guest, /\/api\/checkout\/manual-payment/);
   assert.doesNotMatch(guest, /\/api\/admin\/manual-payment-settings/);
 
   const copy = read("app/components/account/ManualPaymentCopyField.tsx");
@@ -57,6 +82,19 @@ function main() {
   assert.match(box, /Bank name/);
   assert.match(box, /Bank account title/);
   assert.match(box, /Account number \/ IBAN/);
+
+  const fulfill = read("app/lib/admin/whatsappCheckoutFulfillment.ts");
+  assert.match(fulfill, /paymentProofUrl/);
+  assert.match(fulfill, /Verify Payment|Manual payment verified|paymentMethod/);
+  assert.match(fulfill, /prepareAdminPackageAssignment/);
+
+  const panel = read("app/components/admin/WhatsAppPendingOrdersPanel.tsx");
+  assert.match(panel, /View payment proof/);
+  assert.match(panel, /Verify Payment & Issue eSIM/);
+
+  const vesim = read("app/api/vesim/checkout/route.ts");
+  assert.match(vesim, /pendingLocalOrder/);
+  assert.match(vesim, /status: \"PENDING\"/);
 
   const mapped = toManualPaymentSettingsMap({
     ...EMPTY_MANUAL_PAYMENT_CONFIG,
@@ -79,6 +117,13 @@ function main() {
   );
   assert.equal(parsed.enabled, true);
   assert.equal(parsed.accountTitle, "MAP eSIM");
+
+  assert.equal(MANUAL_CHECKOUT_PAYMENT_METHOD, "MANUAL");
+  assert.equal(clipManualSenderName("  Ali  Khan  "), "Ali Khan");
+  assert.match(generateManualOrderReference(1_700_000_000_000), /^MP-/);
+
+  const pkg = read("package.json");
+  assert.match(pkg, /qa:manual-payment-checkout/);
 
   console.log("PASS qa-manual-payment-checkout");
 }

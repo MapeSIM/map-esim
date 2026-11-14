@@ -181,10 +181,25 @@ export async function POST(req: NextRequest) {
             : "unknown"
       );
 
+      // Persist a local PENDING snapshot so ops can recover when VeSIM is down.
+      // Never invent a provider order id — use a durable local reference only.
+      const localPendingRef = `pending-${idempotencyKey || Date.now()}`
+        .replace(/[^A-Za-z0-9_-]/g, "")
+        .slice(0, 120);
+      await persistGuestOrder({
+        providerOrderId: localPendingRef || `pending-${Date.now()}`,
+        customerEmail,
+        verifiedOffer,
+        status: "PENDING",
+        checkoutPayload: checkoutData,
+      });
+
       return NextResponse.json(
         {
           success: false,
-          error: "Unable to complete the purchase. Please try again.",
+          error:
+            "Provider is temporarily unavailable. Your checkout was saved for review — please contact support or try again shortly.",
+          pendingLocalOrder: true,
         },
         {
           status: checkoutResponse.status >= 400 ? checkoutResponse.status : 502,

@@ -128,7 +128,11 @@ export const ADMIN_NAV_LINKS = [
   { href: "/admin", label: "Overview", exact: true },
   { href: "/admin/revenue", label: "Revenue", exact: false },
   { href: "/admin/orders", label: "Orders", exact: false },
-  { href: "/admin/whatsapp-orders", label: "WhatsApp Orders", exact: false },
+  {
+    href: "/admin/whatsapp-orders",
+    label: "Manual / WhatsApp Orders",
+    exact: false,
+  },
   { href: "/admin/customers", label: "Customers", exact: false },
   { href: "/admin/countries", label: "Countries", exact: false },
   { href: "/admin/partners", label: "Partners", exact: false },

@@ -34,6 +34,8 @@ export type WhatsAppPendingOrderListItem = {
   status: WhatsAppCheckoutOrderStatus;
   createdAtLabel: string;
   paymentMethod: string;
+  senderName: string | null;
+  paymentProofUrl: string | null;
 };
 
 export type WhatsAppFulfillResult =
@@ -74,6 +76,8 @@ export async function listWhatsAppPendingOrders(options?: {
       status: true,
       createdAt: true,
       paymentMethod: true,
+      senderName: true,
+      paymentProofUrl: true,
     },
   });
 
@@ -89,6 +93,8 @@ export async function listWhatsAppPendingOrders(options?: {
     status: row.status,
     createdAtLabel: formatCreatedAt(row.createdAt),
     paymentMethod: row.paymentMethod,
+    senderName: (row.senderName ?? "").trim() || null,
+    paymentProofUrl: (row.paymentProofUrl ?? "").trim() || null,
   }));
 }
 
@@ -113,6 +119,7 @@ export async function fulfillWhatsAppCheckoutOrder(input: {
       id: true,
       reference: true,
       status: true,
+      paymentMethod: true,
       customerUserId: true,
       offerId: true,
       destinationCode: true,
@@ -140,12 +147,16 @@ export async function fulfillWhatsAppCheckoutOrder(input: {
   const idempotencyKey = `wa_fulfill_${pending.id}`.slice(0, 128);
 
   try {
+    const paymentLabel =
+      (pending.paymentMethod || "").trim().toUpperCase() === "MANUAL"
+        ? "Manual payment"
+        : "WhatsApp checkout";
     const prepared = await prepareAdminPackageAssignment({
       adminUserId: admin.id,
       customerUserId: pending.customerUserId,
       offerId: pending.offerId,
       countryHint: pending.destinationCode,
-      reason: `WhatsApp checkout payment verified (${pending.reference})`,
+      reason: `${paymentLabel} verified (${pending.reference})`,
       internalReference: pending.reference,
       idempotencyKey,
     });
@@ -157,6 +168,7 @@ export async function fulfillWhatsAppCheckoutOrder(input: {
       idempotencyKey,
     });
 
+    const previousOrderId = pending.orderId;
     await prisma.whatsAppCheckoutOrder.update({
       where: { id: pending.id },
       data: {
@@ -167,6 +179,26 @@ export async function fulfillWhatsAppCheckoutOrder(input: {
         fulfilledByAdminId: admin.id,
       },
     });
+
+    // Drop placeholder PENDING manual snapshot once the real VeSIM Order exists.
+    if (
+      previousOrderId &&
+      confirmed.orderId &&
+      previousOrderId !== confirmed.orderId
+    ) {
+      try {
+        await prisma.order.deleteMany({
+          where: {
+            id: previousOrderId,
+            status: "PENDING",
+            paymentMethod: "MANUAL",
+            providerOrderId: { startsWith: "manual-" },
+          },
+        });
+      } catch {
+        // Best-effort cleanup — fulfilled order already exists.
+      }
+    }
 
     await writeAuditLog({
       actorUserId: admin.id,

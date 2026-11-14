@@ -106,7 +106,9 @@ function RowActions({ order }: { order: WhatsAppPendingOrderListItem }) {
             {fulfillPending ? "Issuing eSIM…" : "Verify Payment & Issue eSIM"}
           </button>
         </form>
-        <ChatOnWhatsAppButton order={order} />
+        {order.paymentMethod !== "MANUAL" ? (
+          <ChatOnWhatsAppButton order={order} />
+        ) : null}
       </div>
       <form action={cancelAction} className="flex flex-wrap items-end gap-2">
         <input type="hidden" name="whatsappOrderId" value={order.id} />
@@ -147,10 +149,11 @@ export function WhatsAppPendingOrdersPanel({
         role="status"
       >
         <p className="text-sm font-medium text-[var(--heading)]">
-          No WhatsApp pending orders right now.
+          No pending manual or WhatsApp orders right now.
         </p>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          New Buy via WhatsApp checkouts appear here as WHATSAPP_PENDING.
+          New Buy via WhatsApp and Manual Payment checkouts appear here as
+          WHATSAPP_PENDING until fulfilled or cancelled.
         </p>
       </div>
     );
@@ -181,6 +184,21 @@ export function WhatsAppPendingOrdersPanel({
                 <div className="mt-0.5 text-[11px] font-normal text-[var(--text-soft)]">
                   {order.paymentMethod}
                 </div>
+                {order.senderName ? (
+                  <div className="mt-1 text-[11px] font-normal text-[var(--text-muted)]">
+                    Sender: {order.senderName}
+                  </div>
+                ) : null}
+                {order.paymentProofUrl ? (
+                  <a
+                    href={order.paymentProofUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 inline-flex text-[11px] font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+                  >
+                    View payment proof
+                  </a>
+                ) : null}
               </td>
               <td className="px-4 py-3 text-[var(--heading)]">
                 {order.customerEmail}

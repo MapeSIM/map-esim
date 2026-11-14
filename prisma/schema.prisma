@@ -1421,12 +1421,16 @@ model WhatsAppCheckoutOrder {
   /// Public reference shown in WhatsApp + admin hub (e.g. WA-83921).
   reference               String                       @unique
   status                  WhatsAppCheckoutOrderStatus  @default(WHATSAPP_PENDING)
-  /// Always "WHATSAPP" for this pipeline.
+  /// "WHATSAPP" or "MANUAL" for this pending-fulfillment pipeline.
   paymentMethod           String                       @default("WHATSAPP")
   customerUserId          String
   customerEmail           String
   /// Optional customer contact digits (not required for checkout open).
   whatsappPhone           String?
+  /// Manual payment: sender account name / mobile (never a secret).
+  senderName              String?
+  /// Manual payment: uploaded proof URL / data URL (admin review only).
+  paymentProofUrl         String?
   offerId                 String
   destinationCode         String?
   destinationName         String?

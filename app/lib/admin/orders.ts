@@ -145,6 +145,9 @@ export type AdminOrderDetail = {
   displayStatusLabel: string;
   lifecycle: ProviderLifecycleCacheView;
   remainingDataLabel: string | null;
+  paymentMethod: string | null;
+  senderName: string | null;
+  paymentProofUrl: string | null;
 };
 
 function fundingSourceLabel(
@@ -494,6 +497,9 @@ export async function getAdminOrderDetail(
       providerActivatedAt: true,
       providerExpiresAt: true,
       providerUsageSyncedAt: true,
+      paymentMethod: true,
+      senderName: true,
+      paymentProofUrl: true,
     },
   });
 
@@ -608,6 +614,9 @@ export async function getAdminOrderDetail(
     displayStatusLabel: customerEsimStatusLabel(statusBadge),
     lifecycle,
     remainingDataLabel: formatLifecycleGb(row.providerRemainingDataGb),
+    paymentMethod: (row.paymentMethod ?? "").trim() || null,
+    senderName: (row.senderName ?? "").trim() || null,
+    paymentProofUrl: (row.paymentProofUrl ?? "").trim() || null,
   };
 }
 

@@ -26,7 +26,11 @@ export async function getPublicManualPaymentConfig(): Promise<PublicManualPaymen
     });
     if (!row) return EMPTY_MANUAL_PAYMENT_CONFIG;
     return toPublicManualPaymentConfig(row);
-  } catch {
+  } catch (error) {
+    console.error(
+      "manual_payment_config_read",
+      error instanceof Error ? error.message : "unknown"
+    );
     return EMPTY_MANUAL_PAYMENT_CONFIG;
   }
 }

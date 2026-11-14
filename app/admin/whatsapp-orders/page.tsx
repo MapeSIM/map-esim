@@ -25,13 +25,14 @@ export default async function AdminWhatsAppOrdersPage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-bold tracking-tight">
-          WhatsApp Pending Orders
+          Pending Manual / WhatsApp Orders
         </h1>
         <p className="mt-2 max-w-3xl text-sm text-[var(--text-muted)]">
-          Manual fulfillment hub for Buy via WhatsApp checkouts. Verify the
-          customer paid on WhatsApp, then issue the eSIM (company-funded
-          provider path + confirmation email). Existing wallet/gateway flows are
-          unchanged.
+          Manual fulfillment hub for Buy via WhatsApp and Manual Payment
+          (JazzCash / EasyPaisa / bank) checkouts. Review payment proof when
+          present, verify the customer paid, then issue the eSIM
+          (company-funded provider path + confirmation email). Existing
+          wallet/gateway flows are unchanged.
         </p>
       </header>
 

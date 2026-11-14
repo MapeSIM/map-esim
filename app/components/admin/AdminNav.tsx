@@ -38,7 +38,7 @@ const navSections: readonly AdminNavSection[] = [
       { href: "/admin/orders", label: "Orders", exact: false },
       {
         href: "/admin/whatsapp-orders",
-        label: "WhatsApp Orders",
+        label: "Manual / WhatsApp Orders",
         exact: false,
       },
       { href: "/admin/customers", label: "Customers", exact: false },

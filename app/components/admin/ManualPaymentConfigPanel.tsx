@@ -56,6 +56,16 @@ export function ManualPaymentConfigPanel() {
         throw new Error(data.error || 'Failed to save');
       }
 
+      if (data.settings) {
+        setEnabled(data.settings.MANUAL_PAYMENTS_ENABLED === 'true');
+        setAccountTitle(data.settings.MANUAL_ACCOUNT_TITLE || '');
+        setJazzcash(data.settings.JAZZCASH_NUMBER || '');
+        setEasypaisa(data.settings.EASYPAISA_NUMBER || '');
+        setBankName(data.settings.BANK_NAME || '');
+        setBankAccountTitle(data.settings.BANK_ACCOUNT_TITLE || '');
+        setBankAccountNumber(data.settings.BANK_ACCOUNT_NUMBER || '');
+      }
+
       setStatusMessage('Settings saved successfully!');
       setTimeout(() => setStatusMessage(''), 3000);
     } catch (err) {
