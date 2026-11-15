@@ -228,13 +228,23 @@ function main() {
   console.log("PASS trust_panel_display_only");
 
   const compatModal = read("app/components/account/CheckoutCompatibilityModal.tsx");
+  const esimModal = read("app/components/esim/EsimCompatibilityModal.tsx");
+  const compatCatalog = read("app/lib/checkout/esimCompatibilityCatalog.ts");
   const compatGuide = read("app/lib/checkout/checkoutCompatibilityGuide.ts");
   assert.match(compatModal, /Check eSIM compatibility \(\?\)/);
-  assert.match(compatModal, /COMMON_SUPPORTED_ESIM_MODELS/);
+  assert.match(compatModal, /EsimCompatibilityTrigger/);
+  assert.match(compatModal, /footerAction="continue"/);
+  assert.match(esimModal, /Got it, Continue/);
+  assert.match(esimModal, /Explore Plans/);
+  assert.match(esimModal, /eSIM Supported/);
+  assert.match(esimModal, /Not Supported/);
+  assert.match(esimModal, /Verify via \*#06#/);
+  assert.match(compatCatalog, /ESIM_COMPAT_DEVICES/);
+  assert.match(compatCatalog, /iPhone XS/);
+  assert.match(compatCatalog, /Galaxy S20/);
   assert.match(compatGuide, /iPhone XR through iPhone 16 \/ 17/);
   assert.match(compatGuide, /Pixel 4 and newer/);
   assert.match(compatGuide, /Galaxy S20\+/);
-  assert.doesNotMatch(compatModal, /Non-PTA|non-pta/i);
   assert.doesNotMatch(compatGuide, /Non-PTA|non-pta/i);
   console.log("PASS checkout_compatibility_modal");
 

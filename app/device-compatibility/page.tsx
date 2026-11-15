@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, LockKeyhole, Smartphone } from "lucide-react";
+import EsimCompatibilityInlineTrigger from "@/app/components/esim/EsimCompatibilityInlineTrigger";
 import { BRAND_NAME } from "@/app/lib/brand";
 import { absoluteCanonical } from "@/app/lib/seo/canonical";
 import { publicPageShareMeta } from "@/app/lib/seo/socialShareMeta";
@@ -43,6 +44,13 @@ export default function DeviceCompatibilityPage() {
             carrier-unlocked. This page is guidance only — {BRAND_NAME} does not
             guarantee compatibility for every device.
           </p>
+          <div className="mt-6">
+            <EsimCompatibilityInlineTrigger
+              label="Check eSIM compatibility (?)"
+              footerAction="explore"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[var(--accent-strong)]/40 bg-[var(--accent-strong)]/12 px-5 text-sm font-bold text-[var(--accent-strong)] transition hover:bg-[var(--accent-strong)]/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+            />
+          </div>
         </div>
       </section>
 

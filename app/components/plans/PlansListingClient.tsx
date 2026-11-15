@@ -8,6 +8,7 @@ import {
 } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import EsimCompatibilityInlineTrigger from "@/app/components/esim/EsimCompatibilityInlineTrigger";
 import type { VesimOffer } from "@/app/lib/vesim/offers";
 import type { VesimDestination } from "@/app/lib/vesim/destinations";
 import {
@@ -181,12 +182,11 @@ export default function PlansListingClient({
       <section className="mx-auto max-w-[1200px] px-4 pt-4 pb-6 sm:px-6 sm:py-10">
         <p className="mb-3 text-xs leading-snug text-[var(--text-muted)] sm:mb-6 sm:text-sm sm:leading-relaxed">
           Confirm your phone supports eSIM and is unlocked.{" "}
-          <Link
-            href="/device-compatibility"
-            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
-          >
-            Check compatibility →
-          </Link>
+          <EsimCompatibilityInlineTrigger
+            label="Check eSIM compatibility (?)"
+            footerAction="explore"
+            className="inline font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+          />
         </p>
 
         {loading && (

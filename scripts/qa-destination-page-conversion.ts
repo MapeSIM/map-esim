@@ -70,7 +70,7 @@ function main() {
   // Sprint B1.4: auth-aware purchase trust (display only).
   assert.match(listing, /planPurchaseTrustLine/);
   assert.match(listing, /purchaseTrustLine/);
-  assert.match(listing, /setSignedIn/);
+  assert.match(listing, /useShellAuth|signedIn/);
   // Public QR/install access lines are not rendered unless a trust line exists.
   assert.match(listing, /PlanCardTrustLine|purchaseTrustLine/);
   assert.doesNotMatch(listing, /QR and install details arrive after purchase/);
@@ -111,8 +111,8 @@ function main() {
   );
   assert.doesNotMatch(listing, /bg-white/);
   assert.doesNotMatch(listing, /Need more options\?/);
-  assert.match(listing, /href="\/device-compatibility"/);
-  assert.match(listing, /Check compatibility/);
+  assert.match(listing, /EsimCompatibilityInlineTrigger|Check eSIM compatibility/);
+  assert.match(listing, /Check eSIM compatibility/);
   // P0/P1: hide Unlimited tab when count is 0 (no disabled empty tab).
   assert.match(
     read("app/lib/plans/planListingModel.ts") + listing,

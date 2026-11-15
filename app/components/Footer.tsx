@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CreditCard } from "lucide-react";
 import CookiePreferencesLink from "@/app/components/cookies/CookiePreferencesLink";
 import SocialIcons from "@/app/components/footer/SocialIcons";
+import FooterEsimCompatibilityLink from "@/app/components/esim/FooterEsimCompatibilityLink";
 import {
   BRAND_LOGO_ALT,
   BRAND_LOGO_DARK_PUBLIC_PATH,
@@ -39,7 +40,6 @@ const columns = [
     title: "Support",
     links: [
       { label: "Support Center", href: "/support" },
-      { label: "Device Compatibility", href: "/device-compatibility" },
       { label: "iPhone Installation", href: "/install/iphone" },
       { label: "Android Installation", href: "/install/android" },
       { label: "Account Orders", href: "/account/orders" },
@@ -107,6 +107,11 @@ export default function Footer() {
               {column.title}
             </h3>
             <ul className="mt-4 space-y-3 text-sm text-[var(--text-muted)]">
+              {column.title === "Support" ? (
+                <li>
+                  <FooterEsimCompatibilityLink />
+                </li>
+              ) : null}
               {column.links.map((link) => (
                 <li key={link.label}>
                   <Link href={link.href} className={footerLinkClass}>

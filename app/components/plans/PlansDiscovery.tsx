@@ -19,6 +19,7 @@ import {
   Search,
 } from "lucide-react";
 import { useCurrency } from "@/app/components/currency/CurrencyProvider";
+import EsimCompatibilityInlineTrigger from "@/app/components/esim/EsimCompatibilityInlineTrigger";
 import {
   filterPlansDiscoveryDestinations,
   plansDestinationHref,
@@ -379,12 +380,11 @@ export default function PlansDiscovery({
         </p>
         <p className="mb-8 text-sm text-[var(--text-muted)]">
           Not sure your phone supports eSIM?{" "}
-          <Link
-            href="/device-compatibility"
-            className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
-          >
-            Check device compatibility
-          </Link>
+          <EsimCompatibilityInlineTrigger
+            label="Check eSIM compatibility (?)"
+            footerAction="explore"
+            className="inline font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+          />
           .
         </p>
 
