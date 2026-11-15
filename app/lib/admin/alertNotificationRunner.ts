@@ -33,6 +33,9 @@ import {
 import { loadOperationalControlPausedMapSoft } from "@/app/lib/admin/operationalControlsPolicy";
 import { prisma } from "@/app/lib/db";
 
+/** Bound monitoring aggregation so a slow DB probe cannot hang the runner. */
+const AGGREGATION_TIMEOUT_MS = 8_000;
+
 export type AlertNotificationRunResult = {
   ok: boolean;
   paused: boolean;
@@ -41,6 +44,24 @@ export type AlertNotificationRunResult = {
   counts: SafeRunnerCounts;
   errorCode?: string;
 };
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  code: string
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(code)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 export async function evaluateAndDeliverAlertNotifications(options?: {
   checkedAt?: Date;
@@ -91,7 +112,27 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
       };
     }
 
-    const aggregation = await collectMonitoringAlerts({ checkedAt });
+    let aggregation: Awaited<ReturnType<typeof collectMonitoringAlerts>>;
+    try {
+      aggregation = await withTimeout(
+        collectMonitoringAlerts({ checkedAt }),
+        AGGREGATION_TIMEOUT_MS,
+        "AGGREGATION_TIMEOUT"
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message === "AGGREGATION_TIMEOUT") {
+        console.error("alert_notification_runner", "AGGREGATION_TIMEOUT");
+        return {
+          ok: false,
+          paused: false,
+          runnerClaimed: true,
+          snapshotComplete: false,
+          counts,
+          errorCode: "aggregation_timeout",
+        };
+      }
+      throw error;
+    }
     const completeness = aggregation.completeness;
     const activeAlerts = aggregation.alerts.filter((a) => a.state === "ACTIVE");
     const eligible = filterEligibleAlerts(activeAlerts);

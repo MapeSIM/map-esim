@@ -454,6 +454,14 @@ function main() {
   assert.match(opsPage, /RunAlertNotificationsPanel/);
   assert.match(panel, /ALERT_NOTIFICATION_CONFIRM_PHRASE|RUN ALERT NOTIFICATIONS/);
   assert.match(panel, /eligible|sent|suppressed|cooldown|failed|recovery/);
+  assert.match(panel, /CLIENT_RUN_TIMEOUT_MS|15_000|15000/);
+  assert.match(panel, /AbortController/);
+  assert.match(panel, /finally[\s\S]{0,400}setRunning\(false\)/);
+  assert.match(panel, /Completed:.*sent.*skipped|sentFromState|skippedFromState/);
+  assert.match(actions, /sentCount|skippedCount/);
+  assert.match(actions, /SERVER_RUN_TIMEOUT_MS|ALERT_RUN_TIMEOUT/);
+  assert.match(runner, /AGGREGATION_TIMEOUT|aggregation_timeout/);
+  assert.match(delivery, /SMTP_TIMEOUT|SMTP_TIMEOUT_MS/);
   assert.doesNotMatch(panel, /useEffect[\s\S]{0,200}runAlertNotifications/);
   console.log("PASS manual_admin_action");
 

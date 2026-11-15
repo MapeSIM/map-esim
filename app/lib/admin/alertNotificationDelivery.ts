@@ -134,38 +134,46 @@ export async function sendAlertNotificationEmails(input: {
   // SMTP cannot guarantee perfect exactly-once if the process crashes after
   // the provider accepts the message but before durable SENT is recorded.
   // Unique eventKey + CAS claim minimize normal concurrent/restart duplication.
+  const SMTP_TIMEOUT_MS = 8_000;
+
   for (const to of input.recipients) {
-    const mailPromise = sendChannelMail({
-      channel: "support",
-      to,
-      subject: content.subject,
-      text: content.text,
-      html: content.html,
-      messageId,
-      headers: {
-        "X-MAP-ESIM-Alert-Event": input.eventType,
-        "X-MAP-ESIM-Alert-Code": String(input.alert.code).slice(0, 80),
-      },
-    });
-
-    // 8-second timeout wrapper to prevent hanging on slow SMTP connections
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("SMTP Timeout")), 8000)
-    );
-
-    let result: any;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      result = await Promise.race([mailPromise, timeoutPromise]);
-    } catch (timeoutError) {
-      console.warn("Email dispatch timed out safely, continuing execution...");
-      return { ok: false, errorCode: "send_failed" };
-    }
+      const mailPromise = sendChannelMail({
+        channel: "support",
+        to,
+        subject: content.subject,
+        text: content.text,
+        html: content.html,
+        messageId,
+        headers: {
+          "X-MAP-ESIM-Alert-Event": input.eventType,
+          "X-MAP-ESIM-Alert-Code": String(input.alert.code).slice(0, 80),
+        },
+      });
 
-    if (!result.ok) {
-      return {
-        ok: false,
-        errorCode: normalizeOpaqueErrorCode(result.reason),
-      };
+      // Bound outbound SMTP so a slow provider cannot hang the serverless run.
+      const result = await Promise.race([
+        mailPromise,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error("SMTP_TIMEOUT")),
+            SMTP_TIMEOUT_MS
+          );
+        }),
+      ]);
+
+      if (!result.ok) {
+        return {
+          ok: false,
+          errorCode: normalizeOpaqueErrorCode(result.reason),
+        };
+      }
+    } catch {
+      console.error("alert_notification_email", "SMTP_TIMEOUT_OR_FAILED");
+      return { ok: false, errorCode: "send_failed" };
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 
