@@ -45,6 +45,16 @@ function main() {
   // Simpaisa must use server action only — no no-op onSubmit that blocks Verify.
   assert.match(confirm, /handleSafepaySubmit/);
   assert.match(confirm, /isSafepayMode\s*\?\s*handleSafepaySubmit/);
+  assert.match(confirm, /showPurchaseConfirmCheckbox/);
+  assert.match(confirm, /confirmGateError/);
+  assert.match(
+    confirm,
+    /Please confirm this purchase before continuing to payment/
+  );
+  assert.doesNotMatch(
+    confirm,
+    /alert\(\s*["']Please confirm this purchase before continuing to payment/
+  );
   assert.match(
     confirm,
     /Simpaisa \/ wallet must NOT attach an onSubmit|must NOT attach an onSubmit handler/
@@ -195,7 +205,8 @@ function main() {
   );
   // Manual Payment: sole in-form Submit; hide aside/sticky duplicates.
   assert.match(confirm, /stickyBarVisible = !awaitingGatewayPayment && !manualSelected/);
-  assert.match(confirm, /manualSelected \? null : zeroCashConfirm/);
+  assert.match(confirm, /manualSelected \? null : showWhatsAppCheckoutCta/);
+  assert.match(confirm, /showPurchaseConfirmCheckbox/);
   assert.match(guest, /Sole Submit CTA when Manual Payment/);
   assert.match(guest, /paymentMethod === "manual" && manualSettings\?\.enabled \? null/);
   assert.match(confirm, /pb-28/);

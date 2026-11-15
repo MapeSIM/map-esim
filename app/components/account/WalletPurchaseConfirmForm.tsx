@@ -312,6 +312,10 @@ export default function WalletPurchaseConfirmForm({
   const [whatsappLocalNumber, setWhatsappLocalNumber] = useState("");
   const [whatsappPhoneTouched, setWhatsappPhoneTouched] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [confirmGateError, setConfirmGateError] = useState<string | null>(null);
+  const [safepayInlineError, setSafepayInlineError] = useState<string | null>(
+    null
+  );
   const [paymentMode, setPaymentMode] = useState<CustomerEsimPaymentMode>(() =>
     defaultPaymentMode(review)
   );
@@ -496,10 +500,14 @@ export default function WalletPurchaseConfirmForm({
    */
   async function handleSafepaySubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setSafepayInlineError(null);
     if (!confirmed) {
-      alert("Please confirm this purchase before continuing to payment.");
+      setConfirmGateError(
+        "Please confirm this purchase before continuing to payment."
+      );
       return;
     }
+    setConfirmGateError(null);
     setWhatsappOrderBusy(true);
     try {
       const res = await fetch("/api/payments/safepay/init", {
@@ -521,13 +529,18 @@ export default function WalletPurchaseConfirmForm({
         (data && typeof data.error === "string" && data.error) ||
         "Could not initialize Safepay checkout.";
       console.error("checkout_safepay_init_failed");
-      alert(message);
+      setSafepayInlineError(message);
       setWhatsappOrderBusy(false);
     } catch {
       console.error("checkout_safepay_init_network");
-      alert("Network error connecting to Safepay.");
+      setSafepayInlineError("Network error connecting to Safepay.");
       setWhatsappOrderBusy(false);
     }
+  }
+
+  function onConfirmChange(checked: boolean) {
+    setConfirmed(checked);
+    if (checked) setConfirmGateError(null);
   }
 
   const walletDisabled = review.balanceCents <= 0;
@@ -601,21 +614,28 @@ export default function WalletPurchaseConfirmForm({
       ? "Wallet"
       : "Covered";
   const gatewayNeedsSimpaisaFields = gatewayReady && simpaisaCheckout;
+  // Wallet-covered and online/card CTAs all require the visible confirm checkbox.
+  const showPurchaseConfirmCheckbox =
+    !manualSelected &&
+    !whatsappSelected &&
+    (zeroCashConfirm || gatewayReady);
   const stickyCtaDisabled = manualSelected
     ? manualSubmitting || !manualSenderName || !proofUrl
     : zeroCashConfirm
       ? purchaseBlocked || !confirmed
       : gatewayReady
         ? purchaseBlocked ||
+          !confirmed ||
           (gatewayNeedsSimpaisaFields && !simpaisaFieldsReady)
         : true;
-  const stickyShowConfirm = zeroCashConfirm && !pending && !manualSelected;
+  const stickyShowConfirm =
+    showPurchaseConfirmCheckbox && !pending && !manualSelected;
   const stickyDisabledReason = (() => {
     if (pending || selectingPayment) return "Updating payment method...";
     if (deliveryBlocksPurchase) {
       return "Save or cancel the delivery email to continue.";
     }
-    if (zeroCashConfirm && !confirmed) {
+    if (showPurchaseConfirmCheckbox && !confirmed) {
       return null;
     }
     if (manualSelected) {
@@ -1461,49 +1481,7 @@ export default function WalletPurchaseConfirmForm({
 
           <CheckoutDisplayCurrencyNote />
 
-          {manualSelected ? null : zeroCashConfirm ? (
-            <>
-              <div id={confirmSectionId} className="scroll-mt-28 sm:scroll-mt-32 space-y-2">
-                <label
-                  htmlFor={confirmId}
-                  className="flex items-start gap-3 text-sm text-[var(--heading)]"
-                >
-                  <input
-                    id={confirmId}
-                    name="confirm"
-                    type="checkbox"
-                    checked={confirmed}
-                    onChange={(event) => setConfirmed(event.target.checked)}
-                    disabled={purchaseBlocked}
-                    className="mt-1"
-                  />
-                  <span>
-                    {confirmCheckboxText}
-                  </span>
-                </label>
-                {errorState.ok === false && errorState.fieldErrors?.confirm ? (
-                  <p className="text-sm text-[var(--heading)]" role="alert">
-                    {errorState.fieldErrors.confirm}
-                  </p>
-                ) : null}
-              </div>
-
-              <button
-                type="submit"
-                disabled={purchaseBlocked || !confirmed}
-                className="hidden min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60 lg:inline-flex"
-              >
-                {pending || selectingPayment ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    Updating payment method...
-                  </>
-                ) : (
-                  primaryCtaLabel
-                )}
-              </button>
-            </>
-          ) : showWhatsAppCheckoutCta ? (
+          {manualSelected ? null : showWhatsAppCheckoutCta ? (
             <div
               id={confirmSectionId}
               className="scroll-mt-28 sm:scroll-mt-32 hidden lg:block"
@@ -1516,12 +1494,49 @@ export default function WalletPurchaseConfirmForm({
                 locked={pending || fundingPending}
               />
             </div>
-          ) : gatewayReady ? (
-            <div id={confirmSectionId} className="scroll-mt-28 sm:scroll-mt-32">
+          ) : showPurchaseConfirmCheckbox ? (
+            <>
+              <div
+                id={confirmSectionId}
+                className="scroll-mt-28 sm:scroll-mt-32 space-y-2"
+              >
+                <label
+                  htmlFor={confirmId}
+                  className="flex items-start gap-3 text-sm text-[var(--heading)]"
+                >
+                  <input
+                    id={confirmId}
+                    name="confirm"
+                    type="checkbox"
+                    checked={confirmed}
+                    onChange={(event) => onConfirmChange(event.target.checked)}
+                    disabled={purchaseBlocked}
+                    className="mt-1"
+                  />
+                  <span>{confirmCheckboxText}</span>
+                </label>
+                {confirmGateError ? (
+                  <p className="text-sm text-[var(--danger-text)]" role="alert">
+                    {confirmGateError}
+                  </p>
+                ) : null}
+                {errorState.ok === false && errorState.fieldErrors?.confirm ? (
+                  <p className="text-sm text-[var(--heading)]" role="alert">
+                    {errorState.fieldErrors.confirm}
+                  </p>
+                ) : null}
+                {safepayInlineError ? (
+                  <p className="text-sm text-[var(--danger-text)]" role="alert">
+                    {safepayInlineError}
+                  </p>
+                ) : null}
+              </div>
+
               <button
                 type="submit"
                 disabled={
                   purchaseBlocked ||
+                  !confirmed ||
                   (gatewayNeedsSimpaisaFields && !simpaisaFieldsReady)
                 }
                 className="hidden min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60 lg:inline-flex"
@@ -1535,7 +1550,7 @@ export default function WalletPurchaseConfirmForm({
                   primaryCtaLabel
                 )}
               </button>
-            </div>
+            </>
           ) : walletOnlyInsufficient ? (
             <div
               id={confirmSectionId}
@@ -1575,30 +1590,42 @@ export default function WalletPurchaseConfirmForm({
           <div className="mx-auto flex max-w-5xl min-w-0 flex-col gap-2">
             {/* Mobile sticky pay action — sole mobile CTA (desktop uses aside). */}
             {stickyShowConfirm ? (
-              <label
-                htmlFor={confirmStickyId}
-                className="flex items-start gap-2.5 text-xs leading-snug text-[var(--heading)]"
-              >
-                <input
-                  id={confirmStickyId}
-                  type="checkbox"
-                  checked={confirmed}
-                  onChange={(event) => setConfirmed(event.target.checked)}
-                  disabled={purchaseBlocked}
-                  className="mt-0.5"
-                  aria-controls={confirmSectionId}
-                />
-                <span className="min-w-0 break-words">
-                  {confirmCheckboxText}{" "}
-                  <a
-                    href={`#${confirmSectionId}`}
-                    className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    Details
-                  </a>
-                </span>
-              </label>
+              <div className="space-y-1.5">
+                <label
+                  htmlFor={confirmStickyId}
+                  className="flex items-start gap-2.5 text-xs leading-snug text-[var(--heading)]"
+                >
+                  <input
+                    id={confirmStickyId}
+                    type="checkbox"
+                    checked={confirmed}
+                    onChange={(event) => onConfirmChange(event.target.checked)}
+                    disabled={purchaseBlocked}
+                    className="mt-0.5"
+                    aria-controls={confirmSectionId}
+                  />
+                  <span className="min-w-0 break-words">
+                    {confirmCheckboxText}{" "}
+                    <a
+                      href={`#${confirmSectionId}`}
+                      className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      Details
+                    </a>
+                  </span>
+                </label>
+                {confirmGateError ? (
+                  <p className="text-xs text-[var(--danger-text)]" role="alert">
+                    {confirmGateError}
+                  </p>
+                ) : null}
+                {safepayInlineError ? (
+                  <p className="text-xs text-[var(--danger-text)]" role="alert">
+                    {safepayInlineError}
+                  </p>
+                ) : null}
+              </div>
             ) : null}
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
@@ -1615,22 +1642,7 @@ export default function WalletPurchaseConfirmForm({
                 )}
               </p>
             </div>
-            {zeroCashConfirm ? (
-              <button
-                type="submit"
-                disabled={stickyCtaDisabled}
-                className="inline-flex h-11 w-full min-w-0 items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
-              >
-                {pending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    {primaryCtaPendingLabel}
-                  </>
-                ) : (
-                  primaryCtaLabel
-                )}
-              </button>
-            ) : showWhatsAppCheckoutCta ? (
+            {showWhatsAppCheckoutCta ? (
               <BuyViaWhatsAppCheckoutButton
                 purchaseId={review.purchaseId}
                 customerWhatsAppDigits={customerWhatsAppDigits}
@@ -1639,7 +1651,7 @@ export default function WalletPurchaseConfirmForm({
                 locked={pending || fundingPending}
                 className="inline-flex h-11 w-full min-w-0 items-center justify-center gap-2 rounded-2xl bg-[#25D366] px-4 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
               />
-            ) : gatewayReady ? (
+            ) : showPurchaseConfirmCheckbox ? (
               <button
                 type="submit"
                 disabled={stickyCtaDisabled}
