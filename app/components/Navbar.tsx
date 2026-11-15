@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import {
   Gift,
@@ -58,6 +58,7 @@ const navLinks: NavLink[] = [
     flagSrc: PAKISTAN_FLAG_PUBLIC_PATH,
   },
   { href: "/countries", label: "Destinations" },
+  { href: "/#esim-usage", label: "Check Usage" },
   { href: "/how-it-works", label: "How It Works" },
   { href: "/support", label: "Support" },
   { href: "/contact", label: "Contact" },
@@ -164,6 +165,7 @@ export default function Navbar({
 
   function isActive(href: string) {
     if (href === "/") return pathname === "/";
+    if (href === "/#esim-usage") return false;
     if (href === "/countries") {
       return (
         pathname === "/countries" ||
@@ -176,6 +178,21 @@ export default function Navbar({
 
   function closeMenu() {
     setOpen(false);
+  }
+
+  function onCheckUsageClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (pathname !== "/") return;
+    event.preventDefault();
+    const el = document.getElementById("esim-usage");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      try {
+        window.history.replaceState(null, "", "/#esim-usage");
+      } catch {
+        // ignore
+      }
+    }
+    closeMenu();
   }
 
   function mobileNavClass(active: boolean, emphasize = false) {
@@ -244,11 +261,13 @@ export default function Navbar({
           {navLinks.map((link) => {
             const active = isActive(link.href);
             const stacked = Boolean(link.labelLines);
+            const isCheckUsage = link.href === "/#esim-usage";
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                prefetch
+                prefetch={!isCheckUsage}
+                onClick={isCheckUsage ? onCheckUsageClick : undefined}
                 className={`
                   relative inline-flex shrink-0 items-center justify-center
                   rounded-lg px-1.5 py-1.5 text-center text-xs font-medium
@@ -435,12 +454,17 @@ export default function Navbar({
                   <nav className="flex flex-col gap-2.5" aria-label="Primary mobile">
                     {navLinks.map((link) => {
                         const active = isActive(link.href);
+                        const isCheckUsage = link.href === "/#esim-usage";
                         return (
                           <Link
                             key={link.href}
                             href={link.href}
-                            prefetch
-                            onClick={closeMenu}
+                            prefetch={!isCheckUsage}
+                            onClick={
+                              isCheckUsage
+                                ? onCheckUsageClick
+                                : closeMenu
+                            }
                             aria-current={active ? "page" : undefined}
                             className={`flex min-h-12 items-center rounded-2xl px-4 text-[15px] font-semibold tracking-[-0.01em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 ${mobileNavClass(active)}`}
                           >

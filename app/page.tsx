@@ -18,6 +18,7 @@ import { HomeTrustSection } from "@/app/components/home/HomeTrustSection";
 import { HomePopularDestinations } from "@/app/components/home/HomePopularDestinations";
 import { HomeComparisonSection } from "@/app/components/home/HomeComparisonSection";
 import { HomeFinalCta } from "@/app/components/home/HomeFinalCta";
+import HomeEsimUsageWidget from "@/app/components/home/HomeEsimUsageWidget";
 import { FaqAccordion } from "@/app/components/faq/FaqAccordion";
 import { BRAND_NAME } from "@/app/lib/brand";
 import {
@@ -205,6 +206,8 @@ export default function Home() {
       </section>
 
       <HomeTrustSection />
+
+      <HomeEsimUsageWidget />
 
       <HomePopularDestinations />
 

@@ -8,6 +8,7 @@ import { CheckoutTrustPanel } from "@/app/components/account/CheckoutTrustPanel"
 import { CheckoutCompatibilityCheck } from "@/app/components/account/CheckoutCompatibilityModal";
 import { ManualPaymentDetailsBox } from "@/app/components/account/ManualPaymentDetailsBox";
 import type { PublicManualPaymentConfig } from "@/app/lib/payments/manualPaymentConfigShared";
+import { writeHomeEsimUsageLookup } from "@/app/lib/esim/homeUsageLookupShared";
 
 type VerifiedOffer = {
   offerId: string;
@@ -248,12 +249,20 @@ function CheckoutContent() {
 
         const ref =
           typeof orderData.reference === "string" ? orderData.reference : "";
+        const guestOrderId =
+          typeof orderData.orderId === "string" ? orderData.orderId.trim() : "";
+        // Persist for Home Screen usage auto-load (Order ID preferred).
+        if (guestOrderId) {
+          writeHomeEsimUsageLookup(guestOrderId);
+        } else if (ref) {
+          writeHomeEsimUsageLookup(ref);
+        }
         alert(
           ref
             ? `Payment proof submitted (ref ${ref}). We will verify and email your eSIM shortly.`
             : "Payment proof submitted. We will verify and email your eSIM shortly."
         );
-        router.push("/account");
+        router.push("/#esim-usage");
         return;
       }
 
