@@ -2,12 +2,12 @@
 
 import { useState, type FormEvent } from "react";
 import {
-  runAlertNotificationsAction,
   type RunAlertNotificationsFormState,
 } from "@/app/lib/admin/alertNotificationActions";
 import { ALERT_NOTIFICATION_CONFIRM_PHRASE } from "@/app/lib/admin/alertNotificationShared";
 
-const CLIENT_RUN_TIMEOUT_MS = 15_000;
+/** Under route maxDuration=60; leave a small client buffer. */
+const CLIENT_RUN_TIMEOUT_MS = 55_000;
 
 function skippedFromState(state: NonNullable<RunAlertNotificationsFormState>): number {
   if (typeof state.skippedCount === "number") return state.skippedCount;
@@ -23,8 +23,8 @@ function sentFromState(state: NonNullable<RunAlertNotificationsFormState>): numb
 
 /**
  * Manual alert-notification runner.
- * Local `running` + hard 15s client timeout so the button never sticks on Running…
- * even if the server action hangs or the connection drops mid-flight.
+ * Posts to `/api/admin/operations/alert-notifications` (maxDuration=60) so Vercel
+ * does not kill the run at the default 10s serverless limit.
  */
 export function RunAlertNotificationsPanel() {
   const [running, setRunning] = useState(false);
@@ -37,35 +37,59 @@ export function RunAlertNotificationsPanel() {
 
     const form = event.currentTarget;
     const formData = new FormData(form);
+    const confirmPhrase = String(formData.get("confirmPhrase") ?? "");
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), CLIENT_RUN_TIMEOUT_MS);
+    const timeoutId = window.setTimeout(
+      () => controller.abort(),
+      CLIENT_RUN_TIMEOUT_MS
+    );
 
     try {
-      const actionPromise = runAlertNotificationsAction(null, formData);
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        const onAbort = () => {
-          reject(new Error("CLIENT_TIMEOUT"));
-        };
-        if (controller.signal.aborted) {
-          onAbort();
-          return;
-        }
-        controller.signal.addEventListener("abort", onAbort, { once: true });
+      const res = await fetch("/api/admin/operations/alert-notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmPhrase }),
+        signal: controller.signal,
+        credentials: "same-origin",
       });
 
-      const result = await Promise.race([actionPromise, timeoutPromise]);
-      setState(result);
+      let payload: RunAlertNotificationsFormState = null;
+      try {
+        payload = (await res.json()) as RunAlertNotificationsFormState;
+      } catch {
+        payload = null;
+      }
+
+      if (!payload || typeof payload.ok !== "boolean") {
+        setState({
+          ok: false,
+          error: "Unable to run alert notifications. Please try again.",
+          sentCount: 0,
+          skippedCount: 0,
+          remainingCount: 0,
+          processedCount: 0,
+          aggregationMs: 0,
+          sendMs: 0,
+        });
+        return;
+      }
+
+      setState(payload);
     } catch (error) {
       const timedOut =
         error instanceof Error &&
-        (error.message === "CLIENT_TIMEOUT" || error.name === "AbortError");
+        (error.name === "AbortError" || error.message === "CLIENT_TIMEOUT");
       setState({
         ok: false,
         error: timedOut
-          ? "Alert notification run timed out after 15 seconds. The server may still be finishing — wait a moment before retrying."
+          ? "Alert notification run timed out on the client. The server may still be finishing — wait a moment before retrying."
           : "Unable to run alert notifications. Please try again.",
         sentCount: 0,
         skippedCount: 0,
+        remainingCount: 0,
+        processedCount: 0,
+        aggregationMs: 0,
+        sendMs: 0,
       });
     } finally {
       window.clearTimeout(timeoutId);
@@ -90,7 +114,8 @@ export function RunAlertNotificationsPanel() {
       <p className="mt-2 text-xs text-[var(--text-muted)]">
         Manually evaluate eligible CRITICAL / allowlisted HIGH alerts and deliver
         evidence-safe emails via the support channel. Does not run on page load.
-        Pausing Alert notification emails blocks sends only.
+        Pausing Alert notification emails blocks sends only. Processes up to 3
+        alerts per click (local DB aggregation only — no provider HTTP).
       </p>
       <form onSubmit={onSubmit} className="mt-4 space-y-3">
         <label className="block text-xs font-medium text-[var(--heading)]">
@@ -137,6 +162,10 @@ export function RunAlertNotificationsPanel() {
                   : ""
               })`
             : ""}
+          {typeof state.aggregationMs === "number" ||
+          typeof state.sendMs === "number"
+            ? ` · timing aggregation ${state.aggregationMs ?? 0}ms / send ${state.sendMs ?? 0}ms / processed ${state.processedCount ?? 0}`
+            : ""}
           {state.snapshotComplete === false ? " — incomplete snapshot" : ""}.
         </p>
       ) : null}
@@ -148,6 +177,10 @@ export function RunAlertNotificationsPanel() {
         >
           {state.error ?? "Unable to run alert notifications."}
           {state.progressMessage ? ` ${state.progressMessage}.` : null}
+          {typeof state.aggregationMs === "number" ||
+          typeof state.sendMs === "number"
+            ? ` (aggregation ${state.aggregationMs ?? 0}ms / send ${state.sendMs ?? 0}ms / processed ${state.processedCount ?? 0})`
+            : null}
         </p>
       ) : null}
     </section>

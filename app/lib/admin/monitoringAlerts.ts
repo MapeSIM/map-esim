@@ -1582,6 +1582,9 @@ async function collectRecordAlerts(now: Date): Promise<{
 /**
  * Collect all derived ACTIVE alerts. Read-only.
  * One immutable checkedAt is used for every age/threshold rule in a run.
+ * Local DB (Prisma) + process env only — never calls external provider HTTP
+ * (VeSIM / Safepay / Simpaisa) during evaluation. Reconciliation actionable /
+ * oldest-unresolved ages are derived from local case rows.
  */
 async function collectMonitoringAlertsImpl(options?: {
   checkedAt?: Date;

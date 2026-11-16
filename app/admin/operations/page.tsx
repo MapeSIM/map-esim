@@ -37,6 +37,8 @@ import { prisma } from "@/app/lib/db";
 import { getGuestCheckoutConfigView } from "@/app/lib/vesim/guestCheckoutGate";
 
 export const dynamic = "force-dynamic";
+/** Allow "Run alert notifications" server work beyond Vercel's default 10s. */
+export const maxDuration = 60;
 
 const UNAVAILABLE =
   "Operations health data is temporarily unavailable. Please refresh shortly.";

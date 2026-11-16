@@ -26,6 +26,9 @@ export type RunAlertNotificationsFormState = {
   sentCount?: number;
   skippedCount?: number;
   remainingCount?: number;
+  processedCount?: number;
+  aggregationMs?: number;
+  sendMs?: number;
   /** Present when a bounded batch left more outbox work. */
   progressMessage?: string;
   counts?: SafeRunnerCounts;
@@ -33,8 +36,11 @@ export type RunAlertNotificationsFormState = {
   snapshotComplete?: boolean;
 } | null;
 
-/** Hard ceiling above the 8s runner budget; client uses 15s. */
-const SERVER_RUN_TIMEOUT_MS = 10_000;
+/**
+ * Soft ceiling under route maxDuration (60s). Prefer the dedicated API route
+ * (`/api/admin/operations/alert-notifications`) which exports maxDuration=60.
+ */
+const SERVER_RUN_TIMEOUT_MS = 55_000;
 
 function skippedCountFrom(counts: SafeRunnerCounts): number {
   return counts.suppressed + counts.cooldown;
@@ -47,6 +53,9 @@ function toBannerState(input: {
   counts?: SafeRunnerCounts;
   paused?: boolean;
   snapshotComplete?: boolean;
+  processedCount?: number;
+  aggregationMs?: number;
+  sendMs?: number;
 }): NonNullable<RunAlertNotificationsFormState> {
   const counts = input.counts ?? emptyRunnerCounts();
   return {
@@ -56,6 +65,9 @@ function toBannerState(input: {
     sentCount: counts.sent,
     skippedCount: skippedCountFrom(counts),
     remainingCount: counts.remaining,
+    processedCount: input.processedCount ?? 0,
+    aggregationMs: input.aggregationMs ?? 0,
+    sendMs: input.sendMs ?? 0,
     counts,
     paused: input.paused,
     snapshotComplete: input.snapshotComplete,
@@ -174,6 +186,9 @@ export async function runAlertNotificationsAction(
         counts: result.counts,
         snapshotComplete: result.snapshotComplete,
         paused: result.paused,
+        processedCount: result.processed,
+        aggregationMs: result.aggregationMs,
+        sendMs: result.sendMs,
         progressMessage:
           formatAlertNotificationPartialProgress({
             processed: result.processed,
@@ -194,6 +209,9 @@ export async function runAlertNotificationsAction(
       paused: result.paused,
       snapshotComplete: result.snapshotComplete,
       progressMessage,
+      processedCount: result.processed,
+      aggregationMs: result.aggregationMs,
+      sendMs: result.sendMs,
     });
   } catch {
     console.error("alert_notification_run", "UNHANDLED");

@@ -16,10 +16,10 @@ export const ALERT_NOTIFICATION_MAX_RECIPIENTS = 10;
 export const ALERT_NOTIFICATION_MAX_ATTEMPTS = 5;
 export const ALERT_NOTIFICATION_CONFIRM_PHRASE = "RUN ALERT NOTIFICATIONS";
 export const ALERT_NOTIFICATION_RECIPIENTS_ENV = "ALERT_NOTIFICATION_RECIPIENTS";
-/** Bound each manual admin click so Vercel cannot hit the 15s function limit. */
-export const ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN = 8;
+/** Bound each manual admin click — keep small so SMTP stays inside maxDuration. */
+export const ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN = 3;
 /** Overall server-side budget for aggregation + delivery after the runner lock. */
-export const ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS = 8_000;
+export const ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS = 45_000;
 
 /** Bounded retry delays after attempt N fails (attemptCount after failure). */
 export const ALERT_NOTIFICATION_RETRY_DELAYS_MS = [

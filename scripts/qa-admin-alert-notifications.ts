@@ -458,26 +458,34 @@ function main() {
   assert.match(opsPage, /RunAlertNotificationsPanel/);
   assert.match(panel, /ALERT_NOTIFICATION_CONFIRM_PHRASE|RUN ALERT NOTIFICATIONS/);
   assert.match(panel, /eligible|sent|suppressed|cooldown|failed|recovery/);
-  assert.match(panel, /CLIENT_RUN_TIMEOUT_MS|15_000|15000/);
+  assert.match(panel, /CLIENT_RUN_TIMEOUT_MS|55_000|55000/);
   assert.match(panel, /AbortController/);
   assert.match(panel, /finally[\s\S]{0,400}setRunning\(false\)/);
   assert.match(panel, /Completed:.*sent.*skipped|sentFromState|skippedFromState/);
+  assert.match(panel, /\/api\/admin\/operations\/alert-notifications/);
   assert.match(actions, /sentCount|skippedCount/);
   assert.match(actions, /SERVER_RUN_TIMEOUT_MS|ALERT_RUN_TIMEOUT/);
   assert.match(runner, /AGGREGATION_TIMEOUT|aggregation_timeout/);
   assert.match(delivery, /SMTP_TIMEOUT|SMTP_TIMEOUT_MS/);
-  assert.ok(
-    ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN >= 5 &&
-      ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN <= 10
-  );
-  assert.equal(ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS, 8_000);
+  assert.equal(ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN, 3);
+  assert.equal(ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS, 45_000);
   assert.match(runner, /ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN/);
   assert.match(runner, /ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS|budgetMs/);
   assert.match(runner, /countDueAlertNotificationDeliveries/);
+  assert.match(runner, /aggregationMs|sendMs/);
+  assert.match(runner, /local-DB|Local Prisma|no external provider HTTP/i);
   assert.match(actions, /formatAlertNotificationFailureReason/);
   assert.match(actions, /formatAlertNotificationPartialProgress/);
-  assert.match(panel, /progressMessage|remainingCount/);
+  assert.match(panel, /progressMessage|remainingCount|aggregationMs|sendMs|processedCount/);
   assert.match(delivery, /getEmailConfig\("support"\)|supportConfig\.reason/);
+  const alertRoute = read(
+    "app/api/admin/operations/alert-notifications/route.ts"
+  );
+  assert.match(alertRoute, /export const maxDuration = 60/);
+  assert.match(opsPage, /export const maxDuration = 60/);
+  assert.match(alertRoute, /aggregationMs|sendMs|processedCount|remainingCount/);
+  assert.doesNotMatch(monitoring, /\bfetch\s*\(/);
+  assert.doesNotMatch(monitoring, /getBrokerToken|axios\.|node-fetch/);
   assert.match(
     formatAlertNotificationFailureReason({
       errorCode: "not_configured",
