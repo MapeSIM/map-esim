@@ -52,6 +52,11 @@ function main() {
 
   assert.match(page, /HomeEsimUsageWidget/);
   assert.match(page, /id="esim-usage"|HomeEsimUsageWidget/);
+  // Usage sits after Popular destinations (discovery first).
+  assert.ok(
+    page.indexOf("<HomePopularDestinations") <
+      page.indexOf("<HomeEsimUsageWidget")
+  );
   assert.match(widget, /id="esim-usage"/);
   assert.match(widget, /eSIM Data Usage/);
   assert.match(widget, /Check another eSIM/);

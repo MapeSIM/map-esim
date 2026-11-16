@@ -189,7 +189,20 @@ function main() {
   assert.match(listing, /py-5 sm:min-h-\[340px\]/);
   assert.match(listing, /id="destination-search"/);
   assert.match(listing, /id="destination-search-sticky"/);
-  assert.match(listing, /destination-search-sticky[\s\S]*?sm:hidden|sm:hidden[\s\S]*?destination-search-sticky/);
+  // Mobile: one sticky search above pills; hero search hidden until sm.
+  assert.match(
+    listing,
+    /destination-search-sticky[\s\S]*?sm:hidden|sm:hidden[\s\S]*?destination-search-sticky/
+  );
+  assert.match(
+    listing,
+    /hidden w-full max-w-\[620px\][\s\S]*?sm:block|CountriesListingHeroSearch[\s\S]*?hidden[\s\S]*?sm:block/
+  );
+  assert.match(listing, /placeholder="Search by country or region"/);
+  assert.doesNotMatch(
+    read("app/components/countries/CountriesListingControls.tsx"),
+    /placeholder="Search destinations"/
+  );
   assert.match(listing, /sticky top-16/);
   console.log("   ok");
 

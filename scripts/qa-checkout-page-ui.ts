@@ -236,9 +236,11 @@ function main() {
   assert.match(compatModal, /footerAction="continue"/);
   assert.match(esimModal, /Got it, Continue/);
   assert.match(esimModal, /Explore Plans/);
-  assert.match(esimModal, /eSIM Supported/);
-  assert.match(esimModal, /Not Supported/);
-  assert.match(esimModal, /Verify via \*#06#/);
+  assert.match(esimModal, /EsimCompatibilityChecker/);
+  const esimChecker = read("app/components/esim/EsimCompatibilityChecker.tsx");
+  assert.match(esimChecker, /eSIM Supported/);
+  assert.match(esimChecker, /Not Supported/);
+  assert.match(esimChecker, /Verify via \*#06#/);
   assert.match(compatCatalog, /ESIM_COMPAT_DEVICES/);
   assert.match(compatCatalog, /iPhone XS/);
   assert.match(compatCatalog, /Galaxy S20/);

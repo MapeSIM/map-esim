@@ -56,28 +56,25 @@ function main() {
 
   const heroIdx = home.indexOf("{/* Hero */}");
   const trustIdx = home.indexOf("<HomeTrustSection");
-  const categoriesIdx = home.indexOf("{/* Categories");
+  const popularIdx = home.indexOf("<HomePopularDestinations");
   assert.ok(heroIdx >= 0 && trustIdx > heroIdx);
-  assert.ok(categoriesIdx > trustIdx);
+  assert.ok(popularIdx > trustIdx);
   assert.match(home, /Stay connected wherever you travel/);
   console.log("PASS homepage_renders_trust_below_hero");
 
   assert.match(section, /aria-labelledby="home-trust-heading"/);
   assert.match(section, /id="home-trust-heading"/);
-  assert.match(section, /lg:grid-cols-5/);
-  assert.match(section, /grid-cols-1/);
-  assert.match(section, /sm:grid-cols-2/);
   assert.match(section, /<ul/);
-  assert.match(section, /<article/);
   assert.match(section, /aria-hidden="true"/);
   assert.match(section, /HOME_TRUST_SECTION_TITLE/);
   assert.match(section, /HOME_TRUST_ITEMS/);
-  // Mobile P1: compact chips on small screens; full cards from sm up.
-  assert.match(section, /sm:hidden/);
-  assert.match(section, /hidden[\s\S]*?sm:grid/);
+  // Compact chip bar on all breakpoints (no tall desktop card grid).
   assert.match(section, /rounded-full/);
   assert.match(section, /aria-label="Trust highlights"/);
-  // Sprint B0: Support / Destinations trust cards link to existing routes (no fake proof).
+  assert.match(section, /flex flex-wrap/);
+  assert.doesNotMatch(section, /lg:grid-cols-5/);
+  assert.doesNotMatch(section, /<article/);
+  // Support / Destinations trust chips link to existing routes.
   assert.match(section, /return "\/support"/);
   assert.match(section, /return "\/countries"/);
   assert.match(section, /href=\{href\}/);

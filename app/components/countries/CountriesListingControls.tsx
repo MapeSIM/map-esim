@@ -27,13 +27,13 @@ type SharedProps = {
   onFilterChange: (filter: CountryListingFilterId) => void;
 };
 
-/** Hero search field. */
+/** Hero search field — desktop/tablet only (mobile uses sticky unified search). */
 export function CountriesListingHeroSearch({
   search,
   onSearchChange,
 }: Pick<SharedProps, "search" | "onSearchChange">) {
   return (
-    <div className="relative mx-auto mt-4 w-full max-w-[620px] sm:mt-7">
+    <div className="relative mx-auto mt-4 hidden w-full max-w-[620px] sm:mt-7 sm:block">
       <label htmlFor="destination-search" className="sr-only">
         Search by country or region
       </label>
@@ -101,12 +101,12 @@ export default function CountriesListingControls({
               type="search"
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search destinations"
+              placeholder="Search by country or region"
               className="
                 w-full rounded-full
                 border border-[var(--border-strong)]
                 bg-[var(--surface)]
-                py-2 pl-9 pr-3
+                py-2.5 pl-9 pr-3
                 text-sm text-[var(--heading)] placeholder:text-[var(--text-soft)]
                 focus:border-[var(--accent-strong)]/50 focus:outline-none
                 focus:ring-2 focus:ring-[var(--accent-strong)]/25

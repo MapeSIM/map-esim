@@ -1,5 +1,5 @@
 /**
- * Offline QA for device-compatibility UX (guidance + interactive modal).
+ * Offline QA for device-compatibility UX (inline checker + modal triggers).
  * Does not call providers or collect IMEI/EID/TAC as form input.
  */
 import assert from "node:assert/strict";
@@ -25,12 +25,13 @@ function main() {
   const credit = read("app/lib/vesim/creditCheckout.ts");
   const payApply = read("app/lib/esim/esimPurchasePaymentApply.ts");
   const modal = read("app/components/esim/EsimCompatibilityModal.tsx");
+  const checker = read("app/components/esim/EsimCompatibilityChecker.tsx");
   const catalog = read("app/lib/checkout/esimCompatibilityCatalog.ts");
   const checkoutCompat = read(
     "app/components/account/CheckoutCompatibilityModal.tsx"
   );
 
-  console.log("1) Page route + SEO metadata");
+  console.log("1) Page route + SEO metadata + inline checker");
   assert.match(page, /Check Device Compatibility/);
   assert.match(page, /<h1[\s\S]*Check Device Compatibility/);
   assert.match(page, /absoluteCanonical\("\/device-compatibility"\)/);
@@ -39,16 +40,23 @@ function main() {
   assert.match(page, /href="\/countries"/);
   assert.match(page, /Need Help\?/);
   assert.match(page, /href="\/support"/);
-  assert.match(page, /EsimCompatibilityInlineTrigger|Check eSIM compatibility/);
+  assert.match(page, /EsimCompatibilityChecker/);
+  assert.doesNotMatch(page, /EsimCompatibilityInlineTrigger/);
+  assert.doesNotMatch(page, /COMMON_SUPPORTED_ESIM_MODELS/);
+  assert.doesNotMatch(page, /Is my phone unlocked\?/);
+  assert.doesNotMatch(page, /id="important-heading"/);
   console.log("   ok");
 
-  console.log("2) No IMEI / EID / TAC collection UI on static page");
-  assert.doesNotMatch(page, /<input[\s\S]*?(IMEI|EID|TAC)/i);
-  assert.doesNotMatch(page, /type=["'](?:tel|text)["'][^>]*(?:imei|eid|tac)/i);
+  console.log("2) No IMEI / EID / TAC collection UI");
+  assert.doesNotMatch(page, /name=["'](?:imei|eid|tac)["']/i);
+  assert.doesNotMatch(page, /placeholder=["'][^"']*(?:IMEI|EID|TAC)/i);
   assert.match(page, /does not require IMEI, EID, or TAC/i);
   assert.ok(
     !existsSync(
-      join(root, "app/components/deviceCompatibility/DeviceCompatibilityChecker.tsx")
+      join(
+        root,
+        "app/components/deviceCompatibility/DeviceCompatibilityChecker.tsx"
+      )
     ),
     "legacy brand/model checker component must remain removed"
   );
@@ -56,11 +64,11 @@ function main() {
     !existsSync(join(root, "app/lib/deviceCompatibility/catalog.ts")),
     "legacy device family catalog must remain removed"
   );
-  assert.doesNotMatch(page, /DEVICE_FAMILIES|Likely compatible|Device brand/);
+  assert.doesNotMatch(page, /DEVICE_FAMILIES|Likely compatible/);
   assert.doesNotMatch(page, /Non-PTA|non-pta/i);
   console.log("   ok");
 
-  console.log("3) Plan-page + footer + home wire interactive modal");
+  console.log("3) Plan-page + footer + home wire modal triggers");
   assert.match(plansListing, /EsimCompatibilityInlineTrigger/);
   assert.match(plansListing, /Check eSIM compatibility/);
   assert.match(footer, /FooterEsimCompatibilityLink/);
@@ -68,16 +76,11 @@ function main() {
     read("app/components/esim/FooterEsimCompatibilityLink.tsx"),
     /footerAction="explore"/
   );
-  assert.match(
-    read("app/page.tsx"),
-    /EsimCompatibilityInlineTrigger/
-  );
+  assert.match(read("app/page.tsx"), /EsimCompatibilityInlineTrigger/);
   console.log("   ok");
 
-  console.log("3b) Shared guide + interactive catalog/modal");
+  console.log("3b) Shared checker + catalog + modal");
   const guide = read("app/lib/checkout/checkoutCompatibilityGuide.ts");
-  assert.match(page, /COMMON_SUPPORTED_ESIM_MODELS/);
-  assert.match(page, /COMPATIBILITY_IPHONE_QUICK_CHECK/);
   assert.match(guide, /iPhone XR through iPhone 16 \/ 17/);
   assert.match(guide, /Pixel 4 and newer/);
   assert.match(guide, /Galaxy S20\+/);
@@ -88,11 +91,14 @@ function main() {
   assert.match(catalog, /Pixel 10/);
   assert.match(catalog, /\*#06#/);
   assert.match(catalog, /No SIM restrictions/);
+  assert.match(checker, /ESIM_COMPAT_BRAND_FILTERS/);
+  assert.match(checker, /eSIM Supported/);
+  assert.match(checker, /Not Supported/);
+  assert.match(checker, /Verify via \*#06#/);
+  assert.match(checker, /data-esim-compat-search/);
+  assert.match(modal, /EsimCompatibilityChecker/);
   assert.match(modal, /Got it, Continue/);
   assert.match(modal, /Explore Plans/);
-  assert.match(modal, /eSIM Supported/);
-  assert.match(modal, /Not Supported/);
-  assert.match(modal, /ESIM_COMPAT_BRAND_FILTERS/);
   assert.match(checkoutCompat, /CheckoutCompatibilityCheck/);
   assert.match(checkoutCompat, /footerAction="continue"/);
   assert.match(checkoutCompat, /Check eSIM compatibility \(\?\)/);

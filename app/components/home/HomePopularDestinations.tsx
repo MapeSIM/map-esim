@@ -9,7 +9,59 @@ import {
 } from "@/app/lib/home/homeConversionSections";
 import { destinationFlagcdnUrl } from "@/app/lib/vesim/destinationPresentation";
 
+const MOBILE_TOP_COUNT = 6;
+
+function DestinationCard({
+  destination,
+}: {
+  destination: (typeof HOME_POPULAR_DESTINATIONS)[number];
+}) {
+  const flagSrc = destinationFlagcdnUrl(destination.code);
+  return (
+    <Link
+      href={`/countries/${destination.id}`}
+      prefetch
+      className="
+        group flex h-full items-center gap-3 rounded-[20px] border
+        border-[var(--border)] bg-[var(--surface)] p-3.5
+        shadow-[0_12px_30px_rgba(0,0,0,0.2)] transition
+        hover:-translate-y-0.5 hover:border-[var(--border-hover)]
+        sm:rounded-[24px] sm:p-5
+      "
+    >
+      <span className="relative flex h-[28px] w-[42px] shrink-0 overflow-hidden rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] sm:h-[30px] sm:w-[45px]">
+        {flagSrc ? (
+          <Image
+            src={flagSrc}
+            alt=""
+            width={45}
+            height={30}
+            sizes="45px"
+            unoptimized
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <span className="flex h-full w-full items-center justify-center text-[10px] font-bold text-[var(--heading)]">
+            {destination.code}
+          </span>
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-bold text-[var(--heading)] sm:text-base">
+          {destination.name}
+        </span>
+        <span className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent-strong)] sm:mt-1 sm:text-sm">
+          View plans
+          <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+        </span>
+      </span>
+    </Link>
+  );
+}
+
 export function HomePopularDestinations() {
+  const mobileDestinations = HOME_POPULAR_DESTINATIONS.slice(0, MOBILE_TOP_COUNT);
+
   return (
     <section
       className="border-b border-[var(--border)]"
@@ -34,59 +86,39 @@ export function HomePopularDestinations() {
           <Link
             href="/countries?filter=Popular"
             prefetch
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent-strong)] transition hover:opacity-90"
+            className="hidden items-center gap-1.5 text-sm font-semibold text-[var(--accent-strong)] transition hover:opacity-90 sm:inline-flex"
           >
             View all popular
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </div>
 
-        <ul className="mt-5 grid grid-cols-1 gap-3 sm:mt-8 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
-          {HOME_POPULAR_DESTINATIONS.map((destination) => {
-            const flagSrc = destinationFlagcdnUrl(destination.code);
-            return (
-              <li key={destination.id}>
-                <Link
-                  href={`/countries/${destination.id}`}
-                  prefetch
-                  className="
-                    group flex h-full items-center gap-3 rounded-[24px] border
-                    border-[var(--border)] bg-[var(--surface)] p-4
-                    shadow-[0_12px_30px_rgba(0,0,0,0.2)] transition
-                    hover:-translate-y-1 hover:border-[var(--border-hover)]
-                    sm:p-5
-                  "
-                >
-                  <span className="relative flex h-[30px] w-[45px] shrink-0 overflow-hidden rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)]">
-                    {flagSrc ? (
-                      <Image
-                        src={flagSrc}
-                        alt=""
-                        width={45}
-                        height={30}
-                        sizes="45px"
-                        unoptimized
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <span className="flex h-full w-full items-center justify-center text-[10px] font-bold text-[var(--heading)]">
-                        {destination.code}
-                      </span>
-                    )}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-base font-bold text-[var(--heading)]">
-                      {destination.name}
-                    </span>
-                    <span className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-[var(--accent-strong)]">
-                      View plans
-                      <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
-                    </span>
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
+        {/* Mobile: top 6 in a 2-column grid */}
+        <ul className="mt-5 grid grid-cols-2 gap-2.5 sm:hidden">
+          {mobileDestinations.map((destination) => (
+            <li key={destination.id}>
+              <DestinationCard destination={destination} />
+            </li>
+          ))}
+        </ul>
+        <div className="mt-4 sm:hidden">
+          <Link
+            href="/countries?filter=Popular"
+            prefetch
+            className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] transition hover:border-[var(--border-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+          >
+            View all destinations
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        </div>
+
+        {/* Tablet/desktop: full popular set */}
+        <ul className="mt-8 hidden grid-cols-2 gap-4 sm:grid lg:grid-cols-4">
+          {HOME_POPULAR_DESTINATIONS.map((destination) => (
+            <li key={destination.id}>
+              <DestinationCard destination={destination} />
+            </li>
+          ))}
         </ul>
       </div>
     </section>

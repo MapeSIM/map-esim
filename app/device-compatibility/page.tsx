@@ -1,20 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, LockKeyhole, Smartphone } from "lucide-react";
-import EsimCompatibilityInlineTrigger from "@/app/components/esim/EsimCompatibilityInlineTrigger";
+import { ArrowRight } from "lucide-react";
+import { EsimCompatibilityChecker } from "@/app/components/esim/EsimCompatibilityChecker";
 import { BRAND_NAME } from "@/app/lib/brand";
 import { absoluteCanonical } from "@/app/lib/seo/canonical";
 import { publicPageShareMeta } from "@/app/lib/seo/socialShareMeta";
-import {
-  COMMON_SUPPORTED_ESIM_MODELS,
-  COMPATIBILITY_ANDROID_QUICK_CHECK,
-  COMPATIBILITY_IPHONE_QUICK_CHECK,
-  COMPATIBILITY_UNLOCKED_NOTE,
-} from "@/app/lib/checkout/checkoutCompatibilityGuide";
 
 const title = `Check Device Compatibility | ${BRAND_NAME}`;
 const description =
-  "Before buying a MAP eSIM, confirm your phone supports eSIM and is carrier-unlocked. Quick settings checks for iPhone and Android — guidance only, not a guarantee.";
+  "Before buying a MAP eSIM, confirm your phone supports eSIM and is carrier-unlocked. Search your model or verify with *#06# — guidance only, not a guarantee.";
 const canonical = absoluteCanonical("/device-compatibility");
 
 export const metadata: Metadata = {
@@ -25,14 +19,11 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const sectionCardClass =
-  "rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] p-5 sm:p-6";
-
 export default function DeviceCompatibilityPage() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[var(--page-bg)] text-[var(--heading)]">
       <section className="border-b border-[var(--border)] bg-[radial-gradient(ellipse_at_top_left,var(--hero-glow)_0%,_transparent_45%),linear-gradient(180deg,var(--page-bg-soft)_0%,var(--page-bg)_100%)]">
-        <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 sm:py-16">
+        <div className="mx-auto max-w-lg px-4 py-10 sm:px-6 sm:py-14">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
             Before you buy
           </p>
@@ -40,142 +31,19 @@ export default function DeviceCompatibilityPage() {
             Check Device Compatibility
           </h1>
           <p className="mt-4 text-sm leading-relaxed text-[var(--text-muted)] sm:text-base">
-            Before purchasing, make sure your phone supports eSIM and is
-            carrier-unlocked. This page is guidance only — {BRAND_NAME} does not
-            guarantee compatibility for every device.
+            Search your phone model or dial *#06# to confirm eSIM support.
+            Guidance only — {BRAND_NAME} does not require IMEI, EID, or TAC, and
+            does not guarantee compatibility for every device.
           </p>
-          <div className="mt-6">
-            <EsimCompatibilityInlineTrigger
-              label="Check eSIM compatibility (?)"
-              footerAction="explore"
-              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[var(--accent-strong)]/40 bg-[var(--accent-strong)]/12 px-5 text-sm font-bold text-[var(--accent-strong)] transition hover:bg-[var(--accent-strong)]/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
-            />
-          </div>
         </div>
       </section>
 
-      <div className="mx-auto max-w-2xl space-y-5 px-4 py-10 sm:px-6 sm:py-12">
-        <section className={sectionCardClass} aria-labelledby="esim-support-heading">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--accent-strong)]/35 bg-[var(--accent-strong)]/10">
-              <Smartphone
-                className="h-5 w-5 text-[var(--accent-strong)]"
-                aria-hidden
-              />
-            </div>
-            <div className="min-w-0">
-              <h2
-                id="esim-support-heading"
-                className="text-lg font-semibold tracking-tight"
-              >
-                Does my phone support eSIM?
-              </h2>
-              <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-                Use your phone settings. Menu names differ by model and software
-                version — these steps do not work identically on every device.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
-              <h3 className="text-sm font-semibold text-[var(--heading)]">
-                iPhone quick check
-              </h3>
-              <ol className="mt-3 list-decimal space-y-2 pl-4 text-sm leading-relaxed text-[var(--text)]">
-                {COMPATIBILITY_IPHONE_QUICK_CHECK.map((step) => (
-                  <li key={step}>{step}</li>
-                ))}
-              </ol>
-            </div>
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
-              <h3 className="text-sm font-semibold text-[var(--heading)]">
-                Android quick check
-              </h3>
-              <ol className="mt-3 list-decimal space-y-2 pl-4 text-sm leading-relaxed text-[var(--text)]">
-                {COMPATIBILITY_ANDROID_QUICK_CHECK.map((step) => (
-                  <li key={step}>{step}</li>
-                ))}
-              </ol>
-            </div>
-          </div>
-        </section>
-
-        <section className={sectionCardClass} aria-labelledby="common-models-heading">
-          <h2
-            id="common-models-heading"
-            className="text-lg font-semibold tracking-tight"
-          >
-            Commonly supported models
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-            These families often support eSIM when carrier-unlocked. Always
-            verify in your phone settings before purchase.
-          </p>
-          <ul className="mt-4 space-y-3">
-            {COMMON_SUPPORTED_ESIM_MODELS.map((item) => (
-              <li
-                key={item.brand}
-                className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3"
-              >
-                <p className="text-sm font-semibold text-[var(--heading)]">
-                  {item.brand}
-                </p>
-                <p className="mt-0.5 text-sm font-medium text-[var(--accent-strong)]">
-                  {item.summary}
-                </p>
-                <p className="mt-1 text-sm leading-relaxed text-[var(--text-muted)]">
-                  {item.detail}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className={sectionCardClass} aria-labelledby="unlocked-heading">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--accent-strong)]/35 bg-[var(--accent-strong)]/10">
-              <LockKeyhole
-                className="h-5 w-5 text-[var(--accent-strong)]"
-                aria-hidden
-              />
-            </div>
-            <div className="min-w-0">
-              <h2
-                id="unlocked-heading"
-                className="text-lg font-semibold tracking-tight"
-              >
-                Is my phone unlocked?
-              </h2>
-              <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-                {COMPATIBILITY_UNLOCKED_NOTE}
-              </p>
-            </div>
-          </div>
-        </section>
-
+      <div className="mx-auto max-w-lg space-y-6 px-4 py-8 sm:px-6 sm:py-10">
         <section
-          className="rounded-2xl border border-[var(--border)] bg-[var(--page-bg-soft)] p-5 sm:p-6"
-          aria-labelledby="important-heading"
+          className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] p-4 sm:p-5"
+          aria-label="Interactive eSIM compatibility checker"
         >
-          <h2
-            id="important-heading"
-            className="text-lg font-semibold tracking-tight"
-          >
-            Important
-          </h2>
-          <ul className="mt-3 space-y-2 text-sm leading-relaxed text-[var(--text-muted)]">
-            <li>
-              eSIM support varies by model, region, and carrier — some versions of
-              the same phone differ.
-            </li>
-            <li>Verify your device before purchase.</li>
-            <li>
-              {BRAND_NAME} does not require IMEI, EID, or TAC for this
-              compatibility check, and does not guarantee that every device will
-              install or connect successfully.
-            </li>
-          </ul>
+          <EsimCompatibilityChecker modelListMaxClassName="max-h-52 sm:max-h-64" />
         </section>
 
         <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:items-center">

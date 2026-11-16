@@ -2,21 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowRight,
-  CheckCircle2,
-  Earth,
-  Globe2,
   MapPinned,
   QrCode,
-  Settings2,
   ShieldCheck,
   Smartphone,
-  Sparkles,
-  Wifi,
-  Zap,
 } from "lucide-react";
 import { HomeTrustSection } from "@/app/components/home/HomeTrustSection";
 import { HomePopularDestinations } from "@/app/components/home/HomePopularDestinations";
-import { HomeComparisonSection } from "@/app/components/home/HomeComparisonSection";
 import { HomeFinalCta } from "@/app/components/home/HomeFinalCta";
 import HomeEsimUsageWidget from "@/app/components/home/HomeEsimUsageWidget";
 import EsimCompatibilityInlineTrigger from "@/app/components/esim/EsimCompatibilityInlineTrigger";
@@ -44,44 +36,23 @@ export const metadata: Metadata = {
   }),
 };
 
-const categories = [
-  {
-    title: "Countries",
-    description: "Browse local eSIM plans for individual destinations.",
-    href: "/countries",
-    icon: Globe2,
-    label: "Explore countries",
-  },
-  {
-    title: "Popular",
-    description: "Start with frequently chosen travel destinations.",
-    href: "/countries?filter=Popular",
-    icon: Sparkles,
-    label: "View popular",
-  },
-  {
-    title: "Global & Regional",
-    description: "Multi-country coverage for broader travel itineraries.",
-    href: "/countries?filter=Regional",
-    icon: Earth,
-    label: "Browse coverage",
-  },
-];
-
 const steps = [
   {
     title: "Choose a destination",
-    description: "Select a country, regional, or global eSIM plan that fits your trip.",
+    description:
+      "Select a country, regional, or global eSIM plan that fits your trip.",
     icon: MapPinned,
   },
   {
     title: "Complete checkout",
-    description: "Confirm your plan details and purchase with your preferred currency display.",
+    description:
+      "Confirm your plan details and purchase with your preferred currency display.",
     icon: ShieldCheck,
   },
   {
     title: "Install and connect",
-    description: "Use your order details to install the eSIM and get online abroad.",
+    description:
+      "Use your order details to install the eSIM and get online abroad.",
     icon: QrCode,
   },
 ];
@@ -112,26 +83,6 @@ const faqs = [
 export default function Home() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[var(--page-bg)] text-[var(--heading)]">
-      {/* Announcement — tablet/desktop only (stacked benefit lines crowd mobile). */}
-      <div className="hidden border-b border-[var(--border)]/60 bg-[var(--surface-2)] sm:block">
-        <div className="mx-auto flex max-w-[1200px] flex-col items-center justify-center gap-2 px-4 py-2.5 text-center text-xs text-[var(--text)] sm:flex-row sm:gap-4 sm:px-6 sm:text-sm">
-          <span className="inline-flex items-center gap-2">
-            <Zap className="h-3.5 w-3.5 text-[var(--accent-strong)]" />
-            Instant digital delivery
-          </span>
-          <span className="hidden h-1 w-1 rounded-full bg-[var(--accent-strong)]/70 sm:inline-block" />
-          <span className="inline-flex items-center gap-2">
-            <Wifi className="h-3.5 w-3.5 text-[var(--accent-strong)]" />
-            No physical SIM required
-          </span>
-          <span className="hidden h-1 w-1 rounded-full bg-[var(--accent-strong)]/70 sm:inline-block" />
-          <span className="inline-flex items-center gap-2">
-            <Globe2 className="h-3.5 w-3.5 text-[var(--accent-strong)]" />
-            Country, regional and global plans
-          </span>
-        </div>
-      </div>
-
       {/* Hero */}
       <section className="border-b border-[var(--border)] bg-[radial-gradient(ellipse_at_top_left,var(--hero-glow)_0%,_transparent_45%),linear-gradient(180deg,var(--page-bg-soft)_0%,var(--page-bg)_100%)]">
         <div className="mx-auto grid max-w-[1200px] items-center gap-6 px-4 py-8 sm:gap-8 sm:px-6 sm:py-10 lg:grid-cols-2 lg:gap-12 lg:py-14">
@@ -164,10 +115,9 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Mobile: compact secondary card; full content from sm up. Primary CTA stays in left column. */}
-          <div className="relative overflow-hidden rounded-[28px] border border-[var(--border-strong)] bg-[var(--surface)] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.35)] sm:p-7">
+          <div className="relative overflow-hidden rounded-[28px] border border-[var(--border-strong)] bg-[var(--surface)] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.35)] sm:p-7">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(124,255,0,0.12),_transparent_45%)]" />
-            <div className="relative space-y-3 sm:space-y-4">
+            <div className="relative space-y-3">
               <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-soft)]">
                 <Smartphone className="h-3.5 w-3.5" />
                 Designed for travelers
@@ -175,32 +125,9 @@ export default function Home() {
               <h2 className="text-xl font-bold text-[var(--heading)] sm:text-3xl">
                 Your travel internet, ready before takeoff
               </h2>
-              <ul className="hidden space-y-2.5 text-sm text-[var(--text)] sm:block">
-                {[
-                  "Instant QR delivery",
-                  "No physical SIM swap",
-                  "Flexible country and regional plans",
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-3">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-strong)]" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="hidden grid-cols-2 gap-3 pt-1 sm:grid">
-                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-3.5">
-                  <Wifi className="h-5 w-5 text-[var(--accent-strong)]" />
-                  <p className="mt-2.5 text-sm font-semibold text-[var(--heading)]">
-                    Data plans for every trip
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-3.5">
-                  <Settings2 className="h-5 w-5 text-[var(--accent-strong)]" />
-                  <p className="mt-2.5 text-sm font-semibold text-[var(--heading)]">
-                    Easy plan comparison
-                  </p>
-                </div>
-              </div>
+              <p className="text-sm leading-relaxed text-[var(--text-muted)] sm:text-base">
+                Digital delivery after purchase — no physical SIM swap required.
+              </p>
             </div>
           </div>
         </div>
@@ -208,88 +135,19 @@ export default function Home() {
 
       <HomeTrustSection />
 
-      <HomeEsimUsageWidget />
-
       <HomePopularDestinations />
 
-      <HomeComparisonSection />
-
-      {/* Categories — compact on mobile; Popular discovery stays in HomePopularDestinations. */}
-      <section className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6 sm:py-20">
-        <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)]">
-            Explore
-          </p>
-          <h2 className="mt-2 text-2xl font-bold tracking-tight text-[var(--heading)] sm:mt-3 sm:text-4xl">
-            Choose how you want to browse plans
-          </h2>
-          <p className="mt-2 hidden text-[var(--text-muted)] sm:mt-3 sm:block">
-            Jump into country plans, popular destinations, or broader regional
-            and global coverage.
-          </p>
-        </div>
-
-        {/* Mobile: compact links (skip Popular — covered by Popular destinations above). */}
-        <nav
-          className="mt-5 flex flex-wrap gap-2 sm:hidden"
-          aria-label="Browse plan types"
-        >
-          {categories
-            .filter((category) => category.title !== "Popular")
-            .map((category) => (
-              <Link
-                key={category.title}
-                href={category.href}
-                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2 text-xs font-semibold text-[var(--heading)] transition hover:border-[var(--border-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
-              >
-                {category.title}
-                <ArrowRight className="h-3.5 w-3.5 text-[var(--accent-strong)]" aria-hidden />
-              </Link>
-            ))}
-        </nav>
-
-        {/* Tablet/desktop: full Explore cards. */}
-        <div className="mt-10 hidden gap-5 sm:grid md:grid-cols-3">
-          {categories.map((category) => {
-            const Icon = category.icon;
-            return (
-              <Link
-                key={category.title}
-                href={category.href}
-                className="
-                  group rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-6
-                  shadow-[0_12px_30px_rgba(0,0,0,0.2)] transition
-                  hover:-translate-y-1 hover:border-[var(--border-hover)]
-                "
-              >
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--accent-strong)]">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <h3 className="mt-5 text-xl font-bold text-[var(--heading)]">
-                  {category.title}
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-                  {category.description}
-                </p>
-                <span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-[var(--accent-strong)]">
-                  {category.label}
-                  <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
+      <HomeEsimUsageWidget />
 
       {/* How it works */}
       <section className="border-y border-[var(--border)] bg-[var(--page-bg-soft)]/70">
-        <div className="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 sm:py-20">
-          <div className="flex max-w-2xl flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:max-w-none">
+        <div className="mx-auto max-w-[1200px] px-4 py-12 sm:px-6 sm:py-16">
+          <div className="flex max-w-2xl flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:max-w-none">
             <div className="max-w-2xl">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)]">
                 How it works
               </p>
-              <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--heading)] sm:text-4xl">
+              <h2 className="mt-2 text-2xl font-bold tracking-tight text-[var(--heading)] sm:mt-3 sm:text-4xl">
                 Three clear steps to get online
               </h2>
             </div>
@@ -302,23 +160,23 @@ export default function Home() {
             </Link>
           </div>
 
-          <div className="mt-10 grid gap-5 md:grid-cols-3">
+          <div className="mt-8 grid gap-4 md:grid-cols-3 sm:mt-10 sm:gap-5">
             {steps.map((step, index) => {
               const Icon = step.icon;
               return (
                 <div
                   key={step.title}
-                  className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-6"
+                  className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6"
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--accent-strong)]">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--accent-strong)] sm:h-12 sm:w-12">
                       <Icon className="h-5 w-5" />
                     </div>
                     <span className="text-sm font-semibold text-[var(--text-soft)]">
                       Step {index + 1}
                     </span>
                   </div>
-                  <h3 className="mt-5 text-xl font-bold text-[var(--heading)]">
+                  <h3 className="mt-4 text-lg font-bold text-[var(--heading)] sm:mt-5 sm:text-xl">
                     {step.title}
                   </h3>
                   <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
@@ -328,61 +186,24 @@ export default function Home() {
               );
             })}
           </div>
-        </div>
-      </section>
 
-      {/* Compatible devices */}
-      <section className="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 sm:py-20">
-        <div className="grid items-center gap-8 rounded-[28px] border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-8 lg:grid-cols-[1.1fr_0.9fr] lg:p-10">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)]">
-              Device readiness
-            </p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--heading)] sm:text-4xl">
-              Compatible devices
-            </h2>
-            <p className="mt-4 max-w-xl text-[var(--text-muted)]">
-              MAP eSIM plans require an unlocked phone that supports eSIM. We
-              do not list unverified model claims — check your device settings
-              or manufacturer documentation before purchase.
-            </p>
-            <ul className="mt-6 space-y-3 text-sm text-[var(--text)]">
-              {[
-                "Look for Cellular / Mobile Service settings that mention eSIM or Add eSIM",
-                "Confirm your device is carrier-unlocked",
-                "Keep a stable internet connection for installation",
-              ].map((item) => (
-                <li key={item} className="flex items-start gap-3">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-strong)]" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="rounded-[24px] border border-[var(--border-strong)] bg-[var(--surface-2)] p-6">
-            <Smartphone className="h-8 w-8 text-[var(--accent-strong)]" />
-            <h3 className="mt-4 text-xl font-bold text-[var(--heading)]">
-              Quick compatibility check
-            </h3>
-            <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
-              Open your phone settings, search for “eSIM”, and verify that your
-              device can add a cellular plan digitally. If that option is
-              missing, a physical SIM may still be required.
-            </p>
+          <p className="mt-6 text-center text-sm text-[var(--text-muted)] sm:mt-8">
+            Not sure your phone supports eSIM?{" "}
             <EsimCompatibilityInlineTrigger
               label="Check eSIM compatibility (?)"
               footerAction="explore"
-              showArrow
-              className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+              className="inline font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
             />
-          </div>
+          </p>
         </div>
       </section>
 
       {/* FAQ */}
-      <section id="faq" className="border-t border-[var(--border)] bg-[var(--page-bg-soft)]/50">
-        <div className="mx-auto max-w-[900px] px-4 py-16 sm:px-6 sm:py-20">
+      <section
+        id="faq"
+        className="border-t border-[var(--border)] bg-[var(--page-bg-soft)]/50"
+      >
+        <div className="mx-auto max-w-[900px] px-4 py-12 sm:px-6 sm:py-16">
           <div className="text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)]">
               FAQ
@@ -392,7 +213,7 @@ export default function Home() {
             </h2>
           </div>
 
-          <div className="mt-10">
+          <div className="mt-8 sm:mt-10">
             <FaqAccordion items={faqs} />
           </div>
           <p className="mt-8 text-center text-sm text-[var(--text-muted)]">
