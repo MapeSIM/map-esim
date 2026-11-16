@@ -446,9 +446,9 @@ export default function HomeEsimUsageWidget() {
 
   return (
     <section
-      id="esim-usage"
       aria-labelledby={headingId}
-      className="scroll-mt-28 border-b border-[var(--border)] bg-[var(--page-bg)]"
+      className="border-b border-[var(--border)] bg-[var(--page-bg)]"
+      data-home-esim-usage-widget="true"
     >
       <div className="mx-auto max-w-[1200px] px-4 py-10 sm:px-6 sm:py-14">
         <div className="max-w-2xl">

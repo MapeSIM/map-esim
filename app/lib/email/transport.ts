@@ -80,10 +80,12 @@ export function getChannelTransporter(
 }
 
 export type SendChannelMailResult =
-  | { ok: true }
+  | { ok: true; messageId?: string }
   | {
       ok: false;
       reason: "not_configured" | "send_failed" | "invalid_recipient";
+      /** Safe machine reason only — never raw SMTP secrets. */
+      detail?: string;
     };
 
 /**
@@ -168,7 +170,7 @@ export async function sendChannelMail(options: {
   const envelopeTo = cc.length ? [to, ...cc] : [to];
 
   try {
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
       from: config.from,
       replyTo: config.replyTo,
       to,
@@ -184,7 +186,11 @@ export async function sendChannelMail(options: {
         to: envelopeTo,
       },
     });
-    return { ok: true };
+    const messageId =
+      typeof info?.messageId === "string" && info.messageId.trim()
+        ? info.messageId.trim().slice(0, 200)
+        : undefined;
+    return { ok: true, messageId };
   } catch (error) {
     // Log provider failure code only — never message/stack (may include SMTP secrets).
     const code =
@@ -199,7 +205,11 @@ export async function sendChannelMail(options: {
         code ? ` code=${code}` : ""
       }`
     );
-    return { ok: false, reason: "send_failed" };
+    return {
+      ok: false,
+      reason: "send_failed",
+      detail: code || "send_failed",
+    };
   }
 }
 

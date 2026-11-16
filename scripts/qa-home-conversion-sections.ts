@@ -87,7 +87,7 @@ function main() {
   const heroIdx = home.indexOf("{/* Hero */}");
   const trustIdx = home.indexOf("<HomeTrustSection");
   const popularIdx = home.indexOf("<HomePopularDestinations");
-  const usageIdx = home.indexOf("<HomeEsimUsageWidget");
+  const usageIdx = home.indexOf("<DeferredHomeEsimUsageWidget");
   const howIdx = home.indexOf("{/* How it works */}");
   const faqIdx = home.indexOf('id="faq"');
   const ctaIdx = home.indexOf("<HomeFinalCta");
@@ -136,7 +136,10 @@ function main() {
   assert.doesNotMatch(home, /Browse eSIM destinations/);
   assert.match(home, /href="#home-popular-heading"/);
   assert.match(home, /Browse popular/);
-  assert.match(home, /EsimCompatibilityInlineTrigger/);
+  assert.match(
+    home,
+    /DeferredEsimCompatibilityInlineTrigger|EsimCompatibilityInlineTrigger/
+  );
   assert.match(home, /Check eSIM compatibility \(\?\)/);
   assert.match(home, /FaqAccordion/);
   assert.match(cta, /HOME_DISCOVERY_CTA_LABEL/);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma as db } from "@/app/lib/db";
 import { requireActiveAdminForOperations } from "@/app/lib/admin/operationsHealth";
+import { invalidateGuestCheckoutEnabledCache } from "@/app/lib/vesim/guestCheckoutGate";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -36,6 +37,8 @@ export async function POST(req: Request) {
       },
       select: { enabled: true, updatedAt: true },
     });
+
+    invalidateGuestCheckoutEnabledCache();
 
     return NextResponse.json({
       success: true,

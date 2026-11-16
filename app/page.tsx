@@ -10,8 +10,8 @@ import {
 import { HomeTrustSection } from "@/app/components/home/HomeTrustSection";
 import { HomePopularDestinations } from "@/app/components/home/HomePopularDestinations";
 import { HomeFinalCta } from "@/app/components/home/HomeFinalCta";
-import HomeEsimUsageWidget from "@/app/components/home/HomeEsimUsageWidget";
-import EsimCompatibilityInlineTrigger from "@/app/components/esim/EsimCompatibilityInlineTrigger";
+import DeferredHomeEsimUsageWidget from "@/app/components/home/DeferredHomeEsimUsageWidget";
+import DeferredEsimCompatibilityInlineTrigger from "@/app/components/esim/DeferredEsimCompatibilityInlineTrigger";
 import { FaqAccordion } from "@/app/components/faq/FaqAccordion";
 import { BRAND_NAME } from "@/app/lib/brand";
 import {
@@ -137,7 +137,7 @@ export default function Home() {
 
       <HomePopularDestinations />
 
-      <HomeEsimUsageWidget />
+      <DeferredHomeEsimUsageWidget />
 
       {/* How it works */}
       <section className="border-y border-[var(--border)] bg-[var(--page-bg-soft)]/70">
@@ -189,7 +189,7 @@ export default function Home() {
 
           <p className="mt-6 text-center text-sm text-[var(--text-muted)] sm:mt-8">
             Not sure your phone supports eSIM?{" "}
-            <EsimCompatibilityInlineTrigger
+            <DeferredEsimCompatibilityInlineTrigger
               label="Check eSIM compatibility (?)"
               footerAction="explore"
               className="inline font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"

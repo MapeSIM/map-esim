@@ -3,7 +3,7 @@ import Link from "next/link";
 import { CreditCard } from "lucide-react";
 import CookiePreferencesLink from "@/app/components/cookies/CookiePreferencesLink";
 import SocialIcons from "@/app/components/footer/SocialIcons";
-import FooterEsimCompatibilityLink from "@/app/components/esim/FooterEsimCompatibilityLink";
+import DeferredFooterEsimCompatibilityLink from "@/app/components/esim/DeferredFooterEsimCompatibilityLink";
 import {
   BRAND_LOGO_ALT,
   BRAND_LOGO_DARK_PUBLIC_PATH,
@@ -109,7 +109,7 @@ export default function Footer() {
             <ul className="mt-4 space-y-3 text-sm text-[var(--text-muted)]">
               {column.title === "Support" ? (
                 <li>
-                  <FooterEsimCompatibilityLink />
+                  <DeferredFooterEsimCompatibilityLink />
                 </li>
               ) : null}
               {column.links.map((link) => (

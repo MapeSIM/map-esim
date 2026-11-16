@@ -71,12 +71,22 @@ function main() {
   console.log("3) Plan-page + footer + home wire modal triggers");
   assert.match(plansListing, /EsimCompatibilityInlineTrigger/);
   assert.match(plansListing, /Check eSIM compatibility/);
-  assert.match(footer, /FooterEsimCompatibilityLink/);
+  assert.match(
+    footer,
+    /DeferredFooterEsimCompatibilityLink|FooterEsimCompatibilityLink/
+  );
   assert.match(
     read("app/components/esim/FooterEsimCompatibilityLink.tsx"),
     /footerAction="explore"/
   );
-  assert.match(read("app/page.tsx"), /EsimCompatibilityInlineTrigger/);
+  assert.match(
+    read("app/components/esim/DeferredFooterEsimCompatibilityLink.tsx"),
+    /next\/dynamic/
+  );
+  assert.match(
+    read("app/page.tsx"),
+    /DeferredEsimCompatibilityInlineTrigger|EsimCompatibilityInlineTrigger/
+  );
   console.log("   ok");
 
   console.log("3b) Shared checker + catalog + modal");
@@ -96,9 +106,12 @@ function main() {
   assert.match(checker, /Not Supported/);
   assert.match(checker, /Verify via \*#06#/);
   assert.match(checker, /data-esim-compat-search/);
-  assert.match(modal, /EsimCompatibilityChecker/);
-  assert.match(modal, /Got it, Continue/);
-  assert.match(modal, /Explore Plans/);
+  assert.match(modal, /next\/dynamic/);
+  assert.match(modal, /EsimCompatibilityDialog/);
+  const dialog = read("app/components/esim/EsimCompatibilityDialog.tsx");
+  assert.match(dialog, /EsimCompatibilityChecker/);
+  assert.match(dialog, /Got it, Continue/);
+  assert.match(dialog, /Explore Plans/);
   assert.match(checkoutCompat, /CheckoutCompatibilityCheck/);
   assert.match(checkoutCompat, /footerAction="continue"/);
   assert.match(checkoutCompat, /Check eSIM compatibility \(\?\)/);

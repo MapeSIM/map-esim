@@ -20,6 +20,9 @@ function main() {
   assert.match(gate, /GUEST_CHECKOUT_FORCE_OFF\s*===\s*"true"/);
   assert.match(gate, /isGuestVesimCheckoutEnabled/);
   assert.match(gate, /getGuestCheckoutConfigView/);
+  assert.match(gate, /unstable_cache/);
+  assert.match(gate, /revalidate:\s*60/);
+  assert.match(gate, /GUEST_CHECKOUT_ENABLED_CACHE_TAG|invalidateGuestCheckoutEnabledCache/);
   assert.doesNotMatch(gate, /NEXT_PUBLIC_ENABLE_GUEST/);
   // Legacy fail-closed env must not override the admin toggle.
   assert.match(gate, /ENABLE_GUEST_VESIM_CHECKOUT[\s\S]{0,120}ignored|Legacy[\s\S]{0,80}ENABLE_GUEST_VESIM_CHECKOUT/i);
@@ -80,6 +83,7 @@ function main() {
   const adminApi = read("app/api/admin/operations/guest-checkout/route.ts");
   assert.match(adminApi, /guestCheckoutConfig\.upsert/);
   assert.match(adminApi, /requireActiveAdminForOperations/);
+  assert.match(adminApi, /invalidateGuestCheckoutEnabledCache/);
   const opsPage = read("app/admin/operations/page.tsx");
   assert.match(opsPage, /GuestCheckoutConfigPanel/);
   assert.match(opsPage, /getGuestCheckoutConfigView/);

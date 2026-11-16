@@ -276,6 +276,8 @@ function main() {
   assert.match(button, /aria-label/);
   assert.match(button, /isWhatsAppSupportRoute/);
   assert.match(button, /\/api\/support\/whatsapp/);
+  assert.match(button, /sessionStorage/);
+  assert.match(button, /CACHE_TTL_MS|10 \* 60 \* 1000/);
   assert.doesNotMatch(button, /dangerouslySetInnerHTML/);
   assert.match(pkg, /qa:whatsapp-support/);
   console.log("PASS admin_ui_and_button_wiring");
@@ -290,7 +292,9 @@ function main() {
 
   // --- Runtime without redeploy (markers) ---
   assert.match(api, /force-dynamic|no-store/);
+  // Fresh fetch still bypasses HTTP cache; client memoizes for ~10 minutes.
   assert.match(button, /cache:\s*"no-store"/);
+  assert.match(button, /sessionStorage/);
   assert.match(panel, /without redeploy/);
   console.log("PASS runtime_no_redeploy_markers");
 

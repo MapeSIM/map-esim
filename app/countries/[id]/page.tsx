@@ -22,6 +22,7 @@ import {
   fetchCachedPublicOffersForCountry as fetchPublicOffersForCountry,
 } from "@/app/lib/vesim/server";
 import { notFound, permanentRedirect } from "next/navigation";
+import { STATIC_POPULAR_DESTINATION_SLUGS } from "@/app/lib/home/homeConversionSections";
 
 /** Align with public destination catalog cache; keep crawlers on fresh plan HTML. */
 export const revalidate = 300;
@@ -29,6 +30,11 @@ export const revalidate = 300;
 export const dynamic = "force-static";
 /** Allow on-demand ISR for destination slugs not prerendered at build time. */
 export const dynamicParams = true;
+
+/** Prerender top popular destinations so first visits avoid cold snapshot refresh. */
+export function generateStaticParams() {
+  return STATIC_POPULAR_DESTINATION_SLUGS.map((id) => ({ id }));
+}
 
 type CountryDetailPageProps = {
   params: Promise<{ id: string }>;

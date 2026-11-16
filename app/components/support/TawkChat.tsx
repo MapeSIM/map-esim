@@ -20,6 +20,7 @@ declare global {
 }
 
 const SCRIPT_ID = "map-esim-tawk-embed";
+const IDLE_FALLBACK_MS = 2500;
 
 function hideTawkWidget(): void {
   if (typeof window === "undefined") return;
@@ -118,6 +119,51 @@ function ensureTawkScript(embedSrc: string): void {
   document.body.appendChild(script);
 }
 
+function scheduleDeferredInject(run: () => void): () => void {
+  let idleId: number | null = null;
+  let timeoutId: number | null = null;
+  let loadHandler: (() => void) | null = null;
+  let cancelled = false;
+
+  const startIdleWindow = () => {
+    if (cancelled) return;
+    if (typeof window.requestIdleCallback === "function") {
+      idleId = window.requestIdleCallback(
+        () => {
+          if (!cancelled) run();
+        },
+        { timeout: IDLE_FALLBACK_MS }
+      );
+      return;
+    }
+    timeoutId = window.setTimeout(() => {
+      if (!cancelled) run();
+    }, IDLE_FALLBACK_MS);
+  };
+
+  if (document.readyState === "complete") {
+    startIdleWindow();
+  } else {
+    loadHandler = () => {
+      startIdleWindow();
+    };
+    window.addEventListener("load", loadHandler, { once: true });
+    // Fallback if `load` already fired in odd SPA cases.
+    timeoutId = window.setTimeout(() => {
+      if (!cancelled) startIdleWindow();
+    }, IDLE_FALLBACK_MS);
+  }
+
+  return () => {
+    cancelled = true;
+    if (loadHandler) window.removeEventListener("load", loadHandler);
+    if (idleId != null && typeof window.cancelIdleCallback === "function") {
+      window.cancelIdleCallback(idleId);
+    }
+    if (timeoutId != null) window.clearTimeout(timeoutId);
+  };
+}
+
 /**
  * Consent- and route-gated Tawk widget.
  * Does not attach visitor identity, order data, or other account attributes.
@@ -134,9 +180,7 @@ export default function TawkChat({
     () => isTawkEnabledRoute(pathname),
     [pathname]
   );
-
   const consentReady = Boolean(enabledByConsent && embedSrc);
-  const widgetVisible = consentReady && routeAllowed;
 
   useEffect(() => {
     if (!consentReady || !embedSrc) {
@@ -153,21 +197,32 @@ export default function TawkChat({
     bindTawkOnLoad();
 
     if (hasTawkScript(embedSrc)) {
-      // SPA navigation back onto an allowlisted route: script already present.
+      // Allowlisted → allowlisted: keep script, just show.
       showTawkWidget();
       return;
     }
 
-    ensureTawkScript(embedSrc);
-  }, [consentReady, routeAllowed, widgetVisible, pathname, embedSrc]);
+    const cancel = scheduleDeferredInject(() => {
+      if (!isTawkEnabledRoute(window.location.pathname || "/")) return;
+      ensureTawkScript(embedSrc);
+    });
+
+    return () => {
+      cancel();
+    };
+  }, [consentReady, routeAllowed, pathname, embedSrc]);
 
   useEffect(() => {
     return () => {
+      // Unmount (consent revoked / gate removed): full unload.
       unloadTawkWidget();
     };
   }, []);
 
-  if (!widgetVisible) {
+  // Keep positioning CSS mounted while consent is on and route is allowlisted,
+  // or while script exists after an allowlisted visit (hidden on blocked routes
+  // after unload — CSS harmless if nodes gone).
+  if (!consentReady || !routeAllowed) {
     return null;
   }
 

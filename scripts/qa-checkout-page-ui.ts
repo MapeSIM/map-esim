@@ -234,9 +234,12 @@ function main() {
   assert.match(compatModal, /Check eSIM compatibility \(\?\)/);
   assert.match(compatModal, /EsimCompatibilityTrigger/);
   assert.match(compatModal, /footerAction="continue"/);
-  assert.match(esimModal, /Got it, Continue/);
-  assert.match(esimModal, /Explore Plans/);
-  assert.match(esimModal, /EsimCompatibilityChecker/);
+  assert.match(esimModal, /next\/dynamic/);
+  assert.match(esimModal, /EsimCompatibilityDialog/);
+  const esimDialog = read("app/components/esim/EsimCompatibilityDialog.tsx");
+  assert.match(esimDialog, /Got it, Continue/);
+  assert.match(esimDialog, /Explore Plans/);
+  assert.match(esimDialog, /EsimCompatibilityChecker/);
   const esimChecker = read("app/components/esim/EsimCompatibilityChecker.tsx");
   assert.match(esimChecker, /eSIM Supported/);
   assert.match(esimChecker, /Not Supported/);

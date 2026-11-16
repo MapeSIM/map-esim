@@ -9,6 +9,15 @@ import {
 } from "@/app/lib/support/whatsappSupportShared";
 
 const OFF: PublicWhatsAppSupportConfig = { enabled: false };
+const CACHE_KEY = "mapesim.whatsappSupportConfig.v1";
+const CACHE_TTL_MS = 10 * 60 * 1000;
+
+type CachedConfig = {
+  savedAt: number;
+  config: PublicWhatsAppSupportConfig;
+};
+
+let memoryCache: CachedConfig | null = null;
 
 function parsePublicConfig(data: unknown): PublicWhatsAppSupportConfig {
   if (!data || typeof data !== "object") return OFF;
@@ -21,9 +30,44 @@ function parsePublicConfig(data: unknown): PublicWhatsAppSupportConfig {
   return { enabled: true, phone, message, href };
 }
 
+function readCachedConfig(): PublicWhatsAppSupportConfig | null {
+  const now = Date.now();
+  if (memoryCache && now - memoryCache.savedAt < CACHE_TTL_MS) {
+    return memoryCache.config;
+  }
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedConfig;
+    if (
+      !parsed ||
+      typeof parsed.savedAt !== "number" ||
+      now - parsed.savedAt >= CACHE_TTL_MS
+    ) {
+      return null;
+    }
+    memoryCache = parsed;
+    return parsed.config;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedConfig(config: PublicWhatsAppSupportConfig): void {
+  const entry: CachedConfig = { savedAt: Date.now(), config };
+  memoryCache = entry;
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(CACHE_KEY, JSON.stringify(entry));
+  } catch {
+    // Ignore quota / private-mode failures.
+  }
+}
+
 /**
  * Floating WhatsApp support button (bottom-left).
- * Fetches runtime config on mount and route changes. Renders nothing when off
+ * Fetches runtime config on mount (cached ~10 minutes). Renders nothing when off
  * or on disallowed routes. Independent of Tawk / marketing consent.
  * On wallet checkout paths the FAB sits above the sticky payment bar and
  * respects mobile safe-area so it never covers the pay CTA.
@@ -36,6 +80,12 @@ export default function WhatsAppSupportButton() {
   useEffect(() => {
     if (!routeOk) {
       setConfig(OFF);
+      return;
+    }
+
+    const cached = readCachedConfig();
+    if (cached) {
+      setConfig(cached);
       return;
     }
 
@@ -55,7 +105,9 @@ export default function WhatsAppSupportButton() {
           return;
         }
         const json: unknown = await res.json();
-        if (!cancelled) setConfig(parsePublicConfig(json));
+        const next = parsePublicConfig(json);
+        writeCachedConfig(next);
+        if (!cancelled) setConfig(next);
       } catch {
         if (!cancelled) setConfig(OFF);
       }

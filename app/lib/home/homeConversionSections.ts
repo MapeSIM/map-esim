@@ -24,6 +24,32 @@ export const HOME_POPULAR_DESTINATIONS = [
 ] as const;
 
 /**
+ * Destination slugs prerendered at build time for fast first paint.
+ * Keep in sync with top travel demand; unknown slugs still ISR via dynamicParams.
+ */
+export const STATIC_POPULAR_DESTINATION_SLUGS = [
+  "pakistan",
+  "saudi-arabia",
+  "uae",
+  "turkey",
+  "united-kingdom",
+  "united-states",
+  "malaysia",
+  "thailand",
+  "qatar",
+  "oman",
+  "kuwait",
+  "bahrain",
+  "egypt",
+  "singapore",
+  "indonesia",
+  "germany",
+  "france",
+  "italy",
+  "spain",
+] as const;
+
+/**
  * Display-only pin order for Popular destination UIs.
  * Codes missing from a given list are skipped; remaining stay after these.
  */

@@ -4,6 +4,7 @@ import {
   createManualPendingOrderFromGuest,
   createManualPendingOrderFromPurchase,
 } from "@/app/lib/esim/manualCheckoutOrder";
+import { notifyManualPaymentSubmissionEmails } from "@/app/lib/esim/manualPaymentSubmissionEmail";
 import {
   GUEST_CHECKOUT_UNAVAILABLE_MESSAGE,
   isGuestVesimCheckoutEnabled,
@@ -16,6 +17,8 @@ export const dynamic = "force-dynamic";
  * Submit a Manual Payment checkout (JazzCash / EasyPaisa / bank).
  * Persists a PENDING local order + admin fulfillable pending row when possible.
  * Never calls VeSIM here — admin Verify & Issue triggers fulfillment.
+ * Emails are awaited (bounded) after durable persist so serverless does not
+ * exit mid-send; SMTP failure never rolls back the order.
  */
 export async function POST(req: Request) {
   let body: Record<string, unknown>;
@@ -64,6 +67,12 @@ export async function POST(req: Request) {
       if (!result.success) {
         return NextResponse.json(result, { status: 400 });
       }
+
+      await notifyManualPaymentSubmissionEmails({
+        orderId: result.orderId,
+        reference: result.reference,
+      });
+
       return NextResponse.json({
         success: true,
         pendingOrderId: result.pendingOrderId,
@@ -102,6 +111,12 @@ export async function POST(req: Request) {
     if (!result.success) {
       return NextResponse.json(result, { status: 400 });
     }
+
+    await notifyManualPaymentSubmissionEmails({
+      orderId: result.orderId,
+      reference: result.reference,
+    });
+
     return NextResponse.json({
       success: true,
       pendingOrderId: result.pendingOrderId,

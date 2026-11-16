@@ -54,6 +54,29 @@ function main() {
   const submitApi = read("app/api/checkout/manual-payment/route.ts");
   assert.match(submitApi, /createManualPendingOrderFromPurchase/);
   assert.match(submitApi, /createManualPendingOrderFromGuest/);
+  assert.match(submitApi, /notifyManualPaymentSubmissionEmails/);
+  assert.match(
+    submitApi,
+    /await notifyManualPaymentSubmissionEmails/
+  );
+
+  const notify = read("app/lib/esim/manualPaymentSubmissionEmail.ts");
+  assert.match(notify, /resolveManualPaymentAdminAlertRecipient/);
+  assert.match(notify, /ADMIN_ALERT_EMAIL/);
+  assert.match(notify, /SUPPORT_EMAIL/);
+  assert.match(notify, /ORDERS_FROM_EMAIL/);
+  assert.match(notify, /SMTP_USER/);
+  assert.match(notify, /Promise\.allSettled/);
+  assert.match(notify, /MANUAL_PAYMENT_EMAIL_TIMEOUT_MS/);
+  assert.match(notify, /admin_alert/);
+  assert.match(notify, /customer_confirmation/);
+  assert.match(notify, /channel:\s*"orders"|isEmailConfigured\("orders"\)/);
+  assert.doesNotMatch(notify, /applyVerifiedPaymentEvent/);
+
+  const templates = read("app/lib/email/manualPaymentSubmissionTemplate.ts");
+  assert.match(templates, /under review/);
+  assert.match(templates, /Review in Admin/);
+  assert.match(templates, /manualPaymentCustomerSubject/);
 
   const review = read("app/account/esim/buy/review/page.tsx");
   assert.match(review, /getPublicManualPaymentConfig/);

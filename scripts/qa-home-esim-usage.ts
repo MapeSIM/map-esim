@@ -50,14 +50,19 @@ function main() {
   const checkout = read("app/checkout/CheckoutClient.tsx");
   const shared = read("app/lib/esim/homeUsageLookupShared.ts");
 
-  assert.match(page, /HomeEsimUsageWidget/);
-  assert.match(page, /id="esim-usage"|HomeEsimUsageWidget/);
+  assert.match(page, /DeferredHomeEsimUsageWidget|HomeEsimUsageWidget/);
+  assert.match(page, /id="esim-usage"|DeferredHomeEsimUsageWidget/);
   // Usage sits after Popular destinations (discovery first).
   assert.ok(
     page.indexOf("<HomePopularDestinations") <
-      page.indexOf("<HomeEsimUsageWidget")
+      page.indexOf("<DeferredHomeEsimUsageWidget")
   );
-  assert.match(widget, /id="esim-usage"/);
+  const deferred = read("app/components/home/DeferredHomeEsimUsageWidget.tsx");
+  assert.match(deferred, /id="esim-usage"/);
+  assert.match(deferred, /IntersectionObserver/);
+  assert.match(deferred, /rootMargin:\s*"300px"/);
+  assert.match(deferred, /next\/dynamic/);
+  assert.match(widget, /data-home-esim-usage-widget/);
   assert.match(widget, /eSIM Data Usage/);
   assert.match(widget, /Check another eSIM/);
   assert.match(widget, /Where to find ICCID/);
