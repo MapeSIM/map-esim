@@ -66,6 +66,11 @@ export type ConfirmAssignmentInput = {
   customerUserId: string;
   assignmentId: string;
   idempotencyKey: string;
+  /**
+   * Preserve Manual / WhatsApp payment rail on the completed Order.
+   * Omitted leaves Order.paymentMethod at schema default (SAFEPAY).
+   */
+  paymentMethod?: string | null;
 };
 
 export type ConfirmAssignmentResult = {
@@ -457,6 +462,7 @@ export async function confirmAdminPackageAssignment(
   const customerUserId = input.customerUserId.trim();
   const assignmentId = input.assignmentId.trim();
   const idempotencyKey = input.idempotencyKey.trim();
+  const paymentMethod = (input.paymentMethod ?? "").trim().slice(0, 32) || null;
 
   if (!adminUserId || adminUserId.length > 64) {
     throw new AdminPackageAssignmentError("FORBIDDEN", "Not authorized.");
@@ -724,6 +730,7 @@ export async function confirmAdminPackageAssignment(
         fundingSource: OrderFundingSource.COMPANY_FUNDED,
         status: OrderStatus.COMPLETED,
         checkoutPayload: checkoutData,
+        ...(paymentMethod ? { paymentMethod } : {}),
       });
 
       await tx.adminPackageAssignment.update({

@@ -41,6 +41,12 @@ export type EmailCenterRow = {
   targetType: string;
   targetId: string;
   orderId: string | null;
+  /** Human order reference when logged (e.g. MP-…). */
+  orderReference: string | null;
+  /** Sanitized subject line when logged. */
+  subject: string | null;
+  /** Redacted recipient hint — never a required full mailbox. */
+  recipientHint: string | null;
   /** Non-secret search text only (ids / types) — never raw mailbox addresses. */
   recipientSearchText: string | null;
   createdAtMs: number;
@@ -177,6 +183,9 @@ function rowFromAudit(log: {
     metaString(meta, "orderId") ??
     metaString(meta, "purchaseId") ??
     metaString(meta, "walletTransactionId");
+  const orderReference = metaString(meta, "orderReference");
+  const subject = metaString(meta, "subject");
+  const recipientHint = metaString(meta, "recipientHint");
   const retry = resolveRetry({
     kind,
     deliveryStatus,
@@ -198,7 +207,17 @@ function rowFromAudit(log: {
     targetType: log.targetType,
     targetId,
     orderId,
-    recipientSearchText: [log.targetType, targetId, orderId ?? ""]
+    orderReference,
+    subject,
+    recipientHint,
+    recipientSearchText: [
+      log.targetType,
+      targetId,
+      orderId ?? "",
+      orderReference ?? "",
+      recipientHint ?? "",
+      subject ?? "",
+    ]
       .filter(Boolean)
       .join(" "),
     createdAtMs: log.createdAt.getTime(),
@@ -238,6 +257,9 @@ function rowFromModel(options: {
     targetType: options.targetType,
     targetId: options.targetId,
     orderId: null,
+    orderReference: null,
+    subject: null,
+    recipientHint: null,
     recipientSearchText: `${options.targetType} ${options.targetId}`,
     createdAtMs: options.createdAt.getTime(),
     createdAtLabel: formatUtcTimestamp(options.createdAt),

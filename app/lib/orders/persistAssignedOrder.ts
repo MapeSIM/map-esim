@@ -26,6 +26,11 @@ export async function persistAssignedOrder(
     fundingSource: OrderFundingSource;
     status?: OrderStatus;
     /**
+     * Explicit checkout payment rail (e.g. MANUAL). Omitted keeps schema default.
+     * Manual/WhatsApp admin fulfill must pass this so /admin/orders does not show SAFEPAY.
+     */
+    paymentMethod?: string | null;
+    /**
      * Frozen confirmed alternate install-email recipient from the purchase.
      * Null/omitted keeps Order.customerEmail as the install recipient.
      * Does not change User.email.
@@ -74,6 +79,7 @@ export async function persistAssignedOrder(
       : null;
 
   const now = new Date();
+  const paymentMethod = (options.paymentMethod ?? "").trim().slice(0, 32) || null;
 
   const order = await tx.order.upsert({
     where: { providerOrderId },
@@ -97,6 +103,7 @@ export async function persistAssignedOrder(
       status: options.status || OrderStatus.COMPLETED,
       claimStatus: OrderClaimStatus.CLAIMED,
       claimedAt: now,
+      ...(paymentMethod ? { paymentMethod } : {}),
       ...(alternateDeliveryEmail !== undefined
         ? { alternateDeliveryEmail }
         : {}),
@@ -120,6 +127,7 @@ export async function persistAssignedOrder(
       status: options.status || OrderStatus.COMPLETED,
       claimStatus: OrderClaimStatus.CLAIMED,
       claimedAt: now,
+      ...(paymentMethod ? { paymentMethod } : {}),
       ...(alternateDeliveryEmail !== undefined
         ? { alternateDeliveryEmail }
         : {}),

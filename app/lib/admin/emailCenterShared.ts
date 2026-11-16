@@ -38,6 +38,10 @@ export const EMAIL_CENTER_AUDIT_ACTIONS = [
   "wallet.transaction_email_failed",
   "esim.payment_failure_email_sent",
   "esim.payment_received_pending_email_sent",
+  "esim.manual_payment_admin_email_sent",
+  "esim.manual_payment_admin_email_failed",
+  "esim.manual_payment_customer_email_sent",
+  "esim.manual_payment_customer_email_failed",
   "esim.recon_required_email_sent",
   "esim.wallet_delivery_email_failed",
   "esim.wallet_delivery_email_uncertain",
@@ -63,6 +67,7 @@ export type EmailCenterKind =
   | "wallet_transaction"
   | "payment_failure"
   | "payment_received_pending"
+  | "manual_payment"
   | "recon_required"
   | "partner_recon_required"
   | "order_install"
@@ -143,6 +148,7 @@ export function emailCenterCategoryForKind(
       return "orders";
     case "payment_failure":
     case "payment_received_pending":
+    case "manual_payment":
       return "payments";
     case "refund_status":
     case "partner_refund_status":
@@ -265,6 +271,14 @@ export function emailCenterKindFromAction(action: string): EmailCenterKind {
   if (a === "esim.payment_received_pending_email_sent") {
     return "payment_received_pending";
   }
+  if (
+    a === "esim.manual_payment_admin_email_sent" ||
+    a === "esim.manual_payment_admin_email_failed" ||
+    a === "esim.manual_payment_customer_email_sent" ||
+    a === "esim.manual_payment_customer_email_failed"
+  ) {
+    return "manual_payment";
+  }
   if (a === "esim.recon_required_email_sent") return "recon_required";
   if (a === "partner.recon_required_email_sent") return "partner_recon_required";
   if (
@@ -291,6 +305,8 @@ export function emailCenterKindLabel(kind: EmailCenterKind): string {
       return "Payment failure notice";
     case "payment_received_pending":
       return "Payment received (pending eSIM)";
+    case "manual_payment":
+      return "Manual payment submission";
     case "recon_required":
       return "Order under review";
     case "partner_recon_required":
@@ -324,6 +340,9 @@ export function emailCenterRowMatchesSearch(
     recipientSearchText: string | null;
     deliveryStatusLabel: string;
     failureReason: string | null;
+    subject?: string | null;
+    recipientHint?: string | null;
+    orderReference?: string | null;
   },
   rawQuery: string | null | undefined
 ): boolean {
@@ -336,6 +355,9 @@ export function emailCenterRowMatchesSearch(
     row.targetId,
     row.emailEvent ?? "",
     row.orderId ?? "",
+    row.orderReference ?? "",
+    row.subject ?? "",
+    row.recipientHint ?? "",
     row.recipientSearchText ?? "",
     row.deliveryStatusLabel,
     row.failureReason ?? "",

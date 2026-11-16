@@ -124,10 +124,18 @@ export function RunAlertNotificationsPanel() {
           className="mt-3 rounded-lg border border-[var(--accent-strong)]/35 bg-[var(--accent-strong)]/10 px-3 py-2 text-sm text-[var(--heading)]"
           role="status"
         >
+          {state.progressMessage
+            ? `${state.progressMessage}. `
+            : null}
           Completed: {sentFromState(state)} sent, {skippedFromState(state)}{" "}
           skipped
           {state.counts
-            ? ` (eligible ${state.counts.eligible}, failed ${state.counts.failed}, recovery ${state.counts.recovery})`
+            ? ` (eligible ${state.counts.eligible}, failed ${state.counts.failed}, recovery ${state.counts.recovery}${
+                typeof state.remainingCount === "number" &&
+                state.remainingCount > 0
+                  ? `, remaining ${state.remainingCount}`
+                  : ""
+              })`
             : ""}
           {state.snapshotComplete === false ? " — incomplete snapshot" : ""}.
         </p>
@@ -139,6 +147,7 @@ export function RunAlertNotificationsPanel() {
           role="alert"
         >
           {state.error ?? "Unable to run alert notifications."}
+          {state.progressMessage ? ` ${state.progressMessage}.` : null}
         </p>
       ) : null}
     </section>

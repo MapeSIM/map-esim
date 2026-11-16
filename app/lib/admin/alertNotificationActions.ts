@@ -11,6 +11,8 @@ import { assertSameOriginAdminRequest } from "@/app/lib/admin/reconciliationCase
 import {
   ALERT_NOTIFICATION_CONFIRM_PHRASE,
   emptyRunnerCounts,
+  formatAlertNotificationFailureReason,
+  formatAlertNotificationPartialProgress,
   type SafeRunnerCounts,
 } from "@/app/lib/admin/alertNotificationShared";
 import { evaluateAndDeliverAlertNotifications } from "@/app/lib/admin/alertNotificationRunner";
@@ -23,13 +25,16 @@ export type RunAlertNotificationsFormState = {
   /** Structured counts for banners — prefer these over digging into `counts`. */
   sentCount?: number;
   skippedCount?: number;
+  remainingCount?: number;
+  /** Present when a bounded batch left more outbox work. */
+  progressMessage?: string;
   counts?: SafeRunnerCounts;
   paused?: boolean;
   snapshotComplete?: boolean;
 } | null;
 
-/** Hard ceiling for a manual admin run (aggregation + SMTP). Client uses 15s. */
-const SERVER_RUN_TIMEOUT_MS = 12_000;
+/** Hard ceiling above the 8s runner budget; client uses 15s. */
+const SERVER_RUN_TIMEOUT_MS = 10_000;
 
 function skippedCountFrom(counts: SafeRunnerCounts): number {
   return counts.suppressed + counts.cooldown;
@@ -38,6 +43,7 @@ function skippedCountFrom(counts: SafeRunnerCounts): number {
 function toBannerState(input: {
   ok: boolean;
   error?: string;
+  progressMessage?: string;
   counts?: SafeRunnerCounts;
   paused?: boolean;
   snapshotComplete?: boolean;
@@ -46,8 +52,10 @@ function toBannerState(input: {
   return {
     ok: input.ok,
     error: input.error,
+    progressMessage: input.progressMessage,
     sentCount: counts.sent,
     skippedCount: skippedCountFrom(counts),
+    remainingCount: counts.remaining,
     counts,
     paused: input.paused,
     snapshotComplete: input.snapshotComplete,
@@ -124,8 +132,7 @@ export async function runAlertNotificationsAction(
     if (controls.map.ALERT_NOTIFICATIONS) {
       return toBannerState({
         ok: false,
-        error:
-          "Alert notifications are paused. Resume the control before running.",
+        error: formatAlertNotificationFailureReason({ errorCode: "paused" }),
         paused: true,
         counts: emptyRunnerCounts(),
       });
@@ -157,46 +164,36 @@ export async function runAlertNotificationsAction(
     revalidatePath("/admin/operations");
     revalidatePath("/admin/alerts");
 
-    if (!result.ok && result.errorCode === "invalid_recipients") {
-      return toBannerState({
-        ok: false,
-        error:
-          "Alert notification recipients are not configured. Set ALERT_NOTIFICATION_RECIPIENTS on the server.",
-        counts: result.counts,
-        snapshotComplete: result.snapshotComplete,
-      });
-    }
-    if (!result.ok && result.errorCode === "runner_busy") {
-      return toBannerState({
-        ok: false,
-        error: "Another notification run is already in progress.",
-        counts: result.counts,
-      });
-    }
-    if (!result.ok && result.errorCode === "aggregation_timeout") {
-      return toBannerState({
-        ok: false,
-        error:
-          "Alert aggregation timed out. Try again shortly or check Operations health.",
-        counts: result.counts,
-        snapshotComplete: result.snapshotComplete,
-      });
-    }
     if (!result.ok) {
       return toBannerState({
         ok: false,
-        error: "Unable to run alert notifications. Please try again.",
+        error: formatAlertNotificationFailureReason({
+          errorCode: result.errorCode,
+          detail: result.errorDetail,
+        }),
         counts: result.counts,
         snapshotComplete: result.snapshotComplete,
         paused: result.paused,
+        progressMessage:
+          formatAlertNotificationPartialProgress({
+            processed: result.processed,
+            remaining: result.counts.remaining,
+          }) ?? undefined,
       });
     }
+
+    const progressMessage =
+      formatAlertNotificationPartialProgress({
+        processed: result.processed,
+        remaining: result.counts.remaining,
+      }) ?? undefined;
 
     return toBannerState({
       ok: true,
       counts: result.counts,
       paused: result.paused,
       snapshotComplete: result.snapshotComplete,
+      progressMessage,
     });
   } catch {
     console.error("alert_notification_run", "UNHANDLED");

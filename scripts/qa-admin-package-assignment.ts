@@ -145,6 +145,8 @@ function main() {
   assert.match(service, /persistAssignedOrder/);
   assert.match(persist, /userId:\s*customerUserId/);
   assert.match(persist, /CLAIMED/);
+  assert.match(persist, /paymentMethod/);
+  assert.match(service, /paymentMethod/);
   assert.match(service, /AdminPackageAssignmentStatus\.COMPLETED/);
   const confirmFn = service.slice(
     service.indexOf("export async function confirmAdminPackageAssignment")
@@ -169,8 +171,11 @@ function main() {
   assert.match(successPage, /notFound\(\)/);
   console.log("PASS success_page_uses_db_values_only");
 
-  assert.match(accountOrders, /\/account\/orders\/\$\{/);
-  assert.match(accountOrders, /View details/);
+  assert.match(accountOrders, /CustomerEsimOrderCard/);
+  assert.match(
+    read("app/components/orders/CustomerEsimOrderCard.tsx"),
+    /\/account\/orders\/\$\{/
+  );
   assert.match(accountOrders, /My eSIMs/);
   assert.match(accountOrderDetail, /getCustomerOwnedOrderDetail/);
   assert.match(accountOrderDetail, /notFound\(\)/);

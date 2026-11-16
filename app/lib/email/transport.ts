@@ -22,10 +22,11 @@ const transporterCache = new Map<EmailChannel, CachedTransporter>();
 
 export const SMTP_TLS_MIN_VERSION = "TLSv1.2";
 
+/** Fail-fast SMTP so serverless runs cannot hang near the Vercel 15s limit. */
 export const SMTP_TRANSPORT_TIMEOUT_MS = {
-  connection: 15_000,
-  greeting: 15_000,
-  socket: 30_000,
+  connection: 4_000,
+  greeting: 4_000,
+  socket: 5_000,
 } as const;
 
 function fingerprintFor(channel: EmailChannel): string | null {
@@ -200,6 +201,7 @@ export async function sendChannelMail(options: {
       typeof (error as { code?: unknown }).code === "string"
         ? String((error as { code: string }).code).slice(0, 64)
         : "";
+    const detail = sanitizeSmtpFailureDetail(code);
     console.error(
       `Email send failed for channel "${options.channel}"${
         code ? ` code=${code}` : ""
@@ -208,9 +210,44 @@ export async function sendChannelMail(options: {
     return {
       ok: false,
       reason: "send_failed",
-      detail: code || "send_failed",
+      detail,
     };
   }
+}
+
+/** Map Nodemailer/network codes to opaque machine details — never raw messages. */
+export function sanitizeSmtpFailureDetail(code: string | null | undefined): string {
+  const c = String(code ?? "")
+    .trim()
+    .toUpperCase()
+    .slice(0, 64);
+  if (
+    c === "ETIMEDOUT" ||
+    c === "ESOCKETTIMEDOUT" ||
+    c === "ETIMEDOUT_CONNECTION" ||
+    c === "CONNECTIONTIMEOUT" ||
+    c === "GREETINGTIMEOUT" ||
+    c === "SOCKETTIMEOUT"
+  ) {
+    return "smtp_connection_timeout";
+  }
+  if (
+    c === "ECONNREFUSED" ||
+    c === "ECONNECTION" ||
+    c === "ECONNRESET" ||
+    c === "ENOTFOUND" ||
+    c === "EHOSTUNREACH" ||
+    c === "ENETUNREACH"
+  ) {
+    return "smtp_connection_failed";
+  }
+  if (c === "EAUTH" || c === "INVALIDLOGIN") {
+    return "smtp_auth_failed";
+  }
+  if (!c) return "send_failed";
+  // Keep short opaque codes only (A-Z0-9_); drop free-form provider text.
+  if (/^[A-Z0-9_]{2,64}$/.test(c)) return c.toLowerCase();
+  return "send_failed";
 }
 
 /** Test helper — clears cached transporters (does not log secrets). */

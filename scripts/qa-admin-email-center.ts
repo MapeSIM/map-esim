@@ -54,7 +54,22 @@ function main() {
   assert.match(page, /name="category"/);
   assert.match(page, /Email type/);
   assert.match(page, /Order \/ reference/);
+  assert.match(page, /Subject|Recipient/);
   assert.match(page, /EMAIL_CENTER_RESEND_SAFE_HINT|Safe retry only/);
+  assert.match(shared, /esim\.manual_payment_admin_email_sent/);
+  assert.match(shared, /manual_payment/);
+  assert.equal(emailCenterCategoryForKind("manual_payment"), "payments");
+  assert.ok(
+    existsSync(join(root, "app/lib/admin/emailCenterLog.ts"))
+  );
+  assert.match(
+    read("app/lib/admin/emailCenterLog.ts"),
+    /recordEmailCenterDelivery/
+  );
+  assert.match(
+    read("app/lib/esim/manualPaymentSubmissionEmail.ts"),
+    /recordEmailCenterDelivery/
+  );
   assert.match(nav, /\/admin\/emails/);
   assert.match(access, /SUPPORT_EMAILS/);
   console.log("PASS email_center_ux_page");

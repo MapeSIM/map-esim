@@ -190,9 +190,9 @@ function main() {
     assert.equal(tls587.tls.requireTLS, true);
   }
   assert.equal(SMTP_TLS_MIN_VERSION, "TLSv1.2");
-  assert.equal(SMTP_TRANSPORT_TIMEOUT_MS.connection, 15_000);
-  assert.equal(SMTP_TRANSPORT_TIMEOUT_MS.greeting, 15_000);
-  assert.equal(SMTP_TRANSPORT_TIMEOUT_MS.socket, 30_000);
+  assert.equal(SMTP_TRANSPORT_TIMEOUT_MS.connection, 4_000);
+  assert.equal(SMTP_TRANSPORT_TIMEOUT_MS.greeting, 4_000);
+  assert.equal(SMTP_TRANSPORT_TIMEOUT_MS.socket, 5_000);
   const transportSrc = readFileSync(
     path.join(process.cwd(), "app/lib/email/transport.ts"),
     "utf8"

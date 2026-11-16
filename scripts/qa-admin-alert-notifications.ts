@@ -10,9 +10,11 @@ import {
   ALERT_NOTIFICATION_ERROR_CODES,
   ALERT_NOTIFICATION_HIGH_ALLOWLIST,
   ALERT_NOTIFICATION_MAX_ATTEMPTS,
+  ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN,
   ALERT_NOTIFICATION_MAX_RECIPIENTS,
   ALERT_NOTIFICATION_REMINDER_COOLDOWN_MS,
   ALERT_NOTIFICATION_RETRY_DELAYS_MS,
+  ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS,
   buildAggregationCompleteness,
   buildDeliveryEventKey,
   buildDeterministicMessageId,
@@ -20,6 +22,8 @@ import {
   cooldownElapsed,
   deriveDisplayStatus,
   evidenceSafeAlertSummary,
+  formatAlertNotificationFailureReason,
+  formatAlertNotificationPartialProgress,
   isAlertEligibleForNotification,
   isCooldownActive,
   isHighAllowlistedForNotification,
@@ -462,6 +466,40 @@ function main() {
   assert.match(actions, /SERVER_RUN_TIMEOUT_MS|ALERT_RUN_TIMEOUT/);
   assert.match(runner, /AGGREGATION_TIMEOUT|aggregation_timeout/);
   assert.match(delivery, /SMTP_TIMEOUT|SMTP_TIMEOUT_MS/);
+  assert.ok(
+    ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN >= 5 &&
+      ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN <= 10
+  );
+  assert.equal(ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS, 8_000);
+  assert.match(runner, /ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN/);
+  assert.match(runner, /ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS|budgetMs/);
+  assert.match(runner, /countDueAlertNotificationDeliveries/);
+  assert.match(actions, /formatAlertNotificationFailureReason/);
+  assert.match(actions, /formatAlertNotificationPartialProgress/);
+  assert.match(panel, /progressMessage|remainingCount/);
+  assert.match(delivery, /getEmailConfig\("support"\)|supportConfig\.reason/);
+  assert.match(
+    formatAlertNotificationFailureReason({
+      errorCode: "not_configured",
+      detail: "missing_channel_credentials",
+    }),
+    /SMTP_SUPPORT_/
+  );
+  assert.match(
+    formatAlertNotificationFailureReason({
+      errorCode: "send_failed",
+      detail: "smtp_connection_timeout",
+    }),
+    /timed out/i
+  );
+  assert.equal(
+    formatAlertNotificationPartialProgress({ processed: 3, remaining: 7 }),
+    "Processed 3 alerts (7 remaining — click again to continue)"
+  );
+  assert.equal(
+    formatAlertNotificationPartialProgress({ processed: 2, remaining: 0 }),
+    null
+  );
   assert.doesNotMatch(panel, /useEffect[\s\S]{0,200}runAlertNotifications/);
   console.log("PASS manual_admin_action");
 

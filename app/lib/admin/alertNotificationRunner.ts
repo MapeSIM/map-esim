@@ -7,6 +7,8 @@ import "server-only";
 
 import { collectMonitoringAlerts } from "@/app/lib/admin/monitoringAlerts";
 import {
+  ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN,
+  ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS,
   buildDeterministicMessageId,
   emptyRunnerCounts,
   filterEligibleAlerts,
@@ -22,6 +24,7 @@ import {
   applySuccessfulDeliveryToState,
   claimAlertNotificationRunnerLock,
   claimNextAlertNotificationDelivery,
+  countDueAlertNotificationDeliveries,
   markAlertNotificationDeliveryFailed,
   markAlertNotificationDeliverySent,
   releaseAlertNotificationDeliveryClaim,
@@ -31,10 +34,11 @@ import {
   syncActiveAlertNotificationStates,
 } from "@/app/lib/admin/alertNotificationState";
 import { loadOperationalControlPausedMapSoft } from "@/app/lib/admin/operationalControlsPolicy";
+import { getEmailConfig } from "@/app/lib/email/config";
 import { prisma } from "@/app/lib/db";
 
-/** Bound monitoring aggregation so a slow DB probe cannot hang the runner. */
-const AGGREGATION_TIMEOUT_MS = 8_000;
+/** Bound monitoring aggregation so a slow DB probe cannot eat the whole run budget. */
+const AGGREGATION_TIMEOUT_MS = 4_000;
 
 export type AlertNotificationRunResult = {
   ok: boolean;
@@ -42,7 +46,11 @@ export type AlertNotificationRunResult = {
   runnerClaimed: boolean;
   snapshotComplete: boolean;
   counts: SafeRunnerCounts;
+  /** Items claimed/handled in this bounded outbox pass (sent + failed + suppressed mid-loop). */
+  processed: number;
   errorCode?: string;
+  /** Opaque machine detail for UI mapping — never secrets or raw SMTP stacks. */
+  errorDetail?: string;
 };
 
 async function withTimeout<T>(
@@ -63,6 +71,17 @@ async function withTimeout<T>(
   }
 }
 
+function isHardSmtpFailure(errorCode: string, detail?: string): boolean {
+  if (errorCode === "not_configured") return true;
+  const d = String(detail ?? "").toLowerCase();
+  return (
+    d === "smtp_connection_timeout" ||
+    d === "smtp_connection_failed" ||
+    d === "smtp_auth_failed" ||
+    d === "smtp_timeout"
+  );
+}
+
 export async function evaluateAndDeliverAlertNotifications(options?: {
   checkedAt?: Date;
   /** Smoke/QA: skip SMTP and mark claimed deliveries failed with not_configured. */
@@ -74,6 +93,7 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
       ? options.checkedAt
       : new Date();
   const counts = emptyRunnerCounts();
+  let processed = 0;
 
   const controls = await loadOperationalControlPausedMapSoft();
   if (controls.map.ALERT_NOTIFICATIONS) {
@@ -83,6 +103,7 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
       runnerClaimed: false,
       snapshotComplete: false,
       counts,
+      processed: 0,
       errorCode: "paused",
     };
   }
@@ -95,9 +116,13 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
       runnerClaimed: false,
       snapshotComplete: false,
       counts,
+      processed: 0,
       errorCode: "runner_busy",
     };
   }
+
+  const runStartedAt = Date.now();
+  const budgetMs = ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS;
 
   try {
     const recipients = loadAlertNotificationRecipientsFromEnv();
@@ -108,8 +133,25 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
         runnerClaimed: true,
         snapshotComplete: false,
         counts,
+        processed: 0,
         errorCode: "invalid_recipients",
       };
+    }
+
+    if (!options?.dryRun) {
+      const supportConfig = getEmailConfig("support");
+      if (!supportConfig.configured) {
+        return {
+          ok: false,
+          paused: false,
+          runnerClaimed: true,
+          snapshotComplete: false,
+          counts,
+          processed: 0,
+          errorCode: "not_configured",
+          errorDetail: supportConfig.reason || "not_configured",
+        };
+      }
     }
 
     let aggregation: Awaited<ReturnType<typeof collectMonitoringAlerts>>;
@@ -128,6 +170,7 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
           runnerClaimed: true,
           snapshotComplete: false,
           counts,
+          processed: 0,
           errorCode: "aggregation_timeout",
         };
       }
@@ -159,12 +202,22 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
     counts.suppressed +=
       activeAlerts.length - eligible.length + scheduled.cooldownSuppressed;
 
-    // Process outbox (bounded loop).
-    for (let i = 0; i < 50; i++) {
+    let hardSmtpFailure:
+      | { errorCode: string; errorDetail?: string }
+      | null = null;
+
+    // Process outbox (bounded by batch size + remaining time budget).
+    for (let i = 0; i < ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN; i++) {
+      if (Date.now() - runStartedAt >= budgetMs) {
+        break;
+      }
+
       const claimed = await claimNextAlertNotificationDelivery({
         now: checkedAt,
       });
       if (!claimed) break;
+
+      processed += 1;
 
       const alert =
         activeAlerts.find((a) => a.id === claimed.alertId) ??
@@ -283,6 +336,13 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
           failedAt: checkedAt,
         });
         counts.failed += 1;
+        if (isHardSmtpFailure(sent.errorCode, sent.detail)) {
+          hardSmtpFailure = {
+            errorCode: sent.errorCode,
+            errorDetail: sent.detail,
+          };
+          break;
+        }
         continue;
       }
 
@@ -308,12 +368,28 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
       if (claimed.eventType === "RECOVERY") counts.recovery += 1;
     }
 
+    counts.remaining = await countDueAlertNotificationDeliveries(checkedAt);
+
+    if (hardSmtpFailure) {
+      return {
+        ok: false,
+        paused: false,
+        runnerClaimed: true,
+        snapshotComplete: completeness.complete,
+        counts,
+        processed,
+        errorCode: hardSmtpFailure.errorCode,
+        errorDetail: hardSmtpFailure.errorDetail,
+      };
+    }
+
     return {
       ok: true,
       paused: false,
       runnerClaimed: true,
       snapshotComplete: completeness.complete,
       counts,
+      processed,
     };
   } finally {
     await releaseAlertNotificationRunnerLock(lock.claimToken);

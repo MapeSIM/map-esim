@@ -650,7 +650,16 @@ export async function getAdminOrderDetail(
     displayStatusLabel: customerEsimStatusLabel(statusBadge),
     lifecycle,
     remainingDataLabel: formatLifecycleGb(row.providerRemainingDataGb),
-    paymentMethod: (row.paymentMethod ?? "").trim() || null,
+    paymentMethod: (() => {
+      const raw = (row.paymentMethod ?? "").trim();
+      if (!raw) return null;
+      // Normalize rails so Manual orders never show a misleading SAFEPAY default casing.
+      const upper = raw.toUpperCase();
+      if (upper === "MANUAL" || upper === "SAFEPAY" || upper === "WHATSAPP") {
+        return upper;
+      }
+      return raw.slice(0, 32);
+    })(),
     senderName: (row.senderName ?? "").trim() || null,
     paymentProofUrl: (row.paymentProofUrl ?? "").trim() || null,
   };

@@ -221,7 +221,11 @@ export default async function AdminEmailCenterPage({
                         Order / reference
                       </dt>
                       <dd className="mt-0.5 text-[var(--heading)]">
-                        {row.orderId ? shortTarget(row.orderId) : "—"}
+                        {row.orderReference
+                          ? row.orderReference
+                          : row.orderId
+                            ? shortTarget(row.orderId)
+                            : "—"}
                       </dd>
                     </div>
                     <div>
@@ -232,14 +236,28 @@ export default async function AdminEmailCenterPage({
                         {row.targetType} {shortTarget(row.targetId)}
                       </dd>
                     </div>
+                    {row.subject ? (
+                      <div className="sm:col-span-2">
+                        <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                          Subject
+                        </dt>
+                        <dd className="mt-0.5 text-[var(--heading)]">
+                          {row.subject}
+                        </dd>
+                      </div>
+                    ) : null}
                     <div className="sm:col-span-2">
                       <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
-                        Recipient search hint
+                        Recipient
                       </dt>
-                      <dd className="mt-0.5 text-xs text-[var(--text-soft)]">
-                        Search uses email type and order/reference ids. Full
-                        mailbox addresses are not stored in this log view.
+                      <dd className="mt-0.5 text-[var(--heading)]">
+                        {row.recipientHint || "—"}
                       </dd>
+                      <p className="mt-1 text-xs text-[var(--text-soft)]">
+                        Search uses email type, subject, and order/reference
+                        ids. Full mailbox addresses are not stored in this log
+                        view.
+                      </p>
                     </div>
                   </dl>
 

@@ -161,11 +161,16 @@ export async function fulfillWhatsAppCheckoutOrder(input: {
       idempotencyKey,
     });
 
+    const pendingPaymentMethod = (pending.paymentMethod || "").trim();
     const confirmed = await confirmAdminPackageAssignment({
       adminUserId: admin.id,
       customerUserId: pending.customerUserId,
       assignmentId: prepared.assignmentId,
       idempotencyKey,
+      // Keep MANUAL (or WhatsApp) on the completed Order — never fall back to SAFEPAY.
+      ...(pendingPaymentMethod
+        ? { paymentMethod: pendingPaymentMethod }
+        : {}),
     });
 
     const previousOrderId = pending.orderId;

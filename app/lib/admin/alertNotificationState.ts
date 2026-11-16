@@ -384,6 +384,33 @@ export async function claimNextAlertNotificationDelivery(input: {
   return null;
 }
 
+/** Count due PENDING/FAILED outbox rows still eligible for another claim. */
+export async function countDueAlertNotificationDeliveries(
+  now: Date
+): Promise<number> {
+  return prisma.alertNotificationDelivery.count({
+    where: {
+      OR: [
+        {
+          status: AlertNotificationDeliveryStatus.PENDING,
+          OR: [
+            { nextAttemptAt: null },
+            { nextAttemptAt: { lte: now } },
+          ],
+        },
+        {
+          status: AlertNotificationDeliveryStatus.FAILED,
+          attemptCount: { lt: ALERT_NOTIFICATION_MAX_ATTEMPTS },
+          OR: [
+            { nextAttemptAt: null },
+            { nextAttemptAt: { lte: now } },
+          ],
+        },
+      ],
+    },
+  });
+}
+
 /** Release a claim without incrementing attempts (e.g. incomplete-snapshot recovery). */
 export async function releaseAlertNotificationDeliveryClaim(input: {
   id: string;

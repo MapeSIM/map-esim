@@ -118,6 +118,29 @@ function main() {
   assert.match(fulfill, /paymentProofUrl/);
   assert.match(fulfill, /Verify Payment|Manual payment verified|paymentMethod/);
   assert.match(fulfill, /prepareAdminPackageAssignment/);
+  assert.match(fulfill, /paymentMethod:\s*pendingPaymentMethod|paymentMethod:\s*pending\.paymentMethod/);
+
+  const persist = read("app/lib/orders/persistAssignedOrder.ts");
+  assert.match(persist, /paymentMethod/);
+  assert.match(
+    read("app/lib/esim/adminPackageAssignment.ts"),
+    /paymentMethod/
+  );
+
+  const createManual = read("app/lib/esim/manualCheckoutOrder.ts");
+  assert.match(createManual, /paymentMethod:\s*MANUAL_CHECKOUT_PAYMENT_METHOD/);
+
+  assert.match(notify, /recordEmailCenterDelivery/);
+  assert.match(notify, /esim\.manual_payment_admin_email_sent/);
+  assert.match(notify, /esim\.manual_payment_customer_email_sent/);
+  assert.match(
+    read("app/lib/admin/emailCenterShared.ts"),
+    /esim\.manual_payment_admin_email_sent/
+  );
+  assert.match(
+    read("app/lib/admin/emailCenterLog.ts"),
+    /recordEmailCenterDelivery/
+  );
 
   const panel = read("app/components/admin/WhatsAppPendingOrdersPanel.tsx");
   assert.match(panel, /View payment proof/);

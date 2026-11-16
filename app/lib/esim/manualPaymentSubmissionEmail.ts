@@ -25,10 +25,23 @@ import {
   type SendChannelMailResult,
 } from "@/app/lib/email/transport";
 import type { EmailChannel } from "@/app/lib/email/channels";
+import {
+  maskEmailCenterRecipient,
+  recordEmailCenterDelivery,
+} from "@/app/lib/admin/emailCenterLog";
 import { MANUAL_CHECKOUT_PAYMENT_METHOD } from "@/app/lib/support/manualCheckoutOrderShared";
 
 /** Bound each SMTP attempt so serverless handlers can finish before idle kill. */
 export const MANUAL_PAYMENT_EMAIL_TIMEOUT_MS = 9_000;
+
+export const MANUAL_PAYMENT_ADMIN_EMAIL_SENT_AUDIT =
+  "esim.manual_payment_admin_email_sent";
+export const MANUAL_PAYMENT_ADMIN_EMAIL_FAILED_AUDIT =
+  "esim.manual_payment_admin_email_failed";
+export const MANUAL_PAYMENT_CUSTOMER_EMAIL_SENT_AUDIT =
+  "esim.manual_payment_customer_email_sent";
+export const MANUAL_PAYMENT_CUSTOMER_EMAIL_FAILED_AUDIT =
+  "esim.manual_payment_customer_email_failed";
 
 export type ManualPaymentEmailDispatchResult = {
   admin: "sent" | "skipped" | "failed";
@@ -138,8 +151,44 @@ function customerDisplayName(
   return local ? local.slice(0, 80) : "Customer";
 }
 
+async function logManualPaymentEmailAttempt(input: {
+  kind: "admin_alert" | "customer_confirmation";
+  status: "sent" | "failed" | "skipped" | "not_configured";
+  orderId: string;
+  orderReference: string;
+  subject: string;
+  recipient: string | null;
+  reason?: string | null;
+}): Promise<void> {
+  const isAdmin = input.kind === "admin_alert";
+  const sent = input.status === "sent";
+  const action = isAdmin
+    ? sent
+      ? MANUAL_PAYMENT_ADMIN_EMAIL_SENT_AUDIT
+      : MANUAL_PAYMENT_ADMIN_EMAIL_FAILED_AUDIT
+    : sent
+      ? MANUAL_PAYMENT_CUSTOMER_EMAIL_SENT_AUDIT
+      : MANUAL_PAYMENT_CUSTOMER_EMAIL_FAILED_AUDIT;
+
+  await recordEmailCenterDelivery({
+    action,
+    targetType: "Order",
+    targetId: input.orderId,
+    deliveryStatus:
+      input.status === "skipped" ? "failed" : input.status,
+    orderId: input.orderId,
+    orderReference: input.orderReference,
+    subject: input.subject,
+    recipientHint:
+      maskEmailCenterRecipient(input.recipient) ||
+      (isAdmin ? "admin-alert" : "customer"),
+    emailEvent: input.kind,
+    reason: input.reason ?? null,
+  });
+}
+
 async function sendTimed(
-  label: string,
+  label: "admin_alert" | "customer_confirmation",
   channel: EmailChannel,
   to: string,
   mail: {
@@ -147,6 +196,10 @@ async function sendTimed(
     text: string;
     html: string;
     headers?: Record<string, string>;
+  },
+  logContext: {
+    orderId: string;
+    orderReference: string;
   }
 ): Promise<"sent" | "failed"> {
   try {
@@ -170,6 +223,14 @@ async function sendTimed(
         messageId: result.messageId || null,
         status: "sent",
       });
+      await logManualPaymentEmailAttempt({
+        kind: label,
+        status: "sent",
+        orderId: logContext.orderId,
+        orderReference: logContext.orderReference,
+        subject: mail.subject,
+        recipient: to,
+      });
       return "sent";
     }
 
@@ -180,6 +241,16 @@ async function sendTimed(
       status: "failed",
       reason: result.reason,
       detail: result.detail || null,
+    });
+    await logManualPaymentEmailAttempt({
+      kind: label,
+      status:
+        result.reason === "not_configured" ? "not_configured" : "failed",
+      orderId: logContext.orderId,
+      orderReference: logContext.orderReference,
+      subject: mail.subject,
+      recipient: to,
+      reason: result.detail || result.reason,
     });
     return "failed";
   } catch (error) {
@@ -192,6 +263,15 @@ async function sendTimed(
       status: "failed",
       reason: detail === "SMTP_TIMEOUT" ? "timeout" : "send_failed",
       detail,
+    });
+    await logManualPaymentEmailAttempt({
+      kind: label,
+      status: "failed",
+      orderId: logContext.orderId,
+      orderReference: logContext.orderReference,
+      subject: mail.subject,
+      recipient: to,
+      reason: detail === "SMTP_TIMEOUT" ? "smtp_timeout" : "send_failed",
     });
     return "failed";
   }
@@ -263,7 +343,27 @@ export async function notifyManualPaymentSubmissionEmails(input: {
         reason: "missing_env",
         detail: "orders_and_billing_smtp_not_configured",
       });
-      return empty;
+      await Promise.allSettled([
+        logManualPaymentEmailAttempt({
+          kind: "admin_alert",
+          status: "not_configured",
+          orderId,
+          orderReference: reference,
+          subject: manualPaymentAdminSubject(reference),
+          recipient: null,
+          reason: "orders_and_billing_smtp_not_configured",
+        }),
+        logManualPaymentEmailAttempt({
+          kind: "customer_confirmation",
+          status: "not_configured",
+          orderId,
+          orderReference: reference,
+          subject: manualPaymentCustomerSubject(reference),
+          recipient: customerEmail,
+          reason: "orders_and_billing_smtp_not_configured",
+        }),
+      ]);
+      return { admin: "failed", customer: "failed" };
     }
 
     const base = getPublicAppBaseUrl() || BRAND_SITE_URL;
@@ -288,9 +388,14 @@ export async function notifyManualPaymentSubmissionEmails(input: {
     const accountOrdersUrl = order.userId
       ? `${base}/account/orders`
       : null;
+    const logContext = { orderId: order.id, orderReference: reference };
 
     const adminRecipient = resolveManualPaymentAdminAlertRecipient();
     const adminTask = (async (): Promise<"sent" | "skipped" | "failed"> => {
+      const subject = sanitizeEmailHeaderValue(
+        manualPaymentAdminSubject(reference),
+        160
+      );
       if (!adminRecipient.email) {
         console.error("manual_payment_email", {
           kind: "admin_alert",
@@ -299,12 +404,17 @@ export async function notifyManualPaymentSubmissionEmails(input: {
           detail:
             "ADMIN_ALERT_EMAIL|SUPPORT_EMAIL|ORDERS_FROM_EMAIL|SMTP_USER",
         });
+        await logManualPaymentEmailAttempt({
+          kind: "admin_alert",
+          status: "failed",
+          orderId: order.id,
+          orderReference: reference,
+          subject,
+          recipient: null,
+          reason: "missing_admin_alert_recipient",
+        });
         return "skipped";
       }
-      const subject = sanitizeEmailHeaderValue(
-        manualPaymentAdminSubject(reference),
-        160
-      );
       const payload = {
         orderId: order.id,
         orderReference: reference,
@@ -317,18 +427,24 @@ export async function notifyManualPaymentSubmissionEmails(input: {
         submittedAtLabel,
         adminReviewUrl,
       };
-      return sendTimed("admin_alert", channel, adminRecipient.email, {
-        subject,
-        text: renderManualPaymentAdminEmailText(payload),
-        html: renderManualPaymentAdminEmailHtml(payload),
-        headers: {
-          "X-MAP-ESIM-Manual-Payment": "admin-alert",
-          "X-MAP-ESIM-Admin-Recipient-Source": sanitizeEmailHeaderValue(
-            adminRecipient.source || "unknown",
-            40
-          ),
+      return sendTimed(
+        "admin_alert",
+        channel,
+        adminRecipient.email,
+        {
+          subject,
+          text: renderManualPaymentAdminEmailText(payload),
+          html: renderManualPaymentAdminEmailHtml(payload),
+          headers: {
+            "X-MAP-ESIM-Manual-Payment": "admin-alert",
+            "X-MAP-ESIM-Admin-Recipient-Source": sanitizeEmailHeaderValue(
+              adminRecipient.source || "unknown",
+              40
+            ),
+          },
         },
-      });
+        logContext
+      );
     })();
 
     const customerTask = (async (): Promise<"sent" | "skipped" | "failed"> => {
@@ -346,14 +462,20 @@ export async function notifyManualPaymentSubmissionEmails(input: {
         supportUrl,
         accountOrdersUrl,
       };
-      return sendTimed("customer_confirmation", channel, customerEmail, {
-        subject,
-        text: renderManualPaymentCustomerEmailText(payload),
-        html: renderManualPaymentCustomerEmailHtml(payload),
-        headers: {
-          "X-MAP-ESIM-Manual-Payment": "customer-confirmation",
+      return sendTimed(
+        "customer_confirmation",
+        channel,
+        customerEmail,
+        {
+          subject,
+          text: renderManualPaymentCustomerEmailText(payload),
+          html: renderManualPaymentCustomerEmailHtml(payload),
+          headers: {
+            "X-MAP-ESIM-Manual-Payment": "customer-confirmation",
+          },
         },
-      });
+        logContext
+      );
     })();
 
     const settled = await Promise.allSettled([adminTask, customerTask]);

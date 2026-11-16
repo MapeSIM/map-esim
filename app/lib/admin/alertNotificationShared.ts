@@ -16,6 +16,10 @@ export const ALERT_NOTIFICATION_MAX_RECIPIENTS = 10;
 export const ALERT_NOTIFICATION_MAX_ATTEMPTS = 5;
 export const ALERT_NOTIFICATION_CONFIRM_PHRASE = "RUN ALERT NOTIFICATIONS";
 export const ALERT_NOTIFICATION_RECIPIENTS_ENV = "ALERT_NOTIFICATION_RECIPIENTS";
+/** Bound each manual admin click so Vercel cannot hit the 15s function limit. */
+export const ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN = 8;
+/** Overall server-side budget for aggregation + delivery after the runner lock. */
+export const ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS = 8_000;
 
 /** Bounded retry delays after attempt N fails (attemptCount after failure). */
 export const ALERT_NOTIFICATION_RETRY_DELAYS_MS = [
@@ -371,6 +375,8 @@ export type SafeRunnerCounts = {
   cooldown: number;
   failed: number;
   recovery: number;
+  /** Due PENDING/FAILED outbox rows left after this bounded run. */
+  remaining: number;
 };
 
 export function emptyRunnerCounts(): SafeRunnerCounts {
@@ -381,7 +387,87 @@ export function emptyRunnerCounts(): SafeRunnerCounts {
     cooldown: 0,
     failed: 0,
     recovery: 0,
+    remaining: 0,
   };
+}
+
+/**
+ * Human-safe admin banner copy for opaque SMTP / runner failure codes.
+ * Never includes secrets, recipients, or raw provider stacks.
+ */
+export function formatAlertNotificationFailureReason(input: {
+  errorCode?: string | null;
+  detail?: string | null;
+}): string {
+  const code = String(input.errorCode ?? "")
+    .trim()
+    .toLowerCase();
+  const detail = String(input.detail ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (code === "not_configured" || detail === "not_configured") {
+    if (detail === "missing_channel_credentials") {
+      return "Support SMTP is not configured (missing SMTP_SUPPORT_USER / SMTP_SUPPORT_PASSWORD).";
+    }
+    if (detail === "missing_smtp_host") {
+      return "Support SMTP is not configured (missing SMTP_HOST).";
+    }
+    if (detail === "invalid_smtp_port") {
+      return "Support SMTP is not configured (invalid SMTP_PORT).";
+    }
+    if (detail === "mailbox_mismatch") {
+      return "Support SMTP is not configured (mailbox mismatch for support@mapesim.com).";
+    }
+    if (detail.startsWith("port_") || detail.includes("secure") || detail.includes("starttls")) {
+      return "Support SMTP is not configured (TLS/port settings invalid).";
+    }
+    return "Support SMTP is not configured. Set SMTP_HOST and SMTP_SUPPORT_* credentials on the server.";
+  }
+
+  if (
+    detail === "smtp_connection_timeout" ||
+    code === "smtp_timeout" ||
+    detail === "smtp_timeout"
+  ) {
+    return "SMTP connection timed out contacting the support mail server.";
+  }
+  if (detail === "smtp_connection_failed") {
+    return "SMTP connection failed (support mail server unreachable).";
+  }
+  if (detail === "smtp_auth_failed") {
+    return "SMTP authentication failed for the support channel.";
+  }
+  if (code === "send_failed") {
+    return "SMTP send failed for the support channel. Check support SMTP credentials and connectivity.";
+  }
+  if (code === "invalid_recipients") {
+    return "Alert notification recipients are not configured. Set ALERT_NOTIFICATION_RECIPIENTS on the server.";
+  }
+  if (code === "runner_busy") {
+    return "Another notification run is already in progress.";
+  }
+  if (code === "aggregation_timeout") {
+    return "Alert aggregation timed out. Try again shortly or check Operations health.";
+  }
+  if (code === "paused") {
+    return "Alert notifications are paused. Resume the control before running.";
+  }
+  if (code === "run_budget_exhausted") {
+    return "Alert notification run stopped after the server time budget. Click again to continue.";
+  }
+  return "Unable to run alert notifications. Please try again.";
+}
+
+/** Success banner when a bounded batch leaves more outbox work. */
+export function formatAlertNotificationPartialProgress(input: {
+  processed: number;
+  remaining: number;
+}): string | null {
+  const processed = Math.max(0, Math.floor(input.processed));
+  const remaining = Math.max(0, Math.floor(input.remaining));
+  if (remaining <= 0) return null;
+  return `Processed ${processed} alerts (${remaining} remaining — click again to continue)`;
 }
 
 export type SanitizedRecentDeliveryView = {

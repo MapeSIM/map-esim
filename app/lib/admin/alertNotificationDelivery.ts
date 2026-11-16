@@ -5,7 +5,7 @@
 import "server-only";
 
 import { randomBytes } from "node:crypto";
-import { isEmailConfigured, sanitizeEmailHeaderValue } from "@/app/lib/email/config";
+import { getEmailConfig, sanitizeEmailHeaderValue } from "@/app/lib/email/config";
 import { sendChannelMail } from "@/app/lib/email/transport";
 import { getPublicAppBaseUrl } from "@/app/lib/email/activation";
 import { BRAND_NAME } from "@/app/lib/brand";
@@ -109,6 +109,13 @@ ${link ? `<p><a href="${escapeHtml(link)}">Open admin alerts</a></p>` : ""}
   return { subject: subject || `${BRAND_NAME} alert`, text: textLines.join("\n"), html };
 }
 
+export type AlertNotificationSendFailure = {
+  ok: false;
+  errorCode: AlertNotificationErrorCode;
+  /** Opaque machine detail only — never secrets or raw SMTP stacks. */
+  detail?: string;
+};
+
 export async function sendAlertNotificationEmails(input: {
   alert: MonitoringAlert;
   eventType: AlertNotificationEventType;
@@ -117,12 +124,14 @@ export async function sendAlertNotificationEmails(input: {
   sourceRecordRef: string | null;
   eventKey: string;
   recipients: string[];
-}): Promise<
-  | { ok: true; messageId: string }
-  | { ok: false; errorCode: AlertNotificationErrorCode }
-> {
-  if (!isEmailConfigured("support")) {
-    return { ok: false, errorCode: "not_configured" };
+}): Promise<{ ok: true; messageId: string } | AlertNotificationSendFailure> {
+  const supportConfig = getEmailConfig("support");
+  if (!supportConfig.configured) {
+    return {
+      ok: false,
+      errorCode: "not_configured",
+      detail: supportConfig.reason || "not_configured",
+    };
   }
   if (!input.recipients.length) {
     return { ok: false, errorCode: "invalid_recipients" };
@@ -134,7 +143,8 @@ export async function sendAlertNotificationEmails(input: {
   // SMTP cannot guarantee perfect exactly-once if the process crashes after
   // the provider accepts the message but before durable SENT is recorded.
   // Unique eventKey + CAS claim minimize normal concurrent/restart duplication.
-  const SMTP_TIMEOUT_MS = 8_000;
+  // Keep race ≤ socketTimeout so we do not wait on a dead connection.
+  const SMTP_TIMEOUT_MS = 5_000;
 
   for (const to of input.recipients) {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -167,11 +177,24 @@ export async function sendAlertNotificationEmails(input: {
         return {
           ok: false,
           errorCode: normalizeOpaqueErrorCode(result.reason),
+          detail:
+            result.reason === "not_configured"
+              ? "not_configured"
+              : result.detail || result.reason,
         };
       }
-    } catch {
-      console.error("alert_notification_email", "SMTP_TIMEOUT_OR_FAILED");
-      return { ok: false, errorCode: "send_failed" };
+    } catch (error) {
+      const timedOut =
+        error instanceof Error && error.message === "SMTP_TIMEOUT";
+      console.error(
+        "alert_notification_email",
+        timedOut ? "SMTP_TIMEOUT" : "SMTP_FAILED"
+      );
+      return {
+        ok: false,
+        errorCode: "send_failed",
+        detail: timedOut ? "smtp_connection_timeout" : "send_failed",
+      };
     } finally {
       if (timer) clearTimeout(timer);
     }
