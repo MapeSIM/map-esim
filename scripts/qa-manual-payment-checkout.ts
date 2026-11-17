@@ -16,6 +16,10 @@ import {
   clipManualSenderName,
   generateManualOrderReference,
 } from "../app/lib/support/manualCheckoutOrderShared";
+import {
+  resolveAdminOrderPaymentMethodDisplay,
+  shouldBackfillOrderPaymentMethodToManual,
+} from "../app/lib/admin/orderPaymentMethodShared";
 
 const root = join(__dirname, "..");
 
@@ -176,8 +180,59 @@ function main() {
   assert.equal(clipManualSenderName("  Ali  Khan  "), "Ali Khan");
   assert.match(generateManualOrderReference(1_700_000_000_000), /^MP-/);
 
+  assert.equal(
+    resolveAdminOrderPaymentMethodDisplay({
+      paymentMethod: "SAFEPAY",
+      whatsappPaymentMethod: "MANUAL",
+      hasWhatsappCheckoutLink: true,
+      fundingSource: "COMPANY_FUNDED",
+    }),
+    "MANUAL"
+  );
+  assert.equal(
+    resolveAdminOrderPaymentMethodDisplay({
+      paymentMethod: "SAFEPAY",
+      paymentProofUrl: "https://example.com/proof.png",
+      fundingSource: "DIRECT_PAYMENT",
+    }),
+    "MANUAL"
+  );
+  assert.equal(
+    resolveAdminOrderPaymentMethodDisplay({
+      paymentMethod: "SAFEPAY",
+      hasGatewayPaymentAttempt: true,
+    }),
+    "SAFEPAY"
+  );
+  assert.equal(
+    shouldBackfillOrderPaymentMethodToManual({
+      paymentMethod: "SAFEPAY",
+      whatsappPaymentMethod: "MANUAL",
+      hasWhatsappCheckoutLink: true,
+      fundingSource: "COMPANY_FUNDED",
+    }),
+    true
+  );
+  assert.equal(
+    shouldBackfillOrderPaymentMethodToManual({
+      paymentMethod: "MANUAL",
+      whatsappPaymentMethod: "MANUAL",
+      hasWhatsappCheckoutLink: true,
+    }),
+    false
+  );
+
+  const adminOrders = read("app/lib/admin/orders.ts");
+  assert.match(adminOrders, /resolveAdminOrderPaymentMethodDisplay/);
+  assert.match(adminOrders, /whatsAppCheckoutOrder/);
+  assert.match(
+    read("scripts/backfill-manual-order-payment-method.ts"),
+    /shouldBackfillOrderPaymentMethodToManual|--apply/
+  );
+
   const pkg = read("package.json");
   assert.match(pkg, /qa:manual-payment-checkout/);
+  assert.match(pkg, /backfill:manual-order-payment-method/);
 
   console.log("PASS qa-manual-payment-checkout");
 }

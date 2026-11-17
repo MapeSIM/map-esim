@@ -52,6 +52,7 @@ import {
   type CustomerAddDataBlockedReason,
 } from "@/app/lib/orders/customerOrders";
 import { normalizeOfferId } from "@/app/lib/vesim/server";
+import { resolveAdminOrderPaymentMethodDisplay } from "@/app/lib/admin/orderPaymentMethodShared";
 
 export type AdminOrderListRow = {
   id: string;
@@ -494,6 +495,13 @@ export async function getAdminOrderDetail(
           offerId: true,
           destinationCode: true,
           idempotencyKey: true,
+          paymentAttempts: {
+            where: {
+              gatewayProvider: { not: null },
+            },
+            select: { id: true, gatewayProvider: true },
+            take: 1,
+          },
         },
       },
       partnerEsimPurchase: {
@@ -508,6 +516,12 @@ export async function getAdminOrderDetail(
           status: true,
           offerId: true,
           destinationCode: true,
+          whatsAppCheckoutOrder: {
+            select: {
+              id: true,
+              paymentMethod: true,
+            },
+          },
         },
       },
       refundRequests: {
@@ -531,6 +545,13 @@ export async function getAdminOrderDetail(
       paymentMethod: true,
       senderName: true,
       paymentProofUrl: true,
+      whatsAppCheckoutOrder: {
+        select: {
+          id: true,
+          paymentMethod: true,
+          reference: true,
+        },
+      },
     },
   });
 
@@ -651,14 +672,22 @@ export async function getAdminOrderDetail(
     lifecycle,
     remainingDataLabel: formatLifecycleGb(row.providerRemainingDataGb),
     paymentMethod: (() => {
-      const raw = (row.paymentMethod ?? "").trim();
-      if (!raw) return null;
-      // Normalize rails so Manual orders never show a misleading SAFEPAY default casing.
-      const upper = raw.toUpperCase();
-      if (upper === "MANUAL" || upper === "SAFEPAY" || upper === "WHATSAPP") {
-        return upper;
-      }
-      return raw.slice(0, 32);
+      const wa =
+        row.whatsAppCheckoutOrder ??
+        row.adminPackageAssignment?.whatsAppCheckoutOrder ??
+        null;
+      return resolveAdminOrderPaymentMethodDisplay({
+        paymentMethod: row.paymentMethod,
+        fundingSource: row.fundingSource,
+        providerOrderId: row.providerOrderId,
+        senderName: row.senderName,
+        paymentProofUrl: row.paymentProofUrl,
+        whatsappPaymentMethod: wa?.paymentMethod,
+        hasWhatsappCheckoutLink: Boolean(wa?.id),
+        hasGatewayPaymentAttempt: Boolean(
+          row.walletEsimPurchase?.paymentAttempts?.length
+        ),
+      });
     })(),
     senderName: (row.senderName ?? "").trim() || null,
     paymentProofUrl: (row.paymentProofUrl ?? "").trim() || null,

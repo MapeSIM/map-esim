@@ -1,0 +1,117 @@
+/**
+ * Pure admin payment-method display helpers (offline-QA safe).
+ * Corrects historical Order.paymentMethod defaults (`SAFEPAY`) for manual /
+ * WhatsApp fulfillment without inventing gateway transactions.
+ */
+
+export const ADMIN_ORDER_PAYMENT_METHOD_MANUAL = "MANUAL" as const;
+export const ADMIN_ORDER_PAYMENT_METHOD_SAFEPAY = "SAFEPAY" as const;
+export const ADMIN_ORDER_PAYMENT_METHOD_WHATSAPP = "WHATSAPP" as const;
+
+export type AdminOrderPaymentMethodRail =
+  | typeof ADMIN_ORDER_PAYMENT_METHOD_MANUAL
+  | typeof ADMIN_ORDER_PAYMENT_METHOD_SAFEPAY
+  | typeof ADMIN_ORDER_PAYMENT_METHOD_WHATSAPP
+  | string;
+
+function normalizeRail(raw: string | null | undefined): string {
+  return String(raw ?? "")
+    .trim()
+    .toUpperCase()
+    .slice(0, 32);
+}
+
+/**
+ * Resolve the payment-method label for /admin/orders/[id].
+ * Prefer durable MANUAL / WHATSAPP evidence over the schema default SAFEPAY.
+ */
+export function resolveAdminOrderPaymentMethodDisplay(input: {
+  paymentMethod?: string | null;
+  fundingSource?: string | null;
+  providerOrderId?: string | null;
+  senderName?: string | null;
+  paymentProofUrl?: string | null;
+  /** WhatsAppCheckoutOrder.paymentMethod when linked. */
+  whatsappPaymentMethod?: string | null;
+  /** True when a WhatsAppCheckoutOrder row points at this order. */
+  hasWhatsappCheckoutLink?: boolean;
+  /** True when a Safepay/Simpaisa gateway payment attempt exists for this order. */
+  hasGatewayPaymentAttempt?: boolean;
+}): string | null {
+  const stored = normalizeRail(input.paymentMethod);
+  const wa = normalizeRail(input.whatsappPaymentMethod);
+  const funding = normalizeRail(input.fundingSource);
+  const providerOrderId = String(input.providerOrderId ?? "").trim();
+  const hasProof = Boolean(String(input.paymentProofUrl ?? "").trim());
+  const hasSender = Boolean(String(input.senderName ?? "").trim());
+  const hasWaLink = Boolean(input.hasWhatsappCheckoutLink);
+  const hasGateway = Boolean(input.hasGatewayPaymentAttempt);
+
+  if (stored === ADMIN_ORDER_PAYMENT_METHOD_MANUAL) {
+    return ADMIN_ORDER_PAYMENT_METHOD_MANUAL;
+  }
+  if (stored === ADMIN_ORDER_PAYMENT_METHOD_WHATSAPP) {
+    return ADMIN_ORDER_PAYMENT_METHOD_WHATSAPP;
+  }
+
+  if (wa === ADMIN_ORDER_PAYMENT_METHOD_MANUAL) {
+    return ADMIN_ORDER_PAYMENT_METHOD_MANUAL;
+  }
+  if (wa === ADMIN_ORDER_PAYMENT_METHOD_WHATSAPP) {
+    return ADMIN_ORDER_PAYMENT_METHOD_WHATSAPP;
+  }
+
+  if (providerOrderId.toLowerCase().startsWith("manual-")) {
+    return ADMIN_ORDER_PAYMENT_METHOD_MANUAL;
+  }
+
+  // Manual submission evidence on the order row (proof / sender).
+  if (hasProof || (hasSender && !hasGateway)) {
+    if (
+      !stored ||
+      stored === ADMIN_ORDER_PAYMENT_METHOD_SAFEPAY ||
+      funding === "COMPANY_FUNDED" ||
+      funding === "DIRECT_PAYMENT"
+    ) {
+      return ADMIN_ORDER_PAYMENT_METHOD_MANUAL;
+    }
+  }
+
+  // Company-funded fulfill via Manual/WhatsApp pipeline without a gateway txn.
+  if (
+    hasWaLink &&
+    !hasGateway &&
+    (funding === "COMPANY_FUNDED" || funding === "DIRECT_PAYMENT") &&
+    (!stored || stored === ADMIN_ORDER_PAYMENT_METHOD_SAFEPAY)
+  ) {
+    return ADMIN_ORDER_PAYMENT_METHOD_MANUAL;
+  }
+
+  if (!stored) return null;
+  if (stored === ADMIN_ORDER_PAYMENT_METHOD_SAFEPAY) {
+    return ADMIN_ORDER_PAYMENT_METHOD_SAFEPAY;
+  }
+  return stored.slice(0, 32);
+}
+
+/**
+ * Whether a DB backfill should set Order.paymentMethod = MANUAL.
+ * Conservative: only when manual evidence is present and no gateway attempt.
+ */
+export function shouldBackfillOrderPaymentMethodToManual(input: {
+  paymentMethod?: string | null;
+  fundingSource?: string | null;
+  providerOrderId?: string | null;
+  senderName?: string | null;
+  paymentProofUrl?: string | null;
+  whatsappPaymentMethod?: string | null;
+  hasWhatsappCheckoutLink?: boolean;
+  hasGatewayPaymentAttempt?: boolean;
+}): boolean {
+  const stored = normalizeRail(input.paymentMethod);
+  if (stored === ADMIN_ORDER_PAYMENT_METHOD_MANUAL) return false;
+  if (Boolean(input.hasGatewayPaymentAttempt)) return false;
+
+  const resolved = resolveAdminOrderPaymentMethodDisplay(input);
+  return resolved === ADMIN_ORDER_PAYMENT_METHOD_MANUAL;
+}
