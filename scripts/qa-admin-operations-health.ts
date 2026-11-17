@@ -110,6 +110,7 @@ function main() {
     true
   );
   assert.match(service, /Never mutates|Read-only/i);
+  assert.match(service, /runPrismaTasksInBatches/);
   assert.doesNotMatch(service, /walletAccount\.(update|create|delete)/);
   assert.doesNotMatch(service, /walletEsimPurchase\.(update|create|delete)/);
   assert.doesNotMatch(service, /order\.(update|create|delete)/);

@@ -29,7 +29,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /** Route-level hard ceiling (auth + run) — always respond before Vercel kill. */
-const ROUTE_HARD_TIMEOUT_MS = 15_000;
+const ROUTE_HARD_TIMEOUT_MS = 20_000;
 
 function skippedCountFrom(counts: {
   suppressed: number;

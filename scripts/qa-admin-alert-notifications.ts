@@ -14,6 +14,7 @@ import {
   ALERT_NOTIFICATION_MAX_RECIPIENTS,
   ALERT_NOTIFICATION_REMINDER_COOLDOWN_MS,
   ALERT_NOTIFICATION_RETRY_DELAYS_MS,
+  ALERT_NOTIFICATION_AGGREGATION_TIMEOUT_MS,
   ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS,
   buildAggregationCompleteness,
   buildDeliveryEventKey,
@@ -468,7 +469,8 @@ function main() {
   assert.match(runner, /AGGREGATION_TIMEOUT|aggregation_timeout/);
   assert.match(delivery, /SMTP_TIMEOUT|ALERT_NOTIFICATION_SMTP_TIMEOUT_MS/);
   assert.equal(ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN, 3);
-  assert.equal(ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS, 12_000);
+  assert.equal(ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS, 16_000);
+  assert.equal(ALERT_NOTIFICATION_AGGREGATION_TIMEOUT_MS, 10_000);
   assert.match(runner, /ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN/);
   assert.match(runner, /ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS|budgetMs/);
   assert.match(runner, /countDueAlertNotificationDeliveries/);
@@ -487,9 +489,10 @@ function main() {
   assert.match(alertRoute, /export const maxDuration = 60/);
   assert.match(opsPage, /export const maxDuration = 60/);
   assert.match(alertRoute, /aggregationMs|sendMs|processedCount|remainingCount/);
-  assert.match(alertRoute, /ROUTE_HARD_TIMEOUT_MS\s*=\s*15_000/);
+  assert.match(alertRoute, /ROUTE_HARD_TIMEOUT_MS\s*=\s*20_000/);
   assert.match(alertRoute, /\[alert-run\]/);
   assert.match(alertRoute, /AUTH_TIMEOUT|ALERT_NOTIFICATION_AUTH_TIMEOUT_MS/);
+  assert.match(monitoring, /runPrismaTasksInBatches/);
   assert.match(stateSrc, /maxStates|maxAlerts|maxResolve/);
   assert.doesNotMatch(
     stateSrc,

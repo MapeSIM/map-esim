@@ -15,7 +15,7 @@ import {
   EsimPurchasePaymentAttemptStatus,
 } from "@prisma/client";
 import { redirect } from "next/navigation";
-import { prisma } from "@/app/lib/db";
+import { prisma, runPrismaTasksInBatches } from "@/app/lib/db";
 import { assertAdminPermission } from "@/app/lib/admin/adminPermissionAccess";
 import {
   probeAdminDatabase,
@@ -794,6 +794,7 @@ async function collectRecordAlerts(now: Date): Promise<{
     now.getTime() - MONITORING_THRESHOLDS.STALE_ASSIGNMENT_AGE_MS
   );
 
+  // Batch heavy reads (2–3 at a time) so Neon connection_limit is not exhausted.
   const [
     purchases,
     assignments,
@@ -802,175 +803,185 @@ async function collectRecordAlerts(now: Date): Promise<{
     walletEmails,
     iccidOrders,
     staleGatewayAttempts,
-  ] = await Promise.all([
-    prisma.walletEsimPurchase.findMany({
-      where: {
-        reconciliationResolvedAt: null,
-        OR: [
-          { status: WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED },
-          {
+  ] = await runPrismaTasksInBatches(
+    [
+      () =>
+        prisma.walletEsimPurchase.findMany({
+          where: {
+            reconciliationResolvedAt: null,
+            OR: [
+              { status: WalletEsimPurchaseStatus.RECONCILIATION_REQUIRED },
+              {
+                status: {
+                  in: [
+                    WalletEsimPurchaseStatus.FUNDS_RESERVED,
+                    WalletEsimPurchaseStatus.PROVIDER_PENDING,
+                    WalletEsimPurchaseStatus.READY,
+                  ],
+                },
+                updatedAt: { lte: stuckPurchaseBefore },
+              },
+            ],
+          },
+          orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+          take: TAKE,
+          select: {
+            id: true,
+            status: true,
+            providerOrderId: true,
+            providerResultKind: true,
+            failureCategory: true,
+            failureCode: true,
+            debitTransactionId: true,
+            refundTransactionId: true,
+            orderId: true,
+            emailDeliveryStatus: true,
+            reconciliationResolvedAt: true,
+            reconciliationLockedAt: true,
+            reconciliationEscalatedAt: true,
+            reconciliationEscalationPriority: true,
+            updatedAt: true,
+            providerRefreshClaimedAt: true,
+            providerRefreshCompletedAt: true,
+            providerRefreshResult: true,
+          },
+        }),
+      () =>
+        prisma.adminPackageAssignment.findMany({
+          where: {
+            reconciliationResolvedAt: null,
+            OR: [
+              { status: AdminPackageAssignmentStatus.RECONCILIATION_REQUIRED },
+              {
+                status: {
+                  in: [
+                    AdminPackageAssignmentStatus.PROVIDER_PENDING,
+                    AdminPackageAssignmentStatus.READY,
+                  ],
+                },
+                updatedAt: { lte: stuckAssignmentBefore },
+              },
+            ],
+          },
+          orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+          take: TAKE,
+          select: {
+            id: true,
+            status: true,
+            providerOrderId: true,
+            providerResultKind: true,
+            failureCategory: true,
+            failureCode: true,
+            orderId: true,
+            emailDeliveryStatus: true,
+            reconciliationResolvedAt: true,
+            reconciliationLockedAt: true,
+            reconciliationEscalatedAt: true,
+            reconciliationEscalationPriority: true,
+            updatedAt: true,
+            providerRefreshClaimedAt: true,
+            providerRefreshCompletedAt: true,
+            providerRefreshResult: true,
+          },
+        }),
+      () =>
+        prisma.walletEsimPurchase.findMany({
+          where: {
+            reconciliationResolvedAt: null,
+            OR: orderEmailInboxStatusOr(now),
+          },
+          orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+          take: TAKE,
+          select: {
+            id: true,
+            status: true,
+            emailDeliveryStatus: true,
+            updatedAt: true,
+            reconciliationResolvedAt: true,
+            reconciliationLockedAt: true,
+            reconciliationEscalationPriority: true,
+          },
+        }),
+      () =>
+        prisma.adminPackageAssignment.findMany({
+          where: {
+            reconciliationResolvedAt: null,
+            OR: orderEmailInboxStatusOr(now),
+          },
+          orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+          take: TAKE,
+          select: {
+            id: true,
+            status: true,
+            emailDeliveryStatus: true,
+            updatedAt: true,
+            reconciliationResolvedAt: true,
+            reconciliationLockedAt: true,
+            reconciliationEscalationPriority: true,
+          },
+        }),
+      () =>
+        prisma.walletTransaction.findMany({
+          where: {
+            emailNotificationStatus: { in: ["failed", "not_configured"] },
+            reconciliationResolvedAt: null,
+          },
+          orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+          take: TAKE,
+          select: {
+            id: true,
+            emailNotificationStatus: true,
+            updatedAt: true,
+            reconciliationLockedAt: true,
+            reconciliationEscalationPriority: true,
+          },
+        }),
+      () =>
+        prisma.order.findMany({
+          where: {
+            OR: [{ iccidHash: null }, { iccidCapturedAt: null }],
+            status: "COMPLETED",
+            reconciliationResolvedAt: null,
+          },
+          orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+          take: TAKE,
+          select: {
+            id: true,
+            status: true,
+            providerOrderId: true,
+            iccidHash: true,
+            iccidCapturedAt: true,
+            reconciliationResolvedAt: true,
+            reconciliationLockedAt: true,
+            reconciliationEscalationPriority: true,
+            updatedAt: true,
+          },
+        }),
+      () =>
+        prisma.esimPurchasePaymentAttempt.findMany({
+          where: {
             status: {
               in: [
-                WalletEsimPurchaseStatus.FUNDS_RESERVED,
-                WalletEsimPurchaseStatus.PROVIDER_PENDING,
-                WalletEsimPurchaseStatus.READY,
+                EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
+                EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING,
               ],
+            },
+            purchase: {
+              status: WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
             },
             updatedAt: { lte: stuckPurchaseBefore },
           },
-        ],
-      },
-      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
-      take: TAKE,
-      select: {
-        id: true,
-        status: true,
-        providerOrderId: true,
-        providerResultKind: true,
-        failureCategory: true,
-        failureCode: true,
-        debitTransactionId: true,
-        refundTransactionId: true,
-        orderId: true,
-        emailDeliveryStatus: true,
-        reconciliationResolvedAt: true,
-        reconciliationLockedAt: true,
-        reconciliationEscalatedAt: true,
-        reconciliationEscalationPriority: true,
-        updatedAt: true,
-        providerRefreshClaimedAt: true,
-        providerRefreshCompletedAt: true,
-        providerRefreshResult: true,
-      },
-    }),
-    prisma.adminPackageAssignment.findMany({
-      where: {
-        reconciliationResolvedAt: null,
-        OR: [
-          { status: AdminPackageAssignmentStatus.RECONCILIATION_REQUIRED },
-          {
-            status: {
-              in: [
-                AdminPackageAssignmentStatus.PROVIDER_PENDING,
-                AdminPackageAssignmentStatus.READY,
-              ],
-            },
-            updatedAt: { lte: stuckAssignmentBefore },
+          orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+          take: TAKE,
+          select: {
+            id: true,
+            status: true,
+            updatedAt: true,
           },
-        ],
-      },
-      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
-      take: TAKE,
-      select: {
-        id: true,
-        status: true,
-        providerOrderId: true,
-        providerResultKind: true,
-        failureCategory: true,
-        failureCode: true,
-        orderId: true,
-        emailDeliveryStatus: true,
-        reconciliationResolvedAt: true,
-        reconciliationLockedAt: true,
-        reconciliationEscalatedAt: true,
-        reconciliationEscalationPriority: true,
-        updatedAt: true,
-        providerRefreshClaimedAt: true,
-        providerRefreshCompletedAt: true,
-        providerRefreshResult: true,
-      },
-    }),
-    prisma.walletEsimPurchase.findMany({
-      where: {
-        reconciliationResolvedAt: null,
-        OR: orderEmailInboxStatusOr(now),
-      },
-      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
-      take: TAKE,
-      select: {
-        id: true,
-        status: true,
-        emailDeliveryStatus: true,
-        updatedAt: true,
-        reconciliationResolvedAt: true,
-        reconciliationLockedAt: true,
-        reconciliationEscalationPriority: true,
-      },
-    }),
-    prisma.adminPackageAssignment.findMany({
-      where: {
-        reconciliationResolvedAt: null,
-        OR: orderEmailInboxStatusOr(now),
-      },
-      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
-      take: TAKE,
-      select: {
-        id: true,
-        status: true,
-        emailDeliveryStatus: true,
-        updatedAt: true,
-        reconciliationResolvedAt: true,
-        reconciliationLockedAt: true,
-        reconciliationEscalationPriority: true,
-      },
-    }),
-    prisma.walletTransaction.findMany({
-      where: {
-        emailNotificationStatus: { in: ["failed", "not_configured"] },
-        reconciliationResolvedAt: null,
-      },
-      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
-      take: TAKE,
-      select: {
-        id: true,
-        emailNotificationStatus: true,
-        updatedAt: true,
-        reconciliationLockedAt: true,
-        reconciliationEscalationPriority: true,
-      },
-    }),
-    prisma.order.findMany({
-      where: {
-        OR: [{ iccidHash: null }, { iccidCapturedAt: null }],
-        status: "COMPLETED",
-        reconciliationResolvedAt: null,
-      },
-      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
-      take: TAKE,
-      select: {
-        id: true,
-        status: true,
-        providerOrderId: true,
-        iccidHash: true,
-        iccidCapturedAt: true,
-        reconciliationResolvedAt: true,
-        reconciliationLockedAt: true,
-        reconciliationEscalationPriority: true,
-        updatedAt: true,
-      },
-    }),
-    prisma.esimPurchasePaymentAttempt.findMany({
-      where: {
-        status: {
-          in: [
-            EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
-            EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING,
-          ],
-        },
-        purchase: {
-          status: WalletEsimPurchaseStatus.AWAITING_GATEWAY_PAYMENT,
-        },
-        updatedAt: { lte: stuckPurchaseBefore },
-      },
-      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
-      take: TAKE,
-      select: {
-        id: true,
-        status: true,
-        updatedAt: true,
-      },
-    }),
-  ]);
+        }),
+    ],
+    3
+  );
 
   const alerts: MonitoringAlert[] = [];
   let oldestEmailFailure: Date | null = null;

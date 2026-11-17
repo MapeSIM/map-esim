@@ -21,17 +21,17 @@ export function resolveDirectDatabaseUrl(
 }
 
 /**
- * Serverless-safe default: one TCP slot per warm isolate against PgBouncer/Neon.
- * Override with PRISMA_CONNECTION_LIMIT (1–10) when the pooled URL omits
- * connection_limit. Never raises a limit already set on DATABASE_URL.
+ * Serverless-safe default against Neon/PgBouncer.
+ * Prefer connection_limit=5 when DATABASE_URL omits it (override 1–10 via
+ * PRISMA_CONNECTION_LIMIT). Never raises a limit already set on DATABASE_URL.
  */
-function resolveAppConnectionLimit(): number {
+export function resolveAppConnectionLimit(): number {
   const raw = Number((process.env.PRISMA_CONNECTION_LIMIT ?? "").trim());
   if (Number.isFinite(raw) && raw >= 1 && raw <= 10) return Math.floor(raw);
-  return 1;
+  return 5;
 }
 
-function withClientConnectionLimit(
+export function withClientConnectionLimit(
   connectionUrl: string | undefined,
   limit: number,
   options?: { force?: boolean; poolTimeoutSec?: number }
@@ -42,18 +42,32 @@ function withClientConnectionLimit(
     if (options?.force || !url.searchParams.has("connection_limit")) {
       url.searchParams.set("connection_limit", String(limit));
     }
-    const poolTimeout = options?.poolTimeoutSec;
-    if (
-      poolTimeout != null &&
-      poolTimeout > 0 &&
-      !url.searchParams.has("pool_timeout")
-    ) {
+    const poolTimeout = options?.poolTimeoutSec ?? 20;
+    if (poolTimeout > 0 && !url.searchParams.has("pool_timeout")) {
       url.searchParams.set("pool_timeout", String(poolTimeout));
     }
     return url.toString();
   } catch {
     return connectionUrl;
   }
+}
+
+/**
+ * Run async Prisma tasks in small batches so serverless connection_limit
+ * (typically 5) is not exhausted by a single Promise.all fan-out.
+ */
+export async function runPrismaTasksInBatches<T>(
+  tasks: Array<() => Promise<T>>,
+  concurrency = 3
+): Promise<T[]> {
+  const size = Math.max(1, Math.min(Math.floor(concurrency) || 3, 5));
+  const out: T[] = [];
+  for (let i = 0; i < tasks.length; i += size) {
+    const chunk = tasks.slice(i, i + size);
+    const part = await Promise.all(chunk.map((task) => task()));
+    out.push(...part);
+  }
+  return out;
 }
 
 function createPrismaClient(connectionUrl: string | undefined) {
@@ -73,9 +87,11 @@ function createPrismaClient(connectionUrl: string | undefined) {
 export const prisma =
   globalForPrisma.prisma ??
   createPrismaClient(
-    withClientConnectionLimit(process.env.DATABASE_URL, resolveAppConnectionLimit(), {
-      poolTimeoutSec: 20,
-    })
+    withClientConnectionLimit(
+      process.env.DATABASE_URL,
+      resolveAppConnectionLimit(),
+      { poolTimeoutSec: 20 }
+    )
   );
 
 globalForPrisma.prisma = prisma;
