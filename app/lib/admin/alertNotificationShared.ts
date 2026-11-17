@@ -19,7 +19,15 @@ export const ALERT_NOTIFICATION_RECIPIENTS_ENV = "ALERT_NOTIFICATION_RECIPIENTS"
 /** Bound each manual admin click — keep small so SMTP stays inside maxDuration. */
 export const ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN = 3;
 /** Overall server-side budget for aggregation + delivery after the runner lock. */
-export const ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS = 45_000;
+export const ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS = 12_000;
+/** Hard auth/session budget for the API route. */
+export const ALERT_NOTIFICATION_AUTH_TIMEOUT_MS = 5_000;
+/** Hard local-DB aggregation budget. */
+export const ALERT_NOTIFICATION_AGGREGATION_TIMEOUT_MS = 5_000;
+/** Hard per-recipient SMTP send budget (must close transporter on expiry). */
+export const ALERT_NOTIFICATION_SMTP_TIMEOUT_MS = 6_000;
+/** Cap state sync/schedule loops so N+1 cannot hang the serverless run. */
+export const ALERT_NOTIFICATION_MAX_STATE_OPS_PER_RUN = 30;
 
 /** Bounded retry delays after attempt N fails (attemptCount after failure). */
 export const ALERT_NOTIFICATION_RETRY_DELAYS_MS = [

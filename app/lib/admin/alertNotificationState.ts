@@ -93,8 +93,15 @@ function sourceMeta(alert: MonitoringAlert) {
 export async function syncActiveAlertNotificationStates(input: {
   alerts: MonitoringAlert[];
   checkedAt: Date;
+  /** Hard cap — prevents N+1 sync from hanging serverless runs. */
+  maxAlerts?: number;
 }): Promise<void> {
-  for (const alert of input.alerts) {
+  const max =
+    typeof input.maxAlerts === "number" && Number.isFinite(input.maxAlerts)
+      ? Math.max(1, Math.floor(input.maxAlerts))
+      : input.alerts.length;
+  const alerts = input.alerts.slice(0, max);
+  for (const alert of alerts) {
     const meta = sourceMeta(alert);
     const existing = await prisma.alertNotificationState.findUnique({
       where: { alertId: alert.id },
@@ -165,14 +172,22 @@ export async function resolveMissingAlertNotificationStates(input: {
   activeAlertIds: Set<string>;
   checkedAt: Date;
   snapshotComplete: boolean;
+  /** Hard cap — prevents N+1 resolve from hanging serverless runs. */
+  maxResolve?: number;
 }): Promise<number> {
   if (!input.snapshotComplete) return 0;
+  const maxResolve =
+    typeof input.maxResolve === "number" && Number.isFinite(input.maxResolve)
+      ? Math.max(1, Math.floor(input.maxResolve))
+      : 50;
   const activeRows = await prisma.alertNotificationState.findMany({
     where: { isActive: true },
     select: { alertId: true },
+    take: maxResolve + input.activeAlertIds.size + 5,
   });
   let resolved = 0;
   for (const row of activeRows) {
+    if (resolved >= maxResolve) break;
     if (input.activeAlertIds.has(row.alertId)) continue;
     await prisma.alertNotificationState.update({
       where: { alertId: row.alertId },
@@ -229,6 +244,8 @@ export async function scheduleEligibleDeliveries(input: {
   eligibleAlertIds: Set<string>;
   checkedAt: Date;
   snapshotComplete: boolean;
+  /** Hard cap — never scan the full AlertNotificationState table unbounded. */
+  maxStates?: number;
 }): Promise<{
   initialCreated: number;
   reminderCreated: number;
@@ -240,7 +257,38 @@ export async function scheduleEligibleDeliveries(input: {
   let recoveryCreated = 0;
   let cooldownSuppressed = 0;
 
-  const states = await prisma.alertNotificationState.findMany();
+  const maxStates =
+    typeof input.maxStates === "number" && Number.isFinite(input.maxStates)
+      ? Math.max(1, Math.floor(input.maxStates))
+      : 50;
+  const eligibleIds = [...input.eligibleAlertIds].slice(0, maxStates);
+
+  // Bound query: eligible actives + a small recovery candidate set. Never findMany().
+  const whereOr: Prisma.AlertNotificationStateWhereInput[] = [];
+  if (eligibleIds.length) {
+    whereOr.push({ alertId: { in: eligibleIds } });
+  }
+  if (input.snapshotComplete) {
+    whereOr.push({
+      isActive: false,
+      lastNotifiedAt: { not: null },
+      recoveryNotifiedAt: null,
+    });
+  }
+  if (!whereOr.length) {
+    return {
+      initialCreated: 0,
+      reminderCreated: 0,
+      recoveryCreated: 0,
+      cooldownSuppressed: 0,
+    };
+  }
+
+  const states = await prisma.alertNotificationState.findMany({
+    where: { OR: whereOr },
+    orderBy: { updatedAt: "desc" },
+    take: maxStates,
+  });
   for (const state of states) {
     if (state.isActive && input.eligibleAlertIds.has(state.alertId)) {
       const initial = await ensureDeliveryEvent({

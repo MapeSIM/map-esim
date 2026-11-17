@@ -6,10 +6,14 @@ import "server-only";
 
 import { randomBytes } from "node:crypto";
 import { getEmailConfig, sanitizeEmailHeaderValue } from "@/app/lib/email/config";
-import { sendChannelMail } from "@/app/lib/email/transport";
+import {
+  closeChannelTransporter,
+  sendChannelMail,
+} from "@/app/lib/email/transport";
 import { getPublicAppBaseUrl } from "@/app/lib/email/activation";
 import { BRAND_NAME } from "@/app/lib/brand";
 import {
+  ALERT_NOTIFICATION_SMTP_TIMEOUT_MS,
   buildDeterministicMessageId,
   buildSafeAdminAlertUrl,
   evidenceSafeAlertSummary,
@@ -143,11 +147,13 @@ export async function sendAlertNotificationEmails(input: {
   // SMTP cannot guarantee perfect exactly-once if the process crashes after
   // the provider accepts the message but before durable SENT is recorded.
   // Unique eventKey + CAS claim minimize normal concurrent/restart duplication.
-  // Keep race ≤ socketTimeout so we do not wait on a dead connection.
-  const SMTP_TIMEOUT_MS = 5_000;
+  // On timeout we MUST close the transporter — Promise.race alone leaves
+  // sendMail sockets alive and Vercel waits until maxDuration.
+  const SMTP_TIMEOUT_MS = ALERT_NOTIFICATION_SMTP_TIMEOUT_MS;
 
   for (const to of input.recipients) {
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
     try {
       const mailPromise = sendChannelMail({
         channel: "support",
@@ -162,14 +168,14 @@ export async function sendAlertNotificationEmails(input: {
         },
       });
 
-      // Bound outbound SMTP so a slow provider cannot hang the serverless run.
       const result = await Promise.race([
         mailPromise,
         new Promise<never>((_, reject) => {
-          timer = setTimeout(
-            () => reject(new Error("SMTP_TIMEOUT")),
-            SMTP_TIMEOUT_MS
-          );
+          timer = setTimeout(() => {
+            timedOut = true;
+            closeChannelTransporter("support");
+            reject(new Error("SMTP_TIMEOUT"));
+          }, SMTP_TIMEOUT_MS);
         }),
       ]);
 
@@ -184,16 +190,20 @@ export async function sendAlertNotificationEmails(input: {
         };
       }
     } catch (error) {
-      const timedOut =
-        error instanceof Error && error.message === "SMTP_TIMEOUT";
+      const isTimeout =
+        timedOut ||
+        (error instanceof Error && error.message === "SMTP_TIMEOUT");
+      if (isTimeout) {
+        closeChannelTransporter("support");
+      }
       console.error(
         "alert_notification_email",
-        timedOut ? "SMTP_TIMEOUT" : "SMTP_FAILED"
+        isTimeout ? "SMTP_TIMEOUT" : "SMTP_FAILED"
       );
       return {
         ok: false,
         errorCode: "send_failed",
-        detail: timedOut ? "smtp_connection_timeout" : "send_failed",
+        detail: isTimeout ? "smtp_connection_timeout" : "send_failed",
       };
     } finally {
       if (timer) clearTimeout(timer);

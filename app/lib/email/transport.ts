@@ -250,7 +250,25 @@ export function sanitizeSmtpFailureDetail(code: string | null | undefined): stri
   return "send_failed";
 }
 
+/**
+ * Close and drop a cached transporter so timed-out sendMail cannot keep the
+ * serverless event loop alive after Promise.race rejects.
+ */
+export function closeChannelTransporter(channel: EmailChannel): void {
+  const cached = transporterCache.get(channel);
+  if (!cached) return;
+  transporterCache.delete(channel);
+  try {
+    cached.transporter.close();
+  } catch {
+    // Ignore close errors — goal is to release sockets.
+  }
+}
+
 /** Test helper — clears cached transporters (does not log secrets). */
 export function clearTransporterCache(): void {
+  for (const channel of [...transporterCache.keys()]) {
+    closeChannelTransporter(channel);
+  }
   transporterCache.clear();
 }

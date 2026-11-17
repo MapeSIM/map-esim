@@ -6,8 +6,8 @@ import {
 } from "@/app/lib/admin/alertNotificationActions";
 import { ALERT_NOTIFICATION_CONFIRM_PHRASE } from "@/app/lib/admin/alertNotificationShared";
 
-/** Under route maxDuration=60; leave a small client buffer. */
-const CLIENT_RUN_TIMEOUT_MS = 55_000;
+/** Route budgets ~15s; client aborts shortly after that. */
+const CLIENT_RUN_TIMEOUT_MS = 20_000;
 
 function skippedFromState(state: NonNullable<RunAlertNotificationsFormState>): number {
   if (typeof state.skippedCount === "number") return state.skippedCount;

@@ -458,7 +458,7 @@ function main() {
   assert.match(opsPage, /RunAlertNotificationsPanel/);
   assert.match(panel, /ALERT_NOTIFICATION_CONFIRM_PHRASE|RUN ALERT NOTIFICATIONS/);
   assert.match(panel, /eligible|sent|suppressed|cooldown|failed|recovery/);
-  assert.match(panel, /CLIENT_RUN_TIMEOUT_MS|55_000|55000/);
+  assert.match(panel, /CLIENT_RUN_TIMEOUT_MS|20_000|20000|55_000|55000/);
   assert.match(panel, /AbortController/);
   assert.match(panel, /finally[\s\S]{0,400}setRunning\(false\)/);
   assert.match(panel, /Completed:.*sent.*skipped|sentFromState|skippedFromState/);
@@ -466,24 +466,35 @@ function main() {
   assert.match(actions, /sentCount|skippedCount/);
   assert.match(actions, /SERVER_RUN_TIMEOUT_MS|ALERT_RUN_TIMEOUT/);
   assert.match(runner, /AGGREGATION_TIMEOUT|aggregation_timeout/);
-  assert.match(delivery, /SMTP_TIMEOUT|SMTP_TIMEOUT_MS/);
+  assert.match(delivery, /SMTP_TIMEOUT|ALERT_NOTIFICATION_SMTP_TIMEOUT_MS/);
   assert.equal(ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN, 3);
-  assert.equal(ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS, 45_000);
+  assert.equal(ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS, 12_000);
   assert.match(runner, /ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN/);
   assert.match(runner, /ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS|budgetMs/);
   assert.match(runner, /countDueAlertNotificationDeliveries/);
   assert.match(runner, /aggregationMs|sendMs/);
+  assert.match(runner, /\[alert-run\]/);
+  assert.match(runner, /closeChannelTransporter/);
   assert.match(runner, /local-DB|Local Prisma|no external provider HTTP/i);
   assert.match(actions, /formatAlertNotificationFailureReason/);
   assert.match(actions, /formatAlertNotificationPartialProgress/);
   assert.match(panel, /progressMessage|remainingCount|aggregationMs|sendMs|processedCount/);
   assert.match(delivery, /getEmailConfig\("support"\)|supportConfig\.reason/);
+  assert.match(delivery, /closeChannelTransporter\("support"\)/);
   const alertRoute = read(
     "app/api/admin/operations/alert-notifications/route.ts"
   );
   assert.match(alertRoute, /export const maxDuration = 60/);
   assert.match(opsPage, /export const maxDuration = 60/);
   assert.match(alertRoute, /aggregationMs|sendMs|processedCount|remainingCount/);
+  assert.match(alertRoute, /ROUTE_HARD_TIMEOUT_MS\s*=\s*15_000/);
+  assert.match(alertRoute, /\[alert-run\]/);
+  assert.match(alertRoute, /AUTH_TIMEOUT|ALERT_NOTIFICATION_AUTH_TIMEOUT_MS/);
+  assert.match(stateSrc, /maxStates|maxAlerts|maxResolve/);
+  assert.doesNotMatch(
+    stateSrc,
+    /findMany\(\s*\)\s*;/
+  );
   assert.doesNotMatch(monitoring, /\bfetch\s*\(/);
   assert.doesNotMatch(monitoring, /getBrokerToken|axios\.|node-fetch/);
   assert.match(

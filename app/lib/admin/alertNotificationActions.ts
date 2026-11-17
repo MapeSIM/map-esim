@@ -37,10 +37,10 @@ export type RunAlertNotificationsFormState = {
 } | null;
 
 /**
- * Soft ceiling under route maxDuration (60s). Prefer the dedicated API route
- * (`/api/admin/operations/alert-notifications`) which exports maxDuration=60.
+ * Soft ceiling aligned with the API route hard budget (~15s).
+ * Prefer `/api/admin/operations/alert-notifications` for production clicks.
  */
-const SERVER_RUN_TIMEOUT_MS = 55_000;
+const SERVER_RUN_TIMEOUT_MS = 15_000;
 
 function skippedCountFrom(counts: SafeRunnerCounts): number {
   return counts.suppressed + counts.cooldown;

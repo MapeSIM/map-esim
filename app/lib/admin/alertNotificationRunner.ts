@@ -5,12 +5,17 @@
  *
  * Aggregation (`collectMonitoringAlerts`) is local-DB + env config only —
  * no external provider HTTP (VeSIM / Safepay / Simpaisa) during evaluation.
+ *
+ * Hard budgets + transporter.close on SMTP timeout so Vercel never waits out
+ * orphaned Promise.race work until maxDuration.
  */
 import "server-only";
 
 import { collectMonitoringAlerts } from "@/app/lib/admin/monitoringAlerts";
 import {
+  ALERT_NOTIFICATION_AGGREGATION_TIMEOUT_MS,
   ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN,
+  ALERT_NOTIFICATION_MAX_STATE_OPS_PER_RUN,
   ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS,
   buildDeterministicMessageId,
   emptyRunnerCounts,
@@ -38,10 +43,8 @@ import {
 } from "@/app/lib/admin/alertNotificationState";
 import { loadOperationalControlPausedMapSoft } from "@/app/lib/admin/operationalControlsPolicy";
 import { getEmailConfig } from "@/app/lib/email/config";
+import { closeChannelTransporter } from "@/app/lib/email/transport";
 import { prisma } from "@/app/lib/db";
-
-/** Bound monitoring aggregation so a slow DB probe cannot eat the whole run budget. */
-const AGGREGATION_TIMEOUT_MS = 8_000;
 
 export type AlertNotificationRunResult = {
   ok: boolean;
@@ -53,6 +56,7 @@ export type AlertNotificationRunResult = {
   processed: number;
   aggregationMs: number;
   sendMs: number;
+  lastStep?: string;
   errorCode?: string;
   /** Opaque machine detail for UI mapping — never secrets or raw SMTP stacks. */
   errorDetail?: string;
@@ -74,6 +78,10 @@ async function withTimeout<T>(
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+function checkpoint(step: string, extra?: Record<string, unknown>): void {
+  console.info("[alert-run]", { step, ...(extra ?? {}) });
 }
 
 function isHardSmtpFailure(errorCode: string, detail?: string): boolean {
@@ -121,27 +129,35 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
   let processed = 0;
   let aggregationMs = 0;
   let sendMs = 0;
+  let lastStep = "start";
+
+  checkpoint("start");
 
   const controls = await loadOperationalControlPausedMapSoft();
   if (controls.map.ALERT_NOTIFICATIONS) {
+    checkpoint("paused");
     return emptyTimingResult({
       ok: true,
       paused: true,
       runnerClaimed: false,
       snapshotComplete: false,
       counts,
+      lastStep: "paused",
       errorCode: "paused",
     });
   }
 
+  lastStep = "lock";
   const lock = await claimAlertNotificationRunnerLock(checkedAt);
   if (!lock.ok) {
+    checkpoint("runner_busy");
     return emptyTimingResult({
       ok: false,
       paused: false,
       runnerClaimed: false,
       snapshotComplete: false,
       counts,
+      lastStep: "runner_busy",
       errorCode: "runner_busy",
     });
   }
@@ -152,12 +168,14 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
   try {
     const recipients = loadAlertNotificationRecipientsFromEnv();
     if (!recipients.ok) {
+      checkpoint("invalid_recipients");
       return emptyTimingResult({
         ok: false,
         paused: false,
         runnerClaimed: true,
         snapshotComplete: false,
         counts,
+        lastStep: "invalid_recipients",
         errorCode: "invalid_recipients",
       });
     }
@@ -165,12 +183,14 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
     if (!options?.dryRun) {
       const supportConfig = getEmailConfig("support");
       if (!supportConfig.configured) {
+        checkpoint("smtp_not_configured");
         return emptyTimingResult({
           ok: false,
           paused: false,
           runnerClaimed: true,
           snapshotComplete: false,
           counts,
+          lastStep: "smtp_not_configured",
           errorCode: "not_configured",
           errorDetail: supportConfig.reason || "not_configured",
         });
@@ -179,17 +199,20 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
 
     let aggregation: Awaited<ReturnType<typeof collectMonitoringAlerts>>;
     const aggregationStartedAt = Date.now();
+    lastStep = "aggregate";
+    checkpoint("aggregate");
     try {
       // Local Prisma/env only — never provider HTTP during alert evaluation.
       aggregation = await withTimeout(
         collectMonitoringAlerts({ checkedAt }),
-        AGGREGATION_TIMEOUT_MS,
+        ALERT_NOTIFICATION_AGGREGATION_TIMEOUT_MS,
         "AGGREGATION_TIMEOUT"
       );
     } catch (error) {
       aggregationMs = Date.now() - aggregationStartedAt;
       if (error instanceof Error && error.message === "AGGREGATION_TIMEOUT") {
         console.error("alert_notification_runner", "AGGREGATION_TIMEOUT");
+        checkpoint("aggregate_timeout", { aggregationMs });
         return emptyTimingResult({
           ok: false,
           paused: false,
@@ -197,34 +220,80 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
           snapshotComplete: false,
           counts,
           aggregationMs,
+          lastStep: "aggregate_timeout",
           errorCode: "aggregation_timeout",
         });
       }
       throw error;
     }
     aggregationMs = Date.now() - aggregationStartedAt;
+    checkpoint("aggregate_done", { aggregationMs });
 
     const completeness = aggregation.completeness;
     const activeAlerts = aggregation.alerts.filter((a) => a.state === "ACTIVE");
-    const eligible = filterEligibleAlerts(activeAlerts);
+    const eligible = filterEligibleAlerts(activeAlerts).slice(
+      0,
+      ALERT_NOTIFICATION_MAX_STATE_OPS_PER_RUN
+    );
     counts.eligible = eligible.length;
 
-    await syncActiveAlertNotificationStates({
-      alerts: activeAlerts,
-      checkedAt,
+    lastStep = "sync_states";
+    checkpoint("sync_states", { eligible: eligible.length });
+    // Sync only notification-eligible alerts (not every ACTIVE low-severity row).
+    await withTimeout(
+      syncActiveAlertNotificationStates({
+        alerts: eligible,
+        checkedAt,
+        maxAlerts: ALERT_NOTIFICATION_MAX_STATE_OPS_PER_RUN,
+      }),
+      ALERT_NOTIFICATION_AGGREGATION_TIMEOUT_MS,
+      "SYNC_TIMEOUT"
+    ).catch((error) => {
+      if (!(error instanceof Error && error.message === "SYNC_TIMEOUT")) {
+        throw error;
+      }
+      console.error("alert_notification_runner", "SYNC_TIMEOUT");
     });
 
-    // Recovery/resolve only when the full snapshot completed successfully.
-    await resolveMissingAlertNotificationStates({
-      activeAlertIds: new Set(activeAlerts.map((a) => a.id)),
-      checkedAt,
-      snapshotComplete: completeness.complete,
+    lastStep = "resolve_missing";
+    await withTimeout(
+      resolveMissingAlertNotificationStates({
+        activeAlertIds: new Set(eligible.map((a) => a.id)),
+        checkedAt,
+        snapshotComplete: completeness.complete,
+        maxResolve: ALERT_NOTIFICATION_MAX_STATE_OPS_PER_RUN,
+      }),
+      ALERT_NOTIFICATION_AGGREGATION_TIMEOUT_MS,
+      "RESOLVE_TIMEOUT"
+    ).catch((error) => {
+      if (!(error instanceof Error && error.message === "RESOLVE_TIMEOUT")) {
+        throw error;
+      }
+      console.error("alert_notification_runner", "RESOLVE_TIMEOUT");
     });
 
-    const scheduled = await scheduleEligibleDeliveries({
-      eligibleAlertIds: new Set(eligible.map((a) => a.id)),
-      checkedAt,
-      snapshotComplete: completeness.complete,
+    lastStep = "schedule";
+    checkpoint("schedule");
+    const scheduled = await withTimeout(
+      scheduleEligibleDeliveries({
+        eligibleAlertIds: new Set(eligible.map((a) => a.id)),
+        checkedAt,
+        snapshotComplete: completeness.complete,
+        maxStates: ALERT_NOTIFICATION_MAX_STATE_OPS_PER_RUN,
+      }),
+      ALERT_NOTIFICATION_AGGREGATION_TIMEOUT_MS,
+      "SCHEDULE_TIMEOUT"
+    ).catch((error) => {
+      if (error instanceof Error && error.message === "SCHEDULE_TIMEOUT") {
+        console.error("alert_notification_runner", "SCHEDULE_TIMEOUT");
+        return {
+          initialCreated: 0,
+          reminderCreated: 0,
+          recoveryCreated: 0,
+          cooldownSuppressed: 0,
+        };
+      }
+      throw error;
     });
     counts.cooldown = scheduled.cooldownSuppressed;
     counts.suppressed +=
@@ -235,9 +304,14 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
       | null = null;
 
     const sendStartedAt = Date.now();
-    // Process outbox (bounded by batch size + remaining time budget).
+    lastStep = "send_start";
+    checkpoint("send_start", {
+      max: ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN,
+    });
+
     for (let i = 0; i < ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN; i++) {
       if (Date.now() - runStartedAt >= budgetMs) {
+        checkpoint("budget_exhausted", { processed });
         break;
       }
 
@@ -249,10 +323,10 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
       processed += 1;
 
       const alert =
+        eligible.find((a) => a.id === claimed.alertId) ??
         activeAlerts.find((a) => a.id === claimed.alertId) ??
         aggregation.alerts.find((a) => a.id === claimed.alertId);
 
-      // Recovery events may reference resolved alerts — load state metadata.
       const state = await prisma.alertNotificationState.findUnique({
         where: { alertId: claimed.alertId },
       });
@@ -268,7 +342,6 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
         continue;
       }
 
-      // Suppress recovery when snapshot incomplete — do not burn retry budget.
       if (claimed.eventType === "RECOVERY" && !completeness.complete) {
         await releaseAlertNotificationDeliveryClaim({
           id: claimed.id,
@@ -278,7 +351,6 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
         continue;
       }
 
-      // Initial/reminder require eligible active alert evidence.
       if (
         (claimed.eventType === "INITIAL" ||
           claimed.eventType === "REMINDER") &&
@@ -317,7 +389,6 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
         } satisfies (typeof aggregation.alerts)[number]);
 
       if (options?.dryRun) {
-        // QA/smoke: exercise durable claim + success path without SMTP.
         void buildAlertNotificationEmail({
           alert: syntheticAlert,
           eventType: claimed.eventType,
@@ -382,7 +453,6 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
         sentAt: checkedAt,
       });
       if (!marked) {
-        // Claim lost after SMTP accept — minimize window; do not resend via unique eventKey.
         counts.failed += 1;
         continue;
       }
@@ -396,7 +466,10 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
       counts.sent += 1;
       if (claimed.eventType === "RECOVERY") counts.recovery += 1;
     }
+
     sendMs = Date.now() - sendStartedAt;
+    lastStep = "send_done";
+    checkpoint("send_done", { processed, sendMs, sent: counts.sent });
 
     counts.remaining = await countDueAlertNotificationDeliveries(checkedAt);
 
@@ -410,6 +483,7 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
         processed,
         aggregationMs,
         sendMs,
+        lastStep,
         errorCode: hardSmtpFailure.errorCode,
         errorDetail: hardSmtpFailure.errorDetail,
       };
@@ -424,8 +498,11 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
       processed,
       aggregationMs,
       sendMs,
+      lastStep,
     };
   } finally {
-    await releaseAlertNotificationRunnerLock(lock.claimToken);
+    closeChannelTransporter("support");
+    await releaseAlertNotificationRunnerLock(lock.claimToken).catch(() => undefined);
+    checkpoint("release_lock");
   }
 }
