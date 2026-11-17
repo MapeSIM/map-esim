@@ -55,19 +55,21 @@ export function withClientConnectionLimit(
 /**
  * Run async Prisma tasks in small batches so serverless connection_limit
  * (typically 5) is not exhausted by a single Promise.all fan-out.
+ * Tuple-generic so heterogeneous findMany results keep their per-slot types.
  */
-export async function runPrismaTasksInBatches<T>(
-  tasks: Array<() => Promise<T>>,
+export async function runPrismaTasksInBatches<T extends readonly unknown[]>(
+  tasks: { [K in keyof T]: () => Promise<T[K]> },
   concurrency = 3
-): Promise<T[]> {
+): Promise<{ -readonly [K in keyof T]: T[K] }> {
   const size = Math.max(1, Math.min(Math.floor(concurrency) || 3, 5));
-  const out: T[] = [];
-  for (let i = 0; i < tasks.length; i += size) {
-    const chunk = tasks.slice(i, i + size);
+  const list = tasks as readonly (() => Promise<unknown>)[];
+  const out: unknown[] = [];
+  for (let i = 0; i < list.length; i += size) {
+    const chunk = list.slice(i, i + size);
     const part = await Promise.all(chunk.map((task) => task()));
     out.push(...part);
   }
-  return out;
+  return out as { -readonly [K in keyof T]: T[K] };
 }
 
 function createPrismaClient(connectionUrl: string | undefined) {
