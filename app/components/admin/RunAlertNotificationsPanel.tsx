@@ -69,6 +69,7 @@ export function RunAlertNotificationsPanel() {
           remainingCount: 0,
           processedCount: 0,
           aggregationMs: 0,
+          scheduleMs: 0,
           sendMs: 0,
         });
         return;
@@ -89,6 +90,7 @@ export function RunAlertNotificationsPanel() {
         remainingCount: 0,
         processedCount: 0,
         aggregationMs: 0,
+        scheduleMs: 0,
         sendMs: 0,
       });
     } finally {
@@ -163,8 +165,9 @@ export function RunAlertNotificationsPanel() {
               })`
             : ""}
           {typeof state.aggregationMs === "number" ||
+          typeof state.scheduleMs === "number" ||
           typeof state.sendMs === "number"
-            ? ` · timing aggregation ${state.aggregationMs ?? 0}ms / send ${state.sendMs ?? 0}ms / processed ${state.processedCount ?? 0}`
+            ? ` · timing aggregation ${state.aggregationMs ?? 0}ms / schedule ${state.scheduleMs ?? 0}ms / send ${state.sendMs ?? 0}ms / processed ${state.processedCount ?? 0}`
             : ""}
           {state.snapshotComplete === false ? " — incomplete snapshot" : ""}.
         </p>
@@ -178,8 +181,9 @@ export function RunAlertNotificationsPanel() {
           {state.error ?? "Unable to run alert notifications."}
           {state.progressMessage ? ` ${state.progressMessage}.` : null}
           {typeof state.aggregationMs === "number" ||
+          typeof state.scheduleMs === "number" ||
           typeof state.sendMs === "number"
-            ? ` (aggregation ${state.aggregationMs ?? 0}ms / send ${state.sendMs ?? 0}ms / processed ${state.processedCount ?? 0})`
+            ? ` (aggregation ${state.aggregationMs ?? 0}ms / schedule ${state.scheduleMs ?? 0}ms / send ${state.sendMs ?? 0}ms / processed ${state.processedCount ?? 0})`
             : null}
         </p>
       ) : null}

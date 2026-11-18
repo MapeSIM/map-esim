@@ -88,12 +88,13 @@ function sourceMeta(alert: MonitoringAlert) {
 
 /**
  * Upsert active alerts into lifecycle state.
+ * One findMany + Promise.all writes (no per-alert findUnique N+1).
  * Reactivation after resolve increments activationSequence (new cycle).
  */
 export async function syncActiveAlertNotificationStates(input: {
   alerts: MonitoringAlert[];
   checkedAt: Date;
-  /** Hard cap — prevents N+1 sync from hanging serverless runs. */
+  /** Hard cap — keep ≤3 on the hot alert-run path. */
   maxAlerts?: number;
 }): Promise<void> {
   const max =
@@ -101,35 +102,62 @@ export async function syncActiveAlertNotificationStates(input: {
       ? Math.max(1, Math.floor(input.maxAlerts))
       : input.alerts.length;
   const alerts = input.alerts.slice(0, max);
-  for (const alert of alerts) {
-    const meta = sourceMeta(alert);
-    const existing = await prisma.alertNotificationState.findUnique({
-      where: { alertId: alert.id },
-    });
+  if (!alerts.length) return;
 
-    if (!existing) {
-      await prisma.alertNotificationState.create({
-        data: {
-          alertId: alert.id,
-          alertCode: alert.code,
-          severity: alert.severity,
-          category: alert.category,
-          sourceType: meta.sourceType,
-          sourceRecordRef: meta.sourceRecordRef,
-          isActive: true,
-          activationSequence: 1,
-          firstSeenAt: input.checkedAt,
-          lastSeenAt: input.checkedAt,
-          activatedAt: input.checkedAt,
-          resolvedAt: null,
-          recoveryNotifiedAt: null,
-        },
-      });
-      continue;
-    }
+  const existingRows = await prisma.alertNotificationState.findMany({
+    where: { alertId: { in: alerts.map((a) => a.id) } },
+  });
+  const existingById = new Map(existingRows.map((row) => [row.alertId, row]));
 
-    if (!existing.isActive) {
-      // Genuine reactivation → new activation cycle.
+  await Promise.all(
+    alerts.map(async (alert) => {
+      const meta = sourceMeta(alert);
+      const existing = existingById.get(alert.id);
+
+      if (!existing) {
+        await prisma.alertNotificationState.create({
+          data: {
+            alertId: alert.id,
+            alertCode: alert.code,
+            severity: alert.severity,
+            category: alert.category,
+            sourceType: meta.sourceType,
+            sourceRecordRef: meta.sourceRecordRef,
+            isActive: true,
+            activationSequence: 1,
+            firstSeenAt: input.checkedAt,
+            lastSeenAt: input.checkedAt,
+            activatedAt: input.checkedAt,
+            resolvedAt: null,
+            recoveryNotifiedAt: null,
+          },
+        });
+        return;
+      }
+
+      if (!existing.isActive) {
+        // Genuine reactivation → new activation cycle.
+        await prisma.alertNotificationState.update({
+          where: { alertId: alert.id },
+          data: {
+            alertCode: alert.code,
+            severity: alert.severity,
+            category: alert.category,
+            sourceType: meta.sourceType,
+            sourceRecordRef: meta.sourceRecordRef,
+            isActive: true,
+            activationSequence: existing.activationSequence + 1,
+            lastSeenAt: input.checkedAt,
+            activatedAt: input.checkedAt,
+            resolvedAt: null,
+            lastNotifiedAt: null,
+            nextReminderAt: null,
+            recoveryNotifiedAt: null,
+          },
+        });
+        return;
+      }
+
       await prisma.alertNotificationState.update({
         where: { alertId: alert.id },
         data: {
@@ -138,68 +166,38 @@ export async function syncActiveAlertNotificationStates(input: {
           category: alert.category,
           sourceType: meta.sourceType,
           sourceRecordRef: meta.sourceRecordRef,
-          isActive: true,
-          activationSequence: existing.activationSequence + 1,
           lastSeenAt: input.checkedAt,
-          activatedAt: input.checkedAt,
-          resolvedAt: null,
-          lastNotifiedAt: null,
-          nextReminderAt: null,
-          recoveryNotifiedAt: null,
         },
       });
-      continue;
-    }
-
-    await prisma.alertNotificationState.update({
-      where: { alertId: alert.id },
-      data: {
-        alertCode: alert.code,
-        severity: alert.severity,
-        category: alert.category,
-        sourceType: meta.sourceType,
-        sourceRecordRef: meta.sourceRecordRef,
-        lastSeenAt: input.checkedAt,
-      },
-    });
-  }
+    })
+  );
 }
 
 /**
  * Mark previously-active alerts resolved only when the snapshot is complete.
+ * Single updateMany — no per-row N+1 updates.
  */
 export async function resolveMissingAlertNotificationStates(input: {
   activeAlertIds: Set<string>;
   checkedAt: Date;
   snapshotComplete: boolean;
-  /** Hard cap — prevents N+1 resolve from hanging serverless runs. */
+  /** Unused hard cap kept for call-site compatibility. */
   maxResolve?: number;
 }): Promise<number> {
   if (!input.snapshotComplete) return 0;
-  const maxResolve =
-    typeof input.maxResolve === "number" && Number.isFinite(input.maxResolve)
-      ? Math.max(1, Math.floor(input.maxResolve))
-      : 50;
-  const activeRows = await prisma.alertNotificationState.findMany({
-    where: { isActive: true },
-    select: { alertId: true },
-    take: maxResolve + input.activeAlertIds.size + 5,
+  const activeIds = [...input.activeAlertIds];
+  const result = await prisma.alertNotificationState.updateMany({
+    where: {
+      isActive: true,
+      ...(activeIds.length ? { alertId: { notIn: activeIds } } : {}),
+    },
+    data: {
+      isActive: false,
+      resolvedAt: input.checkedAt,
+      nextReminderAt: null,
+    },
   });
-  let resolved = 0;
-  for (const row of activeRows) {
-    if (resolved >= maxResolve) break;
-    if (input.activeAlertIds.has(row.alertId)) continue;
-    await prisma.alertNotificationState.update({
-      where: { alertId: row.alertId },
-      data: {
-        isActive: false,
-        resolvedAt: input.checkedAt,
-        nextReminderAt: null,
-      },
-    });
-    resolved += 1;
-  }
-  return resolved;
+  return result.count;
 }
 
 export async function ensureDeliveryEvent(input: {
@@ -252,9 +250,6 @@ export async function scheduleEligibleDeliveries(input: {
   recoveryCreated: number;
   cooldownSuppressed: number;
 }> {
-  let initialCreated = 0;
-  let reminderCreated = 0;
-  let recoveryCreated = 0;
   let cooldownSuppressed = 0;
 
   const maxStates =
@@ -289,15 +284,28 @@ export async function scheduleEligibleDeliveries(input: {
     orderBy: { updatedAt: "desc" },
     take: maxStates,
   });
+
+  type PlannedDelivery = {
+    alertId: string;
+    activationSequence: number;
+    eventType: AlertNotificationEventType;
+    reminderBucket?: number;
+    eventKey: string;
+  };
+  const planned: PlannedDelivery[] = [];
+
   for (const state of states) {
     if (state.isActive && input.eligibleAlertIds.has(state.alertId)) {
-      const initial = await ensureDeliveryEvent({
+      planned.push({
         alertId: state.alertId,
         activationSequence: state.activationSequence,
         eventType: AlertNotificationEventType.INITIAL,
-        checkedAt: input.checkedAt,
+        eventKey: buildDeliveryEventKey({
+          alertId: state.alertId,
+          activationSequence: state.activationSequence,
+          eventType: AlertNotificationEventType.INITIAL,
+        }),
       });
-      if (initial.created) initialCreated += 1;
 
       if (state.lastNotifiedAt) {
         if (
@@ -309,14 +317,18 @@ export async function scheduleEligibleDeliveries(input: {
           cooldownSuppressed += 1;
         } else {
           const bucket = reminderCooldownBucket(input.checkedAt.getTime());
-          const reminder = await ensureDeliveryEvent({
+          planned.push({
             alertId: state.alertId,
             activationSequence: state.activationSequence,
             eventType: AlertNotificationEventType.REMINDER,
             reminderBucket: bucket,
-            checkedAt: input.checkedAt,
+            eventKey: buildDeliveryEventKey({
+              alertId: state.alertId,
+              activationSequence: state.activationSequence,
+              eventType: AlertNotificationEventType.REMINDER,
+              reminderBucket: bucket,
+            }),
           });
-          if (reminder.created) reminderCreated += 1;
         }
       }
       continue;
@@ -329,14 +341,67 @@ export async function scheduleEligibleDeliveries(input: {
       state.lastNotifiedAt &&
       !state.recoveryNotifiedAt
     ) {
-      const recovery = await ensureDeliveryEvent({
+      planned.push({
         alertId: state.alertId,
         activationSequence: state.activationSequence,
         eventType: AlertNotificationEventType.RECOVERY,
-        checkedAt: input.checkedAt,
+        eventKey: buildDeliveryEventKey({
+          alertId: state.alertId,
+          activationSequence: state.activationSequence,
+          eventType: AlertNotificationEventType.RECOVERY,
+        }),
       });
-      if (recovery.created) recoveryCreated += 1;
     }
+  }
+
+  // Cap creates to the current run's delivery budget (≤3) after one existence check.
+  const capped = planned.slice(0, maxStates);
+  const existing =
+    capped.length === 0
+      ? []
+      : await prisma.alertNotificationDelivery.findMany({
+          where: { eventKey: { in: capped.map((row) => row.eventKey) } },
+          select: { eventKey: true },
+        });
+  const existingKeys = new Set(existing.map((row) => row.eventKey));
+  const toCreate = capped.filter((row) => !existingKeys.has(row.eventKey));
+
+  const createResults = await Promise.all(
+    toCreate.map(async (row) => {
+      try {
+        await prisma.alertNotificationDelivery.create({
+          data: {
+            eventKey: row.eventKey,
+            alertId: row.alertId,
+            activationSequence: row.activationSequence,
+            eventType: row.eventType,
+            status: AlertNotificationDeliveryStatus.PENDING,
+            attemptCount: 0,
+            nextAttemptAt: input.checkedAt,
+          },
+        });
+        return row.eventType;
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          return null;
+        }
+        throw error;
+      }
+    })
+  );
+
+  let initialCreated = 0;
+  let reminderCreated = 0;
+  let recoveryCreated = 0;
+  for (const eventType of createResults) {
+    if (eventType === AlertNotificationEventType.INITIAL) initialCreated += 1;
+    else if (eventType === AlertNotificationEventType.REMINDER)
+      reminderCreated += 1;
+    else if (eventType === AlertNotificationEventType.RECOVERY)
+      recoveryCreated += 1;
   }
 
   return {

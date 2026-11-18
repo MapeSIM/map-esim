@@ -59,6 +59,7 @@ export type AlertNotificationRunResult = {
   processed: number;
   aggregationMs: number;
   sendMs: number;
+  scheduleMs: number;
   lastStep?: string;
   errorCode?: string;
   /** Opaque machine detail for UI mapping — never secrets or raw SMTP stacks. */
@@ -69,6 +70,7 @@ export type AlertNotificationRunResult = {
 export type AlertNotificationRunProgress = {
   aggregationMs: number;
   sendMs: number;
+  scheduleMs: number;
   processed: number;
   lastStep: string;
   activeCollector: string | null;
@@ -118,12 +120,13 @@ function isHardSmtpFailure(errorCode: string, detail?: string): boolean {
 function emptyTimingResult(
   partial: Omit<
     AlertNotificationRunResult,
-    "aggregationMs" | "sendMs" | "processed" | "counts"
+    "aggregationMs" | "sendMs" | "scheduleMs" | "processed" | "counts"
   > & {
     counts?: SafeRunnerCounts;
     processed?: number;
     aggregationMs?: number;
     sendMs?: number;
+    scheduleMs?: number;
   }
 ): AlertNotificationRunResult {
   return {
@@ -132,6 +135,7 @@ function emptyTimingResult(
     processed: partial.processed ?? 0,
     aggregationMs: partial.aggregationMs ?? 0,
     sendMs: partial.sendMs ?? 0,
+    scheduleMs: partial.scheduleMs ?? 0,
   };
 }
 
@@ -151,6 +155,7 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
   let processed = 0;
   let aggregationMs = 0;
   let sendMs = 0;
+  let scheduleMs = 0;
   let lastStep = "start";
   const progress = options?.progress;
 
@@ -283,20 +288,27 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
 
     const completeness = aggregation.completeness;
     const activeAlerts = aggregation.alerts.filter((a) => a.state === "ACTIVE");
-    const eligible = filterEligibleAlerts(activeAlerts).slice(
+    const eligibleAll = filterEligibleAlerts(activeAlerts);
+    counts.eligible = eligibleAll.length;
+    // Hot path: only sync/schedule the ≤3 alerts we can send this click.
+    const eligible = eligibleAll.slice(
       0,
-      ALERT_NOTIFICATION_MAX_STATE_OPS_PER_RUN
+      ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN
     );
-    counts.eligible = eligible.length;
+    const eligibleIds = new Set(eligible.map((a) => a.id));
 
+    const scheduleStartedAt = Date.now();
     lastStep = "sync_states";
+    touchProgress(progress, {
+      lastStep: "sync_states",
+      scheduleMs: 0,
+    });
     checkpoint("sync_states", { eligible: eligible.length });
-    // Sync only notification-eligible alerts (not every ACTIVE low-severity row).
     await withTimeout(
       syncActiveAlertNotificationStates({
         alerts: eligible,
         checkedAt,
-        maxAlerts: ALERT_NOTIFICATION_MAX_STATE_OPS_PER_RUN,
+        maxAlerts: ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN,
       }),
       ALERT_NOTIFICATION_AGGREGATION_TIMEOUT_MS,
       "SYNC_TIMEOUT"
@@ -306,11 +318,17 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
       }
       console.error("alert_notification_runner", "SYNC_TIMEOUT");
     });
+    touchProgress(progress, {
+      lastStep: "sync_states",
+      scheduleMs: Date.now() - scheduleStartedAt,
+    });
 
     lastStep = "resolve_missing";
+    touchProgress(progress, { lastStep: "resolve_missing" });
+    // Resolve against the full eligible set (not just the ≤3 send candidates).
     await withTimeout(
       resolveMissingAlertNotificationStates({
-        activeAlertIds: new Set(eligible.map((a) => a.id)),
+        activeAlertIds: new Set(eligibleAll.map((a) => a.id)),
         checkedAt,
         snapshotComplete: completeness.complete,
         maxResolve: ALERT_NOTIFICATION_MAX_STATE_OPS_PER_RUN,
@@ -323,15 +341,20 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
       }
       console.error("alert_notification_runner", "RESOLVE_TIMEOUT");
     });
+    touchProgress(progress, {
+      lastStep: "resolve_missing",
+      scheduleMs: Date.now() - scheduleStartedAt,
+    });
 
     lastStep = "schedule";
     checkpoint("schedule");
+    touchProgress(progress, { lastStep: "schedule" });
     const scheduled = await withTimeout(
       scheduleEligibleDeliveries({
-        eligibleAlertIds: new Set(eligible.map((a) => a.id)),
+        eligibleAlertIds: eligibleIds,
         checkedAt,
         snapshotComplete: completeness.complete,
-        maxStates: ALERT_NOTIFICATION_MAX_STATE_OPS_PER_RUN,
+        maxStates: ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN,
       }),
       ALERT_NOTIFICATION_AGGREGATION_TIMEOUT_MS,
       "SCHEDULE_TIMEOUT"
@@ -347,9 +370,15 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
       }
       throw error;
     });
+    scheduleMs = Date.now() - scheduleStartedAt;
+    touchProgress(progress, {
+      lastStep: "schedule_done",
+      scheduleMs,
+    });
+    checkpoint("schedule_done", { ms: scheduleMs });
     counts.cooldown = scheduled.cooldownSuppressed;
     counts.suppressed +=
-      activeAlerts.length - eligible.length + scheduled.cooldownSuppressed;
+      activeAlerts.length - eligibleAll.length + scheduled.cooldownSuppressed;
 
     let hardSmtpFailure:
       | { errorCode: string; errorDetail?: string }
@@ -541,6 +570,7 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
         processed,
         aggregationMs,
         sendMs,
+        scheduleMs,
         lastStep,
         errorCode: hardSmtpFailure.errorCode,
         errorDetail: hardSmtpFailure.errorDetail,
@@ -556,6 +586,7 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
       processed,
       aggregationMs,
       sendMs,
+      scheduleMs,
       lastStep,
     };
   } finally {

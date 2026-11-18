@@ -68,6 +68,7 @@ function errorPayload(
   extra?: {
     aggregationMs?: number;
     sendMs?: number;
+    scheduleMs?: number;
     processedCount?: number;
     remainingCount?: number;
     lastStep?: string;
@@ -89,6 +90,7 @@ function errorPayload(
     processedCount: extra?.processedCount ?? 0,
     aggregationMs: extra?.aggregationMs ?? 0,
     sendMs: extra?.sendMs ?? 0,
+    scheduleMs: extra?.scheduleMs ?? 0,
     lastStep: extra?.lastStep,
     activeCollector: extra?.activeCollector ?? null,
     counts,
@@ -215,6 +217,7 @@ export async function POST(req: Request) {
     const runProgress: AlertNotificationRunProgress = {
       aggregationMs: 0,
       sendMs: 0,
+      scheduleMs: 0,
       processed: 0,
       lastStep: "start",
       activeCollector: null,
@@ -233,6 +236,7 @@ export async function POST(req: Request) {
       checkpoint(timedOut ? "run_timeout" : "run_failed", {
         aggregationMs: runProgress.aggregationMs,
         sendMs: runProgress.sendMs,
+        scheduleMs: runProgress.scheduleMs,
         processed: runProgress.processed,
         lastStep: runProgress.lastStep,
         activeCollector: runProgress.activeCollector,
@@ -248,6 +252,7 @@ export async function POST(req: Request) {
               : "run_failed",
             aggregationMs: runProgress.aggregationMs,
             sendMs: runProgress.sendMs,
+            scheduleMs: runProgress.scheduleMs,
             processedCount: runProgress.processed,
             activeCollector: runProgress.activeCollector,
           }
@@ -275,6 +280,7 @@ export async function POST(req: Request) {
       ok: result.ok,
       processed: result.processed,
       aggregationMs: result.aggregationMs,
+      scheduleMs: result.scheduleMs,
       sendMs: result.sendMs,
       elapsedMs: Date.now() - routeStartedAt,
     });
@@ -291,6 +297,7 @@ export async function POST(req: Request) {
         remainingCount: counts.remaining,
         processedCount: result.processed,
         aggregationMs: result.aggregationMs,
+        scheduleMs: result.scheduleMs,
         sendMs: result.sendMs,
         lastStep: result.lastStep,
         progressMessage,
@@ -307,6 +314,7 @@ export async function POST(req: Request) {
       remainingCount: counts.remaining,
       processedCount: result.processed,
       aggregationMs: result.aggregationMs,
+      scheduleMs: result.scheduleMs,
       sendMs: result.sendMs,
       lastStep: result.lastStep,
       progressMessage,

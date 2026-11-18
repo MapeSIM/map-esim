@@ -28,6 +28,7 @@ export type RunAlertNotificationsFormState = {
   remainingCount?: number;
   processedCount?: number;
   aggregationMs?: number;
+  scheduleMs?: number;
   sendMs?: number;
   /** Present when a bounded batch left more outbox work. */
   progressMessage?: string;
@@ -55,6 +56,7 @@ function toBannerState(input: {
   snapshotComplete?: boolean;
   processedCount?: number;
   aggregationMs?: number;
+  scheduleMs?: number;
   sendMs?: number;
 }): NonNullable<RunAlertNotificationsFormState> {
   const counts = input.counts ?? emptyRunnerCounts();
@@ -67,6 +69,7 @@ function toBannerState(input: {
     remainingCount: counts.remaining,
     processedCount: input.processedCount ?? 0,
     aggregationMs: input.aggregationMs ?? 0,
+    scheduleMs: input.scheduleMs ?? 0,
     sendMs: input.sendMs ?? 0,
     counts,
     paused: input.paused,
@@ -188,6 +191,7 @@ export async function runAlertNotificationsAction(
         paused: result.paused,
         processedCount: result.processed,
         aggregationMs: result.aggregationMs,
+        scheduleMs: result.scheduleMs,
         sendMs: result.sendMs,
         progressMessage:
           formatAlertNotificationPartialProgress({
@@ -211,6 +215,7 @@ export async function runAlertNotificationsAction(
       progressMessage,
       processedCount: result.processed,
       aggregationMs: result.aggregationMs,
+      scheduleMs: result.scheduleMs,
       sendMs: result.sendMs,
     });
   } catch {

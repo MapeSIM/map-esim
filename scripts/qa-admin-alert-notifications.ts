@@ -474,13 +474,20 @@ function main() {
   assert.match(runner, /ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN/);
   assert.match(runner, /ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS|budgetMs/);
   assert.match(runner, /countDueAlertNotificationDeliveries/);
-  assert.match(runner, /aggregationMs|sendMs/);
+  assert.match(runner, /aggregationMs|sendMs|scheduleMs/);
+  assert.match(runner, /schedule_done/);
   assert.match(runner, /\[alert-run\]/);
   assert.match(runner, /closeChannelTransporter/);
   assert.match(runner, /local-DB|Local Prisma|no external provider HTTP/i);
   assert.match(actions, /formatAlertNotificationFailureReason/);
   assert.match(actions, /formatAlertNotificationPartialProgress/);
-  assert.match(panel, /progressMessage|remainingCount|aggregationMs|sendMs|processedCount/);
+  assert.match(
+    panel,
+    /progressMessage|remainingCount|aggregationMs|scheduleMs|sendMs|processedCount/
+  );
+  assert.match(stateSrc, /findMany\([\s\S]*alertId:\s*\{\s*in:/);
+  assert.match(stateSrc, /updateMany/);
+  assert.match(stateSrc, /Promise\.all/);
   assert.match(delivery, /getEmailConfig\("support"\)|supportConfig\.reason/);
   assert.match(delivery, /closeChannelTransporter\("support"\)/);
   const alertRoute = read(
