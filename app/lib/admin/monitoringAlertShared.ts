@@ -54,8 +54,8 @@ export const MONITORING_THRESHOLDS = {
    * from mapDatabaseProbeToStatus (ok / timeout / error), matching Operations.
    */
   DATABASE_DEGRADED_LATENCY_MS: 500,
-  /** Bounded query take for record-level alerts. */
-  ALERT_QUERY_TAKE: 200,
+  /** Bounded query take for record-level alerts (keep aggregation under ~4s). */
+  ALERT_QUERY_TAKE: 50,
 } as const;
 
 export type MonitoringAlertCode =

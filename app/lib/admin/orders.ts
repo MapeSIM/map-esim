@@ -513,6 +513,7 @@ export async function getAdminOrderDetail(
       },
       adminPackageAssignment: {
         select: {
+          id: true,
           status: true,
           offerId: true,
           destinationCode: true,
@@ -520,6 +521,8 @@ export async function getAdminOrderDetail(
             select: {
               id: true,
               paymentMethod: true,
+              senderName: true,
+              paymentProofUrl: true,
             },
           },
         },
@@ -550,6 +553,8 @@ export async function getAdminOrderDetail(
           id: true,
           paymentMethod: true,
           reference: true,
+          senderName: true,
+          paymentProofUrl: true,
         },
       },
     },
@@ -683,14 +688,37 @@ export async function getAdminOrderDetail(
         senderName: row.senderName,
         paymentProofUrl: row.paymentProofUrl,
         whatsappPaymentMethod: wa?.paymentMethod,
+        whatsappSenderName: wa?.senderName,
+        whatsappPaymentProofUrl: wa?.paymentProofUrl,
         hasWhatsappCheckoutLink: Boolean(wa?.id),
+        hasAdminPackageAssignment: Boolean(row.adminPackageAssignment),
         hasGatewayPaymentAttempt: Boolean(
           row.walletEsimPurchase?.paymentAttempts?.length
         ),
       });
     })(),
-    senderName: (row.senderName ?? "").trim() || null,
-    paymentProofUrl: (row.paymentProofUrl ?? "").trim() || null,
+    senderName: (() => {
+      const wa =
+        row.whatsAppCheckoutOrder ??
+        row.adminPackageAssignment?.whatsAppCheckoutOrder ??
+        null;
+      return (
+        (row.senderName ?? "").trim() ||
+        (wa?.senderName ?? "").trim() ||
+        null
+      );
+    })(),
+    paymentProofUrl: (() => {
+      const wa =
+        row.whatsAppCheckoutOrder ??
+        row.adminPackageAssignment?.whatsAppCheckoutOrder ??
+        null;
+      return (
+        (row.paymentProofUrl ?? "").trim() ||
+        (wa?.paymentProofUrl ?? "").trim() ||
+        null
+      );
+    })(),
   };
 }
 

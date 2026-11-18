@@ -459,7 +459,7 @@ function main() {
   assert.match(opsPage, /RunAlertNotificationsPanel/);
   assert.match(panel, /ALERT_NOTIFICATION_CONFIRM_PHRASE|RUN ALERT NOTIFICATIONS/);
   assert.match(panel, /eligible|sent|suppressed|cooldown|failed|recovery/);
-  assert.match(panel, /CLIENT_RUN_TIMEOUT_MS|20_000|20000|55_000|55000/);
+  assert.match(panel, /CLIENT_RUN_TIMEOUT_MS|25_000|25000/);
   assert.match(panel, /AbortController/);
   assert.match(panel, /finally[\s\S]{0,400}setRunning\(false\)/);
   assert.match(panel, /Completed:.*sent.*skipped|sentFromState|skippedFromState/);
@@ -493,6 +493,12 @@ function main() {
   assert.match(alertRoute, /\[alert-run\]/);
   assert.match(alertRoute, /AUTH_TIMEOUT|ALERT_NOTIFICATION_AUTH_TIMEOUT_MS/);
   assert.match(monitoring, /runPrismaTasksInBatches/);
+  assert.match(monitoring, /timedAlertCollector|collector:/);
+  assert.match(monitoring, /ALERT_QUERY_TAKE|take:\s*TAKE/);
+  assert.match(
+    read("app/lib/admin/monitoringAlertShared.ts"),
+    /ALERT_QUERY_TAKE:\s*50/
+  );
   assert.match(stateSrc, /maxStates|maxAlerts|maxResolve/);
   assert.doesNotMatch(
     stateSrc,

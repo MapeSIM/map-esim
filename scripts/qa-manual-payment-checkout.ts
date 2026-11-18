@@ -200,6 +200,25 @@ function main() {
   assert.equal(
     resolveAdminOrderPaymentMethodDisplay({
       paymentMethod: "SAFEPAY",
+      fundingSource: "COMPANY_FUNDED",
+      hasAdminPackageAssignment: true,
+      hasGatewayPaymentAttempt: false,
+    }),
+    "MANUAL"
+  );
+  assert.equal(
+    resolveAdminOrderPaymentMethodDisplay({
+      paymentMethod: "SAFEPAY",
+      whatsappSenderName: "Ali",
+      whatsappPaymentProofUrl: "https://example.com/wa-proof.png",
+      hasWhatsappCheckoutLink: true,
+      hasGatewayPaymentAttempt: false,
+    }),
+    "MANUAL"
+  );
+  assert.equal(
+    resolveAdminOrderPaymentMethodDisplay({
+      paymentMethod: "SAFEPAY",
       hasGatewayPaymentAttempt: true,
     }),
     "SAFEPAY"

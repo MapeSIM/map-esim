@@ -73,13 +73,23 @@ async function main() {
       senderName: true,
       paymentProofUrl: true,
       whatsAppCheckoutOrder: {
-        select: { id: true, paymentMethod: true },
+        select: {
+          id: true,
+          paymentMethod: true,
+          senderName: true,
+          paymentProofUrl: true,
+        },
       },
       adminPackageAssignment: {
         select: {
           id: true,
           whatsAppCheckoutOrder: {
-            select: { id: true, paymentMethod: true },
+            select: {
+              id: true,
+              paymentMethod: true,
+              senderName: true,
+              paymentProofUrl: true,
+            },
           },
         },
       },
@@ -108,7 +118,10 @@ async function main() {
       senderName: row.senderName,
       paymentProofUrl: row.paymentProofUrl,
       whatsappPaymentMethod: wa?.paymentMethod,
+      whatsappSenderName: wa?.senderName,
+      whatsappPaymentProofUrl: wa?.paymentProofUrl,
       hasWhatsappCheckoutLink: Boolean(wa?.id),
+      hasAdminPackageAssignment: Boolean(row.adminPackageAssignment),
       hasGatewayPaymentAttempt: Boolean(
         row.walletEsimPurchase?.paymentAttempts?.length
       ),

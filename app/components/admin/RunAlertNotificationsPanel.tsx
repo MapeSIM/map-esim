@@ -6,8 +6,8 @@ import {
 } from "@/app/lib/admin/alertNotificationActions";
 import { ALERT_NOTIFICATION_CONFIRM_PHRASE } from "@/app/lib/admin/alertNotificationShared";
 
-/** Route budgets ~15s; client aborts shortly after that. */
-const CLIENT_RUN_TIMEOUT_MS = 20_000;
+/** Wait past the 20s route hard ceiling so the client always reads the JSON body. */
+const CLIENT_RUN_TIMEOUT_MS = 25_000;
 
 function skippedFromState(state: NonNullable<RunAlertNotificationsFormState>): number {
   if (typeof state.skippedCount === "number") return state.skippedCount;

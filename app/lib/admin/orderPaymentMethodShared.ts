@@ -33,8 +33,14 @@ export function resolveAdminOrderPaymentMethodDisplay(input: {
   paymentProofUrl?: string | null;
   /** WhatsAppCheckoutOrder.paymentMethod when linked. */
   whatsappPaymentMethod?: string | null;
+  /** WhatsAppCheckoutOrder.senderName when linked (manual submission). */
+  whatsappSenderName?: string | null;
+  /** WhatsAppCheckoutOrder.paymentProofUrl when linked (manual submission). */
+  whatsappPaymentProofUrl?: string | null;
   /** True when a WhatsAppCheckoutOrder row points at this order. */
   hasWhatsappCheckoutLink?: boolean;
+  /** True when an AdminPackageAssignment fulfilled this order. */
+  hasAdminPackageAssignment?: boolean;
   /** True when a Safepay/Simpaisa gateway payment attempt exists for this order. */
   hasGatewayPaymentAttempt?: boolean;
 }): string | null {
@@ -42,10 +48,19 @@ export function resolveAdminOrderPaymentMethodDisplay(input: {
   const wa = normalizeRail(input.whatsappPaymentMethod);
   const funding = normalizeRail(input.fundingSource);
   const providerOrderId = String(input.providerOrderId ?? "").trim();
-  const hasProof = Boolean(String(input.paymentProofUrl ?? "").trim());
-  const hasSender = Boolean(String(input.senderName ?? "").trim());
+  const hasProof = Boolean(
+    String(input.paymentProofUrl ?? "").trim() ||
+      String(input.whatsappPaymentProofUrl ?? "").trim()
+  );
+  const hasSender = Boolean(
+    String(input.senderName ?? "").trim() ||
+      String(input.whatsappSenderName ?? "").trim()
+  );
   const hasWaLink = Boolean(input.hasWhatsappCheckoutLink);
+  const hasAssignment = Boolean(input.hasAdminPackageAssignment);
   const hasGateway = Boolean(input.hasGatewayPaymentAttempt);
+  const looksLikeDefaultSafepay =
+    !stored || stored === ADMIN_ORDER_PAYMENT_METHOD_SAFEPAY;
 
   if (stored === ADMIN_ORDER_PAYMENT_METHOD_MANUAL) {
     return ADMIN_ORDER_PAYMENT_METHOD_MANUAL;
@@ -65,24 +80,20 @@ export function resolveAdminOrderPaymentMethodDisplay(input: {
     return ADMIN_ORDER_PAYMENT_METHOD_MANUAL;
   }
 
-  // Manual submission evidence on the order row (proof / sender).
-  if (hasProof || (hasSender && !hasGateway)) {
-    if (
-      !stored ||
-      stored === ADMIN_ORDER_PAYMENT_METHOD_SAFEPAY ||
-      funding === "COMPANY_FUNDED" ||
-      funding === "DIRECT_PAYMENT"
-    ) {
-      return ADMIN_ORDER_PAYMENT_METHOD_MANUAL;
-    }
+  // Manual submission evidence on the order or linked WhatsApp checkout row.
+  if ((hasProof || hasSender) && !hasGateway && looksLikeDefaultSafepay) {
+    return ADMIN_ORDER_PAYMENT_METHOD_MANUAL;
   }
 
-  // Company-funded fulfill via Manual/WhatsApp pipeline without a gateway txn.
+  // Admin package / WhatsApp fulfill without a Safepay/Simpaisa gateway txn.
   if (
-    hasWaLink &&
     !hasGateway &&
-    (funding === "COMPANY_FUNDED" || funding === "DIRECT_PAYMENT") &&
-    (!stored || stored === ADMIN_ORDER_PAYMENT_METHOD_SAFEPAY)
+    looksLikeDefaultSafepay &&
+    (hasAssignment || hasWaLink) &&
+    (funding === "COMPANY_FUNDED" ||
+      funding === "DIRECT_PAYMENT" ||
+      hasWaLink ||
+      hasAssignment)
   ) {
     return ADMIN_ORDER_PAYMENT_METHOD_MANUAL;
   }
@@ -105,7 +116,10 @@ export function shouldBackfillOrderPaymentMethodToManual(input: {
   senderName?: string | null;
   paymentProofUrl?: string | null;
   whatsappPaymentMethod?: string | null;
+  whatsappSenderName?: string | null;
+  whatsappPaymentProofUrl?: string | null;
   hasWhatsappCheckoutLink?: boolean;
+  hasAdminPackageAssignment?: boolean;
   hasGatewayPaymentAttempt?: boolean;
 }): boolean {
   const stored = normalizeRail(input.paymentMethod);
