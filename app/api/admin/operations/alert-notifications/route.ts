@@ -17,7 +17,10 @@ import {
   formatAlertNotificationFailureReason,
   formatAlertNotificationPartialProgress,
 } from "@/app/lib/admin/alertNotificationShared";
-import { evaluateAndDeliverAlertNotifications } from "@/app/lib/admin/alertNotificationRunner";
+import {
+  evaluateAndDeliverAlertNotifications,
+  type AlertNotificationRunProgress,
+} from "@/app/lib/admin/alertNotificationRunner";
 import { loadOperationalControlPausedMapSoft } from "@/app/lib/admin/operationalControlsPolicy";
 import { parseOperationalConfirmPhrase } from "@/app/lib/admin/operationalControlsShared";
 import { closeChannelTransporter } from "@/app/lib/email/transport";
@@ -29,7 +32,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /** Route-level hard ceiling (auth + run) — always respond before Vercel kill. */
-const ROUTE_HARD_TIMEOUT_MS = 20_000;
+const ROUTE_HARD_TIMEOUT_MS = 22_000;
 
 function skippedCountFrom(counts: {
   suppressed: number;
@@ -68,12 +71,18 @@ function errorPayload(
     processedCount?: number;
     remainingCount?: number;
     lastStep?: string;
+    activeCollector?: string | null;
   }
 ) {
   const counts = emptyRunnerCounts();
+  const collector = (extra?.activeCollector ?? "").trim();
+  const withCollector =
+    collector && !error.includes(collector)
+      ? `${error} (active collector: ${collector})`
+      : error;
   return {
     ok: false as const,
-    error,
+    error: withCollector,
     sentCount: 0,
     skippedCount: 0,
     remainingCount: extra?.remainingCount ?? 0,
@@ -81,6 +90,7 @@ function errorPayload(
     aggregationMs: extra?.aggregationMs ?? 0,
     sendMs: extra?.sendMs ?? 0,
     lastStep: extra?.lastStep,
+    activeCollector: extra?.activeCollector ?? null,
     counts,
   };
 }
@@ -202,10 +212,17 @@ export async function POST(req: Request) {
     );
 
     checkpoint("run_start", { remainingBudget });
+    const runProgress: AlertNotificationRunProgress = {
+      aggregationMs: 0,
+      sendMs: 0,
+      processed: 0,
+      lastStep: "start",
+      activeCollector: null,
+    };
     let result: Awaited<ReturnType<typeof evaluateAndDeliverAlertNotifications>>;
     try {
       result = await withTimeout(
-        evaluateAndDeliverAlertNotifications(),
+        evaluateAndDeliverAlertNotifications({ progress: runProgress }),
         remainingBudget,
         "ROUTE_RUN_TIMEOUT"
       );
@@ -213,13 +230,27 @@ export async function POST(req: Request) {
       closeChannelTransporter("support");
       const timedOut =
         error instanceof Error && error.message === "ROUTE_RUN_TIMEOUT";
-      checkpoint(timedOut ? "run_timeout" : "run_failed");
+      checkpoint(timedOut ? "run_timeout" : "run_failed", {
+        aggregationMs: runProgress.aggregationMs,
+        sendMs: runProgress.sendMs,
+        processed: runProgress.processed,
+        lastStep: runProgress.lastStep,
+        activeCollector: runProgress.activeCollector,
+      });
       return NextResponse.json(
         errorPayload(
           timedOut
             ? "Alert notification run stopped after the server time budget. Click again to continue."
             : "Unable to run alert notifications. Please try again.",
-          { lastStep: timedOut ? "run_timeout" : "run_failed" }
+          {
+            lastStep: timedOut
+              ? runProgress.lastStep || "run_timeout"
+              : "run_failed",
+            aggregationMs: runProgress.aggregationMs,
+            sendMs: runProgress.sendMs,
+            processedCount: runProgress.processed,
+            activeCollector: runProgress.activeCollector,
+          }
         ),
         { status: timedOut ? 504 : 500 }
       );

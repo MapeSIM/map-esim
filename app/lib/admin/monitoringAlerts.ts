@@ -90,18 +90,27 @@ export type { MonitoringAlertSummary };
 
 const TAKE = MONITORING_THRESHOLDS.ALERT_QUERY_TAKE;
 
+/** Last/active record collector name — read by the runner on AGGREGATION_TIMEOUT. */
+let activeAlertCollector: string | null = null;
+
+export function getActiveAlertCollector(): string | null {
+  return activeAlertCollector;
+}
+
 async function timedAlertCollector<T>(
   name: string,
   run: () => Promise<T>
 ): Promise<T> {
   const startedAt = Date.now();
+  activeAlertCollector = name;
   try {
     return await run();
   } finally {
-    console.info("[alert-run]", {
-      collector: name,
-      ms: Date.now() - startedAt,
-    });
+    const ms = Date.now() - startedAt;
+    console.info("[alert-run]", { collector: name, ms });
+    if (activeAlertCollector === name) {
+      activeAlertCollector = null;
+    }
   }
 }
 
@@ -1012,7 +1021,7 @@ async function collectRecordAlerts(now: Date): Promise<{
           })
         ),
     ],
-    2
+    3
   );
 
   const alerts: MonitoringAlert[] = [];

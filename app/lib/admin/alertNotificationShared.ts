@@ -19,11 +19,11 @@ export const ALERT_NOTIFICATION_RECIPIENTS_ENV = "ALERT_NOTIFICATION_RECIPIENTS"
 /** Bound each manual admin click — keep small so SMTP stays inside maxDuration. */
 export const ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN = 3;
 /** Overall server-side budget for aggregation + delivery after the runner lock. */
-export const ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS = 16_000;
+export const ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS = 18_000;
 /** Hard auth/session budget for the API route. */
 export const ALERT_NOTIFICATION_AUTH_TIMEOUT_MS = 5_000;
-/** Hard local-DB aggregation budget (cold Neon + sequential batches). */
-export const ALERT_NOTIFICATION_AGGREGATION_TIMEOUT_MS = 10_000;
+/** Hard local-DB aggregation budget (cold Neon + batched collectors). */
+export const ALERT_NOTIFICATION_AGGREGATION_TIMEOUT_MS = 14_000;
 /** Hard per-recipient SMTP send budget (must close transporter on expiry). */
 export const ALERT_NOTIFICATION_SMTP_TIMEOUT_MS = 6_000;
 /** Cap state sync/schedule loops so N+1 cannot hang the serverless run. */
@@ -456,6 +456,12 @@ export function formatAlertNotificationFailureReason(input: {
     return "Another notification run is already in progress.";
   }
   if (code === "aggregation_timeout") {
+    const collector = String(input.detail ?? "")
+      .replace(/^collector_/, "")
+      .trim();
+    if (collector) {
+      return `Alert aggregation timed out while running collector "${collector}". Try again shortly or check Operations health.`;
+    }
     return "Alert aggregation timed out. Try again shortly or check Operations health.";
   }
   if (code === "paused") {

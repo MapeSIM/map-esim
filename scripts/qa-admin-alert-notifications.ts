@@ -459,7 +459,7 @@ function main() {
   assert.match(opsPage, /RunAlertNotificationsPanel/);
   assert.match(panel, /ALERT_NOTIFICATION_CONFIRM_PHRASE|RUN ALERT NOTIFICATIONS/);
   assert.match(panel, /eligible|sent|suppressed|cooldown|failed|recovery/);
-  assert.match(panel, /CLIENT_RUN_TIMEOUT_MS|25_000|25000/);
+  assert.match(panel, /CLIENT_RUN_TIMEOUT_MS|30_000|30000/);
   assert.match(panel, /AbortController/);
   assert.match(panel, /finally[\s\S]{0,400}setRunning\(false\)/);
   assert.match(panel, /Completed:.*sent.*skipped|sentFromState|skippedFromState/);
@@ -469,8 +469,8 @@ function main() {
   assert.match(runner, /AGGREGATION_TIMEOUT|aggregation_timeout/);
   assert.match(delivery, /SMTP_TIMEOUT|ALERT_NOTIFICATION_SMTP_TIMEOUT_MS/);
   assert.equal(ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN, 3);
-  assert.equal(ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS, 16_000);
-  assert.equal(ALERT_NOTIFICATION_AGGREGATION_TIMEOUT_MS, 10_000);
+  assert.equal(ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS, 18_000);
+  assert.equal(ALERT_NOTIFICATION_AGGREGATION_TIMEOUT_MS, 14_000);
   assert.match(runner, /ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN/);
   assert.match(runner, /ALERT_NOTIFICATION_RUN_TIME_BUDGET_MS|budgetMs/);
   assert.match(runner, /countDueAlertNotificationDeliveries/);
@@ -489,16 +489,19 @@ function main() {
   assert.match(alertRoute, /export const maxDuration = 60/);
   assert.match(opsPage, /export const maxDuration = 60/);
   assert.match(alertRoute, /aggregationMs|sendMs|processedCount|remainingCount/);
-  assert.match(alertRoute, /ROUTE_HARD_TIMEOUT_MS\s*=\s*20_000/);
+  assert.match(alertRoute, /ROUTE_HARD_TIMEOUT_MS\s*=\s*22_000/);
   assert.match(alertRoute, /\[alert-run\]/);
   assert.match(alertRoute, /AUTH_TIMEOUT|ALERT_NOTIFICATION_AUTH_TIMEOUT_MS/);
+  assert.match(alertRoute, /runProgress|aggregationMs:\s*runProgress/);
   assert.match(monitoring, /runPrismaTasksInBatches/);
   assert.match(monitoring, /timedAlertCollector|collector:/);
+  assert.match(monitoring, /getActiveAlertCollector/);
   assert.match(monitoring, /ALERT_QUERY_TAKE|take:\s*TAKE/);
   assert.match(
     read("app/lib/admin/monitoringAlertShared.ts"),
-    /ALERT_QUERY_TAKE:\s*50/
+    /ALERT_QUERY_TAKE:\s*25/
   );
+  assert.match(runner, /getActiveAlertCollector|activeCollector/);
   assert.match(stateSrc, /maxStates|maxAlerts|maxResolve/);
   assert.doesNotMatch(
     stateSrc,

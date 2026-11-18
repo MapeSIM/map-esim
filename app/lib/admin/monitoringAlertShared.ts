@@ -55,7 +55,7 @@ export const MONITORING_THRESHOLDS = {
    */
   DATABASE_DEGRADED_LATENCY_MS: 500,
   /** Bounded query take for record-level alerts (keep aggregation under ~4s). */
-  ALERT_QUERY_TAKE: 50,
+  ALERT_QUERY_TAKE: 25,
 } as const;
 
 export type MonitoringAlertCode =

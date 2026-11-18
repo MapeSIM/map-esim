@@ -11,7 +11,10 @@
  */
 import "server-only";
 
-import { collectMonitoringAlerts } from "@/app/lib/admin/monitoringAlerts";
+import {
+  collectMonitoringAlerts,
+  getActiveAlertCollector,
+} from "@/app/lib/admin/monitoringAlerts";
 import {
   ALERT_NOTIFICATION_AGGREGATION_TIMEOUT_MS,
   ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN,
@@ -62,6 +65,15 @@ export type AlertNotificationRunResult = {
   errorDetail?: string;
 };
 
+/** Live progress bag shared with the API route so timeouts still report timings. */
+export type AlertNotificationRunProgress = {
+  aggregationMs: number;
+  sendMs: number;
+  processed: number;
+  lastStep: string;
+  activeCollector: string | null;
+};
+
 async function withTimeout<T>(
   promise: Promise<T>,
   ms: number,
@@ -82,6 +94,14 @@ async function withTimeout<T>(
 
 function checkpoint(step: string, extra?: Record<string, unknown>): void {
   console.info("[alert-run]", { step, ...(extra ?? {}) });
+}
+
+function touchProgress(
+  progress: AlertNotificationRunProgress | undefined,
+  patch: Partial<AlertNotificationRunProgress>
+): void {
+  if (!progress) return;
+  Object.assign(progress, patch);
 }
 
 function isHardSmtpFailure(errorCode: string, detail?: string): boolean {
@@ -119,6 +139,8 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
   checkedAt?: Date;
   /** Smoke/QA: skip SMTP and mark claimed deliveries failed with not_configured. */
   dryRun?: boolean;
+  /** Optional live progress bag (route reads this on ROUTE_RUN_TIMEOUT). */
+  progress?: AlertNotificationRunProgress;
 }): Promise<AlertNotificationRunResult> {
   const checkedAt =
     options?.checkedAt instanceof Date &&
@@ -130,8 +152,10 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
   let aggregationMs = 0;
   let sendMs = 0;
   let lastStep = "start";
+  const progress = options?.progress;
 
   checkpoint("start");
+  touchProgress(progress, { lastStep: "start" });
 
   const controls = await loadOperationalControlPausedMapSoft();
   if (controls.map.ALERT_NOTIFICATIONS) {
@@ -201,6 +225,15 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
     const aggregationStartedAt = Date.now();
     lastStep = "aggregate";
     checkpoint("aggregate");
+    touchProgress(progress, { lastStep: "aggregate", activeCollector: null });
+    const aggregationTick = setInterval(() => {
+      aggregationMs = Date.now() - aggregationStartedAt;
+      touchProgress(progress, {
+        aggregationMs,
+        lastStep: "aggregate",
+        activeCollector: getActiveAlertCollector(),
+      });
+    }, 250);
     try {
       // Local Prisma/env only — never provider HTTP during alert evaluation.
       aggregation = await withTimeout(
@@ -210,9 +243,18 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
       );
     } catch (error) {
       aggregationMs = Date.now() - aggregationStartedAt;
+      const activeCollector = getActiveAlertCollector();
+      touchProgress(progress, {
+        aggregationMs,
+        lastStep: "aggregate_timeout",
+        activeCollector,
+      });
       if (error instanceof Error && error.message === "AGGREGATION_TIMEOUT") {
-        console.error("alert_notification_runner", "AGGREGATION_TIMEOUT");
-        checkpoint("aggregate_timeout", { aggregationMs });
+        console.error("alert_notification_runner", "AGGREGATION_TIMEOUT", {
+          aggregationMs,
+          activeCollector,
+        });
+        checkpoint("aggregate_timeout", { aggregationMs, activeCollector });
         return emptyTimingResult({
           ok: false,
           paused: false,
@@ -222,11 +264,21 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
           aggregationMs,
           lastStep: "aggregate_timeout",
           errorCode: "aggregation_timeout",
+          errorDetail: activeCollector
+            ? `collector_${activeCollector}`
+            : undefined,
         });
       }
       throw error;
+    } finally {
+      clearInterval(aggregationTick);
     }
     aggregationMs = Date.now() - aggregationStartedAt;
+    touchProgress(progress, {
+      aggregationMs,
+      lastStep: "aggregate_done",
+      activeCollector: null,
+    });
     checkpoint("aggregate_done", { aggregationMs });
 
     const completeness = aggregation.completeness;
@@ -305,6 +357,7 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
 
     const sendStartedAt = Date.now();
     lastStep = "send_start";
+    touchProgress(progress, { lastStep: "send_start", processed });
     checkpoint("send_start", {
       max: ALERT_NOTIFICATION_MAX_DELIVERIES_PER_RUN,
     });
@@ -314,6 +367,11 @@ export async function evaluateAndDeliverAlertNotifications(options?: {
         checkpoint("budget_exhausted", { processed });
         break;
       }
+      touchProgress(progress, {
+        lastStep: "send",
+        processed,
+        sendMs: Date.now() - sendStartedAt,
+      });
 
       const claimed = await claimNextAlertNotificationDelivery({
         now: checkedAt,
