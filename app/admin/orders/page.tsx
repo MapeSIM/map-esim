@@ -1,9 +1,13 @@
+import InstantOrderRefundButton from "@/app/components/admin/InstantOrderRefundButton";
 import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBadge";
+import { loadAdminAccess } from "@/app/lib/admin/adminPermissionAccess";
+import { hasAdminPermission } from "@/app/lib/admin/adminPermissions";
 import {
   adminHumanStatusLabel,
   ADMIN_UX_PAGE,
 } from "@/app/lib/admin/adminUxCopy";
 import { getAdminOrdersPage } from "@/app/lib/admin/orders";
+import { requireRole } from "@/app/lib/auth/session";
 import {
   AdminButton,
   AdminEmptyState,
@@ -58,6 +62,12 @@ export default async function AdminOrdersPage({
     userId?: string;
   }>;
 }) {
+  const admin = await requireRole("ADMIN");
+  const access = await loadAdminAccess(admin.id);
+  const canRefund = hasAdminPermission(
+    access?.permissions ?? [],
+    "REFUNDS_MANAGE"
+  );
   const params = await searchParams;
 
   let data: Awaited<ReturnType<typeof getAdminOrdersPage>>;
@@ -184,7 +194,7 @@ export default async function AdminOrdersPage({
               <th className="px-3 py-3 font-semibold">Provider ref</th>
               <th className="px-3 py-3 font-semibold">ICCID</th>
               <th className="px-3 py-3 font-semibold">Association</th>
-              <th className="px-3 py-3 font-semibold">Details</th>
+              <th className="px-3 py-3 font-semibold">Actions</th>
             </tr>
           </AdminTableHead>
           <AdminTableBody>
@@ -253,13 +263,18 @@ export default async function AdminOrdersPage({
                   </AdminStatusPill>
                 </td>
                 <td className="px-3 py-3">
-                  <AdminButton
-                    href={`/admin/orders/${order.id}`}
-                    variant="ghost"
-                    size="sm"
-                  >
-                    View
-                  </AdminButton>
+                  <div className="flex flex-col gap-2">
+                    <AdminButton
+                      href={`/admin/orders/${order.id}`}
+                      variant="ghost"
+                      size="sm"
+                    >
+                      View
+                    </AdminButton>
+                    {canRefund ? (
+                      <InstantOrderRefundButton {...order.instantRefund} />
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}

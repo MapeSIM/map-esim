@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { AdminVoidPendingPartnerPurchaseForm } from "@/app/components/admin/AdminVoidPendingPartnerPurchaseForm";
+import InstantOrderRefundButton from "@/app/components/admin/InstantOrderRefundButton";
 import { PartnerDiscountPanel } from "@/app/components/admin/PartnerDiscountPanel";
 import { PartnerInviteResendPanel } from "@/app/components/admin/PartnerInviteResendPanel";
 import { PartnerNameEditPanel } from "@/app/components/admin/PartnerNameEditPanel";
@@ -98,6 +99,10 @@ export default async function AdminPartnerDetailPage({
   const canOpenReconciliation = hasAdminPermission(
     access?.permissions ?? [],
     "RECONCILIATION"
+  );
+  const canRefund = hasAdminPermission(
+    access?.permissions ?? [],
+    "REFUNDS_MANAGE"
   );
 
   const { id } = await params;
@@ -470,6 +475,9 @@ export default async function AdminPartnerDetailPage({
                           compact
                         />
                       ) : null}
+                      {canRefund && purchase.instantRefund ? (
+                        <InstantOrderRefundButton {...purchase.instantRefund} />
+                      ) : null}
                       {canOpenReconciliation && purchase.reconciliationHref ? (
                         <AdminButton
                           href={purchase.reconciliationHref}
@@ -480,6 +488,7 @@ export default async function AdminPartnerDetailPage({
                         </AdminButton>
                       ) : null}
                       {!(canVoidPartnerHolds && purchase.canVoidPending) &&
+                      !(canRefund && purchase.instantRefund) &&
                       !(
                         canOpenReconciliation && purchase.reconciliationHref
                       ) ? (

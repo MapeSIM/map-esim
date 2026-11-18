@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { AdminVoidPendingWalletForm } from "@/app/components/admin/AdminVoidPendingWalletForm";
 import { CustomerBlockPanel } from "@/app/components/admin/CustomerBlockPanel";
+import InstantOrderRefundButton from "@/app/components/admin/InstantOrderRefundButton";
 import {
   AdminButton,
   AdminKpiCard,
@@ -66,6 +67,10 @@ export default async function AdminCustomerDetailPage({
   const canViewOrders = hasAdminPermission(
     access?.permissions ?? [],
     ["ORDERS_VIEW", "ORDERS_MANAGE"]
+  );
+  const canRefund = hasAdminPermission(
+    access?.permissions ?? [],
+    "REFUNDS_MANAGE"
   );
   const canViewTransactions = hasAdminPermission(
     access?.permissions ?? [],
@@ -420,15 +425,20 @@ export default async function AdminCustomerDetailPage({
                       </div>
                     </dl>
                   </div>
-                  {canViewOrders ? (
-                    <AdminButton
-                      href={`/admin/orders/${encodeURIComponent(order.id)}`}
-                      variant="primary"
-                      className="shrink-0"
-                    >
-                      View Order
-                    </AdminButton>
-                  ) : null}
+                  <div className="flex shrink-0 flex-col gap-2">
+                    {canViewOrders ? (
+                      <AdminButton
+                        href={`/admin/orders/${encodeURIComponent(order.id)}`}
+                        variant="primary"
+                        className="shrink-0"
+                      >
+                        View Order
+                      </AdminButton>
+                    ) : null}
+                    {canRefund ? (
+                      <InstantOrderRefundButton {...order.instantRefund} />
+                    ) : null}
+                  </div>
                 </div>
               </li>
             ))}

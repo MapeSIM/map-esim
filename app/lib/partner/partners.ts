@@ -18,6 +18,11 @@ import { sendPartnerInviteEmail } from "@/app/lib/email/sendPartnerInviteEmail";
 import { assertSameOriginAdminRequest } from "@/app/lib/admin/reconciliationCaseManagement";
 import { maskAdminEmail } from "@/app/lib/admin/display";
 import {
+  buildInstantOrderRefundButtonProps,
+  evaluateInstantRefundEligibility,
+} from "@/app/lib/admin/instantOrderRefund";
+import type { InstantOrderRefundButtonProps } from "@/app/lib/admin/instantOrderRefundShared";
+import {
   formatDiscountBpsAsPercent,
   parseDiscountPercentToBps,
 } from "@/app/lib/partner/discount";
@@ -128,6 +133,7 @@ export type PartnerDetailPurchaseStatusFilter =
 
 export type PartnerDetailPurchaseRow = {
   id: string;
+  orderId: string | null;
   planLabel: string;
   destinationLabel: string;
   dataAllowanceLabel: string;
@@ -144,6 +150,8 @@ export type PartnerDetailPurchaseRow = {
   paymentHref: string | null;
   canVoidPending: boolean;
   reconciliationHref: string | null;
+  /** Instant refund control when an order exists for this purchase. */
+  instantRefund: InstantOrderRefundButtonProps | null;
 };
 
 export type PartnerDetailPaymentRow = {
@@ -917,13 +925,29 @@ export async function getPartnerDetail(
     discountSavingsLabel: formatUsdCents(savingsCents),
     purchases: purchases.map((purchase) => {
       const latestAttempt = purchase.paymentAttempts[0] ?? null;
+      const amountLabel = formatUsdCents(purchase.partnerChargeCents);
+      const orderId = (purchase.orderId ?? "").trim() || null;
+      const alreadyRefunded =
+        purchase.status === PartnerEsimPurchaseStatus.FAILED_REFUNDED ||
+        Boolean((purchase.refundTransactionId ?? "").trim());
+      const eligibility = evaluateInstantRefundEligibility({
+        orderStatus: orderId ? "COMPLETED" : null,
+        hasLinkedCustomer: false,
+        hasCompletedRefund: alreadyRefunded,
+        partnerPurchaseStatus: purchase.status,
+        partnerFundingSource: purchase.fundingSource,
+        partnerDebitTransactionId: purchase.debitTransactionId,
+        partnerChargeCents: purchase.partnerChargeCents,
+      });
+      const partyLabel = row.user.name || row.user.email || "Partner";
       return {
         id: purchase.id,
+        orderId,
         planLabel: partnerPurchasePlanLabel(purchase),
         destinationLabel: partnerPurchaseDestinationLabel(purchase),
         dataAllowanceLabel: partnerPurchaseStoredLabel(purchase.dataAllowance),
         validityLabel: partnerPurchaseStoredLabel(purchase.validity),
-        amountLabel: formatUsdCents(purchase.partnerChargeCents),
+        amountLabel,
         currencyLabel: (purchase.currency || "USD").trim() || "USD",
         fundingLabel: partnerFundingSourceLabel(purchase.fundingSource),
         status: purchase.status,
@@ -951,6 +975,20 @@ export async function getPartnerDetail(
           purchase.status
         )
           ? partnerPurchaseReconciliationHref(purchase.id)
+          : null,
+        instantRefund: orderId
+          ? buildInstantOrderRefundButtonProps({
+              orderId,
+              amountLabel,
+              partyLabel,
+              fundingSource: purchase.fundingSource,
+              paymentMethodDisplay: "WALLET",
+              alreadyRefunded: eligibility.alreadyRefunded,
+              refundEligible: eligibility.refundEligible,
+              ineligibleReason: eligibility.ineligibleReason,
+              partnerPurchaseId: purchase.id,
+              compact: true,
+            })
           : null,
       };
     }),

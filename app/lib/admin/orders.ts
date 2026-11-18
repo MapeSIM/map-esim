@@ -53,6 +53,11 @@ import {
 } from "@/app/lib/orders/customerOrders";
 import { normalizeOfferId } from "@/app/lib/vesim/server";
 import { resolveAdminOrderPaymentMethodDisplay } from "@/app/lib/admin/orderPaymentMethodShared";
+import {
+  buildInstantOrderRefundButtonProps,
+  evaluateInstantRefundEligibility,
+} from "@/app/lib/admin/instantOrderRefund";
+import type { InstantOrderRefundButtonProps } from "@/app/lib/admin/instantOrderRefundShared";
 
 export type AdminOrderListRow = {
   id: string;
@@ -76,6 +81,8 @@ export type AdminOrderListRow = {
   displayStatusLabel: string;
   lifecycleLabel: string | null;
   remainingDataLabel: string | null;
+  /** Instant refund control props for Actions column. */
+  instantRefund: InstantOrderRefundButtonProps;
 };
 
 export type AdminOrdersPageResult = {
@@ -149,6 +156,8 @@ export type AdminOrderDetail = {
   paymentMethod: string | null;
   senderName: string | null;
   paymentProofUrl: string | null;
+  /** Instant refund control props for order header actions. */
+  instantRefund: InstantOrderRefundButtonProps;
 };
 
 function fundingSourceLabel(
@@ -357,15 +366,44 @@ export async function getAdminOrdersPage(
       providerOrderId: true,
       userId: true,
       fundingSource: true,
+      paymentMethod: true,
+      senderName: true,
+      paymentProofUrl: true,
+      displayAmount: true,
       iccidLast4: true,
+      user: { select: { email: true, name: true } },
       walletEsimPurchase: {
-        select: { idempotencyKey: true, status: true },
+        select: {
+          idempotencyKey: true,
+          status: true,
+          priceCents: true,
+          refundTransactionId: true,
+        },
       },
       partnerEsimPurchase: {
-        select: { idempotencyKey: true, status: true, fundingSource: true },
+        select: {
+          id: true,
+          idempotencyKey: true,
+          status: true,
+          fundingSource: true,
+          partnerChargeCents: true,
+          debitTransactionId: true,
+          refundTransactionId: true,
+          partner: {
+            select: { user: { select: { name: true, email: true } } },
+          },
+        },
       },
       adminPackageAssignment: {
         select: { status: true },
+      },
+      whatsAppCheckoutOrder: {
+        select: {
+          id: true,
+          paymentMethod: true,
+          senderName: true,
+          paymentProofUrl: true,
+        },
       },
       refundRequests: {
         where: { status: RefundRequestStatus.COMPLETED },
@@ -395,7 +433,11 @@ export async function getAdminOrdersPage(
       row.refundRequests.length > 0 ||
       row.partnerRefundRequests.length > 0 ||
       row.partnerEsimPurchase?.status ===
-        PartnerEsimPurchaseStatus.FAILED_REFUNDED;
+        PartnerEsimPurchaseStatus.FAILED_REFUNDED ||
+      row.walletEsimPurchase?.status ===
+        WalletEsimPurchaseStatus.FAILED_REFUNDED ||
+      Boolean((row.walletEsimPurchase?.refundTransactionId ?? "").trim()) ||
+      Boolean((row.partnerEsimPurchase?.refundTransactionId ?? "").trim());
     const displayStatusBadge = resolveCustomerEsimStatusBadge({
       orderStatus: row.status,
       walletPurchaseStatus: row.walletEsimPurchase?.status,
@@ -408,23 +450,56 @@ export async function getAdminOrdersPage(
       providerRemainingDataGb: row.providerRemainingDataGb,
     });
     const iccid = iccidByOrderId.get(row.id) ?? null;
+    const fundingSource = resolveAdminOrderFundingSource(
+      row.fundingSource,
+      row.partnerEsimPurchase?.fundingSource
+    );
+    const amountLabel = formatOrderAmount(
+      row.providerAmount,
+      row.providerCurrency
+    );
+    const paymentMethodDisplay = resolveAdminOrderPaymentMethodDisplay({
+      paymentMethod: row.paymentMethod,
+      fundingSource: row.fundingSource,
+      providerOrderId: row.providerOrderId,
+      senderName: row.senderName,
+      paymentProofUrl: row.paymentProofUrl,
+      whatsappPaymentMethod: row.whatsAppCheckoutOrder?.paymentMethod,
+      whatsappSenderName: row.whatsAppCheckoutOrder?.senderName,
+      whatsappPaymentProofUrl: row.whatsAppCheckoutOrder?.paymentProofUrl,
+      hasWhatsappCheckoutLink: Boolean(row.whatsAppCheckoutOrder?.id),
+      hasAdminPackageAssignment: Boolean(row.adminPackageAssignment),
+    });
+    const eligibility = evaluateInstantRefundEligibility({
+      orderStatus: row.status,
+      hasLinkedCustomer: Boolean(row.userId),
+      hasCompletedRefund,
+      walletPurchaseStatus: row.walletEsimPurchase?.status,
+      partnerPurchaseStatus: row.partnerEsimPurchase?.status,
+      partnerFundingSource: row.partnerEsimPurchase?.fundingSource,
+      partnerDebitTransactionId: row.partnerEsimPurchase?.debitTransactionId,
+      partnerChargeCents: row.partnerEsimPurchase?.partnerChargeCents,
+      refundAmountCents: row.walletEsimPurchase?.priceCents ?? null,
+    });
+    const partyLabel = row.partnerEsimPurchase
+      ? row.partnerEsimPurchase.partner.user.name ||
+        row.partnerEsimPurchase.partner.user.email ||
+        "Partner"
+      : row.user?.name ||
+        row.user?.email ||
+        (row.userId ? "Linked customer" : "Guest order");
     return {
       id: row.id,
       createdAtLabel: formatCreatedAt(row.createdAt),
       destination: displayOrUnavailable(row.destination),
       planPackage: planPackageLabel(row.planName, row.dataAllowance),
       localStatus: displayOrUnavailable(row.status),
-      amountLabel: formatOrderAmount(row.providerAmount, row.providerCurrency),
+      amountLabel,
       providerRefMasked: maskProviderOrderRef(row.providerOrderId),
       iccidMasked: iccid ?? iccidUnavailableLabel(row.status),
       iccid,
       associationLabel: row.userId ? "Linked customer" : "Guest order",
-      fundingLabel: fundingSourceLabel(
-        resolveAdminOrderFundingSource(
-          row.fundingSource,
-          row.partnerEsimPurchase?.fundingSource
-        )
-      ),
+      fundingLabel: fundingSourceLabel(fundingSource),
       isAddDataPurchase: addDataPurchase.isAddDataPurchase,
       addDataSourceOrderId: addDataPurchase.addDataSourceOrderId,
       displayStatusBadge,
@@ -434,6 +509,18 @@ export async function getAdminOrdersPage(
         ? null
         : lifecycle.lifecycleLabel,
       remainingDataLabel: formatLifecycleGb(row.providerRemainingDataGb),
+      instantRefund: buildInstantOrderRefundButtonProps({
+        orderId: row.id,
+        amountLabel,
+        partyLabel,
+        fundingSource,
+        paymentMethodDisplay,
+        alreadyRefunded: eligibility.alreadyRefunded,
+        refundEligible: eligibility.refundEligible,
+        ineligibleReason: eligibility.ineligibleReason,
+        partnerPurchaseId: row.partnerEsimPurchase?.id ?? null,
+        compact: true,
+      }),
     };
   });
 
@@ -495,6 +582,8 @@ export async function getAdminOrderDetail(
           offerId: true,
           destinationCode: true,
           idempotencyKey: true,
+          priceCents: true,
+          refundTransactionId: true,
           paymentAttempts: {
             where: {
               gatewayProvider: { not: null },
@@ -506,9 +595,16 @@ export async function getAdminOrderDetail(
       },
       partnerEsimPurchase: {
         select: {
+          id: true,
           idempotencyKey: true,
           status: true,
           fundingSource: true,
+          partnerChargeCents: true,
+          debitTransactionId: true,
+          refundTransactionId: true,
+          partner: {
+            select: { user: { select: { name: true, email: true } } },
+          },
         },
       },
       adminPackageAssignment: {
@@ -587,7 +683,10 @@ export async function getAdminOrderDetail(
     row.partnerRefundRequests.length > 0 ||
     row.partnerEsimPurchase?.status ===
       PartnerEsimPurchaseStatus.FAILED_REFUNDED ||
-    row.walletEsimPurchase?.status === WalletEsimPurchaseStatus.FAILED_REFUNDED;
+    row.walletEsimPurchase?.status ===
+      WalletEsimPurchaseStatus.FAILED_REFUNDED ||
+    Boolean((row.walletEsimPurchase?.refundTransactionId ?? "").trim()) ||
+    Boolean((row.partnerEsimPurchase?.refundTransactionId ?? "").trim());
   const statusBadge = resolveCustomerEsimStatusBadge({
     orderStatus: row.status,
     walletPurchaseStatus: row.walletEsimPurchase?.status,
@@ -633,6 +732,50 @@ export async function getAdminOrderDetail(
     catalog,
   });
 
+  const wa =
+    row.whatsAppCheckoutOrder ??
+    row.adminPackageAssignment?.whatsAppCheckoutOrder ??
+    null;
+  const fundingSource = resolveAdminOrderFundingSource(
+    row.fundingSource,
+    row.partnerEsimPurchase?.fundingSource
+  );
+  const amountLabel = formatOrderAmount(
+    row.providerAmount,
+    row.providerCurrency
+  );
+  const paymentMethod = resolveAdminOrderPaymentMethodDisplay({
+    paymentMethod: row.paymentMethod,
+    fundingSource: row.fundingSource,
+    providerOrderId: row.providerOrderId,
+    senderName: row.senderName,
+    paymentProofUrl: row.paymentProofUrl,
+    whatsappPaymentMethod: wa?.paymentMethod,
+    whatsappSenderName: wa?.senderName,
+    whatsappPaymentProofUrl: wa?.paymentProofUrl,
+    hasWhatsappCheckoutLink: Boolean(wa?.id),
+    hasAdminPackageAssignment: Boolean(row.adminPackageAssignment),
+    hasGatewayPaymentAttempt: Boolean(
+      row.walletEsimPurchase?.paymentAttempts?.length
+    ),
+  });
+  const eligibility = evaluateInstantRefundEligibility({
+    orderStatus: row.status,
+    hasLinkedCustomer: Boolean(row.userId),
+    hasCompletedRefund,
+    walletPurchaseStatus: row.walletEsimPurchase?.status,
+    partnerPurchaseStatus: row.partnerEsimPurchase?.status,
+    partnerFundingSource: row.partnerEsimPurchase?.fundingSource,
+    partnerDebitTransactionId: row.partnerEsimPurchase?.debitTransactionId,
+    partnerChargeCents: row.partnerEsimPurchase?.partnerChargeCents,
+    refundAmountCents: row.walletEsimPurchase?.priceCents ?? null,
+  });
+  const partyLabel = row.partnerEsimPurchase
+    ? row.partnerEsimPurchase.partner.user.name ||
+      row.partnerEsimPurchase.partner.user.email ||
+      "Partner"
+    : displayOrUnavailable(row.customerEmail);
+
   return {
     id: row.id,
     createdAtLabel: formatCreatedAt(row.createdAt),
@@ -641,16 +784,11 @@ export async function getAdminOrderDetail(
     planPackage: planPackageLabel(row.planName, row.dataAllowance),
     validity: displayOrUnavailable(row.validity),
     localStatus: displayOrUnavailable(row.status),
-    amountLabel: formatOrderAmount(row.providerAmount, row.providerCurrency),
+    amountLabel,
     providerRefMasked: maskProviderOrderRef(row.providerOrderId),
     offerId: displayOrUnavailable(row.offerId),
     associationLabel: row.userId ? "Linked customer" : "Guest order",
-    fundingLabel: fundingSourceLabel(
-      resolveAdminOrderFundingSource(
-        row.fundingSource,
-        row.partnerEsimPurchase?.fundingSource
-      )
-    ),
+    fundingLabel: fundingSourceLabel(fundingSource),
     customerEmail: displayOrUnavailable(row.customerEmail),
     accountStatusLabel,
     claimStatusLabel: displayOrUnavailable(row.claimStatus),
@@ -676,49 +814,25 @@ export async function getAdminOrderDetail(
     displayStatusLabel: customerEsimStatusLabel(statusBadge),
     lifecycle,
     remainingDataLabel: formatLifecycleGb(row.providerRemainingDataGb),
-    paymentMethod: (() => {
-      const wa =
-        row.whatsAppCheckoutOrder ??
-        row.adminPackageAssignment?.whatsAppCheckoutOrder ??
-        null;
-      return resolveAdminOrderPaymentMethodDisplay({
-        paymentMethod: row.paymentMethod,
-        fundingSource: row.fundingSource,
-        providerOrderId: row.providerOrderId,
-        senderName: row.senderName,
-        paymentProofUrl: row.paymentProofUrl,
-        whatsappPaymentMethod: wa?.paymentMethod,
-        whatsappSenderName: wa?.senderName,
-        whatsappPaymentProofUrl: wa?.paymentProofUrl,
-        hasWhatsappCheckoutLink: Boolean(wa?.id),
-        hasAdminPackageAssignment: Boolean(row.adminPackageAssignment),
-        hasGatewayPaymentAttempt: Boolean(
-          row.walletEsimPurchase?.paymentAttempts?.length
-        ),
-      });
-    })(),
-    senderName: (() => {
-      const wa =
-        row.whatsAppCheckoutOrder ??
-        row.adminPackageAssignment?.whatsAppCheckoutOrder ??
-        null;
-      return (
-        (row.senderName ?? "").trim() ||
-        (wa?.senderName ?? "").trim() ||
-        null
-      );
-    })(),
-    paymentProofUrl: (() => {
-      const wa =
-        row.whatsAppCheckoutOrder ??
-        row.adminPackageAssignment?.whatsAppCheckoutOrder ??
-        null;
-      return (
-        (row.paymentProofUrl ?? "").trim() ||
-        (wa?.paymentProofUrl ?? "").trim() ||
-        null
-      );
-    })(),
+    paymentMethod,
+    senderName:
+      (row.senderName ?? "").trim() || (wa?.senderName ?? "").trim() || null,
+    paymentProofUrl:
+      (row.paymentProofUrl ?? "").trim() ||
+      (wa?.paymentProofUrl ?? "").trim() ||
+      null,
+    instantRefund: buildInstantOrderRefundButtonProps({
+      orderId: row.id,
+      amountLabel,
+      partyLabel,
+      fundingSource,
+      paymentMethodDisplay: paymentMethod,
+      alreadyRefunded: eligibility.alreadyRefunded,
+      refundEligible: eligibility.refundEligible,
+      ineligibleReason: eligibility.ineligibleReason,
+      partnerPurchaseId: row.partnerEsimPurchase?.id ?? null,
+      compact: false,
+    }),
   };
 }
 
@@ -735,6 +849,8 @@ export type AdminCustomerRecentOrderRow = {
   purchasedAtLabel: string;
   /** Full plaintext ICCID when stored; otherwise pending/not-provided label. */
   iccidMasked: string;
+  /** Instant refund control props for customer order cards. */
+  instantRefund: InstantOrderRefundButtonProps;
 };
 
 /**
@@ -755,7 +871,7 @@ export async function getAdminCustomerRecentOrders(
 
   const customer = await prisma.user.findFirst({
     where: { id, role: Role.CUSTOMER },
-    select: { id: true },
+    select: { id: true, email: true, name: true },
   });
   if (!customer) return [];
 
@@ -776,17 +892,70 @@ export async function getAdminCustomerRecentOrders(
       providerAmount: true,
       providerCurrency: true,
       fundingSource: true,
-      partnerEsimPurchase: { select: { fundingSource: true } },
+      paymentMethod: true,
+      walletEsimPurchase: {
+        select: {
+          status: true,
+          priceCents: true,
+          refundTransactionId: true,
+        },
+      },
+      partnerEsimPurchase: {
+        select: {
+          id: true,
+          status: true,
+          fundingSource: true,
+          partnerChargeCents: true,
+          debitTransactionId: true,
+          refundTransactionId: true,
+        },
+      },
+      refundRequests: {
+        where: { status: RefundRequestStatus.COMPLETED },
+        select: { id: true },
+        take: 1,
+      },
+      partnerRefundRequests: {
+        where: { status: RefundRequestStatus.COMPLETED },
+        select: { id: true },
+        take: 1,
+      },
     },
   });
 
   const iccidByOrderId = await loadOrderIccidPlaintextMap(rows.map((r) => r.id));
+  const partyLabel = customer.name || customer.email || "Customer";
 
   return rows.map((row) => {
     const amount = row.displayAmount ?? row.providerAmount;
     const currency = row.displayCurrency ?? row.providerCurrency;
     const currencyCode = (currency ?? "").trim().toUpperCase() || "USD";
     const iccid = iccidByOrderId.get(row.id) ?? null;
+    const amountLabel = formatOrderAmount(amount, currencyCode);
+    const fundingSource = resolveAdminOrderFundingSource(
+      row.fundingSource,
+      row.partnerEsimPurchase?.fundingSource
+    );
+    const hasCompletedRefund =
+      row.refundRequests.length > 0 ||
+      row.partnerRefundRequests.length > 0 ||
+      row.walletEsimPurchase?.status ===
+        WalletEsimPurchaseStatus.FAILED_REFUNDED ||
+      row.partnerEsimPurchase?.status ===
+        PartnerEsimPurchaseStatus.FAILED_REFUNDED ||
+      Boolean((row.walletEsimPurchase?.refundTransactionId ?? "").trim()) ||
+      Boolean((row.partnerEsimPurchase?.refundTransactionId ?? "").trim());
+    const eligibility = evaluateInstantRefundEligibility({
+      orderStatus: row.status,
+      hasLinkedCustomer: true,
+      hasCompletedRefund,
+      walletPurchaseStatus: row.walletEsimPurchase?.status,
+      partnerPurchaseStatus: row.partnerEsimPurchase?.status,
+      partnerFundingSource: row.partnerEsimPurchase?.fundingSource,
+      partnerDebitTransactionId: row.partnerEsimPurchase?.debitTransactionId,
+      partnerChargeCents: row.partnerEsimPurchase?.partnerChargeCents,
+      refundAmountCents: row.walletEsimPurchase?.priceCents ?? null,
+    });
     return {
       id: row.id,
       destination: displayOrUnavailable(row.destination),
@@ -794,16 +963,23 @@ export async function getAdminCustomerRecentOrders(
       dataAllowance: displayOrUnavailable(row.dataAllowance),
       validity: displayOrUnavailable(row.validity),
       localStatus: displayOrUnavailable(row.status),
-      amountLabel: formatOrderAmount(amount, currencyCode),
+      amountLabel,
       currencyLabel: currencyCode,
-      fundingLabel: fundingSourceLabel(
-        resolveAdminOrderFundingSource(
-          row.fundingSource,
-          row.partnerEsimPurchase?.fundingSource
-        )
-      ),
+      fundingLabel: fundingSourceLabel(fundingSource),
       purchasedAtLabel: formatCreatedAt(row.createdAt),
       iccidMasked: iccid ?? iccidUnavailableLabel(row.status),
+      instantRefund: buildInstantOrderRefundButtonProps({
+        orderId: row.id,
+        amountLabel,
+        partyLabel,
+        fundingSource,
+        paymentMethodDisplay: row.paymentMethod,
+        alreadyRefunded: eligibility.alreadyRefunded,
+        refundEligible: eligibility.refundEligible,
+        ineligibleReason: eligibility.ineligibleReason,
+        partnerPurchaseId: row.partnerEsimPurchase?.id ?? null,
+        compact: true,
+      }),
     };
   });
 }

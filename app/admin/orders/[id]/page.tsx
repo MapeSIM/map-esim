@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AdminAddDataForm from "@/app/components/admin/AdminAddDataForm";
 import AdminOrderInstallEmailResendButton from "@/app/components/admin/AdminOrderInstallEmailResendButton";
+import InstantOrderRefundButton from "@/app/components/admin/InstantOrderRefundButton";
 import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBadge";
 import { EsimLifecycleBadges } from "@/app/components/orders/EsimLifecycleBadges";
 import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
@@ -54,6 +55,10 @@ export default async function AdminOrderDetailPage({
   const canResendInstallEmail = hasAdminPermission(
     access?.permissions ?? [],
     ["SUPPORT_EMAILS", "ORDERS_MANAGE", "ESIM_FULFILLMENT", "INSTALL_ISSUES"]
+  );
+  const canRefund = hasAdminPermission(
+    access?.permissions ?? [],
+    "REFUNDS_MANAGE"
   );
   const { id } = await params;
 
@@ -126,6 +131,20 @@ export default async function AdminOrderDetailPage({
             This order is refunded. Installation QR and live usage are blocked.
           </p>
         )}
+        {canRefund ? (
+          <div className="rounded-2xl border border-[var(--danger-border)] bg-[var(--danger-bg)]/40 px-4 py-4 sm:px-5">
+            <p className="text-sm font-semibold text-[var(--heading)]">
+              Instant refund
+            </p>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Credits MAP Wallet or Partner wallet for this order. Gateway
+              chargebacks remain exceptional and manual.
+            </p>
+            <div className="mt-3">
+              <InstantOrderRefundButton {...detail.instantRefund} />
+            </div>
+          </div>
+        ) : null}
         {canResendInstallEmail && detail.installEmailResendEligible ? (
           <div className="rounded-2xl border border-[var(--accent-strong)]/35 bg-[var(--accent-strong)]/10 px-4 py-4 sm:px-5">
             <p className="text-sm font-semibold text-[var(--heading)]">
