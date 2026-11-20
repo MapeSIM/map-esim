@@ -140,20 +140,16 @@ function main() {
   assert.match(catalogRead, /partnerPriceLabel/);
   assert.match(catalogRead, /partnerPriceCents/);
   assert.match(catalogRead, /fundingDisplay/);
-  assert.doesNotMatch(catalogRead, /retailPriceLabel:/);
+  assert.match(catalogRead, /retailPriceLabel:/);
   assert.match(buyPage, /listPartnerCatalogOffers|requireRole\(["']PARTNER["']\)/);
   assert.match(buyPage, /Partner price|your Partner price|Issue eSIM|Confirm purchase/i);
   assert.match(buyPage, /redirect\(\s*["']\/countries["']\s*\)/);
-  assert.doesNotMatch(
-    buyPage,
-    /Retail price is shown|Partner discount is applied server-side/
-  );
   assert.match(catalogBuy, /partnerPriceLabel|PartnerOfferPaymentForm/);
   assert.match(catalogBuy, /Browse catalog again|\/partner\/catalog/);
-  assert.doesNotMatch(catalogBuy, /retailPriceLabel/);
-  assert.doesNotMatch(
+  assert.match(catalogBuy, /retailPriceLabel/);
+  assert.match(
     catalogBuy,
-    /Catalog prices match MAP eSIM retail|Your Partner rate is applied|discountPercent|%\s*off/i
+    /partner discount at checkout|discount applied at checkout/i
   );
   assert.match(storefrontBuy, /partnerPriceLabel/);
   assert.match(storefrontBuy, /PartnerOfferPaymentForm/);

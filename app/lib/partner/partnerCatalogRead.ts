@@ -45,13 +45,19 @@ export type PartnerCatalogFundingDisplay = {
   gatewayAmountCents: number;
 };
 
-/** Partner-facing offer card. No discount / provider / raw charge field names. */
+/**
+ * Partner-facing offer card.
+ * Never includes raw discountBps, partnerChargeCents field name, or provider cost.
+ * retailPriceLabel is portal display only (discount still applied server-side at buy).
+ */
 export type PartnerCatalogOffer = {
   offerId: string;
   name: string;
   dataLabel: string;
   validityLabel: string;
-  /** Final Partner price after admin discount — display only. */
+  /** MAP eSIM retail list price — shown on catalog with discount-at-checkout note. */
+  retailPriceLabel: string;
+  /** Final Partner price after admin discount — charged at checkout. */
   partnerPriceLabel: string;
   /**
    * Final Partner payable (integer USD cents) for balance sufficiency UI.
@@ -136,6 +142,7 @@ function buildPartnerCatalogOfferDisplay(input: {
     name: input.name,
     dataLabel: input.dataLabel,
     validityLabel: input.validityLabel,
+    retailPriceLabel: `${formatUsdCents(input.retailPriceCents)} USD`,
     partnerPriceLabel: `${formatUsdCents(partnerChargeCents)} USD`,
     partnerPriceCents: partnerChargeCents,
     destinationLabel: input.destinationLabel,
@@ -247,7 +254,6 @@ export function partnerCatalogOfferForbiddenKeys(): readonly string[] {
     "providerPriceUSD",
     "providerCostLabel",
     "discountPercent",
-    "retailPriceLabel",
     "retailPriceCents",
   ] as const;
 }

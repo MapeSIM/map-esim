@@ -1,26 +1,26 @@
-/** Lightweight catalog skeleton — never blocks forever; page always settles. */
+/** Fast destination/catalog skeleton — page settles without hanging. */
 export default function PartnerCatalogLoading() {
   return (
-    <div className="animate-pulse space-y-6" aria-busy="true" aria-label="Loading catalog">
-      <div className="flex justify-between gap-3">
+    <div
+      className="animate-pulse space-y-6"
+      aria-busy="true"
+      aria-label="Loading catalog"
+    >
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-2">
-          <div className="h-7 w-40 rounded-lg bg-white/[0.06]" />
+          <div className="h-7 w-36 rounded-lg bg-white/[0.06]" />
           <div className="h-4 w-72 max-w-full rounded bg-white/[0.04]" />
         </div>
-        <div className="h-11 w-48 rounded-xl bg-emerald-500/20" />
+        <div className="h-11 w-52 rounded-xl bg-emerald-500/20" />
       </div>
-      <div className="h-28 rounded-2xl border border-white/[0.06] bg-[#0D1526]" />
-      <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0D1526]">
-        {Array.from({ length: 8 }).map((_, i) => (
+      <div className="h-20 rounded-2xl border border-white/[0.06] bg-[#0D1526]" />
+      <div className="h-11 rounded-xl bg-white/[0.04]" />
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="flex gap-4 border-t border-white/[0.04] px-4 py-4 first:border-t-0"
-          >
-            <div className="h-4 flex-1 rounded bg-white/[0.05]" />
-            <div className="h-4 w-24 rounded bg-white/[0.04]" />
-            <div className="h-4 w-16 rounded bg-white/[0.04]" />
-            <div className="h-4 w-20 rounded bg-emerald-500/10" />
-          </div>
+            className="h-[72px] rounded-2xl border border-white/[0.06] bg-[#0D1526]"
+          />
         ))}
       </div>
     </div>
