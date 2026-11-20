@@ -17,6 +17,15 @@ function isActive(pathname: string, href: string, exact?: boolean): boolean {
   if (exact || href === "/partner") {
     return pathname === href;
   }
+  // Catalog lives at /partner/countries; legacy /partner/catalog* still counts.
+  if (href === "/partner/countries") {
+    return (
+      pathname === href ||
+      pathname.startsWith(`${href}/`) ||
+      pathname === "/partner/catalog" ||
+      pathname.startsWith("/partner/catalog/")
+    );
+  }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

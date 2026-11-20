@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/app/lib/auth/session";
 import { prisma } from "@/app/lib/db";
-import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
+import {
+  getPartnerDiscountPercentLabel,
+  requireActivePartnerActor,
+} from "@/app/lib/partner/partnerAccess";
 import { listPartnerCatalogOffers } from "@/app/lib/partner/partnerCatalogRead";
 import { isPartnerEsimSplitPaymentEnabled } from "@/app/lib/partner/partnerEsimSplitPaymentPolicy";
 import PartnerStorefrontBuy from "@/app/components/partner/PartnerStorefrontBuy";
@@ -18,7 +21,7 @@ export const maxDuration = 60;
 
 /**
  * Deep-link confirm for a single Partner-priced offer.
- * Browse stays on public /countries; missing params return there.
+ * Browse stays on /partner/countries; missing params return there.
  */
 export default async function PartnerStorefrontBuyPage({
   searchParams,
@@ -32,7 +35,7 @@ export default async function PartnerStorefrontBuyPage({
   const country = sanitizeCountryHint(query.country);
 
   if (!offerId || !country) {
-    redirect("/countries");
+    redirect("/partner/countries");
   }
 
   if (!actor) {
@@ -49,17 +52,19 @@ export default async function PartnerStorefrontBuyPage({
   }
 
   const splitPaymentEnabled = isPartnerEsimSplitPaymentEnabled();
-  const [profile, wallet, simpaisaOperators] = await Promise.all([
-    prisma.partnerProfile.findUnique({
-      where: { id: actor.partnerId },
-      select: { discountBps: true },
-    }),
-    prisma.partnerWalletAccount.findUnique({
-      where: { partnerId: actor.partnerId },
-      select: { balanceCents: true },
-    }),
-    getSimpaisaWalletOperatorConfig(),
-  ]);
+  const [profile, wallet, simpaisaOperators, discountPercentLabel] =
+    await Promise.all([
+      prisma.partnerProfile.findUnique({
+        where: { id: actor.partnerId },
+        select: { discountBps: true },
+      }),
+      prisma.partnerWalletAccount.findUnique({
+        where: { partnerId: actor.partnerId },
+        select: { balanceCents: true },
+      }),
+      getSimpaisaWalletOperatorConfig(),
+      getPartnerDiscountPercentLabel(user.id),
+    ]);
   const balanceCents = wallet?.balanceCents ?? 0;
   const offers = await listPartnerCatalogOffers(country, {
     discountBps: profile?.discountBps ?? 0,
@@ -71,8 +76,8 @@ export default async function PartnerStorefrontBuyPage({
   if (!offer) {
     redirect(
       country
-        ? `/countries?q=${encodeURIComponent(country)}`
-        : "/countries"
+        ? `/partner/countries?q=${encodeURIComponent(country)}`
+        : "/partner/countries"
     );
   }
 
@@ -81,7 +86,8 @@ export default async function PartnerStorefrontBuyPage({
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Confirm purchase</h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Review your Partner price and wallet balance, then confirm.
+          Review retail price, your partner discount, and the final amount due,
+          then confirm with Partner balance or online payment.
         </p>
       </header>
       <PartnerStorefrontBuy
@@ -89,6 +95,7 @@ export default async function PartnerStorefrontBuyPage({
         destinationCode={country}
         balanceLabel={formatUsdCents(balanceCents)}
         balanceCents={balanceCents}
+        discountPercentLabel={discountPercentLabel}
         splitPaymentEnabled={splitPaymentEnabled}
         paymentGatewayConfigured={isPaymentGatewayConfigured()}
         enabledSimpaisaOperatorIds={simpaisaOperators.enabledOperatorIds}

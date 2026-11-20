@@ -59,6 +59,8 @@ export type PlansListingClientProps = {
   defaultGrid: ReactNode;
   /** Server gate: when true, signed-out Buy Now goes to /checkout (not /account). */
   guestCheckoutEnabled?: boolean;
+  /** Partner portal: always route Buy Now to `/partner/buy`. */
+  forcePartnerCheckout?: boolean;
 };
 
 export default function PlansListingClient({
@@ -69,6 +71,7 @@ export default function PlansListingClient({
   countryNames = {},
   defaultGrid,
   guestCheckoutEnabled = false,
+  forcePartnerCheckout = false,
 }: PlansListingClientProps) {
   const [planType, setPlanType] = useState<PlanTypeFilter>(DEFAULT_PLAN_TYPE);
   const [category, setCategory] = useState<CategoryFilter>(DEFAULT_CATEGORY);
@@ -79,8 +82,11 @@ export default function PlansListingClient({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState<VesimOffer | null>(null);
   const [, startFilterTransition] = useTransition();
-  const { signedIn, isPartner: partnerCheckout } = useShellAuth();
-  const purchaseTrustLine = planPurchaseTrustLine(signedIn);
+  const { signedIn, isPartner: shellPartner } = useShellAuth();
+  const partnerCheckout = forcePartnerCheckout || shellPartner;
+  const purchaseTrustLine = forcePartnerCheckout
+    ? "Partner discount is applied at checkout."
+    : planPurchaseTrustLine(signedIn);
 
   const resolveCheckoutHref = partnerCheckout
     ? buildPartnerCheckoutHref

@@ -530,9 +530,11 @@ export function destinationRouteId(
 }
 
 export function destinationPath(
-  destination: Pick<VesimDestination, "code" | "name" | "slug" | "kind">
+  destination: Pick<VesimDestination, "code" | "name" | "slug" | "kind">,
+  basePath: string = "/countries"
 ): string {
-  return `/countries/${destinationRouteId(destination)}`;
+  const root = (basePath || "/countries").trim().replace(/\/$/, "") || "/countries";
+  return `${root}/${destinationRouteId(destination)}`;
 }
 
 /**

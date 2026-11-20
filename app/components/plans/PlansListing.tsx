@@ -23,6 +23,13 @@ export type PlansListingProps = {
   countryNames?: Record<string, string>;
   relatedRegional?: VesimDestination | null;
   children?: ReactNode;
+  /** Public `/countries` or partner `/partner/countries`. */
+  listingBasePath?: string;
+  /**
+   * Force Buy Now → `/partner/buy` (partner portal shell has no NavbarShell
+   * session publisher, so ShellAuth may not mark isPartner).
+   */
+  forcePartnerCheckout?: boolean;
 };
 
 /**
@@ -38,8 +45,12 @@ export default async function PlansListing({
   countryNames = {},
   relatedRegional = null,
   children,
+  listingBasePath = "/countries",
+  forcePartnerCheckout = false,
 }: PlansListingProps) {
-  const guestCheckoutEnabled = await isGuestVesimCheckoutEnabled();
+  const guestCheckoutEnabled = forcePartnerCheckout
+    ? false
+    : await isGuestVesimCheckoutEnabled();
   const defaultModel = buildDefaultPlansListingModel(offers, destination);
   const displayName = destinationDisplayName(destination);
   const heading = `${displayName} eSIM Plans`;
@@ -52,7 +63,7 @@ export default async function PlansListing({
     Number.isFinite(destination.minPrice);
 
   const relatedRegionalHref = relatedRegional
-    ? destinationPath(relatedRegional)
+    ? destinationPath(relatedRegional, listingBasePath)
     : null;
   const relatedRegionalName = relatedRegional
     ? destinationDisplayName(relatedRegional)
@@ -86,7 +97,7 @@ export default async function PlansListing({
       <section className="theme-hero border-b border-[var(--border)]">
         {/* Extra mobile top padding keeps hero clear of the sticky navbar. */}
         <div className="mx-auto max-w-[1200px] px-4 pb-3 pt-6 sm:px-6 sm:py-8">
-          <PlansListingBackLink />
+          <PlansListingBackLink listingBasePath={listingBasePath} />
 
           <div className="flex items-start gap-3 sm:gap-4">
             <div
@@ -136,6 +147,7 @@ export default async function PlansListing({
         countryNames={countryNames}
         defaultGrid={defaultGrid}
         guestCheckoutEnabled={guestCheckoutEnabled}
+        forcePartnerCheckout={forcePartnerCheckout}
       />
 
       {relatedRegional && relatedRegionalHref && relatedRegionalName ? (

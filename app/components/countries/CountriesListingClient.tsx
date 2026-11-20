@@ -36,6 +36,8 @@ export type CountriesListingClientProps = {
   /** Slim cards only — full VesimDestination catalog stays on the server. */
   initialCards: DestinationCard[];
   initialSource: DestinationCatalogSource;
+  /** Public `/countries` or partner `/partner/countries`. */
+  basePath?: string;
   /**
    * RSC default Country A–Z grid (children slot, not a named client prop)
    * — shown until search/filter/catalog diverge.
@@ -46,6 +48,7 @@ export type CountriesListingClientProps = {
 function CountriesListingClientInner({
   initialCards,
   initialSource,
+  basePath = "/countries",
   children: defaultGrid,
 }: CountriesListingClientProps) {
   const router = useRouter();
@@ -221,6 +224,7 @@ function CountriesListingClientInner({
           updating={updating}
           alphabeticalGroups={alphabeticalGroups}
           gridItems={gridItems}
+          basePath={basePath}
         />
       )}
     </main>

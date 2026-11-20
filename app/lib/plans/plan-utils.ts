@@ -103,7 +103,7 @@ export function buildGuestPublicCheckoutHref(
 
 /**
  * Partner wallet buy — confirm page for a single Partner-priced offer.
- * Do not use /partner/catalog here: that route redirects to /countries (browse).
+ * Browse is /partner/countries (legacy /partner/catalog redirects there).
  */
 export function buildPartnerCheckoutHref(
   offer: VesimOffer,

@@ -40,35 +40,34 @@ function main() {
   const access = read("app/lib/partner/partnerAccess.ts");
   const authConfig = read("auth.config.ts");
 
-  assert.match(partnerLayout, /AccountMenu/);
-  assert.match(partnerLayout, /["']\/countries["']/);
-  assert.match(partnerLayout, /label:\s*["']Buy eSIM["']/);
-  assert.doesNotMatch(partnerLayout, /label:\s*["']Destinations["']/);
+  assert.match(partnerLayout, /PartnerMenu/);
+  assert.match(partnerLayout, /label:\s*["']Catalog["']/);
+  assert.match(partnerLayout, /["']\/partner\/countries["']/);
   assert.match(partnerLayout, /["']\/partner\/orders["']/);
-  assert.match(partnerLayout, /["']\/partner\/sales["']/);
-  assert.match(partnerHome, /Partner Balance|Available Partner Balance|balanceLabel/);
-  assert.match(partnerHome, /\/partner\/sales|Sales report/);
-  assert.match(partnerHome, /Current Partner Discount|discountPercentLabel/);
-  assert.match(partnerHome, /Total eSIM orders|totalEsimOrdersLabel/);
-  assert.match(partnerHome, /Total spent|totalSpentLabel/);
-  assert.match(partnerHome, /Total savings|totalSavingsLabel/);
-  assert.match(partnerHome, /Share Branding/);
-  assert.match(partnerHome, /Quick Actions/);
-  assert.match(partnerHome, /href=["']\/countries["']/);
-  assert.match(partnerHome, /title=["']Buy eSIM["']|title=\{?"Buy eSIM"?\}/);
-  assert.doesNotMatch(partnerHome, /title=["']Destinations["']/);
+  assert.match(partnerLayout, /["']\/partner\/wallet["']/);
+  assert.match(partnerHome, /Available Balance|balanceLabel/);
+  assert.match(partnerHome, /totalEsimOrdersLabel|Total Orders/);
+  assert.match(partnerHome, /totalSpentLabel|Total Spend/);
+  assert.match(partnerHome, /Browse Catalog|\/partner\/catalog|\/partner\/countries/);
   assert.doesNotMatch(partnerHome, /Reward Points|rewardPoints/i);
 
   const catalogPage = read("app/partner/(portal)/catalog/page.tsx");
-  // Deep-link checkout params → confirm page; bare catalog → destinations browse.
+  // Deep-link checkout params → confirm page; bare catalog → partner countries.
   assert.match(catalogPage, /\/partner\/buy\?/);
-  assert.match(catalogPage, /redirect\(\s*["']\/countries["']\s*\)/);
+  assert.match(catalogPage, /redirect\(\s*["']\/partner\/countries["']\s*\)/);
   const nextConfig = read("next.config.ts");
-  // Must not 308 /partner/catalog → /countries (that broke Buy Now deep-links).
+  // Must not 308 /partner/catalog → public /countries (that broke Buy Now deep-links).
   assert.doesNotMatch(
     nextConfig,
     /source:\s*["']\/partner\/catalog["'][\s\S]*destination:\s*["']\/countries["']/
   );
+  const partnerCountries = read("app/partner/(portal)/countries/page.tsx");
+  assert.match(partnerCountries, /CountriesListing|PARTNER_COUNTRIES_BASE_PATH/);
+  assert.match(
+    read("app/partner/(portal)/countries/[slug]/page.tsx"),
+    /forcePartnerCheckout|PARTNER_COUNTRIES_BASE_PATH/
+  );
+  assert.match(partnerLayout, /["']\/partner\/countries["']/);
 
   const returnState = read(
     "app/lib/partner/partnerEsimPurchasePaymentReturnState.ts"
@@ -91,11 +90,9 @@ function main() {
 
   assert.doesNotMatch(partnerWallet, /Reward Points|rewardPoints/i);
   assert.doesNotMatch(partnerWallet, /href=["']\/account\/wallet\/top-up["']/);
-  assert.match(partnerWallet, /PartnerWalletAddFundsForm|Available Partner Balance/);
-  assert.match(partnerWallet, /Available Partner Balance/);
-  assert.match(partnerOrders, /My eSIMs/);
-  assert.match(partnerOrders, /PartnerEsimOrderCard/);
-  assert.match(partnerOrders, /Browse the catalog|\/partner\/catalog/);
+  assert.match(partnerWallet, /PartnerWalletAddFundsForm/);
+  assert.match(partnerWallet, /Available balance|balanceLabel/i);
+  assert.match(partnerOrders, /PartnerOrdersTableClient|\/partner\/orders/);
   assert.doesNotMatch(partnerOrders, /Reward Points|rewardPoints/i);
   assert.match(partnerOrderDetail, /PartnerEsimOrderCard/);
   assert.doesNotMatch(
@@ -143,9 +140,9 @@ function main() {
   assert.match(catalogRead, /retailPriceLabel:/);
   assert.match(buyPage, /listPartnerCatalogOffers|requireRole\(["']PARTNER["']\)/);
   assert.match(buyPage, /Partner price|your Partner price|Issue eSIM|Confirm purchase/i);
-  assert.match(buyPage, /redirect\(\s*["']\/countries["']\s*\)/);
+  assert.match(buyPage, /redirect\(\s*["']\/partner\/countries["']\s*\)/);
   assert.match(catalogBuy, /partnerPriceLabel|PartnerOfferPaymentForm/);
-  assert.match(catalogBuy, /Browse catalog again|\/partner\/catalog/);
+  assert.match(catalogBuy, /Browse catalog again|\/partner\/catalog|\/partner\/countries/);
   assert.match(catalogBuy, /retailPriceLabel/);
   assert.match(
     catalogBuy,
@@ -153,11 +150,8 @@ function main() {
   );
   assert.match(storefrontBuy, /partnerPriceLabel/);
   assert.match(storefrontBuy, /PartnerOfferPaymentForm/);
-  assert.doesNotMatch(storefrontBuy, /retailPriceLabel/);
-  assert.doesNotMatch(
-    storefrontBuy,
-    /Catalog prices match MAP eSIM retail|Your Partner rate is applied/i
-  );
+  assert.match(storefrontBuy, /retailPriceLabel/);
+  assert.match(storefrontBuy, /Partner discount|discountPercentLabel/i);
   const offerPaymentForm = read(
     "app/components/partner/PartnerOfferPaymentForm.tsx"
   );

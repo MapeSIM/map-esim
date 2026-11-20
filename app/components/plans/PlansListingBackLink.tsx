@@ -4,12 +4,20 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { countriesListingHrefFromPlanParams } from "@/app/lib/vesim/countriesListingReturn";
+import {
+  countriesListingHrefFromPlanParams,
+  normalizeCountriesBasePath,
+} from "@/app/lib/vesim/countriesListingReturn";
 
-function PlansListingBackLinkInner() {
+function PlansListingBackLinkInner({
+  listingBasePath,
+}: {
+  listingBasePath: string;
+}) {
   const searchParams = useSearchParams();
-  const href = countriesListingHrefFromPlanParams((key) =>
-    searchParams.get(key)
+  const href = countriesListingHrefFromPlanParams(
+    (key) => searchParams.get(key),
+    listingBasePath
   );
 
   return (
@@ -27,13 +35,18 @@ function PlansListingBackLinkInner() {
   );
 }
 
-/** Keeps /countries return filter+q URLs without making the whole listing client. */
-export default function PlansListingBackLink() {
+/** Keeps destinations return filter+q URLs without making the whole listing client. */
+export default function PlansListingBackLink({
+  listingBasePath = "/countries",
+}: {
+  listingBasePath?: string;
+}) {
+  const base = normalizeCountriesBasePath(listingBasePath);
   return (
     <Suspense
       fallback={
         <Link
-          href="/countries"
+          href={base}
           className="
             mb-3 inline-flex max-w-full items-center gap-2 text-sm font-medium
             text-[var(--text-muted)] transition hover:text-[var(--accent-strong)]
@@ -45,7 +58,7 @@ export default function PlansListingBackLink() {
         </Link>
       }
     >
-      <PlansListingBackLinkInner />
+      <PlansListingBackLinkInner listingBasePath={base} />
     </Suspense>
   );
 }

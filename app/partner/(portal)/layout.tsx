@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 
 const partnerLinks: PartnerNavLink[] = [
   { href: "/partner", label: "Home", exact: true },
-  { href: "/partner/catalog", label: "Catalog" },
+  { href: "/partner/countries", label: "Catalog" },
   { href: "/partner/orders", label: "Orders" },
   { href: "/partner/wallet", label: "Wallet" },
   { href: "/partner/docs", label: "API Docs" },

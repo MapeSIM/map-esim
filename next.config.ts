@@ -44,7 +44,7 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
       // /partner/catalog is handled in-app: offerId+country → /partner/buy,
-      // otherwise → /countries. Do not 308 here — that strips checkout deep-links.
+      // otherwise → /partner/countries. Do not 308 here — that strips checkout deep-links.
     ];
   },
 };

@@ -46,6 +46,8 @@ type CountriesDestinationGridProps = {
   updating?: boolean;
   alphabeticalGroups: LetterGroup[];
   gridItems: DestinationCard[];
+  /** Public `/countries` or partner `/partner/countries`. */
+  basePath?: string;
 };
 
 /**
@@ -60,6 +62,7 @@ export default function CountriesDestinationGrid({
   updating = false,
   alphabeticalGroups,
   gridItems,
+  basePath = "/countries",
 }: CountriesDestinationGridProps) {
   const emptyMessage = countryListingEmptyMessage(filter);
 
@@ -67,6 +70,7 @@ export default function CountriesDestinationGrid({
     return buildDestinationPlansHref(destinationId, {
       filter,
       q: search,
+      basePath,
     });
   }
 

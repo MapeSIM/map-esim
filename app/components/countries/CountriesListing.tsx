@@ -14,6 +14,8 @@ import CountriesListingClient from "@/app/components/countries/CountriesListingC
 export type CountriesListingProps = {
   initialDestinations: VesimDestination[];
   initialSource: DestinationCatalogSource;
+  /** Public `/countries` or partner `/partner/countries`. */
+  basePath?: string;
 };
 
 /**
@@ -24,6 +26,7 @@ export type CountriesListingProps = {
 export default function CountriesListing({
   initialDestinations,
   initialSource,
+  basePath = "/countries",
 }: CountriesListingProps) {
   const cards: DestinationCard[] = initialDestinations.map(toDestinationCard);
   const defaultFiltered = filterDestinationCards(cards, "Country", "");
@@ -34,6 +37,7 @@ export default function CountriesListing({
       alphabeticalGroups={defaultGroups}
       destinationsCount={cards.length}
       filteredCount={defaultFiltered.length}
+      basePath={basePath}
     />
   );
 
@@ -41,6 +45,7 @@ export default function CountriesListing({
     <CountriesListingClient
       initialCards={cards}
       initialSource={initialSource}
+      basePath={basePath}
     >
       {defaultGrid}
     </CountriesListingClient>

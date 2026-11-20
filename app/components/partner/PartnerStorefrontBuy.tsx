@@ -19,6 +19,7 @@ export default function PartnerStorefrontBuy({
   destinationCode,
   balanceLabel,
   balanceCents,
+  discountPercentLabel = null,
   splitPaymentEnabled = false,
   paymentGatewayConfigured = false,
   enabledSimpaisaOperatorIds,
@@ -27,6 +28,8 @@ export default function PartnerStorefrontBuy({
   destinationCode: string;
   balanceLabel: string;
   balanceCents: number;
+  /** e.g. "5%" — partner discount applied to retail at checkout. */
+  discountPercentLabel?: string | null;
   splitPaymentEnabled?: boolean;
   paymentGatewayConfigured?: boolean;
   enabledSimpaisaOperatorIds?: readonly string[];
@@ -53,6 +56,13 @@ export default function PartnerStorefrontBuy({
     wasPending.current = buyPending;
   }, [buyPending]);
 
+  const discountBadge =
+    (discountPercentLabel ?? "").trim() &&
+    discountPercentLabel !== "0" &&
+    discountPercentLabel !== "0%"
+      ? discountPercentLabel
+      : null;
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--heading)]">
@@ -62,8 +72,19 @@ export default function PartnerStorefrontBuy({
           ).
         </p>
         <p className="mt-1 text-[var(--text-muted)]">
-          The price below is your Partner price for this plan. Each Issue eSIM
-          creates a new provider order.
+          Catalog cards show retail rates. Your partner discount
+          {discountBadge ? (
+            <>
+              {" "}
+              (
+              <span className="font-semibold text-emerald-600 dark:text-emerald-300">
+                {discountBadge}
+              </span>
+              )
+            </>
+          ) : null}{" "}
+          is applied automatically below. Each Issue eSIM creates a new provider
+          order.
         </p>
         {splitPaymentEnabled ? (
           <p className="mt-2 text-xs text-[var(--text-muted)]">
@@ -90,12 +111,18 @@ export default function PartnerStorefrontBuy({
             Failed attempts refund Partner balance automatically. Try again to
             issue a new eSIM.
           </p>
-          <div className="mt-4">
+          <div className="mt-4 flex flex-wrap gap-3">
             <Link
               href="/partner/orders"
               className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)]"
             >
               My eSIMs
+            </Link>
+            <Link
+              href="/partner/countries"
+              className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)]"
+            >
+              Browse catalog again
             </Link>
           </div>
         </div>
@@ -108,9 +135,30 @@ export default function PartnerStorefrontBuy({
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           {offer.dataLabel} · {offer.validityLabel}
         </p>
-        <p className="mt-2 text-lg font-bold tabular-nums text-[var(--heading)]">
-          {offer.partnerPriceLabel}
-        </p>
+
+        <dl className="mt-4 space-y-2 text-sm">
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-[var(--text-muted)]">Retail price</dt>
+            <dd className="font-semibold tabular-nums text-[var(--heading)]">
+              {offer.retailPriceLabel}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-[var(--text-muted)]">Partner discount</dt>
+            <dd className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-300">
+              {discountBadge ?? "0%"}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] pt-2">
+            <dt className="font-semibold text-[var(--heading)]">
+              You pay (Partner price)
+            </dt>
+            <dd className="text-lg font-bold tabular-nums text-emerald-600 dark:text-emerald-300">
+              {offer.partnerPriceLabel}
+            </dd>
+          </div>
+        </dl>
+
         <div className="mt-5">
           <PartnerOfferPaymentForm
             offerId={offer.offerId}

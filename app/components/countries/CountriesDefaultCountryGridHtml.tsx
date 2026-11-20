@@ -23,23 +23,30 @@ function safeLetter(letter: string): string {
 }
 
 /**
- * Only relative /countries/{slug} hrefs — never javascript: or external schemes.
+ * Only relative /countries/{slug} or /partner/countries/{slug} hrefs —
+ * never javascript: or external schemes.
  */
-export function safeDestinationCardHref(destinationId: string): string {
+export function safeDestinationCardHref(
+  destinationId: string,
+  basePath: string = "/countries"
+): string {
   const href = buildDestinationPlansHref(destinationId, {
     filter: "Country",
     q: "",
+    basePath,
   });
+  const fallback =
+    basePath === "/partner/countries" ? "/partner/countries" : "/countries";
   // Absolute schemes, javascript:, or any non-allowlisted path → hard fallback.
   if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/i.test(href) || /javascript:/i.test(href)) {
-    return "/countries";
+    return fallback;
   }
   if (
-    !/^\/countries\/[A-Za-z0-9][A-Za-z0-9_-]*(?:\?[A-Za-z0-9_=&.-]*)?$/.test(
+    !/^\/(?:partner\/)?countries\/[A-Za-z0-9][A-Za-z0-9_-]*(?:\?[A-Za-z0-9_=&.-]*)?$/.test(
       href
     )
   ) {
-    return "/countries";
+    return fallback;
   }
   return href;
 }
@@ -84,8 +91,8 @@ function flagHtml(destination: DestinationCard): string {
   return `<span class="map-dest-flag map-dest-flag--initials" aria-hidden="true" title="${escapeHtml(destination.name)}">${escapeHtml(visual.initials)}</span>`;
 }
 
-function cardHtml(destination: DestinationCard): string {
-  const href = escapeHtml(safeDestinationCardHref(destination.id));
+function cardHtml(destination: DestinationCard, basePath: string): string {
+  const href = escapeHtml(safeDestinationCardHref(destination.id, basePath));
   const name = escapeHtml(destination.name);
   const plans = safePlansCount(destination.plans);
   const plansLabel = `${plans} ${plans === 1 ? "plan" : "plans"}`;
@@ -98,7 +105,7 @@ function cardHtml(destination: DestinationCard): string {
   return `<a href="${href}" class="map-dest-card"><div class="map-dest-card__main">${flagHtml(destination)}<div class="map-dest-card__text"><h3 class="map-dest-card__name">${name}</h3><p class="map-dest-card__meta">${plansLabel}</p></div></div><div class="map-dest-card__price-wrap"><div class="map-dest-card__price"><p class="map-dest-card__from">From</p><p class="map-dest-card__amount" data-usd="${amountAttr}">${amountText}</p></div><span class="map-dest-card__arrow" aria-hidden="true">→</span></div></a>`;
 }
 
-function groupsHtml(groups: LetterGroup[]): string {
+function groupsHtml(groups: LetterGroup[], basePath: string): string {
   return groups
     .map((group) => {
       const letter = safeLetter(group.letter);
@@ -106,7 +113,9 @@ function groupsHtml(groups: LetterGroup[]): string {
       const countLabel = `${group.items.length} ${
         group.items.length === 1 ? "destination" : "destinations"
       }`;
-      const cards = group.items.map(cardHtml).join("");
+      const cards = group.items
+        .map((item) => cardHtml(item, basePath))
+        .join("");
       return `<section aria-labelledby="letter-${letterAttr}"><div class="mb-3 flex items-center gap-3 border-b border-[var(--border)] pb-2"><h3 id="letter-${letterAttr}" class="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent-strong)]/15 text-sm font-bold text-[var(--accent-strong)]">${letterAttr}</h3><p class="text-xs font-medium text-[var(--text-soft)]">${countLabel}</p></div><div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">${cards}</div></section>`;
     })
     .join("");
@@ -120,15 +129,21 @@ export function buildCountriesDefaultGridBodyHtml(options: {
   alphabeticalGroups: LetterGroup[];
   destinationsCount: number;
   filteredCount: number;
+  basePath?: string;
 }): string {
-  const { alphabeticalGroups, destinationsCount, filteredCount } = options;
+  const {
+    alphabeticalGroups,
+    destinationsCount,
+    filteredCount,
+    basePath = "/countries",
+  } = options;
   if (destinationsCount === 0) {
     return `<div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3" aria-label="Loading destinations"></div>`;
   }
   if (filteredCount === 0) {
     return `<div class="flex flex-col items-center justify-center rounded-[18px] border border-[var(--border)] bg-[var(--surface-2)] px-6 py-16 text-center"><h3 class="text-lg font-semibold text-[var(--heading)]">No destinations found</h3><p class="mt-2 max-w-sm text-sm text-[var(--text-muted)]">Try searching with another country or region.</p></div>`;
   }
-  return `<div class="space-y-8">${groupsHtml(alphabeticalGroups)}</div>`;
+  return `<div class="space-y-8">${groupsHtml(alphabeticalGroups, basePath)}</div>`;
 }
 
 /**
@@ -140,15 +155,19 @@ export default function CountriesDefaultCountryGridHtml({
   alphabeticalGroups,
   destinationsCount,
   filteredCount,
+  basePath = "/countries",
 }: {
   alphabeticalGroups: LetterGroup[];
   destinationsCount: number;
   filteredCount: number;
+  /** Public `/countries` or partner `/partner/countries`. */
+  basePath?: string;
 }) {
   const body = buildCountriesDefaultGridBodyHtml({
     alphabeticalGroups,
     destinationsCount,
     filteredCount,
+    basePath,
   });
 
   return (
