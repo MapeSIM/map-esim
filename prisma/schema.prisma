@@ -294,6 +294,33 @@ enum PartnerRefundRequestReason {
   OTHER
 }
 
+/// Order Support Ticket ("Raise issue") subjects — Partner + Customer.
+enum OrderSupportTicketSubject {
+  REFUND_REQUEST
+  ESIM_NOT_WORKING
+  ACTIVATION_ISSUE
+  DATA_NOT_WORKING
+  QR_INSTALLATION_PROBLEM
+  WRONG_PLAN_OR_DESTINATION
+  TOPUP_RECHARGE_ISSUE
+  BILLING_OR_PAYMENT_ISSUE
+  CONNECTION_NETWORK_ISSUE
+  OTHER
+}
+
+enum OrderSupportTicketStatus {
+  OPEN
+  PENDING_REVIEW
+  RESOLVED
+  REJECTED
+  REFUNDED
+}
+
+enum OrderSupportTicketActor {
+  CUSTOMER
+  PARTNER
+}
+
 /// Allowlisted runtime pause switches only (Admin Operations Part A2).
 /// Never stores secrets, arbitrary JSON, or customer data.
 enum OperationalControlKey {
@@ -419,6 +446,8 @@ model User {
   refundRequestsReviewed       RefundRequest[]          @relation("RefundRequestReviewedBy")
   refundRequestsDecided        RefundRequest[]          @relation("RefundRequestDecidedBy")
   refundRequestsExecuted       RefundRequest[]          @relation("RefundRequestExecutedBy")
+  orderSupportTickets          OrderSupportTicket[]     @relation("OrderSupportTicketSubmitter")
+  orderSupportTicketsReviewed  OrderSupportTicket[]     @relation("OrderSupportTicketReviewedBy")
   partnerProfile               PartnerProfile?
   partnerWalletTxCreated       PartnerWalletTransaction[] @relation("PartnerWalletTxCreatedByAdmin")
   promoCodesCreated            PromoCode[]                @relation("PromoCodeCreatedByAdmin")
@@ -493,6 +522,7 @@ model PartnerProfile {
   refundRequests  PartnerRefundRequest[]
   walletTopups    PartnerWalletTopup[]
   apiKeys         PartnerApiKey[]
+  supportTickets  OrderSupportTicket[]
 
   @@index([disabledAt])
   @@index([apiEnabled])
@@ -784,6 +814,7 @@ model Order {
   partnerEsimShareTokens           PartnerEsimShareToken[]
   refundRequests                   RefundRequest[]
   partnerRefundRequests            PartnerRefundRequest[]
+  orderSupportTickets              OrderSupportTicket[]
   promoRedemptions                 PromoCodeRedemption[]
   customerRewardTransactions       CustomerRewardTransaction[]
   lifecycleNotificationDeliveries  EsimLifecycleNotificationDelivery[]
@@ -1565,6 +1596,51 @@ model AlertNotificationRunnerLock {
   claimedAt      DateTime?
   claimExpiresAt DateTime?
   updatedAt      DateTime  @updatedAt
+}
+
+/// Partner/Customer "Raise issue" support ticket. Creating a ticket never credits a wallet.
+/// Refund subjects require explicit Admin Approve (idempotent wallet credit) or Reject.
+model OrderSupportTicket {
+  id                          String                     @id @default(cuid())
+  actorType                   OrderSupportTicketActor
+  subject                     OrderSupportTicketSubject
+  status                      OrderSupportTicketStatus   @default(OPEN)
+  orderId                     String
+  /// Submitting user (customer or partner user).
+  submittedByUserId           String
+  partnerId                   String?
+  /// Display snapshots at request time.
+  planName                    String?
+  iccid                       String?
+  details                     String
+  /// Snapshot for refund subjects only (server-computed). Never trusted from client.
+  refundAmountCents           Int?
+  currency                    String                     @default("USD")
+  /// Equals orderId while OPEN/PENDING_REVIEW; null when terminal — one open ticket per order.
+  openOrderKey                String?                    @unique
+  adminResolutionNote         String?
+  reviewedByAdminId           String?
+  reviewedAt                  DateTime?
+  /// Linked legacy refund request created/used on Approve (optional).
+  customerRefundRequestId     String?
+  partnerRefundRequestId      String?
+  executedRefundTransactionId String?
+  createdAt                   DateTime                   @default(now())
+  updatedAt                   DateTime                   @updatedAt
+  order                       Order                      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  submittedBy                 User                       @relation("OrderSupportTicketSubmitter", fields: [submittedByUserId], references: [id], onDelete: Cascade)
+  partner                     PartnerProfile?            @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  reviewedByAdmin             User?                      @relation("OrderSupportTicketReviewedBy", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([submittedByUserId])
+  @@index([partnerId])
+  @@index([actorType])
+  @@index([subject])
+  @@index([status])
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([actorType, status])
 }
 
 /// Customer-initiated refund request for admin review + MAP Wallet credit execution.

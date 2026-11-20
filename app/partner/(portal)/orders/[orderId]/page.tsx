@@ -11,6 +11,7 @@ import {
 } from "@/app/lib/partner/partnerRefundRequest";
 import { getPartnerShareBranding } from "@/app/lib/partner/partnerShareBranding";
 import { displayShareCompanyName } from "@/app/lib/partner/partnerShareBrandingValidate";
+import { getLatestOrderSupportTicketForOrder } from "@/app/lib/support/orderSupportTicket";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +82,10 @@ export default async function PartnerOrderDetailPage({
     refundRequest = null;
   }
 
+  const supportTicket = await getLatestOrderSupportTicketForOrder(
+    detail.orderId
+  ).catch(() => null);
+
   return (
     <div className="min-w-0 space-y-6">
       <Link
@@ -114,6 +119,7 @@ export default async function PartnerOrderDetailPage({
           remainingDataLabel: detail.remainingDataLabel,
         }}
         refundRequest={refundRequest}
+        supportTicket={supportTicket}
         partnerDisplayName={partnerDisplayName}
         variant="detail"
       />

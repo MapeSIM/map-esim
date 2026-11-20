@@ -11,6 +11,7 @@ import {
   refundStatusLabel,
 } from "@/app/lib/refunds/refundRequestConstants";
 import { formatUsdCents } from "@/app/lib/wallet/display";
+import { getLatestOrderSupportTicketForOrder } from "@/app/lib/support/orderSupportTicket";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,10 @@ export default async function AccountOrderDetailPage({
   );
   const canRequestRefund = !detail.isRefunded && !openRefund;
 
+  const supportTicket = await getLatestOrderSupportTicketForOrder(
+    detail.id
+  ).catch(() => null);
+
   const refundRequestsSlot =
     refundRequests.length > 0 ? (
       <section className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3">
@@ -121,6 +126,7 @@ export default async function AccountOrderDetailPage({
       openRefundStatusLabel={
         openRefund ? refundStatusLabel(openRefund.status) : null
       }
+      supportTicket={supportTicket}
       autoRefreshUsage={autoOpenUsage}
       refundJustRequested={refundJustRequested}
       refundRequestsSlot={refundRequestsSlot}

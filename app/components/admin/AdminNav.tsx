@@ -74,6 +74,7 @@ const navSections: readonly AdminNavSection[] = [
       },
       { href: "/admin/wallet-topups", label: "Wallet Top-ups", exact: false },
       { href: "/admin/refund-requests", label: "Refund Requests", exact: false },
+      { href: "/admin/support-tickets", label: "Support Tickets", exact: false },
     ],
   },
   {

@@ -10,6 +10,8 @@ import PartnerEsimInstallPanel from "@/app/components/partner/PartnerEsimInstall
 import PartnerRefundRequestControls, {
   type PartnerRefundRequestCardState,
 } from "@/app/components/partner/PartnerRefundRequestControls";
+import RaiseIssueModal from "@/app/components/orders/RaiseIssueModal";
+import type { OrderSupportTicketSummary } from "@/app/lib/support/orderSupportTicket";
 import {
   partnerCardClass,
   partnerSecondaryCtaClass,
@@ -48,6 +50,7 @@ function quickDataSummary(row: PartnerOrderListRow): string {
 type Props = {
   row: PartnerOrderListRow;
   refundRequest: PartnerRefundRequestCardState;
+  supportTicket?: OrderSupportTicketSummary | null;
   variant?: "list" | "detail";
   /** Partner share-settings company name for outbound share messages. */
   partnerDisplayName?: string | null;
@@ -56,11 +59,13 @@ type Props = {
 export default function PartnerEsimOrderCard({
   row,
   refundRequest,
+  supportTicket = null,
   variant = "detail",
   partnerDisplayName = null,
 }: Props) {
   const [showRefund, setShowRefund] = useState(false);
   const [showInstall, setShowInstall] = useState(false);
+  const [raiseIssueOpen, setRaiseIssueOpen] = useState(false);
   const refunded = partnerOrderIsRefunded(row.statusBadge);
   const expired = row.statusBadge === "eSIM Expired";
   const lineReady = partnerOrderLineReady(row.statusBadge) && !refunded;
@@ -158,7 +163,21 @@ export default function PartnerEsimOrderCard({
         shareUrl={`/partner/orders/${encodeURIComponent(row.orderId)}`}
         shareTitle={row.planName}
         addDataHref={addDataHref}
-        raiseIssueHref="/support"
+        onRaiseIssue={
+          !supportTicket?.isOpen ? () => setRaiseIssueOpen(true) : undefined
+        }
+        raiseIssueExtra={
+          <RaiseIssueModal
+            orderId={row.orderId}
+            planName={row.planName}
+            iccid={row.iccid}
+            actor="PARTNER"
+            existingTicket={supportTicket}
+            open={raiseIssueOpen}
+            onOpenChange={setRaiseIssueOpen}
+            showTrigger={false}
+          />
+        }
         refundAction={
           !expired && !refunded ? (
             <button

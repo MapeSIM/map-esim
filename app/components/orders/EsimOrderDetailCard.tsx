@@ -68,6 +68,10 @@ export type EsimOrderDetailCardProps = {
   qrDownloadHref?: string | null;
   addDataHref?: string | null;
   raiseIssueHref?: string | null;
+  /** Prefer over raiseIssueHref when provided (opens in-app Raise issue modal). */
+  onRaiseIssue?: () => void;
+  /** Optional status badge / controls next to Raise issue. */
+  raiseIssueExtra?: ReactNode;
   /** Admin/partner conditional refund control (button or form trigger). */
   refundAction?: ReactNode;
   /** Extra footer content (e.g. ICCID, admin-only notes). */
@@ -176,6 +180,8 @@ export default function EsimOrderDetailCard({
   qrDownloadHref = null,
   addDataHref = null,
   raiseIssueHref = null,
+  onRaiseIssue,
+  raiseIssueExtra = null,
   refundAction = null,
   footer = null,
   hideActions = false,
@@ -317,7 +323,7 @@ export default function EsimOrderDetailCard({
     (enableShare || Boolean(shareUrl) || variant === "modal") && !isRefunded;
   const showDownload = Boolean(qrDownloadHref) && !isRefunded;
   const showAddData = Boolean(addDataHref) && !isRefunded;
-  const showRaiseIssue = Boolean(raiseIssueHref);
+  const showRaiseIssue = Boolean(onRaiseIssue || raiseIssueHref);
   const showActionBar =
     !hideActions &&
     (showViewQr ||
@@ -573,15 +579,26 @@ export default function EsimOrderDetailCard({
               </Link>
             ) : null}
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {showRaiseIssue ? (
-                <Link
-                  href={raiseIssueHref!}
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-[#1E3A5F] bg-transparent px-3.5 text-sm font-semibold text-white/80 transition hover:bg-white/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B8E6]"
-                >
-                  Raise issue
-                </Link>
+                onRaiseIssue ? (
+                  <button
+                    type="button"
+                    onClick={onRaiseIssue}
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-[#1E3A5F] bg-transparent px-3.5 text-sm font-semibold text-white/80 transition hover:bg-white/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B8E6]"
+                  >
+                    Raise issue
+                  </button>
+                ) : (
+                  <Link
+                    href={raiseIssueHref!}
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-[#1E3A5F] bg-transparent px-3.5 text-sm font-semibold text-white/80 transition hover:bg-white/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B8E6]"
+                  >
+                    Raise issue
+                  </Link>
+                )
               ) : null}
+              {raiseIssueExtra}
               {refundAction}
             </div>
           </div>

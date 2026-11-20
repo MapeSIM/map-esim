@@ -14,6 +14,7 @@ import { getPartnerGrowthSummary } from "@/app/lib/partner/partnerGrowth";
 import { prisma } from "@/app/lib/db";
 import { PartnerEsimPurchaseStatus } from "@prisma/client";
 import { partnerCardClass } from "@/app/components/partner/partnerPortalUi";
+import { mapLatestOrderSupportTicketsByOrderIds } from "@/app/lib/support/orderSupportTicket";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,9 @@ export default async function PartnerOrdersPage({
   }
 
   const refundMap: Record<string, PartnerRefundRequestCardState> = {};
+  let supportByOrder: Awaited<
+    ReturnType<typeof mapLatestOrderSupportTicketsByOrderIds>
+  > = {};
   try {
     const summaries = await listPartnerRefundRequestSummaries({
       partnerUserId: user.id,
@@ -73,6 +77,13 @@ export default async function PartnerOrdersPage({
     }
   } catch {
     /* ignore */
+  }
+  try {
+    supportByOrder = await mapLatestOrderSupportTicketsByOrderIds(
+      data.orders.map((row) => row.orderId)
+    );
+  } catch {
+    supportByOrder = {};
   }
 
   let performance: Awaited<ReturnType<typeof getPartnerGrowthSummary>> | null =
@@ -201,6 +212,7 @@ export default async function PartnerOrdersPage({
           <PartnerOrdersTableClient
             orders={data.orders}
             refundByPurchase={refundMap}
+            supportByOrder={supportByOrder}
           />
           {data.totalPages > 1 ? (
             <nav

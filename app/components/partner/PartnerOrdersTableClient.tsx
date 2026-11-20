@@ -5,6 +5,7 @@ import { Copy, Check, X } from "lucide-react";
 import PartnerEsimOrderCard from "@/app/components/partner/PartnerEsimOrderCard";
 import type { PartnerRefundRequestCardState } from "@/app/components/partner/PartnerRefundRequestControls";
 import type { PartnerOrderListRow } from "@/app/lib/partner/partnerOrders";
+import type { OrderSupportTicketSummary } from "@/app/lib/support/orderSupportTicket";
 import {
   partnerCardClass,
   partnerFieldClass,
@@ -41,9 +42,11 @@ function CopyIccid({ value }: { value: string }) {
 export default function PartnerOrdersTableClient({
   orders,
   refundByPurchase,
+  supportByOrder = {},
 }: {
   orders: PartnerOrderListRow[];
   refundByPurchase: Record<string, PartnerRefundRequestCardState>;
+  supportByOrder?: Record<string, OrderSupportTicketSummary>;
 }) {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("ALL");
@@ -200,6 +203,7 @@ export default function PartnerOrdersTableClient({
               <PartnerEsimOrderCard
                 row={selected}
                 refundRequest={refundByPurchase[selected.purchaseId] ?? null}
+                supportTicket={supportByOrder[selected.orderId] ?? null}
                 variant="detail"
               />
             </div>

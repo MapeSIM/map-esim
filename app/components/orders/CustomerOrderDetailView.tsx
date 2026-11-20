@@ -5,9 +5,11 @@ import Link from "next/link";
 import EsimOrderDetailCard from "@/app/components/orders/EsimOrderDetailCard";
 import CustomerEsimInstallPanel from "@/app/components/orders/CustomerEsimInstallPanel";
 import CustomerRefundRequestForm from "@/app/components/orders/CustomerRefundRequestForm";
+import RaiseIssueModal from "@/app/components/orders/RaiseIssueModal";
 import { customerEsimLineReady } from "@/app/lib/orders/customerOrderDisplay";
 import type { CustomerEsimStatusBadge } from "@/app/lib/orders/customerOrderDisplay";
 import type { ProviderLifecycleCacheView } from "@/app/lib/orders/providerLifecycleShared";
+import type { OrderSupportTicketSummary } from "@/app/lib/support/orderSupportTicket";
 
 export type CustomerOrderDetailViewProps = {
   orderId: string;
@@ -28,6 +30,7 @@ export type CustomerOrderDetailViewProps = {
   iccidMasked: string;
   canRequestRefund: boolean;
   openRefundStatusLabel: string | null;
+  supportTicket?: OrderSupportTicketSummary | null;
   autoRefreshUsage?: boolean;
   refundRequestsSlot?: ReactNode;
   refundJustRequested?: boolean;
@@ -56,6 +59,7 @@ export default function CustomerOrderDetailView({
   iccid,
   canRequestRefund,
   openRefundStatusLabel,
+  supportTicket = null,
   autoRefreshUsage = false,
   refundRequestsSlot = null,
   refundJustRequested = false,
@@ -63,6 +67,7 @@ export default function CustomerOrderDetailView({
   rewardsAppliedLabel = null,
 }: CustomerOrderDetailViewProps) {
   const [showRefund, setShowRefund] = useState(false);
+  const [raiseIssueOpen, setRaiseIssueOpen] = useState(false);
   const orderPath = `/account/orders/${encodeURIComponent(orderId)}`;
 
   return (
@@ -105,7 +110,21 @@ export default function CustomerOrderDetailView({
             ? `/account/orders/${encodeURIComponent(orderId)}/add-data`
             : null
         }
-        raiseIssueHref="/support"
+        onRaiseIssue={
+          !supportTicket?.isOpen ? () => setRaiseIssueOpen(true) : undefined
+        }
+        raiseIssueExtra={
+          <RaiseIssueModal
+            orderId={orderId}
+            planName={planName}
+            iccid={iccid}
+            actor="CUSTOMER"
+            existingTicket={supportTicket}
+            open={raiseIssueOpen}
+            onOpenChange={setRaiseIssueOpen}
+            showTrigger={false}
+          />
+        }
         refundAction={
           !isRefunded ? (
             <button

@@ -62,6 +62,9 @@ export function requiredAdminAccessForPath(pathname: string): AdminPathAccess {
   if (path.startsWith("/admin/refund-requests")) {
     return { mode: "any-of", permissions: ["REFUNDS_MANAGE"] };
   }
+  if (path.startsWith("/admin/support-tickets")) {
+    return { mode: "any-of", permissions: ["REFUNDS_MANAGE", "ORDERS_VIEW"] };
+  }
   if (path.startsWith("/admin/partners")) {
     return { mode: "any-of", permissions: ["PARTNERS_MANAGE"] };
   }
@@ -148,6 +151,7 @@ export const ADMIN_NAV_LINKS = [
   { href: "/admin/payments/webhooks", label: "Webhook Receipts", exact: false },
   { href: "/admin/wallet-topups", label: "Wallet Top-ups", exact: false },
   { href: "/admin/refund-requests", label: "Refund Requests", exact: false },
+  { href: "/admin/support-tickets", label: "Support Tickets", exact: false },
   { href: "/admin/reconciliation", label: "Stuck Cases", exact: false },
   { href: "/admin/operations", label: "Operations Dashboard", exact: true },
   {
