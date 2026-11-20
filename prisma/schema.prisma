@@ -474,6 +474,12 @@ model PartnerProfile {
   shareLogoUrl            String?
   shareButtonBackground   String?
   shareButtonTextColor    String?
+  /// Optional Partner Public API / white-label Share QR branding aliases.
+  /// Prefer these for `/api/v1/partner/*` responses; fall back to share* when null.
+  brandCompanyName        String?
+  brandSupportEmail       String?
+  brandButtonBg           String?
+  brandButtonText         String?
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
   user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -482,8 +488,29 @@ model PartnerProfile {
   esimShareTokens PartnerEsimShareToken[]
   refundRequests  PartnerRefundRequest[]
   walletTopups    PartnerWalletTopup[]
+  apiKeys         PartnerApiKey[]
 
   @@index([disabledAt])
+  @@index([createdAt])
+}
+
+/// Partner Public REST API key (Bearer token). Store SHA-256 hash only — never plaintext.
+model PartnerApiKey {
+  id         String         @id @default(cuid())
+  partnerId  String
+  /// Admin/partner label for this key (e.g. "Production", "Staging").
+  name       String
+  /// Short public prefix for display (e.g. "pk_live_ab12").
+  prefix     String
+  /// SHA-256 hex of the raw Bearer token.
+  keyHash    String         @unique
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime       @default(now())
+  partner    PartnerProfile @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+  @@index([revokedAt])
   @@index([createdAt])
 }
 
