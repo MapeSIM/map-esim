@@ -1,208 +1,139 @@
+import Link from "next/link";
 import {
-  BarChart3,
-  CreditCard,
-  Palette,
-  Shield,
-  Smartphone,
-  UserRound,
+  BookOpen,
+  KeyRound,
+  Package,
+  ShoppingBag,
   Wallet,
 } from "lucide-react";
-import AccountActionRow from "@/app/components/account/AccountActionRow";
-import PartnerSignOutRow from "@/app/components/partner/PartnerSignOutRow";
 import { getPartnerPortalSummary } from "@/app/lib/partner/partnerAccess";
 import { requireRole } from "@/app/lib/auth/session";
+import { prisma } from "@/app/lib/db";
+import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
 
 export const dynamic = "force-dynamic";
 
-const PORTAL_UNAVAILABLE =
-  "Partner data is temporarily unavailable. Please refresh shortly.";
+const cardClass =
+  "rounded-2xl border border-slate-800 bg-slate-900/60 p-5 transition hover:border-emerald-500/40 hover:bg-slate-900";
 
-export default async function PartnerDashboardPage() {
+export default async function PartnerHomePage() {
   const user = await requireRole("PARTNER");
-
-  let summary: Awaited<ReturnType<typeof getPartnerPortalSummary>>;
-  try {
-    summary = await getPartnerPortalSummary(user.id);
-  } catch {
+  const actor = await requireActivePartnerActor(user.id);
+  if (!actor) {
     return (
-      <div
-        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-        role="status"
-      >
-        <p className="text-sm font-medium text-[var(--heading)]">
-          {PORTAL_UNAVAILABLE}
-        </p>
-      </div>
+      <p className="text-sm text-slate-300">Partner access is unavailable.</p>
     );
   }
 
-  if (!summary) {
-    return (
-      <div
-        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-        role="status"
-      >
-        <p className="text-sm font-medium text-[var(--heading)]">
-          Partner access is unavailable.
-        </p>
-      </div>
-    );
-  }
+  const [summary, profile] = await Promise.all([
+    getPartnerPortalSummary(user.id).catch(() => null),
+    prisma.partnerProfile.findUnique({
+      where: { id: actor.partnerId },
+      select: { apiEnabled: true },
+    }),
+  ]);
+  const apiEnabled = profile?.apiEnabled === true;
 
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight">My Account</h1>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Manage Partner balance, purchases, and account settings.
+      <header className="space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-400">
+          Partner portal
+        </p>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-50">
+          Welcome back, {actor.name.split(" ")[0] || actor.name}
+        </h1>
+        <p className="max-w-3xl text-sm leading-relaxed text-slate-400">
+          Manage catalog pricing, orders, wallet balance, and white-label share
+          branding.{" "}
+          {apiEnabled ? (
+            <>
+              Use{" "}
+              <code className="rounded bg-slate-900 px-1.5 py-0.5 text-emerald-300">
+                /api/v1/partner/...
+              </code>{" "}
+              on this host with your Bearer token.
+            </>
+          ) : (
+            <>API access is locked until an admin enables it for your account.</>
+          )}
         </p>
       </header>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
-            Partner Balance
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Available balance
           </p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
-            {summary.balanceLabel}
-          </p>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">USD</p>
-        </div>
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
-            Current Partner Discount
-          </p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
-            {summary.discountPercentLabel}
-          </p>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Applied automatically at purchase
+          <p className="mt-2 text-3xl font-bold text-slate-50">
+            {summary?.balanceLabel ?? "—"}
           </p>
         </div>
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
-            Total eSIM orders
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Completed orders
           </p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
-            {summary.totalEsimOrdersLabel}
-          </p>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Completed Partner purchases
+          <p className="mt-2 text-3xl font-bold text-slate-50">
+            {summary?.totalEsimOrdersLabel ?? "—"}
           </p>
         </div>
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
-            Total spent
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Partner discount
           </p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
-            {summary.totalSpentLabel}
-          </p>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            eSIM purchase debits from wallet
-          </p>
-        </div>
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
-            Total savings
-          </p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
-            {summary.totalSavingsLabel}
-          </p>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Retail minus Partner charge on completed buys
+          <p className="mt-2 text-3xl font-bold text-slate-50">
+            {summary?.discountPercentLabel ?? "—"}
           </p>
         </div>
       </div>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold tracking-tight">Quick Actions</h2>
-        <div className="grid gap-3">
-          <AccountActionRow
-            href="/countries"
-            title="Buy eSIM"
-            subtitle="Browse destinations at your Partner wholesale price"
-            icon={<CreditCard className="h-5 w-5" aria-hidden="true" />}
-            emphasize
-          />
-          <AccountActionRow
-            href="/partner/wallet"
-            title="My Wallet"
-            subtitle="Partner balance and transaction history"
-            icon={<Wallet className="h-5 w-5" aria-hidden="true" />}
-            trailing={
-              <span className="mt-1 block text-sm font-bold text-[var(--heading)]">
-                {summary.balanceLabel}
-                <span className="ml-1 text-xs font-semibold text-[var(--text-soft)]">
-                  USD
-                </span>
-              </span>
-            }
-          />
-          <AccountActionRow
-            href="/partner/orders"
-            title="My eSIMs"
-            subtitle="Install, usage, and ICCID for Partner purchases"
-            icon={<Smartphone className="h-5 w-5" aria-hidden="true" />}
-          />
-          <AccountActionRow
-            href="/partner/sales"
-            title="Sales report"
-            subtitle="Period totals, destinations, packages, and CSV export"
-            icon={<BarChart3 className="h-5 w-5" aria-hidden="true" />}
-          />
-          <AccountActionRow
-            href="/partner/profile"
-            title="Account / Share Branding"
-            subtitle="Profile details and share-page branding"
-            icon={<Palette className="h-5 w-5" aria-hidden="true" />}
-          />
-          <PartnerSignOutRow />
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold tracking-tight">
-          Profile Information
-        </h2>
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 text-sm">
-          <p>
-            <span className="text-[var(--text-soft)]">Name:</span>{" "}
-            <b>{user.name}</b>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {apiEnabled ? (
+          <Link href="/partner/docs" className={cardClass}>
+            <BookOpen className="h-5 w-5 text-emerald-400" />
+            <p className="mt-3 font-semibold text-slate-100">API documentation</p>
+            <p className="mt-1 text-sm text-slate-400">
+              Endpoints, cancel codes, Postman downloads.
+            </p>
+          </Link>
+        ) : (
+          <div className={cardClass}>
+            <KeyRound className="h-5 w-5 text-amber-300" />
+            <p className="mt-3 font-semibold text-slate-100">Request API access</p>
+            <p className="mt-1 text-sm text-slate-400">
+              Contact MAP eSIM support / your admin to enable Partner Public API.
+            </p>
+          </div>
+        )}
+        <Link href="/partner/catalog" className={cardClass}>
+          <Package className="h-5 w-5 text-emerald-400" />
+          <p className="mt-3 font-semibold text-slate-100">Catalog</p>
+          <p className="mt-1 text-sm text-slate-400">
+            Browse partner-priced plans and export CSV.
           </p>
-          <p className="mt-2">
-            <span className="text-[var(--text-soft)]">Email:</span>{" "}
-            <b>{user.email}</b>
+        </Link>
+        <Link href="/partner/orders" className={cardClass}>
+          <ShoppingBag className="h-5 w-5 text-emerald-400" />
+          <p className="mt-3 font-semibold text-slate-100">Orders</p>
+          <p className="mt-1 text-sm text-slate-400">
+            Track eSIMs, usage, and performance.
           </p>
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold tracking-tight">Account Info</h2>
-        <div className="grid gap-3">
-          <AccountActionRow
-            href="/partner/profile"
-            title="Profile"
-            subtitle="Partner account information"
-            icon={<UserRound className="h-5 w-5" aria-hidden="true" />}
-          />
-          <AccountActionRow
-            href="/partner/security"
-            title="Password & Security"
-            subtitle="Password and security controls"
-            icon={<Shield className="h-5 w-5" aria-hidden="true" />}
-          />
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold tracking-tight">Share Branding</h2>
-        <AccountActionRow
-          href="/partner/profile"
-          title="Share Branding"
-          subtitle="Company name, support email, website, logo, and button colors"
-          icon={<Palette className="h-5 w-5" aria-hidden="true" />}
-        />
-      </section>
+        </Link>
+        <Link href="/partner/wallet" className={cardClass}>
+          <Wallet className="h-5 w-5 text-emerald-400" />
+          <p className="mt-3 font-semibold text-slate-100">Wallet</p>
+          <p className="mt-1 text-sm text-slate-400">
+            Balance, top-ups, and ledger history.
+          </p>
+        </Link>
+        <Link href="/partner/account" className={cardClass}>
+          <KeyRound className="h-5 w-5 text-emerald-400" />
+          <p className="mt-3 font-semibold text-slate-100">Account</p>
+          <p className="mt-1 text-sm text-slate-400">
+            API keys and Share QR branding.
+          </p>
+        </Link>
+      </div>
     </div>
   );
 }

@@ -80,6 +80,8 @@ export type PartnerListRow = {
   totalOrdersLabel: string;
   /** Sum of partnerChargeCents on COMPLETED purchases only. */
   revenueLabel: string;
+  /** Admin-gated Partner Public API access. */
+  apiEnabled: boolean;
 };
 
 export type PartnerListKpis = {
@@ -222,6 +224,8 @@ export type PartnerDetail = {
   paymentsPageSize: number;
   paymentsTotalCount: number;
   paymentsTotalPages: number;
+  /** Admin-gated Partner Public API access. */
+  apiEnabled: boolean;
 };
 
 export type PartnersMutationResult =
@@ -457,6 +461,7 @@ export async function listPartnersPage(options: {
       discountBps: true,
       statusVersion: true,
       disabledAt: true,
+      apiEnabled: true,
       createdAt: true,
       user: {
         select: {
@@ -526,6 +531,7 @@ export async function listPartnersPage(options: {
         totalOrders: agg.orders,
         totalOrdersLabel: String(agg.orders),
         revenueLabel: formatUsdCents(agg.revenueCents),
+        apiEnabled: row.apiEnabled === true,
       };
     }),
     kpis: {
@@ -647,6 +653,7 @@ export async function getPartnerDetail(
       discountVersion: true,
       statusVersion: true,
       disabledAt: true,
+      apiEnabled: true,
       createdAt: true,
       updatedAt: true,
       user: {
@@ -898,6 +905,7 @@ export async function getPartnerDetail(
     disabledAtLabel: formatDateTime(row.disabledAt),
     deletedAtLabel: formatDateTime(row.user.deletedAt),
     credentialsAvailableLabel: row.user.passwordHash ? "Yes" : "No",
+    apiEnabled: row.apiEnabled === true,
     balanceCents,
     balanceLabel: formatUsdCents(balanceCents),
     hasWallet: Boolean(row.walletAccount),

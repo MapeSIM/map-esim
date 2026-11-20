@@ -122,7 +122,7 @@ export type PartnerApiActor = {
 
 export type PartnerApiAuthFailure = {
   ok: false;
-  status: 401 | 403 | 429;
+  status: 401 | 403 | 429 | 503;
   error: string;
   message?: string;
   retryAfterSec?: number;
@@ -136,12 +136,43 @@ export type PartnerApiAuthSuccess = {
 export type PartnerApiAuthResult = PartnerApiAuthSuccess | PartnerApiAuthFailure;
 
 /**
+ * Global Partner Public API kill-switch.
+ * Env PARTNER_API_DISABLED=1|true wins; otherwise OperationalControl PARTNER_PUBLIC_API.
+ */
+export async function isPartnerPublicApiGloballyPaused(): Promise<boolean> {
+  const env = String(process.env.PARTNER_API_DISABLED ?? "")
+    .trim()
+    .toLowerCase();
+  if (env === "1" || env === "true" || env === "yes") return true;
+  try {
+    const row = await prisma.operationalControl.findUnique({
+      where: { key: "PARTNER_PUBLIC_API" },
+      select: { paused: true },
+    });
+    return Boolean(row?.paused);
+  } catch {
+    // Fail closed for API surface when control store is unavailable.
+    return true;
+  }
+}
+
+/**
  * Validate Authorization: Bearer <token> against PartnerApiKey.
  * Updates lastUsedAt asynchronously (fire-and-forget).
  */
 export async function authenticatePartnerApiRequest(
   req: NextRequest
 ): Promise<PartnerApiAuthResult> {
+  if (await isPartnerPublicApiGloballyPaused()) {
+    return {
+      ok: false,
+      status: 503,
+      error: "Service Unavailable",
+      message:
+        "Partner Public API is temporarily paused. Please try again later.",
+    };
+  }
+
   const token = extractBearerToken(req);
   if (!token) {
     return {
@@ -164,6 +195,7 @@ export async function authenticatePartnerApiRequest(
           select: {
             id: true,
             disabledAt: true,
+            apiEnabled: true,
             discountBps: true,
             brandCompanyName: true,
             brandSupportEmail: true,
@@ -217,6 +249,15 @@ export async function authenticatePartnerApiRequest(
       status: 403,
       error: "Forbidden",
       message: "Partner account is disabled or not allowed.",
+    };
+  }
+
+  if (!partner.apiEnabled) {
+    return {
+      ok: false,
+      status: 403,
+      error: "API_ACCESS_DISABLED",
+      message: "API access is not enabled for this partner account.",
     };
   }
 

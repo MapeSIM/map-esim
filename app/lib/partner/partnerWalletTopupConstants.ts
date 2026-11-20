@@ -12,7 +12,7 @@ export const PARTNER_TOPUP_USER_KEY_PREFIX = "ptop_" as const;
 export const PARTNER_TOPUP_CREDIT_REFERENCE_TYPE = "PARTNER_WALLET_TOPUP";
 
 export const PARTNER_TOPUP_MIN_CENTS = 10; // $0.10
-export const PARTNER_TOPUP_MAX_CENTS = 50_000; // $500.00
+export const PARTNER_TOPUP_MAX_CENTS = 100_000; // $1,000.00
 
 /**
  * Partner Add Funds amount parse — min $0.10 / max $500.00.

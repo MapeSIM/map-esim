@@ -308,6 +308,8 @@ enum OperationalControlKey {
   CUSTOMER_PAYMENT_GATEWAY_CHECKOUT
   /// Pauses alert-notification email delivery only. Aggregation/dashboard stay live.
   ALERT_NOTIFICATIONS
+  /// Global kill-switch for Partner Public REST API (`/api/v1/partner/*`).
+  PARTNER_PUBLIC_API
 }
 
 enum AlertNotificationEventType {
@@ -480,6 +482,8 @@ model PartnerProfile {
   brandSupportEmail       String?
   brandButtonBg           String?
   brandButtonText         String?
+  /// Admin-gated Partner Public API access. Default false — must be explicitly enabled.
+  apiEnabled              Boolean              @default(false)
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
   user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -491,6 +495,7 @@ model PartnerProfile {
   apiKeys         PartnerApiKey[]
 
   @@index([disabledAt])
+  @@index([apiEnabled])
   @@index([createdAt])
 }
 

@@ -12,6 +12,7 @@ export const OPERATIONAL_CONTROL_KEYS = [
   "PARTNER_WALLET_PURCHASES",
   "CUSTOMER_PAYMENT_GATEWAY_CHECKOUT",
   "ALERT_NOTIFICATIONS",
+  "PARTNER_PUBLIC_API",
 ] as const;
 
 export type OperationalControlKeyName =
@@ -78,6 +79,10 @@ export const CONTROL_CONFIRM_PHRASES = {
     pause: "PAUSE ALERT NOTIFICATIONS",
     resume: "RESUME ALERT NOTIFICATIONS",
   },
+  PARTNER_PUBLIC_API: {
+    pause: "PAUSE PARTNER PUBLIC API",
+    resume: "RESUME PARTNER PUBLIC API",
+  },
 } as const satisfies Record<
   OperationalControlKeyName,
   { pause: string; resume: string }
@@ -120,6 +125,11 @@ export const CONTROL_DISPLAY = {
     name: "Alert notification emails",
     scope:
       "Pauses outbound admin alert notification emails only. Alert aggregation and the Alerts dashboard remain active. This pause is never emailed.",
+  },
+  PARTNER_PUBLIC_API: {
+    name: "Partner Public API",
+    scope:
+      "Global kill-switch for /api/v1/partner/* Bearer API. Partner portal browsing remains available; API keys cannot call endpoints while paused.",
   },
 } as const satisfies Record<
   OperationalControlKeyName,

@@ -18,18 +18,24 @@ type Props = {
   enabledSimpaisaOperatorIds?: readonly string[];
 };
 
-type AmountPreset = "10" | "50" | "100" | "150" | "500" | "custom";
+type AmountPreset =
+  | "100"
+  | "250"
+  | "500"
+  | "750"
+  | "1000"
+  | "custom";
 
 const AMOUNT_PRESETS: ReadonlyArray<{
   id: AmountPreset;
   label: string;
   value: string | null;
 }> = [
-  { id: "10", label: "$10", value: "10" },
-  { id: "50", label: "$50", value: "50" },
   { id: "100", label: "$100", value: "100" },
-  { id: "150", label: "$150", value: "150" },
+  { id: "250", label: "$250", value: "250" },
   { id: "500", label: "$500", value: "500" },
+  { id: "750", label: "$750", value: "750" },
+  { id: "1000", label: "$1000", value: "1000" },
   { id: "custom", label: "Custom", value: null },
 ];
 

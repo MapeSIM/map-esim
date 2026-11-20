@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { AdminVoidPendingPartnerPurchaseForm } from "@/app/components/admin/AdminVoidPendingPartnerPurchaseForm";
+import AdminPartnerApiAccessCard from "@/app/components/admin/AdminPartnerApiAccessCard";
 import InstantOrderRefundButton from "@/app/components/admin/InstantOrderRefundButton";
 import { PartnerDiscountPanel } from "@/app/components/admin/PartnerDiscountPanel";
 import { PartnerInviteResendPanel } from "@/app/components/admin/PartnerInviteResendPanel";
@@ -9,6 +10,8 @@ import { PartnerWalletPanel } from "@/app/components/admin/PartnerWalletPanel";
 import { loadAdminAccess } from "@/app/lib/admin/adminPermissionAccess";
 import { hasAdminPermission } from "@/app/lib/admin/adminPermissions";
 import { requireRole } from "@/app/lib/auth/session";
+import { isPartnerPublicApiGloballyPaused } from "@/app/lib/partnerApiAuth";
+import { listPartnerApiKeysForAdmin } from "@/app/lib/partner/partnerApiKeys";
 import {
   AdminButton,
   AdminEmptyState,
@@ -142,6 +145,19 @@ export default async function AdminPartnerDetailPage({
   const discountDisabled =
     detail.statusLabel === "Disabled" || detail.statusLabel === "Deleted";
   const purchaseStatusFilter = detail.purchasesStatusFilter;
+  const canManagePartners = hasAdminPermission(
+    access?.permissions ?? [],
+    "PARTNERS_MANAGE"
+  );
+  let globallyPaused = false;
+  let apiKeys: Awaited<ReturnType<typeof listPartnerApiKeysForAdmin>> = [];
+  try {
+    globallyPaused = await isPartnerPublicApiGloballyPaused();
+    apiKeys = await listPartnerApiKeysForAdmin(detail.id);
+  } catch {
+    globallyPaused = true;
+    apiKeys = [];
+  }
 
   return (
     <div className={`${ADMIN_PAGE_STACK_CLASS} min-w-0 w-full max-w-full`}>
@@ -152,6 +168,11 @@ export default async function AdminPartnerDetailPage({
           <span className="flex flex-wrap items-center gap-2">
             <AdminStatusPill value={partnerStatusPillValue(detail.statusLabel)}>
               {detail.statusLabel}
+            </AdminStatusPill>
+            <AdminStatusPill
+              value={detail.apiEnabled ? "API Enabled" : "API Disabled"}
+            >
+              {detail.apiEnabled ? "API Enabled" : "API Off"}
             </AdminStatusPill>
             <span className="text-[var(--text-soft)]">{detail.email}</span>
             <span className="text-[var(--text-soft)]">·</span>
@@ -173,6 +194,10 @@ export default async function AdminPartnerDetailPage({
           <DetailRow label="Partner name" value={detail.name} />
           <DetailRow label="Email" value={detail.email} />
           <DetailRow label="Status" value={detail.statusLabel} />
+          <DetailRow
+            label="API access"
+            value={detail.apiEnabled ? "Enabled" : "Disabled"}
+          />
           <DetailRow label="Created" value={detail.createdAtLabel} />
           <DetailRow label="Partner ID" value={detail.id} />
           <DetailRow label="User ID" value={detail.userId} />
@@ -184,6 +209,15 @@ export default async function AdminPartnerDetailPage({
           <DetailRow label="Deleted at" value={detail.deletedAtLabel} />
         </dl>
       </section>
+
+      {canManagePartners ? (
+        <AdminPartnerApiAccessCard
+          partnerId={detail.id}
+          apiEnabled={detail.apiEnabled}
+          globalPaused={globallyPaused}
+          keys={apiKeys}
+        />
+      ) : null}
 
       <section className={ADMIN_KPI_GRID_CLASS} aria-label="Partner KPIs">
         <AdminKpiCard label="Wallet balance" value={detail.balanceLabel} />

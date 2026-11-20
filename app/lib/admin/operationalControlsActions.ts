@@ -12,6 +12,7 @@ export type OperationalControlFormState = ControlMutationResult | null;
 
 function revalidateOperations() {
   revalidatePath("/admin/operations");
+  revalidatePath("/admin/partners");
 }
 
 export async function pauseOperationalControlAction(

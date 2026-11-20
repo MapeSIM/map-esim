@@ -148,6 +148,11 @@ export async function updatePartnerShareBranding(
         shareLogoUrl: next.logoUrl,
         shareButtonBackground: next.buttonBackground,
         shareButtonTextColor: next.buttonTextColor,
+        // Keep Partner Public API / white-label brand* aliases in sync.
+        brandCompanyName: next.companyName,
+        brandSupportEmail: next.supportEmail,
+        brandButtonBg: next.buttonBackground,
+        brandButtonText: next.buttonTextColor,
       },
     });
   } catch (error) {
@@ -199,8 +204,21 @@ export async function loadPublicShareBrandingForPartner(
       shareLogoUrl: true,
       shareButtonBackground: true,
       shareButtonTextColor: true,
+      brandCompanyName: true,
+      brandSupportEmail: true,
+      brandButtonBg: true,
+      brandButtonText: true,
     },
   });
   if (!row) return EMPTY_BRANDING;
-  return publicShareBrandingDto(rowToFields(row));
+  return publicShareBrandingDto(
+    rowToFields({
+      shareCompanyName: row.brandCompanyName ?? row.shareCompanyName,
+      shareSupportEmail: row.brandSupportEmail ?? row.shareSupportEmail,
+      shareWebsiteUrl: row.shareWebsiteUrl,
+      shareLogoUrl: row.shareLogoUrl,
+      shareButtonBackground: row.brandButtonBg ?? row.shareButtonBackground,
+      shareButtonTextColor: row.brandButtonText ?? row.shareButtonTextColor,
+    })
+  );
 }

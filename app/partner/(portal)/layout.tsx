@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
-import AccountMenu, {
-  type AccountNavLink,
-} from "@/app/components/account/AccountMenu";
+import { redirect } from "next/navigation";
+import PartnerMenu, {
+  type PartnerNavLink,
+} from "@/app/components/partner/PartnerMenu";
 import { requireRole } from "@/app/lib/auth/session";
+import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
+import { prisma } from "@/app/lib/db";
 
 export const dynamic = "force-dynamic";
 /** Partner buy runs prepare + reserve + VeSIM credit checkout (up to ~25s). */
@@ -12,14 +15,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false, nocache: true },
 };
 
-const partnerLinks: AccountNavLink[] = [
-  { href: "/partner", label: "Overview", exact: true },
-  { href: "/partner/orders", label: "My eSIMs" },
-  { href: "/partner/sales", label: "Sales" },
+const partnerLinks: PartnerNavLink[] = [
+  { href: "/partner", label: "Home", exact: true },
+  { href: "/partner/docs", label: "API docs" },
+  { href: "/partner/catalog", label: "Catalog" },
+  { href: "/partner/orders", label: "Orders" },
   { href: "/partner/wallet", label: "Wallet" },
-  { href: "/countries", label: "Buy eSIM" },
-  { href: "/partner/profile", label: "Profile" },
-  { href: "/partner/security", label: "Security" },
+  { href: "/partner/account", label: "Account" },
 ];
 
 export default async function PartnerLayout({
@@ -28,18 +30,33 @@ export default async function PartnerLayout({
   children: React.ReactNode;
 }) {
   const user = await requireRole("PARTNER");
+  const actor = await requireActivePartnerActor(user.id);
+  if (!actor) {
+    redirect("/signin");
+  }
+
+  const branding = await prisma.partnerProfile.findUnique({
+    where: { id: actor.partnerId },
+    select: {
+      brandCompanyName: true,
+      shareCompanyName: true,
+    },
+  });
+  const companyBadge =
+    branding?.brandCompanyName || branding?.shareCompanyName || actor.name;
 
   return (
-    <main className="min-h-screen w-full max-w-full bg-[var(--page-bg)] px-3 py-8 text-[var(--heading)] sm:px-6 sm:py-10">
-      <div className="mx-auto w-full min-w-0 max-w-5xl space-y-5">
-        <header className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 sm:px-5">
-          <AccountMenu
-            userName={user.name}
-            userEmail={user.email}
+    <main className="min-h-screen w-full max-w-full bg-[#020617] px-3 py-6 text-slate-100 sm:px-6 sm:py-8">
+      <div className="mx-auto w-full min-w-0 max-w-6xl space-y-5">
+        <header className="rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-4 shadow-[0_0_0_1px_rgba(16,185,129,0.08)] sm:px-5">
+          <PartnerMenu
+            userName={actor.name}
+            userEmail={actor.email}
+            companyBadge={companyBadge}
             links={partnerLinks}
           />
         </header>
-        <section className="min-w-0 w-full max-w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-8">
+        <section className="min-w-0 w-full max-w-full rounded-2xl border border-slate-800 bg-slate-950 p-5 sm:p-8">
           {children}
         </section>
       </div>

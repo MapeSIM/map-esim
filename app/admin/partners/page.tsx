@@ -1,5 +1,6 @@
 import { PartnerCreateForm } from "@/app/components/admin/PartnerCreateForm";
 import { PartnerListRowActions } from "@/app/components/admin/PartnerListRowActions";
+import AdminPartnerApiMasterSwitch from "@/app/components/admin/AdminPartnerApiMasterSwitch";
 import {
   AdminButton,
   AdminEmptyState,
@@ -16,6 +17,8 @@ import {
   ADMIN_PAGE_STACK_CLASS,
   ADMIN_SOFT_COPY_CLASS,
 } from "@/app/components/admin/ui";
+import { isPartnerPublicApiGloballyPaused } from "@/app/lib/partnerApiAuth";
+import { ensurePartnerPublicApiControlRow } from "@/app/lib/partner/partnerApiAccessAdmin";
 import { listPartnersPage } from "@/app/lib/partner/partners";
 
 export const dynamic = "force-dynamic";
@@ -77,6 +80,13 @@ export default async function AdminPartnersPage({
   }
 
   const filterBase = { q: data.search, status: data.status };
+  let globallyPaused = false;
+  try {
+    await ensurePartnerPublicApiControlRow();
+    globallyPaused = await isPartnerPublicApiGloballyPaused();
+  } catch {
+    globallyPaused = true;
+  }
 
   return (
     <div className={ADMIN_PAGE_STACK_CLASS}>
@@ -94,6 +104,8 @@ export default async function AdminPartnersPage({
         <AdminKpiCard label="Invited" value={String(data.kpis.invitedCount)} />
         <AdminKpiCard label="Disabled" value={String(data.kpis.disabledCount)} />
       </section>
+
+      <AdminPartnerApiMasterSwitch globallyPaused={globallyPaused} />
 
       <PartnerCreateForm />
 
@@ -147,6 +159,7 @@ export default async function AdminPartnersPage({
               <th className="px-3 py-3 font-semibold">Partner name</th>
               <th className="px-3 py-3 font-semibold">Email</th>
               <th className="px-3 py-3 font-semibold">Status</th>
+              <th className="px-3 py-3 font-semibold">API</th>
               <th className="px-3 py-3 font-semibold">Wallet balance</th>
               <th className="px-3 py-3 font-semibold">Total orders</th>
               <th className="px-3 py-3 font-semibold">Revenue</th>
@@ -167,6 +180,13 @@ export default async function AdminPartnersPage({
                 <td className="px-3 py-3 align-top">
                   <AdminStatusPill value={partnerStatusPillValue(partner.statusLabel)}>
                     {partner.statusLabel}
+                  </AdminStatusPill>
+                </td>
+                <td className="px-3 py-3 align-top">
+                  <AdminStatusPill
+                    value={partner.apiEnabled ? "API Enabled" : "API Disabled"}
+                  >
+                    {partner.apiEnabled ? "API Enabled" : "API Off"}
                   </AdminStatusPill>
                 </td>
                 <td className="px-3 py-3 align-top tabular-nums text-[var(--heading)]">
