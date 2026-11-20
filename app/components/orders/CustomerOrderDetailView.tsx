@@ -6,10 +6,15 @@ import EsimOrderDetailCard from "@/app/components/orders/EsimOrderDetailCard";
 import CustomerEsimInstallPanel from "@/app/components/orders/CustomerEsimInstallPanel";
 import CustomerRefundRequestForm from "@/app/components/orders/CustomerRefundRequestForm";
 import RaiseIssueModal from "@/app/components/orders/RaiseIssueModal";
+import SupportTicketViewModal from "@/app/components/orders/SupportTicketViewModal";
 import { customerEsimLineReady } from "@/app/lib/orders/customerOrderDisplay";
 import type { CustomerEsimStatusBadge } from "@/app/lib/orders/customerOrderDisplay";
 import type { ProviderLifecycleCacheView } from "@/app/lib/orders/providerLifecycleShared";
 import type { OrderSupportTicketSummary } from "@/app/lib/support/orderSupportTicket";
+import {
+  isOrderSupportTicketTerminalStatus,
+  orderSupportTicketPillLabel,
+} from "@/app/lib/support/orderSupportTicketConstants";
 
 export type CustomerOrderDetailViewProps = {
   orderId: string;
@@ -68,7 +73,10 @@ export default function CustomerOrderDetailView({
 }: CustomerOrderDetailViewProps) {
   const [showRefund, setShowRefund] = useState(false);
   const [raiseIssueOpen, setRaiseIssueOpen] = useState(false);
+  const [viewTicketOpen, setViewTicketOpen] = useState(false);
   const orderPath = `/account/orders/${encodeURIComponent(orderId)}`;
+  const canRaiseIssue =
+    !supportTicket || isOrderSupportTicketTerminalStatus(supportTicket.status);
 
   return (
     <div className="mx-auto w-full max-w-lg space-y-4">
@@ -111,19 +119,41 @@ export default function CustomerOrderDetailView({
             : null
         }
         onRaiseIssue={
-          !supportTicket?.isOpen ? () => setRaiseIssueOpen(true) : undefined
+          canRaiseIssue ? () => setRaiseIssueOpen(true) : undefined
         }
         raiseIssueExtra={
-          <RaiseIssueModal
-            orderId={orderId}
-            planName={planName}
-            iccid={iccid}
-            actor="CUSTOMER"
-            existingTicket={supportTicket}
-            open={raiseIssueOpen}
-            onOpenChange={setRaiseIssueOpen}
-            showTrigger={false}
-          />
+          <>
+            {supportTicket ? (
+              <button
+                type="button"
+                onClick={() => setViewTicketOpen(true)}
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-[#1E3A5F] bg-transparent px-3.5 text-sm font-semibold text-white/80 transition hover:bg-white/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B8E6]"
+              >
+                {orderSupportTicketPillLabel(supportTicket.status)}
+              </button>
+            ) : null}
+            {supportTicket ? (
+              <SupportTicketViewModal
+                ticket={supportTicket}
+                orderId={orderId}
+                planName={planName}
+                iccid={iccid}
+                open={viewTicketOpen}
+                onOpenChange={setViewTicketOpen}
+                onRaiseNewTicket={() => setRaiseIssueOpen(true)}
+              />
+            ) : null}
+            <RaiseIssueModal
+              orderId={orderId}
+              planName={planName}
+              iccid={iccid}
+              actor="CUSTOMER"
+              existingTicket={supportTicket}
+              open={raiseIssueOpen}
+              onOpenChange={setRaiseIssueOpen}
+              showTrigger={false}
+            />
+          </>
         }
         refundAction={
           !isRefunded ? (

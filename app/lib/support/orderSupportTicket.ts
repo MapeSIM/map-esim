@@ -17,6 +17,7 @@ import { prisma } from "@/app/lib/db";
 import { resolveOrderIccidPlaintext } from "@/app/lib/orders/orderIccidResolve";
 import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
 import {
+  isOrderSupportTicketOpenStatus,
   isOrderSupportTicketSubject,
   ORDER_SUPPORT_AUDIT,
   ORDER_SUPPORT_DETAILS_MAX,
@@ -67,11 +68,15 @@ function sanitizeDetails(raw: unknown): string {
 
 export type OrderSupportTicketSummary = {
   id: string;
+  orderId: string;
   subject: OrderSupportTicketSubject;
   subjectLabel: string;
   status: OrderSupportTicketStatus;
   statusLabel: string;
   createdAtLabel: string;
+  details: string;
+  planName: string | null;
+  iccid: string | null;
   adminResolutionNote: string | null;
   isOpen: boolean;
   isRefundSubject: boolean;
@@ -79,21 +84,27 @@ export type OrderSupportTicketSummary = {
 
 export function toOrderSupportTicketSummary(row: {
   id: string;
+  orderId: string;
   subject: OrderSupportTicketSubject;
   status: OrderSupportTicketStatus;
   createdAt: Date;
+  details: string;
+  planName: string | null;
+  iccid: string | null;
   adminResolutionNote: string | null;
 }): OrderSupportTicketSummary {
-  const isOpen =
-    row.status === OrderSupportTicketStatus.OPEN ||
-    row.status === OrderSupportTicketStatus.PENDING_REVIEW;
+  const isOpen = isOrderSupportTicketOpenStatus(row.status);
   return {
     id: row.id,
+    orderId: row.orderId,
     subject: row.subject,
     subjectLabel: orderSupportSubjectLabel(row.subject),
     status: row.status,
     statusLabel: orderSupportStatusLabel(row.status),
     createdAtLabel: formatWalletDateTime(row.createdAt),
+    details: row.details,
+    planName: row.planName,
+    iccid: row.iccid,
     adminResolutionNote: row.adminResolutionNote,
     isOpen,
     isRefundSubject: row.subject === OrderSupportTicketSubject.REFUND_REQUEST,
@@ -162,6 +173,8 @@ export async function createCustomerOrderSupportTicket(input: {
         in: [
           OrderSupportTicketStatus.OPEN,
           OrderSupportTicketStatus.PENDING_REVIEW,
+          OrderSupportTicketStatus.IN_REVIEW,
+          OrderSupportTicketStatus.INFO_REQUIRED,
         ],
       },
     },
@@ -223,6 +236,8 @@ export async function createCustomerOrderSupportTicket(input: {
             in: [
               OrderSupportTicketStatus.OPEN,
               OrderSupportTicketStatus.PENDING_REVIEW,
+              OrderSupportTicketStatus.IN_REVIEW,
+              OrderSupportTicketStatus.INFO_REQUIRED,
             ],
           },
         },
@@ -295,6 +310,8 @@ export async function createPartnerOrderSupportTicket(input: {
         in: [
           OrderSupportTicketStatus.OPEN,
           OrderSupportTicketStatus.PENDING_REVIEW,
+          OrderSupportTicketStatus.IN_REVIEW,
+          OrderSupportTicketStatus.INFO_REQUIRED,
         ],
       },
     },
@@ -359,6 +376,8 @@ export async function createPartnerOrderSupportTicket(input: {
             in: [
               OrderSupportTicketStatus.OPEN,
               OrderSupportTicketStatus.PENDING_REVIEW,
+              OrderSupportTicketStatus.IN_REVIEW,
+              OrderSupportTicketStatus.INFO_REQUIRED,
             ],
           },
         },

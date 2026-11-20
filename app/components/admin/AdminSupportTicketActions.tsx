@@ -5,6 +5,8 @@ import {
   adminApproveSupportTicketRefundAction,
   adminRejectSupportTicketAction,
   adminResolveSupportTicketAction,
+  adminSetSupportTicketInfoRequiredAction,
+  adminSetSupportTicketInReviewAction,
   type AdminSupportTicketFormState,
 } from "@/app/lib/support/orderSupportTicketAdminActions";
 
@@ -13,6 +15,16 @@ type Props = {
   isOpen: boolean;
   isRefundSubject: boolean;
 };
+
+function readNote(): string {
+  return (
+    (
+      document.getElementById(
+        "support-ticket-note"
+      ) as HTMLTextAreaElement | null
+    )?.value ?? ""
+  );
+}
 
 export default function AdminSupportTicketActions({
   ticketId,
@@ -31,6 +43,14 @@ export default function AdminSupportTicketActions({
     adminApproveSupportTicketRefundAction,
     null as AdminSupportTicketFormState
   );
+  const [inReviewState, inReviewAction, inReviewPending] = useActionState(
+    adminSetSupportTicketInReviewAction,
+    null as AdminSupportTicketFormState
+  );
+  const [infoState, infoAction, infoPending] = useActionState(
+    adminSetSupportTicketInfoRequiredAction,
+    null as AdminSupportTicketFormState
+  );
 
   if (!isOpen) {
     return (
@@ -40,57 +60,96 @@ export default function AdminSupportTicketActions({
     );
   }
 
-  const pending = resolvePending || rejectPending || approvePending;
+  const pending =
+    resolvePending ||
+    rejectPending ||
+    approvePending ||
+    inReviewPending ||
+    infoPending;
   const message =
     (resolveState?.ok && resolveState.message) ||
     (rejectState?.ok && rejectState.message) ||
     (approveState?.ok && approveState.message) ||
+    (inReviewState?.ok && inReviewState.message) ||
+    (infoState?.ok && infoState.message) ||
     null;
   const error =
     (resolveState && !resolveState.ok && resolveState.error) ||
     (rejectState && !rejectState.ok && rejectState.error) ||
     (approveState && !approveState.ok && approveState.error) ||
+    (inReviewState && !inReviewState.ok && inReviewState.error) ||
+    (infoState && !infoState.ok && infoState.error) ||
     null;
 
   return (
     <div className="space-y-4">
       <label className="block text-sm font-medium text-[var(--heading)]">
-        Resolution notes
+        Notes (optional)
         <textarea
           form="support-ticket-reject"
           name="note"
           rows={3}
           disabled={pending}
-          placeholder="Optional notes shown to the partner/customer"
+          placeholder="Optional note shown on the Support ticket modal"
           className="mt-1.5 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
           id="support-ticket-note"
         />
       </label>
 
-      {/* Hidden note sync for other forms via JS-less: duplicate note fields */}
       <div className="flex flex-wrap gap-2">
+        <form action={inReviewAction}>
+          <input type="hidden" name="ticketId" value={ticketId} />
+          <input type="hidden" name="note" id="in-review-note-proxy" value="" />
+          <button
+            type="submit"
+            disabled={pending}
+            onClick={() => {
+              const proxy = document.getElementById(
+                "in-review-note-proxy"
+              ) as HTMLInputElement | null;
+              if (proxy) proxy.value = readNote();
+            }}
+            className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] disabled:opacity-60"
+          >
+            {inReviewPending ? "Saving…" : "Mark In Review"}
+          </button>
+        </form>
+
+        <form action={infoAction}>
+          <input type="hidden" name="ticketId" value={ticketId} />
+          <input
+            type="hidden"
+            name="note"
+            id="info-required-note-proxy"
+            value=""
+          />
+          <button
+            type="submit"
+            disabled={pending}
+            onClick={() => {
+              const proxy = document.getElementById(
+                "info-required-note-proxy"
+              ) as HTMLInputElement | null;
+              if (proxy) proxy.value = readNote();
+            }}
+            className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] disabled:opacity-60"
+          >
+            {infoPending ? "Saving…" : "Request info"}
+          </button>
+        </form>
+
         {isRefundSubject ? (
           <form action={approveAction}>
             <input type="hidden" name="ticketId" value={ticketId} />
-            <input
-              type="hidden"
-              name="note"
-              value=""
-              id="approve-note-proxy"
-            />
+            <input type="hidden" name="note" id="approve-note-proxy" value="" />
             <button
               type="submit"
               disabled={pending}
               onClick={() => {
-                const note = (
-                  document.getElementById(
-                    "support-ticket-note"
-                  ) as HTMLTextAreaElement | null
-                )?.value;
                 const proxy = document.getElementById(
                   "approve-note-proxy"
                 ) as HTMLInputElement | null;
-                if (proxy) proxy.value = note ?? "";
+                if (proxy) proxy.value = readNote();
               }}
               className="inline-flex h-10 items-center rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--accent-ink)] disabled:opacity-60"
             >
@@ -105,15 +164,10 @@ export default function AdminSupportTicketActions({
               type="submit"
               disabled={pending}
               onClick={() => {
-                const note = (
-                  document.getElementById(
-                    "support-ticket-note"
-                  ) as HTMLTextAreaElement | null
-                )?.value;
                 const proxy = document.getElementById(
                   "resolve-note-proxy"
                 ) as HTMLInputElement | null;
-                if (proxy) proxy.value = note ?? "";
+                if (proxy) proxy.value = readNote();
               }}
               className="inline-flex h-10 items-center rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--accent-ink)] disabled:opacity-60"
             >

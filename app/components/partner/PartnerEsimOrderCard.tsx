@@ -11,7 +11,12 @@ import PartnerRefundRequestControls, {
   type PartnerRefundRequestCardState,
 } from "@/app/components/partner/PartnerRefundRequestControls";
 import RaiseIssueModal from "@/app/components/orders/RaiseIssueModal";
+import SupportTicketViewModal from "@/app/components/orders/SupportTicketViewModal";
 import type { OrderSupportTicketSummary } from "@/app/lib/support/orderSupportTicket";
+import {
+  isOrderSupportTicketTerminalStatus,
+  orderSupportTicketPillLabel,
+} from "@/app/lib/support/orderSupportTicketConstants";
 import {
   partnerCardClass,
   partnerSecondaryCtaClass,
@@ -66,6 +71,9 @@ export default function PartnerEsimOrderCard({
   const [showRefund, setShowRefund] = useState(false);
   const [showInstall, setShowInstall] = useState(false);
   const [raiseIssueOpen, setRaiseIssueOpen] = useState(false);
+  const [viewTicketOpen, setViewTicketOpen] = useState(false);
+  const canRaiseIssue =
+    !supportTicket || isOrderSupportTicketTerminalStatus(supportTicket.status);
   const refunded = partnerOrderIsRefunded(row.statusBadge);
   const expired = row.statusBadge === "eSIM Expired";
   const lineReady = partnerOrderLineReady(row.statusBadge) && !refunded;
@@ -164,19 +172,41 @@ export default function PartnerEsimOrderCard({
         shareTitle={row.planName}
         addDataHref={addDataHref}
         onRaiseIssue={
-          !supportTicket?.isOpen ? () => setRaiseIssueOpen(true) : undefined
+          canRaiseIssue ? () => setRaiseIssueOpen(true) : undefined
         }
         raiseIssueExtra={
-          <RaiseIssueModal
-            orderId={row.orderId}
-            planName={row.planName}
-            iccid={row.iccid}
-            actor="PARTNER"
-            existingTicket={supportTicket}
-            open={raiseIssueOpen}
-            onOpenChange={setRaiseIssueOpen}
-            showTrigger={false}
-          />
+          <>
+            {supportTicket ? (
+              <button
+                type="button"
+                onClick={() => setViewTicketOpen(true)}
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-white/12 bg-transparent px-3.5 text-sm font-semibold text-white/80 transition hover:bg-white/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+              >
+                {orderSupportTicketPillLabel(supportTicket.status)}
+              </button>
+            ) : null}
+            {supportTicket ? (
+              <SupportTicketViewModal
+                ticket={supportTicket}
+                orderId={row.orderId}
+                planName={row.planName}
+                iccid={row.iccid}
+                open={viewTicketOpen}
+                onOpenChange={setViewTicketOpen}
+                onRaiseNewTicket={() => setRaiseIssueOpen(true)}
+              />
+            ) : null}
+            <RaiseIssueModal
+              orderId={row.orderId}
+              planName={row.planName}
+              iccid={row.iccid}
+              actor="PARTNER"
+              existingTicket={supportTicket}
+              open={raiseIssueOpen}
+              onOpenChange={setRaiseIssueOpen}
+              showTrigger={false}
+            />
+          </>
         }
         refundAction={
           !expired && !refunded ? (

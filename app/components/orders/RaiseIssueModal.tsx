@@ -12,10 +12,6 @@ import {
   orderSupportSubjectLabel,
 } from "@/app/lib/support/orderSupportTicketConstants";
 import type { OrderSupportTicketSummary } from "@/app/lib/support/orderSupportTicket";
-import {
-  orderSupportStatusLabel,
-  orderSupportStatusTone,
-} from "@/app/lib/support/orderSupportTicketConstants";
 
 type Props = {
   orderId: string;
@@ -29,22 +25,6 @@ type Props = {
   showTrigger?: boolean;
   triggerClassName?: string;
 };
-
-function statusBadgeClass(status: string): string {
-  const tone = orderSupportStatusTone(status);
-  switch (tone) {
-    case "pending":
-      return "border-amber-500/30 bg-amber-500/10 text-amber-200";
-    case "resolved":
-      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
-    case "rejected":
-      return "border-rose-500/30 bg-rose-500/10 text-rose-300";
-    case "refunded":
-      return "border-sky-500/30 bg-sky-500/10 text-sky-300";
-    default:
-      return "border-white/10 bg-white/5 text-slate-300";
-  }
-}
 
 export default function RaiseIssueModal({
   orderId,
@@ -79,14 +59,6 @@ export default function RaiseIssueModal({
 
   return (
     <>
-      {existingTicket ? (
-        <span
-          className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass(existingTicket.status)}`}
-        >
-          {orderSupportStatusLabel(existingTicket.status)}
-        </span>
-      ) : null}
-
       {showTrigger && canSubmit ? (
         <button
           type="button"

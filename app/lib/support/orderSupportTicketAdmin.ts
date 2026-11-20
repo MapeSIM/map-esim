@@ -27,11 +27,19 @@ import {
   executeAdminCustomerRefundRequest,
 } from "@/app/lib/refunds/refundRequestExecution";
 import {
+  isOrderSupportTicketOpenStatus,
   ORDER_SUPPORT_AUDIT,
   ORDER_SUPPORT_DETAILS_MAX,
   orderSupportStatusLabel,
   orderSupportSubjectLabel,
 } from "@/app/lib/support/orderSupportTicketConstants";
+
+const OPEN_SUPPORT_STATUSES: OrderSupportTicketStatus[] = [
+  OrderSupportTicketStatus.OPEN,
+  OrderSupportTicketStatus.PENDING_REVIEW,
+  OrderSupportTicketStatus.IN_REVIEW,
+  OrderSupportTicketStatus.INFO_REQUIRED,
+];
 import { formatUsdCents, formatWalletDateTime } from "@/app/lib/wallet/display";
 import {
   REFUND_CUSTOMER_WALLET_PHRASE,
@@ -173,9 +181,7 @@ export async function getAdminOrderSupportTicketDetail(ticketId: string) {
         ? `${formatUsdCents(row.refundAmountCents)} USD`
         : null,
     createdAtLabel: formatWalletDateTime(row.createdAt),
-    isOpen:
-      row.status === OrderSupportTicketStatus.OPEN ||
-      row.status === OrderSupportTicketStatus.PENDING_REVIEW,
+    isOpen: isOrderSupportTicketOpenStatus(row.status),
     isRefundSubject: row.subject === OrderSupportTicketSubject.REFUND_REQUEST,
   };
 }
@@ -209,10 +215,7 @@ export async function resolveOrderSupportTicket(input: {
   if (!ticket) {
     throw new OrderSupportTicketAdminError("NOT_FOUND", "Ticket not found.");
   }
-  if (
-    ticket.status !== OrderSupportTicketStatus.OPEN &&
-    ticket.status !== OrderSupportTicketStatus.PENDING_REVIEW
-  ) {
+  if (!OPEN_SUPPORT_STATUSES.includes(ticket.status)) {
     throw new OrderSupportTicketAdminError(
       "INVALID_STATE",
       "This ticket is already closed."
@@ -245,6 +248,89 @@ export async function resolveOrderSupportTicket(input: {
   return updated;
 }
 
+export async function setOrderSupportTicketInReview(input: {
+  adminUserId: string;
+  ticketId: string;
+  note?: unknown;
+}) {
+  await requireAdmin(input.adminUserId);
+  const note = sanitizeNote(input.note);
+  const ticket = await prisma.orderSupportTicket.findUnique({
+    where: { id: input.ticketId },
+  });
+  if (!ticket) {
+    throw new OrderSupportTicketAdminError("NOT_FOUND", "Ticket not found.");
+  }
+  if (!OPEN_SUPPORT_STATUSES.includes(ticket.status)) {
+    throw new OrderSupportTicketAdminError(
+      "INVALID_STATE",
+      "This ticket is already closed."
+    );
+  }
+  if (ticket.status === OrderSupportTicketStatus.IN_REVIEW && !note) {
+    return ticket;
+  }
+
+  const updated = await prisma.orderSupportTicket.update({
+    where: { id: ticket.id },
+    data: {
+      status: OrderSupportTicketStatus.IN_REVIEW,
+      ...(note ? { adminResolutionNote: note } : {}),
+      reviewedByAdminId: input.adminUserId,
+      reviewedAt: new Date(),
+      openOrderKey: ticket.openOrderKey ?? ticket.orderId,
+    },
+  });
+  await writeAuditLog({
+    actorUserId: input.adminUserId,
+    action: ORDER_SUPPORT_AUDIT.setInReview,
+    targetType: "OrderSupportTicket",
+    targetId: ticket.id,
+    metadata: { orderId: ticket.orderId },
+  }).catch(() => null);
+  return updated;
+}
+
+export async function setOrderSupportTicketInfoRequired(input: {
+  adminUserId: string;
+  ticketId: string;
+  note?: unknown;
+}) {
+  await requireAdmin(input.adminUserId);
+  const note = sanitizeNote(input.note);
+  const ticket = await prisma.orderSupportTicket.findUnique({
+    where: { id: input.ticketId },
+  });
+  if (!ticket) {
+    throw new OrderSupportTicketAdminError("NOT_FOUND", "Ticket not found.");
+  }
+  if (!OPEN_SUPPORT_STATUSES.includes(ticket.status)) {
+    throw new OrderSupportTicketAdminError(
+      "INVALID_STATE",
+      "This ticket is already closed."
+    );
+  }
+
+  const updated = await prisma.orderSupportTicket.update({
+    where: { id: ticket.id },
+    data: {
+      status: OrderSupportTicketStatus.INFO_REQUIRED,
+      ...(note ? { adminResolutionNote: note } : {}),
+      reviewedByAdminId: input.adminUserId,
+      reviewedAt: new Date(),
+      openOrderKey: ticket.openOrderKey ?? ticket.orderId,
+    },
+  });
+  await writeAuditLog({
+    actorUserId: input.adminUserId,
+    action: ORDER_SUPPORT_AUDIT.setInfoRequired,
+    targetType: "OrderSupportTicket",
+    targetId: ticket.id,
+    metadata: { orderId: ticket.orderId },
+  }).catch(() => null);
+  return updated;
+}
+
 export async function rejectOrderSupportTicket(input: {
   adminUserId: string;
   ticketId: string;
@@ -258,10 +344,7 @@ export async function rejectOrderSupportTicket(input: {
   if (!ticket) {
     throw new OrderSupportTicketAdminError("NOT_FOUND", "Ticket not found.");
   }
-  if (
-    ticket.status !== OrderSupportTicketStatus.OPEN &&
-    ticket.status !== OrderSupportTicketStatus.PENDING_REVIEW
-  ) {
+  if (!OPEN_SUPPORT_STATUSES.includes(ticket.status)) {
     throw new OrderSupportTicketAdminError(
       "INVALID_STATE",
       "This ticket is already closed."
@@ -314,10 +397,7 @@ export async function approveOrderSupportTicketRefund(input: {
   if (ticket.status === OrderSupportTicketStatus.REFUNDED) {
     return { ticketId: ticket.id, idempotent: true as const };
   }
-  if (
-    ticket.status !== OrderSupportTicketStatus.OPEN &&
-    ticket.status !== OrderSupportTicketStatus.PENDING_REVIEW
-  ) {
+  if (!OPEN_SUPPORT_STATUSES.includes(ticket.status)) {
     throw new OrderSupportTicketAdminError(
       "INVALID_STATE",
       "This ticket cannot be approved for refund."

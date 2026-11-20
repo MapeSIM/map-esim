@@ -311,6 +311,8 @@ enum OrderSupportTicketSubject {
 enum OrderSupportTicketStatus {
   OPEN
   PENDING_REVIEW
+  IN_REVIEW
+  INFO_REQUIRED
   RESOLVED
   REJECTED
   REFUNDED
@@ -1616,7 +1618,7 @@ model OrderSupportTicket {
   /// Snapshot for refund subjects only (server-computed). Never trusted from client.
   refundAmountCents           Int?
   currency                    String                     @default("USD")
-  /// Equals orderId while OPEN/PENDING_REVIEW; null when terminal — one open ticket per order.
+  /// Equals orderId while open (OPEN/PENDING_REVIEW/IN_REVIEW/INFO_REQUIRED); null when terminal — one open ticket per order.
   openOrderKey                String?                    @unique
   adminResolutionNote         String?
   reviewedByAdminId           String?

@@ -104,8 +104,10 @@ export default async function AdminSupportTicketsPage({
           className="h-10 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-sm"
         >
           <option value="">All statuses</option>
-          <option value="OPEN">Open</option>
+          <option value="OPEN">Open / Pending</option>
           <option value="PENDING_REVIEW">Pending review</option>
+          <option value="IN_REVIEW">In Review</option>
+          <option value="INFO_REQUIRED">Info Required</option>
           <option value="RESOLVED">Resolved</option>
           <option value="REJECTED">Rejected</option>
           <option value="REFUNDED">Refunded</option>
