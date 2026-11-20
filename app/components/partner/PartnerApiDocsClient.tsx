@@ -1,8 +1,31 @@
 "use client";
 
 import { useState } from "react";
+import { Check, Copy } from "lucide-react";
 
 type TocItem = { id: string; label: string };
+
+function CopyCode({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1200);
+        } catch {
+          /* ignore */
+        }
+      }}
+      className="inline-flex items-center gap-1 rounded-md border border-white/[0.1] px-2 py-1 text-[11px] font-semibold text-slate-300 hover:bg-white/[0.04]"
+    >
+      {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+      {copied ? "Copied" : "Copy"}
+    </button>
+  );
+}
 
 const ENDPOINTS: Array<{
   method: string;
@@ -94,7 +117,7 @@ export default function PartnerApiDocsClient({
 
   return (
     <div className="lg:grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-8">
-      <aside className="mb-6 lg:sticky lg:top-4 lg:mb-0 lg:self-start">
+      <aside className="mb-6 rounded-2xl border border-white/[0.08] bg-[#0D1526] p-4 lg:sticky lg:top-20 lg:mb-0 lg:self-start">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
           On this page
         </p>
@@ -103,7 +126,7 @@ export default function PartnerApiDocsClient({
             <li key={item.id}>
               <a
                 href={`#${item.id}`}
-                className="block rounded-lg px-2 py-1.5 text-sm text-slate-300 hover:bg-slate-900 hover:text-emerald-300"
+                className="block rounded-lg px-2 py-1.5 text-sm text-slate-300 hover:bg-white/[0.04] hover:text-emerald-300"
               >
                 {item.label}
               </a>
@@ -112,7 +135,7 @@ export default function PartnerApiDocsClient({
         </ul>
         <a
           href="/api/partner/docs/markdown"
-          className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-xl bg-emerald-400 px-3 text-sm font-semibold text-slate-950"
+          className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-xl bg-emerald-500 px-3 text-sm font-semibold text-slate-950 hover:bg-emerald-400"
         >
           Download Markdown guide
         </a>
@@ -123,11 +146,11 @@ export default function PartnerApiDocsClient({
           <h1 className="text-2xl font-bold text-slate-50">Partner API docs</h1>
           <p className="text-sm text-slate-400">
             Authenticate with{" "}
-            <code className="rounded bg-slate-900 px-1.5 py-0.5 text-emerald-300">
+            <code className="rounded bg-[#070D19] px-1.5 py-0.5 text-emerald-300">
               Authorization: Bearer map_live_...
             </code>
             . Same-origin hint: use{" "}
-            <code className="rounded bg-slate-900 px-1.5 py-0.5 text-emerald-300">
+            <code className="rounded bg-[#070D19] px-1.5 py-0.5 text-emerald-300">
               /api/v1/partner/...
             </code>{" "}
             on this host with your Bearer token.
@@ -146,9 +169,10 @@ export default function PartnerApiDocsClient({
 
         <section id="base-url" className="space-y-2">
           <h2 className="text-lg font-semibold text-slate-100">Base URL</h2>
-          <pre className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs text-emerald-300">
-            {`/api/v1/partner`}
-          </pre>
+          <div className="flex items-start justify-between gap-2 overflow-x-auto rounded-xl border border-white/[0.08] bg-[#070D19] p-3">
+            <pre className="text-xs text-emerald-300">{`/api/v1/partner`}</pre>
+            <CopyCode text="/api/v1/partner" />
+          </div>
         </section>
 
         <section id="downloads" className="space-y-3">
@@ -156,19 +180,19 @@ export default function PartnerApiDocsClient({
           <div className="flex flex-wrap gap-2">
             <a
               href="/api/partner/docs/markdown"
-              className="inline-flex h-10 items-center rounded-xl border border-slate-700 px-3 text-sm font-semibold text-slate-100 hover:border-emerald-500/40"
+              className="inline-flex h-10 items-center rounded-xl border border-white/[0.1] px-3 text-sm font-semibold text-slate-100 hover:border-emerald-500/40"
             >
               PARTNER_API.md
             </a>
             <a
               href="/api/partner/docs/postman-collection"
-              className="inline-flex h-10 items-center rounded-xl border border-slate-700 px-3 text-sm font-semibold text-slate-100 hover:border-emerald-500/40"
+              className="inline-flex h-10 items-center rounded-xl border border-white/[0.1] px-3 text-sm font-semibold text-slate-100 hover:border-emerald-500/40"
             >
               Postman collection
             </a>
             <a
               href="/api/partner/docs/postman-environment"
-              className="inline-flex h-10 items-center rounded-xl border border-slate-700 px-3 text-sm font-semibold text-slate-100 hover:border-emerald-500/40"
+              className="inline-flex h-10 items-center rounded-xl border border-white/[0.1] px-3 text-sm font-semibold text-slate-100 hover:border-emerald-500/40"
             >
               Postman environment
             </a>
@@ -213,7 +237,7 @@ export default function PartnerApiDocsClient({
               return (
                 <div
                   key={key}
-                  className="rounded-xl border border-slate-800 bg-slate-900/50"
+                  className="rounded-xl border border-white/[0.08] bg-[#0D1526]"
                 >
                   <button
                     type="button"
@@ -229,17 +253,27 @@ export default function PartnerApiDocsClient({
                     </span>
                   </button>
                   {isOpen ? (
-                    <div className="space-y-3 border-t border-slate-800 px-4 py-3 text-sm text-slate-400">
+                    <div className="space-y-3 border-t border-white/[0.06] px-4 py-3 text-sm text-slate-400">
                       <p>{ep.summary}</p>
                       {ep.request ? (
-                        <pre className="overflow-x-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-300">
-                          {ep.request}
-                        </pre>
+                        <div className="space-y-1">
+                          <div className="flex justify-end">
+                            <CopyCode text={ep.request} />
+                          </div>
+                          <pre className="overflow-x-auto rounded-lg bg-[#070D19] p-3 text-xs text-slate-300">
+                            {ep.request}
+                          </pre>
+                        </div>
                       ) : null}
                       {ep.response ? (
-                        <pre className="overflow-x-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-300">
-                          {ep.response}
-                        </pre>
+                        <div className="space-y-1">
+                          <div className="flex justify-end">
+                            <CopyCode text={ep.response} />
+                          </div>
+                          <pre className="overflow-x-auto rounded-lg bg-[#070D19] p-3 text-xs text-slate-300">
+                            {ep.response}
+                          </pre>
+                        </div>
                       ) : null}
                     </div>
                   ) : null}

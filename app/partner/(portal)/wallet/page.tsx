@@ -5,6 +5,10 @@ import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
 import { resolveHostedCheckoutProvider } from "@/app/lib/payments/gatewaySelect";
 import { getSimpaisaWalletOperatorConfig } from "@/app/lib/payments/simpaisaWalletOperatorConfig";
 import PartnerWalletAddFundsForm from "@/app/components/partner/PartnerWalletAddFundsForm";
+import {
+  partnerCardClass,
+  partnerPrimaryCtaClass,
+} from "@/app/components/partner/partnerPortalUi";
 
 export const dynamic = "force-dynamic";
 
@@ -19,42 +23,22 @@ export default async function PartnerWalletPage() {
     summary = await getPartnerPortalSummary(user.id);
   } catch {
     return (
-      <div className="min-w-0 w-full max-w-full space-y-6">
-        <header>
-          <h1 className="text-2xl font-bold tracking-tight">Wallet</h1>
-        </header>
-        <div
-          className="min-w-0 w-full max-w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-          role="status"
-        >
-          <p className="text-sm font-medium text-[var(--heading)]">
-            {PORTAL_UNAVAILABLE}
-          </p>
-        </div>
+      <div className={partnerCardClass} role="status">
+        <p className="text-sm font-medium text-slate-100">{PORTAL_UNAVAILABLE}</p>
       </div>
     );
   }
 
   if (!summary) {
     return (
-      <div className="min-w-0 w-full max-w-full space-y-6">
-        <header>
-          <h1 className="text-2xl font-bold tracking-tight">Wallet</h1>
-        </header>
-        <div
-          className="min-w-0 w-full max-w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
-          role="status"
-        >
-          <p className="text-sm font-medium text-[var(--heading)]">
-            Partner access is unavailable.
-          </p>
-        </div>
+      <div className={partnerCardClass} role="status">
+        <p className="text-sm font-medium text-slate-100">
+          Partner access is unavailable.
+        </p>
       </div>
     );
   }
 
-  // Partner Add Funds is Simpaisa-only; hosted checkout resolves SAFEPAY → Simpaisa
-  // while the Safepay customer kill switch is on.
   const selectedProvider = resolveHostedCheckoutProvider(
     process.env.PAYMENT_GATEWAY_PROVIDER
   );
@@ -66,34 +50,32 @@ export default async function PartnerWalletPage() {
     <div className="min-w-0 w-full max-w-full space-y-8">
       <header className="flex min-w-0 flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Wallet</h1>
-          <p className="mt-2 text-sm text-[var(--text-muted)] break-words">
-            Your MAP eSIM Partner balance and history.
+          <h1 className="text-2xl font-bold tracking-tight text-slate-50">
+            Wallet
+          </h1>
+          <p className="mt-1 text-sm text-slate-400">
+            Prepaid USD balance for wholesale eSIM purchases.
           </p>
         </div>
-        <Link
-          href="/partner/catalog"
-          className="inline-flex h-10 items-center justify-center rounded-[14px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
-        >
+        <Link href="/partner/catalog" className={partnerPrimaryCtaClass}>
           Buy eSIM
         </Link>
       </header>
 
-      <div className="min-w-0 w-full max-w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
-          Available Partner Balance
+      <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/15 via-[#0D1526] to-[#0D1526] p-6 sm:p-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-300/80">
+          Available balance
         </p>
-        <p className="mt-2 break-words text-3xl font-bold tracking-tight text-[var(--heading)]">
+        <p className="mt-2 text-4xl font-bold tracking-tight text-slate-50 tabular-nums">
           {summary.balanceLabel}
         </p>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">USD</p>
-        <p className="mt-4 text-sm leading-relaxed text-[var(--text-muted)]">
-          Current Partner discount:{" "}
-          <span className="font-semibold text-[var(--heading)]">
+        <p className="mt-1 text-sm text-slate-400">USD</p>
+        <p className="mt-4 max-w-xl text-sm leading-relaxed text-slate-400">
+          Partner discount{" "}
+          <span className="font-semibold text-slate-200">
             {summary.discountPercentLabel}
-          </span>
-          . Applied automatically when you buy. Admin funding continues to
-          credit this wallet.
+          </span>{" "}
+          applies automatically at purchase. Admin credits also land here.
         </p>
       </div>
 
@@ -103,38 +85,49 @@ export default async function PartnerWalletPage() {
         enabledSimpaisaOperatorIds={simpaisaOperators.enabledOperatorIds}
       />
 
-      <section className="min-w-0 w-full max-w-full space-y-4">
-        <h2 className="text-lg font-semibold tracking-tight">
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold tracking-tight text-slate-50">
           Transaction history
         </h2>
         {summary.recentTransactions.length === 0 ? (
-          <div className="min-w-0 w-full max-w-full rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]">
+          <div className="rounded-2xl border border-dashed border-white/[0.1] bg-[#0D1526] p-6 text-sm text-slate-400">
             No wallet transactions yet.
           </div>
         ) : (
-          <ul className="min-w-0 space-y-3">
-            {summary.recentTransactions.map((tx) => (
-              <li
-                key={tx.id}
-                className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm"
-              >
-                <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-[var(--heading)]">
-                      {tx.typeLabel}
-                    </p>
-                    <p className="mt-1 text-[var(--text-muted)]">{tx.reason}</p>
-                  </div>
-                  <p className="font-semibold tabular-nums text-[var(--heading)]">
-                    {tx.amountLabel}
-                  </p>
-                </div>
-                <p className="mt-2 text-xs text-[var(--text-soft)]">
-                  {tx.createdAtLabel} · Balance after {tx.balanceAfterLabel}
-                </p>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0D1526]">
+            <table className="min-w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-white/[0.06] text-xs uppercase tracking-[0.08em] text-slate-500">
+                  <th className="px-4 py-3 font-semibold">Type</th>
+                  <th className="px-4 py-3 font-semibold">Amount</th>
+                  <th className="px-4 py-3 font-semibold">Balance after</th>
+                  <th className="px-4 py-3 font-semibold">When</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.recentTransactions.map((tx) => (
+                  <tr
+                    key={tx.id}
+                    className="border-t border-white/[0.05] hover:bg-white/[0.02]"
+                  >
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-slate-100">{tx.typeLabel}</p>
+                      <p className="text-xs text-slate-500">{tx.reason}</p>
+                    </td>
+                    <td className="px-4 py-3 font-semibold tabular-nums text-slate-100">
+                      {tx.amountLabel}
+                    </td>
+                    <td className="px-4 py-3 tabular-nums text-slate-400">
+                      {tx.balanceAfterLabel}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">
+                      {tx.createdAtLabel}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>

@@ -110,23 +110,23 @@ export default function PartnerWalletAddFundsForm({
   return (
     <form
       action={formAction}
-      className="space-y-5 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6"
+      className="space-y-5 rounded-2xl border border-white/[0.08] bg-[#0D1526] p-5 sm:p-6"
       noValidate
       data-partner-add-funds="true"
     >
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
       <div>
-        <h2 className="text-lg font-semibold tracking-tight text-[var(--heading)]">
+        <h2 className="text-lg font-semibold tracking-tight text-slate-50">
           Add Funds
         </h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
+        <p className="mt-1 text-sm text-slate-400">
           Top up your Partner balance with Easypaisa or JazzCash. Only a verified
           payment credits this wallet.
         </p>
       </div>
 
       <div className="space-y-3">
-        <p className="block text-sm font-semibold text-[var(--heading)]">
+        <p className="block text-sm font-semibold text-slate-100">
           Quick amount
         </p>
         <div
@@ -146,8 +146,8 @@ export default function PartnerWalletAddFundsForm({
                 onClick={() => selectPreset(preset)}
                 className={
                   active
-                    ? "inline-flex h-10 min-w-[4.5rem] flex-1 items-center justify-center rounded-[14px] bg-[var(--accent)] px-3 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] disabled:opacity-60 sm:flex-none"
-                    : "inline-flex h-10 min-w-[4.5rem] flex-1 items-center justify-center rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--surface-2)] disabled:opacity-60 sm:flex-none"
+                    ? "inline-flex h-10 min-w-[4.5rem] flex-1 items-center justify-center rounded-xl bg-emerald-500 px-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-60 sm:flex-none"
+                    : "inline-flex h-10 min-w-[4.5rem] flex-1 items-center justify-center rounded-xl border border-white/[0.12] bg-transparent px-3 text-sm font-semibold text-slate-100 transition hover:bg-white/[0.04] disabled:opacity-60 sm:flex-none"
                 }
               >
                 {preset.label}
@@ -160,7 +160,7 @@ export default function PartnerWalletAddFundsForm({
       <div className="space-y-2">
         <label
           htmlFor={amountId}
-          className="block text-sm font-semibold text-[var(--heading)]"
+          className="block text-sm font-semibold text-slate-100"
         >
           Custom USD amount
         </label>
@@ -178,13 +178,13 @@ export default function PartnerWalletAddFundsForm({
             setSelectedPreset("custom");
           }}
           placeholder={`${minLabel}`}
-          className="w-full rounded-[14px] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-3 text-sm text-[var(--heading)]"
+          className="w-full rounded-xl border border-white/[0.1] bg-[#070D19] px-3 py-3 text-sm text-slate-100"
         />
-        <p className="text-xs text-[var(--text-muted)]">
+        <p className="text-xs text-slate-500">
           Minimum ${minLabel} · Maximum ${maxLabel} · Up to two decimal places
         </p>
         {errorState.ok === false && errorState.fieldErrors?.amount ? (
-          <p className="text-sm text-[var(--heading)]" role="alert">
+          <p className="text-sm text-rose-300" role="alert">
             {errorState.fieldErrors.amount}
           </p>
         ) : null}
@@ -211,14 +211,14 @@ export default function PartnerWalletAddFundsForm({
       <button
         type="submit"
         disabled={pending || amountCents <= 0}
-        className="inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] disabled:opacity-60"
+        className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-emerald-500 px-5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-60"
       >
         {pending ? "Sending payment request…" : "Continue"}
       </button>
 
       {errorState.ok === false && errorState.error ? (
         <div
-          className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--heading)]"
+          className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100"
           role="alert"
         >
           {errorState.error}

@@ -48,6 +48,7 @@ export async function GET() {
         page,
         limit: 500,
         fullCatalog: true,
+        snapshotOnly: true,
       });
       offers.push(...batch.offers);
       totalPages = batch.totalPages;
@@ -59,11 +60,13 @@ export async function GET() {
       "name",
       "destinationCode",
       "destinationLabel",
+      "kind",
       "region",
       "dataLabel",
       "validityLabel",
       "partnerPriceUsd",
       "partnerPriceCents",
+      "retailPriceUsd",
       "currency",
     ];
     const lines = [header.join(",")];
@@ -74,11 +77,13 @@ export async function GET() {
           row.name,
           row.destinationCode,
           row.destinationLabel,
+          row.kind ?? "",
           row.region ?? "",
           row.dataLabel,
           row.validityLabel,
           String(row.partnerPriceUsd),
           String(row.partnerPriceCents),
+          row.retailPriceUsd != null ? String(row.retailPriceUsd) : "",
           row.currency,
         ]
           .map((v) => csvEscape(String(v)))

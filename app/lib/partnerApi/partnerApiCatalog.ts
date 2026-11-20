@@ -40,16 +40,22 @@ export type PartnerApiOfferRow = {
   destinationCode: string;
   destinationLabel: string;
   region: string | null;
+  /** Destination kind when known: country | regional | global */
+  kind: string | null;
   partnerPriceUsd: number;
   partnerPriceCents: number;
   partnerPriceLabel: string;
+  retailPriceUsd: number | null;
+  retailPriceCents: number | null;
+  retailPriceLabel: string | null;
   currency: "USD";
 };
 
 function offerToApiRow(
   offer: PartnerCatalogOffer,
   destinationCode: string,
-  region: string | null
+  region: string | null,
+  kind: string | null = null
 ): PartnerApiOfferRow {
   return {
     offerId: offer.offerId,
@@ -59,9 +65,13 @@ function offerToApiRow(
     destinationCode,
     destinationLabel: offer.destinationLabel,
     region,
+    kind,
     partnerPriceUsd: Number((offer.partnerPriceCents / 100).toFixed(2)),
     partnerPriceCents: offer.partnerPriceCents,
     partnerPriceLabel: offer.partnerPriceLabel,
+    retailPriceUsd: null,
+    retailPriceCents: null,
+    retailPriceLabel: null,
     currency: "USD",
   };
 }
@@ -89,6 +99,11 @@ function mapSnapshotOffer(input: {
       : input.destinationCode.startsWith("region-")
         ? input.destinationCode
         : null;
+  const kind = input.destinationCode.startsWith("region-")
+    ? "regional"
+    : input.destinationCode === "global"
+      ? "global"
+      : "country";
   return {
     offerId: verified.offerId,
     name: verified.name,
@@ -101,9 +116,13 @@ function mapSnapshotOffer(input: {
     destinationLabel:
       verified.countryName || verified.countryCode || input.destinationCode,
     region,
+    kind,
     partnerPriceUsd: Number((partnerChargeCents / 100).toFixed(2)),
     partnerPriceCents: partnerChargeCents,
     partnerPriceLabel: `${formatUsdCents(partnerChargeCents)} USD`,
+    retailPriceUsd: Number((retailCents / 100).toFixed(2)),
+    retailPriceCents: retailCents,
+    retailPriceLabel: `${formatUsdCents(retailCents)} USD`,
     currency: "USD",
   };
 }
@@ -168,6 +187,11 @@ export async function listPartnerApiOffers(options: {
   region?: string | null;
   search?: string | null;
   fullCatalog?: boolean;
+  /**
+   * Portal / CSV fast path: price DB snapshots only.
+   * Never fans out live VeSIM fetches (that hung /partner/catalog).
+   */
+  snapshotOnly?: boolean;
 }): Promise<{
   offers: PartnerApiOfferRow[];
   page: number;
@@ -176,14 +200,15 @@ export async function listPartnerApiOffers(options: {
   totalPages: number;
 }> {
   const page = Math.max(1, options.page);
-  const limit = Math.min(500, Math.max(1, options.limit));
+  const limit = Math.min(5000, Math.max(1, options.limit));
   const country = sanitizeCountryHint(options.country);
   const region = (options.region ?? "").trim().toLowerCase() || null;
   const search = (options.search ?? "").trim().toLowerCase() || null;
+  const snapshotOnly = options.snapshotOnly === true;
 
   const collected: PartnerApiOfferRow[] = [];
 
-  if (country && !options.fullCatalog) {
+  if (country && !options.fullCatalog && !snapshotOnly) {
     const offers = await listPartnerCatalogOffers(country, {
       discountBps: options.discountBps,
       walletBalanceCents: 0,
@@ -198,10 +223,11 @@ export async function listPartnerApiOffers(options: {
       select: { destinationCode: true, offersJson: true },
       orderBy: { destinationCode: "asc" },
     });
-    // Fallback: if no snapshots, walk destination catalog (background refresh).
+    // Fallback: if no snapshots, walk destination catalog (capped; never hang).
     if (snapshots.length === 0) {
       const destinations = await fetchPublicDestinationCatalog().catch(() => []);
-      for (const d of destinations.slice(0, 80)) {
+      const capped = destinations.slice(0, snapshotOnly ? 40 : 80);
+      for (const d of capped) {
         const code = sanitizeCountryHint(d.code);
         if (!code) continue;
         if (country && code !== country) continue;
@@ -216,7 +242,8 @@ export async function listPartnerApiOffers(options: {
               offerToApiRow(
                 offer,
                 code,
-                d.kind === "regional" || d.kind === "global" ? code : null
+                d.kind === "regional" || d.kind === "global" ? code : null,
+                d.kind ?? null
               )
             );
           }
@@ -235,24 +262,25 @@ export async function listPartnerApiOffers(options: {
         const raw = Array.isArray(snap.offersJson)
           ? (snap.offersJson as unknown as VesimOffer[])
           : [];
-        const offers = applyPakistanPublicCatalog(
-          code,
-          await Promise.resolve(raw)
-        );
-        // Prefer live-ish snapshot transform without Asia customer overlay.
-        let liveOffers = offers;
-        try {
-          liveOffers = applyPakistanPublicCatalog(
-            code,
-            await fetchPublicOffersForCountry(code, {
-              refreshMode: "background",
-              applyAsiaCustomerOverlay: false,
-            })
-          );
-        } catch {
-          liveOffers = offers;
+        let pricedOffers = applyPakistanPublicCatalog(code, raw);
+
+        // Live refresh only when explicitly requested (API clients).
+        // Portal uses snapshotOnly to avoid N× provider round-trips.
+        if (!snapshotOnly) {
+          try {
+            pricedOffers = applyPakistanPublicCatalog(
+              code,
+              await fetchPublicOffersForCountry(code, {
+                refreshMode: "background",
+                applyAsiaCustomerOverlay: false,
+              })
+            );
+          } catch {
+            // keep snapshot offers
+          }
         }
-        for (const offer of liveOffers) {
+
+        for (const offer of pricedOffers) {
           const mapped = mapSnapshotOffer({
             offer,
             destinationCode: code,

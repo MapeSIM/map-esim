@@ -6,6 +6,7 @@ import PartnerMenu, {
 import { requireRole } from "@/app/lib/auth/session";
 import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
 import { prisma } from "@/app/lib/db";
+import { formatUsdCents } from "@/app/lib/wallet/display";
 
 export const dynamic = "force-dynamic";
 /** Partner buy runs prepare + reserve + VeSIM credit checkout (up to ~25s). */
@@ -17,10 +18,10 @@ export const metadata: Metadata = {
 
 const partnerLinks: PartnerNavLink[] = [
   { href: "/partner", label: "Home", exact: true },
-  { href: "/partner/docs", label: "API docs" },
   { href: "/partner/catalog", label: "Catalog" },
   { href: "/partner/orders", label: "Orders" },
   { href: "/partner/wallet", label: "Wallet" },
+  { href: "/partner/docs", label: "API Docs" },
   { href: "/partner/account", label: "Account" },
 ];
 
@@ -40,26 +41,31 @@ export default async function PartnerLayout({
     select: {
       brandCompanyName: true,
       shareCompanyName: true,
+      walletAccount: { select: { balanceCents: true } },
     },
   });
   const companyBadge =
     branding?.brandCompanyName || branding?.shareCompanyName || actor.name;
+  const walletBalanceLabel = formatUsdCents(
+    branding?.walletAccount?.balanceCents ?? 0
+  );
 
   return (
-    <main className="min-h-screen w-full max-w-full bg-[#020617] px-3 py-6 text-slate-100 sm:px-6 sm:py-8">
-      <div className="mx-auto w-full min-w-0 max-w-6xl space-y-5">
-        <header className="rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-4 shadow-[0_0_0_1px_rgba(16,185,129,0.08)] sm:px-5">
+    <div className="min-h-screen w-full bg-[#070D19] text-slate-100">
+      <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#070D19]/90 backdrop-blur-md">
+        <div className="mx-auto w-full max-w-6xl px-4 pt-3 sm:px-6">
           <PartnerMenu
             userName={actor.name}
             userEmail={actor.email}
             companyBadge={companyBadge}
+            walletBalanceLabel={walletBalanceLabel}
             links={partnerLinks}
           />
-        </header>
-        <section className="min-w-0 w-full max-w-full rounded-2xl border border-slate-800 bg-slate-950 p-5 sm:p-8">
-          {children}
-        </section>
-      </div>
-    </main>
+        </div>
+      </header>
+      <main className="mx-auto w-full min-w-0 max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        {children}
+      </main>
+    </div>
   );
 }

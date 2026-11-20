@@ -1,50 +1,55 @@
 import type { PartnerOrderStatusBadge } from "@/app/lib/partner/partnerOrdersDisplay";
 
-/** Shared Partner Portal presentation only. No API or permission changes. */
+/** Shared Partner Portal presentation — Stripe/Airalo-inspired B2B shell. */
+
+export const partnerShellBg = "#070D19";
+export const partnerCardBg = "#0D1526";
+export const partnerBorder = "1px solid rgba(255,255,255,0.08)";
+export const partnerAccent = "#10B981";
 
 export const partnerCardClass =
-  "min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6";
+  "min-w-0 rounded-2xl border border-white/[0.08] bg-[#0D1526] p-5 sm:p-6";
 
 export const partnerInsetCardClass =
-  "min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-4 sm:px-5";
+  "min-w-0 rounded-2xl border border-white/[0.08] bg-[#070D19] px-4 py-4 sm:px-5";
 
 export const partnerSectionLabelClass =
-  "text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]";
+  "text-xs font-semibold uppercase tracking-[0.12em] text-slate-500";
 
 export const partnerSectionTitleClass =
-  "text-base font-semibold tracking-tight text-[var(--heading)]";
+  "text-base font-semibold tracking-tight text-slate-50";
 
 export const partnerPrimaryCtaClass =
-  "inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--accent-ink)] outline-none transition hover:bg-[var(--accent-strong)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60";
+  "inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 text-sm font-bold text-slate-950 outline-none transition hover:bg-emerald-400 focus-visible:ring-2 focus-visible:ring-emerald-400/60 disabled:opacity-60";
 
 export const partnerSecondaryCtaClass =
-  "inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] outline-none transition hover:bg-[var(--page-bg-soft)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60";
+  "inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/[0.12] bg-transparent px-4 text-sm font-semibold text-slate-100 outline-none transition hover:bg-white/[0.04] focus-visible:ring-2 focus-visible:ring-emerald-400/60 disabled:opacity-60";
 
 export const partnerQuietCtaClass =
-  "inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-transparent px-4 text-sm font-semibold text-[var(--text)] outline-none transition hover:bg-[var(--surface)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60";
+  "inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-transparent px-4 text-sm font-semibold text-slate-300 outline-none transition hover:bg-white/[0.04] focus-visible:ring-2 focus-visible:ring-emerald-400/60 disabled:opacity-60";
 
 export const partnerDangerCtaClass =
-  "inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--danger-border)] px-4 text-sm font-semibold text-[var(--danger-text)] outline-none transition hover:bg-[var(--danger-bg)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60";
+  "inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-rose-500/40 px-4 text-sm font-semibold text-rose-300 outline-none transition hover:bg-rose-500/10 focus-visible:ring-2 focus-visible:ring-emerald-400/60 disabled:opacity-60";
 
 export const partnerFieldClass =
-  "mt-1.5 w-full min-w-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--heading)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]";
+  "mt-1.5 w-full min-w-0 rounded-xl border border-white/[0.1] bg-[#070D19] px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus-visible:ring-2 focus-visible:ring-emerald-400/50";
 
 export function partnerStatusBadgeClass(status: PartnerOrderStatusBadge): string {
   switch (status) {
     case "Completed":
     case "Active":
-      return "bg-[var(--accent)]/15 text-[var(--heading)] border-[var(--accent-strong)]/40";
+      return "border-emerald-500/30 bg-emerald-500/15 text-emerald-300";
     case "Data Depleted":
-      return "bg-[var(--warning-bg)] text-[var(--warning-text)] border-[var(--warning-border)]";
+      return "border-amber-500/30 bg-amber-500/10 text-amber-200";
     case "Processing":
-      return "bg-[var(--surface)] text-[var(--text)] border-[var(--border-hover)]";
+      return "border-slate-500/30 bg-slate-500/10 text-slate-300";
     case "Under review":
-      return "bg-[var(--warning-bg)] text-[var(--warning-text)] border-[var(--warning-border)]";
+      return "border-amber-500/30 bg-amber-500/10 text-amber-200";
     case "Refunded":
     case "Failed — balance returned":
     case "eSIM Expired":
-      return "bg-[var(--danger-bg)] text-[var(--danger-text)] border-[var(--danger-border)]";
+      return "border-rose-500/30 bg-rose-500/10 text-rose-300";
     default:
-      return "bg-[var(--surface)] text-[var(--text-muted)] border-[var(--border)]";
+      return "border-white/[0.08] bg-white/[0.04] text-slate-400";
   }
 }
