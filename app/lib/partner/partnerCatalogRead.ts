@@ -1,19 +1,22 @@
 /**
- * Partner catalog reads — Partner-facing offer cards.
+ * Partner catalog reads — Partner-facing destination + offer cards.
  * Browse uses public destination/offer snapshots (fast).
  * Purchase still verifies live via verifyOfferAuthoritative.
- * Exposes final Partner price labels only — never discount %, retail,
- * provider cost, or raw partnerChargeCents.
+ * Catalog shows MAP retail; Partner discount % is applied at checkout.
+ * Never exposes provider cost or raw discountBps to the client.
  */
 import "server-only";
 
+import { prisma } from "@/app/lib/db";
 import { applyPakistanPublicCatalog } from "@/app/lib/plans/pakistanCatalogPolicy";
 import { partnerChargeCentsFromRetail } from "@/app/lib/partner/partnerPricing";
 import {
   calculatePartnerPurchaseFunding,
   partnerPurchaseRequiresGateway,
 } from "@/app/lib/partner/partnerPurchaseFunding";
+import { planCardOperatorLabel } from "@/app/lib/plans/planOfferPresentation";
 import { destinationDisplayName } from "@/app/lib/vesim/destinationPresentation";
+import type { VesimOffer } from "@/app/lib/vesim/offers";
 import {
   fetchPublicDestinationCatalog,
   fetchPublicOffersForCountry,
@@ -31,6 +34,11 @@ export type PartnerCatalogDestination = {
   isPopular?: boolean;
   slug?: string;
   searchAliases?: string[];
+  /** Snapshot-backed plan count for destination cards. */
+  planCount: number;
+  /** Lowest retail USD for "From $X" on destination cards. */
+  minRetailPriceUsd: number | null;
+  minRetailPriceLabel: string | null;
 };
 
 /** Split / gateway remainder labels for Partner purchase UI (display only). */
@@ -55,6 +63,10 @@ export type PartnerCatalogOffer = {
   name: string;
   dataLabel: string;
   validityLabel: string;
+  durationDays: number | null;
+  networkLabel: string | null;
+  isUnlimited: boolean;
+  retailPriceUsd: number;
   /** MAP eSIM retail list price — shown on catalog with discount-at-checkout note. */
   retailPriceLabel: string;
   /** Final Partner price after admin discount — charged at checkout. */
@@ -79,25 +91,89 @@ export type PartnerCatalogOfferPricingContext = {
 };
 
 /**
+ * Snapshot-only min retail + plan counts (no live VeSIM fan-out).
+ */
+async function loadDestinationRetailStats(): Promise<
+  Map<string, { planCount: number; minRetailCents: number }>
+> {
+  const out = new Map<string, { planCount: number; minRetailCents: number }>();
+  try {
+    const snapshots = await prisma.publicDestinationOfferSnapshot.findMany({
+      select: { destinationCode: true, offersJson: true },
+    });
+    for (const snap of snapshots) {
+      const code = sanitizeCountryHint(snap.destinationCode);
+      if (!code) continue;
+      const raw = Array.isArray(snap.offersJson)
+        ? (snap.offersJson as unknown as VesimOffer[])
+        : [];
+      const offers = applyPakistanPublicCatalog(code, raw);
+      let planCount = 0;
+      let minRetailCents: number | null = null;
+      for (const offer of offers) {
+        const verified = toVerifiedCheckoutOffer(offer, code, {
+          applyAsiaTemporaryMarkup: false,
+        });
+        if (!verified) continue;
+        const retailCents = Math.round(verified.priceUSD * 100);
+        if (!Number.isFinite(retailCents) || retailCents <= 0) continue;
+        planCount += 1;
+        if (minRetailCents == null || retailCents < minRetailCents) {
+          minRetailCents = retailCents;
+        }
+      }
+      if (planCount > 0 && minRetailCents != null) {
+        out.set(code, { planCount, minRetailCents });
+      }
+    }
+  } catch {
+    // leave empty — cards show "—" / 0 plans
+  }
+  return out;
+}
+
+/**
  * Partner destination picker — public cached catalog (not live VeSIM).
+ * Enriched with snapshot plan counts + starting retail for destination cards.
  */
 export async function listPartnerCatalogDestinations(): Promise<
   PartnerCatalogDestination[]
 > {
   try {
-    const destinations = await fetchPublicDestinationCatalog();
+    const [destinations, stats] = await Promise.all([
+      fetchPublicDestinationCatalog(),
+      loadDestinationRetailStats(),
+    ]);
     return destinations
       .filter((d) => Boolean(d.code?.trim()))
       .slice(0, 400)
-      .map((d) => ({
-        code: d.code,
-        name: destinationDisplayName(d),
-        kind: d.kind,
-        flag: d.flag,
-        isPopular: d.isPopular === true,
-        slug: d.slug,
-        searchAliases: d.searchAliases,
-      }));
+      .map((d) => {
+        const code = d.code;
+        const stat = stats.get(sanitizeCountryHint(code) || code);
+        const minRetailCents = stat?.minRetailCents ?? null;
+        return {
+          code,
+          name: destinationDisplayName(d),
+          kind: d.kind,
+          flag: d.flag,
+          isPopular: d.isPopular === true,
+          slug: d.slug,
+          searchAliases: d.searchAliases,
+          planCount: stat?.planCount ?? d.offerCount ?? 0,
+          minRetailPriceUsd:
+            minRetailCents != null
+              ? Number((minRetailCents / 100).toFixed(2))
+              : d.minPrice != null && Number.isFinite(d.minPrice)
+                ? Number(d.minPrice)
+                : null,
+          minRetailPriceLabel:
+            minRetailCents != null
+              ? formatUsdCents(minRetailCents)
+              : d.minPrice != null && Number.isFinite(d.minPrice)
+                ? `$${Number(d.minPrice).toFixed(2)}`
+                : null,
+        };
+      });
   } catch {
     return [];
   }
@@ -110,6 +186,9 @@ function buildPartnerCatalogOfferDisplay(input: {
   validityLabel: string;
   destinationLabel: string;
   retailPriceCents: number;
+  durationDays?: number | null;
+  networkLabel?: string | null;
+  isUnlimited?: boolean;
   pricing?: PartnerCatalogOfferPricingContext;
 }): PartnerCatalogOffer | null {
   const discountBps = input.pricing?.discountBps ?? 0;
@@ -142,6 +221,10 @@ function buildPartnerCatalogOfferDisplay(input: {
     name: input.name,
     dataLabel: input.dataLabel,
     validityLabel: input.validityLabel,
+    durationDays: input.durationDays ?? null,
+    networkLabel: input.networkLabel ?? null,
+    isUnlimited: input.isUnlimited === true,
+    retailPriceUsd: Number((input.retailPriceCents / 100).toFixed(2)),
     retailPriceLabel: `${formatUsdCents(input.retailPriceCents)} USD`,
     partnerPriceLabel: `${formatUsdCents(partnerChargeCents)} USD`,
     partnerPriceCents: partnerChargeCents,
@@ -184,11 +267,19 @@ export async function listPartnerCatalogOffers(
         dataLabel: verified.dataFormatted || "Not available",
         validityLabel:
           verified.durationDays != null
-            ? `${verified.durationDays} Days`
+            ? verified.durationDays === 1
+              ? "1 Day"
+              : `${verified.durationDays} Days`
             : "Not available",
         destinationLabel:
           verified.countryName || verified.countryCode || code,
         retailPriceCents: retailCents,
+        durationDays: verified.durationDays ?? null,
+        networkLabel: planCardOperatorLabel(offer),
+        isUnlimited:
+          offer.dataUnlimited === true ||
+          /unlimited/i.test(verified.dataFormatted || "") ||
+          /unlimited/i.test(offer.dataFormatted || ""),
         pricing,
       });
       if (row) out.push(row);
@@ -225,13 +316,18 @@ export function partnerCatalogOfferFromRetail(input: {
     dataLabel: (input.dataFormatted ?? "").trim() || "Not available",
     validityLabel:
       input.durationDays != null
-        ? `${input.durationDays} Days`
+        ? input.durationDays === 1
+          ? "1 Day"
+          : `${input.durationDays} Days`
         : "Not available",
     destinationLabel:
       (input.countryName ?? "").trim() ||
       (input.countryCode ?? "").trim() ||
       "Destination",
     retailPriceCents: retailCents,
+    durationDays: input.durationDays ?? null,
+    networkLabel: null,
+    isUnlimited: /unlimited/i.test(input.dataFormatted || ""),
     pricing:
       input.discountBps != null ||
       input.walletBalanceCents != null ||
