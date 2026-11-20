@@ -32,7 +32,7 @@ Same-origin hint: use \`/api/v1/partner/...\` on this host with your Bearer toke
 2. \`POST /checkout/quote\` — confirm unit/total + wallet sufficiency.
 3. \`POST /checkout/credit\` with \`Idempotency-Key\` — debit Partner wallet and fulfill eSIM.
 4. \`GET /orders/{id}\` — retrieve ICCID, LPA, QR URL.
-5. Optional: \`POST /orders/{id}/cancel\` when unused.
+5. Optional: \`POST /orders/{id}/cancel\` when unused — submits a refund request for admin review (no instant wallet credit).
 
 ## Endpoints
 
@@ -66,6 +66,31 @@ Live usage for an ICCID owned by the authenticated Partner.
 Body: \`{ "reason": "OTHERS", "notes": "optional" }\`
 Only unused / not-activated Partner-balance orders.
 
+**Does not credit the Partner wallet automatically.** Creates an Order Support Ticket
+(\`subject: "Refund request"\`, \`status: "PENDING"\`) for Admin review in Support tickets.
+Wallet credit happens only after an Admin clicks **Approve**. Duplicate open tickets on
+the same order are rejected / returned idempotently.
+
+Example success response:
+
+\`\`\`json
+{
+  "success": true,
+  "refundRequest": {
+    "ticketId": "clx...",
+    "orderId": "...",
+    "purchaseId": "...",
+    "status": "PENDING",
+    "statusLabel": "Pending",
+    "subject": "Refund request",
+    "message": "Refund request submitted for admin review. Wallet credit occurs only after an admin approves the ticket in Support tickets.",
+    "reason": "OTHERS",
+    "idempotent": false,
+    "walletCredited": false
+  }
+}
+\`\`\`
+
 ### GET /wallet
 Current USD balance + recent ledger transactions.
 
@@ -86,7 +111,7 @@ ${cancelRows}
 
 | Status | Meaning |
 |--------|---------|
-| 400 | Validation, insufficient wallet credit, ineligible cancellation |
+| 400 | Validation, insufficient wallet credit, ineligible cancel/refund request |
 | 401 | Missing/invalid Bearer token |
 | 403 | Partner disabled / not allowed |
 | 429 | Rate limited |
@@ -190,7 +215,7 @@ export function buildPartnerPostmanCollection(baseUrl = "{{base_url}}"): Record<
       },
     },
     {
-      name: "Cancel order",
+      name: "Cancel / refund request (admin review)",
       request: {
         method: "POST",
         header: [jsonHeader],
@@ -199,6 +224,8 @@ export function buildPartnerPostmanCollection(baseUrl = "{{base_url}}"): Record<
           raw: '{\n  "reason": "OTHERS",\n  "notes": "unused"\n}',
         },
         url: `${baseUrl}/api/v1/partner/orders/{{order_id}}/cancel`,
+        description:
+          "Submits a Refund request support ticket for Admin approval. Does not credit the Partner wallet instantly.",
         auth,
       },
     },

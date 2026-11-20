@@ -11,7 +11,11 @@ import { cancelPartnerApiOrder } from "@/app/lib/partnerApi/partnerApiCancel";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/** POST /api/v1/partner/orders/[id]/cancel */
+/**
+ * POST /api/v1/partner/orders/[id]/cancel
+ * Submits a Refund request support ticket for Admin review.
+ * Never credits Partner wallet or marks the order refunded automatically.
+ */
 export async function POST(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -27,9 +31,11 @@ export async function POST(
     return partnerApiError(400, "Validation error", "Invalid JSON body.");
   }
 
+  // Client-supplied money fields are ignored — Admin Approve decides credit.
   void body.amount;
   void body.amountCents;
   void body.refundAmount;
+  void body.refundAmountCents;
 
   try {
     const result = await cancelPartnerApiOrder({
@@ -49,15 +55,17 @@ export async function POST(
     }
     return partnerApiJson({
       success: true,
-      cancellation: {
+      refundRequest: {
+        ticketId: result.ticketId,
         orderId: result.orderId,
         purchaseId: result.purchaseId,
+        status: result.status,
+        statusLabel: result.statusLabel,
+        subject: result.subject,
+        message: result.message,
         reason: result.reason,
-        refundedAmountCents: result.refundedAmountCents,
-        refundedAmountLabel: result.refundedAmountLabel,
-        remainingBalanceCents: result.remainingBalanceCents,
-        remainingBalanceLabel: result.remainingBalanceLabel,
         idempotent: result.idempotent,
+        walletCredited: false,
       },
       cancelReasonCodes: CANCEL_REASON_CODES,
     });
@@ -65,7 +73,7 @@ export async function POST(
     return partnerApiError(
       503,
       "Unavailable",
-      "Cancellation is temporarily unavailable."
+      "Refund request is temporarily unavailable."
     );
   }
 }

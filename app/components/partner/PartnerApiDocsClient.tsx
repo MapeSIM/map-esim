@@ -96,8 +96,20 @@ const ENDPOINTS: Array<{
   {
     method: "POST",
     path: "/orders/{id}/cancel",
-    summary: "Cancel unused order and credit Partner wallet.",
+    summary:
+      "Submit a refund request for unused orders. Creates a PENDING Support ticket for Admin approval — does not credit the Partner wallet instantly.",
     request: `{ "reason": "OTHERS", "notes": "unused" }`,
+    response: `{
+  "success": true,
+  "refundRequest": {
+    "ticketId": "clx...",
+    "orderId": "...",
+    "status": "PENDING",
+    "subject": "Refund request",
+    "message": "Refund request submitted for admin review...",
+    "walletCredited": false
+  }
+}`,
   },
   {
     method: "GET",
@@ -215,7 +227,10 @@ export default function PartnerApiDocsClient({
             <li>POST /checkout/quote</li>
             <li>POST /checkout/credit with Idempotency-Key</li>
             <li>GET /orders/{"{id}"} for ICCID / LPA / QR</li>
-            <li>Optional POST /orders/{"{id}"}/cancel when unused</li>
+            <li>
+              Optional POST /orders/{"{id}"}/cancel when unused (refund request →
+              Admin Approve; no instant wallet credit)
+            </li>
           </ol>
         </section>
 
@@ -312,7 +327,7 @@ export default function PartnerApiDocsClient({
           <ul className="space-y-2 text-sm text-slate-400">
             <li>
               <strong className="text-slate-200">400</strong> — validation,
-              insufficient wallet credit, ineligible cancellation
+              insufficient wallet credit, ineligible cancel/refund request
             </li>
             <li>
               <strong className="text-slate-200">401</strong> — missing/invalid
