@@ -111,8 +111,11 @@ function main() {
     service,
     /scheduleRefundStatusNotification\(current\.id,\s*"rejected"\)/
   );
-  assert.match(orderDetailView, /CustomerRefundRequestForm/);
-  assert.match(orderDetailView, /Request Refund|Hide refund/);
+  // Standalone Request Refund CTA removed — customers use Raise Issue.
+  assert.doesNotMatch(orderDetailView, /CustomerRefundRequestForm/);
+  assert.doesNotMatch(orderDetailView, /Request Refund|Hide refund/);
+  assert.match(orderDetailView, /RaiseIssueModal/);
+  assert.match(orderDetailView, /actor=["']CUSTOMER["']/);
   assert.match(orderPage, /listCustomerRefundRequestsForOrder/);
   assert.match(orderPage, /CustomerOrderDetailView/);
   assert.match(orderPage, /refundJustRequested/);

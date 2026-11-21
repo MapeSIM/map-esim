@@ -6,7 +6,6 @@ import { getCustomerOwnedOrderDetail } from "@/app/lib/orders/customerOrders";
 import { customerEsimStatusLabel } from "@/app/lib/orders/customerOrderDisplay";
 import { listCustomerRefundRequestsForOrder } from "@/app/lib/refunds/refundRequest";
 import {
-  isOpenRefundStatus,
   refundReasonLabel,
   refundStatusLabel,
 } from "@/app/lib/refunds/refundRequestConstants";
@@ -70,11 +69,6 @@ export default async function AccountOrderDetailPage({
   } catch {
     refundRequests = [];
   }
-  const openRefund = refundRequests.find((row) =>
-    isOpenRefundStatus(row.status)
-  );
-  const canRequestRefund = !detail.isRefunded && !openRefund;
-
   const supportTicket = await getLatestOrderSupportTicketForOrder(
     detail.id
   ).catch(() => null);
@@ -122,10 +116,6 @@ export default async function AccountOrderDetailPage({
       addDataEligible={detail.addDataEligible}
       iccid={detail.iccid}
       iccidMasked={detail.iccidMasked}
-      canRequestRefund={canRequestRefund}
-      openRefundStatusLabel={
-        openRefund ? refundStatusLabel(openRefund.status) : null
-      }
       supportTicket={supportTicket}
       autoRefreshUsage={autoOpenUsage}
       refundJustRequested={refundJustRequested}

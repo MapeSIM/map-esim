@@ -7,9 +7,7 @@ import { ChevronRight } from "lucide-react";
 import { AddDataPurchaseBadge } from "@/app/components/orders/AddDataPurchaseBadge";
 import EsimOrderDetailCard from "@/app/components/orders/EsimOrderDetailCard";
 import PartnerEsimInstallPanel from "@/app/components/partner/PartnerEsimInstallPanel";
-import PartnerRefundRequestControls, {
-  type PartnerRefundRequestCardState,
-} from "@/app/components/partner/PartnerRefundRequestControls";
+import type { PartnerRefundRequestCardState } from "@/app/components/partner/PartnerRefundRequestControls";
 import RaiseIssueModal from "@/app/components/orders/RaiseIssueModal";
 import SupportTicketViewModal from "@/app/components/orders/SupportTicketViewModal";
 import type { OrderSupportTicketSummary } from "@/app/lib/support/orderSupportTicket";
@@ -68,7 +66,6 @@ export default function PartnerEsimOrderCard({
   variant = "detail",
   partnerDisplayName = null,
 }: Props) {
-  const [showRefund, setShowRefund] = useState(false);
   const [showInstall, setShowInstall] = useState(false);
   const [raiseIssueOpen, setRaiseIssueOpen] = useState(false);
   const [viewTicketOpen, setViewTicketOpen] = useState(false);
@@ -208,20 +205,14 @@ export default function PartnerEsimOrderCard({
             />
           </>
         }
-        refundAction={
-          !expired && !refunded ? (
-            <button
-              type="button"
-              onClick={() => setShowRefund((v) => !v)}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-white/12 bg-transparent px-3.5 text-sm font-semibold text-white/80 transition hover:bg-white/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
-            >
-              {showRefund ? "Hide refund" : "Request Refund"}
-            </button>
-          ) : null
-        }
         footer={
           <div className="space-y-3 border-t border-white/8 pt-3">
             <p className="text-xs text-white/45">{row.shortReference}</p>
+            {refundRequest ? (
+              <p className="text-xs text-white/55">
+                Legacy refund request: {refundRequest.statusLabel}
+              </p>
+            ) : null}
             {installAllowed ? (
               <button
                 type="button"
@@ -251,16 +242,6 @@ export default function PartnerEsimOrderCard({
                   validity={row.validity}
                   addDataHref={addDataHref}
                   defaultExpanded
-                />
-              </div>
-            ) : null}
-            {showRefund || refunded ? (
-              <div id="partner-refund">
-                <PartnerRefundRequestControls
-                  purchaseId={row.purchaseId}
-                  partnerDebitLabel={row.partnerDebitLabel}
-                  alreadyRefunded={refunded}
-                  existingRequest={refundRequest}
                 />
               </div>
             ) : null}

@@ -258,7 +258,15 @@ function runOfflineChecks(): void {
     form,
     /If installation details can be recovered from the provider/
   );
-  assert.match(ordersPage, /PartnerRefundRequestControls/);
+  // Partner order UI: Raise Issue only — no standalone Request Refund CTA.
+  const partnerOrderCard = read(
+    "app/components/partner/PartnerEsimOrderCard.tsx"
+  );
+  assert.match(partnerOrderCard, /RaiseIssueModal/);
+  assert.match(partnerOrderCard, /actor=["']PARTNER["']/);
+  assert.doesNotMatch(partnerOrderCard, /Request Refund|Hide refund/);
+  assert.doesNotMatch(partnerOrderCard, /PartnerRefundRequestControls/);
+  assert.match(ordersPage, /PartnerRefundRequestCardState/);
   assert.doesNotMatch(sharePage, /Request Refund|PartnerRefundRequest/);
   assert.match(customerService, /createCustomerRefundRequest/);
   assert.match(customerActions, /requireRole\("CUSTOMER"/);

@@ -4,7 +4,6 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import EsimOrderDetailCard from "@/app/components/orders/EsimOrderDetailCard";
 import CustomerEsimInstallPanel from "@/app/components/orders/CustomerEsimInstallPanel";
-import CustomerRefundRequestForm from "@/app/components/orders/CustomerRefundRequestForm";
 import RaiseIssueModal from "@/app/components/orders/RaiseIssueModal";
 import SupportTicketViewModal from "@/app/components/orders/SupportTicketViewModal";
 import { customerEsimLineReady } from "@/app/lib/orders/customerOrderDisplay";
@@ -33,10 +32,9 @@ export type CustomerOrderDetailViewProps = {
   addDataEligible: boolean;
   iccid: string | null;
   iccidMasked: string;
-  canRequestRefund: boolean;
-  openRefundStatusLabel: string | null;
   supportTicket?: OrderSupportTicketSummary | null;
   autoRefreshUsage?: boolean;
+  /** Read-only status of legacy RefundRequest rows (no submit button). */
   refundRequestsSlot?: ReactNode;
   refundJustRequested?: boolean;
   rewardsEarnedLabel?: string | null;
@@ -45,6 +43,7 @@ export type CustomerOrderDetailViewProps = {
 
 /**
  * Premium customer order detail — install hero front-and-center, then usage metrics.
+ * Refund requests go through Raise Issue (subject: Refund request), not a separate CTA.
  */
 export default function CustomerOrderDetailView({
   orderId,
@@ -62,8 +61,6 @@ export default function CustomerOrderDetailView({
   installEligible,
   addDataEligible,
   iccid,
-  canRequestRefund,
-  openRefundStatusLabel,
   supportTicket = null,
   autoRefreshUsage = false,
   refundRequestsSlot = null,
@@ -71,7 +68,6 @@ export default function CustomerOrderDetailView({
   rewardsEarnedLabel = null,
   rewardsAppliedLabel = null,
 }: CustomerOrderDetailViewProps) {
-  const [showRefund, setShowRefund] = useState(false);
   const [raiseIssueOpen, setRaiseIssueOpen] = useState(false);
   const [viewTicketOpen, setViewTicketOpen] = useState(false);
   const orderPath = `/account/orders/${encodeURIComponent(orderId)}`;
@@ -155,17 +151,6 @@ export default function CustomerOrderDetailView({
             />
           </>
         }
-        refundAction={
-          !isRefunded ? (
-            <button
-              type="button"
-              onClick={() => setShowRefund((v) => !v)}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-[#1E3A5F] bg-transparent px-3.5 text-sm font-semibold text-white/80 transition hover:bg-white/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B8E6]"
-            >
-              {showRefund ? "Hide refund" : "Request Refund"}
-            </button>
-          ) : null
-        }
         footer={
           <div className="space-y-3 border-t border-[#1E3A5F] pt-3">
             <p className="text-xs text-white/45">Order {shortReference}</p>
@@ -188,19 +173,6 @@ export default function CustomerOrderDetailView({
                   </div>
                 ) : null}
               </dl>
-            ) : null}
-
-            {showRefund ? (
-              <div
-                id="refund-request"
-                className="rounded-xl border border-[#1E3A5F] bg-white/[0.04] p-1"
-              >
-                <CustomerRefundRequestForm
-                  orderId={orderId}
-                  canRequest={canRequestRefund}
-                  openStatusLabel={openRefundStatusLabel}
-                />
-              </div>
             ) : null}
 
             {refundJustRequested ? (
