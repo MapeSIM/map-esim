@@ -23,6 +23,8 @@ function main() {
   assert.equal(isPakistanDestinationHint("uae"), false);
   assert.equal(isPakistanDestinationPath("/countries/pakistan"), true);
   assert.equal(isPakistanDestinationPath("/countries/pk"), true);
+  assert.equal(isPakistanDestinationPath("/partner/countries/pakistan"), true);
+  assert.equal(isPakistanDestinationPath("/partner/countries/pk"), true);
   assert.equal(isPakistanDestinationPath("/countries/uae"), false);
   assert.equal(isPakistanDestinationPath("/account"), false);
   assert.equal(
@@ -51,6 +53,7 @@ function main() {
   assert.match(provider, /manualOverrideRef/);
   assert.match(provider, /setCurrencyPreferenceAction/);
   assert.match(provider, /CURRENCY_PREFERENCE_COOKIE/);
+  assert.match(provider, /useLayoutEffect/);
   // Manual setCurrency must mark override + persist; auto path must not.
   assert.match(
     provider,

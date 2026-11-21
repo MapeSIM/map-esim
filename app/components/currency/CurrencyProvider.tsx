@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -89,7 +90,8 @@ export function CurrencyProvider({
   }, [pathname, countryQuery]);
 
   // Preference cookie = manual override. Soft destination default otherwise.
-  useEffect(() => {
+  // useLayoutEffect so Pakistan → PKR applies before first painted price labels.
+  useLayoutEffect(() => {
     if (persistPreferences) {
       const stored = readManualCurrencyPreference();
       if (stored) {
@@ -106,8 +108,9 @@ export function CurrencyProvider({
     applyAutoCurrency();
   }, [persistPreferences, applyAutoCurrency]);
 
-  // Destination-based soft default when the user has not manually chosen.
-  useEffect(() => {
+  // Destination-based soft default when the user has not manually chosen
+  // (e.g. navigate into /countries/pakistan without a preference cookie).
+  useLayoutEffect(() => {
     if (!softHydratedRef.current) return;
     applyAutoCurrency();
   }, [applyAutoCurrency]);

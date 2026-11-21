@@ -31,14 +31,23 @@ function normalizePathname(pathname: string): string {
 
 /**
  * True when the browse URL is a Pakistan destination page.
- * Matches /countries/pakistan, /countries/pk, /esim/pakistan, etc.
+ * Matches /countries/pakistan, /countries/pk, /partner/countries/pakistan,
+ * /esim/pakistan, etc.
  */
 export function isPakistanDestinationPath(pathname: string): boolean {
   const path = normalizePathname(pathname);
   const segments = path.split("/").filter(Boolean);
   if (segments.length < 2) return false;
 
-  const root = segments[0]?.toLowerCase();
+  // /partner/countries/pakistan → treat like public countries path.
+  const offset =
+    segments[0]?.toLowerCase() === "partner" &&
+    segments[1]?.toLowerCase() === "countries"
+      ? 1
+      : 0;
+  const root = segments[offset]?.toLowerCase();
+  const slug = segments[offset + 1];
+
   if (
     root !== "countries" &&
     root !== "esim" &&
@@ -48,7 +57,7 @@ export function isPakistanDestinationPath(pathname: string): boolean {
     return false;
   }
 
-  return isPakistanDestinationHint(segments[1]);
+  return isPakistanDestinationHint(slug);
 }
 
 /**

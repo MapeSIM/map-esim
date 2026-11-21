@@ -128,7 +128,7 @@ function main() {
   );
   assert.match(
     csp,
-    /script-src 'self' 'unsafe-inline' 'unsafe-eval' https:\/\/embed\.tawk\.to https:\/\/cdn\.jsdelivr\.net/
+    /script-src 'self' 'unsafe-inline' 'unsafe-eval' https:\/\/embed\.tawk\.to https:\/\/cdn\.tawk\.to https:\/\/va\.tawk\.to https:\/\/cdn\.jsdelivr\.net/
   );
   assert.match(
     csp,

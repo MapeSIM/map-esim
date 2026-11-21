@@ -141,17 +141,40 @@ export function isAsia1Gb7DayAsialinkPackage(offer: VesimOffer): boolean {
   );
 }
 
+/**
+ * Asia regional 10 GB / 30 Days SKU (historically Asia Link / Asialink).
+ * Matches branded names/ids and capacity+validity so provider renames cannot
+ * drop the locked PKR 2149 retail pin.
+ */
 export function isAsia10Gb30DayAsialinkPackage(offer: VesimOffer): boolean {
-  return (
-    isAsialinkOffer(offer) &&
-    isTenGbPackage(offer) &&
-    asiaOfferDurationDays(offer) === 30
-  );
+  if (!isTenGbPackage(offer) || asiaOfferDurationDays(offer) !== 30) {
+    return false;
+  }
+  if (isAsialinkOffer(offer)) return true;
+  const blob = [
+    offer.id,
+    offer.offerId,
+    offer.code,
+    offer.name,
+    offer.network,
+    ...(Array.isArray(offer.networks) ? offer.networks : []),
+  ]
+    .map((value) => trimmed(value))
+    .join(" ");
+  if (/asia\s*link|asialink/i.test(blob)) return true;
+  // Capacity + validity lock when branding fields churn after provider sync.
+  if (isAsiaRegionalDestinationCode(offer.country)) return true;
+  if (/\b10\s*gb\b/i.test(blob) && /\b30\b/.test(blob)) return true;
+  return false;
 }
 
 function resolveAsiaPinnedRetailUsd(offer: VesimOffer): number | null {
   if (isAsia1Gb7DayAsialinkPackage(offer)) return ASIA_1GB_7DAY_RETAIL_USD;
   if (isAsia10Gb30DayAsialinkPackage(offer)) return ASIA_10GB_30DAY_RETAIL_USD;
+  // Destination-scoped lock: any Asia regional 10 GB / 30 Day package.
+  if (isTenGbPackage(offer) && asiaOfferDurationDays(offer) === 30) {
+    return ASIA_10GB_30DAY_RETAIL_USD;
+  }
   return null;
 }
 

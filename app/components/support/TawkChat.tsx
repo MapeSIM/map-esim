@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { getTawkEmbedSrc } from "@/app/lib/support/tawkConfig";
 import { isTawkEnabledRoute } from "@/app/lib/support/tawkRoutes";
 
@@ -20,7 +20,7 @@ declare global {
 }
 
 const SCRIPT_ID = "map-esim-tawk-embed";
-const IDLE_FALLBACK_MS = 2500;
+const IDLE_FALLBACK_MS = 1200;
 
 function hideTawkWidget(): void {
   if (typeof window === "undefined") return;
@@ -103,7 +103,11 @@ function bindTawkOnLoad(): void {
  * for a stable id under App Router SPA navigations.
  */
 function ensureTawkScript(embedSrc: string): void {
-  if (hasTawkScript(embedSrc)) return;
+  if (hasTawkScript(embedSrc)) {
+    bindTawkOnLoad();
+    showTawkWidget();
+    return;
+  }
 
   bindTawkOnLoad();
 
@@ -181,6 +185,14 @@ export default function TawkChat({
     [pathname]
   );
   const consentReady = Boolean(enabledByConsent && embedSrc);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!consentReady || !embedSrc) {
@@ -203,6 +215,7 @@ export default function TawkChat({
     }
 
     const cancel = scheduleDeferredInject(() => {
+      if (!mountedRef.current) return;
       if (!isTawkEnabledRoute(window.location.pathname || "/")) return;
       ensureTawkScript(embedSrc);
     });
@@ -212,16 +225,14 @@ export default function TawkChat({
     };
   }, [consentReady, routeAllowed, pathname, embedSrc]);
 
+  // Unload only when marketing consent is revoked — not on Strict Mode remounts
+  // of an otherwise healthy allowlisted session.
   useEffect(() => {
-    return () => {
-      // Unmount (consent revoked / gate removed): full unload.
-      unloadTawkWidget();
-    };
-  }, []);
+    if (consentReady) return;
+    unloadTawkWidget();
+  }, [consentReady]);
 
-  // Keep positioning CSS mounted while consent is on and route is allowlisted,
-  // or while script exists after an allowlisted visit (hidden on blocked routes
-  // after unload — CSS harmless if nodes gone).
+  // Keep positioning CSS mounted while consent is on and route is allowlisted.
   if (!consentReady || !routeAllowed) {
     return null;
   }
