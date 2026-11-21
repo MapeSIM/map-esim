@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useId, useState } from "react";
 import { X } from "lucide-react";
+import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 import {
   createOrderSupportTicketAction,
   type CreateOrderSupportTicketFormState,
@@ -204,9 +205,14 @@ export default function RaiseIssueModal({
                 <button
                   type="submit"
                   disabled={pending}
-                  className="inline-flex h-10 flex-1 items-center justify-center rounded-xl bg-emerald-500 px-4 text-sm font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-60"
+                  aria-busy={pending || undefined}
+                  className="inline-flex h-10 flex-1 items-center justify-center rounded-xl bg-emerald-500 px-4 text-sm font-bold text-slate-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {pending ? "Submitting…" : "Submit ticket"}
+                  {pending ? (
+                    <BrandPendingLabel label="Submitting…" />
+                  ) : (
+                    "Submit ticket"
+                  )}
                 </button>
                 <button
                   type="button"

@@ -361,3 +361,118 @@ video {
   letter-spacing: 0.04em;
   color: var(--heading);
 }
+
+/* ── Brand loading system (lime accent on dark glass) ─────────────── */
+
+.map-nav-progress {
+  pointer-events: none;
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 9999;
+  height: 3px;
+  overflow: hidden;
+  background: transparent;
+}
+
+.map-nav-progress__bar {
+  height: 100%;
+  width: 0%;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent-strong) 70%, transparent),
+    var(--accent-strong),
+    #b8ff5c
+  );
+  box-shadow:
+    0 0 12px color-mix(in srgb, var(--accent-strong) 75%, transparent),
+    0 0 4px color-mix(in srgb, var(--accent) 55%, transparent);
+  transition: width 0.35s ease-out;
+}
+
+.map-nav-progress[data-phase="start"] .map-nav-progress__bar {
+  width: 18%;
+  transition: width 0.18s ease-out;
+}
+
+.map-nav-progress[data-phase="trickle"] .map-nav-progress__bar {
+  width: 72%;
+  transition: width 4.5s cubic-bezier(0.1, 0.35, 0.2, 1);
+}
+
+.map-nav-progress[data-phase="done"] .map-nav-progress__bar {
+  width: 100%;
+  transition: width 0.18s ease-out;
+  opacity: 1;
+}
+
+.map-brand-spinner {
+  display: inline-block;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  border: 2px solid color-mix(in srgb, var(--accent-strong) 28%, transparent);
+  border-top-color: var(--accent-strong);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent-strong) 35%, transparent);
+  animation: map-brand-spin 0.7s linear infinite;
+}
+
+.map-brand-spinner--sm {
+  width: 1rem;
+  height: 1rem;
+  border-width: 2px;
+}
+
+.map-brand-spinner--lg {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-width: 3px;
+  box-shadow:
+    0 0 22px color-mix(in srgb, var(--accent-strong) 40%, transparent),
+    0 0 8px color-mix(in srgb, #00e676 25%, transparent);
+}
+
+@keyframes map-brand-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.map-brand-loading-page {
+  display: flex;
+  min-height: min(60vh, 28rem);
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.map-brand-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--page-bg) 55%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.map-brand-loading-card {
+  display: flex;
+  width: 100%;
+  max-width: 22rem;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--accent-strong) 22%, var(--border));
+  background: color-mix(in srgb, var(--surface-2) 88%, #020817);
+  padding: 1.75rem 1.25rem;
+  text-align: center;
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.35),
+    0 0 0 1px color-mix(in srgb, var(--accent-strong) 12%, transparent),
+    0 0 36px color-mix(in srgb, var(--accent-strong) 12%, transparent);
+}

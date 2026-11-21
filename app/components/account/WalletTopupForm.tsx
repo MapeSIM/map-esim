@@ -10,6 +10,7 @@ import {
   WALLET_TOPUP_MAX_CENTS,
   WALLET_TOPUP_MIN_CENTS,
 } from "@/app/lib/wallet/amount";
+import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 
 type Props = {
   balanceLabel: string;
@@ -178,9 +179,14 @@ export default function WalletTopupForm({
       <button
         type="submit"
         disabled={pending}
-        className="inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] disabled:opacity-60"
+        aria-busy={pending || undefined}
+        className="inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {pending ? "Preparing top-up…" : "Continue"}
+        {pending ? (
+          <BrandPendingLabel label="Preparing top-up…" />
+        ) : (
+          "Continue"
+        )}
       </button>
     </form>
   );

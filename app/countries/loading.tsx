@@ -1,5 +1,5 @@
-import CountriesListingSkeleton from "@/app/components/countries/CountriesListingSkeleton";
+import BrandLoadingState from "@/app/components/loading/BrandLoadingState";
 
 export default function CountriesLoading() {
-  return <CountriesListingSkeleton />;
+  return <BrandLoadingState label="Loading destinations…" />;
 }

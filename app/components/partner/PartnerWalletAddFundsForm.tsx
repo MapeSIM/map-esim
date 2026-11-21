@@ -11,6 +11,7 @@ import {
   PARTNER_TOPUP_MIN_CENTS,
 } from "@/app/lib/partner/partnerWalletTopupConstants";
 import SimpaisaWalletFields from "@/app/components/account/SimpaisaWalletFields";
+import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 
 type Props = {
   balanceLabel: string;
@@ -211,9 +212,14 @@ export default function PartnerWalletAddFundsForm({
       <button
         type="submit"
         disabled={pending || amountCents <= 0}
-        className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-emerald-500 px-5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-60"
+        aria-busy={pending || undefined}
+        className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-emerald-500 px-5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {pending ? "Sending payment request…" : "Continue"}
+        {pending ? (
+          <BrandPendingLabel label="Sending payment request…" />
+        ) : (
+          "Continue"
+        )}
       </button>
 
       {errorState.ok === false && errorState.error ? (

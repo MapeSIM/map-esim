@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 import type { PartnerPurchaseActionState } from "@/app/lib/partner/partnerPurchaseFormState";
 import type { PartnerEsimPaymentMode } from "@/app/lib/partner/partnerPurchaseValidation";
 import {
@@ -310,10 +310,7 @@ export default function PartnerOfferPaymentForm({
         className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent-strong)] px-5 text-sm font-semibold text-[var(--accent-ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
       >
         {buyPending ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            {ctaPendingLabel}
-          </>
+          <BrandPendingLabel label={ctaPendingLabel} />
         ) : (
           ctaLabel
         )}

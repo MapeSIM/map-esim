@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 import type { VesimOffer } from "@/app/lib/vesim/offers";
 
 type PlansListingChromeValue = {
@@ -131,10 +131,7 @@ export function PlanBuyNowLink({
       `}
     >
       {isNavigating ? (
-        <>
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          Preparing Checkout...
-        </>
+        <BrandPendingLabel label="Preparing Checkout..." />
       ) : (
         "Buy Now"
       )}

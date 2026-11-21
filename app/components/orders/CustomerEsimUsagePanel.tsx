@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { RefreshCw, Signal } from "lucide-react";
+import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 
 type UsagePayload = {
   status: string;
@@ -284,23 +285,34 @@ export default function CustomerEsimUsagePanel({
               type="button"
               onClick={() => void openAndLoad()}
               disabled={loading}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_16px_rgba(0,0,0,0.14)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 disabled:opacity-60 sm:w-auto"
+              aria-busy={loading || undefined}
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] shadow-[0_8px_16px_rgba(0,0,0,0.14)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
-              <Signal className="h-4 w-4" aria-hidden="true" />
-              {loading ? "Loading…" : "Refresh Status"}
+              {loading ? (
+                <BrandPendingLabel label="Loading…" />
+              ) : (
+                <>
+                  <Signal className="h-4 w-4" aria-hidden="true" />
+                  Refresh Status
+                </>
+              )}
             </button>
           ) : (
             <button
               type="button"
               onClick={() => void loadUsage()}
               disabled={loading}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--page-bg-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 disabled:opacity-60 sm:w-auto"
+              aria-busy={loading || undefined}
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--heading)] transition hover:bg-[var(--page-bg-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
-              <RefreshCw
-                className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-                aria-hidden="true"
-              />
-              {loading ? "Refreshing…" : "Refresh Status"}
+              {loading ? (
+                <BrandPendingLabel label="Refreshing…" />
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                  Refresh Status
+                </>
+              )}
             </button>
           )}
         </div>

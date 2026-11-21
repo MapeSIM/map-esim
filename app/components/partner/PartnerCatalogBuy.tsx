@@ -10,7 +10,8 @@ import {
   useTransition,
   type ReactNode,
 } from "react";
-import { ArrowLeft, Earth, Loader2, MapPinned, Search, X } from "lucide-react";
+import { ArrowLeft, Earth, MapPinned, Search, X } from "lucide-react";
+import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 import { loadPartnerCatalogOffersAction } from "@/app/lib/partner/partnerPurchaseActions";
 import type {
   PartnerCatalogDestination,
@@ -725,13 +726,7 @@ export default function PartnerCatalogBuy({
                                 }`}
                               >
                                 {navigating ? (
-                                  <>
-                                    <Loader2
-                                      className="h-4 w-4 animate-spin"
-                                      aria-hidden
-                                    />
-                                    Preparing Checkout...
-                                  </>
+                                  <BrandPendingLabel label="Preparing Checkout..." />
                                 ) : (
                                   "Buy Now"
                                 )}

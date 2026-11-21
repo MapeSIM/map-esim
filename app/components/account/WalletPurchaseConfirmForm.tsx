@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Upload, CheckCircle2 } from "lucide-react";
+import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 import { ManualPaymentDetailsBox } from "@/app/components/account/ManualPaymentDetailsBox";
 import type { PublicManualPaymentConfig } from "@/app/lib/payments/manualPaymentConfigShared";
 import {
@@ -470,24 +471,14 @@ export default function WalletPurchaseConfirmForm({
     ? "Buy eSIM with Wallet"
     : "Continue to Payment";
 
-  const primaryCtaPendingLabel = fundingPending || selectingPayment ? (
-    <>
-      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-      Updating payment method...
-    </>
-  ) : isFullWalletMode ? (
-    "Buying with wallet…"
-  ) : simpaisaCheckout ? (
-    <>
-      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-      Contacting JazzCash / Easypaisa…
-    </>
-  ) : (
-    <>
-      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-      Connecting to payment…
-    </>
-  );
+  const primaryCtaPendingLabel =
+    fundingPending || selectingPayment
+      ? "Updating payment method..."
+      : isFullWalletMode
+        ? "Buying with wallet…"
+        : simpaisaCheckout
+          ? "Contacting JazzCash / Easypaisa…"
+          : "Connecting to payment…";
 
   const rewardsDisabled = !review.rewardEligible;
 
@@ -1655,13 +1646,11 @@ export default function WalletPurchaseConfirmForm({
               <button
                 type="submit"
                 disabled={stickyCtaDisabled}
-                className="inline-flex h-11 w-full min-w-0 items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:opacity-60"
+                aria-busy={pending || whatsappOrderBusy || undefined}
+                className="inline-flex h-11 w-full min-w-0 items-center justify-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {pending || whatsappOrderBusy ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    {primaryCtaPendingLabel}
-                  </>
+                  <BrandPendingLabel label={primaryCtaPendingLabel} />
                 ) : (
                   primaryCtaLabel
                 )}

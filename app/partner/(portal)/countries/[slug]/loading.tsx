@@ -1,5 +1,5 @@
-import DestinationPlansSkeleton from "@/app/components/plans/DestinationPlansSkeleton";
+import BrandLoadingState from "@/app/components/loading/BrandLoadingState";
 
 export default function PartnerCountryDestinationLoading() {
-  return <DestinationPlansSkeleton />;
+  return <BrandLoadingState label="Loading plans…" />;
 }

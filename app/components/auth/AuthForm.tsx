@@ -11,6 +11,7 @@ import type { AuthActionState } from "@/app/lib/auth/actions";
 import PasswordConfirmStatus from "@/app/components/auth/PasswordConfirmStatus";
 import PasswordField from "@/app/components/auth/PasswordField";
 import PasswordRequirements from "@/app/components/auth/PasswordRequirements";
+import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 import { LEGAL_CONSENT_ERROR } from "@/app/lib/legal";
 
 const initialState: AuthActionState = { ok: false };
@@ -322,9 +323,10 @@ export function AuthForm({
       <button
         type="submit"
         disabled={pending}
-        className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[var(--accent-strong)] text-sm font-bold text-[var(--accent-ink)] disabled:opacity-60"
+        aria-busy={pending || undefined}
+        className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[var(--accent-strong)] text-sm font-bold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {pending ? "Please wait…" : submitLabel}
+        {pending ? <BrandPendingLabel label="Please wait…" /> : submitLabel}
       </button>
 
       {footer}

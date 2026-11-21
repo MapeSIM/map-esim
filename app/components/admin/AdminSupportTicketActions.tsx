@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 import {
   adminApproveSupportTicketRefundAction,
   adminRejectSupportTicketAction,
@@ -103,15 +104,20 @@ export default function AdminSupportTicketActions({
           <button
             type="submit"
             disabled={pending}
+            aria-busy={inReviewPending || undefined}
             onClick={() => {
               const proxy = document.getElementById(
                 "in-review-note-proxy"
               ) as HTMLInputElement | null;
               if (proxy) proxy.value = readNote();
             }}
-            className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] disabled:opacity-60"
+            className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {inReviewPending ? "Saving…" : "Mark In Review"}
+            {inReviewPending ? (
+              <BrandPendingLabel label="Saving…" />
+            ) : (
+              "Mark In Review"
+            )}
           </button>
         </form>
 
@@ -126,15 +132,20 @@ export default function AdminSupportTicketActions({
           <button
             type="submit"
             disabled={pending}
+            aria-busy={infoPending || undefined}
             onClick={() => {
               const proxy = document.getElementById(
                 "info-required-note-proxy"
               ) as HTMLInputElement | null;
               if (proxy) proxy.value = readNote();
             }}
-            className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] disabled:opacity-60"
+            className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {infoPending ? "Saving…" : "Request info"}
+            {infoPending ? (
+              <BrandPendingLabel label="Saving…" />
+            ) : (
+              "Request info"
+            )}
           </button>
         </form>
 
@@ -145,15 +156,20 @@ export default function AdminSupportTicketActions({
             <button
               type="submit"
               disabled={pending}
+              aria-busy={approvePending || undefined}
               onClick={() => {
                 const proxy = document.getElementById(
                   "approve-note-proxy"
                 ) as HTMLInputElement | null;
                 if (proxy) proxy.value = readNote();
               }}
-              className="inline-flex h-10 items-center rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--accent-ink)] disabled:opacity-60"
+              className="inline-flex h-10 items-center rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {approvePending ? "Approving…" : "Approve refund (credit once)"}
+              {approvePending ? (
+                <BrandPendingLabel label="Approving…" />
+              ) : (
+                "Approve refund (credit once)"
+              )}
             </button>
           </form>
         ) : (
@@ -163,15 +179,20 @@ export default function AdminSupportTicketActions({
             <button
               type="submit"
               disabled={pending}
+              aria-busy={resolvePending || undefined}
               onClick={() => {
                 const proxy = document.getElementById(
                   "resolve-note-proxy"
                 ) as HTMLInputElement | null;
                 if (proxy) proxy.value = readNote();
               }}
-              className="inline-flex h-10 items-center rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--accent-ink)] disabled:opacity-60"
+              className="inline-flex h-10 items-center rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {resolvePending ? "Saving…" : "Mark resolved"}
+              {resolvePending ? (
+                <BrandPendingLabel label="Saving…" />
+              ) : (
+                "Mark resolved"
+              )}
             </button>
           </form>
         )}
@@ -181,9 +202,14 @@ export default function AdminSupportTicketActions({
           <button
             type="submit"
             disabled={pending}
-            className="inline-flex h-10 items-center rounded-xl border border-[var(--danger-border)] px-4 text-sm font-semibold text-[var(--danger-text)] disabled:opacity-60"
+            aria-busy={rejectPending || undefined}
+            className="inline-flex h-10 items-center rounded-xl border border-[var(--danger-border)] px-4 text-sm font-semibold text-[var(--danger-text)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {rejectPending ? "Rejecting…" : "Reject"}
+            {rejectPending ? (
+              <BrandPendingLabel label="Rejecting…" />
+            ) : (
+              "Reject"
+            )}
           </button>
         </form>
       </div>

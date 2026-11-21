@@ -1,5 +1,5 @@
-import PartnerPortalSkeleton from "@/app/components/partner/PartnerPortalSkeleton";
+import BrandLoadingState from "@/app/components/loading/BrandLoadingState";
 
 export default function PartnerBuyLoading() {
-  return <PartnerPortalSkeleton title="Confirm purchase" variant="buy" />;
+  return <BrandLoadingState label="Preparing checkout…" />;
 }

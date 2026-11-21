@@ -7,6 +7,7 @@ import {
   type PartnerWalletTopupActionState,
 } from "@/app/lib/partner/partnerWalletTopupFormState";
 import SimpaisaWalletFields from "@/app/components/account/SimpaisaWalletFields";
+import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 
 type Props = {
   topupId: string;
@@ -52,9 +53,14 @@ export default function PartnerWalletTopupCheckoutButton({
       <button
         type="submit"
         disabled={pending || !enabled}
-        className="inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] disabled:opacity-60"
+        aria-busy={pending || undefined}
+        className="inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {pending ? "Checking payment provider…" : "Continue"}
+        {pending ? (
+          <BrandPendingLabel label="Checking payment provider…" />
+        ) : (
+          "Continue"
+        )}
       </button>
       {errorState.ok === false && errorState.error ? (
         <div

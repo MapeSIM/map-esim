@@ -17,6 +17,7 @@ import {
   SHARE_COMPANY_NAME_MAX,
   type PartnerShareBrandingFields,
 } from "@/app/lib/partner/partnerShareBrandingValidate";
+import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 
 /** Dummy form so iOS color-picker OK cannot POST the branding Server Action. */
 const COLOR_SCRATCH_FORM_ID = "partner-share-branding-color-scratch";
@@ -361,10 +362,15 @@ export default function PartnerShareBrandingForm({
               type="button"
               data-branding-save="true"
               disabled={pending}
+              aria-busy={pending || undefined}
               onClick={handleSaveBrandingClick}
-              className="inline-flex h-9 items-center rounded-lg bg-emerald-500 px-3.5 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-60"
+              className="inline-flex h-9 items-center rounded-lg bg-emerald-500 px-3.5 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {pending ? "Saving…" : "Save Branding"}
+              {pending ? (
+                <BrandPendingLabel label="Saving…" />
+              ) : (
+                "Save Branding"
+              )}
             </button>
           </div>
         </div>

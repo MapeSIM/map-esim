@@ -1,6 +1,5 @@
-import DestinationPlansSkeleton from "@/app/components/plans/DestinationPlansSkeleton";
+import BrandLoadingState from "@/app/components/loading/BrandLoadingState";
 
-/** Segment-level fallback while the destination page Suspense boundary resolves. */
 export default function CountryDestinationLoading() {
-  return <DestinationPlansSkeleton />;
+  return <BrandLoadingState label="Loading plans…" />;
 }

@@ -13,6 +13,7 @@ import {
   clearWalletPurchaseAlternateDeliveryEmailAction,
   saveWalletPurchaseAlternateDeliveryEmailAction,
 } from "@/app/lib/esim/walletPurchaseActions";
+import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 import {
   ALTERNATE_DELIVERY_EMAIL_COPY,
   ALTERNATE_DELIVERY_EMAIL_MAX_LENGTH,
@@ -145,9 +146,11 @@ export default function CheckoutDeliveryEmailSection({
                 disabled={busy}
                 className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-xs font-semibold text-[var(--heading)] disabled:opacity-60"
               >
-                {clearPending
-                  ? "Updating…"
-                  : ALTERNATE_DELIVERY_EMAIL_COPY.useAccount}
+                {clearPending ? (
+                  <BrandPendingLabel label="Updating…" />
+                ) : (
+                  ALTERNATE_DELIVERY_EMAIL_COPY.useAccount
+                )}
               </button>
             </div>
           ) : null}
@@ -237,7 +240,11 @@ export default function CheckoutDeliveryEmailSection({
               disabled={busy || !attested}
               className="inline-flex h-9 items-center justify-center rounded-xl bg-[var(--accent)] px-3 text-xs font-semibold text-[var(--accent-ink)] disabled:opacity-60"
             >
-              {savePending ? "Saving…" : "Save"}
+              {savePending ? (
+                <BrandPendingLabel label="Saving…" />
+              ) : (
+                "Save"
+              )}
             </button>
             <button
               type="button"

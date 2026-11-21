@@ -12,6 +12,7 @@ import JsonLd from "./components/seo/JsonLd";
 import ThemeProvider from "./components/theme/ThemeProvider";
 import DeferredWhatsAppSupportButton from "./components/support/DeferredWhatsAppSupportButton";
 import HideOnShare from "./components/share/HideOnShare";
+import NavigationProgressBarHost from "./components/loading/NavigationProgressBarHost";
 import { BRAND_NAME, BRAND_SITE_URL, BRAND_TAGLINE } from "@/app/lib/brand";
 import {
   DEFAULT_THEME,
@@ -101,6 +102,7 @@ export default function RootLayout({
         >
           <ThemeProvider>
             <PreferenceStorageSync />
+            <NavigationProgressBarHost />
             <Suspense fallback={null}>
               <CurrencyProvider>
                 <ShellAuthProvider>

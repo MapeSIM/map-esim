@@ -18,6 +18,7 @@ import {
   Share2,
   X,
 } from "lucide-react";
+import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 import type { ProviderLifecycleCacheView } from "@/app/lib/orders/providerLifecycleShared";
 import {
   composeEsimStatusBadgeText,
@@ -410,13 +411,17 @@ export default function EsimOrderDetailCard({
               type="button"
               onClick={() => void loadUsage()}
               disabled={loading}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#1E3A5F] bg-white/8 px-3.5 text-sm font-semibold text-white transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B8E6] disabled:opacity-60"
+              aria-busy={loading || undefined}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#1E3A5F] bg-white/8 px-3.5 text-sm font-semibold text-white transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B8E6] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <RefreshCw
-                className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-                aria-hidden="true"
-              />
-              {loading ? "Updating…" : "Update"}
+              {loading ? (
+                <BrandPendingLabel label="Updating…" />
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                  Update
+                </>
+              )}
             </button>
           ) : null}
         </div>

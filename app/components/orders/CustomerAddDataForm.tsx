@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 import { startCustomerAddDataCheckoutAction } from "@/app/lib/esim/walletPurchaseActions";
 
 type Props = {
@@ -29,9 +30,10 @@ export default function CustomerAddDataForm({
       <button
         type="submit"
         disabled={pending}
-        className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60 sm:w-auto"
+        aria-busy={pending || undefined}
+        className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-4 text-sm font-bold text-[var(--accent-ink)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
       >
-        {pending ? "Continuing…" : buttonLabel}
+        {pending ? <BrandPendingLabel label="Continuing…" /> : buttonLabel}
       </button>
     </form>
   );

@@ -1,3 +1,5 @@
+import BrandLoadingState from "@/app/components/loading/BrandLoadingState";
+
 type Variant =
   | "overview"
   | "orders"
@@ -19,6 +21,11 @@ export default function AccountRouteSkeleton({
 }) {
   return (
     <div className="min-w-0 space-y-6" role="status" aria-busy="true" aria-live="polite">
+      <BrandLoadingState
+        variant="card"
+        label={`Loading ${title}…`}
+        className="mx-auto"
+      />
       <div>
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
         <Pulse className="mt-3 h-4 w-64 max-w-full" />

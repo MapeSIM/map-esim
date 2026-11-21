@@ -1,3 +1,5 @@
+import BrandLoadingState from "@/app/components/loading/BrandLoadingState";
+
 function Shimmer({ className }: { className: string }) {
   return (
     <div
@@ -21,6 +23,11 @@ export default function PartnerPortalSkeleton({
       aria-busy="true"
       aria-live="polite"
     >
+      <BrandLoadingState
+        variant="card"
+        label={`Loading ${title}…`}
+        className="mx-auto"
+      />
       <div>
         <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
         <Shimmer className="mt-3 h-4 w-56 max-w-full" />
