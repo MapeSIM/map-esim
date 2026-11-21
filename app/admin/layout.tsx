@@ -40,8 +40,13 @@ export default async function AdminLayout({
 
   return (
     <main className="min-h-screen bg-[var(--page-bg)] px-3 py-6 text-[var(--heading)] sm:px-6 sm:py-10">
-      <div className="mx-auto grid max-w-6xl gap-4 sm:gap-6 lg:grid-cols-[240px_1fr]">
-        <div className="min-w-0 lg:sticky lg:top-6 lg:self-start">
+      <div className="mx-auto grid max-w-6xl gap-4 sm:gap-6 lg:grid-cols-[240px_1fr] lg:items-start">
+        {/*
+          Desktop: sticky + max-height + own overflow so OPERATIONS stays reachable
+          while the tall right column (e.g. /admin/operations) scrolls separately.
+          Avoid overflow-hidden on ancestors — it breaks position:sticky.
+        */}
+        <div className="min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:overscroll-contain">
           <AdminNav
             adminName={user.name || "Administrator"}
             permissions={[...access.permissions]}

@@ -167,6 +167,10 @@ export default function AdminNav({
       <p className="mt-2 truncate px-2 text-sm font-semibold text-[var(--heading)]">
         {adminName}
       </p>
+      {/*
+        Mobile/tablet: constrain the link list. Desktop scroll lives on the
+        sticky layout wrapper so the whole sidebar (incl. Sign out) stays reachable.
+      */}
       <nav
         className="mt-4 flex max-h-[min(70vh,28rem)] flex-col gap-4 overflow-y-auto overscroll-contain lg:max-h-none lg:overflow-visible"
         aria-label="Admin"
