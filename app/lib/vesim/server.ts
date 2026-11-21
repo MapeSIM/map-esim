@@ -472,7 +472,7 @@ export async function fetchPublicOffersForCountry(
 const loadCachedPublicOffersForCountryBrowse = unstable_cache(
   async (countryKey: string): Promise<VesimOffer[]> =>
     fetchPublicOffersForCountry(countryKey, { refreshMode: "blocking" }),
-  ["public-offers-country-browse-v4-asia-10gb-pin"],
+  ["public-offers-country-browse-v5-asialink-10gb-pin"],
   { revalidate: PUBLIC_OFFER_SNAPSHOT_STALE_SECONDS }
 );
 

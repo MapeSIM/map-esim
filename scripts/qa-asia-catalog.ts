@@ -282,28 +282,65 @@ function main() {
   );
   console.log("PASS asia_10gb_30d_asialink_pinned_rs2149");
 
-  // Provider branding churn must not drop the locked PKR 2149 pin.
-  const asia10gb30dUnbranded = offer({
-    id: "SEA-10GB-30D",
-    offerId: "SEA-10GB-30D",
-    country: "region-asia",
-    name: "10 GB - Valid for 30 days",
-    network: "Multiple networks",
-    dataFormatted: "10 GB",
-    dataGB: 10,
-    durationDays: 30,
-    priceUSD: 11.5,
-    providerPriceUSD: 7.2,
-  });
-  assert.equal(isAsia10Gb30DayAsialinkPackage(asia10gb30dUnbranded), true);
-  const pinnedUnbranded = applyAsiaCustomerRetailPrice(
-    asia10gb30dUnbranded,
-    "region-asia"
-  );
-  assert.equal(pinnedUnbranded.priceUSD, ASIA_10GB_30DAY_RETAIL_USD);
-  assert.equal(formatMoney(pinnedUnbranded.priceUSD, "PKR"), "Rs 2,149");
-  assert.equal(pinnedUnbranded.providerPriceUSD, 7.2);
-  console.log("PASS asia_10gb_30d_unbranded_still_pinned_rs2149");
+  // Non-Asialink Asia 10 GB / 30-day operators must keep normal MAP retail.
+  const otherAsia10gb30d = [
+    offer({
+      id: "ais-th-10gb-30d",
+      offerId: "ais-th-10gb-30d",
+      country: "region-asia",
+      name: "10 GB - 30 days",
+      network: "AIS Thailand",
+      dataFormatted: "10 GB",
+      dataGB: 10,
+      durationDays: 30,
+      priceUSD: 11.5,
+      providerPriceUSD: 7.2,
+    }),
+    offer({
+      id: "cellcard-kh-10gb-30d",
+      offerId: "cellcard-kh-10gb-30d",
+      country: "region-asia",
+      name: "10 GB - 30 days",
+      network: "Cellcard Cambodia",
+      dataFormatted: "10 GB",
+      dataGB: 10,
+      durationDays: 30,
+      priceUSD: 10.8,
+      providerPriceUSD: 6.9,
+    }),
+    offer({
+      id: "3hk-10gb-30d",
+      offerId: "3hk-10gb-30d",
+      country: "region-asia",
+      name: "10 GB - 30 days",
+      network: "3 Hong Kong",
+      dataFormatted: "10 GB",
+      dataGB: 10,
+      durationDays: 30,
+      priceUSD: 12.2,
+      providerPriceUSD: 8.1,
+    }),
+    offer({
+      id: "optus-10gb-30d",
+      offerId: "optus-10gb-30d",
+      country: "region-asia",
+      name: "10 GB - 30 days",
+      network: "Optus",
+      dataFormatted: "10 GB",
+      dataGB: 10,
+      durationDays: 30,
+      priceUSD: 13.0,
+      providerPriceUSD: 8.5,
+    }),
+  ];
+  for (const other of otherAsia10gb30d) {
+    assert.equal(isAsia10Gb30DayAsialinkPackage(other), false);
+    const priced = applyAsiaCustomerRetailPrice(other, "region-asia");
+    assert.equal(priced.priceUSD, other.priceUSD);
+    assert.notEqual(priced.priceUSD, ASIA_10GB_30DAY_RETAIL_USD);
+    assert.equal(priced.providerPriceUSD, other.providerPriceUSD);
+  }
+  console.log("PASS asia_10gb_30d_non_asialink_unpinned");
 
   const catalogMix = applyAsiaPublicCatalog("region-asia", [
     asia500,
