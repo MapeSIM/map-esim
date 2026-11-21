@@ -1055,6 +1055,11 @@ async function executeClaimedPartnerEsimProviderPurchase(options: {
           verifiedOffer,
           fundingSource: orderFundingSource,
           status: OrderStatus.COMPLETED,
+          // Full Partner Wallet debit — never leave schema default SAFEPAY.
+          paymentMethod:
+            orderFundingSource === OrderFundingSource.PARTNER_BALANCE
+              ? "PARTNER_WALLET"
+              : null,
           checkoutPayload: successCheckout.payload,
           allowSharedIccid: Boolean(addDataSourceOrderId),
         });

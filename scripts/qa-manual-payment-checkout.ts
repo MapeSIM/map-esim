@@ -224,6 +224,32 @@ function main() {
     "SAFEPAY"
   );
   assert.equal(
+    resolveAdminOrderPaymentMethodDisplay({
+      paymentMethod: "SAFEPAY",
+      fundingSource: "PARTNER_BALANCE",
+    }),
+    "PARTNER_WALLET"
+  );
+  assert.equal(
+    resolveAdminOrderPaymentMethodDisplay({
+      paymentMethod: "PARTNER_WALLET",
+      fundingSource: "PARTNER_BALANCE",
+    }),
+    "PARTNER_WALLET"
+  );
+  assert.equal(
+    resolveAdminOrderPaymentMethodDisplay({
+      paymentMethod: "SAFEPAY",
+      fundingSource: "PARTNER_GATEWAY",
+      hasGatewayPaymentAttempt: true,
+    }),
+    "SAFEPAY"
+  );
+  assert.match(
+    read("app/lib/partner/partnerEsimPurchaseProvider.ts"),
+    /paymentMethod:\s*[\s\S]*PARTNER_WALLET/
+  );
+  assert.equal(
     shouldBackfillOrderPaymentMethodToManual({
       paymentMethod: "SAFEPAY",
       whatsappPaymentMethod: "MANUAL",

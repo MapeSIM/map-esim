@@ -1,17 +1,20 @@
 /**
  * Pure admin payment-method display helpers (offline-QA safe).
  * Corrects historical Order.paymentMethod defaults (`SAFEPAY`) for manual /
- * WhatsApp fulfillment without inventing gateway transactions.
+ * WhatsApp / Partner Wallet fulfillment without inventing gateway transactions.
  */
 
 export const ADMIN_ORDER_PAYMENT_METHOD_MANUAL = "MANUAL" as const;
 export const ADMIN_ORDER_PAYMENT_METHOD_SAFEPAY = "SAFEPAY" as const;
 export const ADMIN_ORDER_PAYMENT_METHOD_WHATSAPP = "WHATSAPP" as const;
+export const ADMIN_ORDER_PAYMENT_METHOD_PARTNER_WALLET =
+  "PARTNER_WALLET" as const;
 
 export type AdminOrderPaymentMethodRail =
   | typeof ADMIN_ORDER_PAYMENT_METHOD_MANUAL
   | typeof ADMIN_ORDER_PAYMENT_METHOD_SAFEPAY
   | typeof ADMIN_ORDER_PAYMENT_METHOD_WHATSAPP
+  | typeof ADMIN_ORDER_PAYMENT_METHOD_PARTNER_WALLET
   | string;
 
 function normalizeRail(raw: string | null | undefined): string {
@@ -23,7 +26,8 @@ function normalizeRail(raw: string | null | undefined): string {
 
 /**
  * Resolve the payment-method label for /admin/orders/[id].
- * Prefer durable MANUAL / WHATSAPP evidence over the schema default SAFEPAY.
+ * Prefer durable MANUAL / WHATSAPP / PARTNER_WALLET evidence over the schema
+ * default SAFEPAY. Keep SAFEPAY only for real gateway rails.
  */
 export function resolveAdminOrderPaymentMethodDisplay(input: {
   paymentMethod?: string | null;
@@ -68,6 +72,9 @@ export function resolveAdminOrderPaymentMethodDisplay(input: {
   if (stored === ADMIN_ORDER_PAYMENT_METHOD_WHATSAPP) {
     return ADMIN_ORDER_PAYMENT_METHOD_WHATSAPP;
   }
+  if (stored === ADMIN_ORDER_PAYMENT_METHOD_PARTNER_WALLET) {
+    return ADMIN_ORDER_PAYMENT_METHOD_PARTNER_WALLET;
+  }
 
   if (wa === ADMIN_ORDER_PAYMENT_METHOD_MANUAL) {
     return ADMIN_ORDER_PAYMENT_METHOD_MANUAL;
@@ -78,6 +85,11 @@ export function resolveAdminOrderPaymentMethodDisplay(input: {
 
   if (providerOrderId.toLowerCase().startsWith("manual-")) {
     return ADMIN_ORDER_PAYMENT_METHOD_MANUAL;
+  }
+
+  // Partner Account / Wallet funded orders — never surface schema-default SAFEPAY.
+  if (funding === "PARTNER_BALANCE") {
+    return ADMIN_ORDER_PAYMENT_METHOD_PARTNER_WALLET;
   }
 
   // Manual submission evidence on the order or linked WhatsApp checkout row.

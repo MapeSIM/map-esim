@@ -460,7 +460,7 @@ export async function getAdminOrdersPage(
     );
     const paymentMethodDisplay = resolveAdminOrderPaymentMethodDisplay({
       paymentMethod: row.paymentMethod,
-      fundingSource: row.fundingSource,
+      fundingSource,
       providerOrderId: row.providerOrderId,
       senderName: row.senderName,
       paymentProofUrl: row.paymentProofUrl,
@@ -746,7 +746,7 @@ export async function getAdminOrderDetail(
   );
   const paymentMethod = resolveAdminOrderPaymentMethodDisplay({
     paymentMethod: row.paymentMethod,
-    fundingSource: row.fundingSource,
+    fundingSource,
     providerOrderId: row.providerOrderId,
     senderName: row.senderName,
     paymentProofUrl: row.paymentProofUrl,

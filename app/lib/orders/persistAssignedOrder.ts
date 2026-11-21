@@ -26,8 +26,8 @@ export async function persistAssignedOrder(
     fundingSource: OrderFundingSource;
     status?: OrderStatus;
     /**
-     * Explicit checkout payment rail (e.g. MANUAL). Omitted keeps schema default.
-     * Manual/WhatsApp admin fulfill must pass this so /admin/orders does not show SAFEPAY.
+     * Explicit checkout payment rail (e.g. MANUAL, PARTNER_WALLET).
+     * Omitted keeps schema default (SAFEPAY) — callers that are not Safepay must pass this.
      */
     paymentMethod?: string | null;
     /**
