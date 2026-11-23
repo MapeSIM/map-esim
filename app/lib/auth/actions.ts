@@ -356,13 +356,19 @@ export async function signinAction(
     };
   }
 
-  const redirectTo = resolvePostSignInPath(
+  const redirectPath = resolvePostSignInPath(
     role,
     rawCallbackUrl || (partnerPortalOnly ? "/" : ""),
     {
       requestOrigin,
     }
   );
+  // Absolute redirect keeps partneresim.com / mapesim.store logins on that host
+  // (Auth.js redirect callback otherwise anchors relative paths to AUTH_URL).
+  const redirectTo =
+    requestOrigin && redirectPath.startsWith("/")
+      ? `${requestOrigin}${redirectPath}`
+      : redirectPath;
 
   try {
     await signIn("credentials", {

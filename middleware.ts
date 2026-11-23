@@ -8,6 +8,7 @@ import {
   PARTNER_SITE_ORIGIN,
   type AppDomain,
   isLocalDevHost,
+  publicUrlForRequest,
   resolveAppDomain,
 } from "@/app/lib/domain/appDomain";
 
@@ -47,9 +48,12 @@ function withDomainHeaders(
 function attachDomainCookie(
   res: NextResponse,
   domain: AppDomain,
-  setFromQuery: boolean
+  persist: boolean
 ): NextResponse {
-  if (setFromQuery) {
+  // Persist for partner/sandbox hosts and ?__domain= overrides so client
+  // chrome-hiding (HideOnShare) matches the server domain even when AUTH_URL
+  // rewrites nextUrl to mapesim.com.
+  if (persist) {
     res.cookies.set(MAP_DOMAIN_COOKIE, domain, {
       path: "/",
       sameSite: "lax",
@@ -69,14 +73,19 @@ export default auth((req) => {
     queryDomain,
     cookieDomain,
   });
-  const setCookieFromQuery = Boolean(queryDomain);
+  // Always persist non-retail domains + explicit query overrides.
+  const persistDomainCookie = Boolean(queryDomain) || domain !== "retail";
   const pathname = req.nextUrl.pathname;
   const requestHeaders = withDomainHeaders(req, domain);
 
   // Retail (mapesim.com / default localhost): B2B docs live only on partneresim.com.
   if (domain === "retail" && isPartnerDocsPath(pathname)) {
     if (isLocalDevHost(host)) {
-      const dest = req.nextUrl.clone();
+      const dest = publicUrlForRequest(
+        req,
+        pathname,
+        req.nextUrl.search || undefined
+      );
       dest.searchParams.set(MAP_DOMAIN_QUERY, "partneresim.com");
       const res = NextResponse.redirect(dest);
       return attachDomainCookie(res, "partner", true);
@@ -89,38 +98,37 @@ export default auth((req) => {
   }
 
   // partneresim.com: keep auth on clean `/` login (not /signin URL).
+  // Strip Auth.js callbackUrl so we never bounce to mapesim.com/?callbackUrl=…
   if (domain === "partner" && (pathname === "/signin" || pathname === "/login")) {
-    const dest = req.nextUrl.clone();
-    dest.pathname = "/";
+    const dest = publicUrlForRequest(req, "/");
     const res = NextResponse.redirect(dest);
-    return attachDomainCookie(res, domain, setCookieFromQuery);
+    return attachDomainCookie(res, domain, persistDomainCookie);
   }
 
   // partneresim.com: internal rewrite `/` → `/partner` (URL bar stays `/`).
-  // Logged-out → PartnerPortalLogin; PARTNER session → dashboard.
+  // IMPORTANT: build rewrite on the real public origin — Auth.js may have
+  // replaced nextUrl with AUTH_URL (mapesim.com), which would leak retail chrome.
   if (domain === "partner" && pathname === "/") {
-    const url = req.nextUrl.clone();
-    url.pathname = "/partner";
+    const url = publicUrlForRequest(req, "/partner", req.nextUrl.search || undefined);
     const res = NextResponse.rewrite(url, {
       request: { headers: requestHeaders },
     });
-    return attachDomainCookie(res, domain, setCookieFromQuery);
+    return attachDomainCookie(res, domain, persistDomainCookie);
   }
 
   // mapesim.store: internal rewrite `/` → `/sandbox` (URL bar stays `/`).
   if (domain === "sandbox" && pathname === "/") {
-    const url = req.nextUrl.clone();
-    url.pathname = "/sandbox";
+    const url = publicUrlForRequest(req, "/sandbox", req.nextUrl.search || undefined);
     const res = NextResponse.rewrite(url, {
       request: { headers: requestHeaders },
     });
-    return attachDomainCookie(res, domain, setCookieFromQuery);
+    return attachDomainCookie(res, domain, persistDomainCookie);
   }
 
   const res = NextResponse.next({
     request: { headers: requestHeaders },
   });
-  return attachDomainCookie(res, domain, setCookieFromQuery);
+  return attachDomainCookie(res, domain, persistDomainCookie);
 });
 
 export const config = {

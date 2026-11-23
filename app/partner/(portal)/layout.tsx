@@ -88,7 +88,8 @@ export default async function PartnerLayout({
   }
 
   if (domain === "partner" && !isPartnerSession) {
-    redirect("/signin?callbackUrl=/");
+    // Stay on partneresim.com `/` (PartnerPortalLogin) — never /signin via AUTH_URL.
+    redirect("/");
   }
 
   const user = await requireRole("PARTNER");

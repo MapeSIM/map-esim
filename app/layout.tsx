@@ -24,6 +24,7 @@ import {
   websiteNode,
 } from "@/app/lib/seo/siteGraph";
 import { defaultSocialShareImages } from "@/app/lib/seo/socialShareMeta";
+import { readAppDomain } from "@/app/lib/domain/readAppDomain";
 
 const { openGraphImages, twitterImages } = defaultSocialShareImages();
 
@@ -81,12 +82,15 @@ export const viewport: Viewport = {
   colorScheme: "dark light",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   const htmlThemeClass = themePreferenceToHtmlClass(DEFAULT_THEME);
+  const domain = await readAppDomain();
+  // partneresim.com + mapesim.store: never mount retail chrome (nav/footer/WhatsApp).
+  const portalHost = domain === "partner" || domain === "sandbox";
 
   const siteGraph = {
     "@context": "https://schema.org",
@@ -106,15 +110,19 @@ export default function RootLayout({
             <Suspense fallback={null}>
               <CurrencyProvider>
                 <ShellAuthProvider>
-                  <DomainAwareHideChrome>
-                    <JsonLd data={siteGraph} />
-                    <NavbarShell />
-                  </DomainAwareHideChrome>
+                  {portalHost ? null : (
+                    <DomainAwareHideChrome>
+                      <JsonLd data={siteGraph} />
+                      <NavbarShell />
+                    </DomainAwareHideChrome>
+                  )}
                   {children}
-                  <DomainAwareHideChrome>
-                    <Footer />
-                    <DeferredWhatsAppSupportButton />
-                  </DomainAwareHideChrome>
+                  {portalHost ? null : (
+                    <DomainAwareHideChrome>
+                      <Footer />
+                      <DeferredWhatsAppSupportButton />
+                    </DomainAwareHideChrome>
+                  )}
                 </ShellAuthProvider>
               </CurrencyProvider>
             </Suspense>

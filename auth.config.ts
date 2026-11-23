@@ -5,6 +5,7 @@ import { safeCallbackPath } from "@/app/lib/auth/redirects";
 import {
   isPartnerLandingPath,
   multiDomainAllowedOrigins,
+  publicUrlForRequest,
   resolveAppDomainFromRequest,
 } from "@/app/lib/domain/appDomain";
 
@@ -71,7 +72,7 @@ export const authConfig = {
         }
 
         const callback = `${pathname}${request.nextUrl.search || ""}`;
-        const url = new URL("/oauth-consent", request.nextUrl);
+        const url = publicUrlForRequest(request, "/oauth-consent");
         url.searchParams.set("callbackUrl", callback);
         return Response.redirect(url);
       }
@@ -81,7 +82,7 @@ export const authConfig = {
         if (role !== "ADMIN") {
           const dest =
             role === "PARTNER" ? "/partner" : role === "CUSTOMER" ? "/account" : "/signin";
-          return Response.redirect(new URL(dest, request.nextUrl));
+          return Response.redirect(publicUrlForRequest(request, dest));
         }
         return true;
       }
@@ -97,22 +98,27 @@ export const authConfig = {
       if (pathname === "/partner" || pathname.startsWith("/partner/")) {
         const domain = resolveAppDomainFromRequest(request);
         // partneresim.com: allow logged-out visitors on landing (login view).
+        // Never `return false` here — Auth.js would redirect via AUTH_URL
+        // (mapesim.com/signin?callbackUrl=…). Stay on the partner host.
         if (!isLoggedIn) {
-          if (domain === "partner" && isPartnerLandingPath(pathname)) {
-            return true;
+          if (domain === "partner") {
+            if (isPartnerLandingPath(pathname)) {
+              return true;
+            }
+            return Response.redirect(publicUrlForRequest(request, "/"));
           }
           return false;
         }
         if (role !== "PARTNER") {
           // Strict partner role on partneresim.com — never drop customers into B2B.
           if (domain === "partner") {
-            const denied = new URL("/", request.nextUrl);
+            const denied = publicUrlForRequest(request, "/");
             denied.searchParams.set("denied", "1");
             return Response.redirect(denied);
           }
           const dest =
             role === "ADMIN" ? "/admin" : role === "CUSTOMER" ? "/account" : "/signin";
-          return Response.redirect(new URL(dest, request.nextUrl));
+          return Response.redirect(publicUrlForRequest(request, dest));
         }
         return true;
       }
@@ -125,18 +131,21 @@ export const authConfig = {
             pathname.startsWith("/account/esim/buy/")
           ) {
             // Partner Buy Now / shared buy links → confirm purchase, not destinations.
-            const dest = new URL("/partner/buy", request.nextUrl);
-            dest.search = request.nextUrl.search;
+            const dest = publicUrlForRequest(
+              request,
+              "/partner/buy",
+              request.nextUrl.search || undefined
+            );
             return Response.redirect(dest);
           }
-          return Response.redirect(new URL("/partner", request.nextUrl));
+          return Response.redirect(publicUrlForRequest(request, "/partner"));
         }
         if (role === "ADMIN") {
           // Admins may open /account only when explicitly navigating; keep reachable.
           return true;
         }
         if (role !== "CUSTOMER") {
-          return Response.redirect(new URL("/signin", request.nextUrl));
+          return Response.redirect(publicUrlForRequest(request, "/signin"));
         }
         return true;
       }
@@ -151,21 +160,34 @@ export const authConfig = {
       return true;
     },
     redirect({ url, baseUrl }) {
-      // Only same-site/internal destinations. Absolute URLs are reduced to
-      // pathname+search when the origin is allowlisted (AUTH_URL / APP_BASE_URL
-      // / Auth.js baseUrl / multi-domain hosts). Foreign origins fall back to
-      // home — no open redirect. Keep partneresim.com logins on that host.
+      // Only same-site/internal destinations. Absolute URLs on allowlisted
+      // origins keep THAT origin (so partneresim.com / mapesim.store logins
+      // never bounce to AUTH_URL / mapesim.com). Relative paths use baseUrl.
+      const allowed = multiDomainAllowedOrigins();
       let baseOrigin: string;
       try {
         baseOrigin = new URL(baseUrl).origin;
       } catch {
         return baseUrl;
       }
-      const safe = safeCallbackPath(url, "", {
-        allowedOrigins: [baseOrigin, ...multiDomainAllowedOrigins()],
-      });
-      if (!safe) return baseUrl;
-      return `${baseOrigin}${safe}`;
+      const allowedOrigins = [baseOrigin, ...allowed];
+
+      let preferOrigin = baseOrigin;
+      const trimmed = (url || "").trim();
+      if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+        try {
+          const absolute = new URL(trimmed);
+          if (allowedOrigins.includes(absolute.origin)) {
+            preferOrigin = absolute.origin;
+          }
+        } catch {
+          /* fall through */
+        }
+      }
+
+      const safe = safeCallbackPath(url, "", { allowedOrigins });
+      if (!safe) return preferOrigin === baseOrigin ? baseUrl : `${preferOrigin}/`;
+      return `${preferOrigin}${safe}`;
     },
   },
 } satisfies NextAuthConfig;

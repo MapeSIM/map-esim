@@ -139,6 +139,60 @@ export function resolveAppDomainFromRequest(request: {
   });
 }
 
+/**
+ * Real browser origin for redirects/rewrites.
+ * Auth.js `reqWithEnvURL` replaces `nextUrl` with AUTH_URL/NEXTAUTH_URL
+ * (often mapesim.com) — never trust that origin for partner/sandbox hosts.
+ */
+export function resolveRequestPublicOrigin(request: {
+  headers: Headers;
+  nextUrl: { protocol?: string; origin?: string };
+}): string {
+  const host = (
+    request.headers.get("x-forwarded-host") ||
+    request.headers.get("host") ||
+    ""
+  )
+    .split(",")[0]
+    .trim();
+  if (!host) {
+    return request.nextUrl.origin || RETAIL_SITE_ORIGIN;
+  }
+  const xfProto = (request.headers.get("x-forwarded-proto") || "")
+    .split(",")[0]
+    .trim()
+    .toLowerCase();
+  const proto =
+    xfProto === "http" || xfProto === "https"
+      ? xfProto
+      : isLocalDevHost(host)
+        ? "http"
+        : "https";
+  return `${proto}://${host}`;
+}
+
+/** Build a same-site URL on the real public host (not AUTH_URL). */
+export function publicUrlForRequest(
+  request: {
+    headers: Headers;
+    nextUrl: { protocol?: string; origin?: string; pathname: string; search: string };
+  },
+  pathname: string,
+  search?: string
+): URL {
+  const origin = resolveRequestPublicOrigin(request);
+  const path = pathname.startsWith("/") ? pathname : `/${pathname}`;
+  const qs =
+    search === undefined
+      ? ""
+      : search
+        ? search.startsWith("?")
+          ? search
+          : `?${search}`
+        : "";
+  return new URL(`${path}${qs}`, origin);
+}
+
 /** True when the path is the B2B marketing/landing surface (rewritten `/` or `/partner`). */
 export function isPartnerLandingPath(pathname: string): boolean {
   const path = (pathname || "/").split("?")[0].split("#")[0] || "/";

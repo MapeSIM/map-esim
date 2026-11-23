@@ -52,7 +52,10 @@ export default function HideOnShare({
     readClientDomain,
     () => domainProp ?? ("retail" as AppDomain)
   );
+  // Prefer server domain, then client (host / ?__domain= / cookie).
   const domain = domainProp ?? clientDomain;
+  // Entire partner + sandbox hosts: hide even if pathname looks retail.
+  if (domain === "partner" || domain === "sandbox") return null;
   if (shouldHidePublicSiteChrome(pathname, domain)) return null;
   return <>{children}</>;
 }
