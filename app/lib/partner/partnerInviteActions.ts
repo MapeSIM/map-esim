@@ -136,7 +136,11 @@ export async function completePartnerPasswordSetupAction(
   await clearPartnerInviteSetupCookie();
 
   const email = setupUser.email;
-  await sendPasswordChangedEmail(email);
+  try {
+    await sendPasswordChangedEmail(email, { audience: "partner" });
+  } catch {
+    /* non-blocking */
+  }
 
   redirect("/signin?partnerSetup=1");
 }

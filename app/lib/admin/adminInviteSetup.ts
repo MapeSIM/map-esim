@@ -8,6 +8,10 @@ import {
   hashAdminInviteSetupToken,
   isAdminInviteSetupLive,
 } from "@/app/lib/admin/adminInviteSetupShared";
+import {
+  RETAIL_SITE_ORIGIN,
+  isLocalDevHost,
+} from "@/app/lib/domain/appDomain";
 
 export {
   ADMIN_INVITE_INVALID_MESSAGE,
@@ -34,12 +38,29 @@ function mintRawToken(): string {
 }
 
 export function buildAdminInviteSetupUrl(rawToken: string): string {
-  const base =
+  // Admin invites always target the retail admin host (mapesim.com), never
+  // partneresim.com / mapesim.store — those hosts redirect /admin to retail.
+  const envBase =
     process.env.APP_BASE_URL?.trim() ||
     process.env.AUTH_URL?.trim() ||
-    "http://localhost:3000";
-  const origin = base.replace(/\/$/, "");
-  const url = new URL("/admin-setup-password", origin);
+    "";
+  let origin = RETAIL_SITE_ORIGIN;
+  if (envBase) {
+    try {
+      const u = new URL(envBase);
+      if (isLocalDevHost(u.hostname)) {
+        origin = u.origin;
+      } else if (
+        u.hostname === "mapesim.com" ||
+        u.hostname === "www.mapesim.com"
+      ) {
+        origin = "https://mapesim.com";
+      }
+    } catch {
+      origin = RETAIL_SITE_ORIGIN;
+    }
+  }
+  const url = new URL("/admin-setup-password", origin.replace(/\/$/, ""));
   url.searchParams.set("token", rawToken);
   return url.toString();
 }

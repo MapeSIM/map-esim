@@ -24,28 +24,64 @@ export default function SandboxWalletClient() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    try {
-      const bal = localStorage.getItem(SANDBOX_WALLET_KEY);
-      setBalanceCents(
-        bal != null && Number.isFinite(Number(bal))
-          ? Number(bal)
-          : SANDBOX_DEFAULT_BALANCE_CENTS
-      );
-      const rawTx = localStorage.getItem(SANDBOX_TX_KEY);
-      const parsed = rawTx ? (JSON.parse(rawTx) as SandboxWalletTx[]) : [];
-      setTxs(Array.isArray(parsed) ? parsed : []);
-    } catch {
-      /* ignore */
+    let cancelled = false;
+    async function load() {
+      try {
+        const key = localStorage.getItem("mapesim_sandbox_api_key");
+        if (key) {
+          const res = await fetch("/api/sandbox/v1/wallet", {
+            headers: { Authorization: `Bearer ${key}` },
+            cache: "no-store",
+          });
+          if (res.ok) {
+            const data = (await res.json()) as {
+              wallet?: { balanceCents?: number };
+            };
+            const cents = data.wallet?.balanceCents;
+            if (typeof cents === "number" && !cancelled) {
+              setBalanceCents(cents);
+              try {
+                localStorage.setItem(SANDBOX_WALLET_KEY, String(cents));
+              } catch {
+                /* ignore */
+              }
+            }
+          }
+        } else {
+          const bal = localStorage.getItem(SANDBOX_WALLET_KEY);
+          if (!cancelled) {
+            setBalanceCents(
+              bal != null && Number.isFinite(Number(bal))
+                ? Number(bal)
+                : SANDBOX_DEFAULT_BALANCE_CENTS
+            );
+          }
+        }
+      } catch {
+        /* local fallback */
+      }
+      try {
+        const rawTx = localStorage.getItem(SANDBOX_TX_KEY);
+        const parsed = rawTx ? (JSON.parse(rawTx) as SandboxWalletTx[]) : [];
+        if (!cancelled) setTxs(Array.isArray(parsed) ? parsed : []);
+      } catch {
+        /* ignore */
+      }
+      if (!cancelled) setReady(true);
     }
-    setReady(true);
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function credit(usd: number) {
+    // Local cache only — Neon balance is set via Sandbox Admin (set/top-up).
     const cents = usd * 100;
     const next = balanceCents + cents;
     const tx: SandboxWalletTx = {
       id: `tx_credit_${Date.now()}`,
-      label: `Add Funds · $${usd}`,
+      label: `Local preview · $${usd} (admin set/top-up for Neon)`,
       amountCents: cents,
       createdAt: new Date().toISOString(),
       kind: "credit",

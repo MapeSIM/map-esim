@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { generateSandboxTestKey } from "@/app/lib/sandbox/sandboxShared";
 import { SANDBOX_API_KEY_KEY } from "@/app/lib/sandbox/sandboxClientStorage";
 import { partnerCardClass } from "@/app/components/partner/partnerPortalUi";
 import { BRAND_SUPPORT_EMAIL } from "@/app/lib/brand";
@@ -11,37 +10,57 @@ import SandboxShareBrandingForm from "@/app/components/sandbox/SandboxShareBrand
 export default function SandboxAccountClient() {
   const [apiKey, setApiKey] = useState("");
   const [copied, setCopied] = useState(false);
-  const [email, setEmail] = useState("partner@example.com");
+  const [email, setEmail] = useState("—");
+  const [name, setName] = useState("Sandbox Partner");
+  const [keyPrefix, setKeyPrefix] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const session = localStorage.getItem("mapesim_sandbox_session");
-      if (session) {
-        const parsed = JSON.parse(session) as { email?: string };
-        if (parsed.email) setEmail(parsed.email);
+    async function load() {
+      try {
+        const res = await fetch("/api/sandbox/session", {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        const data = (await res.json()) as {
+          ok?: boolean;
+          partner?: {
+            name: string;
+            email: string;
+            apiKeyPrefix?: string | null;
+          };
+        };
+        if (data.ok && data.partner) {
+          setName(data.partner.name);
+          setEmail(data.partner.email);
+          setKeyPrefix(data.partner.apiKeyPrefix ?? null);
+          try {
+            localStorage.setItem(
+              "mapesim_sandbox_session",
+              JSON.stringify({
+                email: data.partner.email,
+                name: data.partner.name,
+                at: Date.now(),
+              })
+            );
+          } catch {
+            /* ignore */
+          }
+        }
+      } catch {
+        /* ignore */
       }
-      let key = localStorage.getItem(SANDBOX_API_KEY_KEY);
-      if (!key || !key.startsWith("sb_test_")) {
-        key = generateSandboxTestKey();
-        localStorage.setItem(SANDBOX_API_KEY_KEY, key);
+      try {
+        const key = localStorage.getItem(SANDBOX_API_KEY_KEY);
+        if (key && key.startsWith("sb_test_")) setApiKey(key);
+      } catch {
+        /* ignore */
       }
-      setApiKey(key);
-    } catch {
-      setApiKey(generateSandboxTestKey());
     }
+    void load();
   }, []);
 
-  function mint() {
-    const key = generateSandboxTestKey();
-    setApiKey(key);
-    try {
-      localStorage.setItem(SANDBOX_API_KEY_KEY, key);
-    } catch {
-      /* ignore */
-    }
-  }
-
   async function copy() {
+    if (!apiKey) return;
     try {
       await navigator.clipboard.writeText(apiKey);
       setCopied(true);
@@ -71,7 +90,7 @@ export default function SandboxAccountClient() {
                 <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                   Partner name
                 </dt>
-                <dd className="mt-1 text-sm text-slate-100">MAP Partner</dd>
+                <dd className="mt-1 text-sm text-slate-100">{name}</dd>
               </div>
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
@@ -88,6 +107,7 @@ export default function SandboxAccountClient() {
             </h2>
             <p className="text-sm text-slate-400">
               Company details and Install button colors for public share pages.
+              Demo QR is generated automatically — no custom QR paste fields.
             </p>
             <SandboxShareBrandingForm />
             <p className="text-xs text-slate-500">
@@ -122,7 +142,7 @@ export default function SandboxAccountClient() {
                   href="/sandbox/wallet"
                   className="font-semibold text-emerald-400 hover:text-emerald-300"
                 >
-                  Top up wallet →
+                  Wallet →
                 </Link>
               </li>
               <li>
@@ -143,30 +163,37 @@ export default function SandboxAccountClient() {
             <dl className="mt-4 space-y-3 text-sm">
               <div className="flex justify-between gap-3">
                 <dt className="text-slate-500">API access</dt>
-                <dd className="font-semibold text-emerald-300">Enabled</dd>
+                <dd className="font-semibold text-emerald-300">Sandbox</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-slate-500">Key prefix</dt>
+                <dd className="font-mono text-xs text-slate-300">
+                  {keyPrefix ?? "—"}
+                </dd>
               </div>
             </dl>
           </section>
 
           <section className={partnerCardClass + " space-y-4"}>
             <h2 className="text-lg font-semibold text-slate-50">API Keys</h2>
+            <p className="text-xs text-slate-500">
+              Issued on sandbox sign-in (Neon). Sign out and sign in again to
+              rotate. Client-minted keys are no longer accepted by the API.
+            </p>
             <div className="flex flex-wrap items-center gap-2">
               <code className="min-w-0 flex-1 overflow-x-auto rounded-xl border border-white/[0.1] bg-slate-950 px-3 py-2.5 font-mono text-xs text-emerald-300">
-                {apiKey || "…"}
+                {apiKey ||
+                  (keyPrefix
+                    ? `${keyPrefix}… (re-sign-in to reveal full key)`
+                    : "Sign in again to receive a key")}
               </code>
               <button
                 type="button"
                 onClick={() => void copy()}
-                className="inline-flex h-10 items-center rounded-xl border border-white/[0.12] px-3 text-sm font-semibold text-slate-100 hover:bg-white/[0.05]"
+                disabled={!apiKey}
+                className="inline-flex h-10 items-center rounded-xl border border-white/[0.12] px-3 text-sm font-semibold text-slate-100 hover:bg-white/[0.05] disabled:opacity-40"
               >
                 {copied ? "Copied" : "Copy"}
-              </button>
-              <button
-                type="button"
-                onClick={mint}
-                className="inline-flex h-10 items-center rounded-xl bg-emerald-500 px-3 text-sm font-bold text-slate-950 hover:bg-emerald-400"
-              >
-                Mint key
               </button>
             </div>
           </section>

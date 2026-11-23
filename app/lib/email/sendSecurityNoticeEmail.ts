@@ -5,6 +5,7 @@ import {
   renderPasswordChangedEmailText,
 } from "@/app/lib/email/securityNoticeTemplate";
 import { sendChannelMail } from "@/app/lib/email/transport";
+import { sendPartnerChannelMail } from "@/app/lib/email/partnerTransport";
 
 export type SendSecurityNoticeResult =
   | { ok: true }
@@ -13,10 +14,22 @@ export type SendSecurityNoticeResult =
 /**
  * Password-changed alert via SECURITY channel.
  * Never includes passwords, OTPs, or install secrets.
+ * Pass `audience: "partner"` for partneresim.com security@ mailbox.
  */
 export async function sendPasswordChangedEmail(
-  to: string
+  to: string,
+  options?: { audience?: "retail" | "partner" }
 ): Promise<SendSecurityNoticeResult> {
+  if (options?.audience === "partner") {
+    return sendPartnerChannelMail({
+      channel: "security",
+      to,
+      subject: "Your MAP eSIM Partner password was changed",
+      text: renderPasswordChangedEmailText(to),
+      html: renderPasswordChangedEmailHtml(to),
+      headers: { "X-MAP-ESIM-Partner-Mail": "password_changed" },
+    });
+  }
   return sendChannelMail({
     channel: "security",
     to,

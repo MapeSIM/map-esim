@@ -1,16 +1,17 @@
 import "server-only";
 
 import { RefundRequestStatus, Role } from "@prisma/client";
-import { BRAND_SITE_URL } from "@/app/lib/brand";
 import { prisma } from "@/app/lib/db";
-import { isEmailConfigured, sanitizeEmailHeaderValue } from "@/app/lib/email/config";
+import { sanitizeEmailHeaderValue } from "@/app/lib/email/config";
+import { resolvePartnerSiteOrigin } from "@/app/lib/email/partnerChannels";
+import { isPartnerEmailConfigured } from "@/app/lib/email/partnerEmailConfig";
 import {
   partnerRefundStatusEmailSubject,
   renderPartnerRefundStatusEmailHtml,
   renderPartnerRefundStatusEmailText,
   type PartnerRefundStatusEmailKind,
 } from "@/app/lib/email/partnerRefundStatusTemplate";
-import { sendChannelMail } from "@/app/lib/email/transport";
+import { sendPartnerChannelMail } from "@/app/lib/email/partnerTransport";
 import {
   PARTNER_REFUND_AUDIT,
   sanitizePartnerRefundNote,
@@ -227,7 +228,7 @@ export async function notifyPartnerRefundStatusEmail(
       return { status: "skipped", reason: "invalid_recipient" };
     }
 
-    if (!isEmailConfigured("billing")) {
+    if (!isPartnerEmailConfigured("billing")) {
       await recordEmailAudit({
         requestId: id,
         actorUserId: user.id,
@@ -253,7 +254,7 @@ export async function notifyPartnerRefundStatusEmail(
     const amountCents = Math.max(0, row.partnerChargeCents);
     const amountLabel = formatUsdCents(amountCents);
     const currencyLabel = (row.currency || "USD").trim().toUpperCase() || "USD";
-    const ordersUrl = `${BRAND_SITE_URL}/partner/orders`;
+    const ordersUrl = `${resolvePartnerSiteOrigin()}/partner/orders`;
     const when =
       event === "received"
         ? row.createdAt
@@ -284,14 +285,14 @@ export async function notifyPartnerRefundStatusEmail(
     const text = renderPartnerRefundStatusEmailText(payload);
     const html = renderPartnerRefundStatusEmailHtml(payload);
 
-    const sendResult = await sendChannelMail({
+    const sendResult = await sendPartnerChannelMail({
       channel: "billing",
       to,
-      subject: `[MAP eSIM Billing] ${sanitizeEmailHeaderValue(subject, 160)}`,
+      subject: `[MAP eSIM Partner Billing] ${sanitizeEmailHeaderValue(subject, 160)}`,
       text,
       html,
       headers: {
-        "X-MAP-ESIM-Billing-Kind": "partner_refund_status",
+        "X-MAP-ESIM-Partner-Mail": "refund_status",
         "X-MAP-ESIM-Partner-Refund-Event": sanitizeEmailHeaderValue(event, 40),
         "X-MAP-ESIM-Partner-Refund-Request-ID": sanitizeEmailHeaderValue(id, 64),
       },

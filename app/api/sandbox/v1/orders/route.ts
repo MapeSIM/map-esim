@@ -1,49 +1,31 @@
 import { NextRequest } from "next/server";
 import {
   authenticateSandboxRequest,
-  buildSandboxOrder,
+  persistSandboxOrderFromApi,
   sandboxError,
   sandboxJson,
+  sandboxOrdersListResponse,
 } from "@/app/lib/sandbox/sandboxApi";
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/sandbox/v1/orders — canned recent mock orders. */
+/** GET /api/sandbox/v1/orders — Neon SandboxOrder list for this API key. */
 export async function GET(req: NextRequest) {
-  const auth = authenticateSandboxRequest(req);
+  const auth = await authenticateSandboxRequest(req);
   if (!auth.ok) return auth.response;
-
-  return sandboxJson({
-    success: true,
-    sandbox: true,
-    orders: [
-      {
-        orderId: "sandbox_ord_demo_001",
-        status: "COMPLETED",
-        offerId: "sandbox_eu_1gb_7d",
-        region: "Europe",
-        planName: "1 GB · 7 days",
-        totalCents: 450,
-        createdAt: new Date(Date.now() - 86_400_000).toISOString(),
-      },
-      {
-        orderId: "sandbox_ord_demo_002",
-        status: "COMPLETED",
-        offerId: "sandbox_asia_10gb_30d",
-        region: "Asia",
-        planName: "10 GB · 30 days",
-        totalCents: 1800,
-        createdAt: new Date(Date.now() - 3600_000).toISOString(),
-      },
-    ],
-    note: "List is fixture data. POST creates a fresh mock order (not persisted).",
-  });
+  if (!auth.partnerId) {
+    return sandboxError(401, "Unauthorized", "Sandbox partner required.");
+  }
+  return sandboxOrdersListResponse(auth.partnerId);
 }
 
-/** POST /api/sandbox/v1/orders — create a mock eSIM order + QR payload. */
+/** POST /api/sandbox/v1/orders — create + persist mock eSIM order in Neon. */
 export async function POST(req: NextRequest) {
-  const auth = authenticateSandboxRequest(req);
+  const auth = await authenticateSandboxRequest(req);
   if (!auth.ok) return auth.response;
+  if (!auth.partnerId) {
+    return sandboxError(401, "Unauthorized", "Sandbox partner required.");
+  }
 
   let body: Record<string, unknown> = {};
   try {
@@ -63,12 +45,16 @@ export async function POST(req: NextRequest) {
       ? 1
       : Number(quantityRaw);
 
-  const built = buildSandboxOrder({
+  const result = await persistSandboxOrderFromApi({
+    partnerId: auth.partnerId,
     offerId,
-    quantity,
+    quantity: Number.isFinite(quantity) ? quantity : 1,
     apiKey: auth.apiKey,
   });
-  if (!built.ok) return built.response;
+  if (!result.ok) return result.response;
 
-  return sandboxJson({ success: true, sandbox: true, order: built.order }, 201);
+  return sandboxJson(
+    { success: true, sandbox: true, order: result.order },
+    201
+  );
 }

@@ -578,7 +578,7 @@ export async function forgotPasswordAction(
   if (isValidEmailFormat(email)) {
     const user = await prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, deletedAt: true },
+      select: { id: true, email: true, deletedAt: true, role: true },
     });
 
     // Deleted accounts must not receive password-reset OTPs.
@@ -594,6 +594,7 @@ export async function forgotPasswordAction(
           kind: "password_reset",
           to: user.email,
           code: issued.code,
+          audience: user.role === Role.PARTNER ? "partner" : "retail",
         });
         if (!sent.ok) {
           console.error("Password-reset OTP email failed:", sent.reason);
@@ -700,7 +701,7 @@ export async function resendResetOtpAction(
 
   const user = await prisma.user.findUnique({
     where: { email },
-    select: { id: true, email: true, deletedAt: true },
+    select: { id: true, email: true, deletedAt: true, role: true },
   });
 
   if (!user || user.deletedAt) {
@@ -723,6 +724,7 @@ export async function resendResetOtpAction(
     kind: "password_reset",
     to: user.email,
     code: issued.code,
+    audience: user.role === Role.PARTNER ? "partner" : "retail",
   });
   if (!sent.ok) {
     console.error("Password-reset OTP resend email failed:", sent.reason);
@@ -817,7 +819,13 @@ export async function resetPasswordAction(
   });
 
   // Best-effort security notice — never blocks password reset.
-  await sendPasswordChangedEmail(user.email);
+  try {
+    await sendPasswordChangedEmail(user.email, {
+      audience: user.role === Role.PARTNER ? "partner" : "retail",
+    });
+  } catch {
+    /* non-blocking */
+  }
 
   redirect("/signin?reset=1");
 }
@@ -907,7 +915,13 @@ export async function changePasswordAction(
     targetType: "User",
     targetId: dbUser.id,
   });
-  await sendPasswordChangedEmail(dbUser.email);
+  try {
+    await sendPasswordChangedEmail(dbUser.email, {
+      audience: dbUser.role === Role.PARTNER ? "partner" : "retail",
+    });
+  } catch {
+    /* non-blocking */
+  }
 
   return { ok: true, error: "Password updated successfully." };
 }

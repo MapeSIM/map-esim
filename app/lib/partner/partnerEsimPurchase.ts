@@ -777,6 +777,28 @@ export async function reservePartnerEsimPurchase(
       { maxWait: 5000, timeout: 15000 }
     );
 
+    if (!reserved.duplicate) {
+      try {
+        const wallet = await prisma.partnerWalletAccount.findUnique({
+          where: { partnerId: partner.partnerId },
+          select: { balanceCents: true },
+        });
+        if (wallet) {
+          const {
+            schedulePartnerLowBalanceIfCrossed,
+          } = await import("@/app/lib/partner/partnerEmailNotifications");
+          schedulePartnerLowBalanceIfCrossed({
+            partnerId: partner.partnerId,
+            previousBalanceCents:
+              wallet.balanceCents + purchase.partnerChargeCents,
+            newBalanceCents: wallet.balanceCents,
+          });
+        }
+      } catch {
+        /* non-blocking */
+      }
+    }
+
     return {
       purchaseId: purchase.id,
       partnerId: partner.partnerId,

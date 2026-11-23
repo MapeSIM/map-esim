@@ -4,9 +4,7 @@ import { useEffect, useState } from "react";
 import PartnerMenu, {
   type PartnerNavLink,
 } from "@/app/components/partner/PartnerMenu";
-import {
-  SANDBOX_DEFAULT_BALANCE_CENTS,
-} from "@/app/lib/sandbox/sandboxShared";
+import { SANDBOX_DEFAULT_BALANCE_CENTS } from "@/app/lib/sandbox/sandboxShared";
 import { SANDBOX_WALLET_KEY } from "@/app/lib/sandbox/sandboxClientStorage";
 
 const links: PartnerNavLink[] = [
@@ -29,9 +27,12 @@ export default function SandboxPortalChrome() {
   const [balanceLabel, setBalanceLabel] = useState(
     formatUsd(SANDBOX_DEFAULT_BALANCE_CENTS)
   );
+  const [userName, setUserName] = useState("Sandbox Partner");
+  const [userEmail, setUserEmail] = useState("sandbox@mapesim.store");
+  const [companyBadge, setCompanyBadge] = useState("Sandbox Demo Co");
 
   useEffect(() => {
-    function sync() {
+    function syncLocal() {
       try {
         const raw = localStorage.getItem(SANDBOX_WALLET_KEY);
         const cents =
@@ -43,13 +44,49 @@ export default function SandboxPortalChrome() {
         /* ignore */
       }
     }
-    sync();
-    window.addEventListener("storage", sync);
-    window.addEventListener("focus", sync);
-    const id = window.setInterval(sync, 1500);
+
+    async function syncSession() {
+      try {
+        const res = await fetch("/api/sandbox/session", {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        const data = (await res.json()) as {
+          ok?: boolean;
+          partner?: {
+            name: string;
+            email: string;
+            balanceCents: number;
+          };
+        };
+        if (data.ok && data.partner) {
+          setUserName(data.partner.name);
+          setUserEmail(data.partner.email);
+          setCompanyBadge(data.partner.name);
+          setBalanceLabel(formatUsd(data.partner.balanceCents));
+          try {
+            localStorage.setItem(
+              SANDBOX_WALLET_KEY,
+              String(data.partner.balanceCents)
+            );
+          } catch {
+            /* ignore */
+          }
+          return;
+        }
+      } catch {
+        /* fall through to local cache */
+      }
+      syncLocal();
+    }
+
+    void syncSession();
+    window.addEventListener("storage", syncLocal);
+    window.addEventListener("focus", syncLocal);
+    const id = window.setInterval(syncLocal, 2000);
     return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener("focus", sync);
+      window.removeEventListener("storage", syncLocal);
+      window.removeEventListener("focus", syncLocal);
       window.clearInterval(id);
     };
   }, []);
@@ -57,9 +94,9 @@ export default function SandboxPortalChrome() {
   return (
     <PartnerMenu
       mode="sandbox"
-      userName="Sandbox Partner"
-      userEmail="sandbox@mapesim.store"
-      companyBadge="Sandbox Demo Co"
+      userName={userName}
+      userEmail={userEmail}
+      companyBadge={companyBadge}
       walletBalanceLabel={balanceLabel}
       links={links}
       brandLabel="MAP eSIM"

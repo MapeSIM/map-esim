@@ -1,6 +1,6 @@
 import "server-only";
 
-import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from "@/app/lib/brand";
+import { BRAND_NAME } from "@/app/lib/brand";
 import {
   escapeHtml,
   renderEmailFooterText,
@@ -8,12 +8,13 @@ import {
   TEXT_SECONDARY,
 } from "@/app/lib/email/brand";
 import { renderTransactionalEmailLayoutHtml } from "@/app/lib/email/emailLayout";
+import { sanitizeEmailHeaderValue } from "@/app/lib/email/config";
 import {
-  getEmailConfig,
-  sanitizeEmailHeaderValue,
-} from "@/app/lib/email/config";
-import { getEmailLogoAttachment } from "@/app/lib/email/logo";
-import { getChannelTransporter } from "@/app/lib/email/transport";
+  PARTNER_SUPPORT_MAILBOX,
+  resolvePartnerSiteOrigin,
+} from "@/app/lib/email/partnerChannels";
+import { getPartnerEmailConfig } from "@/app/lib/email/partnerEmailConfig";
+import { sendPartnerChannelMail } from "@/app/lib/email/partnerTransport";
 import { partnershipVolumeLabel } from "@/app/lib/partnerships/partnershipLimits";
 import { isValidEmail } from "@/app/lib/vesim/server";
 
@@ -38,7 +39,7 @@ export type PartnershipApplicationPayload = {
 };
 
 /**
- * Inbound partnership application → SUPPORT mailbox.
+ * Inbound partnership application → support@partneresim.com.
  * Reply-To is the validated business email only.
  */
 export async function sendPartnershipFormEmail(
@@ -71,17 +72,12 @@ export async function sendPartnershipFormEmail(
     return { ok: false, reason: "send_failed" };
   }
 
-  const config = getEmailConfig("support");
+  const config = getPartnerEmailConfig("support");
   if (!config.configured) {
     return { ok: false, reason: "not_configured" };
   }
 
-  const transporter = getChannelTransporter("support");
-  if (!transporter) {
-    return { ok: false, reason: "not_configured" };
-  }
-
-  const to = BRAND_SUPPORT_EMAIL.trim().toLowerCase();
+  const to = PARTNER_SUPPORT_MAILBOX.trim().toLowerCase();
   if (!to || !isValidEmail(to)) {
     return { ok: false, reason: "send_failed" };
   }
@@ -93,6 +89,7 @@ export async function sendPartnershipFormEmail(
 
   const text = [
     `New partnership application via ${BRAND_NAME}`,
+    `Portal: ${resolvePartnerSiteOrigin()}`,
     "",
     `Full name: ${fullName}`,
     `Company: ${companyName}`,
@@ -115,7 +112,7 @@ export async function sendPartnershipFormEmail(
     contentHtml: `
               <h1 style="margin:0 0 12px;font-size:20px;color:${TEXT_PRIMARY};">Partnership application</h1>
               <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:${TEXT_SECONDARY};">
-                A new Affiliates &amp; Partnerships application was submitted on the website.
+                A new Affiliates &amp; Partnerships application was submitted.
               </p>
               <p style="margin:0 0 8px;font-size:14px;"><strong>Full name:</strong> ${escapeHtml(fullName)}</p>
               <p style="margin:0 0 8px;font-size:14px;"><strong>Company:</strong> ${escapeHtml(companyName)}</p>
@@ -130,23 +127,20 @@ export async function sendPartnershipFormEmail(
               <p style="margin:0;font-size:14px;line-height:1.55;white-space:pre-wrap;">${escapeHtml(about)}</p>`,
   });
 
-  try {
-    const logo = getEmailLogoAttachment();
-    await transporter.sendMail({
-      from: config.from,
-      to,
-      replyTo,
-      subject: `[MAP eSIM Partnerships] ${subject}`,
-      text,
-      html,
-      attachments: logo ? [logo] : undefined,
-      headers: {
-        "X-MAP-ESIM-Form": "partnership_application",
-      },
-    });
-    return { ok: true };
-  } catch {
-    console.error("partnership_form_email", "send_failed");
-    return { ok: false, reason: "send_failed" };
+  const result = await sendPartnerChannelMail({
+    channel: "support",
+    to,
+    replyToOverride: replyTo,
+    subject: `[MAP eSIM Partners] ${subject}`,
+    text,
+    html,
+    headers: {
+      "X-MAP-ESIM-Partner-Mail": "partnership_application",
+    },
+  });
+  if (result.ok) return { ok: true };
+  if (result.reason === "not_configured") {
+    return { ok: false, reason: "not_configured" };
   }
+  return { ok: false, reason: "send_failed" };
 }

@@ -1,15 +1,16 @@
 import "server-only";
 
 import { PartnerEsimPurchaseStatus, Role } from "@prisma/client";
-import { BRAND_SITE_URL } from "@/app/lib/brand";
 import { prisma } from "@/app/lib/db";
-import { isEmailConfigured, sanitizeEmailHeaderValue } from "@/app/lib/email/config";
+import { sanitizeEmailHeaderValue } from "@/app/lib/email/config";
+import { resolvePartnerSiteOrigin } from "@/app/lib/email/partnerChannels";
+import { isPartnerEmailConfigured } from "@/app/lib/email/partnerEmailConfig";
 import {
   PARTNER_RECON_REQUIRED_EMAIL_SUBJECT,
   renderPartnerReconciliationRequiredEmailHtml,
   renderPartnerReconciliationRequiredEmailText,
 } from "@/app/lib/email/partnerReconciliationRequiredTemplate";
-import { sendChannelMail } from "@/app/lib/email/transport";
+import { sendPartnerChannelMail } from "@/app/lib/email/partnerTransport";
 import {
   RECON_REQUIRED_EMAIL_FAILED,
   RECON_REQUIRED_EMAIL_NOT_CONFIGURED,
@@ -153,12 +154,13 @@ export async function notifyPartnerReconciliationRequiredEmail(
       return { status: "skipped", reason: "partner_unavailable" };
     }
 
-    if (!isEmailConfigured("billing")) {
+    if (!isPartnerEmailConfigured("billing")) {
       await markPartnerReconEmail(id, RECON_REQUIRED_EMAIL_NOT_CONFIGURED);
       console.error("partner_recon_required_email", "not_configured", id);
       return { status: "not_configured" };
     }
 
+    const partnerOrigin = resolvePartnerSiteOrigin();
     const payload = {
       partnerName: (user.name ?? "").trim() || "Partner",
       purchaseReference: shortPartnerPurchaseReference(row.id),
@@ -169,21 +171,21 @@ export async function notifyPartnerReconciliationRequiredEmail(
         null,
       amountLabel: formatUsdCents(row.partnerChargeCents),
       currencyLabel: (row.currency ?? "USD").trim().toUpperCase() || "USD",
-      supportUrl: `${BRAND_SITE_URL}/support`,
-      partnerOrdersUrl: `${BRAND_SITE_URL}/partner/orders`,
+      supportUrl: `${partnerOrigin}/partner`,
+      partnerOrdersUrl: `${partnerOrigin}/partner/orders`,
     };
     const subject = sanitizeEmailHeaderValue(
       PARTNER_RECON_REQUIRED_EMAIL_SUBJECT,
       160
     );
-    const sendResult = await sendChannelMail({
+    const sendResult = await sendPartnerChannelMail({
       channel: "billing",
       to: user.email.trim(),
       subject,
       text: renderPartnerReconciliationRequiredEmailText(payload),
       html: renderPartnerReconciliationRequiredEmailHtml(payload),
       headers: {
-        "X-MAP-ESIM-Billing-Kind": "partner_purchase_under_review",
+        "X-MAP-ESIM-Partner-Mail": "purchase_under_review",
         "X-MAP-ESIM-Partner-Purchase": sanitizeEmailHeaderValue(row.id, 64),
       },
     });

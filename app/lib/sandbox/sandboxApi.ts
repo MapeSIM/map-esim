@@ -1,6 +1,6 @@
 /**
- * Sandbox Partner API helpers — mock only (server).
- * No Neon writes, no supplier calls.
+ * Sandbox Partner API helpers — Neon-backed when a SandboxApiKey exists.
+ * Still zero supplier calls / zero live PartnerProfile writes.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -9,6 +9,17 @@ import {
   SANDBOX_DEFAULT_BALANCE_CENTS,
   type SandboxCatalogItem,
 } from "@/app/lib/sandbox/sandboxShared";
+import {
+  createSandboxOrderForPartner,
+  findSandboxPartnerByApiKey,
+  getSandboxOrderByIccid,
+  getSandboxPartnerById,
+  isSandboxApiKeyFormat,
+  listSandboxOrdersForPartner,
+  mintDemoActivationCode,
+  newSandboxOrderId,
+} from "@/app/lib/sandbox/sandboxPartnerDb";
+import { prisma } from "@/app/lib/db";
 
 export {
   SANDBOX_CATALOG,
@@ -39,10 +50,16 @@ export function sandboxError(
   return sandboxJson({ success: false, error, message, sandbox: true }, status);
 }
 
-/** Accept any Bearer sb_test_… key (8+ charset suffix). */
-export function authenticateSandboxRequest(
+export type SandboxAuthOk = {
+  ok: true;
+  apiKey: string;
+  partnerId: string | null;
+};
+
+/** Resolve Bearer sb_test_* against Neon SandboxApiKey (preferred). */
+export async function authenticateSandboxRequest(
   req: NextRequest
-): { ok: true; apiKey: string } | { ok: false; response: NextResponse } {
+): Promise<SandboxAuthOk | { ok: false; response: NextResponse }> {
   const header =
     req.headers.get("authorization") ?? req.headers.get("Authorization");
   const match = /^Bearer\s+(.+)$/i.exec((header ?? "").trim());
@@ -57,7 +74,7 @@ export function authenticateSandboxRequest(
       ),
     };
   }
-  if (!/^sb_test_[A-Za-z0-9_-]{8,}$/.test(token)) {
+  if (!isSandboxApiKeyFormat(token)) {
     return {
       ok: false,
       response: sandboxError(
@@ -67,31 +84,42 @@ export function authenticateSandboxRequest(
       ),
     };
   }
-  return { ok: true, apiKey: token };
+
+  const found = await findSandboxPartnerByApiKey(token);
+  if (found) {
+    return { ok: true, apiKey: token, partnerId: found.partnerId };
+  }
+
+  // No Neon key: reject so UI/API stay consistent with provisioned partners.
+  return {
+    ok: false,
+    response: sandboxError(
+      401,
+      "Unauthorized",
+      "Unknown sandbox API key. Create a sandbox partner on mapesim.store/sandbox/admin and use the issued sb_test_ key."
+    ),
+  };
 }
 
-function mockIccid(seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  const mid = String(h).padStart(10, "0").slice(0, 10);
-  return `8944${mid}000000`.slice(0, 19);
-}
-
-function mockMatchingId(seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 17 + seed.charCodeAt(i)) >>> 0;
-  return `SNDBOX${h.toString(16).toUpperCase().padStart(8, "0")}`;
-}
-
-export function buildSandboxOrder(input: {
+export function buildSandboxOrderPayload(input: {
   offerId: string;
   quantity?: number;
-  apiKey: string;
+  seed: string;
 }):
   | {
       ok: true;
       order: Record<string, unknown>;
       item: SandboxCatalogItem;
+      persist: {
+        orderId: string;
+        region: string;
+        planName: string;
+        totalCents: number;
+        iccid: string;
+        activationCode: string;
+        matchingId: string;
+        smdpAddress: string;
+      };
     }
   | { ok: false; response: NextResponse } {
   const item = SANDBOX_CATALOG.find((c) => c.id === input.offerId);
@@ -117,73 +145,177 @@ export function buildSandboxOrder(input: {
     };
   }
 
-  const orderId = `sandbox_ord_${Date.now().toString(36)}_${Math.random()
-    .toString(36)
-    .slice(2, 8)}`;
-  const seed = `${orderId}:${input.apiKey}`;
-  const iccid = mockIccid(seed);
-  const matchingId = mockMatchingId(seed);
-  const smdpAddress = "smdp.sandbox.mapesim.store";
-  const activationCode = `LPA:1$${smdpAddress}$${matchingId}`;
+  const orderId = newSandboxOrderId();
+  const demo = mintDemoActivationCode(`${orderId}:${input.seed}`);
   const totalCents = item.priceCents * qty;
+
+  const persist = {
+    orderId,
+    region: item.region,
+    planName: item.name,
+    totalCents,
+    iccid: demo.iccid,
+    activationCode: demo.activationCode,
+    matchingId: demo.matchingId,
+    smdpAddress: demo.smdpAddress,
+  };
 
   return {
     ok: true,
     item,
+    persist,
     order: {
-      orderId,
+      ...persist,
       status: "COMPLETED",
       offerId: item.id,
-      region: item.region,
-      planName: item.name,
       quantity: qty,
       priceCents: item.priceCents,
-      totalCents,
       currency: "USD",
-      iccid,
-      smdpAddress,
-      matchingId,
-      activationCode,
       qr: {
         format: "LPA",
-        data: activationCode,
-        mockImageHint: `/sandbox/demo-store#qr-${orderId}`,
+        data: demo.activationCode,
       },
       createdAt: new Date().toISOString(),
       sandbox: true,
-      note: "Mock order — zero Neon writes, zero supplier calls.",
+      note: "Sandbox order persisted in Neon SandboxOrder (not live Order).",
     },
   };
 }
 
-export function buildSandboxEsim(iccid: string): Record<string, unknown> | null {
-  const cleaned = iccid.trim();
-  if (
-    !/^89\d{10,18}$/.test(cleaned) &&
-    !cleaned.startsWith("8944") &&
-    !cleaned.startsWith("sandbox_") &&
-    cleaned.length < 10
-  ) {
-    return null;
+/** @deprecated use buildSandboxOrderPayload + persist */
+export function buildSandboxOrder(input: {
+  offerId: string;
+  quantity?: number;
+  apiKey: string;
+}):
+  | {
+      ok: true;
+      order: Record<string, unknown>;
+      item: SandboxCatalogItem;
+    }
+  | { ok: false; response: NextResponse } {
+  const built = buildSandboxOrderPayload({
+    offerId: input.offerId,
+    quantity: input.quantity,
+    seed: input.apiKey,
+  });
+  if (!built.ok) return built;
+  return { ok: true, order: built.order, item: built.item };
+}
+
+export async function persistSandboxOrderFromApi(input: {
+  partnerId: string;
+  offerId: string;
+  quantity?: number;
+  apiKey: string;
+}): Promise<
+  | { ok: true; order: Record<string, unknown> }
+  | { ok: false; response: NextResponse }
+> {
+  const built = buildSandboxOrderPayload({
+    offerId: input.offerId,
+    quantity: input.quantity,
+    seed: input.apiKey,
+  });
+  if (!built.ok) return built;
+
+  const saved = await createSandboxOrderForPartner({
+    partnerId: input.partnerId,
+    offerId: input.offerId,
+    quantity: input.quantity,
+    orderPayload: built.persist,
+  });
+  if (!saved.ok) {
+    return {
+      ok: false,
+      response: sandboxError(402, "Insufficient funds", saved.error),
+    };
   }
-  const matchingId = mockMatchingId(cleaned);
-  const smdpAddress = "smdp.sandbox.mapesim.store";
-  const activationCode = `LPA:1$${smdpAddress}$${matchingId}`;
-  return {
-    iccid: cleaned.startsWith("89") ? cleaned : mockIccid(cleaned),
-    status: "ACTIVE",
-    smdpAddress,
-    matchingId,
-    activationCode,
-    usage: {
-      dataUsedMb: 128,
-      dataTotalMb: 1024,
-      percentUsed: 12.5,
-    },
-    qr: {
-      format: "LPA",
-      data: activationCode,
-    },
+  return { ok: true, order: built.order };
+}
+
+export async function sandboxWalletResponse(partnerId: string) {
+  const partner = await getSandboxPartnerById(partnerId);
+  if (!partner) {
+    return sandboxError(404, "Not found", "Sandbox partner not found.");
+  }
+  return sandboxJson({
+    success: true,
     sandbox: true,
-  };
+    wallet: {
+      balanceCents: partner.balanceCents,
+      currency: "USD",
+      balanceLabel: new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+      }).format(partner.balanceCents / 100),
+      note: "Neon SandboxPartner balance — shared by portal UI and API.",
+    },
+  });
+}
+
+export async function sandboxOrdersListResponse(partnerId: string) {
+  const orders = await listSandboxOrdersForPartner(partnerId);
+  return sandboxJson({
+    success: true,
+    sandbox: true,
+    orders: orders.map((o) => ({
+      orderId: o.orderId,
+      status: o.status,
+      offerId: o.offerId,
+      region: o.region,
+      planName: o.planName,
+      totalCents: o.totalCents,
+      iccid: o.iccid,
+      activationCode: o.activationCode,
+      createdAt: o.createdAt.toISOString(),
+    })),
+    note: "Orders from Neon SandboxOrder for this API key's partner.",
+  });
+}
+
+export async function sandboxEsimResponse(partnerId: string, iccid: string) {
+  const row = await getSandboxOrderByIccid(partnerId, iccid);
+  if (row) {
+    return sandboxJson({
+      success: true,
+      sandbox: true,
+      esim: {
+        iccid: row.iccid,
+        status: "ACTIVE",
+        smdpAddress: row.smdpAddress,
+        matchingId: row.matchingId,
+        activationCode: row.activationCode,
+        usage: {
+          dataUsedMb: 128,
+          dataTotalMb: 1024,
+          percentUsed: 12.5,
+        },
+        qr: { format: "LPA", data: row.activationCode },
+      },
+    });
+  }
+  const demo = mintDemoActivationCode(iccid);
+  return sandboxJson({
+    success: true,
+    sandbox: true,
+    esim: {
+      iccid: demo.iccid,
+      status: "ACTIVE",
+      smdpAddress: demo.smdpAddress,
+      matchingId: demo.matchingId,
+      activationCode: demo.activationCode,
+      usage: {
+        dataUsedMb: 128,
+        dataTotalMb: 1024,
+        percentUsed: 12.5,
+      },
+      qr: { format: "LPA", data: demo.activationCode },
+      note: "Synthetic demo eSIM (no matching SandboxOrder).",
+    },
+  });
+}
+
+export async function countSandboxPartners(): Promise<number> {
+  return prisma.sandboxPartner.count();
 }

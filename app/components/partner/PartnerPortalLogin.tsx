@@ -1,18 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import {
   signinAction,
   type AuthActionState,
 } from "@/app/lib/auth/actions";
 import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 import { RETAIL_SITE_ORIGIN } from "@/app/lib/domain/appDomain";
+import {
+  sandboxPartnerLoginAction,
+  type SandboxActionState,
+} from "@/app/lib/sandbox/sandboxPartnerActions";
+import { SANDBOX_API_KEY_KEY } from "@/app/lib/sandbox/sandboxClientStorage";
 
-const initialState: AuthActionState = { ok: false };
+const initialAuthState: AuthActionState = { ok: false };
+const initialSandboxState: SandboxActionState = { ok: false };
 
 type Props = {
-  /** Real Auth.js partner sign-in vs sandbox localStorage gate. */
+  /** Real Auth.js partner sign-in vs Neon sandbox partner login. */
   mode: "partner" | "sandbox";
   callbackUrl?: string;
   retailHref?: string;
@@ -27,42 +33,45 @@ export default function PartnerPortalLogin({
   applyHref = "/contact?topic=partner",
   onSandboxAuthenticated,
 }: Props) {
-  const [state, formAction, pending] = useActionState(signinAction, initialState);
-  const [sandboxError, setSandboxError] = useState<string | null>(null);
-  const [sandboxPending, setSandboxPending] = useState(false);
+  const [partnerState, partnerAction, partnerPending] = useActionState(
+    signinAction,
+    initialAuthState
+  );
+  const [sandboxState, sandboxAction, sandboxPending] = useActionState(
+    sandboxPartnerLoginAction,
+    initialSandboxState
+  );
 
   const error =
     mode === "sandbox"
-      ? sandboxError
-      : state.ok
+      ? sandboxState.ok
         ? null
-        : state.error || null;
+        : sandboxState.error || null
+      : partnerState.ok
+        ? null
+        : partnerState.error || null;
 
-  function handleSandboxSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setSandboxError(null);
-    const fd = new FormData(e.currentTarget);
-    const email = String(fd.get("email") || "").trim();
-    const password = String(fd.get("password") || "");
-    if (!email || !password) {
-      setSandboxError("Enter your partner email and password.");
-      return;
-    }
-    setSandboxPending(true);
+  useEffect(() => {
+    if (mode !== "sandbox" || !sandboxState.ok) return;
     try {
+      if (sandboxState.rawApiKey) {
+        localStorage.setItem(SANDBOX_API_KEY_KEY, sandboxState.rawApiKey);
+      }
       localStorage.setItem(
         "mapesim_sandbox_session",
-        JSON.stringify({ email, at: Date.now() })
+        JSON.stringify({
+          id: sandboxState.partnerId,
+          at: Date.now(),
+        })
       );
-      onSandboxAuthenticated?.();
-      window.location.href = "/sandbox";
     } catch {
-      setSandboxError("Unable to start sandbox session. Try again.");
-      setSandboxPending(false);
+      /* ignore */
     }
-  }
+    onSandboxAuthenticated?.();
+    window.location.href = "/sandbox";
+  }, [mode, sandboxState, onSandboxAuthenticated]);
 
-  const busy = mode === "sandbox" ? sandboxPending : pending;
+  const busy = mode === "sandbox" ? sandboxPending : partnerPending;
 
   return (
     <div className="min-h-screen w-full bg-[#070D19] text-slate-100">
@@ -87,7 +96,9 @@ export default function PartnerPortalLogin({
             Welcome Back
           </h1>
           <p className="mt-2 text-sm text-slate-400">
-            Sign in with your partner credentials
+            {mode === "sandbox"
+              ? "Sign in with your sandbox partner credentials"
+              : "Sign in with your partner credentials"}
           </p>
 
           {error ? (
@@ -96,8 +107,19 @@ export default function PartnerPortalLogin({
               role="alert"
             >
               <p>{error}</p>
-              {error.toLowerCase().includes("mapesim.com") ||
-              error.toLowerCase().includes("partner account") ? (
+              {mode === "sandbox" ? (
+                <p className="mt-2 text-xs text-slate-400">
+                  Need an account? Ask an admin to create one at{" "}
+                  <Link
+                    href="/sandbox/admin"
+                    className="font-semibold text-emerald-300 underline-offset-2 hover:underline"
+                  >
+                    /sandbox/admin
+                  </Link>
+                  .
+                </p>
+              ) : error.toLowerCase().includes("mapesim.com") ||
+                error.toLowerCase().includes("partner account") ? (
                 <p className="mt-2 space-x-3 text-xs">
                   <a
                     href={retailHref}
@@ -118,13 +140,14 @@ export default function PartnerPortalLogin({
 
           <form
             className="mt-6 space-y-4"
-            action={mode === "partner" ? formAction : undefined}
-            onSubmit={mode === "sandbox" ? handleSandboxSubmit : undefined}
+            action={mode === "partner" ? partnerAction : sandboxAction}
           >
             {mode === "partner" ? (
               <input type="hidden" name="callbackUrl" value={callbackUrl} />
             ) : null}
-            <input type="hidden" name="partnerPortal" value="1" />
+            {mode === "partner" ? (
+              <input type="hidden" name="partnerPortal" value="1" />
+            ) : null}
 
             <label className="block space-y-1.5">
               <span className="text-sm font-medium text-slate-200">Email</span>
@@ -142,12 +165,14 @@ export default function PartnerPortalLogin({
                 <span className="text-sm font-medium text-slate-200">
                   Password
                 </span>
-                <Link
-                  href="/forgot-password"
-                  className="text-xs font-semibold text-emerald-400 hover:text-emerald-300"
-                >
-                  Forgot password?
-                </Link>
+                {mode === "partner" ? (
+                  <Link
+                    href="/forgot-password"
+                    className="text-xs font-semibold text-emerald-400 hover:text-emerald-300"
+                  >
+                    Forgot password?
+                  </Link>
+                ) : null}
               </div>
               <input
                 name="password"

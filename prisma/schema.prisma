@@ -407,7 +407,8 @@ model User {
   blockedByAdminId             String?
   /// CAS version for block/reactivate admin actions.
   accountStatusVersion         Int                      @default(0)
-  /// Incremented on each ADMIN credentials sign-in; JWT must match (single active admin session).
+  /// Bumped on admin password change / disable / lock (not routine sign-in).
+  /// JWT must match so revoked/credential-changed sessions fail closed across hosts.
   adminSessionVersion          Int                      @default(0)
   /// Admin disable (Admin Users): null = not disabled. Denies admin login/access when set.
   adminDisabledAt              DateTime?
@@ -2087,4 +2088,83 @@ model ManualPaymentConfig {
   updatedByAdminId   String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+}
+
+/// Isolated mapesim.store demo partner — NEVER linked to live PartnerProfile / User.
+model SandboxPartner {
+  id                  String              @id @default(cuid())
+  name                String
+  email               String              @unique
+  passwordHash        String
+  /// Current demo wallet balance (USD cents).
+  balanceCents        Int                 @default(125000)
+  /// Opening balance restored by "Reset Demo Data".
+  initialBalanceCents Int                 @default(125000)
+  shareCompanyName    String?
+  shareSupportEmail   String?
+  shareLogoUrl        String?             @db.Text
+  shareButtonBackground String?
+  shareButtonTextColor  String?
+  disabledAt          DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  apiKeys             SandboxApiKey[]
+  orders              SandboxOrder[]
+  walletTx            SandboxWalletTx[]
+
+  @@index([disabledAt])
+  @@index([createdAt])
+}
+
+/// Sandbox-only API key (sb_test_*). Hash only — never store plaintext after mint.
+model SandboxApiKey {
+  id         String         @id @default(cuid())
+  partnerId  String
+  name       String         @default("Default")
+  /// Public prefix for display (e.g. sb_test_ab12).
+  prefix     String
+  keyHash    String         @unique
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime       @default(now())
+  partner    SandboxPartner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+  @@index([revokedAt])
+}
+
+/// Sandbox-only mock eSIM order (no supplier / no live Order row).
+model SandboxOrder {
+  id             String         @id @default(cuid())
+  partnerId      String
+  /// Public order id shown in UI / API (sandbox_ord_…).
+  orderId        String         @unique
+  offerId        String
+  region         String
+  planName       String
+  totalCents     Int
+  iccid          String
+  activationCode String
+  matchingId     String?
+  smdpAddress    String         @default("smdp.sandbox.mapesim.store")
+  status         String         @default("COMPLETED")
+  createdAt      DateTime       @default(now())
+  partner        SandboxPartner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId, createdAt])
+  @@index([iccid])
+}
+
+/// Sandbox-only wallet ledger lines for the demo portal.
+model SandboxWalletTx {
+  id          String         @id @default(cuid())
+  partnerId   String
+  label       String
+  amountCents Int
+  /// "credit" | "debit"
+  kind        String
+  createdAt   DateTime       @default(now())
+  partner     SandboxPartner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId, createdAt])
 }

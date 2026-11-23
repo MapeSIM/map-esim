@@ -2,8 +2,20 @@
 
 import { useEffect, useState } from "react";
 import PartnerPortalLogin from "@/app/components/partner/PartnerPortalLogin";
+import {
+  SANDBOX_API_KEY_KEY,
+  SANDBOX_WALLET_KEY,
+} from "@/app/lib/sandbox/sandboxClientStorage";
 
-const SESSION_KEY = "mapesim_sandbox_session";
+type MeResponse = {
+  ok: boolean;
+  partner?: {
+    id: string;
+    name: string;
+    email: string;
+    balanceCents: number;
+  };
+};
 
 export default function SandboxSessionGate({
   children,
@@ -14,16 +26,49 @@ export default function SandboxSessionGate({
   const [authed, setAuthed] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(SESSION_KEY);
-      setAuthed(Boolean(raw));
-    } catch {
-      setAuthed(false);
+    let cancelled = false;
+    async function check() {
+      try {
+        const res = await fetch("/api/sandbox/session", {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        const data = (await res.json()) as MeResponse;
+        if (cancelled) return;
+        if (data.ok && data.partner) {
+          try {
+            localStorage.setItem(
+              SANDBOX_WALLET_KEY,
+              String(data.partner.balanceCents)
+            );
+            localStorage.setItem(
+              "mapesim_sandbox_session",
+              JSON.stringify({
+                email: data.partner.email,
+                name: data.partner.name,
+                id: data.partner.id,
+                at: Date.now(),
+              })
+            );
+          } catch {
+            /* ignore */
+          }
+          setAuthed(true);
+        } else {
+          setAuthed(false);
+        }
+      } catch {
+        if (!cancelled) setAuthed(false);
+      } finally {
+        if (!cancelled) setReady(true);
+      }
     }
-    setReady(true);
+    void check();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // SSR + pre-hydration: show the same login as partneresim.com (no portal flash).
   if (!ready || !authed) {
     return (
       <PartnerPortalLogin
@@ -35,4 +80,14 @@ export default function SandboxSessionGate({
   }
 
   return <>{children}</>;
+}
+
+/** Cache issued API key in localStorage for playground / catalog buys. */
+export function cacheSandboxApiKey(rawKey: string | undefined | null) {
+  if (!rawKey || typeof window === "undefined") return;
+  try {
+    localStorage.setItem(SANDBOX_API_KEY_KEY, rawKey);
+  } catch {
+    /* ignore */
+  }
 }

@@ -279,7 +279,12 @@ async function main() {
     authSrc,
     /dbUser\.role === ["']ADMIN["'] && dbUser\.adminDisabledAt/
   );
-  assert.match(authSrc, /adminSessionVersion:\s*\{\s*increment:\s*1\s*\}/);
+  // Version bump lives on revoke paths (password/disable/lock), not routine sign-in.
+  const adminUsersSrc = read("app/lib/admin/adminUsers.ts");
+  assert.match(
+    adminUsersSrc,
+    /adminSessionVersion:\s*\{\s*increment:\s*1\s*\}/
+  );
   console.log("PASS auth_signin_and_jwt_deny_disabled");
 
   const sessionSrc = read("app/lib/auth/session.ts");

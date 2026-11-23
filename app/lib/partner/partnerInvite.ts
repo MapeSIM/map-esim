@@ -1,7 +1,12 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
-import { prisma } from "@/app/lib/db";
 import { Role } from "@prisma/client";
+import { prisma } from "@/app/lib/db";
+import {
+  PARTNER_SITE_ORIGIN,
+  isLocalDevHost,
+} from "@/app/lib/domain/appDomain";
+import { resolvePartnerSiteOrigin } from "@/app/lib/email/partnerChannels";
 
 /** Email invite link lifetime (unused until exchanged). 30 days. */
 export const PARTNER_INVITE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -33,13 +38,25 @@ function mintRawToken(): string {
 }
 
 export function buildPartnerInviteSetupUrl(rawToken: string): string {
-  const base =
-    process.env.APP_BASE_URL?.trim() ||
-    process.env.AUTH_URL?.trim() ||
-    "http://localhost:3000";
-  const origin = base.replace(/\/$/, "");
+  // Always target partneresim.com (or local host for DX) — never retail APP_BASE_URL.
+  let origin = resolvePartnerSiteOrigin() || PARTNER_SITE_ORIGIN;
+  const envBase =
+    process.env.APP_BASE_URL?.trim() || process.env.AUTH_URL?.trim() || "";
+  if (envBase) {
+    try {
+      const u = new URL(envBase);
+      if (isLocalDevHost(u.hostname)) {
+        origin = u.origin;
+      }
+    } catch {
+      /* keep partner origin */
+    }
+  }
   // Route Handler — cookie writes are illegal in Server Components.
-  const url = new URL("/partner/setup-password/exchange", origin);
+  const url = new URL(
+    "/partner/setup-password/exchange",
+    origin.replace(/\/$/, "")
+  );
   url.searchParams.set("token", rawToken);
   return url.toString();
 }

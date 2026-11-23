@@ -87,13 +87,21 @@ export default function PartnerMenu({
     };
   }, [drawerOpen]);
 
-  function resetSandbox() {
+  async function resetSandbox() {
     try {
       localStorage.removeItem("mapesim_sandbox_wallet_cents");
       localStorage.removeItem("mapesim_sandbox_demo_orders");
       localStorage.removeItem("mapesim_sandbox_api_key");
       localStorage.removeItem("mapesim_sandbox_session");
       localStorage.removeItem("mapesim_sandbox_wallet_tx");
+    } catch {
+      /* ignore */
+    }
+    try {
+      await fetch("/api/sandbox/session/logout", {
+        method: "POST",
+        credentials: "same-origin",
+      });
     } catch {
       /* ignore */
     }

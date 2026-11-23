@@ -30,6 +30,20 @@ export {
 export { sendBillingEmail } from "@/app/lib/email/sendBillingEmail";
 export { sendSupportEmail } from "@/app/lib/email/sendSupportEmail";
 export { sendChannelMail } from "@/app/lib/email/transport";
+export {
+  PARTNER_EMAIL_CHANNEL_IDS,
+  PARTNER_EMAIL_CHANNELS,
+  formatPartnerChannelFrom,
+  formatPartnerReplyTo,
+  resolvePartnerSiteOrigin,
+  type PartnerEmailChannel,
+} from "@/app/lib/email/partnerChannels";
+export {
+  getPartnerEmailConfig,
+  isPartnerEmailConfigured,
+} from "@/app/lib/email/partnerEmailConfig";
+export { sendPartnerChannelMail } from "@/app/lib/email/partnerTransport";
+export { sendPartnerInviteEmail } from "@/app/lib/email/sendPartnerInviteEmail";
 export type {
   EmailDeliveryStatus,
   OrderEmailPayload,

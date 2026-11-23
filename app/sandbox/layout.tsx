@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import SandboxSessionGate from "@/app/components/sandbox/SandboxSessionGate";
 import SandboxPortalChrome from "@/app/components/sandbox/SandboxPortalChrome";
 
@@ -8,11 +9,18 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false, nocache: true },
 };
 
-export default function SandboxLayout({
+export default async function SandboxLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const h = await headers();
+  const pathname = h.get("x-map-pathname") || "";
+  // Sandbox admin panel uses Auth.js ADMIN — skip demo partner gate.
+  if (pathname === "/sandbox/admin" || pathname.startsWith("/sandbox/admin/")) {
+    return <>{children}</>;
+  }
+
   return (
     <SandboxSessionGate>
       <div className="min-h-screen w-full bg-[#070D19] text-slate-100">

@@ -107,20 +107,10 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         const valid = await verifyPassword(parsed.data.password, passwordHash);
         if (!valid) return null;
 
-        // Single active ADMIN session: rotate generation before JWT is issued.
-        if (user.role === "ADMIN") {
-          await authPrisma.user.update({
-            where: { id: user.id },
-            data: { adminSessionVersion: { increment: 1 } },
-          });
-          await writeAuditLog({
-            actorUserId: user.id,
-            action: "admin.session_rotated",
-            targetType: "User",
-            targetId: user.id,
-            metadata: { method: "credentials_signin" },
-          });
-        }
+        // Do NOT rotate adminSessionVersion on sign-in — multi-domain hosts
+        // (mapesim.com / partneresim.com / mapesim.store) keep independent cookies;
+        // rotating here would invalidate valid sessions on other origins.
+        // Version still increments on password change / disable / lock.
 
         const role = coerceAppRole(user.role);
         if (!role) return null;

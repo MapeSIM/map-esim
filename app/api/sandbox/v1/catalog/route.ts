@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 /** GET /api/sandbox/v1/catalog — mock wholesale catalog. */
 export async function GET(req: NextRequest) {
-  const auth = authenticateSandboxRequest(req);
+  const auth = await authenticateSandboxRequest(req);
   if (!auth.ok) return auth.response;
 
   return sandboxJson({

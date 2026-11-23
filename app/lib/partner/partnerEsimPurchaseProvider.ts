@@ -1175,6 +1175,15 @@ async function executeClaimedPartnerEsimProviderPurchase(options: {
     );
   }
 
+  try {
+    const { schedulePartnerOrderReadyEmail } = await import(
+      "@/app/lib/partner/partnerEmailNotifications"
+    );
+    schedulePartnerOrderReadyEmail(purchase.id);
+  } catch {
+    /* non-blocking — never roll back a completed purchase */
+  }
+
   return {
     purchaseId: purchase.id,
     partnerId: partner.partnerId,

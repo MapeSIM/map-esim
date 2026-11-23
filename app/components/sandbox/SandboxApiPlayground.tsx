@@ -1,10 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  generateSandboxTestKey,
-  SANDBOX_CATALOG,
-} from "@/app/lib/sandbox/sandboxShared";
+import { useEffect, useMemo, useState } from "react";
+import { SANDBOX_CATALOG } from "@/app/lib/sandbox/sandboxShared";
+import { SANDBOX_API_KEY_KEY } from "@/app/lib/sandbox/sandboxClientStorage";
 
 type EndpointId =
   | "catalog"
@@ -69,7 +67,7 @@ function statusBadgeClass(status: number | null): string {
 }
 
 export default function SandboxApiPlayground() {
-  const [apiKey, setApiKey] = useState(() => generateSandboxTestKey());
+  const [apiKey, setApiKey] = useState("");
   const [selectedId, setSelectedId] = useState<EndpointId>("catalog");
   const selected = useMemo(
     () => ENDPOINTS.find((e) => e.id === selectedId) ?? ENDPOINTS[0]!,
@@ -83,6 +81,15 @@ export default function SandboxApiPlayground() {
     "// Click Send Request to call /api/sandbox/v1/*"
   );
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    try {
+      const key = localStorage.getItem(SANDBOX_API_KEY_KEY);
+      if (key?.startsWith("sb_test_")) setApiKey(key);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   function selectEndpoint(ep: EndpointDef) {
     setSelectedId(ep.id);
@@ -149,14 +156,15 @@ export default function SandboxApiPlayground() {
         </h1>
         <p className="max-w-xl text-sm text-slate-400">
           Live requests to{" "}
-          <code className="text-emerald-300">/api/sandbox/v1/*</code> with a
-          generated <code className="text-emerald-300">sb_test_…</code> key.
+          <code className="text-emerald-300">/api/sandbox/v1/*</code> with your
+          Neon-issued <code className="text-emerald-300">sb_test_…</code> key
+          (from sandbox sign-in).
         </p>
       </header>
 
       <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
         <label className="min-w-[16rem] flex-1 space-y-1.5 text-sm">
-          <span className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
+          <span className="mb-0 block text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
             Test API key
           </span>
           <input
@@ -164,14 +172,22 @@ export default function SandboxApiPlayground() {
             onChange={(e) => setApiKey(e.target.value)}
             className="h-11 w-full rounded-xl border border-white/[0.1] bg-slate-950 px-3 font-mono text-xs text-slate-100 outline-none focus:border-emerald-500/50"
             spellCheck={false}
+            placeholder="sb_test_… from sign-in"
           />
         </label>
         <button
           type="button"
-          onClick={() => setApiKey(generateSandboxTestKey())}
+          onClick={() => {
+            try {
+              const key = localStorage.getItem(SANDBOX_API_KEY_KEY);
+              if (key?.startsWith("sb_test_")) setApiKey(key);
+            } catch {
+              /* ignore */
+            }
+          }}
           className="inline-flex h-11 items-center rounded-xl border border-white/[0.12] px-4 text-sm font-semibold text-slate-100 transition hover:bg-white/[0.05]"
         >
-          Generate key
+          Load from session
         </button>
       </div>
 

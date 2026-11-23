@@ -301,6 +301,19 @@ export async function creditPartnerWalletAction(
 
     revalidatePartnerPaths(partnerId);
 
+    if (!result.duplicate) {
+      const { schedulePartnerWalletEmail } = await import(
+        "@/app/lib/partner/partnerEmailNotifications"
+      );
+      schedulePartnerWalletEmail({
+        partnerId,
+        type: "credit",
+        amountCents: result.amountCents,
+        balanceCents: result.balanceCents,
+        reference: result.transactionId,
+      });
+    }
+
     return {
       ok: true,
       message: result.duplicate
@@ -422,6 +435,25 @@ export async function debitPartnerWalletAction(
     });
 
     revalidatePartnerPaths(partnerId);
+
+    if (!result.duplicate) {
+      const {
+        schedulePartnerWalletEmail,
+        schedulePartnerLowBalanceIfCrossed,
+      } = await import("@/app/lib/partner/partnerEmailNotifications");
+      schedulePartnerWalletEmail({
+        partnerId,
+        type: "debit",
+        amountCents: result.amountCents,
+        balanceCents: result.balanceCents,
+        reference: result.transactionId,
+      });
+      schedulePartnerLowBalanceIfCrossed({
+        partnerId,
+        previousBalanceCents: result.balanceCents + result.amountCents,
+        newBalanceCents: result.balanceCents,
+      });
+    }
 
     return {
       ok: true,

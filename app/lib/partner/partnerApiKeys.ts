@@ -133,6 +133,19 @@ export async function createPartnerApiKey(options: {
       targetId: row.id,
       metadata: { partnerId: actor.partnerId, prefix: row.prefix, name: row.name },
     });
+    try {
+      const { schedulePartnerApiKeyEmail } = await import(
+        "@/app/lib/partner/partnerEmailNotifications"
+      );
+      schedulePartnerApiKeyEmail({
+        partnerId: actor.partnerId,
+        event: "created",
+        keyName: row.name,
+        keyPrefix: row.prefix,
+      });
+    } catch {
+      /* non-blocking */
+    }
     return {
       ok: true,
       keyId: row.id,
@@ -158,6 +171,19 @@ export async function createPartnerApiKey(options: {
         },
         select: { id: true, name: true, prefix: true },
       });
+      try {
+        const { schedulePartnerApiKeyEmail } = await import(
+          "@/app/lib/partner/partnerEmailNotifications"
+        );
+        schedulePartnerApiKeyEmail({
+          partnerId: actor.partnerId,
+          event: "created",
+          keyName: row.name,
+          keyPrefix: row.prefix,
+        });
+      } catch {
+        /* non-blocking */
+      }
       return {
         ok: true,
         keyId: row.id,
@@ -183,9 +209,21 @@ export async function revokePartnerApiKey(options: {
     return { ok: false, error: "API key not found." };
   }
 
-  const updated = await prisma.partnerApiKey.updateMany({
+  const existing = await prisma.partnerApiKey.findFirst({
     where: {
       id: keyId,
+      partnerId: actor.partnerId,
+      revokedAt: null,
+    },
+    select: { id: true, name: true, prefix: true },
+  });
+  if (!existing) {
+    return { ok: false, error: "API key not found or already revoked." };
+  }
+
+  const updated = await prisma.partnerApiKey.updateMany({
+    where: {
+      id: existing.id,
       partnerId: actor.partnerId,
       revokedAt: null,
     },
@@ -201,6 +239,19 @@ export async function revokePartnerApiKey(options: {
     targetId: keyId,
     metadata: { partnerId: actor.partnerId },
   });
+  try {
+    const { schedulePartnerApiKeyEmail } = await import(
+      "@/app/lib/partner/partnerEmailNotifications"
+    );
+    schedulePartnerApiKeyEmail({
+      partnerId: actor.partnerId,
+      event: "revoked",
+      keyName: existing.name,
+      keyPrefix: existing.prefix,
+    });
+  } catch {
+    /* non-blocking */
+  }
   return { ok: true };
 }
 

@@ -6,6 +6,7 @@ import {
   MAP_DOMAIN_HEADER,
   MAP_DOMAIN_QUERY,
   PARTNER_SITE_ORIGIN,
+  RETAIL_SITE_ORIGIN,
   type AppDomain,
   isLocalDevHost,
   publicUrlForRequest,
@@ -77,6 +78,20 @@ export default auth((req) => {
   const persistDomainCookie = Boolean(queryDomain) || domain !== "retail";
   const pathname = req.nextUrl.pathname;
   const requestHeaders = withDomainHeaders(req, domain);
+
+  // Canonical admin host is mapesim.com — avoid ambiguous /admin on B2B/sandbox hosts.
+  // Localhost keeps /admin on the current origin for DX (?__domain= overrides still work).
+  if (
+    !isLocalDevHost(host) &&
+    (domain === "partner" || domain === "sandbox") &&
+    (pathname === "/admin" || pathname.startsWith("/admin/"))
+  ) {
+    const dest = new URL(
+      `${pathname}${req.nextUrl.search}`,
+      RETAIL_SITE_ORIGIN
+    );
+    return NextResponse.redirect(dest);
+  }
 
   // Retail (mapesim.com / default localhost): B2B docs live only on partneresim.com.
   if (domain === "retail" && isPartnerDocsPath(pathname)) {

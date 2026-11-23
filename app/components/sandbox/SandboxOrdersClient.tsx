@@ -23,13 +23,66 @@ export default function SandboxOrdersClient({
   const [orders, setOrders] = useState<SandboxStoredOrder[]>([]);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(SANDBOX_ORDERS_KEY);
-      const parsed = raw ? (JSON.parse(raw) as SandboxStoredOrder[]) : [];
-      setOrders(Array.isArray(parsed) ? parsed : []);
-    } catch {
-      setOrders([]);
+    let cancelled = false;
+    async function load() {
+      try {
+        const key = localStorage.getItem("mapesim_sandbox_api_key");
+        if (key) {
+          const res = await fetch("/api/sandbox/v1/orders", {
+            headers: { Authorization: `Bearer ${key}` },
+            cache: "no-store",
+          });
+          if (res.ok) {
+            const data = (await res.json()) as {
+              orders?: Array<{
+                orderId: string;
+                planName: string;
+                region: string;
+                totalCents: number;
+                iccid?: string;
+                activationCode?: string;
+                createdAt: string;
+                status?: string;
+              }>;
+            };
+            const mapped: SandboxStoredOrder[] = (data.orders ?? []).map(
+              (o) => ({
+                orderId: o.orderId,
+                planName: o.planName,
+                region: o.region,
+                totalCents: o.totalCents,
+                iccid: o.iccid ?? "",
+                activationCode: o.activationCode ?? "",
+                createdAt: o.createdAt,
+                status: "COMPLETED",
+              })
+            );
+            if (!cancelled) {
+              setOrders(mapped);
+              try {
+                localStorage.setItem(SANDBOX_ORDERS_KEY, JSON.stringify(mapped));
+              } catch {
+                /* ignore */
+              }
+            }
+            return;
+          }
+        }
+      } catch {
+        /* fall back to local cache */
+      }
+      try {
+        const raw = localStorage.getItem(SANDBOX_ORDERS_KEY);
+        const parsed = raw ? (JSON.parse(raw) as SandboxStoredOrder[]) : [];
+        if (!cancelled) setOrders(Array.isArray(parsed) ? parsed : []);
+      } catch {
+        if (!cancelled) setOrders([]);
+      }
     }
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const stats = useMemo(() => {
@@ -44,13 +97,7 @@ export default function SandboxOrdersClient({
   }, [orders]);
 
   function refresh() {
-    try {
-      const raw = localStorage.getItem(SANDBOX_ORDERS_KEY);
-      const parsed = raw ? (JSON.parse(raw) as SandboxStoredOrder[]) : [];
-      setOrders(Array.isArray(parsed) ? parsed : []);
-    } catch {
-      setOrders([]);
-    }
+    window.location.reload();
   }
 
   return (

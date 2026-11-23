@@ -1199,6 +1199,27 @@ export async function applyVerifiedPartnerTopupPaymentEvent(
         };
       });
 
+      if (!result.duplicate && result.status === PartnerWalletTopupStatus.CREDITED) {
+        try {
+          const wallet = await prisma.partnerWalletAccount.findUnique({
+            where: { partnerId: topup.partnerId },
+            select: { balanceCents: true },
+          });
+          const { schedulePartnerWalletEmail } = await import(
+            "@/app/lib/partner/partnerEmailNotifications"
+          );
+          schedulePartnerWalletEmail({
+            partnerId: topup.partnerId,
+            type: "top_up",
+            amountCents: result.baseAmountCents,
+            balanceCents: wallet?.balanceCents ?? result.baseAmountCents,
+            reference: result.walletTransactionId ?? result.topupId,
+          });
+        } catch {
+          /* non-blocking */
+        }
+      }
+
       return result;
     } catch (error) {
       if (
