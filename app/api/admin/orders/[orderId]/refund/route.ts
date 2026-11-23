@@ -21,12 +21,12 @@ function json(
 }
 
 /**
- * POST /api/admin/orders/[id]/refund
+ * POST /api/admin/orders/[orderId]/refund
  * Instant admin refund (MAP Wallet / Partner wallet credit). Idempotent.
  */
 export async function POST(
   req: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ orderId: string }> }
 ) {
   try {
     const session = await auth();
@@ -58,7 +58,7 @@ export async function POST(
       return json({ success: false, error: "Forbidden" }, 403);
     }
 
-    const { id: orderId } = await context.params;
+    const { orderId } = await context.params;
     let body: Record<string, unknown> = {};
     try {
       body = (await req.json()) as Record<string, unknown>;

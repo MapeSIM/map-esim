@@ -1,0 +1,73 @@
+[33mcommit 0ffeb498df0de236eccfaca96c9bd3494921e14b[m
+Author: MapeSIM <rana@gmail.com>
+Date:   Fri Nov 20 05:23:34 2026 +0500
+
+    feat(partner): Phase 2 portal + admin granular API access controls
+    
+    Add partner.apiEnabled (default false) and PARTNER_PUBLIC_API global
+    kill-switch. Gate /api/v1/partner/* with 503/403. Admin partners list
+    master switch + per-partner API Access card with key revoke. Dark
+    6-tab partner portal: home, docs (locked when disabled), catalog CSV,
+    orders+performance, wallet presets to $1000, account keys+branding.
+
+app/admin/partners/[id]/page.tsx
+app/admin/partners/page.tsx
+app/api/partner/catalog/csv/route.ts
+app/api/partner/docs/markdown/route.ts
+app/api/partner/docs/postman-collection/route.ts
+app/api/partner/docs/postman-environment/route.ts
+app/components/admin/AdminPartnerApiAccessCard.tsx
+app/components/admin/AdminPartnerApiMasterSwitch.tsx
+app/components/partner/PartnerApiDocsClient.tsx
+app/components/partner/PartnerApiKeysManager.tsx
+app/components/partner/PartnerMenu.tsx
+app/components/partner/PartnerWalletAddFundsForm.tsx
+app/lib/admin/operationalControlsActions.ts
+app/lib/admin/operationalControlsShared.ts
+app/lib/partner/partnerApiAccessAdmin.ts
+app/lib/partner/partnerApiAccessAdminActions.ts
+app/lib/partner/partnerApiDocsContent.ts
+app/lib/partner/partnerApiKeyActions.ts
+app/lib/partner/partnerApiKeys.ts
+app/lib/partner/partnerShareBranding.ts
+app/lib/partner/partnerWalletTopupConstants.ts
+app/lib/partner/partners.ts
+app/lib/partnerApiAuth.ts
+app/partner/(portal)/account/page.tsx
+app/partner/(portal)/catalog/page.tsx
+app/partner/(portal)/docs/page.tsx
+app/partner/(portal)/layout.tsx
+app/partner/(portal)/orders/page.tsx
+app/partner/(portal)/page.tsx
+app/partner/(portal)/profile/page.tsx
+prisma/schema.prisma
+
+[33mcommit ec692daf86dd25c78a8be2baedcccdf3a3b6d731[m
+Author: MapeSIM <rana@gmail.com>
+Date:   Fri Nov 20 06:03:24 2026 +0500
+
+    fix(partner): unblock catalog hang and redesign B2B portal shell
+    
+    Use snapshot-only catalog loading (no live VeSIM fan-out) with client
+    search/filters and CSV export. Hide public navbar/footer on /partner/*.
+    Stripe-style partner header with wallet pill, scrollable tabs, and
+    polished Home/Orders/Wallet/Docs/Account surfaces.
+
+app/api/partner/catalog/csv/route.ts
+app/components/partner/PartnerApiDocsClient.tsx
+app/components/partner/PartnerBrandingPreviewCard.tsx
+app/components/partner/PartnerCatalogClient.tsx
+app/components/partner/PartnerMenu.tsx
+app/components/partner/PartnerOrdersTableClient.tsx
+app/components/partner/PartnerWalletAddFundsForm.tsx
+app/components/partner/partnerPortalUi.ts
+app/components/share/HideOnShare.tsx
+app/lib/partner/partnerSiteChrome.ts
+app/lib/partnerApi/partnerApiCatalog.ts
+app/partner/(portal)/account/page.tsx
+app/partner/(portal)/catalog/loading.tsx
+app/partner/(portal)/catalog/page.tsx
+app/partner/(portal)/layout.tsx
+app/partner/(portal)/orders/page.tsx
+app/partner/(portal)/page.tsx
+app/partner/(portal)/wallet/page.tsx

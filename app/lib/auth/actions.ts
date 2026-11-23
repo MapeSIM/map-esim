@@ -345,9 +345,24 @@ export async function signinAction(
   }
 
   const role = coerceAppRole(user.role) ?? "CUSTOMER";
-  const redirectTo = resolvePostSignInPath(role, rawCallbackUrl, {
-    requestOrigin,
-  });
+  const partnerPortalOnly = formData.get("partnerPortal") === "1";
+
+  // partneresim.com (and PartnerPortalLogin): live PARTNER role only.
+  if (partnerPortalOnly && role !== "PARTNER") {
+    return {
+      ok: false,
+      error:
+        "This portal is for approved Partner accounts only. Shop on mapesim.com, or apply for a Partner account if you need wholesale API access.",
+    };
+  }
+
+  const redirectTo = resolvePostSignInPath(
+    role,
+    rawCallbackUrl || (partnerPortalOnly ? "/" : ""),
+    {
+      requestOrigin,
+    }
+  );
 
   try {
     await signIn("credentials", {

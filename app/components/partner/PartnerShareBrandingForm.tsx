@@ -55,10 +55,10 @@ export default function PartnerShareBrandingForm({
 
   const previewBg = /^#[0-9a-fA-F]{6}$/.test(buttonBackground)
     ? buttonBackground
-    : "#10B981";
+    : "#84cc16";
   const previewFg = /^#[0-9a-fA-F]{6}$/.test(buttonTextColor)
     ? buttonTextColor
-    : "#020617";
+    : "#ffffff";
   const previewLogo = publicShareLogoSrc(logoUrl);
   const previewName = companyName.trim() || "MAP eSIM";
 
@@ -296,7 +296,7 @@ export default function PartnerShareBrandingForm({
                     value={
                       /^#[0-9a-fA-F]{6}$/.test(buttonBackground)
                         ? buttonBackground
-                        : "#10B981"
+                        : "#84cc16"
                     }
                     onChange={(e) => setButtonBackground(e.target.value)}
                     onKeyDown={handleColorPickerKeyDown}
@@ -307,7 +307,7 @@ export default function PartnerShareBrandingForm({
                     name="buttonBackground"
                     value={buttonBackground}
                     onChange={(e) => setButtonBackground(e.target.value)}
-                    placeholder="#10B981"
+                    placeholder="#84cc16"
                     maxLength={7}
                     className={`${fieldClass} !mt-0`}
                   />
@@ -322,7 +322,7 @@ export default function PartnerShareBrandingForm({
                     value={
                       /^#[0-9a-fA-F]{6}$/.test(buttonTextColor)
                         ? buttonTextColor
-                        : "#020617"
+                        : "#ffffff"
                     }
                     onChange={(e) => setButtonTextColor(e.target.value)}
                     onKeyDown={handleColorPickerKeyDown}
@@ -333,7 +333,7 @@ export default function PartnerShareBrandingForm({
                     name="buttonTextColor"
                     value={buttonTextColor}
                     onChange={(e) => setButtonTextColor(e.target.value)}
-                    placeholder="#020617"
+                    placeholder="#ffffff"
                     maxLength={7}
                     className={`${fieldClass} !mt-0`}
                   />
@@ -349,8 +349,11 @@ export default function PartnerShareBrandingForm({
                   {state.error}
                 </p>
               ) : state.saved ? (
-                <p className="text-emerald-300/90" role="status">
-                  Branding saved. Existing share links stay valid.
+                <p
+                  className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-emerald-300"
+                  role="status"
+                >
+                  Branding saved
                 </p>
               ) : (
                 <p className="text-slate-500">

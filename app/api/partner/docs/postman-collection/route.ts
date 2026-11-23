@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { buildPartnerPostmanCollection } from "@/app/lib/partner/partnerApiDocsContent";
+import { rejectUnlessPartnerDomain } from "@/app/lib/domain/requirePartnerDomain";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const domainBlock = await rejectUnlessPartnerDomain();
+  if (domainBlock) return domainBlock;
+
   const session = await auth();
   if (!session?.user?.id || session.user.role !== "PARTNER") {
     return NextResponse.json(

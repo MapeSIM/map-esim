@@ -11,7 +11,7 @@ import { CurrencyProvider } from "./components/currency/CurrencyProvider";
 import JsonLd from "./components/seo/JsonLd";
 import ThemeProvider from "./components/theme/ThemeProvider";
 import DeferredWhatsAppSupportButton from "./components/support/DeferredWhatsAppSupportButton";
-import HideOnShare from "./components/share/HideOnShare";
+import DomainAwareHideChrome from "./components/share/DomainAwareHideChrome";
 import NavigationProgressBarHost from "./components/loading/NavigationProgressBarHost";
 import { BRAND_NAME, BRAND_SITE_URL, BRAND_TAGLINE } from "@/app/lib/brand";
 import {
@@ -106,15 +106,15 @@ export default function RootLayout({
             <Suspense fallback={null}>
               <CurrencyProvider>
                 <ShellAuthProvider>
-                  <HideOnShare>
+                  <DomainAwareHideChrome>
                     <JsonLd data={siteGraph} />
                     <NavbarShell />
-                  </HideOnShare>
+                  </DomainAwareHideChrome>
                   {children}
-                  <HideOnShare>
+                  <DomainAwareHideChrome>
                     <Footer />
                     <DeferredWhatsAppSupportButton />
-                  </HideOnShare>
+                  </DomainAwareHideChrome>
                 </ShellAuthProvider>
               </CurrencyProvider>
             </Suspense>

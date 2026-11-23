@@ -1,13 +1,7 @@
 import Link from "next/link";
-import {
-  KeyRound,
-  Package,
-  ShoppingBag,
-  Wallet,
-} from "lucide-react";
+import { Package, ShoppingBag, Wallet } from "lucide-react";
 import { getPartnerPortalSummary } from "@/app/lib/partner/partnerAccess";
-import { requireRole } from "@/app/lib/auth/session";
-import { prisma } from "@/app/lib/db";
+import { getSessionUser, requireRole } from "@/app/lib/auth/session";
 import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
 import { listPartnerOrdersPage } from "@/app/lib/partner/partnerOrders";
 import {
@@ -16,11 +10,20 @@ import {
   partnerSecondaryCtaClass,
   partnerStatusBadgeClass,
 } from "@/app/components/partner/partnerPortalUi";
-import { PartnerEsimPurchaseStatus } from "@prisma/client";
+import PartnerPortalHomeCards, {
+  B2B_HOME_CARDS,
+} from "@/app/components/partner/PartnerPortalHomeCards";
+import { readAppDomain } from "@/app/lib/domain/readAppDomain";
 
 export const dynamic = "force-dynamic";
 
 export default async function PartnerHomePage() {
+  const domain = await readAppDomain();
+  const sessionUser = await getSessionUser();
+  if (domain === "partner" && sessionUser?.role !== "PARTNER") {
+    return null;
+  }
+
   const user = await requireRole("PARTNER");
   const actor = await requireActivePartnerActor(user.id);
   if (!actor) {
@@ -29,41 +32,42 @@ export default async function PartnerHomePage() {
     );
   }
 
-  const [summary, profile, recentOrders, activeEsims] = await Promise.all([
+  const isB2b = domain === "partner";
+
+  if (isB2b) {
+    return (
+      <PartnerPortalHomeCards
+        cards={B2B_HOME_CARDS}
+        eyebrow="MAP eSIM Partner"
+        title={`Welcome back, ${actor.name.split(" ")[0] || actor.name}`}
+        subtitle="API documentation, catalog, orders, wallet, and account — one Partner workspace."
+      />
+    );
+  }
+
+  // mapesim.com — simple customer-style partner home (no API cards).
+  const [summary, recentOrders] = await Promise.all([
     getPartnerPortalSummary(user.id).catch(() => null),
-    prisma.partnerProfile.findUnique({
-      where: { id: actor.partnerId },
-      select: { apiEnabled: true },
-    }),
     listPartnerOrdersPage(user.id, { page: "1" }).catch(() => null),
-    prisma.order.count({
-      where: {
-        partnerEsimPurchase: {
-          partnerId: actor.partnerId,
-          status: PartnerEsimPurchaseStatus.COMPLETED,
-        },
-        providerLifecycleStatus: "ACTIVE",
-      },
-    }).catch(() => 0),
   ]);
-  const apiEnabled = profile?.apiEnabled === true;
   const recent = (recentOrders?.orders ?? []).slice(0, 5);
 
   return (
     <div className="space-y-8">
       <header className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-400">
-          Executive overview
+          Partner wallet
         </p>
         <h1 className="text-3xl font-bold tracking-tight text-slate-50">
           Welcome back, {actor.name.split(" ")[0] || actor.name}
         </h1>
         <p className="max-w-2xl text-sm leading-relaxed text-slate-400">
-          Monitor balance, orders, and wholesale catalog from one workspace.
+          Check your balance, buy eSIMs fast, and manage orders — same wallet as
+          the Partner API Hub.
         </p>
       </header>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-3">
         {[
           {
             label: "Available Balance",
@@ -74,11 +78,6 @@ export default async function PartnerHomePage() {
             label: "Total Orders",
             value: summary?.totalEsimOrdersLabel ?? "—",
             hint: "Completed purchases",
-          },
-          {
-            label: "Active eSIMs",
-            value: String(activeEsims),
-            hint: "Lifecycle ACTIVE",
           },
           {
             label: "Total Spend",
@@ -99,20 +98,13 @@ export default async function PartnerHomePage() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Link href="/partner/catalog" className={partnerPrimaryCtaClass}>
+        <Link href="/partner/countries" className={partnerPrimaryCtaClass}>
           <ShoppingBag className="h-4 w-4" aria-hidden />
           Browse Catalog
         </Link>
         <Link href="/partner/wallet" className={partnerSecondaryCtaClass}>
           <Wallet className="h-4 w-4" aria-hidden />
           Top Up Wallet
-        </Link>
-        <Link
-          href={apiEnabled ? "/partner/account" : "/partner/account"}
-          className={partnerSecondaryCtaClass}
-        >
-          <KeyRound className="h-4 w-4" aria-hidden />
-          {apiEnabled ? "API Keys" : "Request API Access"}
         </Link>
         <Link href="/partner/orders" className={partnerSecondaryCtaClass}>
           <Package className="h-4 w-4" aria-hidden />
@@ -135,7 +127,10 @@ export default async function PartnerHomePage() {
         {recent.length === 0 ? (
           <p className="mt-4 text-sm text-slate-400">
             No orders yet.{" "}
-            <Link href="/partner/catalog" className="font-semibold text-emerald-300">
+            <Link
+              href="/partner/countries"
+              className="font-semibold text-emerald-300"
+            >
               Browse the catalog
             </Link>{" "}
             to place your first purchase.

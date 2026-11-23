@@ -50,20 +50,34 @@ export default function PartnerOrdersTableClient({
 }) {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("ALL");
+  const [typeFilter, setTypeFilter] = useState("ALL");
+  const [dateFilter, setDateFilter] = useState("ALL");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
+    const now = Date.now();
     return orders.filter((row) => {
       if (status !== "ALL" && !row.statusBadge.toUpperCase().includes(status)) {
         return false;
+      }
+      if (typeFilter === "ESIM" && row.isAddDataPurchase) return false;
+      if (typeFilter === "TOPUP" && !row.isAddDataPurchase) return false;
+      if (dateFilter !== "ALL") {
+        const ts = Date.parse(row.purchasedAtLabel || "");
+        if (Number.isFinite(ts)) {
+          const days = (now - ts) / 86_400_000;
+          if (dateFilter === "7" && days > 7) return false;
+          if (dateFilter === "30" && days > 30) return false;
+          if (dateFilter === "90" && days > 90) return false;
+        }
       }
       if (!needle) return true;
       const hay =
         `${row.orderId} ${row.iccid ?? ""} ${row.destination} ${row.planName}`.toLowerCase();
       return hay.includes(needle);
     });
-  }, [orders, q, status]);
+  }, [orders, q, status, typeFilter, dateFilter]);
 
   const selected = selectedId
     ? orders.find((o) => o.orderId === selectedId) ?? null
@@ -72,18 +86,18 @@ export default function PartnerOrdersTableClient({
   return (
     <>
       <div className={partnerCardClass + " space-y-3 !p-4"}>
-        <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search Order ID, ICCID, country, plan…"
-            className={`${partnerFieldClass} !mt-0`}
+            className={`${partnerFieldClass} !mt-0 sm:col-span-2 lg:col-span-1`}
             aria-label="Search orders"
           />
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className={`${partnerFieldClass} !mt-0 sm:w-44`}
+            className={`${partnerFieldClass} !mt-0`}
             aria-label="Filter by status"
           >
             <option value="ALL">All statuses</option>
@@ -91,6 +105,27 @@ export default function PartnerOrdersTableClient({
             <option value="ACTIVE">Active</option>
             <option value="REFUNDED">Refunded</option>
             <option value="EXPIRED">Expired</option>
+          </select>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className={`${partnerFieldClass} !mt-0`}
+            aria-label="Filter by type"
+          >
+            <option value="ALL">All types</option>
+            <option value="ESIM">eSIM</option>
+            <option value="TOPUP">Top-up</option>
+          </select>
+          <select
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className={`${partnerFieldClass} !mt-0`}
+            aria-label="Filter by date"
+          >
+            <option value="ALL">All dates</option>
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
           </select>
         </div>
         <p className="text-xs text-slate-500">

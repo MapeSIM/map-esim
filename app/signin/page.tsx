@@ -13,6 +13,7 @@ import {
 } from "@/app/lib/auth/googleOAuth";
 import { safeCallbackPath } from "@/app/lib/auth/redirects";
 import { readRequestOrigin } from "@/app/lib/auth/requestOrigin";
+import { readAppDomain } from "@/app/lib/domain/readAppDomain";
 
 export default async function SigninPage({
   searchParams,
@@ -28,10 +29,17 @@ export default async function SigninPage({
 }) {
   const params = await searchParams;
   const requestOrigin = await readRequestOrigin();
+  const domain = await readAppDomain();
+  const isPartnerHost = domain === "partner";
   // Auth.js middleware often sets an absolute same-site callbackUrl.
-  const callbackUrl = safeCallbackPath(params.callbackUrl, "", {
-    requestOrigin,
-  });
+  // On partneresim.com, land on `/` (middleware rewrites to the B2B dashboard).
+  const callbackUrl = safeCallbackPath(
+    params.callbackUrl,
+    isPartnerHost ? "/" : "",
+    {
+      requestOrigin,
+    }
+  );
   const verified = params.verified === "1";
   const reset = params.reset === "1";
   const deleted = params.deleted === "1";
@@ -46,8 +54,16 @@ export default async function SigninPage({
 
   return (
     <AuthCard
-      title="Sign in"
-      subtitle="Access your MAP eSIM account."
+      title={
+        isPartnerHost
+          ? "Partner eSIM Portal — B2B & API Hub"
+          : "Sign in"
+      }
+      subtitle={
+        isPartnerHost
+          ? "Sign in to your wholesale wallet, API keys, and Live API Hub."
+          : "Access your MAP eSIM account."
+      }
     >
       {deleted ? (
         <p className="mb-4 rounded-xl border border-[var(--accent-strong)]/35 bg-[var(--accent-strong)]/10 px-3 py-2 text-sm text-[var(--heading)]">
@@ -91,7 +107,9 @@ export default async function SigninPage({
 
       {googleEnabled ? (
         <>
-          <GoogleSignInButton callbackUrl={callbackUrl || "/"} />
+          <GoogleSignInButton
+            callbackUrl={callbackUrl || (isPartnerHost ? "/" : "/")}
+          />
           <AuthDivider />
         </>
       ) : null}

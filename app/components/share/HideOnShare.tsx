@@ -1,18 +1,58 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useSyncExternalStore } from "react";
+import {
+  resolveAppDomainFromHost,
+  parseAppDomainToken,
+  MAP_DOMAIN_COOKIE,
+  MAP_DOMAIN_QUERY,
+  type AppDomain,
+} from "@/app/lib/domain/appDomain";
 import { shouldHidePublicSiteChrome } from "@/app/lib/partner/partnerSiteChrome";
+
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${name}=`));
+  if (!match) return null;
+  return decodeURIComponent(match.slice(name.length + 1));
+}
+
+function readClientDomain(): AppDomain {
+  if (typeof window === "undefined") return "retail";
+  const params = new URLSearchParams(window.location.search);
+  const fromQuery = parseAppDomainToken(params.get(MAP_DOMAIN_QUERY));
+  if (fromQuery) return fromQuery;
+  const fromCookie = parseAppDomainToken(readCookie(MAP_DOMAIN_COOKIE));
+  if (fromCookie) return fromCookie;
+  return resolveAppDomainFromHost(window.location.host);
+}
+
+function subscribeNoop() {
+  return () => {};
+}
 
 /**
  * Hides public site chrome (nav/footer/JSON-LD/WhatsApp) on share, partner,
- * and admin surfaces so those workspaces are distraction-free.
+ * admin, sandbox surfaces — and on the entire partneresim.com / mapesim.store hosts.
  */
 export default function HideOnShare({
   children,
+  domain: domainProp,
 }: {
   children: React.ReactNode;
+  /** Server-resolved domain from middleware header (avoids chrome flash). */
+  domain?: AppDomain;
 }) {
   const pathname = usePathname() || "/";
-  if (shouldHidePublicSiteChrome(pathname)) return null;
+  const clientDomain = useSyncExternalStore(
+    subscribeNoop,
+    readClientDomain,
+    () => domainProp ?? ("retail" as AppDomain)
+  );
+  const domain = domainProp ?? clientDomain;
+  if (shouldHidePublicSiteChrome(pathname, domain)) return null;
   return <>{children}</>;
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireRole } from "@/app/lib/auth/session";
 import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
 import { prisma } from "@/app/lib/db";
@@ -9,10 +10,28 @@ import {
   PARTNER_DOCS_TOC,
 } from "@/app/lib/partner/partnerApiDocsContent";
 import PartnerApiDocsClient from "@/app/components/partner/PartnerApiDocsClient";
+import {
+  isLocalDevHost,
+  MAP_DOMAIN_QUERY,
+  PARTNER_SITE_ORIGIN,
+} from "@/app/lib/domain/appDomain";
+import { readAppDomain } from "@/app/lib/domain/readAppDomain";
+import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
 export default async function PartnerDocsPage() {
+  const domain = await readAppDomain();
+  // Defense-in-depth: docs are partneresim.com-only (middleware also redirects).
+  if (domain !== "partner") {
+    const h = await headers();
+    const host = h.get("x-forwarded-host") || h.get("host");
+    if (isLocalDevHost(host)) {
+      redirect(`/partner/docs?${MAP_DOMAIN_QUERY}=partneresim.com`);
+    }
+    redirect(`${PARTNER_SITE_ORIGIN}/partner/docs`);
+  }
+
   const user = await requireRole("PARTNER");
   const actor = await requireActivePartnerActor(user.id);
   if (!actor) {

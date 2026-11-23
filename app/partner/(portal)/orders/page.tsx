@@ -126,13 +126,22 @@ export default async function PartnerOrdersPage({
 
   return (
     <div className="min-w-0 space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-50">
-          Orders
-        </h1>
-        <p className="mt-1 max-w-2xl text-sm text-slate-400">
-          Search, copy ICCIDs, open the drawer for QR / LPA / usage / refund.
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-50">
+            My eSIMs
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-slate-400">
+            Search, filter, and manage Partner orders — QR, LPA, usage, and
+            refunds.
+          </p>
+        </div>
+        <Link
+          href={buildHref({ tab, page: 1 })}
+          className="inline-flex h-10 items-center rounded-xl border border-white/[0.12] px-4 text-sm font-semibold text-slate-100 transition hover:bg-white/[0.05]"
+        >
+          Refresh
+        </Link>
       </header>
 
       <div className="flex gap-1 border-b border-white/[0.06]">

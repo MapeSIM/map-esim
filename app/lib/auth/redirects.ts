@@ -3,6 +3,8 @@
  * Only same-site/internal paths are allowed.
  */
 
+import { multiDomainAllowedOrigins } from "@/app/lib/domain/appDomain";
+
 export type SafeCallbackOptions = {
   /** Current request origin (e.g. from Host / x-forwarded-*). */
   requestOrigin?: string | null;
@@ -44,6 +46,10 @@ export function collectAllowedCallbackOrigins(
       typeof process !== "undefined" ? process.env?.NEXTAUTH_URL : null
     )
   );
+  // Multi-domain deploy: retail + partner portal + sandbox share Auth.js.
+  for (const origin of multiDomainAllowedOrigins()) {
+    push(tryOrigin(origin));
+  }
   return out;
 }
 

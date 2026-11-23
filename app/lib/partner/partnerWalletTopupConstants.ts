@@ -15,7 +15,8 @@ export const PARTNER_TOPUP_MIN_CENTS = 10; // $0.10
 export const PARTNER_TOPUP_MAX_CENTS = 100_000; // $1,000.00
 
 /**
- * Partner Add Funds amount parse — min $0.10 / max $500.00.
+ * Partner Add Funds amount parse — min $0.10 / max $1,000.00
+ * (presets: $100 / $250 / $500 / $750 / $1000).
  * Do not reuse customer parseTopupUsdAmountToCents ($10 min).
  */
 export function parsePartnerTopupUsdAmountToCents(
@@ -28,7 +29,7 @@ export function parsePartnerTopupUsdAmountToCents(
     return { ok: false, error: "Minimum Partner top-up is $0.10." };
   }
   if (parsed.cents > PARTNER_TOPUP_MAX_CENTS) {
-    return { ok: false, error: "Maximum Partner top-up is $500.00." };
+    return { ok: false, error: "Maximum Partner top-up is $1,000.00." };
   }
   if (parsed.cents <= 0) {
     return { ok: false, error: "Enter a valid USD amount." };

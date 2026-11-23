@@ -2,6 +2,11 @@ import type { NextAuthConfig } from "next-auth";
 import { coerceAppRole } from "@/app/lib/auth/appRole";
 import { isAllowedDuringLegalConsent } from "@/app/lib/auth/legalConsentPolicy";
 import { safeCallbackPath } from "@/app/lib/auth/redirects";
+import {
+  isPartnerLandingPath,
+  multiDomainAllowedOrigins,
+  resolveAppDomainFromRequest,
+} from "@/app/lib/domain/appDomain";
 
 /**
  * Edge-safe Auth.js config (no Prisma / Node crypto imports).
@@ -90,8 +95,21 @@ export const authConfig = {
       }
 
       if (pathname === "/partner" || pathname.startsWith("/partner/")) {
-        if (!isLoggedIn) return false;
+        const domain = resolveAppDomainFromRequest(request);
+        // partneresim.com: allow logged-out visitors on landing (login view).
+        if (!isLoggedIn) {
+          if (domain === "partner" && isPartnerLandingPath(pathname)) {
+            return true;
+          }
+          return false;
+        }
         if (role !== "PARTNER") {
+          // Strict partner role on partneresim.com — never drop customers into B2B.
+          if (domain === "partner") {
+            const denied = new URL("/", request.nextUrl);
+            denied.searchParams.set("denied", "1");
+            return Response.redirect(denied);
+          }
           const dest =
             role === "ADMIN" ? "/admin" : role === "CUSTOMER" ? "/account" : "/signin";
           return Response.redirect(new URL(dest, request.nextUrl));
@@ -135,7 +153,8 @@ export const authConfig = {
     redirect({ url, baseUrl }) {
       // Only same-site/internal destinations. Absolute URLs are reduced to
       // pathname+search when the origin is allowlisted (AUTH_URL / APP_BASE_URL
-      // / Auth.js baseUrl). Foreign origins fall back to home — no open redirect.
+      // / Auth.js baseUrl / multi-domain hosts). Foreign origins fall back to
+      // home — no open redirect. Keep partneresim.com logins on that host.
       let baseOrigin: string;
       try {
         baseOrigin = new URL(baseUrl).origin;
@@ -143,7 +162,7 @@ export const authConfig = {
         return baseUrl;
       }
       const safe = safeCallbackPath(url, "", {
-        allowedOrigins: [baseOrigin],
+        allowedOrigins: [baseOrigin, ...multiDomainAllowedOrigins()],
       });
       if (!safe) return baseUrl;
       return `${baseOrigin}${safe}`;

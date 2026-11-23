@@ -82,25 +82,18 @@ export default async function PartnerCountriesPage() {
   const { destinations, source } = await loadInitialCatalog();
 
   return (
-    <div className="space-y-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-50">
-            Catalog
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm text-slate-400">
-            Browse destinations at retail rates. Your partner discount is
-            applied automatically at checkout.
-          </p>
-        </div>
+    <div
+      className="space-y-4 [--accent-soft:#6ee7b7] [--heading:#f8fafc] [--page-bg:transparent] [--surface:#0D1526] [--surface-2:#111827] [--text:#e2e8f0] [--text-muted:#94a3b8] [--border:rgba(255,255,255,0.08)] [--border-strong:rgba(255,255,255,0.12)]"
+    >
+      <div className="flex justify-end">
         <a
           href="/api/partner/catalog/csv"
-          className="inline-flex h-11 items-center gap-2 rounded-xl bg-emerald-500 px-4 text-sm font-bold text-slate-950 transition hover:bg-emerald-400"
+          className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/[0.12] bg-white/[0.03] px-3 text-sm font-semibold text-slate-100 transition hover:bg-white/[0.06]"
         >
           <Download className="h-4 w-4" aria-hidden />
-          Download All Plans CSV
+          Download CSV
         </a>
-      </header>
+      </div>
 
       <CountriesListing
         initialDestinations={destinations}
