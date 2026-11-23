@@ -1,11 +1,18 @@
 "use client";
 
-import { useEffect, useState, type FormEvent, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 import {
   readSandboxShareBranding,
   writeSandboxShareBranding,
   SANDBOX_DEFAULT_BUTTON_BG,
   SANDBOX_DEFAULT_BUTTON_FG,
+  SANDBOX_LOGO_MAX_BYTES,
   type SandboxShareBranding,
 } from "@/app/lib/sandbox/sandboxClientStorage";
 import { SHARE_COMPANY_NAME_MAX } from "@/app/lib/partner/partnerShareBrandingValidate";
@@ -18,11 +25,26 @@ const fieldClass =
 const labelClass = "block min-w-0 text-xs font-semibold text-slate-300";
 
 const HEX6 = /^#[0-9a-fA-F]{6}$/;
+const LOGO_ACCEPT = "image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp";
+const LOGO_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("Could not read image."));
+    };
+    reader.onerror = () => reject(new Error("Could not read image."));
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function SandboxShareBrandingForm() {
   const [hydrated, setHydrated] = useState(false);
   const [companyName, setCompanyName] = useState("");
   const [supportEmail, setSupportEmail] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [buttonBackground, setButtonBackground] = useState(
     SANDBOX_DEFAULT_BUTTON_BG
   );
@@ -30,12 +52,17 @@ export default function SandboxShareBrandingForm() {
     SANDBOX_DEFAULT_BUTTON_FG
   );
   const [error, setError] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const [logoMessage, setLogoMessage] = useState<string | null>(null);
+  const [logoBusy, setLogoBusy] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const saved = readSandboxShareBranding();
     setCompanyName(saved.companyName);
     setSupportEmail(saved.supportEmail);
+    setLogoUrl(saved.logoUrl);
     setButtonBackground(saved.buttonBackground);
     setButtonTextColor(saved.buttonTextColor);
     setHydrated(true);
@@ -58,6 +85,64 @@ export default function SandboxShareBrandingForm() {
     if (event.key === "Enter") event.preventDefault();
   }
 
+  function persistPartial(
+    patch: Partial<SandboxShareBranding>
+  ): SandboxShareBranding {
+    const current = readSandboxShareBranding();
+    return writeSandboxShareBranding({
+      companyName: patch.companyName ?? current.companyName,
+      supportEmail: patch.supportEmail ?? current.supportEmail,
+      logoUrl:
+        patch.logoUrl !== undefined ? patch.logoUrl : current.logoUrl,
+      buttonBackground: patch.buttonBackground ?? current.buttonBackground,
+      buttonTextColor: patch.buttonTextColor ?? current.buttonTextColor,
+    });
+  }
+
+  async function uploadLogo(file: File) {
+    setLogoBusy(true);
+    setLogoError(null);
+    setLogoMessage(null);
+    setError(null);
+    try {
+      if (!LOGO_MIME.has(file.type)) {
+        setLogoError("Logo must be a PNG, JPG, or WEBP image.");
+        return;
+      }
+      if (file.size > SANDBOX_LOGO_MAX_BYTES) {
+        setLogoError("Logo must be 1 MB or smaller.");
+        return;
+      }
+      const dataUrl = await readFileAsDataUrl(file);
+      const next = persistPartial({ logoUrl: dataUrl });
+      if (!next.logoUrl) {
+        setLogoError("Logo could not be saved in this browser.");
+        return;
+      }
+      setLogoUrl(next.logoUrl);
+      setLogoMessage("Logo uploaded.");
+    } catch {
+      setLogoError("Logo upload failed. Try a smaller PNG, JPG, or WEBP.");
+    } finally {
+      setLogoBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  function removeLogo() {
+    setLogoBusy(true);
+    setLogoError(null);
+    setLogoMessage(null);
+    try {
+      persistPartial({ logoUrl: null });
+      setLogoUrl(null);
+      setLogoMessage("Logo removed.");
+    } finally {
+      setLogoBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
   function saveBranding() {
     setError(null);
     const name = companyName.trim();
@@ -66,7 +151,9 @@ export default function SandboxShareBrandingForm() {
       return;
     }
     if (name.length > SHARE_COMPANY_NAME_MAX) {
-      setError(`Company name must be ${SHARE_COMPANY_NAME_MAX} characters or fewer.`);
+      setError(
+        `Company name must be ${SHARE_COMPANY_NAME_MAX} characters or fewer.`
+      );
       return;
     }
     const email = supportEmail.trim();
@@ -82,14 +169,16 @@ export default function SandboxShareBrandingForm() {
       return;
     }
 
-    const next: SandboxShareBranding = writeSandboxShareBranding({
+    const next = writeSandboxShareBranding({
       companyName: name,
       supportEmail: email || "support@example.com",
+      logoUrl,
       buttonBackground: buttonBackground.toLowerCase(),
       buttonTextColor: buttonTextColor.toLowerCase(),
     });
     setCompanyName(next.companyName);
     setSupportEmail(next.supportEmail);
+    setLogoUrl(next.logoUrl);
     setButtonBackground(next.buttonBackground);
     setButtonTextColor(next.buttonTextColor);
     setSavedFlash(true);
@@ -129,6 +218,73 @@ export default function SandboxShareBrandingForm() {
             <p className="mt-0.5 text-xs text-slate-500">
               Shown on shared eSIM install pages only.
             </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/[0.1] bg-[#070D19]">
+              {logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoUrl}
+                  alt=""
+                  width={56}
+                  height={56}
+                  className="h-full w-full object-contain p-1.5"
+                />
+              ) : (
+                <span className="px-1 text-center text-[10px] leading-tight text-slate-500">
+                  No logo
+                </span>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-slate-200">Logo</p>
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                PNG, JPG, WEBP · max 1 MB
+              </p>
+              <input
+                ref={fileRef}
+                type="file"
+                accept={LOGO_ACCEPT}
+                className="sr-only"
+                aria-label="Upload logo"
+                disabled={logoBusy}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void uploadLogo(file);
+                }}
+              />
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  disabled={logoBusy}
+                  onClick={() => fileRef.current?.click()}
+                  className="inline-flex h-7 items-center rounded-md border border-white/[0.12] px-2.5 text-[11px] font-semibold text-slate-200 hover:bg-white/[0.04] disabled:opacity-60"
+                >
+                  {logoBusy ? "…" : logoUrl ? "Replace" : "Upload"}
+                </button>
+                {logoUrl ? (
+                  <button
+                    type="button"
+                    disabled={logoBusy}
+                    onClick={removeLogo}
+                    className="inline-flex h-7 items-center rounded-md border border-rose-500/30 px-2.5 text-[11px] font-semibold text-rose-300 hover:bg-rose-500/10 disabled:opacity-60"
+                  >
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+              {logoMessage ? (
+                <p className="mt-1 text-[11px] text-slate-400" role="status">
+                  {logoMessage}
+                </p>
+              ) : null}
+              {logoError ? (
+                <p className="mt-1 text-[11px] text-rose-300" role="alert">
+                  {logoError}
+                </p>
+              ) : null}
+            </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -261,9 +417,20 @@ export default function SandboxShareBrandingForm() {
           <div className="mx-auto w-full max-w-[260px] overflow-hidden rounded-xl border border-white/[0.1] bg-[#0D1526] shadow-lg shadow-black/30">
             <div className="flex items-center gap-2.5 border-b border-white/[0.06] px-3 py-2.5">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/[0.08] bg-[#070D19]">
-                <span className="text-[9px] font-bold text-emerald-400">
-                  {(previewName[0] || "M").toUpperCase()}
-                </span>
+                {logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={logoUrl}
+                    alt=""
+                    width={32}
+                    height={32}
+                    className="h-full w-full object-contain p-0.5"
+                  />
+                ) : (
+                  <span className="text-[9px] font-bold text-emerald-400">
+                    {(previewName[0] || "M").toUpperCase()}
+                  </span>
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-semibold text-slate-50">

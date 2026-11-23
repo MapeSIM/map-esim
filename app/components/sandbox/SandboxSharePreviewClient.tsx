@@ -36,10 +36,21 @@ export default function SandboxSharePreviewClient() {
         }`}
       >
         <div className="flex items-center gap-3 border-b border-white/[0.06] px-4 py-3.5">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-[#070D19]">
-            <span className="text-sm font-black text-emerald-400">
-              {(branding.companyName[0] || "M").toUpperCase()}
-            </span>
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/[0.08] bg-[#070D19]">
+            {branding.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={branding.logoUrl}
+                alt=""
+                width={44}
+                height={44}
+                className="h-full w-full object-contain p-1"
+              />
+            ) : (
+              <span className="text-sm font-black text-emerald-400">
+                {(branding.companyName[0] || "M").toUpperCase()}
+              </span>
+            )}
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-slate-50">

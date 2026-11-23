@@ -32,6 +32,8 @@ export type SandboxWalletTx = {
 export type SandboxShareBranding = {
   companyName: string;
   supportEmail: string;
+  /** data:image/(png|jpeg|webp);base64,… or null */
+  logoUrl: string | null;
   buttonBackground: string;
   buttonTextColor: string;
 };
@@ -39,11 +41,30 @@ export type SandboxShareBranding = {
 export const SANDBOX_DEFAULT_BRANDING: SandboxShareBranding = {
   companyName: "MAP Partner Co",
   supportEmail: "support@example.com",
+  logoUrl: null,
   buttonBackground: SANDBOX_DEFAULT_BUTTON_BG,
   buttonTextColor: SANDBOX_DEFAULT_BUTTON_FG,
 };
 
+/** Match live Partner logo cap (1 MB raw file). */
+export const SANDBOX_LOGO_MAX_BYTES = 1_048_576;
+/** Base64 data-URL ceiling (~1 MB binary + header). */
+export const SANDBOX_LOGO_DATA_URL_MAX_CHARS = 1_500_000;
+
 const HEX6 = /^#[0-9a-fA-F]{6}$/;
+const SANDBOX_LOGO_DATA_RE =
+  /^data:image\/(png|jpeg|jpg|webp);base64,[a-z0-9+/=\s]+$/i;
+
+export function normalizeSandboxLogoUrl(
+  value: unknown
+): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > SANDBOX_LOGO_DATA_URL_MAX_CHARS) return null;
+  if (!SANDBOX_LOGO_DATA_RE.test(trimmed)) return null;
+  return trimmed;
+}
 
 export function normalizeSandboxShareBranding(
   raw: unknown
@@ -71,6 +92,7 @@ export function normalizeSandboxShareBranding(
   return {
     companyName,
     supportEmail,
+    logoUrl: normalizeSandboxLogoUrl(src.logoUrl),
     buttonBackground,
     buttonTextColor,
   };
