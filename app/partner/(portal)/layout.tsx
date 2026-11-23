@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import AccountMenu, {
+  type AccountNavLink,
+} from "@/app/components/account/AccountMenu";
 import PartnerMenu, {
   type PartnerNavLink,
 } from "@/app/components/partner/PartnerMenu";
@@ -25,12 +28,15 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false, nocache: true },
 };
 
-const retailPartnerLinks: PartnerNavLink[] = [
-  { href: "/partner", label: "Home", exact: true },
-  { href: "/partner/countries", label: "Catalog" },
-  { href: "/partner/orders", label: "Orders" },
+/** mapesim.com — 6a9cf44 customer-account nav (no API Docs). */
+const retailAccountLinks: AccountNavLink[] = [
+  { href: "/partner", label: "Overview", exact: true },
+  { href: "/partner/orders", label: "My eSIMs" },
+  { href: "/partner/sales", label: "Sales" },
   { href: "/partner/wallet", label: "Wallet" },
-  { href: "/partner/account", label: "Account" },
+  { href: "/countries", label: "Buy eSIM" },
+  { href: "/partner/profile", label: "Profile" },
+  { href: "/partner/security", label: "Security" },
 ];
 
 const b2bPartnerLinks: PartnerNavLink[] = [
@@ -60,8 +66,6 @@ export default async function PartnerLayout({
   const denied =
     h.get("x-map-search")?.includes("denied=1") ||
     pathname.includes("denied=1");
-
-  // Also read denied from forwarded search header set by middleware.
   const search = h.get("x-map-search") || "";
   const isDenied = search.includes("denied=1") || denied;
 
@@ -88,7 +92,6 @@ export default async function PartnerLayout({
   }
 
   if (domain === "partner" && !isPartnerSession) {
-    // Stay on partneresim.com `/` (PartnerPortalLogin) — never /signin via AUTH_URL.
     redirect("/");
   }
 
@@ -98,9 +101,27 @@ export default async function PartnerLayout({
     redirect(domain === "partner" ? "/?denied=1" : "/signin");
   }
 
-  const isB2b = domain === "partner";
-  const partnerLinks = isB2b ? b2bPartnerLinks : retailPartnerLinks;
+  // mapesim.com — 6a9cf44 AccountMenu customer shell.
+  if (domain !== "partner") {
+    return (
+      <main className="min-h-screen w-full max-w-full bg-[var(--page-bg)] px-3 py-8 text-[var(--heading)] sm:px-6 sm:py-10">
+        <div className="mx-auto w-full min-w-0 max-w-5xl space-y-5">
+          <header className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 sm:px-5">
+            <AccountMenu
+              userName={user.name}
+              userEmail={user.email}
+              links={retailAccountLinks}
+            />
+          </header>
+          <section className="min-w-0 w-full max-w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-8">
+            {children}
+          </section>
+        </div>
+      </main>
+    );
+  }
 
+  // partneresim.com — keep dark B2B PartnerMenu shell.
   const branding = await prisma.partnerProfile.findUnique({
     where: { id: actor.partnerId },
     select: {
@@ -120,15 +141,15 @@ export default async function PartnerLayout({
       <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#070D19]/90 backdrop-blur-md">
         <div className="mx-auto w-full max-w-6xl px-4 pt-3 sm:px-6">
           <PartnerMenu
-            mode={isB2b ? "b2b" : "retail"}
+            mode="b2b"
             userName={actor.name}
             userEmail={actor.email}
             companyBadge={companyBadge}
             walletBalanceLabel={walletBalanceLabel}
-            links={partnerLinks}
+            links={b2bPartnerLinks}
             brandLabel="MAP eSIM"
             brandSuffix="Partner"
-            homeHref={isB2b ? "/" : "/partner"}
+            homeHref="/"
             walletHref="/partner/wallet"
             accountHref="/partner/account"
           />

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireRole } from "@/app/lib/auth/session";
 import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
 import { prisma } from "@/app/lib/db";
@@ -13,6 +14,13 @@ import { BRAND_SUPPORT_EMAIL } from "@/app/lib/brand";
 export const dynamic = "force-dynamic";
 
 export default async function PartnerAccountPage() {
+  const domain = await readAppDomain();
+
+  // mapesim.com — no API keys surface; branding lives on Profile (6a9cf44).
+  if (domain !== "partner") {
+    redirect("/partner/profile");
+  }
+
   const user = await requireRole("PARTNER");
   const actor = await requireActivePartnerActor(user.id);
   if (!actor) {
@@ -20,9 +28,6 @@ export default async function PartnerAccountPage() {
       <p className="text-sm text-slate-300">Partner access is unavailable.</p>
     );
   }
-
-  const domain = await readAppDomain();
-  const isB2b = domain === "partner";
 
   const [profile, keys, branding] = await Promise.all([
     prisma.partnerProfile.findUnique({
@@ -33,7 +38,7 @@ export default async function PartnerAccountPage() {
         user: { select: { email: true, name: true, emailVerifiedAt: true } },
       },
     }),
-    isB2b ? listPartnerApiKeysForUser(user.id) : Promise.resolve(null),
+    listPartnerApiKeysForUser(user.id),
     getPartnerShareBranding(user.id),
   ]);
 
@@ -44,52 +49,7 @@ export default async function PartnerAccountPage() {
       }).format(profile.createdAt) + " UTC"
     : "Not available";
 
-  if (!isB2b) {
-    return (
-      <div className="space-y-8">
-        <header>
-          <h1 className="text-2xl font-bold text-slate-50">Account</h1>
-          <p className="mt-1 text-sm text-slate-400">
-            Profile and white-label Share QR branding.
-          </p>
-        </header>
-        <section className={partnerCardClass}>
-          <h2 className="text-lg font-semibold text-slate-50">
-            Partner profile
-          </h2>
-          <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                Partner name
-              </dt>
-              <dd className="mt-1 text-sm text-slate-100">
-                {profile?.user.name ?? actor.name}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                Email
-              </dt>
-              <dd className="mt-1 text-sm text-slate-100">
-                {profile?.user.email ?? actor.email}
-              </dd>
-            </div>
-          </dl>
-        </section>
-        <section className="space-y-3">
-          <h2 className="text-lg font-semibold text-slate-50">
-            White-Label Share QR Branding
-          </h2>
-          {branding.ok ? (
-            <PartnerShareBrandingForm initial={branding.branding} />
-          ) : (
-            <p className="text-sm text-slate-400">{branding.error}</p>
-          )}
-        </section>
-      </div>
-    );
-  }
-
+  // partneresim.com — B2B account (API keys + branding).
   return (
     <div className="space-y-8">
       <header>

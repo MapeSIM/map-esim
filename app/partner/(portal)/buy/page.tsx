@@ -15,13 +15,14 @@ import {
   sanitizeCountryHint,
 } from "@/app/lib/vesim/server";
 import { formatUsdCents } from "@/app/lib/wallet/display";
+import { readAppDomain } from "@/app/lib/domain/readAppDomain";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
  * Deep-link confirm for a single Partner-priced offer.
- * Browse stays on /partner/countries; missing params return there.
+ * Browse: B2B → /partner/countries; retail → /countries (6a9cf44).
  */
 export default async function PartnerStorefrontBuyPage({
   searchParams,
@@ -30,12 +31,13 @@ export default async function PartnerStorefrontBuyPage({
 }) {
   const user = await requireRole("PARTNER");
   const actor = await requireActivePartnerActor(user.id);
+  const domain = await readAppDomain();
   const query = await searchParams;
   const offerId = normalizeOfferId(query.offerId);
   const country = sanitizeCountryHint(query.country);
 
   if (!offerId || !country) {
-    redirect("/partner/countries");
+    redirect(domain === "partner" ? "/partner/countries" : "/countries");
   }
 
   if (!actor) {

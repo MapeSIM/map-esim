@@ -9,6 +9,7 @@ import {
   partnerCardClass,
   partnerPrimaryCtaClass,
 } from "@/app/components/partner/partnerPortalUi";
+import { readAppDomain } from "@/app/lib/domain/readAppDomain";
 
 export const dynamic = "force-dynamic";
 
@@ -17,22 +18,63 @@ const PORTAL_UNAVAILABLE =
 
 export default async function PartnerWalletPage() {
   const user = await requireRole("PARTNER");
+  const domain = await readAppDomain();
+  const isRetail = domain !== "partner";
 
   let summary: Awaited<ReturnType<typeof getPartnerPortalSummary>>;
   try {
     summary = await getPartnerPortalSummary(user.id);
   } catch {
     return (
-      <div className={partnerCardClass} role="status">
-        <p className="text-sm font-medium text-slate-100">{PORTAL_UNAVAILABLE}</p>
+      <div
+        className={
+          isRetail
+            ? "min-w-0 w-full max-w-full space-y-6"
+            : partnerCardClass
+        }
+        role="status"
+      >
+        {isRetail ? (
+          <header>
+            <h1 className="text-2xl font-bold tracking-tight">Wallet</h1>
+          </header>
+        ) : null}
+        <div
+          className={
+            isRetail
+              ? "min-w-0 w-full max-w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
+              : undefined
+          }
+        >
+          <p
+            className={
+              isRetail
+                ? "text-sm font-medium text-[var(--heading)]"
+                : "text-sm font-medium text-slate-100"
+            }
+          >
+            {PORTAL_UNAVAILABLE}
+          </p>
+        </div>
       </div>
     );
   }
 
   if (!summary) {
     return (
-      <div className={partnerCardClass} role="status">
-        <p className="text-sm font-medium text-slate-100">
+      <div className={isRetail ? "space-y-6" : partnerCardClass} role="status">
+        {isRetail ? (
+          <header>
+            <h1 className="text-2xl font-bold tracking-tight">Wallet</h1>
+          </header>
+        ) : null}
+        <p
+          className={
+            isRetail
+              ? "rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8 text-sm font-medium text-[var(--heading)]"
+              : "text-sm font-medium text-slate-100"
+          }
+        >
           Partner access is unavailable.
         </p>
       </div>
@@ -46,6 +88,88 @@ export default async function PartnerWalletPage() {
     selectedProvider === "SIMPAISA" && isPaymentGatewayConfigured();
   const simpaisaOperators = await getSimpaisaWalletOperatorConfig();
 
+  // mapesim.com — 6a9cf44 customer-style wallet.
+  if (isRetail) {
+    return (
+      <div className="min-w-0 w-full max-w-full space-y-8">
+        <header className="flex min-w-0 flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Wallet</h1>
+            <p className="mt-2 break-words text-sm text-[var(--text-muted)]">
+              Your MAP eSIM Partner balance and history.
+            </p>
+          </div>
+          <Link
+            href="/countries"
+            className="inline-flex h-10 items-center justify-center rounded-[14px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]/60"
+          >
+            Buy eSIM
+          </Link>
+        </header>
+
+        <div className="min-w-0 w-full max-w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
+            Available Partner Balance
+          </p>
+          <p className="mt-2 break-words text-3xl font-bold tracking-tight text-[var(--heading)]">
+            {summary.balanceLabel}
+          </p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">USD</p>
+          <p className="mt-4 text-sm leading-relaxed text-[var(--text-muted)]">
+            Current Partner discount:{" "}
+            <span className="font-semibold text-[var(--heading)]">
+              {summary.discountPercentLabel}
+            </span>
+            . Applied automatically when you buy. Admin funding continues to
+            credit this wallet.
+          </p>
+        </div>
+
+        <PartnerWalletAddFundsForm
+          balanceLabel={summary.balanceLabel}
+          gatewayReady={gatewayReady}
+          enabledSimpaisaOperatorIds={simpaisaOperators.enabledOperatorIds}
+        />
+
+        <section className="min-w-0 w-full max-w-full space-y-4">
+          <h2 className="text-lg font-semibold tracking-tight">
+            Transaction history
+          </h2>
+          {summary.recentTransactions.length === 0 ? (
+            <div className="min-w-0 w-full max-w-full rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] p-6 text-sm text-[var(--text-muted)]">
+              No wallet transactions yet.
+            </div>
+          ) : (
+            <ul className="min-w-0 space-y-3">
+              {summary.recentTransactions.map((tx) => (
+                <li
+                  key={tx.id}
+                  className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm"
+                >
+                  <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-[var(--heading)]">
+                        {tx.typeLabel}
+                      </p>
+                      <p className="mt-1 text-[var(--text-muted)]">{tx.reason}</p>
+                    </div>
+                    <p className="font-semibold tabular-nums text-[var(--heading)]">
+                      {tx.amountLabel}
+                    </p>
+                  </div>
+                  <p className="mt-2 text-xs text-[var(--text-soft)]">
+                    {tx.createdAtLabel} · Balance after {tx.balanceAfterLabel}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+    );
+  }
+
+  // partneresim.com — dark B2B wallet.
   return (
     <div className="min-w-0 w-full max-w-full space-y-8">
       <header className="flex min-w-0 flex-wrap items-end justify-between gap-3">

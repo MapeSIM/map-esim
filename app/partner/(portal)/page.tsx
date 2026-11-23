@@ -1,21 +1,26 @@
-import Link from "next/link";
-import { Package, ShoppingBag, Wallet } from "lucide-react";
-import { getPartnerPortalSummary } from "@/app/lib/partner/partnerAccess";
-import { getSessionUser, requireRole } from "@/app/lib/auth/session";
-import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
-import { listPartnerOrdersPage } from "@/app/lib/partner/partnerOrders";
 import {
-  partnerCardClass,
-  partnerPrimaryCtaClass,
-  partnerSecondaryCtaClass,
-  partnerStatusBadgeClass,
-} from "@/app/components/partner/partnerPortalUi";
+  BarChart3,
+  CreditCard,
+  Palette,
+  Shield,
+  Smartphone,
+  UserRound,
+  Wallet,
+} from "lucide-react";
+import AccountActionRow from "@/app/components/account/AccountActionRow";
+import PartnerSignOutRow from "@/app/components/partner/PartnerSignOutRow";
 import PartnerPortalHomeCards, {
   B2B_HOME_CARDS,
 } from "@/app/components/partner/PartnerPortalHomeCards";
+import { getPartnerPortalSummary } from "@/app/lib/partner/partnerAccess";
+import { getSessionUser, requireRole } from "@/app/lib/auth/session";
+import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
 import { readAppDomain } from "@/app/lib/domain/readAppDomain";
 
 export const dynamic = "force-dynamic";
+
+const PORTAL_UNAVAILABLE =
+  "Partner data is temporarily unavailable. Please refresh shortly.";
 
 export default async function PartnerHomePage() {
   const domain = await readAppDomain();
@@ -28,13 +33,14 @@ export default async function PartnerHomePage() {
   const actor = await requireActivePartnerActor(user.id);
   if (!actor) {
     return (
-      <p className="text-sm text-slate-300">Partner access is unavailable.</p>
+      <p className="text-sm text-[var(--text-muted)]">
+        Partner access is unavailable.
+      </p>
     );
   }
 
-  const isB2b = domain === "partner";
-
-  if (isB2b) {
+  // partneresim.com — B2B home cards.
+  if (domain === "partner") {
     return (
       <PartnerPortalHomeCards
         cards={B2B_HOME_CARDS}
@@ -45,122 +51,189 @@ export default async function PartnerHomePage() {
     );
   }
 
-  // mapesim.com — simple customer-style partner home (no API cards).
-  const [summary, recentOrders] = await Promise.all([
-    getPartnerPortalSummary(user.id).catch(() => null),
-    listPartnerOrdersPage(user.id, { page: "1" }).catch(() => null),
-  ]);
-  const recent = (recentOrders?.orders ?? []).slice(0, 5);
+  // mapesim.com — 6a9cf44 customer-account overview (no API CTAs).
+  let summary: Awaited<ReturnType<typeof getPartnerPortalSummary>>;
+  try {
+    summary = await getPartnerPortalSummary(user.id);
+  } catch {
+    return (
+      <div
+        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
+        role="status"
+      >
+        <p className="text-sm font-medium text-[var(--heading)]">
+          {PORTAL_UNAVAILABLE}
+        </p>
+      </div>
+    );
+  }
+
+  if (!summary) {
+    return (
+      <div
+        className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
+        role="status"
+      >
+        <p className="text-sm font-medium text-[var(--heading)]">
+          Partner access is unavailable.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
-      <header className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-400">
-          Partner wallet
-        </p>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-50">
-          Welcome back, {actor.name.split(" ")[0] || actor.name}
-        </h1>
-        <p className="max-w-2xl text-sm leading-relaxed text-slate-400">
-          Check your balance, buy eSIMs fast, and manage orders — same wallet as
-          the Partner API Hub.
+      <header>
+        <h1 className="text-2xl font-bold tracking-tight">My Account</h1>
+        <p className="mt-2 text-sm text-[var(--text-muted)]">
+          Manage Partner balance, purchases, and account settings.
         </p>
       </header>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        {[
-          {
-            label: "Available Balance",
-            value: summary?.balanceLabel ?? "—",
-            hint: "USD wallet",
-          },
-          {
-            label: "Total Orders",
-            value: summary?.totalEsimOrdersLabel ?? "—",
-            hint: "Completed purchases",
-          },
-          {
-            label: "Total Spend",
-            value: summary?.totalSpentLabel ?? "—",
-            hint: "Purchase debits",
-          },
-        ].map((kpi) => (
-          <div key={kpi.label} className={partnerCardClass + " !p-4 sm:!p-5"}>
-            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
-              {kpi.label}
-            </p>
-            <p className="mt-2 text-2xl font-bold tabular-nums tracking-tight text-slate-50">
-              {kpi.value}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">{kpi.hint}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <Link href="/partner/countries" className={partnerPrimaryCtaClass}>
-          <ShoppingBag className="h-4 w-4" aria-hidden />
-          Browse Catalog
-        </Link>
-        <Link href="/partner/wallet" className={partnerSecondaryCtaClass}>
-          <Wallet className="h-4 w-4" aria-hidden />
-          Top Up Wallet
-        </Link>
-        <Link href="/partner/orders" className={partnerSecondaryCtaClass}>
-          <Package className="h-4 w-4" aria-hidden />
-          View Orders
-        </Link>
-      </div>
-
-      <section className={partnerCardClass}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-semibold text-slate-50">
-            Recent orders
-          </h2>
-          <Link
-            href="/partner/orders"
-            className="text-sm font-semibold text-emerald-400 hover:text-emerald-300"
-          >
-            View all
-          </Link>
-        </div>
-        {recent.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-400">
-            No orders yet.{" "}
-            <Link
-              href="/partner/countries"
-              className="font-semibold text-emerald-300"
-            >
-              Browse the catalog
-            </Link>{" "}
-            to place your first purchase.
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
+            Partner Balance
           </p>
-        ) : (
-          <ul className="mt-4 divide-y divide-white/[0.06]">
-            {recent.map((row) => (
-              <li key={row.orderId}>
-                <Link
-                  href={`/partner/orders/${encodeURIComponent(row.orderId)}`}
-                  className="flex flex-wrap items-center justify-between gap-2 py-3 transition hover:bg-white/[0.02]"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-slate-100">
-                      {row.destination} · {row.planName}
-                    </p>
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      {row.purchasedAtLabel} · {row.partnerDebitLabel}
-                    </p>
-                  </div>
-                  <span
-                    className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${partnerStatusBadgeClass(row.statusBadge)}`}
-                  >
-                    {row.statusBadge}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+          <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
+            {summary.balanceLabel}
+          </p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">USD</p>
+        </div>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
+            Current Partner Discount
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
+            {summary.discountPercentLabel}
+          </p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Applied automatically at purchase
+          </p>
+        </div>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
+            Total eSIM orders
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
+            {summary.totalEsimOrdersLabel}
+          </p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Completed Partner purchases
+          </p>
+        </div>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
+            Total spent
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
+            {summary.totalSpentLabel}
+          </p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            eSIM purchase debits from wallet
+          </p>
+        </div>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
+            Total savings
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--heading)]">
+            {summary.totalSavingsLabel}
+          </p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Retail minus Partner charge on completed buys
+          </p>
+        </div>
+      </div>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold tracking-tight">Quick Actions</h2>
+        <div className="grid gap-3">
+          <AccountActionRow
+            href="/countries"
+            title="Buy eSIM"
+            subtitle="Browse destinations at your Partner wholesale price"
+            icon={<CreditCard className="h-5 w-5" aria-hidden="true" />}
+            emphasize
+          />
+          <AccountActionRow
+            href="/partner/wallet"
+            title="My Wallet"
+            subtitle="Partner balance and transaction history"
+            icon={<Wallet className="h-5 w-5" aria-hidden="true" />}
+            trailing={
+              <span className="mt-1 block text-sm font-bold text-[var(--heading)]">
+                {summary.balanceLabel}
+                <span className="ml-1 text-xs font-semibold text-[var(--text-soft)]">
+                  USD
+                </span>
+              </span>
+            }
+          />
+          <AccountActionRow
+            href="/partner/orders"
+            title="My eSIMs"
+            subtitle="Install, usage, and ICCID for Partner purchases"
+            icon={<Smartphone className="h-5 w-5" aria-hidden="true" />}
+          />
+          <AccountActionRow
+            href="/partner/sales"
+            title="Sales report"
+            subtitle="Period totals, destinations, packages, and CSV export"
+            icon={<BarChart3 className="h-5 w-5" aria-hidden="true" />}
+          />
+          <AccountActionRow
+            href="/partner/profile"
+            title="Account / Share Branding"
+            subtitle="Profile details and share-page branding"
+            icon={<Palette className="h-5 w-5" aria-hidden="true" />}
+          />
+          <PartnerSignOutRow />
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold tracking-tight">
+          Profile Information
+        </h2>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 text-sm">
+          <p>
+            <span className="text-[var(--text-soft)]">Name:</span>{" "}
+            <b>{user.name}</b>
+          </p>
+          <p className="mt-2">
+            <span className="text-[var(--text-soft)]">Email:</span>{" "}
+            <b>{user.email}</b>
+          </p>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold tracking-tight">Account Info</h2>
+        <div className="grid gap-3">
+          <AccountActionRow
+            href="/partner/profile"
+            title="Profile"
+            subtitle="Partner account information"
+            icon={<UserRound className="h-5 w-5" aria-hidden="true" />}
+          />
+          <AccountActionRow
+            href="/partner/security"
+            title="Password & Security"
+            subtitle="Password and security controls"
+            icon={<Shield className="h-5 w-5" aria-hidden="true" />}
+          />
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold tracking-tight">Share Branding</h2>
+        <AccountActionRow
+          href="/partner/profile"
+          title="Share Branding"
+          subtitle="Company name, support email, website, logo, and button colors"
+          icon={<Palette className="h-5 w-5" aria-hidden="true" />}
+        />
       </section>
     </div>
   );

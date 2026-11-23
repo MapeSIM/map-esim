@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PartnerEsimOrderCard from "@/app/components/partner/PartnerEsimOrderCard";
 import PartnerOrdersTableClient from "@/app/components/partner/PartnerOrdersTableClient";
 import {
   type PartnerRefundRequestCardState,
@@ -15,6 +16,7 @@ import { prisma } from "@/app/lib/db";
 import { PartnerEsimPurchaseStatus } from "@prisma/client";
 import { partnerCardClass } from "@/app/components/partner/partnerPortalUi";
 import { mapLatestOrderSupportTicketsByOrderIds } from "@/app/lib/support/orderSupportTicket";
+import { readAppDomain } from "@/app/lib/domain/readAppDomain";
 
 export const dynamic = "force-dynamic";
 
@@ -29,41 +31,74 @@ function buildHref(options: { tab?: string; page?: number }): string {
   return qs ? `/partner/orders?${qs}` : "/partner/orders";
 }
 
+function buildPartnerOrdersHref(page: number): string {
+  if (page <= 1) return "/partner/orders";
+  return `/partner/orders?page=${page}`;
+}
+
 export default async function PartnerOrdersPage({
   searchParams,
 }: {
   searchParams: Promise<{ page?: string; tab?: string }>;
 }) {
   const user = await requireRole("PARTNER");
+  const domain = await readAppDomain();
+  const isRetail = domain !== "partner";
   const params = await searchParams;
-  const tab =
-    (params.tab ?? "orders").trim().toLowerCase() === "performance"
-      ? "performance"
-      : "orders";
 
   let data: Awaited<ReturnType<typeof listPartnerOrdersPage>>;
   try {
     data = await listPartnerOrdersPage(user.id, { page: params.page });
   } catch {
     return (
-      <div className={partnerCardClass} role="status">
-        <p className="text-sm font-medium text-slate-100">{PORTAL_UNAVAILABLE}</p>
+      <div
+        className={
+          isRetail
+            ? "rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
+            : partnerCardClass
+        }
+        role="status"
+      >
+        <p
+          className={
+            isRetail
+              ? "text-sm font-medium text-[var(--heading)]"
+              : "text-sm font-medium text-slate-100"
+          }
+        >
+          {PORTAL_UNAVAILABLE}
+        </p>
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className={partnerCardClass}>
-        <p className="text-sm text-slate-100">Partner access is unavailable.</p>
+      <div
+        className={
+          isRetail
+            ? "rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-8"
+            : partnerCardClass
+        }
+      >
+        <p
+          className={
+            isRetail
+              ? "text-sm font-medium text-[var(--heading)]"
+              : "text-sm text-slate-100"
+          }
+        >
+          Partner access is unavailable.
+        </p>
       </div>
     );
   }
 
   const refundMap: Record<string, PartnerRefundRequestCardState> = {};
-  let supportByOrder: Awaited<
-    ReturnType<typeof mapLatestOrderSupportTicketsByOrderIds>
-  > = {};
+  let refundByPurchase = new Map<
+    string,
+    NonNullable<PartnerRefundRequestCardState>
+  >();
   try {
     const summaries = await listPartnerRefundRequestSummaries({
       partnerUserId: user.id,
@@ -73,11 +108,112 @@ export default async function PartnerOrdersPage({
       const latest = latestPartnerRefundSummary(
         summaries.filter((s) => s.purchaseId === row.purchaseId)
       );
-      if (latest) refundMap[row.purchaseId] = toPartnerRefundCardState(latest);
+      if (latest) {
+        const state = toPartnerRefundCardState(latest);
+        refundMap[row.purchaseId] = state;
+        refundByPurchase.set(row.purchaseId, state);
+      }
     }
   } catch {
     /* ignore */
   }
+
+  // mapesim.com — 6a9cf44 customer-style card list.
+  if (isRetail) {
+    return (
+      <div className="min-w-0 space-y-8">
+        <header>
+          <h1 className="text-2xl font-bold tracking-tight">My eSIMs</h1>
+          <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
+            Tap an eSIM to manage usage, QR install, and top-ups.
+          </p>
+        </header>
+
+        <section className="min-w-0 space-y-3" aria-labelledby="orders-heading">
+          <h2
+            id="orders-heading"
+            className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]"
+          >
+            Your eSIMs
+          </h2>
+          {data.orders.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-4 py-6 text-sm text-[var(--text-muted)]">
+              You have not purchased an eSIM yet.{" "}
+              <Link
+                href="/countries"
+                className="font-semibold text-[var(--accent-strong)] underline-offset-2 hover:underline"
+              >
+                Browse destinations
+              </Link>{" "}
+              to find a plan.
+            </p>
+          ) : (
+            <>
+              <ul className="space-y-3">
+                {data.orders.map((row) => (
+                  <li key={row.orderId} className="min-w-0">
+                    <PartnerEsimOrderCard
+                      row={row}
+                      refundRequest={
+                        refundByPurchase.get(row.purchaseId) ?? null
+                      }
+                      variant="list"
+                    />
+                  </li>
+                ))}
+              </ul>
+              {data.totalPages > 1 ? (
+                <nav
+                  className="flex min-w-0 flex-wrap items-center justify-between gap-3 pt-2 text-sm"
+                  aria-label="Partner eSIM pages"
+                >
+                  <p className="text-[var(--text-muted)]">
+                    Page {data.page} of {data.totalPages}
+                    <span className="text-[var(--text-soft)]">
+                      {" "}
+                      · {data.totalMatched} total
+                    </span>
+                  </p>
+                  <div className="flex gap-3">
+                    {data.page > 1 ? (
+                      <Link
+                        href={buildPartnerOrdersHref(data.page - 1)}
+                        className="font-semibold text-[var(--heading)] underline-offset-2 hover:underline"
+                      >
+                        Previous
+                      </Link>
+                    ) : (
+                      <span className="text-[var(--text-soft)]">Previous</span>
+                    )}
+                    {data.page < data.totalPages ? (
+                      <Link
+                        href={buildPartnerOrdersHref(data.page + 1)}
+                        className="font-semibold text-[var(--heading)] underline-offset-2 hover:underline"
+                      >
+                        Next
+                      </Link>
+                    ) : (
+                      <span className="text-[var(--text-soft)]">Next</span>
+                    )}
+                  </div>
+                </nav>
+              ) : null}
+            </>
+          )}
+        </section>
+      </div>
+    );
+  }
+
+  // partneresim.com — B2B table + performance tabs.
+  const tab =
+    (params.tab ?? "orders").trim().toLowerCase() === "performance"
+      ? "performance"
+      : "orders";
+
+  let supportByOrder: Awaited<
+    ReturnType<typeof mapLatestOrderSupportTicketsByOrderIds>
+  > = {};
   try {
     supportByOrder = await mapLatestOrderSupportTicketsByOrderIds(
       data.orders.map((row) => row.orderId)

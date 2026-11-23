@@ -35,8 +35,9 @@ function subscribeNoop() {
 }
 
 /**
- * Hides public site chrome (nav/footer/JSON-LD/WhatsApp) on share, partner,
- * admin, sandbox surfaces — and on the entire partneresim.com / mapesim.store hosts.
+ * Hides public site chrome (nav/footer/JSON-LD/WhatsApp) on share, admin,
+ * sandbox paths — and on entire partneresim.com / mapesim.store hosts.
+ * mapesim.com /partner/* keeps retail chrome (customer-account shell).
  */
 export default function HideOnShare({
   children,

@@ -16,7 +16,8 @@ export function shouldHidePublicSiteChrome(
 
   const path = (pathname || "/").split("?")[0].split("#")[0] || "/";
   if (isShareSurfacePath(path)) return true;
-  if (path === "/partner" || path.startsWith("/partner/")) return true;
+  // mapesim.com /partner/* uses the customer-account shell WITH retail chrome
+  // (6a9cf44). Do not hide Navbar/Footer/WhatsApp on retail partner routes.
   if (path === "/admin" || path.startsWith("/admin/")) return true;
   if (
     path === "/admin-setup-password" ||
