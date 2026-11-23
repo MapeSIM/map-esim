@@ -18,16 +18,30 @@ function formatUsd(cents: number): string {
   }).format(cents / 100);
 }
 
+function readApiKey(): string | null {
+  try {
+    return localStorage.getItem("mapesim_sandbox_api_key");
+  } catch {
+    return null;
+  }
+}
+
 export default function SandboxWalletClient() {
   const [balanceCents, setBalanceCents] = useState(SANDBOX_DEFAULT_BALANCE_CENTS);
   const [txs, setTxs] = useState<SandboxWalletTx[]>([]);
   const [ready, setReady] = useState(false);
+  const [selectedUsd, setSelectedUsd] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [hasApiKey, setHasApiKey] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      const key = readApiKey();
+      if (!cancelled) setHasApiKey(Boolean(key));
       try {
-        const key = localStorage.getItem("mapesim_sandbox_api_key");
         if (key) {
           const res = await fetch("/api/sandbox/v1/wallet", {
             headers: { Authorization: `Bearer ${key}` },
@@ -36,6 +50,7 @@ export default function SandboxWalletClient() {
           if (res.ok) {
             const data = (await res.json()) as {
               wallet?: { balanceCents?: number };
+              transactions?: SandboxWalletTx[];
             };
             const cents = data.wallet?.balanceCents;
             if (typeof cents === "number" && !cancelled) {
@@ -45,6 +60,19 @@ export default function SandboxWalletClient() {
               } catch {
                 /* ignore */
               }
+            }
+            if (Array.isArray(data.transactions) && !cancelled) {
+              setTxs(data.transactions);
+              try {
+                localStorage.setItem(
+                  SANDBOX_TX_KEY,
+                  JSON.stringify(data.transactions)
+                );
+              } catch {
+                /* ignore */
+              }
+              if (!cancelled) setReady(true);
+              return;
             }
           }
         } else {
@@ -75,13 +103,12 @@ export default function SandboxWalletClient() {
     };
   }, []);
 
-  function credit(usd: number) {
-    // Local cache only — Neon balance is set via Sandbox Admin (set/top-up).
+  function applyLocalCredit(usd: number) {
     const cents = usd * 100;
     const next = balanceCents + cents;
     const tx: SandboxWalletTx = {
       id: `tx_credit_${Date.now()}`,
-      label: `Local preview · $${usd} (admin set/top-up for Neon)`,
+      label: `Sandbox top-up · $${usd}`,
       amountCents: cents,
       createdAt: new Date().toISOString(),
       kind: "credit",
@@ -94,6 +121,83 @@ export default function SandboxWalletClient() {
       localStorage.setItem(SANDBOX_TX_KEY, JSON.stringify(nextTxs));
     } catch {
       /* ignore */
+    }
+  }
+
+  async function confirmTopUp() {
+    if (selectedUsd == null || busy) return;
+    const usd = selectedUsd;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const key = readApiKey();
+      if (key) {
+        const res = await fetch("/api/sandbox/v1/wallet", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${key}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ amountUsd: usd }),
+          cache: "no-store",
+        });
+        const data = (await res.json().catch(() => null)) as {
+          wallet?: { balanceCents?: number };
+          transactions?: SandboxWalletTx[];
+          message?: string;
+        } | null;
+        if (!res.ok) {
+          setError(data?.message || "Top-up could not be completed.");
+          return;
+        }
+        const cents = data?.wallet?.balanceCents;
+        if (typeof cents === "number") {
+          setBalanceCents(cents);
+          try {
+            localStorage.setItem(SANDBOX_WALLET_KEY, String(cents));
+          } catch {
+            /* ignore */
+          }
+        }
+        if (Array.isArray(data?.transactions)) {
+          setTxs(data.transactions);
+          try {
+            localStorage.setItem(
+              SANDBOX_TX_KEY,
+              JSON.stringify(data.transactions)
+            );
+          } catch {
+            /* ignore */
+          }
+        } else {
+          const tx: SandboxWalletTx = {
+            id: `tx_credit_${Date.now()}`,
+            label: `Sandbox top-up · $${usd}`,
+            amountCents: usd * 100,
+            createdAt: new Date().toISOString(),
+            kind: "credit",
+          };
+          const nextTxs = [tx, ...txs].slice(0, 50);
+          setTxs(nextTxs);
+          try {
+            localStorage.setItem(SANDBOX_TX_KEY, JSON.stringify(nextTxs));
+          } catch {
+            /* ignore */
+          }
+        }
+        setMessage(`Added $${usd} to your sandbox wallet.`);
+        setSelectedUsd(null);
+        return;
+      }
+
+      applyLocalCredit(usd);
+      setMessage(`Added $${usd} to your sandbox wallet.`);
+      setSelectedUsd(null);
+    } catch {
+      setError("Top-up is temporarily unavailable. Try again.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -117,19 +221,75 @@ export default function SandboxWalletClient() {
       </div>
 
       <section className={partnerCardClass + " space-y-4"}>
-        <h2 className="text-lg font-semibold text-slate-50">+ Add Funds</h2>
-        <div className="flex flex-wrap gap-2">
-          {PRESETS.map((usd) => (
-            <button
-              key={usd}
-              type="button"
-              onClick={() => credit(usd)}
-              className="inline-flex h-10 items-center rounded-xl border border-white/[0.12] px-4 text-sm font-semibold text-slate-100 hover:border-emerald-500/40 hover:bg-emerald-500/10"
-            >
-              ${usd}
-            </button>
-          ))}
+        <div>
+          <h2 className="text-lg font-semibold text-slate-50">+ Add Funds</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Choose an amount, then confirm to credit your sandbox wallet
+            {hasApiKey ? "." : " in this browser."}
+          </p>
         </div>
+        <div
+          className="flex flex-wrap gap-2"
+          role="group"
+          aria-label="Top-up amounts"
+        >
+          {PRESETS.map((usd) => {
+            const active = selectedUsd === usd;
+            return (
+              <button
+                key={usd}
+                type="button"
+                aria-pressed={active}
+                disabled={busy}
+                onClick={() => {
+                  setSelectedUsd(usd);
+                  setError(null);
+                  setMessage(null);
+                }}
+                className={
+                  active
+                    ? "inline-flex h-10 items-center rounded-xl bg-emerald-500 px-4 text-sm font-semibold text-slate-950 disabled:opacity-60"
+                    : "inline-flex h-10 items-center rounded-xl border border-white/[0.12] px-4 text-sm font-semibold text-slate-100 hover:border-emerald-500/40 hover:bg-emerald-500/10 disabled:opacity-60"
+                }
+              >
+                ${usd}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex flex-wrap items-center gap-3 border-t border-white/[0.06] pt-4">
+          <button
+            type="button"
+            disabled={busy || selectedUsd == null}
+            onClick={() => void confirmTopUp()}
+            className="inline-flex h-10 items-center rounded-xl bg-emerald-500 px-4 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy
+              ? "Adding…"
+              : selectedUsd != null
+                ? `Confirm · Add $${selectedUsd}`
+                : "Select an amount"}
+          </button>
+          {selectedUsd != null && !busy ? (
+            <button
+              type="button"
+              onClick={() => setSelectedUsd(null)}
+              className="text-sm font-semibold text-slate-400 hover:text-slate-200"
+            >
+              Clear
+            </button>
+          ) : null}
+        </div>
+        {message ? (
+          <p className="text-sm text-emerald-300" role="status">
+            {message}
+          </p>
+        ) : null}
+        {error ? (
+          <p className="text-sm text-rose-300" role="alert">
+            {error}
+          </p>
+        ) : null}
       </section>
 
       <section className="space-y-3">
@@ -147,14 +307,14 @@ export default function SandboxWalletClient() {
                 key={tx.id}
                 className="flex items-center justify-between gap-3 px-5 py-3"
               >
-                <div>
-                  <p className="text-sm text-slate-100">{tx.label}</p>
+                <div className="min-w-0">
+                  <p className="truncate text-sm text-slate-100">{tx.label}</p>
                   <p className="text-xs text-slate-500">
                     {new Date(tx.createdAt).toLocaleString()}
                   </p>
                 </div>
                 <p
-                  className={`text-sm font-semibold tabular-nums ${
+                  className={`shrink-0 text-sm font-semibold tabular-nums ${
                     tx.kind === "credit" ? "text-emerald-300" : "text-slate-200"
                   }`}
                 >

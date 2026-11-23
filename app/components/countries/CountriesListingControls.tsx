@@ -25,6 +25,8 @@ type SharedProps = {
   onSearchChange: (value: string) => void;
   filter: CountryListingFilterId;
   onFilterChange: (filter: CountryListingFilterId) => void;
+  /** Under partner/sandbox sticky chrome — use portal sticky offset. */
+  embedded?: boolean;
 };
 
 /** Hero search field — desktop/tablet only (mobile uses sticky unified search). */
@@ -74,14 +76,15 @@ export default function CountriesListingControls({
   onSearchChange,
   filter,
   onFilterChange,
+  embedded = false,
 }: SharedProps) {
   return (
     <div
-      className="
-        sticky top-16 z-40 sm:top-[72px]
-        border-b border-[var(--border)]
-        bg-[var(--page-bg)]/95 backdrop-blur-md
-      "
+      className={
+        embedded
+          ? "sticky top-[var(--portal-sticky-offset,3.5rem)] z-30 border-b border-[var(--border)] bg-[var(--page-bg)]/95 backdrop-blur-md"
+          : "sticky top-16 z-40 border-b border-[var(--border)] bg-[var(--page-bg)]/95 backdrop-blur-md sm:top-[72px]"
+      }
     >
       <div className="mx-auto max-w-[1200px] px-4 sm:px-6">
         <div className="pt-2.5 sm:hidden">

@@ -124,6 +124,23 @@ export const authConfig = {
       }
 
       if (pathname === "/account" || pathname.startsWith("/account/")) {
+        const domain = resolveAppDomainFromRequest(request);
+        // mapesim.store: never bounce sandbox users to retail /signin.
+        if (domain === "sandbox") {
+          if (
+            pathname === "/account/esim/buy" ||
+            pathname.startsWith("/account/esim/buy/")
+          ) {
+            return Response.redirect(
+              publicUrlForRequest(
+                request,
+                "/sandbox/catalog",
+                request.nextUrl.search || undefined
+              )
+            );
+          }
+          return Response.redirect(publicUrlForRequest(request, "/sandbox"));
+        }
         if (!isLoggedIn) return false;
         if (role === "PARTNER") {
           if (

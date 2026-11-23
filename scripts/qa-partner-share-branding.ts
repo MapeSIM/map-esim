@@ -318,11 +318,13 @@ async function main() {
   assert.match(formSrc, /formAction\(new FormData/);
   assert.doesNotMatch(formSrc, /action=\{formAction\}/);
   assert.doesNotMatch(formSrc, /type=["']submit["']/);
-  assert.match(formSrc, /Upload Logo/);
-  assert.match(formSrc, /Replace Logo/);
-  assert.match(formSrc, /Remove Logo/);
-  assert.match(formSrc, /PNG, JPG or WEBP\. Max 1 MB\./);
+  assert.match(formSrc, /Upload|Replace/);
+  assert.match(formSrc, /Remove/);
+  assert.match(formSrc, /PNG, JPG, WEBP/);
   assert.match(formSrc, /type=["']file["']/);
+  assert.doesNotMatch(formSrc, /Live preview/i);
+  assert.doesNotMatch(formSrc, /Compact view of the shared eSIM page/);
+  assert.doesNotMatch(formSrc, /lg:grid-cols-2/);
   assert.doesNotMatch(formSrc, /mapesim\.com\/brand\/your-logo/);
   assert.match(profileSrc, /PartnerShareBrandingForm/);
   assert.doesNotMatch(profileSrc, /Coming later/);

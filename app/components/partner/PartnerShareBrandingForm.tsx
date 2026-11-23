@@ -53,14 +53,7 @@ export default function PartnerShareBrandingForm({
   const fileRef = useRef<HTMLInputElement>(null);
   const brandingFormRef = useRef<HTMLFormElement>(null);
 
-  const previewBg = /^#[0-9a-fA-F]{6}$/.test(buttonBackground)
-    ? buttonBackground
-    : "#84cc16";
-  const previewFg = /^#[0-9a-fA-F]{6}$/.test(buttonTextColor)
-    ? buttonTextColor
-    : "#ffffff";
   const previewLogo = publicShareLogoSrc(logoUrl);
-  const previewName = companyName.trim() || "MAP eSIM";
 
   async function uploadLogo(file: File) {
     setLogoBusy(true);
@@ -154,10 +147,8 @@ export default function PartnerShareBrandingForm({
         ref={brandingFormRef}
         method="dialog"
         onSubmit={handleBrandingSubmit}
-        className="grid lg:grid-cols-2"
+        className="space-y-4 p-4 sm:p-5"
       >
-        {/* Left: controls */}
-        <div className="space-y-4 border-b border-white/[0.06] p-4 sm:p-5 lg:border-b-0 lg:border-r">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
               Brand identity
@@ -376,79 +367,6 @@ export default function PartnerShareBrandingForm({
               )}
             </button>
           </div>
-        </div>
-
-        {/* Right: live preview */}
-        <div className="flex flex-col bg-[#070D19]/60 p-4 sm:p-5">
-          <div className="mb-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
-              Live preview
-            </p>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Compact view of the shared eSIM page.
-            </p>
-          </div>
-
-          <div className="mx-auto w-full max-w-[260px] overflow-hidden rounded-xl border border-white/[0.1] bg-[#0D1526] shadow-lg shadow-black/30">
-            {/* Brand header */}
-            <div className="flex items-center gap-2.5 border-b border-white/[0.06] px-3 py-2.5">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/[0.08] bg-[#070D19]">
-                {previewLogo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={previewLogo}
-                    alt=""
-                    width={32}
-                    height={32}
-                    className="h-full w-full object-contain p-0.5"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <span className="text-[9px] font-bold text-emerald-400">
-                    M
-                  </span>
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-semibold text-slate-50">
-                  {previewName}
-                </p>
-                <p className="truncate text-[10px] text-slate-500">
-                  {supportEmail.trim() || "support@example.com"}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-2.5 px-3 py-3 text-center">
-              <div>
-                <p className="text-sm font-bold text-slate-100">Sample Plan</p>
-                <p className="text-[11px] text-slate-500">Sample destination</p>
-              </div>
-              <span className="inline-flex rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
-                Ready to install
-              </span>
-              <div
-                className="mx-auto h-16 w-16 rounded-lg border border-white/[0.08] bg-white p-1.5"
-                aria-hidden="true"
-              >
-                <div className="h-full w-full bg-[repeating-linear-gradient(90deg,#111_0_3px,transparent_3px_6px),repeating-linear-gradient(0deg,#111_0_3px,transparent_3px_6px)] opacity-80" />
-              </div>
-              <button
-                type="button"
-                tabIndex={-1}
-                className="inline-flex h-8 w-full items-center justify-center rounded-lg text-xs font-bold"
-                style={{ backgroundColor: previewBg, color: previewFg }}
-              >
-                Install eSIM
-              </button>
-              {websiteUrl.trim() ? (
-                <p className="truncate text-[10px] text-slate-500">
-                  {websiteUrl.trim()}
-                </p>
-              ) : null}
-            </div>
-          </div>
-        </div>
       </form>
     </div>
   );

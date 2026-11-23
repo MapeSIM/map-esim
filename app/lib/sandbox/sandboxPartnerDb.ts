@@ -286,7 +286,8 @@ export async function setSandboxPartnerBalance(
 
 export async function topUpSandboxPartner(
   partnerId: string,
-  amountCents: number
+  amountCents: number,
+  options?: { label?: string }
 ): Promise<{ ok: true; balanceCents: number } | { ok: false; error: string }> {
   const add = Math.floor(amountCents);
   if (!Number.isFinite(add) || add <= 0) {
@@ -298,6 +299,7 @@ export async function topUpSandboxPartner(
   });
   if (!row) return { ok: false, error: "Sandbox partner not found." };
   const next = Math.min(row.balanceCents + add, 50_000_000);
+  const label = (options?.label ?? "Admin top-up").trim() || "Admin top-up";
   await prisma.$transaction([
     prisma.sandboxPartner.update({
       where: { id: partnerId },
@@ -306,7 +308,7 @@ export async function topUpSandboxPartner(
     prisma.sandboxWalletTx.create({
       data: {
         partnerId,
-        label: "Admin top-up",
+        label,
         amountCents: add,
         kind: "credit",
       },

@@ -8,6 +8,12 @@ export const COUNTRIES_RETURN_Q_PARAM = "fromQ";
 
 export const PUBLIC_COUNTRIES_BASE_PATH = "/countries";
 export const PARTNER_COUNTRIES_BASE_PATH = "/partner/countries";
+export const SANDBOX_CATALOG_BASE_PATH = "/sandbox/catalog";
+
+export type CountriesCatalogBasePath =
+  | typeof PUBLIC_COUNTRIES_BASE_PATH
+  | typeof PARTNER_COUNTRIES_BASE_PATH
+  | typeof SANDBOX_CATALOG_BASE_PATH;
 
 const FILTER_IDS = new Set(["Country", "Popular", "Regional", "Global"]);
 
@@ -18,13 +24,18 @@ export function sanitizeCountriesListingFilter(
   return FILTER_IDS.has(filter) ? filter : null;
 }
 
-/** Allowlisted catalog roots only — public or partner portal. */
+/** Allowlisted catalog roots — public, partner, or sandbox. */
 export function normalizeCountriesBasePath(
   basePath?: string | null
-): typeof PUBLIC_COUNTRIES_BASE_PATH | typeof PARTNER_COUNTRIES_BASE_PATH {
-  const trimmed = (basePath ?? PUBLIC_COUNTRIES_BASE_PATH).trim().replace(/\/$/, "");
+): CountriesCatalogBasePath {
+  const trimmed = (basePath ?? PUBLIC_COUNTRIES_BASE_PATH)
+    .trim()
+    .replace(/\/$/, "");
   if (trimmed === PARTNER_COUNTRIES_BASE_PATH) {
     return PARTNER_COUNTRIES_BASE_PATH;
+  }
+  if (trimmed === SANDBOX_CATALOG_BASE_PATH) {
+    return SANDBOX_CATALOG_BASE_PATH;
   }
   return PUBLIC_COUNTRIES_BASE_PATH;
 }

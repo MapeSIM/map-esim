@@ -169,12 +169,12 @@ export default function PartnerMenu({
 
   return (
     <div className="space-y-0">
-      <div className="flex min-w-0 items-center justify-between gap-3 border-b border-white/[0.06] px-1 pb-4 sm:px-0">
-        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-white/[0.06] px-1 pb-3 sm:gap-x-3 sm:px-0 sm:pb-4">
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
           {isB2bChrome ? (
             <button
               type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.1] text-slate-200 lg:hidden"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/[0.1] text-slate-200 lg:hidden"
               aria-expanded={drawerOpen}
               aria-controls={drawerTitleId}
               onClick={() => setDrawerOpen(true)}
@@ -185,14 +185,16 @@ export default function PartnerMenu({
           ) : null}
           <Link
             href={homeHref}
-            className="flex shrink-0 items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+            className="flex min-w-0 items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
           >
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-xs font-black text-slate-950">
+            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500 text-xs font-black text-slate-950">
               M
             </span>
-            <span className="text-sm font-semibold tracking-tight text-slate-50">
-              {brandLabel}{" "}
-              <span className="font-medium text-slate-400">{brandSuffix}</span>
+            <span className="min-w-0 truncate text-sm font-semibold tracking-tight text-slate-50">
+              {brandLabel}
+              <span className="ml-1 hidden font-medium text-slate-400 sm:inline">
+                {brandSuffix}
+              </span>
             </span>
           </Link>
           {!isSandbox ? (
@@ -202,13 +204,13 @@ export default function PartnerMenu({
           ) : null}
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           <Link
             href={walletHref}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 text-xs font-semibold text-emerald-300 outline-none transition hover:bg-emerald-500/15 focus-visible:ring-2 focus-visible:ring-emerald-400/60 sm:px-3 sm:text-sm"
+            className="inline-flex h-9 max-w-[9.5rem] items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 text-xs font-semibold text-emerald-300 outline-none transition hover:bg-emerald-500/15 focus-visible:ring-2 focus-visible:ring-emerald-400/60 sm:max-w-none sm:gap-1.5 sm:px-3 sm:text-sm"
           >
-            <Wallet className="h-3.5 w-3.5" aria-hidden />
-            <span className="tabular-nums">{balance}</span>
+            <Wallet className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span className="truncate tabular-nums">{balance}</span>
           </Link>
           <Link
             href={walletHref}
@@ -222,7 +224,7 @@ export default function PartnerMenu({
           ) : (
             <Link
               href={accountHref}
-              className="inline-flex h-9 items-center rounded-full border border-white/[0.1] px-3 text-xs font-semibold text-slate-200 sm:text-sm"
+              className="inline-flex h-9 max-w-[7rem] items-center truncate rounded-full border border-white/[0.1] px-2.5 text-xs font-semibold text-slate-200 sm:max-w-none sm:px-3 sm:text-sm"
             >
               {userName.split(" ")[0] || userName}
             </Link>
@@ -238,9 +240,9 @@ export default function PartnerMenu({
         {navList}
       </nav>
 
-      {/* Mobile drawer */}
+      {/* Mobile drawer — isolated above page chrome */}
       {isB2bChrome && drawerOpen ? (
-        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal>
+        <div className="fixed inset-0 z-[60] lg:hidden" role="dialog" aria-modal>
           <button
             type="button"
             className="absolute inset-0 bg-black/60"
@@ -252,20 +254,20 @@ export default function PartnerMenu({
             id={drawerTitleId}
             className="absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col border-r border-white/[0.08] bg-[#0D1526] shadow-2xl"
           >
-            <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
-              <p className="text-sm font-semibold text-slate-50">
-                MAP eSIM Partner
+            <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-3">
+              <p className="min-w-0 truncate text-sm font-semibold text-slate-50">
+                {brandLabel} {brandSuffix}
               </p>
               <button
                 type="button"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.1]"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/[0.1]"
                 onClick={() => setDrawerOpen(false)}
               >
                 <X className="h-4 w-4" aria-hidden />
                 <span className="sr-only">Close</span>
               </button>
             </div>
-            <div className="border-b border-white/[0.06] px-4 py-3">
+            <div className="space-y-0.5 border-b border-white/[0.06] px-4 py-3">
               <p className="truncate text-sm font-semibold text-slate-100">
                 {userName}
               </p>

@@ -83,6 +83,14 @@ function main() {
   console.log("4) Href allowlist rejects schemes / unsafe ids");
   assert.equal(safeDestinationCardHref("pakistan"), "/countries/pakistan?fromFilter=Country");
   assert.equal(safeDestinationCardHref("region-asia"), "/countries/region-asia?fromFilter=Country");
+  assert.equal(
+    safeDestinationCardHref("pakistan", "/sandbox/catalog"),
+    "/sandbox/catalog/pakistan?fromFilter=Country"
+  );
+  assert.equal(
+    safeDestinationCardHref("pakistan", "/partner/countries"),
+    "/partner/countries/pakistan?fromFilter=Country"
+  );
   assert.equal(safeDestinationCardHref("javascript:alert(1)"), "/countries");
   assert.equal(safeDestinationCardHref('pk"><script>'), "/countries");
   console.log("   ok");

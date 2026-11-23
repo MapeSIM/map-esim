@@ -102,18 +102,23 @@ export default function SandboxOrdersClient({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-50">My eSIMs</h1>
+      <header className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-slate-50 sm:text-2xl">
+            My eSIMs
+          </h1>
           <p className="mt-1 text-sm text-slate-400">
-            Search, filter, and manage Partner orders — QR, LPA, usage, and
-            refunds.
+            <span className="sm:hidden">Orders, QR codes, and usage.</span>
+            <span className="hidden sm:inline">
+              Search, filter, and manage Partner orders — QR, LPA, usage, and
+              refunds.
+            </span>
           </p>
         </div>
         <button
           type="button"
           onClick={refresh}
-          className="inline-flex h-10 items-center rounded-xl border border-white/[0.12] px-4 text-sm font-semibold text-slate-100 transition hover:bg-white/[0.05]"
+          className="inline-flex h-9 w-fit items-center rounded-xl border border-white/[0.12] px-3 text-sm font-semibold text-slate-100 transition hover:bg-white/[0.05] sm:h-10 sm:px-4"
         >
           Refresh
         </button>

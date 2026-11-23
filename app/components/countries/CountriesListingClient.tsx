@@ -36,8 +36,10 @@ export type CountriesListingClientProps = {
   /** Slim cards only — full VesimDestination catalog stays on the server. */
   initialCards: DestinationCard[];
   initialSource: DestinationCatalogSource;
-  /** Public `/countries` or partner `/partner/countries`. */
+  /** Public `/countries`, partner `/partner/countries`, or sandbox `/sandbox/catalog`. */
   basePath?: string;
+  /** Compact hero + sticky offset under portal chrome. */
+  embedded?: boolean;
   /**
    * RSC default Country A–Z grid (children slot, not a named client prop)
    * — shown until search/filter/catalog diverge.
@@ -49,6 +51,7 @@ function CountriesListingClientInner({
   initialCards,
   initialSource,
   basePath = "/countries",
+  embedded = false,
   children: defaultGrid,
 }: CountriesListingClientProps) {
   const router = useRouter();
@@ -154,14 +157,17 @@ function CountriesListingClientInner({
     isDefaultCountryListingView({ filter, search }) && !catalogReplaced;
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[var(--page-bg)] text-[var(--heading)]">
+    <main
+      className={`${
+        embedded ? "min-h-0" : "min-h-screen"
+      } overflow-x-hidden bg-[var(--page-bg)] text-[var(--heading)]`}
+    >
       <section
-        className="
-          relative flex items-center justify-center
-          border-b border-[var(--border)]
-          theme-hero
-          px-4 py-5 sm:min-h-[340px] sm:px-6 sm:py-12
-        "
+        className={
+          embedded
+            ? "relative flex items-center justify-center border-b border-[var(--border)] theme-hero px-4 py-3 sm:px-6 sm:py-4"
+            : "relative flex items-center justify-center border-b border-[var(--border)] theme-hero px-4 py-5 sm:min-h-[340px] sm:px-6 sm:py-12"
+        }
       >
         <div
           className="destinations-grid pointer-events-none absolute inset-0 opacity-[0.35]"
@@ -179,25 +185,26 @@ function CountriesListingClientInner({
           </p>
 
           <h1
-            className="
-              mx-auto mt-2 max-w-3xl
-              text-[1.5rem] font-semibold leading-tight tracking-tight
-              text-[var(--heading)]
-              sm:mt-3 sm:text-4xl md:text-[2.5rem]
-            "
+            className={
+              embedded
+                ? "mx-auto mt-1.5 max-w-3xl text-xl font-semibold leading-tight tracking-tight text-[var(--heading)] sm:mt-2 sm:text-2xl"
+                : "mx-auto mt-2 max-w-3xl text-[1.5rem] font-semibold leading-tight tracking-tight text-[var(--heading)] sm:mt-3 sm:text-4xl md:text-[2.5rem]"
+            }
           >
             Explore destinations worldwide
           </h1>
 
-          <p
-            className="
-              mx-auto mt-2 hidden max-w-xl
-              text-sm leading-relaxed text-[var(--text-muted)]
-              sm:mt-3 sm:block sm:text-base
-            "
-          >
-            Browse country, popular, regional, and global eSIM destinations.
-          </p>
+          {!embedded ? (
+            <p
+              className="
+                mx-auto mt-2 hidden max-w-xl
+                text-sm leading-relaxed text-[var(--text-muted)]
+                sm:mt-3 sm:block sm:text-base
+              "
+            >
+              Browse country, popular, regional, and global eSIM destinations.
+            </p>
+          ) : null}
 
           <CountriesListingHeroSearch
             search={search}
@@ -211,6 +218,7 @@ function CountriesListingClientInner({
         onSearchChange={setSearch}
         filter={filter}
         onFilterChange={setFilter}
+        embedded={embedded}
       />
 
       {usingDefaultGrid ? (

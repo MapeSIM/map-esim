@@ -140,6 +140,52 @@ export default auth((req) => {
     return attachDomainCookie(res, domain, persistDomainCookie);
   }
 
+  // mapesim.store: keep storefront traffic inside the sandbox portal.
+  if (domain === "sandbox") {
+    if (
+      pathname === "/signin" ||
+      pathname === "/login" ||
+      pathname === "/signup"
+    ) {
+      const dest = publicUrlForRequest(req, "/sandbox");
+      return attachDomainCookie(
+        NextResponse.redirect(dest),
+        domain,
+        persistDomainCookie
+      );
+    }
+    if (pathname === "/countries" || pathname.startsWith("/countries/")) {
+      const rest =
+        pathname === "/countries" ? "" : pathname.slice("/countries".length);
+      const dest = publicUrlForRequest(
+        req,
+        `/sandbox/catalog${rest}`,
+        req.nextUrl.search || undefined
+      );
+      return attachDomainCookie(
+        NextResponse.redirect(dest),
+        domain,
+        persistDomainCookie
+      );
+    }
+    if (pathname === "/account" || pathname.startsWith("/account/")) {
+      const dest =
+        pathname === "/account/esim/buy" ||
+        pathname.startsWith("/account/esim/buy/")
+          ? publicUrlForRequest(
+              req,
+              "/sandbox/catalog",
+              req.nextUrl.search || undefined
+            )
+          : publicUrlForRequest(req, "/sandbox");
+      return attachDomainCookie(
+        NextResponse.redirect(dest),
+        domain,
+        persistDomainCookie
+      );
+    }
+  }
+
   const res = NextResponse.next({
     request: { headers: requestHeaders },
   });

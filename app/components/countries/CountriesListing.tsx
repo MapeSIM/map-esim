@@ -14,8 +14,10 @@ import CountriesListingClient from "@/app/components/countries/CountriesListingC
 export type CountriesListingProps = {
   initialDestinations: VesimDestination[];
   initialSource: DestinationCatalogSource;
-  /** Public `/countries` or partner `/partner/countries`. */
+  /** Public `/countries`, partner `/partner/countries`, or sandbox `/sandbox/catalog`. */
   basePath?: string;
+  /** Compact hero when nested under partner/sandbox portal chrome. */
+  embedded?: boolean;
 };
 
 /**
@@ -27,6 +29,7 @@ export default function CountriesListing({
   initialDestinations,
   initialSource,
   basePath = "/countries",
+  embedded = false,
 }: CountriesListingProps) {
   const cards: DestinationCard[] = initialDestinations.map(toDestinationCard);
   const defaultFiltered = filterDestinationCards(cards, "Country", "");
@@ -46,6 +49,7 @@ export default function CountriesListing({
       initialCards={cards}
       initialSource={initialSource}
       basePath={basePath}
+      embedded={embedded}
     >
       {defaultGrid}
     </CountriesListingClient>

@@ -23,8 +23,8 @@ function safeLetter(letter: string): string {
 }
 
 /**
- * Only relative /countries/{slug} or /partner/countries/{slug} hrefs —
- * never javascript: or external schemes.
+ * Only relative catalog hrefs under /countries, /partner/countries, or
+ * /sandbox/catalog — never javascript: or external schemes.
  */
 export function safeDestinationCardHref(
   destinationId: string,
@@ -36,13 +36,17 @@ export function safeDestinationCardHref(
     basePath,
   });
   const fallback =
-    basePath === "/partner/countries" ? "/partner/countries" : "/countries";
+    basePath === "/partner/countries"
+      ? "/partner/countries"
+      : basePath === "/sandbox/catalog"
+        ? "/sandbox/catalog"
+        : "/countries";
   // Absolute schemes, javascript:, or any non-allowlisted path → hard fallback.
   if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/i.test(href) || /javascript:/i.test(href)) {
     return fallback;
   }
   if (
-    !/^\/(?:partner\/)?countries\/[A-Za-z0-9][A-Za-z0-9_-]*(?:\?[A-Za-z0-9_=&.-]*)?$/.test(
+    !/^\/(?:partner\/countries|sandbox\/catalog|countries)\/[A-Za-z0-9][A-Za-z0-9_-]*(?:\?[A-Za-z0-9_=&.-]*)?$/.test(
       href
     )
   ) {

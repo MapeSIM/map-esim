@@ -16,8 +16,10 @@ import {
   getSandboxPartnerById,
   isSandboxApiKeyFormat,
   listSandboxOrdersForPartner,
+  listSandboxWalletTxForPartner,
   mintDemoActivationCode,
   newSandboxOrderId,
+  topUpSandboxPartner,
 } from "@/app/lib/sandbox/sandboxPartnerDb";
 import { prisma } from "@/app/lib/db";
 
@@ -239,6 +241,7 @@ export async function sandboxWalletResponse(partnerId: string) {
   if (!partner) {
     return sandboxError(404, "Not found", "Sandbox partner not found.");
   }
+  const txs = await listSandboxWalletTxForPartner(partnerId);
   return sandboxJson({
     success: true,
     sandbox: true,
@@ -251,7 +254,35 @@ export async function sandboxWalletResponse(partnerId: string) {
       }).format(partner.balanceCents / 100),
       note: "Neon SandboxPartner balance — shared by portal UI and API.",
     },
+    transactions: txs.map((tx) => ({
+      id: tx.id,
+      label: tx.label,
+      amountCents: tx.amountCents,
+      kind: tx.kind === "debit" ? "debit" : "credit",
+      createdAt: tx.createdAt.toISOString(),
+    })),
   });
+}
+
+export async function sandboxWalletTopUpResponse(
+  partnerId: string,
+  amountUsd: number
+) {
+  const usd = Math.round(amountUsd);
+  if (![100, 250, 500, 750, 1000].includes(usd)) {
+    return sandboxError(
+      400,
+      "Invalid amount",
+      "Choose a top-up of $100, $250, $500, $750, or $1000."
+    );
+  }
+  const result = await topUpSandboxPartner(partnerId, usd * 100, {
+    label: `Sandbox top-up · $${usd}`,
+  });
+  if (!result.ok) {
+    return sandboxError(400, "Top-up failed", result.error);
+  }
+  return sandboxWalletResponse(partnerId);
 }
 
 export async function sandboxOrdersListResponse(partnerId: string) {
