@@ -18,6 +18,13 @@ import {
 import { sendContactFormEmail } from "@/app/lib/email/sendContactFormEmail";
 import { isValidEmail } from "@/app/lib/vesim/server";
 
+export type ContactFormValues = {
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+};
+
 export type ContactFormState =
   | { status: "idle" }
   | { status: "success" }
@@ -30,6 +37,8 @@ export type ContactFormState =
         | "not_configured"
         | "send_failed";
       message: string;
+      fieldErrors?: Partial<Record<keyof ContactFormValues, string>>;
+      values?: ContactFormValues;
     };
 
 function readField(formData: FormData, key: string): string {
@@ -48,34 +57,53 @@ export async function submitContactFormAction(
   _prev: ContactFormState,
   formData: FormData
 ): Promise<ContactFormState> {
-  // Honeypot — bots fill hidden fields; humans leave this empty.
-  // Do not use autofill names like "company" (browsers fill those and skip SMTP).
   const honeypot = readField(formData, "fax_number");
   if (honeypot) {
     return { status: "success" };
   }
 
-  const name = readField(formData, "name");
-  const email = readField(formData, "email").toLowerCase();
-  const subject = readField(formData, "subject");
-  const message = readField(formData, "message");
+  const values: ContactFormValues = {
+    name: readField(formData, "name"),
+    email: readField(formData, "email").toLowerCase(),
+    subject: readField(formData, "subject"),
+    message: readField(formData, "message"),
+  };
+
+  const fieldErrors: Partial<Record<keyof ContactFormValues, string>> = {};
 
   if (
-    name.length < CONTACT_NAME_MIN ||
-    name.length > CONTACT_NAME_MAX ||
-    email.length === 0 ||
-    email.length > CONTACT_EMAIL_MAX ||
-    !isValidEmail(email) ||
-    subject.length < CONTACT_SUBJECT_MIN ||
-    subject.length > CONTACT_SUBJECT_MAX ||
-    message.length < CONTACT_MESSAGE_MIN ||
-    message.length > CONTACT_MESSAGE_MAX
+    values.name.length < CONTACT_NAME_MIN ||
+    values.name.length > CONTACT_NAME_MAX
   ) {
+    fieldErrors.name = `Enter your name (at least ${CONTACT_NAME_MIN} characters).`;
+  }
+  if (
+    !values.email ||
+    values.email.length > CONTACT_EMAIL_MAX ||
+    !isValidEmail(values.email)
+  ) {
+    fieldErrors.email = "Enter a valid email address.";
+  }
+  if (
+    values.subject.length < CONTACT_SUBJECT_MIN ||
+    values.subject.length > CONTACT_SUBJECT_MAX
+  ) {
+    fieldErrors.subject = `Enter a subject (at least ${CONTACT_SUBJECT_MIN} characters).`;
+  }
+  if (
+    values.message.length < CONTACT_MESSAGE_MIN ||
+    values.message.length > CONTACT_MESSAGE_MAX
+  ) {
+    fieldErrors.message = `Enter a message of ${CONTACT_MESSAGE_MIN}–${CONTACT_MESSAGE_MAX} characters.`;
+  }
+
+  if (Object.keys(fieldErrors).length > 0) {
     return {
       status: "error",
       code: "validation",
-      message:
-        "Please check your name, email, subject and message, then try again.",
+      message: "Please check the highlighted fields and try again.",
+      fieldErrors,
+      values,
     };
   }
 
@@ -88,11 +116,12 @@ export async function submitContactFormAction(
       code: "rate_limited",
       message:
         "Too many messages were sent recently. Please wait and try again later, or email support directly.",
+      values,
     };
   }
 
   const contentKey = createHash("sha256")
-    .update(`${email}\n${subject}\n${message}`)
+    .update(`${values.email}\n${values.subject}\n${values.message}`)
     .digest("hex");
   const dedupe = assertContactNotDuplicate(contentKey);
   if (!dedupe.ok) {
@@ -101,14 +130,15 @@ export async function submitContactFormAction(
       code: "duplicate",
       message:
         "This message was already submitted. If you still need help, email support or wait before sending again.",
+      values,
     };
   }
 
   const result = await sendContactFormEmail({
-    customerName: name,
-    customerEmail: email,
-    subject,
-    message,
+    customerName: values.name,
+    customerEmail: values.email,
+    subject: values.subject,
+    message: values.message,
   });
 
   if (!result.ok) {
@@ -118,6 +148,7 @@ export async function submitContactFormAction(
         code: "not_configured",
         message:
           "Contact email is temporarily unavailable. Please use the support email address on this page.",
+        values,
       };
     }
     return {
@@ -125,6 +156,7 @@ export async function submitContactFormAction(
       code: "send_failed",
       message:
         "We could not send your message right now. Please try again later or email support directly.",
+      values,
     };
   }
 

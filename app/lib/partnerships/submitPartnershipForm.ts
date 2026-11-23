@@ -27,6 +27,19 @@ import {
 } from "@/app/lib/partnerships/partnershipRateLimit";
 import { isValidEmail } from "@/app/lib/vesim/server";
 
+export type PartnershipFormValues = {
+  fullName: string;
+  companyName: string;
+  registrationNumber: string;
+  businessEmail: string;
+  phone: string;
+  country: string;
+  postalCode: string;
+  website: string;
+  about: string;
+  expectedVolume: string;
+};
+
 export type PartnershipFormState =
   | { status: "idle" }
   | { status: "success" }
@@ -39,21 +52,8 @@ export type PartnershipFormState =
         | "not_configured"
         | "send_failed";
       message: string;
-      fieldErrors?: Partial<
-        Record<
-          | "fullName"
-          | "companyName"
-          | "registrationNumber"
-          | "businessEmail"
-          | "phone"
-          | "country"
-          | "postalCode"
-          | "website"
-          | "about"
-          | "expectedVolume",
-          string
-        >
-      >;
+      fieldErrors?: Partial<Record<keyof PartnershipFormValues, string>>;
+      values?: PartnershipFormValues;
     };
 
 function readField(formData: FormData, key: string): string {
@@ -116,13 +116,13 @@ export async function submitPartnershipFormAction(
     fullName.length < PARTNERSHIP_NAME_MIN ||
     fullName.length > PARTNERSHIP_NAME_MAX
   ) {
-    fieldErrors.fullName = "Enter your full name.";
+    fieldErrors.fullName = `Enter your full name (at least ${PARTNERSHIP_NAME_MIN} characters).`;
   }
   if (
     companyName.length < PARTNERSHIP_COMPANY_MIN ||
     companyName.length > PARTNERSHIP_COMPANY_MAX
   ) {
-    fieldErrors.companyName = "Enter your business or company name.";
+    fieldErrors.companyName = `Enter your business or company name (at least ${PARTNERSHIP_COMPANY_MIN} characters).`;
   }
   if (registrationNumber.length > PARTNERSHIP_REGISTRATION_MAX) {
     fieldErrors.registrationNumber = "Registration number is too long.";
@@ -135,19 +135,19 @@ export async function submitPartnershipFormAction(
     fieldErrors.businessEmail = "Enter a valid business email.";
   }
   if (!looksLikePhone(phone) || phone.length > PARTNERSHIP_PHONE_MAX) {
-    fieldErrors.phone = "Enter a valid phone number.";
+    fieldErrors.phone = `Enter a valid phone number (at least ${PARTNERSHIP_PHONE_MIN} digits).`;
   }
   if (
     country.length < PARTNERSHIP_COUNTRY_MIN ||
     country.length > PARTNERSHIP_COUNTRY_MAX
   ) {
-    fieldErrors.country = "Enter your country.";
+    fieldErrors.country = `Enter your country (at least ${PARTNERSHIP_COUNTRY_MIN} characters).`;
   }
   if (
     postalCode.length < PARTNERSHIP_POSTAL_MIN ||
     postalCode.length > PARTNERSHIP_POSTAL_MAX
   ) {
-    fieldErrors.postalCode = "Enter a ZIP / postal code.";
+    fieldErrors.postalCode = `Enter a ZIP / postal code (at least ${PARTNERSHIP_POSTAL_MIN} characters).`;
   }
   if (website && !looksLikeUrlOrHandle(website)) {
     fieldErrors.website = "Enter a website URL or social profile.";
@@ -156,12 +156,24 @@ export async function submitPartnershipFormAction(
     about.length < PARTNERSHIP_ABOUT_MIN ||
     about.length > PARTNERSHIP_ABOUT_MAX
   ) {
-    fieldErrors.about =
-      "Tell us a little more about your business or audience.";
+    fieldErrors.about = `Tell us about your business or audience (at least ${PARTNERSHIP_ABOUT_MIN} characters).`;
   }
   if (!expectedVolume) {
     fieldErrors.expectedVolume = "Select an expected monthly volume.";
   }
+
+  const values: PartnershipFormValues = {
+    fullName,
+    companyName,
+    registrationNumber,
+    businessEmail,
+    phone,
+    country,
+    postalCode,
+    website,
+    about,
+    expectedVolume: expectedVolume ?? readField(formData, "expectedVolume"),
+  };
 
   if (Object.keys(fieldErrors).length > 0) {
     return {
@@ -169,6 +181,7 @@ export async function submitPartnershipFormAction(
       code: "validation",
       message: "Please check the highlighted fields and try again.",
       fieldErrors,
+      values,
     };
   }
 
@@ -181,6 +194,7 @@ export async function submitPartnershipFormAction(
       code: "rate_limited",
       message:
         "Too many applications were sent recently. Please wait and try again later, or email support directly.",
+      values,
     };
   }
 
@@ -196,6 +210,7 @@ export async function submitPartnershipFormAction(
       code: "duplicate",
       message:
         "This application was already submitted. If you still need help, email support or wait before sending again.",
+      values,
     };
   }
 
@@ -219,6 +234,7 @@ export async function submitPartnershipFormAction(
         code: "not_configured",
         message:
           "Partnership email is temporarily unavailable. Please use the support email address on this page.",
+        values,
       };
     }
     return {
@@ -226,6 +242,7 @@ export async function submitPartnershipFormAction(
       code: "send_failed",
       message:
         "We could not send your application right now. Please try again later or email support directly.",
+      values,
     };
   }
 

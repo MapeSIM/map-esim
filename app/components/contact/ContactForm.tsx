@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import {
   CONTACT_EMAIL_MAX,
@@ -48,6 +48,15 @@ const fieldClass = `
   focus:ring-2 focus:ring-[var(--accent-strong)]/25
 `;
 
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <p className="mt-1.5 text-xs text-[var(--warning-text)]" role="alert">
+      {message}
+    </p>
+  );
+}
+
 export default function ContactForm() {
   const [state, formAction] = useActionState(
     submitContactFormAction,
@@ -55,11 +64,29 @@ export default function ContactForm() {
   );
   const formRef = useRef<HTMLFormElement>(null);
   const success = state.status === "success";
+  const fieldErrors = state.status === "error" ? state.fieldErrors : undefined;
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+
+  // Restore server-returned values if the tree remounts after a validation error.
+  useEffect(() => {
+    if (state.status !== "error" || !state.values) return;
+    setName(state.values.name);
+    setEmail(state.values.email);
+    setSubject(state.values.subject);
+    setMessage(state.values.message);
+  }, [state]);
 
   useEffect(() => {
-    if (success) {
-      formRef.current?.reset();
-    }
+    if (!success) return;
+    setName("");
+    setEmail("");
+    setSubject("");
+    setMessage("");
+    formRef.current?.reset();
   }, [success]);
 
   const mailtoFallback = `mailto:${BRAND_SUPPORT_EMAIL}?subject=${encodeURIComponent(
@@ -107,8 +134,12 @@ export default function ContactForm() {
         </div>
       ) : null}
 
-      <form ref={formRef} action={formAction} className="mt-6 space-y-5" noValidate>
-        {/* Honeypot — visually hidden, not a real contact field. */}
+      <form
+        ref={formRef}
+        action={formAction}
+        className="mt-6 space-y-5"
+        noValidate
+      >
         <div className="absolute left-[-10000px] top-auto h-px w-px overflow-hidden" aria-hidden="true">
           <label htmlFor="fax_number">Fax</label>
           <input
@@ -132,8 +163,14 @@ export default function ContactForm() {
             minLength={CONTACT_NAME_MIN}
             maxLength={CONTACT_NAME_MAX}
             autoComplete="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             className={fieldClass}
           />
+          <p className="mt-1.5 text-xs text-[var(--text-soft)]">
+            At least {CONTACT_NAME_MIN} characters.
+          </p>
+          <FieldError message={fieldErrors?.name} />
         </div>
 
         <div>
@@ -148,8 +185,11 @@ export default function ContactForm() {
             maxLength={CONTACT_EMAIL_MAX}
             autoComplete="email"
             inputMode="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             className={fieldClass}
           />
+          <FieldError message={fieldErrors?.email} />
         </div>
 
         <div>
@@ -163,8 +203,14 @@ export default function ContactForm() {
             required
             minLength={CONTACT_SUBJECT_MIN}
             maxLength={CONTACT_SUBJECT_MAX}
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
             className={fieldClass}
           />
+          <p className="mt-1.5 text-xs text-[var(--text-soft)]">
+            At least {CONTACT_SUBJECT_MIN} characters.
+          </p>
+          <FieldError message={fieldErrors?.subject} />
         </div>
 
         <div>
@@ -178,12 +224,15 @@ export default function ContactForm() {
             minLength={CONTACT_MESSAGE_MIN}
             maxLength={CONTACT_MESSAGE_MAX}
             rows={6}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
             className={`${fieldClass} resize-y`}
           />
           <p className="mt-1.5 text-xs text-[var(--text-soft)]">
             {CONTACT_MESSAGE_MIN}–{CONTACT_MESSAGE_MAX} characters. Do not include
             passwords, full card numbers, QR codes, or activation secrets.
           </p>
+          <FieldError message={fieldErrors?.message} />
         </div>
 
         <SubmitButton />

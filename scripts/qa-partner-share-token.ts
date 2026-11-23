@@ -185,12 +185,10 @@ async function main() {
   assert.match(shareModel, /revokedAt/);
 
   const controlsSrc = read("app/components/partner/PartnerEsimShareControls.tsx");
-  assert.match(
-    controlsSrc,
-    /This share link stays\s+active until you revoke or regenerate it/
-  );
-  assert.match(controlsSrc, /Revoke Share Link/);
-  assert.match(controlsSrc, /Regenerate Share Link/);
+  assert.doesNotMatch(controlsSrc, /Create Share Link/);
+  assert.doesNotMatch(controlsSrc, /Revoke Share Link/);
+  assert.doesNotMatch(controlsSrc, /Regenerate Share Link/);
+  assert.match(controlsSrc, /Copy Link/);
   assert.doesNotMatch(controlsSrc, /expires in \d+|expires in X /i);
 
   const robots = read("app/robots.ts");

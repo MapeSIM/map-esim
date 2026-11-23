@@ -293,14 +293,13 @@ async function main() {
   assert.match(orderDetailSrc, /partnerDisplayName/);
   assert.match(orderDetailSrc, /displayShareCompanyName/);
   assert.doesNotMatch(orderDetailSrc, /createPartnerEsimShareToken|mintRawToken/);
-  assert.match(controlsSrc, /Regenerate Share Link/);
-  assert.match(controlsSrc, /Create Share Link/);
-  assert.match(controlsSrc, /Revoke Share Link/);
+  assert.doesNotMatch(controlsSrc, /Create Share Link/);
+  assert.doesNotMatch(controlsSrc, /Revoke Share Link/);
+  assert.doesNotMatch(controlsSrc, /Regenerate Share Link/);
   assert.match(controlsSrc, /Copy Link/);
-  assert.match(
-    controlsSrc,
-    /This share link stays\s+active until you revoke or regenerate it/
-  );
+  assert.match(controlsSrc, /WhatsApp Share/);
+  assert.match(controlsSrc, /Web Share/);
+  assert.match(controlsSrc, /ensureShareUrl|createOrRegeneratePartnerShareLinkAction/);
   assert.doesNotMatch(controlsSrc, /expires in \d+|expires in X /i);
   assert.match(controlsSrc, /navigator\.share/);
   assert.match(controlsSrc, /window\.location\.origin/);

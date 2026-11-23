@@ -1,16 +1,22 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { BRAND_SUPPORT_EMAIL } from "@/app/lib/brand";
 import {
   PARTNERSHIP_ABOUT_MAX,
+  PARTNERSHIP_ABOUT_MIN,
   PARTNERSHIP_COMPANY_MAX,
+  PARTNERSHIP_COMPANY_MIN,
   PARTNERSHIP_COUNTRY_MAX,
+  PARTNERSHIP_COUNTRY_MIN,
   PARTNERSHIP_EMAIL_MAX,
   PARTNERSHIP_NAME_MAX,
+  PARTNERSHIP_NAME_MIN,
   PARTNERSHIP_PHONE_MAX,
+  PARTNERSHIP_PHONE_MIN,
   PARTNERSHIP_POSTAL_MAX,
+  PARTNERSHIP_POSTAL_MIN,
   PARTNERSHIP_REGISTRATION_MAX,
   PARTNERSHIP_VOLUME_OPTIONS,
   PARTNERSHIP_WEBSITE_MAX,
@@ -19,9 +25,23 @@ import {
 import {
   submitPartnershipFormAction,
   type PartnershipFormState,
+  type PartnershipFormValues,
 } from "@/app/lib/partnerships/submitPartnershipForm";
 
 const initialState: PartnershipFormState = { status: "idle" };
+
+const emptyValues: PartnershipFormValues = {
+  fullName: "",
+  companyName: "",
+  registrationNumber: "",
+  businessEmail: "",
+  phone: "",
+  country: "",
+  postalCode: "",
+  website: "",
+  about: "",
+  expectedVolume: "",
+};
 
 const fieldClass = `
   mt-2 w-full rounded-2xl border border-[var(--border-strong)]
@@ -70,10 +90,25 @@ export default function PartnershipApplicationForm() {
   const success = state.status === "success";
   const fieldErrors = state.status === "error" ? state.fieldErrors : undefined;
 
+  const [values, setValues] = useState<PartnershipFormValues>(emptyValues);
+
+  function patchField<K extends keyof PartnershipFormValues>(
+    key: K,
+    value: PartnershipFormValues[K]
+  ) {
+    setValues((prev) => ({ ...prev, [key]: value }));
+  }
+
+  // Restore server-returned values if the tree remounts after a validation error.
   useEffect(() => {
-    if (success) {
-      formRef.current?.reset();
-    }
+    if (state.status !== "error" || !state.values) return;
+    setValues(state.values);
+  }, [state]);
+
+  useEffect(() => {
+    if (!success) return;
+    setValues(emptyValues);
+    formRef.current?.reset();
   }, [success]);
 
   const mailtoFallback = `mailto:${BRAND_SUPPORT_EMAIL}?subject=${encodeURIComponent(
@@ -144,10 +179,16 @@ export default function PartnershipApplicationForm() {
               name="fullName"
               type="text"
               required
+              minLength={PARTNERSHIP_NAME_MIN}
               maxLength={PARTNERSHIP_NAME_MAX}
               autoComplete="name"
+              value={values.fullName}
+              onChange={(e) => patchField("fullName", e.target.value)}
               className={fieldClass}
             />
+            <p className="mt-1.5 text-xs text-[var(--text-soft)]">
+              At least {PARTNERSHIP_NAME_MIN} characters.
+            </p>
             <FieldError message={fieldErrors?.fullName} />
           </div>
           <div>
@@ -159,10 +200,16 @@ export default function PartnershipApplicationForm() {
               name="companyName"
               type="text"
               required
+              minLength={PARTNERSHIP_COMPANY_MIN}
               maxLength={PARTNERSHIP_COMPANY_MAX}
               autoComplete="organization"
+              value={values.companyName}
+              onChange={(e) => patchField("companyName", e.target.value)}
               className={fieldClass}
             />
+            <p className="mt-1.5 text-xs text-[var(--text-soft)]">
+              At least {PARTNERSHIP_COMPANY_MIN} characters.
+            </p>
             <FieldError message={fieldErrors?.companyName} />
           </div>
         </div>
@@ -176,6 +223,8 @@ export default function PartnershipApplicationForm() {
             name="registrationNumber"
             type="text"
             maxLength={PARTNERSHIP_REGISTRATION_MAX}
+            value={values.registrationNumber}
+            onChange={(e) => patchField("registrationNumber", e.target.value)}
             className={fieldClass}
           />
           <FieldError message={fieldErrors?.registrationNumber} />
@@ -193,6 +242,8 @@ export default function PartnershipApplicationForm() {
               required
               maxLength={PARTNERSHIP_EMAIL_MAX}
               autoComplete="email"
+              value={values.businessEmail}
+              onChange={(e) => patchField("businessEmail", e.target.value)}
               className={fieldClass}
             />
             <FieldError message={fieldErrors?.businessEmail} />
@@ -208,8 +259,13 @@ export default function PartnershipApplicationForm() {
               required
               maxLength={PARTNERSHIP_PHONE_MAX}
               autoComplete="tel"
+              value={values.phone}
+              onChange={(e) => patchField("phone", e.target.value)}
               className={fieldClass}
             />
+            <p className="mt-1.5 text-xs text-[var(--text-soft)]">
+              At least {PARTNERSHIP_PHONE_MIN} digits.
+            </p>
             <FieldError message={fieldErrors?.phone} />
           </div>
         </div>
@@ -224,10 +280,16 @@ export default function PartnershipApplicationForm() {
               name="country"
               type="text"
               required
+              minLength={PARTNERSHIP_COUNTRY_MIN}
               maxLength={PARTNERSHIP_COUNTRY_MAX}
               autoComplete="country-name"
+              value={values.country}
+              onChange={(e) => patchField("country", e.target.value)}
               className={fieldClass}
             />
+            <p className="mt-1.5 text-xs text-[var(--text-soft)]">
+              At least {PARTNERSHIP_COUNTRY_MIN} characters.
+            </p>
             <FieldError message={fieldErrors?.country} />
           </div>
           <div>
@@ -239,10 +301,16 @@ export default function PartnershipApplicationForm() {
               name="postalCode"
               type="text"
               required
+              minLength={PARTNERSHIP_POSTAL_MIN}
               maxLength={PARTNERSHIP_POSTAL_MAX}
               autoComplete="postal-code"
+              value={values.postalCode}
+              onChange={(e) => patchField("postalCode", e.target.value)}
               className={fieldClass}
             />
+            <p className="mt-1.5 text-xs text-[var(--text-soft)]">
+              At least {PARTNERSHIP_POSTAL_MIN} characters.
+            </p>
             <FieldError message={fieldErrors?.postalCode} />
           </div>
         </div>
@@ -258,6 +326,8 @@ export default function PartnershipApplicationForm() {
             type="text"
             maxLength={PARTNERSHIP_WEBSITE_MAX}
             placeholder="https://… or @handle"
+            value={values.website}
+            onChange={(e) => patchField("website", e.target.value)}
             className={fieldClass}
           />
           <FieldError message={fieldErrors?.website} />
@@ -272,9 +342,15 @@ export default function PartnershipApplicationForm() {
             name="about"
             required
             rows={5}
+            minLength={PARTNERSHIP_ABOUT_MIN}
             maxLength={PARTNERSHIP_ABOUT_MAX}
+            value={values.about}
+            onChange={(e) => patchField("about", e.target.value)}
             className={`${fieldClass} min-h-[140px] resize-y`}
           />
+          <p className="mt-1.5 text-xs text-[var(--text-soft)]">
+            At least {PARTNERSHIP_ABOUT_MIN} characters.
+          </p>
           <FieldError message={fieldErrors?.about} />
         </div>
 
@@ -286,7 +362,8 @@ export default function PartnershipApplicationForm() {
             id="expectedVolume"
             name="expectedVolume"
             required
-            defaultValue=""
+            value={values.expectedVolume}
+            onChange={(e) => patchField("expectedVolume", e.target.value)}
             className={fieldClass}
           >
             <option value="" disabled>
