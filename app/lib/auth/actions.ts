@@ -1194,5 +1194,13 @@ export async function deleteAccountAction(
 }
 
 export async function signOutAction(): Promise<void> {
-  await signOut({ redirectTo: "/" });
+  // Absolute same-origin redirect keeps partneresim.com / mapesim.store /
+  // mapesim.com logouts on the host that initiated Sign out. Auth.js otherwise
+  // anchors relative redirectTo paths to AUTH_URL (often the retail origin).
+  const requestOrigin = await readRequestOrigin();
+  const redirectTo =
+    requestOrigin && requestOrigin.startsWith("http")
+      ? `${requestOrigin}/`
+      : "/";
+  await signOut({ redirectTo });
 }
