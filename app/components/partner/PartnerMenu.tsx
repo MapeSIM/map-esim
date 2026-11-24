@@ -170,8 +170,8 @@ export default function PartnerMenu({
 
   return (
     <div className="space-y-0">
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-white/[0.06] px-1 pb-3 sm:gap-x-3 sm:px-0 sm:pb-4">
-        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+      <div className="flex min-w-0 flex-nowrap items-center justify-between gap-2 border-b border-white/[0.06] px-1 pb-3 sm:gap-3 sm:px-0 sm:pb-4">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-3">
           {isB2bChrome ? (
             <button
               type="button"
@@ -186,12 +186,12 @@ export default function PartnerMenu({
           ) : null}
           <Link
             href={homeHref}
-            className="flex min-w-0 items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+            className="flex min-w-0 items-center gap-1.5 outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 sm:gap-2"
           >
             <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500 text-xs font-black text-slate-950">
               M
             </span>
-            <span className="min-w-0 truncate text-sm font-semibold tracking-tight text-slate-50">
+            <span className="min-w-0 max-w-[7.5rem] truncate text-sm font-semibold tracking-tight text-slate-50 sm:max-w-[12rem]">
               {brandLabel}
               <span className="ml-1 hidden font-medium text-slate-400 sm:inline">
                 {brandSuffix}
@@ -206,7 +206,7 @@ export default function PartnerMenu({
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           <Link
             href={walletHref}
-            className="inline-flex h-9 max-w-[9.5rem] items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 text-xs font-semibold text-emerald-300 outline-none transition hover:bg-emerald-500/15 focus-visible:ring-2 focus-visible:ring-emerald-400/60 sm:max-w-none sm:gap-1.5 sm:px-3 sm:text-sm"
+            className="inline-flex h-9 max-w-[7.25rem] items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 text-xs font-semibold text-emerald-300 outline-none transition hover:bg-emerald-500/15 focus-visible:ring-2 focus-visible:ring-emerald-400/60 sm:max-w-none sm:gap-1.5 sm:px-3 sm:text-sm"
           >
             <Wallet className="h-3.5 w-3.5 shrink-0" aria-hidden />
             <span className="truncate tabular-nums">{balance}</span>
@@ -251,9 +251,9 @@ export default function PartnerMenu({
           <div
             ref={panelRef}
             id={drawerTitleId}
-            className="absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col border-r border-white/[0.08] bg-[#0D1526] shadow-2xl"
+            className="absolute inset-y-0 left-0 flex w-[min(20rem,calc(100vw-2.5rem))] max-w-full flex-col overflow-x-hidden border-r border-white/[0.08] bg-[#0D1526] shadow-2xl"
           >
-            <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-3">
+            <div className="flex min-w-0 items-center justify-between gap-3 border-b border-white/[0.06] px-3 py-3 sm:px-4">
               <p className="min-w-0 truncate text-sm font-semibold text-slate-50">
                 {brandLabel} {brandSuffix}
               </p>
@@ -266,16 +266,21 @@ export default function PartnerMenu({
                 <span className="sr-only">Close</span>
               </button>
             </div>
-            <div className="space-y-0.5 border-b border-white/[0.06] px-4 py-3">
+            <div className="min-w-0 space-y-0.5 border-b border-white/[0.06] px-3 py-3 sm:px-4">
               <p className="truncate text-sm font-semibold text-slate-100">
                 {userName}
               </p>
               <p className="truncate text-xs text-slate-400">{userEmail}</p>
             </div>
-            <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label="Menu">
+            <nav
+              className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-2 py-3"
+              aria-label="Menu"
+            >
               {navList}
             </nav>
-            <div className="border-t border-white/[0.06] p-4">{signOutControl}</div>
+            <div className="border-t border-white/[0.06] p-3 sm:p-4">
+              {signOutControl}
+            </div>
           </div>
         </div>
       ) : null}

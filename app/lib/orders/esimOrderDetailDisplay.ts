@@ -187,6 +187,17 @@ export function composeEsimStatusBadgeText(input: {
   const lifecycle = input.lifecycle?.lifecycleStatus ?? null;
   if (lifecycle === "EXPIRED") return "eSIM Expired";
 
+  const expiresAt =
+    usage?.expiresAt ?? input.lifecycle?.expiresAtIso ?? null;
+  const days =
+    usage?.daysRemaining ??
+    daysLeftFromExpiresAt(expiresAt, input.nowMs ?? Date.now());
+
+  // Past expiry must never read as Active with remaining-days copy.
+  if (days != null && days < 0) {
+    return "eSIM Expired";
+  }
+
   // Unlimited must never show as Data Depleted (even if cache says DEPLETED / 0 GB).
   if (
     !unlimited &&
@@ -197,12 +208,6 @@ export function composeEsimStatusBadgeText(input: {
   ) {
     return "Data Depleted";
   }
-
-  const expiresAt =
-    usage?.expiresAt ?? input.lifecycle?.expiresAtIso ?? null;
-  const days =
-    usage?.daysRemaining ??
-    daysLeftFromExpiresAt(expiresAt, input.nowMs ?? Date.now());
 
   const looksActive =
     unlimited ||

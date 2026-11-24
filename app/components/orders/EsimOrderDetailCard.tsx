@@ -246,6 +246,30 @@ export default function EsimOrderDetailCard({
 
   const canUpdate = Boolean(usagePath) && usageEligible && !isRefunded;
 
+  const isExpiredStatus =
+    /expir/i.test(statusText) ||
+    usage?.isExpired === true ||
+    lifecycle?.lifecycleStatus === "EXPIRED" ||
+    (daysLeft != null && daysLeft < 0);
+  const isDepletedStatus = /deplet/i.test(statusText);
+  // Never append remaining-days next to Expired / Refunded / Depleted chips.
+  const showDaysSuffix =
+    Boolean(daysBadge) &&
+    !isRefunded &&
+    !isExpiredStatus &&
+    !isDepletedStatus &&
+    !/day/i.test(statusText);
+
+  const activatedLabel = formatOrderDetailWhen(
+    usage?.activatedAt ?? lifecycle?.activatedAtIso ?? null
+  );
+  const expiresMetaLabel = formatOrderDetailWhen(
+    usage?.expiresAt ?? lifecycle?.expiresAtIso ?? null
+  );
+  const showActivationMeta =
+    !isRefunded &&
+    (activatedLabel !== "—" || expiresMetaLabel !== "—");
+
   const loadUsage = useCallback(async () => {
     if (!usagePath || !canUpdate) return;
     setLoading(true);
@@ -317,11 +341,9 @@ export default function EsimOrderDetailCard({
     }
   }
 
-  // View QR is owned by the install hero on customer detail — keep optional
-  // for partner/admin surfaces that still pass viewQrHref / onViewQr.
+  // View QR / Share / Download only when callers explicitly opt in.
   const showViewQr = Boolean(onViewQr || viewQrHref) && !isRefunded;
-  const showShare =
-    (enableShare || Boolean(shareUrl) || variant === "modal") && !isRefunded;
+  const showShare = (enableShare || Boolean(shareUrl)) && !isRefunded;
   const showDownload = Boolean(qrDownloadHref) && !isRefunded;
   const showAddData = Boolean(addDataHref) && !isRefunded;
   const showRaiseIssue = Boolean(onRaiseIssue || raiseIssueHref);
@@ -337,11 +359,7 @@ export default function EsimOrderDetailCard({
   const shellClass =
     variant === "modal"
       ? "relative mx-auto flex max-h-[min(92vh,880px)] w-full max-w-lg flex-col overflow-hidden rounded-[24px] border border-[#1E3A5F] bg-[#061A33] shadow-[0_24px_64px_rgba(6,26,51,0.55)]"
-      : "overflow-hidden rounded-[24px] border border-[#1E3A5F] bg-[#061A33] shadow-[0_14px_36px_rgba(6,26,51,0.35)]";
-
-  const expiresLabel = formatOrderDetailWhen(
-    usage?.expiresAt ?? lifecycle?.expiresAtIso ?? null
-  );
+      : "min-w-0 overflow-hidden rounded-[24px] border border-[#1E3A5F] bg-[#061A33] shadow-[0_14px_36px_rgba(6,26,51,0.35)]";
 
   return (
     <section
@@ -349,10 +367,10 @@ export default function EsimOrderDetailCard({
       className={shellClass}
       data-order-id={orderId}
     >
-      <header className="flex items-center justify-between gap-3 border-b border-[#1E3A5F] bg-[#0A2340] px-4 py-3.5 sm:px-5">
+      <header className="flex min-w-0 items-center justify-between gap-3 border-b border-[#1E3A5F] bg-[#0A2340] px-3 py-3 sm:px-5 sm:py-3.5">
         <h2
           id={headingId}
-          className="font-[family-name:var(--font-heading,Poppins,Inter,system-ui,sans-serif)] text-base font-bold tracking-tight text-white sm:text-lg"
+          className="min-w-0 truncate font-[family-name:var(--font-heading,Poppins,Inter,system-ui,sans-serif)] text-base font-bold tracking-tight text-white sm:text-lg"
         >
           {title}
         </h2>
@@ -360,7 +378,7 @@ export default function EsimOrderDetailCard({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#1E3A5F] bg-white/5 text-white/90 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B8E6]"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#1E3A5F] bg-white/5 text-white/90 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B8E6]"
             aria-label="Close order details"
           >
             <X className="h-4 w-4" aria-hidden="true" />
@@ -368,15 +386,16 @@ export default function EsimOrderDetailCard({
         ) : null}
       </header>
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
+      <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto px-3 py-4 sm:px-5">
         {isRefunded ? (
           <div
             className="rounded-2xl border border-red-500/40 bg-red-500/15 px-4 py-3.5"
             role="alert"
           >
-            <p className="text-sm font-bold text-red-100">
-              Order Refunded: This order has been refunded. The eSIM QR code is
-              no longer valid and cannot be activated.
+            <p className="text-sm font-bold text-red-100">Order Refunded</p>
+            <p className="mt-1.5 text-sm leading-relaxed text-red-100/90">
+              This order has been refunded. The eSIM QR code is no longer valid
+              and cannot be activated.
             </p>
             {refundedAtLabel ? (
               <p className="mt-2 text-xs font-medium text-red-200/90">
@@ -386,20 +405,22 @@ export default function EsimOrderDetailCard({
           </div>
         ) : null}
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-white/45">
               eSIM Status
             </p>
             <span
-              className={`mt-1.5 inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold tracking-wide ${statusBadgeClass(statusText, isRefunded)}`}
+              className={`mt-1.5 inline-flex max-w-full flex-wrap items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold tracking-wide ${statusBadgeClass(statusText, isRefunded)}`}
             >
               <span
                 className={`h-2 w-2 shrink-0 rounded-full ${statusDotClass(statusText, isRefunded)}`}
                 aria-hidden="true"
               />
-              {statusText}
-              {daysBadge && !isRefunded && !/day/i.test(statusText) ? (
+              <span className="min-w-0 break-words">
+                {isExpiredStatus && !isRefunded ? "Expired" : statusText}
+              </span>
+              {showDaysSuffix ? (
                 <span className="font-semibold text-white/70">
                   ({daysBadge})
                 </span>
@@ -412,7 +433,7 @@ export default function EsimOrderDetailCard({
               onClick={() => void loadUsage()}
               disabled={loading}
               aria-busy={loading || undefined}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#1E3A5F] bg-white/8 px-3.5 text-sm font-semibold text-white transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B8E6] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#1E3A5F] bg-white/8 px-3.5 text-sm font-semibold text-white transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B8E6] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? (
                 <BrandPendingLabel label="Updating…" />
@@ -425,6 +446,29 @@ export default function EsimOrderDetailCard({
             </button>
           ) : null}
         </div>
+
+        {showActivationMeta ? (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="rounded-xl border border-[#1E3A5F] bg-[#0A2340] px-3 py-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/45">
+                Activated
+              </p>
+              <p className="mt-1 text-sm font-semibold text-white break-words">
+                {activatedLabel}
+              </p>
+            </div>
+            <div className="rounded-xl border border-[#1E3A5F] bg-[#0A2340] px-3 py-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/45">
+                Expires
+              </p>
+              <p className="mt-1 text-sm font-semibold text-white break-words">
+                {isExpiredStatus && expiresMetaLabel === "—"
+                  ? "Expired"
+                  : expiresMetaLabel}
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         {error ? (
           <p
@@ -489,8 +533,8 @@ export default function EsimOrderDetailCard({
           ) : null}
         </div>
 
-        <dl className="grid grid-cols-2 gap-2.5">
-          <div className="rounded-xl border border-[#1E3A5F] bg-[#0A2340] px-3 py-2.5">
+        <dl className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          <div className="min-w-0 rounded-xl border border-[#1E3A5F] bg-[#0A2340] px-3 py-2.5">
             <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/45">
               Data Plan
             </dt>
@@ -498,15 +542,15 @@ export default function EsimOrderDetailCard({
               {dataPlan}
             </dd>
           </div>
-          <div className="rounded-xl border border-[#1E3A5F] bg-[#0A2340] px-3 py-2.5">
+          <div className="min-w-0 rounded-xl border border-[#1E3A5F] bg-[#0A2340] px-3 py-2.5">
             <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/45">
-              Validity
+              Validity Period
             </dt>
             <dd className="mt-1 text-sm font-semibold text-white break-words">
               {validityPeriod}
             </dd>
           </div>
-          <div className="rounded-xl border border-[#1E3A5F] bg-[#0A2340] px-3 py-2.5">
+          <div className="min-w-0 rounded-xl border border-[#1E3A5F] bg-[#0A2340] px-3 py-2.5">
             <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/45">
               Amount Paid
             </dt>
@@ -514,12 +558,12 @@ export default function EsimOrderDetailCard({
               {amountPaid}
             </dd>
           </div>
-          <div className="rounded-xl border border-[#1E3A5F] bg-[#0A2340] px-3 py-2.5">
+          <div className="min-w-0 rounded-xl border border-[#1E3A5F] bg-[#0A2340] px-3 py-2.5">
             <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/45">
-              Expiry Date
+              Purchased
             </dt>
             <dd className="mt-1 text-sm font-semibold text-white break-words">
-              {expiresLabel}
+              {purchasedAt || "—"}
             </dd>
           </div>
         </dl>

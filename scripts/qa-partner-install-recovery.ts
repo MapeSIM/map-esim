@@ -200,12 +200,10 @@ async function main() {
   assert.match(partnerPanel, /Install your eSIM/);
   assert.match(partnerPanel, /View QR Code & Install/);
   assert.match(partnerPanel, /PARTNER_INSTALL_UNAVAILABLE_MESSAGE/);
-  assert.match(partnerPanel, /ManualInstallSheet/);
-  assert.match(partnerPanel, /Installation Guide/);
-  assert.match(partnerPanel, /iPhone Guide/);
-  assert.match(partnerPanel, /Android Guide/);
-  assert.match(partnerPanel, /\/install\/iphone/);
-  assert.match(partnerPanel, /\/install\/android/);
+  assert.doesNotMatch(partnerPanel, /ManualInstallSheet/);
+  assert.doesNotMatch(partnerPanel, /Installation Guide/);
+  assert.doesNotMatch(partnerPanel, /Add More Data/);
+  assert.match(partnerPanel, /PartnerEsimShareControls/);
   assert.doesNotMatch(partnerPanel, /AppleOneTapInstallButton|useAppleOneTapInstallState/);
   assert.doesNotMatch(partnerPanel, /EsimInstallExperience/);
   assert.doesNotMatch(partnerPanel, /Confirmation PIN|confirmationPin/);

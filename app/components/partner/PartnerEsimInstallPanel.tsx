@@ -2,16 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { QrCode } from "lucide-react";
-import Link from "next/link";
-import EsimActionSheet from "@/app/components/install/EsimActionSheet";
-import ManualInstallSheet from "@/app/components/install/ManualInstallSheet";
 import SmartInstallEsimButton from "@/app/components/install/SmartInstallEsimButton";
 import IccidRevealPanel from "@/app/components/orders/IccidRevealPanel";
 import PartnerEsimShareControls from "@/app/components/partner/PartnerEsimShareControls";
 import {
   partnerCardClass,
   partnerPrimaryCtaClass,
-  partnerSecondaryCtaClass,
   partnerSectionLabelClass,
 } from "@/app/components/partner/partnerPortalUi";
 import { PARTNER_INSTALL_UNAVAILABLE_MESSAGE } from "@/app/lib/partner/partnerOrderInstallClient";
@@ -43,6 +39,7 @@ type Props = {
   planName: string | null;
   dataAllowance: string | null;
   validity: string | null;
+  /** @deprecated Kept for call-site compatibility; no longer rendered in this panel. */
   addDataHref?: string | null;
   defaultExpanded?: boolean;
 };
@@ -58,11 +55,9 @@ export default function PartnerEsimInstallPanel({
   planName,
   dataAllowance,
   validity,
-  addDataHref = null,
   defaultExpanded = false,
 }: Props) {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const [guideOpen, setGuideOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<InstallPayload | null>(null);
@@ -160,7 +155,7 @@ export default function PartnerEsimInstallPanel({
         </h3>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           Use the green button on this device, or scan the QR code with another
-          phone.
+          phone. Share a secure install link with your traveler when needed.
         </p>
 
         {loading && !data ? (
@@ -215,18 +210,12 @@ export default function PartnerEsimInstallPanel({
               />
             ) : null}
             <p className="text-sm leading-relaxed text-[var(--text-muted)]">
-              If automatic install does not open, use Manual Installation or the
-              Installation Guide below.
+              Scan the QR code above, or use Install eSIM on this device.
             </p>
           </div>
         </div>
 
-        <div className="mt-5 grid gap-2 sm:grid-cols-2">
-          {addDataHref ? (
-            <Link href={addDataHref} className={partnerSecondaryCtaClass}>
-              Add More Data
-            </Link>
-          ) : null}
+        <div className="mt-5">
           <PartnerEsimShareControls
             orderId={orderId}
             hasActiveToken={hasActiveShareToken}
@@ -237,41 +226,7 @@ export default function PartnerEsimInstallPanel({
             validity={validity}
             compact
           />
-          <ManualInstallSheet
-            label="Manual Installation"
-            smdpAddress={data?.smdpAddress}
-            activationCode={data?.activationCode}
-            lpa={data?.lpa}
-            buttonClassName={partnerSecondaryCtaClass}
-          />
-          <button
-            type="button"
-            onClick={() => setGuideOpen(true)}
-            className={partnerSecondaryCtaClass}
-          >
-            Installation Guide
-          </button>
         </div>
-        <EsimActionSheet
-          open={guideOpen}
-          title="Installation Guide"
-          onClose={() => setGuideOpen(false)}
-        >
-          <div className="flex flex-col gap-2">
-            <Link
-              href={data?.iphoneGuideHref || "/install/iphone"}
-              className={partnerSecondaryCtaClass}
-            >
-              iPhone Guide
-            </Link>
-            <Link
-              href={data?.androidGuideHref || "/install/android"}
-              className={partnerSecondaryCtaClass}
-            >
-              Android Guide
-            </Link>
-          </div>
-        </EsimActionSheet>
       </section>
 
       <IccidRevealPanel

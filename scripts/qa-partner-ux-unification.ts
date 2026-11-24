@@ -108,7 +108,10 @@ function main() {
   assert.doesNotMatch(partnerCard, /Recharge|Reward Points/i);
   const partnerInstall = read("app/components/partner/PartnerEsimInstallPanel.tsx");
   assert.match(partnerInstall, /View QR Code & Install/);
-  assert.match(partnerInstall, /ManualInstallSheet/);
+  assert.doesNotMatch(partnerInstall, /ManualInstallSheet/);
+  assert.doesNotMatch(partnerInstall, /Installation Guide/);
+  assert.doesNotMatch(partnerInstall, /Add More Data/);
+  assert.match(partnerInstall, /PartnerEsimShareControls/);
   assert.doesNotMatch(partnerInstall, /eSIM activated and ready to use/);
   assert.match(partnerWallet, /Partner/);
   assert.match(access, /Purchase debit/);

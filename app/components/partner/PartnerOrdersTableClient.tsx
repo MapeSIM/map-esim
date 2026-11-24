@@ -205,7 +205,7 @@ export default function PartnerOrdersTableClient({
       )}
 
       {selected ? (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex justify-end overflow-x-hidden bg-black/60 backdrop-blur-sm">
           <button
             type="button"
             className="absolute inset-0 cursor-default"
@@ -213,28 +213,30 @@ export default function PartnerOrdersTableClient({
             onClick={() => setSelectedId(null)}
           />
           <aside
-            className="relative z-10 flex h-full w-full max-w-lg flex-col border-l border-white/[0.1] bg-[#070D19] shadow-2xl"
+            className="relative z-10 flex h-full w-full max-w-lg min-w-0 flex-col overflow-x-hidden border-l border-white/[0.1] bg-[#070D19] shadow-2xl"
             role="dialog"
             aria-modal="true"
             aria-label="Order details"
           >
-            <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-3">
-              <div>
-                <p className="text-sm font-semibold text-slate-50">
+            <div className="flex min-w-0 items-center justify-between gap-3 border-b border-white/[0.08] px-3 py-3 sm:px-4">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-50">
                   {selected.destination}
                 </p>
-                <p className="text-xs text-slate-500">{selected.planName}</p>
+                <p className="truncate text-xs text-slate-500">
+                  {selected.planName}
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedId(null)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.1] text-slate-300 hover:bg-white/[0.04]"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/[0.1] text-slate-300 hover:bg-white/[0.04]"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4">
               <PartnerEsimOrderCard
                 row={selected}
                 refundRequest={refundByPurchase[selected.purchaseId] ?? null}
