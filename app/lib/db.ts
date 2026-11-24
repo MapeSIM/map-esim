@@ -151,6 +151,12 @@ export function isPrismaTransientError(error: unknown): boolean {
   if (code && PRISMA_TRANSIENT_CODES.has(code)) return true;
 
   const message = String((error as { message?: unknown }).message || "");
+  // Neon / Prisma engine sometimes surfaces Closed as structured kind, not P1017.
+  const kind = String(
+    (error as { kind?: unknown }).kind ??
+      (error as { cause?: { kind?: unknown } })?.cause?.kind ??
+      ""
+  );
   return (
     /Can't reach database server/i.test(message) ||
     /Server has closed the connection/i.test(message) ||
@@ -161,7 +167,9 @@ export function isPrismaTransientError(error: unknown): boolean {
     ) ||
     /Timed out fetching a new connection from the connection pool/i.test(
       message
-    )
+    ) ||
+    /^Closed$/i.test(kind) ||
+    /kind:\s*Closed/i.test(message)
   );
 }
 

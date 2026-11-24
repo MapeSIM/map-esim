@@ -13,7 +13,11 @@ import {
   Role,
 } from "@prisma/client";
 import { writeAuditLog } from "@/app/lib/auth/audit";
-import { prisma } from "@/app/lib/db";
+import {
+  isPrismaTransientError,
+  prisma,
+  withPrismaRetry,
+} from "@/app/lib/db";
 import { resolveOrderIccidPlaintext } from "@/app/lib/orders/orderIccidResolve";
 import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
 import {
@@ -145,91 +149,31 @@ export async function createCustomerOrderSupportTicket(input: {
       "Please select a valid subject."
     );
   }
+  const subject = input.subject;
   const details = sanitizeDetails(input.details);
   const orderId = String(input.orderId ?? "").trim();
   if (!orderId) {
     throw new OrderSupportTicketError("ORDER_UNAVAILABLE", "Order not found.");
   }
 
-  const order = await prisma.order.findFirst({
-    where: { id: orderId, userId: input.customerUserId },
-    select: {
-      id: true,
-      planName: true,
-      partnerEsimPurchase: { select: { id: true } },
-    },
-  });
-  if (!order || order.partnerEsimPurchase) {
-    throw new OrderSupportTicketError(
-      "ORDER_UNAVAILABLE",
-      "This order is unavailable for a support ticket."
-    );
-  }
-
-  const existing = await prisma.orderSupportTicket.findFirst({
-    where: {
-      orderId,
-      status: {
-        in: [
-          OrderSupportTicketStatus.OPEN,
-          OrderSupportTicketStatus.PENDING_REVIEW,
-          OrderSupportTicketStatus.IN_REVIEW,
-          OrderSupportTicketStatus.INFO_REQUIRED,
-        ],
-      },
-    },
-  });
-  if (existing) {
-    return {
-      ticketId: existing.id,
-      duplicate: true,
-      summary: toOrderSupportTicketSummary(existing),
-    };
-  }
-
-  const iccid = await resolveOrderIccidPlaintext(orderId).catch(() => null);
-  const isRefund = input.subject === "REFUND_REQUEST";
-  const refundAmountCents = isRefund
-    ? await resolveCustomerRefundAmountCents(orderId)
-    : null;
-  const status = isRefund
-    ? OrderSupportTicketStatus.PENDING_REVIEW
-    : OrderSupportTicketStatus.OPEN;
-
   try {
-    const created = await prisma.orderSupportTicket.create({
-      data: {
-        actorType: OrderSupportTicketActor.CUSTOMER,
-        subject: input.subject,
-        status,
-        orderId,
-        submittedByUserId: input.customerUserId,
-        planName: order.planName,
-        iccid,
-        details,
-        refundAmountCents,
-        openOrderKey: orderId,
-      },
-    });
-    await writeAuditLog({
-      actorUserId: input.customerUserId,
-      action: ORDER_SUPPORT_AUDIT.create,
-      targetType: "OrderSupportTicket",
-      targetId: created.id,
-      metadata: {
-        actorType: "CUSTOMER",
-        subject: input.subject,
-        orderId,
-      },
-    }).catch(() => null);
-    return {
-      ticketId: created.id,
-      duplicate: false,
-      summary: toOrderSupportTicketSummary(created),
-    };
-  } catch (error) {
-    if (isUniqueViolation(error)) {
-      const again = await prisma.orderSupportTicket.findFirst({
+    return await withPrismaRetry(async () => {
+      const order = await prisma.order.findFirst({
+        where: { id: orderId, userId: input.customerUserId },
+        select: {
+          id: true,
+          planName: true,
+          partnerEsimPurchase: { select: { id: true } },
+        },
+      });
+      if (!order || order.partnerEsimPurchase) {
+        throw new OrderSupportTicketError(
+          "ORDER_UNAVAILABLE",
+          "This order is unavailable for a support ticket."
+        );
+      }
+
+      const existing = await prisma.orderSupportTicket.findFirst({
         where: {
           orderId,
           status: {
@@ -242,14 +186,87 @@ export async function createCustomerOrderSupportTicket(input: {
           },
         },
       });
-      if (again) {
+      if (existing) {
         return {
-          ticketId: again.id,
+          ticketId: existing.id,
           duplicate: true,
-          summary: toOrderSupportTicketSummary(again),
+          summary: toOrderSupportTicketSummary(existing),
         };
       }
-    }
+
+      const iccid = await resolveOrderIccidPlaintext(orderId).catch(() => null);
+      const isRefund = subject === "REFUND_REQUEST";
+      const refundAmountCents = isRefund
+        ? await resolveCustomerRefundAmountCents(orderId)
+        : null;
+      const status = isRefund
+        ? OrderSupportTicketStatus.PENDING_REVIEW
+        : OrderSupportTicketStatus.OPEN;
+
+      try {
+        const created = await prisma.orderSupportTicket.create({
+          data: {
+            actorType: OrderSupportTicketActor.CUSTOMER,
+            subject,
+            status,
+            orderId,
+            submittedByUserId: input.customerUserId,
+            planName: order.planName,
+            iccid,
+            details,
+            refundAmountCents,
+            openOrderKey: orderId,
+          },
+        });
+        await writeAuditLog({
+          actorUserId: input.customerUserId,
+          action: ORDER_SUPPORT_AUDIT.create,
+          targetType: "OrderSupportTicket",
+          targetId: created.id,
+          metadata: {
+            actorType: "CUSTOMER",
+            subject,
+            orderId,
+          },
+        }).catch(() => null);
+        return {
+          ticketId: created.id,
+          duplicate: false,
+          summary: toOrderSupportTicketSummary(created),
+        };
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          const again = await prisma.orderSupportTicket.findFirst({
+            where: {
+              orderId,
+              status: {
+                in: [
+                  OrderSupportTicketStatus.OPEN,
+                  OrderSupportTicketStatus.PENDING_REVIEW,
+                  OrderSupportTicketStatus.IN_REVIEW,
+                  OrderSupportTicketStatus.INFO_REQUIRED,
+                ],
+              },
+            },
+          });
+          if (again) {
+            return {
+              ticketId: again.id,
+              duplicate: true,
+              summary: toOrderSupportTicketSummary(again),
+            };
+          }
+        }
+        if (error instanceof OrderSupportTicketError) throw error;
+        if (isPrismaTransientError(error)) throw error;
+        throw new OrderSupportTicketError(
+          "UNAVAILABLE",
+          "Unable to submit the support ticket right now."
+        );
+      }
+    });
+  } catch (error) {
+    if (error instanceof OrderSupportTicketError) throw error;
     throw new OrderSupportTicketError(
       "UNAVAILABLE",
       "Unable to submit the support ticket right now."
@@ -269,6 +286,7 @@ export async function createPartnerOrderSupportTicket(input: {
       "Please select a valid subject."
     );
   }
+  const subject = input.subject;
   const details = sanitizeDetails(input.details);
   const orderId = String(input.orderId ?? "").trim();
   if (!orderId) {
@@ -283,93 +301,29 @@ export async function createPartnerOrderSupportTicket(input: {
     );
   }
 
-  const purchase = await prisma.partnerEsimPurchase.findFirst({
-    where: {
-      partnerId: actor.partnerId,
-      orderId,
-      status: PartnerEsimPurchaseStatus.COMPLETED,
-    },
-    select: {
-      id: true,
-      partnerChargeCents: true,
-      planName: true,
-      order: { select: { id: true, planName: true } },
-    },
-  });
-  if (!purchase?.order) {
-    throw new OrderSupportTicketError(
-      "ORDER_UNAVAILABLE",
-      "This Partner order is unavailable for a support ticket."
-    );
-  }
-
-  const existing = await prisma.orderSupportTicket.findFirst({
-    where: {
-      orderId,
-      status: {
-        in: [
-          OrderSupportTicketStatus.OPEN,
-          OrderSupportTicketStatus.PENDING_REVIEW,
-          OrderSupportTicketStatus.IN_REVIEW,
-          OrderSupportTicketStatus.INFO_REQUIRED,
-        ],
-      },
-    },
-  });
-  if (existing) {
-    return {
-      ticketId: existing.id,
-      duplicate: true,
-      summary: toOrderSupportTicketSummary(existing),
-    };
-  }
-
-  const iccid = await resolveOrderIccidPlaintext(orderId).catch(() => null);
-  const isRefund = input.subject === "REFUND_REQUEST";
-  const refundAmountCents =
-    isRefund && purchase.partnerChargeCents > 0
-      ? purchase.partnerChargeCents
-      : null;
-  const status = isRefund
-    ? OrderSupportTicketStatus.PENDING_REVIEW
-    : OrderSupportTicketStatus.OPEN;
-
   try {
-    const created = await prisma.orderSupportTicket.create({
-      data: {
-        actorType: OrderSupportTicketActor.PARTNER,
-        subject: input.subject,
-        status,
-        orderId,
-        submittedByUserId: input.partnerUserId,
-        partnerId: actor.partnerId,
-        planName: purchase.planName || purchase.order.planName,
-        iccid,
-        details,
-        refundAmountCents,
-        openOrderKey: orderId,
-      },
-    });
-    await writeAuditLog({
-      actorUserId: input.partnerUserId,
-      action: ORDER_SUPPORT_AUDIT.create,
-      targetType: "OrderSupportTicket",
-      targetId: created.id,
-      metadata: {
-        actorType: "PARTNER",
-        subject: input.subject,
-        orderId,
-        partnerId: actor.partnerId,
-      },
-    }).catch(() => null);
-    return {
-      ticketId: created.id,
-      duplicate: false,
-      summary: toOrderSupportTicketSummary(created),
-    };
-  } catch (error) {
-    if (isUniqueViolation(error)) {
-      const again = await prisma.orderSupportTicket.findFirst({
+    return await withPrismaRetry(async () => {
+      const purchase = await prisma.partnerEsimPurchase.findFirst({
+        where: {
+          partnerId: actor.partnerId,
+          orderId,
+          status: PartnerEsimPurchaseStatus.COMPLETED,
+        },
+        select: {
+          id: true,
+          partnerChargeCents: true,
+          planName: true,
+          order: { select: { id: true, planName: true } },
+        },
+      });
+      if (!purchase?.order) {
+        throw new OrderSupportTicketError(
+          "ORDER_UNAVAILABLE",
+          "This Partner order is unavailable for a support ticket."
+        );
+      }
+
+      const existing = await prisma.orderSupportTicket.findFirst({
         where: {
           orderId,
           status: {
@@ -382,14 +336,90 @@ export async function createPartnerOrderSupportTicket(input: {
           },
         },
       });
-      if (again) {
+      if (existing) {
         return {
-          ticketId: again.id,
+          ticketId: existing.id,
           duplicate: true,
-          summary: toOrderSupportTicketSummary(again),
+          summary: toOrderSupportTicketSummary(existing),
         };
       }
-    }
+
+      const iccid = await resolveOrderIccidPlaintext(orderId).catch(() => null);
+      const isRefund = subject === "REFUND_REQUEST";
+      const refundAmountCents =
+        isRefund && purchase.partnerChargeCents > 0
+          ? purchase.partnerChargeCents
+          : null;
+      const status = isRefund
+        ? OrderSupportTicketStatus.PENDING_REVIEW
+        : OrderSupportTicketStatus.OPEN;
+
+      try {
+        const created = await prisma.orderSupportTicket.create({
+          data: {
+            actorType: OrderSupportTicketActor.PARTNER,
+            subject,
+            status,
+            orderId,
+            submittedByUserId: input.partnerUserId,
+            partnerId: actor.partnerId,
+            planName: purchase.planName || purchase.order.planName,
+            iccid,
+            details,
+            refundAmountCents,
+            openOrderKey: orderId,
+          },
+        });
+        await writeAuditLog({
+          actorUserId: input.partnerUserId,
+          action: ORDER_SUPPORT_AUDIT.create,
+          targetType: "OrderSupportTicket",
+          targetId: created.id,
+          metadata: {
+            actorType: "PARTNER",
+            subject,
+            orderId,
+            partnerId: actor.partnerId,
+          },
+        }).catch(() => null);
+        return {
+          ticketId: created.id,
+          duplicate: false,
+          summary: toOrderSupportTicketSummary(created),
+        };
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          const again = await prisma.orderSupportTicket.findFirst({
+            where: {
+              orderId,
+              status: {
+                in: [
+                  OrderSupportTicketStatus.OPEN,
+                  OrderSupportTicketStatus.PENDING_REVIEW,
+                  OrderSupportTicketStatus.IN_REVIEW,
+                  OrderSupportTicketStatus.INFO_REQUIRED,
+                ],
+              },
+            },
+          });
+          if (again) {
+            return {
+              ticketId: again.id,
+              duplicate: true,
+              summary: toOrderSupportTicketSummary(again),
+            };
+          }
+        }
+        if (error instanceof OrderSupportTicketError) throw error;
+        if (isPrismaTransientError(error)) throw error;
+        throw new OrderSupportTicketError(
+          "UNAVAILABLE",
+          "Unable to submit the support ticket right now."
+        );
+      }
+    });
+  } catch (error) {
+    if (error instanceof OrderSupportTicketError) throw error;
     throw new OrderSupportTicketError(
       "UNAVAILABLE",
       "Unable to submit the support ticket right now."

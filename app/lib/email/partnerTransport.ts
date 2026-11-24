@@ -141,23 +141,49 @@ export async function sendPartnerChannelMail(options: {
 
   const envelopeTo = cc.length ? [to, ...cc] : [to];
 
+  /** Outer race so hung sockets cannot stall the serverless invocation. */
+  const OUTER_SEND_TIMEOUT_MS =
+    SMTP_TRANSPORT_TIMEOUT_MS.connection +
+    SMTP_TRANSPORT_TIMEOUT_MS.greeting +
+    SMTP_TRANSPORT_TIMEOUT_MS.socket +
+    1_500;
+
   try {
-    const info = await transporter.sendMail({
-      from: config.from,
-      replyTo,
-      to,
-      ...(cc.length ? { cc } : {}),
-      subject,
-      text: options.text,
-      html: options.html,
-      attachments: attachments.length ? attachments : undefined,
-      headers: options.headers,
-      messageId: options.messageId,
-      envelope: {
-        from: config.mailbox,
-        to: envelopeTo,
-      },
-    });
+    const info = await Promise.race([
+      transporter.sendMail({
+        from: config.from,
+        replyTo,
+        to,
+        ...(cc.length ? { cc } : {}),
+        subject,
+        text: options.text,
+        html: options.html,
+        attachments: attachments.length ? attachments : undefined,
+        headers: options.headers,
+        messageId: options.messageId,
+        envelope: {
+          from: config.mailbox,
+          to: envelopeTo,
+        },
+      }),
+      new Promise<never>((_, reject) => {
+        const timer = setTimeout(() => {
+          closePartnerChannelTransporter(options.channel);
+          reject(
+            Object.assign(new Error("smtp_outer_timeout"), {
+              code: "ETIMEDOUT",
+            })
+          );
+        }, OUTER_SEND_TIMEOUT_MS);
+        if (typeof timer === "object" && timer && "unref" in timer) {
+          try {
+            (timer as NodeJS.Timeout).unref();
+          } catch {
+            /* ignore */
+          }
+        }
+      }),
+    ]);
     const messageId =
       typeof info?.messageId === "string" && info.messageId.trim()
         ? info.messageId.trim().slice(0, 200)
@@ -175,19 +201,31 @@ export async function sendPartnerChannelMail(options: {
     console.error(
       `Partner email send failed for channel "${options.channel}"${
         code ? ` code=${code}` : ""
-      }`
+      } detail=${detail}`
     );
     return { ok: false, reason: "send_failed", detail };
   }
 }
 
+/**
+ * Close and drop a cached partner transporter so timed-out sendMail cannot
+ * keep the serverless event loop alive after Promise.race rejects.
+ */
+export function closePartnerChannelTransporter(
+  channel: PartnerEmailChannel
+): void {
+  const cached = partnerTransporterCache.get(channel);
+  if (!cached) return;
+  partnerTransporterCache.delete(channel);
+  try {
+    cached.transporter.close();
+  } catch {
+    /* ignore */
+  }
+}
+
 export function clearPartnerTransporterCache(): void {
-  for (const [channel, cached] of partnerTransporterCache) {
-    partnerTransporterCache.delete(channel);
-    try {
-      cached.transporter.close();
-    } catch {
-      /* ignore */
-    }
+  for (const channel of [...partnerTransporterCache.keys()]) {
+    closePartnerChannelTransporter(channel);
   }
 }

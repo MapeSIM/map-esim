@@ -127,11 +127,10 @@ async function alreadyEmailed(
     existing.metadata && typeof existing.metadata === "object"
       ? (existing.metadata as Record<string, unknown>)
       : {};
+  // Only treat a confirmed send as done. A prior "sending" that timed out
+  // (ETIMEDOUT) must remain retryable via Email Center / schedule.
   const status = String(meta.deliveryStatus ?? "");
-  return (
-    status === PARTNER_REFUND_EMAIL_SENT ||
-    status === PARTNER_REFUND_EMAIL_SENDING
-  );
+  return status === PARTNER_REFUND_EMAIL_SENT;
 }
 
 /**
@@ -330,9 +329,19 @@ export async function notifyPartnerRefundStatusEmail(
       deliveryStatus: PARTNER_REFUND_EMAIL_FAILED,
       purchaseId: row.partnerEsimPurchaseId,
       orderId: row.orderId,
-      extra: { reason: sendResult.reason },
+      extra: {
+        reason: sendResult.reason,
+        ...(sendResult.detail ? { detail: sendResult.detail } : {}),
+      },
     });
-    console.error("partner_refund_status_email", "send_failed", id, event);
+    console.error(
+      "partner_refund_status_email",
+      "send_failed",
+      id,
+      event,
+      sendResult.reason,
+      sendResult.detail ?? ""
+    );
     return { status: "failed", reason: sendResult.reason };
   } catch {
     console.error("partner_refund_status_email", "dispatch_error", id, event);

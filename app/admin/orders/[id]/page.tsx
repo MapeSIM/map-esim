@@ -263,6 +263,11 @@ export default async function AdminOrderDetailPage({
           orderId={detail.id}
           iccid={detail.iccid}
           unavailableLabel={detail.iccidHint}
+          syncPath={
+            detail.iccid
+              ? null
+              : `/api/admin/orders/${encodeURIComponent(detail.id)}/iccid`
+          }
         />
       </dl>
 

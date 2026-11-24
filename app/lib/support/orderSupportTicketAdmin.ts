@@ -15,7 +15,7 @@ import {
   Role,
 } from "@prisma/client";
 import { writeAuditLog } from "@/app/lib/auth/audit";
-import { prisma } from "@/app/lib/db";
+import { prisma, withPrismaRetry } from "@/app/lib/db";
 import {
   executeAdminPartnerRefundRequest,
 } from "@/app/lib/partner/partnerRefundRequestExecution";
@@ -228,16 +228,18 @@ export async function resolveOrderSupportTicket(input: {
     );
   }
 
-  const updated = await prisma.orderSupportTicket.update({
-    where: { id: ticket.id },
-    data: {
-      status: OrderSupportTicketStatus.RESOLVED,
-      adminResolutionNote: note,
-      reviewedByAdminId: input.adminUserId,
-      reviewedAt: new Date(),
-      openOrderKey: null,
-    },
-  });
+  const updated = await withPrismaRetry(() =>
+    prisma.orderSupportTicket.update({
+      where: { id: ticket.id },
+      data: {
+        status: OrderSupportTicketStatus.RESOLVED,
+        adminResolutionNote: note,
+        reviewedByAdminId: input.adminUserId,
+        reviewedAt: new Date(),
+        openOrderKey: null,
+      },
+    })
+  );
   await writeAuditLog({
     actorUserId: input.adminUserId,
     action: ORDER_SUPPORT_AUDIT.resolve,
@@ -271,16 +273,18 @@ export async function setOrderSupportTicketInReview(input: {
     return ticket;
   }
 
-  const updated = await prisma.orderSupportTicket.update({
-    where: { id: ticket.id },
-    data: {
-      status: OrderSupportTicketStatus.IN_REVIEW,
-      ...(note ? { adminResolutionNote: note } : {}),
-      reviewedByAdminId: input.adminUserId,
-      reviewedAt: new Date(),
-      openOrderKey: ticket.openOrderKey ?? ticket.orderId,
-    },
-  });
+  const updated = await withPrismaRetry(() =>
+    prisma.orderSupportTicket.update({
+      where: { id: ticket.id },
+      data: {
+        status: OrderSupportTicketStatus.IN_REVIEW,
+        ...(note ? { adminResolutionNote: note } : {}),
+        reviewedByAdminId: input.adminUserId,
+        reviewedAt: new Date(),
+        openOrderKey: ticket.openOrderKey ?? ticket.orderId,
+      },
+    })
+  );
   await writeAuditLog({
     actorUserId: input.adminUserId,
     action: ORDER_SUPPORT_AUDIT.setInReview,
@@ -311,16 +315,18 @@ export async function setOrderSupportTicketInfoRequired(input: {
     );
   }
 
-  const updated = await prisma.orderSupportTicket.update({
-    where: { id: ticket.id },
-    data: {
-      status: OrderSupportTicketStatus.INFO_REQUIRED,
-      ...(note ? { adminResolutionNote: note } : {}),
-      reviewedByAdminId: input.adminUserId,
-      reviewedAt: new Date(),
-      openOrderKey: ticket.openOrderKey ?? ticket.orderId,
-    },
-  });
+  const updated = await withPrismaRetry(() =>
+    prisma.orderSupportTicket.update({
+      where: { id: ticket.id },
+      data: {
+        status: OrderSupportTicketStatus.INFO_REQUIRED,
+        ...(note ? { adminResolutionNote: note } : {}),
+        reviewedByAdminId: input.adminUserId,
+        reviewedAt: new Date(),
+        openOrderKey: ticket.openOrderKey ?? ticket.orderId,
+      },
+    })
+  );
   await writeAuditLog({
     actorUserId: input.adminUserId,
     action: ORDER_SUPPORT_AUDIT.setInfoRequired,
@@ -351,16 +357,18 @@ export async function rejectOrderSupportTicket(input: {
     );
   }
 
-  const updated = await prisma.orderSupportTicket.update({
-    where: { id: ticket.id },
-    data: {
-      status: OrderSupportTicketStatus.REJECTED,
-      adminResolutionNote: note,
-      reviewedByAdminId: input.adminUserId,
-      reviewedAt: new Date(),
-      openOrderKey: null,
-    },
-  });
+  const updated = await withPrismaRetry(() =>
+    prisma.orderSupportTicket.update({
+      where: { id: ticket.id },
+      data: {
+        status: OrderSupportTicketStatus.REJECTED,
+        adminResolutionNote: note,
+        reviewedByAdminId: input.adminUserId,
+        reviewedAt: new Date(),
+        openOrderKey: null,
+      },
+    })
+  );
   await writeAuditLog({
     actorUserId: input.adminUserId,
     action: ORDER_SUPPORT_AUDIT.reject,
@@ -470,18 +478,20 @@ export async function approveOrderSupportTicketRefund(input: {
         confirmPhrase: REFUND_PARTNER_FUNDS_PHRASE,
       });
 
-      await prisma.orderSupportTicket.update({
-        where: { id: ticket.id },
-        data: {
-          status: OrderSupportTicketStatus.REFUNDED,
-          adminResolutionNote: note,
-          reviewedByAdminId: input.adminUserId,
-          reviewedAt: new Date(),
-          openOrderKey: null,
-          partnerRefundRequestId: requestId,
-          executedRefundTransactionId: executed.refundTransactionId,
-        },
-      });
+      await withPrismaRetry(() =>
+        prisma.orderSupportTicket.update({
+          where: { id: ticket.id },
+          data: {
+            status: OrderSupportTicketStatus.REFUNDED,
+            adminResolutionNote: note,
+            reviewedByAdminId: input.adminUserId,
+            reviewedAt: new Date(),
+            openOrderKey: null,
+            partnerRefundRequestId: requestId,
+            executedRefundTransactionId: executed.refundTransactionId,
+          },
+        })
+      );
 
       await writeAuditLog({
         actorUserId: input.adminUserId,
@@ -562,18 +572,20 @@ export async function approveOrderSupportTicketRefund(input: {
       confirmPhrase: REFUND_CUSTOMER_WALLET_PHRASE,
     });
 
-    await prisma.orderSupportTicket.update({
-      where: { id: ticket.id },
-      data: {
-        status: OrderSupportTicketStatus.REFUNDED,
-        adminResolutionNote: note,
-        reviewedByAdminId: input.adminUserId,
-        reviewedAt: new Date(),
-        openOrderKey: null,
-        customerRefundRequestId: requestId,
-        executedRefundTransactionId: executed.refundTransactionId,
-      },
-    });
+    await withPrismaRetry(() =>
+      prisma.orderSupportTicket.update({
+        where: { id: ticket.id },
+        data: {
+          status: OrderSupportTicketStatus.REFUNDED,
+          adminResolutionNote: note,
+          reviewedByAdminId: input.adminUserId,
+          reviewedAt: new Date(),
+          openOrderKey: null,
+          customerRefundRequestId: requestId,
+          executedRefundTransactionId: executed.refundTransactionId,
+        },
+      })
+    );
 
     await writeAuditLog({
       actorUserId: input.adminUserId,

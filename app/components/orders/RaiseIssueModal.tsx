@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useId, useState } from "react";
+import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 import {
@@ -39,6 +40,7 @@ export default function RaiseIssueModal({
   triggerClassName,
 }: Props) {
   const titleId = useId();
+  const router = useRouter();
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
   const setOpen = (next: boolean) => {
@@ -52,7 +54,9 @@ export default function RaiseIssueModal({
   );
 
   useEffect(() => {
-    if (state?.ok) setOpen(false);
+    if (!state?.ok) return;
+    setOpen(false);
+    router.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 

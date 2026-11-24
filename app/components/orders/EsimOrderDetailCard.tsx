@@ -347,6 +347,8 @@ export default function EsimOrderDetailCard({
   const showDownload = Boolean(qrDownloadHref) && !isRefunded;
   const showAddData = Boolean(addDataHref) && !isRefunded;
   const showRaiseIssue = Boolean(onRaiseIssue || raiseIssueHref);
+  // Keep the action bar when a ticket pill / modal lives in raiseIssueExtra
+  // even after Raise issue is hidden for an open ticket.
   const showActionBar =
     !hideActions &&
     (showViewQr ||
@@ -354,7 +356,8 @@ export default function EsimOrderDetailCard({
       showDownload ||
       showAddData ||
       showRaiseIssue ||
-      Boolean(refundAction));
+      Boolean(refundAction) ||
+      Boolean(raiseIssueExtra));
 
   const shellClass =
     variant === "modal"

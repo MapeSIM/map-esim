@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Props = {
   orderId: string;
@@ -15,6 +15,11 @@ type Props = {
    * Parent owns the fetch; on success it should pass the new `iccid` prop.
    */
   onRefreshFromProvider?: () => Promise<string | null>;
+  /**
+   * Serializable sync endpoint for Server Components (POST `{ sync: true }`).
+   * Used when `onRefreshFromProvider` cannot be passed across the RSC boundary.
+   */
+  syncPath?: string | null;
 };
 
 /**
@@ -27,16 +32,29 @@ export default function IccidRevealPanel({
   unavailableLabel = "Pending from provider",
   compact = false,
   onRefreshFromProvider,
+  syncPath = null,
 }: Props) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [localIccid, setLocalIccid] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const autoSyncedRef = useRef(false);
 
   const value = (localIccid ?? iccid ?? "").trim();
   const hasIccid = value.length > 0;
   const display = hasIccid ? value : unavailableLabel;
-  const canRefresh = !hasIccid && typeof onRefreshFromProvider === "function";
+  const syncHref = (syncPath ?? "").trim();
+  const canRefresh =
+    !hasIccid &&
+    (typeof onRefreshFromProvider === "function" || Boolean(syncHref));
+
+  useEffect(() => {
+    if (hasIccid || !canRefresh || autoSyncedRef.current) return;
+    autoSyncedRef.current = true;
+    void refresh();
+    // One-shot best-effort provider sync when ICCID is still pending.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasIccid, canRefresh]);
 
   async function copy() {
     if (!hasIccid) return;
@@ -50,15 +68,38 @@ export default function IccidRevealPanel({
     }
   }
 
+  async function refreshFromPath(): Promise<string | null> {
+    if (!syncHref) return null;
+    const res = await fetch(syncHref, {
+      method: "POST",
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sync: true }),
+    });
+    const json = (await res.json().catch(() => null)) as {
+      success?: boolean;
+      iccid?: string;
+    } | null;
+    if (!res.ok || !json?.success || !json.iccid) {
+      return null;
+    }
+    return json.iccid;
+  }
+
   async function refresh() {
-    if (!onRefreshFromProvider || refreshing) return;
+    if ((!onRefreshFromProvider && !syncHref) || refreshing) return;
     setRefreshing(true);
     setError(null);
     try {
-      const next = await onRefreshFromProvider();
+      const next = onRefreshFromProvider
+        ? await onRefreshFromProvider()
+        : await refreshFromPath();
       const trimmed = (next ?? "").trim();
       if (!trimmed) {
-        setError("ICCID is not available from the provider yet. Try again shortly.");
+        setError(
+          "ICCID is not available from the provider yet. Try again shortly."
+        );
         return;
       }
       setLocalIccid(trimmed);
