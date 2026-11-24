@@ -8,7 +8,6 @@ import PartnerEsimShareControls from "@/app/components/partner/PartnerEsimShareC
 import {
   partnerCardClass,
   partnerPrimaryCtaClass,
-  partnerSectionLabelClass,
 } from "@/app/components/partner/partnerPortalUi";
 import { PARTNER_INSTALL_UNAVAILABLE_MESSAGE } from "@/app/lib/partner/partnerOrderInstallClient";
 
@@ -145,31 +144,22 @@ export default function PartnerEsimInstallPanel({
   const showQr = Boolean(data?.hasVerifiedLpa && data.qrViewHref);
 
   return (
-    <div className="min-w-0 space-y-5">
+    <div className="min-w-0 space-y-3">
       <h2 className="sr-only">Install your eSIM</h2>
 
-      <section className={partnerCardClass}>
-        <p className={partnerSectionLabelClass}>QR Installation</p>
-        <h3 className="mt-2 text-base font-semibold tracking-tight text-[var(--heading)]">
-          Install this eSIM
-        </h3>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Use the green button on this device, or scan the QR code with another
-          phone. Share a secure install link with your traveler when needed.
-        </p>
-
+      <section className={`${partnerCardClass} !p-4 sm:!p-5`}>
         {loading && !data ? (
-          <p className="mt-4 text-sm text-[var(--text-muted)]" role="status">
+          <p className="text-sm text-[var(--text-muted)]" role="status">
             Loading installation details…
           </p>
         ) : null}
         {error && !data ? (
-          <p className="mt-4 text-sm text-[var(--danger-text)]" role="alert">
+          <p className="text-sm text-[var(--danger-text)]" role="alert">
             {error}
           </p>
         ) : null}
         {data && !data.hasInstallDetails ? (
-          <p className="mt-4 text-sm text-[var(--text-muted)]" role="status">
+          <p className="text-sm text-[var(--text-muted)]" role="status">
             {PARTNER_INSTALL_UNAVAILABLE_MESSAGE}
           </p>
         ) : null}
@@ -177,25 +167,25 @@ export default function PartnerEsimInstallPanel({
         <div
           className={
             showQr
-              ? "mt-5 grid gap-5 lg:grid-cols-[minmax(0,200px)_minmax(0,1fr)] lg:items-start"
-              : "mt-5 space-y-4"
+              ? "grid gap-4 sm:grid-cols-[minmax(0,168px)_minmax(0,1fr)] sm:items-start"
+              : "space-y-3"
           }
         >
           {showQr ? (
-            <div className="rounded-2xl border border-[var(--border)] bg-white p-4">
+            <div className="rounded-2xl border border-[var(--border)] bg-white p-3">
               {/* authorized partner QR route */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={data!.qrViewHref!}
                 alt="eSIM installation QR code"
-                width={180}
-                height={180}
-                className="mx-auto h-auto w-full max-w-[180px]"
+                width={160}
+                height={160}
+                className="mx-auto h-auto w-full max-w-[160px]"
               />
             </div>
           ) : null}
 
-          <div className="min-w-0 space-y-3">
+          <div className="min-w-0 space-y-2.5">
             {data ? (
               <SmartInstallEsimButton
                 activationLpa={data.lpa}
@@ -209,23 +199,17 @@ export default function PartnerEsimInstallPanel({
                 className={partnerPrimaryCtaClass}
               />
             ) : null}
-            <p className="text-sm leading-relaxed text-[var(--text-muted)]">
-              Scan the QR code above, or use Install eSIM on this device.
-            </p>
+            <PartnerEsimShareControls
+              orderId={orderId}
+              hasActiveToken={hasActiveShareToken}
+              partnerDisplayName={partnerDisplayName}
+              destination={destination}
+              planName={planName}
+              dataAllowance={dataAllowance}
+              validity={validity}
+              compact
+            />
           </div>
-        </div>
-
-        <div className="mt-5">
-          <PartnerEsimShareControls
-            orderId={orderId}
-            hasActiveToken={hasActiveShareToken}
-            partnerDisplayName={partnerDisplayName}
-            destination={destination}
-            planName={planName}
-            dataAllowance={dataAllowance}
-            validity={validity}
-            compact
-          />
         </div>
       </section>
 

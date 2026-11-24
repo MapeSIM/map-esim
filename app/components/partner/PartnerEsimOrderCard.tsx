@@ -221,11 +221,6 @@ export default function PartnerEsimOrderCard({
         footer={
           <div className="space-y-3 border-t border-white/8 pt-3">
             <p className="text-xs text-white/45">{row.shortReference}</p>
-            {refundRequest ? (
-              <p className="text-xs text-white/55">
-                Legacy refund request: {refundRequest.statusLabel}
-              </p>
-            ) : null}
             {installAllowed ? (
               <button
                 type="button"

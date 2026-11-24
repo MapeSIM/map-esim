@@ -75,7 +75,7 @@ export default function IccidRevealPanel({
       onClick={() => void copy()}
       className={
         compact
-          ? "inline-flex h-10 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 text-xs font-semibold text-[var(--heading)] transition hover:bg-[var(--page-bg-soft)]"
+          ? "inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-2.5 text-xs font-semibold text-[var(--heading)] transition hover:bg-[var(--page-bg-soft)]"
           : "inline-flex h-9 items-center justify-center rounded-xl border border-[var(--border-strong)] px-3 text-xs font-semibold text-[var(--heading)] transition hover:bg-[var(--surface)]"
       }
     >
@@ -90,43 +90,43 @@ export default function IccidRevealPanel({
       disabled={refreshing}
       className={
         compact
-          ? "inline-flex h-10 items-center justify-center rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 text-xs font-semibold text-[var(--heading)] transition hover:bg-[var(--page-bg-soft)] disabled:opacity-60"
+          ? "inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-2.5 text-xs font-semibold text-[var(--heading)] transition hover:bg-[var(--page-bg-soft)] disabled:opacity-60"
           : "inline-flex h-9 items-center justify-center rounded-xl border border-[var(--border-strong)] px-3 text-xs font-semibold text-[var(--heading)] transition hover:bg-[var(--surface)] disabled:opacity-60"
       }
     >
-      {refreshing ? "Refreshing…" : "Refresh from provider"}
+      {refreshing ? "Refreshing…" : compact ? "Refresh" : "Refresh from provider"}
     </button>
   ) : null;
 
   if (compact) {
     return (
-      <section className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5 sm:p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
-          ICCID
-        </p>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Full ICCID for this eSIM. Copy when you need it.
-        </p>
-        <div className="mt-4 min-w-0 space-y-3 text-sm font-medium text-[var(--heading)]">
-          <p
-            className="break-all rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 font-mono tracking-wide"
-            aria-label={`ICCID for order ${orderId}`}
-          >
-            {display}
-          </p>
-          <div className="flex flex-wrap gap-2">
+      <section className="min-w-0 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+              ICCID
+            </p>
+            <p
+              className="mt-0.5 truncate font-mono text-xs font-medium tracking-wide text-[var(--heading)] sm:text-sm"
+              aria-label={`ICCID for order ${orderId}`}
+              title={hasIccid ? value : undefined}
+            >
+              {display}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
             {copyButton}
             {refreshButton}
           </div>
-          {error ? (
-            <p
-              className="text-xs font-normal text-amber-700 dark:text-amber-200"
-              role="alert"
-            >
-              {error}
-            </p>
-          ) : null}
         </div>
+        {error ? (
+          <p
+            className="mt-1.5 text-xs font-normal text-amber-700 dark:text-amber-200"
+            role="alert"
+          >
+            {error}
+          </p>
+        ) : null}
       </section>
     );
   }

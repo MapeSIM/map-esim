@@ -27,8 +27,8 @@ export default function ShareLayout({
   children: React.ReactNode;
 }) {
   return (
-    <main className="min-h-screen w-full max-w-full bg-[var(--page-bg)] px-3 py-8 text-[var(--heading)] sm:px-6 sm:py-10">
-      <div className="mx-auto w-full min-w-0 max-w-xl">{children}</div>
+    <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-[var(--page-bg)] px-3 py-6 text-[var(--heading)] sm:px-6 sm:py-10">
+      <div className="mx-auto w-full min-w-0 max-w-[440px]">{children}</div>
     </main>
   );
 }

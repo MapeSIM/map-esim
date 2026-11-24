@@ -26,34 +26,50 @@ export default async function PartnerEsimSharePage({
 
   const companyName = data.branding.companyName;
   const companyLabel = displayShareCompanyName(companyName) || BRAND_NAME;
+  const websiteUrl = (data.branding.websiteUrl ?? "").trim() || null;
 
   return (
-    <div className="min-w-0 space-y-6 overflow-x-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-8">
-      <header className="space-y-4">
-        <div className="flex min-w-0 flex-col items-center text-center">
-          <PartnerSharePageLogo
-            src={data.branding.logoUrl}
-            alt={companyLabel}
-          />
-          <p className="mt-4 line-clamp-2 max-w-full min-w-0 break-words text-center text-lg font-bold leading-snug text-[var(--heading)] [overflow-wrap:anywhere] sm:text-xl">
-            {companyLabel}
-          </p>
-        </div>
-        <div className="space-y-2 text-center">
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--heading)]">
+    <div className="mx-auto min-w-0 w-full max-w-[440px] space-y-5 overflow-x-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] px-4 py-5 sm:px-5 sm:py-6">
+      <header className="flex min-w-0 flex-col items-center text-center">
+        <PartnerSharePageLogo
+          src={data.branding.logoUrl}
+          alt={companyLabel}
+        />
+        <p className="mt-3 line-clamp-2 max-w-full min-w-0 break-words text-center text-base font-bold leading-snug text-[var(--heading)] [overflow-wrap:anywhere] sm:text-lg">
+          {companyLabel}
+        </p>
+        {websiteUrl ? (
+          <a
+            href={websiteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            referrerPolicy="no-referrer"
+            className="mt-1 max-w-full truncate text-sm font-medium text-[var(--accent-strong)] outline-none hover:underline focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+          >
+            {websiteUrl.replace(/^https?:\/\//i, "")}
+          </a>
+        ) : null}
+
+        <div className="mt-5 flex min-w-0 w-full flex-col items-center gap-2">
+          {data.flagUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={data.flagUrl}
+              alt=""
+              width={40}
+              height={30}
+              className="h-7 w-auto object-contain"
+            />
+          ) : null}
+          <h1 className="max-w-full break-words text-xl font-bold tracking-tight text-[var(--heading)] [overflow-wrap:anywhere]">
             {data.planName}
           </h1>
-          <p className="text-sm text-[var(--text-muted)]">
-            {data.destinationName}
-          </p>
-        </div>
-        <div className="flex justify-center">
-          <span className="inline-flex rounded-full border border-[var(--accent-strong)]/40 bg-[var(--accent-strong)]/10 px-3 py-1 text-xs font-semibold text-[var(--heading)]">
-            {data.statusLabel}
-          </span>
+          <p className="text-sm text-[var(--text-muted)]">{data.destinationName}</p>
         </div>
       </header>
+
       <PartnerEsimShareView token={token} data={data} />
+
       <p className="mx-auto max-w-full break-words text-center text-xs leading-snug text-[var(--text-soft)] [overflow-wrap:anywhere]">
         {sharePoweredByLabel(companyName)}
       </p>

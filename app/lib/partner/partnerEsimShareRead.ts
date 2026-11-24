@@ -32,6 +32,7 @@ import {
   normalizeProviderUsagePayload,
   type CustomerUsageSnapshot,
 } from "@/app/lib/orders/customerEsimUsage";
+import { customerFlagImageUrl } from "@/app/lib/orders/customerOrderDisplay";
 import { displayOrUnavailable } from "@/app/lib/partner/partnerOrdersDisplay";
 import { resolvePartnerEsimShareToken } from "@/app/lib/partner/partnerEsimShareToken";
 import { loadPublicShareBrandingForPartner } from "@/app/lib/partner/partnerShareBranding";
@@ -47,6 +48,7 @@ export type PartnerEsimSharePageData = {
   planName: string;
   dataAllowance: string;
   validity: string;
+  flagUrl: string | null;
   statusLabel: typeof SHARE_STATUS_READY;
   qrDataUrl: string | null;
   smdpAddress: string | null;
@@ -100,6 +102,7 @@ async function loadCompletedShareOrder(orderId: string): Promise<{
   planName: string | null;
   dataAllowance: string | null;
   validity: string | null;
+  destinationCode: string | null;
   iccidEncrypted: string | null;
   providerOrderId: string;
   purchaseDestination: string | null;
@@ -146,6 +149,7 @@ async function loadCompletedShareOrder(orderId: string): Promise<{
     planName: purchase.order.planName,
     dataAllowance: purchase.order.dataAllowance,
     validity: purchase.order.validity,
+    destinationCode: (purchase.destinationCode ?? "").trim() || null,
     iccidEncrypted: purchase.order.iccidEncrypted,
     providerOrderId: purchase.order.providerOrderId,
     purchaseDestination: purchase.destinationName || purchase.destinationCode,
@@ -214,6 +218,7 @@ export async function getPartnerEsimSharePageData(
       row.dataAllowance || row.purchaseData
     ),
     validity: displayOrUnavailable(row.validity || row.purchaseValidity),
+    flagUrl: customerFlagImageUrl(row.destinationCode),
     statusLabel: SHARE_STATUS_READY,
     qrDataUrl,
     smdpAddress: install.smdpAddress?.trim() || null,
