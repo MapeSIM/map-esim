@@ -118,6 +118,29 @@ export function buildPartnerCheckoutHref(
   return `/partner/buy?${params.toString()}`;
 }
 
+/**
+ * Sandbox demo buy — confirm page; never hits live /account or /signin.
+ * Browse is /sandbox/catalog.
+ */
+export function buildSandboxCheckoutHref(
+  offer: VesimOffer,
+  destinationCode: string
+): string {
+  const params = new URLSearchParams({
+    offerId: offer.id,
+  });
+  if (destinationCode.trim()) {
+    params.set("country", destinationCode.trim());
+  }
+  const priceUsd = offer.priceUSD ?? offer.price;
+  if (typeof priceUsd === "number" && Number.isFinite(priceUsd)) {
+    params.set("priceUsd", String(priceUsd));
+  }
+  const planName = (offer.name || offer.dataFormatted || "").trim();
+  if (planName) params.set("planName", planName.slice(0, 120));
+  return `/sandbox/buy?${params.toString()}`;
+}
+
 export function summarizePlanTypes(offers: VesimOffer[]) {
   const dataOnly = offers.filter((offer) => !offerHasVoiceSms(offer)).length;
   const withVoice = offers.filter(offerHasVoiceSms).length;

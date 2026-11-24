@@ -15,6 +15,7 @@ import {
   buildCheckoutHref,
   buildGuestPublicCheckoutHref,
   buildPartnerCheckoutHref,
+  buildSandboxCheckoutHref,
   uniqueCoveredCountries,
   uniqueDataAmounts,
   uniqueValidities,
@@ -61,6 +62,8 @@ export type PlansListingClientProps = {
   guestCheckoutEnabled?: boolean;
   /** Partner portal: always route Buy Now to `/partner/buy`. */
   forcePartnerCheckout?: boolean;
+  /** Sandbox portal: always route Buy Now to `/sandbox/buy`. */
+  forceSandboxCheckout?: boolean;
 };
 
 export default function PlansListingClient({
@@ -72,6 +75,7 @@ export default function PlansListingClient({
   defaultGrid,
   guestCheckoutEnabled = false,
   forcePartnerCheckout = false,
+  forceSandboxCheckout = false,
 }: PlansListingClientProps) {
   const [planType, setPlanType] = useState<PlanTypeFilter>(DEFAULT_PLAN_TYPE);
   const [category, setCategory] = useState<CategoryFilter>(DEFAULT_CATEGORY);
@@ -83,16 +87,21 @@ export default function PlansListingClient({
   const [selectedOffer, setSelectedOffer] = useState<VesimOffer | null>(null);
   const [, startFilterTransition] = useTransition();
   const { signedIn, isPartner: shellPartner } = useShellAuth();
-  const partnerCheckout = forcePartnerCheckout || shellPartner;
-  const purchaseTrustLine = forcePartnerCheckout
-    ? "Partner discount is applied at checkout."
-    : planPurchaseTrustLine(signedIn);
+  const partnerCheckout =
+    !forceSandboxCheckout && (forcePartnerCheckout || shellPartner);
+  const purchaseTrustLine = forceSandboxCheckout
+    ? "Charged to your sandbox wallet (demo)."
+    : forcePartnerCheckout
+      ? "Partner discount is applied at checkout."
+      : planPurchaseTrustLine(signedIn);
 
-  const resolveCheckoutHref = partnerCheckout
-    ? buildPartnerCheckoutHref
-    : !signedIn && guestCheckoutEnabled
-      ? buildGuestPublicCheckoutHref
-      : buildCheckoutHref;
+  const resolveCheckoutHref = forceSandboxCheckout
+    ? buildSandboxCheckoutHref
+    : partnerCheckout
+      ? buildPartnerCheckoutHref
+      : !signedIn && guestCheckoutEnabled
+        ? buildGuestPublicCheckoutHref
+        : buildCheckoutHref;
 
   const model = useMemo(
     () =>

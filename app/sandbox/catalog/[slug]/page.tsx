@@ -1,15 +1,21 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import SandboxDestinationBuyClient from "@/app/components/sandbox/SandboxDestinationBuyClient";
+import { Suspense } from "react";
+import { notFound, permanentRedirect } from "next/navigation";
+import DestinationPlansSkeleton from "@/app/components/plans/DestinationPlansSkeleton";
+import PlansListing from "@/app/components/plans/PlansListing";
 import { countries as staticCountries } from "@/app/data/countries";
+import { SANDBOX_CATALOG_BASE_PATH } from "@/app/lib/vesim/countriesListingReturn";
+import { toPublicVesimOffers, type VesimOffer } from "@/app/lib/vesim/offers";
+import type { VesimDestination } from "@/app/lib/vesim/destinations";
 import {
+  destinationPath,
+  destinationRouteId,
   findDestinationBySlug,
+  findRelatedRegionalDestination,
   retailMinFromProviderStartingPrice,
   slugifyDestination,
   toPublicPlanDestination,
-  type VesimDestination,
+  withLowestOfferRetailMinPrice,
 } from "@/app/lib/vesim/destinations";
-import { toPublicVesimOffers, type VesimOffer } from "@/app/lib/vesim/offers";
 import {
   fetchPublicDestinationCatalog,
   fetchCachedPublicOffersForCountry as fetchPublicOffersForCountry,
@@ -18,81 +24,149 @@ import {
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function staticFallback(): VesimDestination[] {
-  return staticCountries.map((item) => {
-    const retail = retailMinFromProviderStartingPrice(item.startingPrice);
-    return {
-      code: item.code,
-      name: item.name,
-      flag: item.flag,
-      regions: item.region ? [item.region] : [],
-      offerCount: item.plans,
-      minPrice: retail.minPrice,
-      minPriceFormatted: retail.minPriceFormatted,
-      isPopular: item.region === "Popular",
-      isRegional: false,
-      isGlobal: false,
-      searchAliases: [item.id, item.code, item.name],
-      slug: item.id || slugifyDestination(item.name),
-      kind: "country" as const,
-    };
-  });
+function staticToDestination(id: string): VesimDestination | undefined {
+  const match = staticCountries.find(
+    (item) =>
+      item.id.toLowerCase() === id.toLowerCase() ||
+      item.code.toLowerCase() === id.toLowerCase() ||
+      slugifyDestination(item.name) === slugifyDestination(id)
+  );
+
+  if (!match) return undefined;
+
+  const retail = retailMinFromProviderStartingPrice(match.startingPrice);
+
+  return {
+    code: match.code,
+    name: match.name,
+    flag: match.flag,
+    regions: match.region ? [match.region] : [],
+    offerCount: match.plans,
+    minPrice: retail.minPrice,
+    minPriceFormatted: retail.minPriceFormatted,
+    isPopular: match.region === "Popular",
+    isRegional: false,
+    isGlobal: false,
+    searchAliases: [match.id, match.code, match.name],
+    slug: match.id,
+    kind: "country",
+  };
 }
 
+async function loadPublicDestinations(): Promise<VesimDestination[]> {
+  try {
+    return await fetchPublicDestinationCatalog();
+  } catch {
+    return [];
+  }
+}
+
+async function loadPublicOffers(countryCode: string): Promise<{
+  offers: VesimOffer[];
+  error: string;
+}> {
+  try {
+    const raw = await fetchPublicOffersForCountry(countryCode);
+    return { offers: toPublicVesimOffers(raw), error: "" };
+  } catch {
+    return {
+      offers: [],
+      error:
+        "Plans are temporarily unavailable for this destination. Please try again shortly.",
+    };
+  }
+}
+
+function sameDestinationCode(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+function earlyOfferCodeHint(
+  id: string,
+  fallback: VesimDestination | undefined
+): string | null {
+  if (fallback?.code) return fallback.code.trim();
+  const key = id.trim().toLowerCase();
+  if (key === "global" || key.startsWith("region-")) return key;
+  if (/^[a-z]{2}$/i.test(key)) return key.toUpperCase();
+  return null;
+}
+
+async function SandboxCatalogPlansContent({ slug }: { slug: string }) {
+  const fallbackDestination = staticToDestination(slug);
+  const earlyCode = earlyOfferCodeHint(slug, fallbackDestination);
+  const destinationsPromise = loadPublicDestinations();
+  const earlyOffersPromise = earlyCode ? loadPublicOffers(earlyCode) : null;
+
+  const destinations = await destinationsPromise;
+  const countryNames: Record<string, string> = {};
+  for (const item of destinations) {
+    if (item.kind === "country") {
+      countryNames[item.code.toUpperCase()] = item.name;
+    }
+  }
+
+  const matched =
+    findDestinationBySlug(destinations, slug) || fallbackDestination || null;
+
+  if (!matched) {
+    notFound();
+  }
+
+  const canonicalRouteId = destinationRouteId(matched);
+  if (slug.toLowerCase() !== canonicalRouteId.toLowerCase()) {
+    permanentRedirect(destinationPath(matched, SANDBOX_CATALOG_BASE_PATH));
+  }
+
+  const relatedRegional =
+    matched.kind === "country"
+      ? findRelatedRegionalDestination(matched, destinations) || null
+      : null;
+
+  const { offers, error } =
+    earlyOffersPromise && sameDestinationCode(matched.code, earlyCode || "")
+      ? await earlyOffersPromise
+      : await loadPublicOffers(matched.code.trim());
+
+  const destination = toPublicPlanDestination(
+    withLowestOfferRetailMinPrice(
+      { ...matched, offerCount: offers.length },
+      offers
+    )
+  );
+  const publicRelatedRegional = relatedRegional
+    ? toPublicPlanDestination(relatedRegional)
+    : null;
+
+  return (
+    <div className="[--accent-soft:#6ee7b7] [--heading:#f8fafc] [--page-bg:transparent] [--surface:#0D1526] [--surface-2:#111827] [--text:#e2e8f0] [--text-muted:#94a3b8] [--text-soft:#64748b] [--border:rgba(255,255,255,0.08)] [--border-strong:rgba(255,255,255,0.12)] [--border-hover:rgba(255,255,255,0.18)] [--accent-strong:#84cc16] [--accent-ink:#052e16]">
+      <PlansListing
+        destination={destination}
+        offers={offers}
+        loading={false}
+        error={error}
+        countryNames={countryNames}
+        relatedRegional={publicRelatedRegional}
+        listingBasePath={SANDBOX_CATALOG_BASE_PATH}
+        forceSandboxCheckout
+      />
+    </div>
+  );
+}
+
+/** Same plans UI as mapesim.com /countries/[id]; Buy Now → /sandbox/buy. */
 export default async function SandboxCatalogDestinationPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { slug } = await params;
-  let destinations: VesimDestination[] = [];
-  try {
-    destinations = await fetchPublicDestinationCatalog();
-  } catch {
-    destinations = staticFallback();
-  }
-  if (destinations.length === 0) destinations = staticFallback();
-
-  const matched = findDestinationBySlug(destinations, slug);
-  if (!matched) notFound();
-
-  let offers: VesimOffer[] = [];
-  try {
-    const raw = await fetchPublicOffersForCountry(matched.code);
-    offers = toPublicVesimOffers(raw);
-  } catch {
-    offers = [];
-  }
-
-  const dest = toPublicPlanDestination(matched);
+  const { slug: rawSlug } = await params;
+  const slug = typeof rawSlug === "string" ? rawSlug.trim() : "";
+  if (!slug) notFound();
 
   return (
-    <div className="space-y-6">
-      <Link
-        href="/sandbox/catalog"
-        className="text-sm font-semibold text-emerald-400 hover:text-emerald-300"
-      >
-        ← Back to destinations
-      </Link>
-      <header>
-        <h1 className="text-2xl font-bold text-slate-50">
-          {dest.flag ? `${dest.flag} ` : ""}
-          {dest.name}
-        </h1>
-        <p className="mt-1 text-sm text-slate-400">
-          Select a plan and purchase with your Partner wallet.
-        </p>
-      </header>
-      <SandboxDestinationBuyClient
-        destinationName={dest.name}
-        region={(dest.regions && dest.regions[0]) || dest.name}
-        offers={offers.slice(0, 24).map((o) => ({
-          offerId: o.offerId || o.id,
-          name: o.name || o.dataFormatted || "Plan",
-          priceLabel: o.priceFormatted || "—",
-          priceCents: Math.round((o.priceUSD ?? o.price ?? 0) * 100),
-        }))}
-      />
-    </div>
+    <Suspense fallback={<DestinationPlansSkeleton />}>
+      <SandboxCatalogPlansContent slug={slug} />
+    </Suspense>
   );
 }

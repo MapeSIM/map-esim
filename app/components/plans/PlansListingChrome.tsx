@@ -102,6 +102,9 @@ export function PlanBuyNowLink({
   const { getOffer, resolveCheckoutHref } = usePlansListingChrome();
   const [isNavigating, setIsNavigating] = useState(false);
   const offer = getOffer(offerId);
+  // Prefer resolver (partner/sandbox/retail). Fallback stays retail only when
+  // chrome is used outside those portals — never invent a live buy path for
+  // sandbox; callers must pass forceSandboxCheckout → buildSandboxCheckoutHref.
   const href = offer
     ? resolveCheckoutHref(offer, destinationCode)
     : `/account/esim/buy?offerId=${encodeURIComponent(offerId)}${

@@ -7,6 +7,10 @@ import {
   SANDBOX_WALLET_KEY,
   type SandboxWalletTx,
 } from "@/app/lib/sandbox/sandboxClientStorage";
+import {
+  readSandboxApiKey,
+  refreshSandboxWalletCache,
+} from "@/app/lib/sandbox/sandboxPurchaseClient";
 import { partnerCardClass } from "@/app/components/partner/partnerPortalUi";
 
 const PRESETS = [100, 250, 500, 750, 1000] as const;
@@ -16,14 +20,6 @@ function formatUsd(cents: number): string {
     style: "currency",
     currency: "USD",
   }).format(cents / 100);
-}
-
-function readApiKey(): string | null {
-  try {
-    return localStorage.getItem("mapesim_sandbox_api_key");
-  } catch {
-    return null;
-  }
 }
 
 export default function SandboxWalletClient() {
@@ -36,162 +32,104 @@ export default function SandboxWalletClient() {
   const [error, setError] = useState<string | null>(null);
   const [hasApiKey, setHasApiKey] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      const key = readApiKey();
-      if (!cancelled) setHasApiKey(Boolean(key));
-      try {
-        if (key) {
-          const res = await fetch("/api/sandbox/v1/wallet", {
-            headers: { Authorization: `Bearer ${key}` },
-            cache: "no-store",
-          });
-          if (res.ok) {
-            const data = (await res.json()) as {
-              wallet?: { balanceCents?: number };
-              transactions?: SandboxWalletTx[];
-            };
-            const cents = data.wallet?.balanceCents;
-            if (typeof cents === "number" && !cancelled) {
-              setBalanceCents(cents);
-              try {
-                localStorage.setItem(SANDBOX_WALLET_KEY, String(cents));
-              } catch {
-                /* ignore */
-              }
-            }
-            if (Array.isArray(data.transactions) && !cancelled) {
-              setTxs(data.transactions);
-              try {
-                localStorage.setItem(
-                  SANDBOX_TX_KEY,
-                  JSON.stringify(data.transactions)
-                );
-              } catch {
-                /* ignore */
-              }
-              if (!cancelled) setReady(true);
-              return;
-            }
-          }
-        } else {
-          const bal = localStorage.getItem(SANDBOX_WALLET_KEY);
-          if (!cancelled) {
-            setBalanceCents(
-              bal != null && Number.isFinite(Number(bal))
-                ? Number(bal)
-                : SANDBOX_DEFAULT_BALANCE_CENTS
-            );
-          }
-        }
-      } catch {
-        /* local fallback */
+  async function reloadWallet() {
+    const key = readSandboxApiKey();
+    setHasApiKey(Boolean(key));
+    if (key) {
+      const cents = await refreshSandboxWalletCache();
+      if (typeof cents === "number") {
+        setBalanceCents(cents);
       }
       try {
         const rawTx = localStorage.getItem(SANDBOX_TX_KEY);
         const parsed = rawTx ? (JSON.parse(rawTx) as SandboxWalletTx[]) : [];
-        if (!cancelled) setTxs(Array.isArray(parsed) ? parsed : []);
+        setTxs(Array.isArray(parsed) ? parsed : []);
       } catch {
         /* ignore */
       }
+      return;
+    }
+    try {
+      const bal = localStorage.getItem(SANDBOX_WALLET_KEY);
+      setBalanceCents(
+        bal != null && Number.isFinite(Number(bal))
+          ? Number(bal)
+          : SANDBOX_DEFAULT_BALANCE_CENTS
+      );
+      const rawTx = localStorage.getItem(SANDBOX_TX_KEY);
+      const parsed = rawTx ? (JSON.parse(rawTx) as SandboxWalletTx[]) : [];
+      setTxs(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setBalanceCents(SANDBOX_DEFAULT_BALANCE_CENTS);
+      setTxs([]);
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      await reloadWallet();
       if (!cancelled) setReady(true);
     }
     void load();
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only hydrate
   }, []);
-
-  function applyLocalCredit(usd: number) {
-    const cents = usd * 100;
-    const next = balanceCents + cents;
-    const tx: SandboxWalletTx = {
-      id: `tx_credit_${Date.now()}`,
-      label: `Sandbox top-up · $${usd}`,
-      amountCents: cents,
-      createdAt: new Date().toISOString(),
-      kind: "credit",
-    };
-    const nextTxs = [tx, ...txs].slice(0, 50);
-    setBalanceCents(next);
-    setTxs(nextTxs);
-    try {
-      localStorage.setItem(SANDBOX_WALLET_KEY, String(next));
-      localStorage.setItem(SANDBOX_TX_KEY, JSON.stringify(nextTxs));
-    } catch {
-      /* ignore */
-    }
-  }
 
   async function confirmTopUp() {
     if (selectedUsd == null || busy) return;
     const usd = selectedUsd;
+    const key = readSandboxApiKey();
+    if (!key) {
+      setError(
+        "Sandbox API key required. Use a provisioned sandbox session — local preview top-ups are disabled to avoid unexpected balance changes."
+      );
+      return;
+    }
+
     setBusy(true);
     setError(null);
     setMessage(null);
     try {
-      const key = readApiKey();
-      if (key) {
-        const res = await fetch("/api/sandbox/v1/wallet", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${key}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ amountUsd: usd }),
-          cache: "no-store",
-        });
-        const data = (await res.json().catch(() => null)) as {
-          wallet?: { balanceCents?: number };
-          transactions?: SandboxWalletTx[];
-          message?: string;
-        } | null;
-        if (!res.ok) {
-          setError(data?.message || "Top-up could not be completed.");
-          return;
-        }
-        const cents = data?.wallet?.balanceCents;
-        if (typeof cents === "number") {
-          setBalanceCents(cents);
-          try {
-            localStorage.setItem(SANDBOX_WALLET_KEY, String(cents));
-          } catch {
-            /* ignore */
-          }
-        }
-        if (Array.isArray(data?.transactions)) {
-          setTxs(data.transactions);
-          try {
-            localStorage.setItem(
-              SANDBOX_TX_KEY,
-              JSON.stringify(data.transactions)
-            );
-          } catch {
-            /* ignore */
-          }
-        } else {
-          const tx: SandboxWalletTx = {
-            id: `tx_credit_${Date.now()}`,
-            label: `Sandbox top-up · $${usd}`,
-            amountCents: usd * 100,
-            createdAt: new Date().toISOString(),
-            kind: "credit",
-          };
-          const nextTxs = [tx, ...txs].slice(0, 50);
-          setTxs(nextTxs);
-          try {
-            localStorage.setItem(SANDBOX_TX_KEY, JSON.stringify(nextTxs));
-          } catch {
-            /* ignore */
-          }
-        }
-        setMessage(`Added $${usd} to your sandbox wallet.`);
-        setSelectedUsd(null);
+      const res = await fetch("/api/sandbox/v1/wallet", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ amountUsd: usd }),
+        cache: "no-store",
+      });
+      const data = (await res.json().catch(() => null)) as {
+        wallet?: { balanceCents?: number };
+        transactions?: SandboxWalletTx[];
+        message?: string;
+      } | null;
+      if (!res.ok) {
+        setError(data?.message || "Top-up could not be completed.");
         return;
       }
-
-      applyLocalCredit(usd);
+      const cents = data?.wallet?.balanceCents;
+      if (typeof cents === "number") {
+        setBalanceCents(cents);
+        try {
+          localStorage.setItem(SANDBOX_WALLET_KEY, String(cents));
+        } catch {
+          /* ignore */
+        }
+      } else {
+        await reloadWallet();
+      }
+      if (Array.isArray(data?.transactions)) {
+        setTxs(data.transactions);
+        try {
+          localStorage.setItem(SANDBOX_TX_KEY, JSON.stringify(data.transactions));
+        } catch {
+          /* ignore */
+        }
+      }
       setMessage(`Added $${usd} to your sandbox wallet.`);
       setSelectedUsd(null);
     } catch {
@@ -224,8 +162,9 @@ export default function SandboxWalletClient() {
         <div>
           <h2 className="text-lg font-semibold text-slate-50">+ Add Funds</h2>
           <p className="mt-1 text-sm text-slate-400">
-            Choose an amount, then confirm to credit your sandbox wallet
-            {hasApiKey ? "." : " in this browser."}
+            Select an amount, then confirm. Balance only changes after a
+            confirmed top-up
+            {hasApiKey ? " to your Neon sandbox wallet." : "."}
           </p>
         </div>
         <div
@@ -319,7 +258,7 @@ export default function SandboxWalletClient() {
                   }`}
                 >
                   {tx.kind === "credit" ? "+" : ""}
-                  {formatUsd(tx.amountCents)}
+                  {formatUsd(Math.abs(tx.amountCents))}
                 </p>
               </li>
             ))}

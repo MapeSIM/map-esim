@@ -3,9 +3,14 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
+  CustomerEsimOrderCard,
+  type CustomerEsimOrderCardOrder,
+} from "@/app/components/orders/CustomerEsimOrderCard";
+import {
   SANDBOX_ORDERS_KEY,
   type SandboxStoredOrder,
 } from "@/app/lib/sandbox/sandboxClientStorage";
+import { readSandboxApiKey } from "@/app/lib/sandbox/sandboxPurchaseClient";
 import { partnerCardClass } from "@/app/components/partner/partnerPortalUi";
 
 function formatUsd(cents: number): string {
@@ -13,6 +18,32 @@ function formatUsd(cents: number): string {
     style: "currency",
     currency: "USD",
   }).format(cents / 100);
+}
+
+function toCardOrder(row: SandboxStoredOrder): CustomerEsimOrderCardOrder {
+  const short =
+    row.orderId.length > 10
+      ? `${row.orderId.slice(0, 4)}…${row.orderId.slice(-4)}`
+      : row.orderId;
+  return {
+    id: row.orderId,
+    shortReference: short,
+    destination: row.region || "Destination",
+    flagUrl: null,
+    planName: row.planName,
+    dataAllowance: "View details",
+    validity: "—",
+    statusBadge: "Completed",
+    amountLabel: formatUsd(row.totalCents),
+    createdAtLabel: new Date(row.createdAt).toLocaleString(),
+    iccidMasked: row.iccid || "Pending",
+    iccid: row.iccid || null,
+    emailDeliveryLabel: null,
+    addDataEligible: false,
+    isAddDataPurchase: false,
+    lifecycle: null,
+    remainingDataLabel: null,
+  };
 }
 
 export default function SandboxOrdersClient({
@@ -26,7 +57,7 @@ export default function SandboxOrdersClient({
     let cancelled = false;
     async function load() {
       try {
-        const key = localStorage.getItem("mapesim_sandbox_api_key");
+        const key = readSandboxApiKey();
         if (key) {
           const res = await fetch("/api/sandbox/v1/orders", {
             headers: { Authorization: `Bearer ${key}` },
@@ -42,7 +73,6 @@ export default function SandboxOrdersClient({
                 iccid?: string;
                 activationCode?: string;
                 createdAt: string;
-                status?: string;
               }>;
             };
             const mapped: SandboxStoredOrder[] = (data.orders ?? []).map(
@@ -69,7 +99,7 @@ export default function SandboxOrdersClient({
           }
         }
       } catch {
-        /* fall back to local cache */
+        /* fall back */
       }
       try {
         const raw = localStorage.getItem(SANDBOX_ORDERS_KEY);
@@ -101,7 +131,7 @@ export default function SandboxOrdersClient({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 [--heading:#f8fafc] [--surface:#0D1526] [--surface-2:#111827] [--text:#e2e8f0] [--text-muted:#94a3b8] [--text-soft:#64748b] [--border:rgba(255,255,255,0.08)] [--border-strong:rgba(255,255,255,0.12)] [--border-hover:rgba(255,255,255,0.18)] [--accent-strong:#84cc16]">
       <header className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-xl font-bold text-slate-50 sm:text-2xl">
@@ -110,8 +140,7 @@ export default function SandboxOrdersClient({
           <p className="mt-1 text-sm text-slate-400">
             <span className="sm:hidden">Orders, QR codes, and usage.</span>
             <span className="hidden sm:inline">
-              Search, filter, and manage Partner orders — QR, LPA, usage, and
-              refunds.
+              Search, filter, and manage sandbox orders — QR, LPA, and share.
             </span>
           </p>
         </div>
@@ -180,35 +209,13 @@ export default function SandboxOrdersClient({
           </p>
         </div>
       ) : (
-        <ul className={`${partnerCardClass} divide-y divide-white/[0.06] !p-0`}>
+        <ul className="space-y-3">
           {orders.map((row) => (
-            <li
-              key={row.orderId}
-              className="flex flex-wrap items-center justify-between gap-2 px-5 py-4"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-slate-100">
-                  {row.region} · {row.planName}
-                </p>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  {new Date(row.createdAt).toLocaleString()} ·{" "}
-                  {formatUsd(row.totalCents)}
-                </p>
-                <p className="mt-1 font-mono text-[11px] text-emerald-300/90">
-                  {row.iccid}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Link
-                  href="/sandbox/share/preview"
-                  className="rounded-full border border-white/[0.12] px-2.5 py-0.5 text-xs font-semibold text-slate-200 hover:bg-white/[0.05]"
-                >
-                  Share QR
-                </Link>
-                <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">
-                  {row.status}
-                </span>
-              </div>
+            <li key={row.orderId}>
+              <CustomerEsimOrderCard
+                order={toCardOrder(row)}
+                detailHref={`/sandbox/orders/${encodeURIComponent(row.orderId)}`}
+              />
             </li>
           ))}
         </ul>

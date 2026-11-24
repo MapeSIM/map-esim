@@ -40,7 +40,7 @@ export type SandboxShareBranding = {
 
 export const SANDBOX_DEFAULT_BRANDING: SandboxShareBranding = {
   companyName: "MAP Partner Co",
-  supportEmail: "support@example.com",
+  supportEmail: "sandbox@mapesim.store",
   logoUrl: null,
   buttonBackground: SANDBOX_DEFAULT_BUTTON_BG,
   buttonTextColor: SANDBOX_DEFAULT_BUTTON_FG,

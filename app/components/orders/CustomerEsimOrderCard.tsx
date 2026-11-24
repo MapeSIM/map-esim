@@ -81,10 +81,15 @@ function quickDataSummary(order: CustomerEsimOrderCardOrder): string {
  */
 export function CustomerEsimOrderCard({
   order,
+  detailHref,
 }: {
   order: CustomerEsimOrderCardOrder;
+  /** Override detail route (e.g. sandbox `/sandbox/orders/[id]`). */
+  detailHref?: string;
 }) {
-  const href = `/account/orders/${encodeURIComponent(order.id)}`;
+  const href =
+    detailHref?.trim() ||
+    `/account/orders/${encodeURIComponent(order.id)}`;
   const dataSummary = quickDataSummary(order);
 
   return (

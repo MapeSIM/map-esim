@@ -30,6 +30,8 @@ export type PlansListingProps = {
    * session publisher, so ShellAuth may not mark isPartner).
    */
   forcePartnerCheckout?: boolean;
+  /** Force Buy Now → `/sandbox/buy` (demo wallet; never live account checkout). */
+  forceSandboxCheckout?: boolean;
 };
 
 /**
@@ -47,10 +49,12 @@ export default async function PlansListing({
   children,
   listingBasePath = "/countries",
   forcePartnerCheckout = false,
+  forceSandboxCheckout = false,
 }: PlansListingProps) {
-  const guestCheckoutEnabled = forcePartnerCheckout
-    ? false
-    : await isGuestVesimCheckoutEnabled();
+  const guestCheckoutEnabled =
+    forcePartnerCheckout || forceSandboxCheckout
+      ? false
+      : await isGuestVesimCheckoutEnabled();
   const defaultModel = buildDefaultPlansListingModel(offers, destination);
   const displayName = destinationDisplayName(destination);
   const heading = `${displayName} eSIM Plans`;
@@ -148,6 +152,7 @@ export default async function PlansListing({
         defaultGrid={defaultGrid}
         guestCheckoutEnabled={guestCheckoutEnabled}
         forcePartnerCheckout={forcePartnerCheckout}
+        forceSandboxCheckout={forceSandboxCheckout}
       />
 
       {relatedRegional && relatedRegionalHref && relatedRegionalName ? (
