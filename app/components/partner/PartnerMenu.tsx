@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Menu, Plus, Wallet, X } from "lucide-react";
 import { signOutAction } from "@/app/lib/auth/actions";
 
@@ -65,10 +66,15 @@ export default function PartnerMenu({
   const badge = (companyBadge ?? "").trim() || userName;
   const balance = (walletBalanceLabel ?? "").trim() || "—";
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [portalReady, setPortalReady] = useState(false);
   const drawerTitleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const isSandbox = mode === "sandbox";
   const isB2bChrome = mode === "b2b" || mode === "sandbox";
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
 
   useEffect(() => {
     setDrawerOpen(false);
@@ -80,10 +86,11 @@ export default function PartnerMenu({
       if (e.key === "Escape") setDrawerOpen(false);
     }
     document.addEventListener("keydown", onKey);
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
+      document.body.style.overflow = previousOverflow;
     };
   }, [drawerOpen]);
 
@@ -291,89 +298,98 @@ export default function PartnerMenu({
         {desktopNavList}
       </nav>
 
-      {/* Mobile drawer — always vertical; never inherits desktop sm:flex-row nav */}
-      {isB2bChrome && drawerOpen ? (
-        <div
-          className="fixed inset-0 z-[60] lg:hidden"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={drawerTitleId}
-        >
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/60"
-            aria-label="Close menu"
-            onClick={() => setDrawerOpen(false)}
-          />
-          <div
-            ref={panelRef}
-            className="absolute inset-y-0 left-0 flex w-[min(18.5rem,calc(100vw-3rem))] max-w-full flex-col overflow-x-hidden border-r border-white/[0.08] bg-[#0D1526] shadow-2xl"
-            style={{
-              paddingTop: "env(safe-area-inset-top, 0px)",
-              paddingBottom: "env(safe-area-inset-bottom, 0px)",
-            }}
-          >
-            <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 border-b border-white/[0.06] px-3 py-3">
-              <p
-                id={drawerTitleId}
-                className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-50"
-              >
-                {brandLabel}
-                <span className="ml-1 font-medium text-slate-400">
-                  {brandSuffix}
-                </span>
-              </p>
+      {/*
+        Portal to document.body so fixed positioning escapes sticky header
+        backdrop-filter / overflow containing blocks (partner + sandbox).
+      */}
+      {portalReady &&
+      isB2bChrome &&
+      drawerOpen &&
+      typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[100] lg:hidden"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={drawerTitleId}
+            >
               <button
                 type="button"
-                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/[0.1] text-slate-200"
+                className="absolute inset-0 h-dvh w-full bg-black/60"
+                aria-label="Close menu"
                 onClick={() => setDrawerOpen(false)}
+              />
+              <div
+                ref={panelRef}
+                className="absolute inset-y-0 left-0 flex h-dvh max-h-dvh w-[min(18.5rem,calc(100vw-3rem))] max-w-full flex-col overflow-x-hidden border-r border-white/[0.08] bg-[#0D1526] shadow-2xl"
+                style={{
+                  paddingTop: "env(safe-area-inset-top, 0px)",
+                  paddingBottom: "env(safe-area-inset-bottom, 0px)",
+                }}
               >
-                <X className="h-4 w-4" aria-hidden />
-                <span className="sr-only">Close</span>
-              </button>
-            </div>
+                <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 border-b border-white/[0.06] px-3 py-3">
+                  <p
+                    id={drawerTitleId}
+                    className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-50"
+                  >
+                    {brandLabel}
+                    <span className="ml-1 font-medium text-slate-400">
+                      {brandSuffix}
+                    </span>
+                  </p>
+                  <button
+                    type="button"
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/[0.1] text-slate-200"
+                    onClick={() => setDrawerOpen(false)}
+                  >
+                    <X className="h-4 w-4" aria-hidden />
+                    <span className="sr-only">Close</span>
+                  </button>
+                </div>
 
-            <div className="min-w-0 shrink-0 space-y-1 border-b border-white/[0.06] px-3 py-3">
-              <p className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                {badge}
-              </p>
-              <p className="truncate text-sm font-semibold text-slate-100">
-                {userName}
-              </p>
-              <p className="truncate text-xs text-slate-400">{userEmail}</p>
-            </div>
+                <div className="min-w-0 shrink-0 space-y-1 border-b border-white/[0.06] px-3 py-3">
+                  <p className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    {badge}
+                  </p>
+                  <p className="truncate text-sm font-semibold text-slate-100">
+                    {userName}
+                  </p>
+                  <p className="truncate text-xs text-slate-400">{userEmail}</p>
+                </div>
 
-            <nav
-              className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-2 py-3"
-              aria-label="Menu"
-            >
-              {drawerNavList}
-            </nav>
-
-            <div className="min-w-0 shrink-0 space-y-2 border-t border-white/[0.06] px-3 py-3">
-              <div className="grid min-w-0 grid-cols-2 gap-2">
-                <Link
-                  href={walletHref}
-                  onClick={() => setDrawerOpen(false)}
-                  className="inline-flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-2 text-xs font-semibold text-emerald-300 outline-none transition hover:bg-emerald-500/15 focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+                <nav
+                  className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-2 py-3"
+                  aria-label="Menu"
                 >
-                  <Wallet className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  <span className="truncate tabular-nums">{balance}</span>
-                </Link>
-                <Link
-                  href={walletHref}
-                  onClick={() => setDrawerOpen(false)}
-                  className="inline-flex h-11 min-w-0 items-center justify-center gap-1 rounded-xl bg-emerald-500 px-2 text-xs font-bold text-slate-950 outline-none transition hover:bg-emerald-400 focus-visible:ring-2 focus-visible:ring-emerald-400/60"
-                >
-                  <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  <span className="truncate">Top Up</span>
-                </Link>
+                  {drawerNavList}
+                </nav>
+
+                <div className="min-w-0 shrink-0 space-y-2 border-t border-white/[0.06] px-3 py-3">
+                  <div className="grid min-w-0 grid-cols-2 gap-2">
+                    <Link
+                      href={walletHref}
+                      onClick={() => setDrawerOpen(false)}
+                      className="inline-flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-2 text-xs font-semibold text-emerald-300 outline-none transition hover:bg-emerald-500/15 focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+                    >
+                      <Wallet className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      <span className="truncate tabular-nums">{balance}</span>
+                    </Link>
+                    <Link
+                      href={walletHref}
+                      onClick={() => setDrawerOpen(false)}
+                      className="inline-flex h-11 min-w-0 items-center justify-center gap-1 rounded-xl bg-emerald-500 px-2 text-xs font-bold text-slate-950 outline-none transition hover:bg-emerald-400 focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+                    >
+                      <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      <span className="truncate">Top Up</span>
+                    </Link>
+                  </div>
+                  {signOutControl}
+                </div>
               </div>
-              {signOutControl}
-            </div>
-          </div>
-        </div>
-      ) : null}
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }
