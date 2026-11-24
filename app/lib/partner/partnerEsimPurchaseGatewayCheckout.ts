@@ -100,18 +100,20 @@ export type StartPartnerEsimPurchaseHostedCheckoutResult = {
   walletAppliedCents: number;
 };
 
-/** Display-only return-page view. Never funds or mutates payment state. */
+/** Owned payment attempt view for return/cancel pages. */
 export type OwnedPartnerPaymentAttemptView = {
   attemptId: string;
   purchaseId: string;
   status: EsimPurchasePaymentAttemptStatus;
   purchaseStatus: PartnerEsimPurchaseStatus;
   gatewayProvider: PaymentGatewayProvider | null;
+  /** Gateway session expiry — used to release expired pending holds on return. */
+  expiresAt: Date | null;
 };
 
 /**
  * Load a Partner payment attempt owned by the signed-in partner user.
- * Read-only — used by the browser return page for UX status only.
+ * Read-only ownership check — callers may then release holds separately.
  */
 export async function getOwnedPartnerEsimPurchasePaymentAttempt(
   partnerUserId: string,
@@ -128,6 +130,7 @@ export async function getOwnedPartnerEsimPurchasePaymentAttempt(
       id: true,
       status: true,
       gatewayProvider: true,
+      expiresAt: true,
       purchase: {
         select: {
           id: true,
@@ -160,6 +163,7 @@ export async function getOwnedPartnerEsimPurchasePaymentAttempt(
     status: row.status,
     purchaseStatus: row.purchase.status,
     gatewayProvider: row.gatewayProvider ?? null,
+    expiresAt: row.expiresAt ?? null,
   };
 }
 
@@ -637,8 +641,17 @@ async function runPartnerEsimHostedCheckoutAfterLoad(options: {
     });
   }
 
+  // After reserve, any pre-session failure must restore the wallet hold.
+  const restoreHeldWallet = () =>
+    restoreSplitWalletBestEffort({
+      partnerId: partner.partnerId,
+      purchaseId: purchase.id,
+      walletAppliedCents: funding.walletAppliedCents,
+    });
+
   const currency = (purchase.currency || "USD").trim().toUpperCase() || "USD";
   if (currency !== "USD") {
+    await restoreHeldWallet();
     throw new PartnerEsimPurchaseGatewayCheckoutError(
       "INVALID_STATE",
       "Card payment is only available in USD."
@@ -647,6 +660,7 @@ async function runPartnerEsimHostedCheckoutAfterLoad(options: {
 
   const adapter = getActivePaymentAdapter();
   if (!adapter.enabled || adapter.provider !== "SIMPAISA") {
+    await restoreHeldWallet();
     throw new PartnerEsimPurchaseGatewayCheckoutError(
       "GATEWAY_UNAVAILABLE",
       "Payment gateway is not available yet. Please try again later."
@@ -800,6 +814,7 @@ async function runPartnerEsimHostedCheckoutAfterLoad(options: {
 
   const quote = quoteSimpaisaPkrChargeFromUsdCents(funding.gatewayAmountCents);
   if (!quote) {
+    await restoreHeldWallet();
     throw new PartnerEsimPurchaseGatewayCheckoutError(
       "GATEWAY_UNAVAILABLE",
       "Payment checkout quote is unavailable. Please try again."
@@ -810,6 +825,7 @@ async function runPartnerEsimHostedCheckoutAfterLoad(options: {
     customerMsisdn: input.customerMsisdn,
   });
   if (!walletFields.ok) {
+    await restoreHeldWallet();
     throw new PartnerEsimPurchaseGatewayCheckoutError(
       "INVALID_STATE",
       walletFields.error
@@ -820,6 +836,7 @@ async function runPartnerEsimHostedCheckoutAfterLoad(options: {
     ? `${checkoutKey}:retry:${Date.now()}`
     : checkoutKey;
   if (sessionCheckoutKey.length > 128) {
+    await restoreHeldWallet();
     throw new PartnerEsimPurchaseGatewayCheckoutError(
       "UNAVAILABLE",
       "Payment checkout is temporarily unavailable. Please try again."
@@ -842,20 +859,12 @@ async function runPartnerEsimHostedCheckoutAfterLoad(options: {
       customerMsisdn: walletFields.customerMsisdn,
     });
   } catch (error) {
-    await restoreSplitWalletBestEffort({
-      partnerId: partner.partnerId,
-      purchaseId: purchase.id,
-      walletAppliedCents: funding.walletAppliedCents,
-    });
+    await restoreHeldWallet();
     throw error;
   }
 
   if (!session.ok) {
-    await restoreSplitWalletBestEffort({
-      partnerId: partner.partnerId,
-      purchaseId: purchase.id,
-      walletAppliedCents: funding.walletAppliedCents,
-    });
+    await restoreHeldWallet();
     throw new PartnerEsimPurchaseGatewayCheckoutError(
       "GATEWAY_UNAVAILABLE",
       session.message
@@ -874,11 +883,7 @@ async function runPartnerEsimHostedCheckoutAfterLoad(options: {
       chargeAmountMinor,
     })
   ) {
-    await restoreSplitWalletBestEffort({
-      partnerId: partner.partnerId,
-      purchaseId: purchase.id,
-      walletAppliedCents: funding.walletAppliedCents,
-    });
+    await restoreHeldWallet();
     throw new PartnerEsimPurchaseGatewayCheckoutError(
       "GATEWAY_UNAVAILABLE",
       "Payment checkout quote did not match the PKR charge. Please try again."
@@ -914,11 +919,7 @@ async function runPartnerEsimHostedCheckoutAfterLoad(options: {
     },
   });
   if (updated.count !== 1) {
-    await restoreSplitWalletBestEffort({
-      partnerId: partner.partnerId,
-      purchaseId: purchase.id,
-      walletAppliedCents: funding.walletAppliedCents,
-    });
+    await restoreHeldWallet();
     throw new PartnerEsimPurchaseGatewayCheckoutError(
       "INVALID_STATE",
       "This payment cannot start checkout in its current state."

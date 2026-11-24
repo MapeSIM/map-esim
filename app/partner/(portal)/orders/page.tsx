@@ -6,6 +6,7 @@ import {
 } from "@/app/components/partner/PartnerRefundRequestControls";
 import { requireRole } from "@/app/lib/auth/session";
 import { listPartnerOrdersPage } from "@/app/lib/partner/partnerOrders";
+import { recoverPartnerOwnedStaleWalletHolds } from "@/app/lib/partner/partnerOwnedStaleHoldRecovery";
 import {
   latestPartnerRefundSummary,
   listPartnerRefundRequestSummaries,
@@ -45,6 +46,11 @@ export default async function PartnerOrdersPage({
   const domain = await readAppDomain();
   const isRetail = domain !== "partner";
   const params = await searchParams;
+
+  // partneresim.com + sandbox only — never touch mapesim.com retail behavior.
+  if (domain === "partner" || domain === "sandbox") {
+    await recoverPartnerOwnedStaleWalletHolds(user.id).catch(() => undefined);
+  }
 
   let data: Awaited<ReturnType<typeof listPartnerOrdersPage>>;
   try {

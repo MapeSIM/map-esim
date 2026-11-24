@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getPartnerPortalSummary } from "@/app/lib/partner/partnerAccess";
+import { recoverPartnerOwnedStaleWalletHolds } from "@/app/lib/partner/partnerOwnedStaleHoldRecovery";
 import { requireRole } from "@/app/lib/auth/session";
 import { isPaymentGatewayConfigured } from "@/app/lib/payments/disabledAdapter";
 import { resolveHostedCheckoutProvider } from "@/app/lib/payments/gatewaySelect";
@@ -20,6 +21,11 @@ export default async function PartnerWalletPage() {
   const user = await requireRole("PARTNER");
   const domain = await readAppDomain();
   const isRetail = domain !== "partner";
+
+  // partneresim.com + sandbox only — never touch mapesim.com retail behavior.
+  if (domain === "partner" || domain === "sandbox") {
+    await recoverPartnerOwnedStaleWalletHolds(user.id).catch(() => undefined);
+  }
 
   let summary: Awaited<ReturnType<typeof getPartnerPortalSummary>>;
   try {

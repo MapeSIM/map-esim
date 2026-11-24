@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
+import { EsimPurchasePaymentAttemptStatus } from "@prisma/client";
 import { requireRole } from "@/app/lib/auth/session";
 import { requireActivePartnerActor } from "@/app/lib/partner/partnerAccess";
 import { getOwnedPartnerEsimPurchasePaymentAttempt } from "@/app/lib/partner/partnerEsimPurchaseGatewayCheckout";
+import { maybeReleasePendingPartnerGatewayReservation } from "@/app/lib/partner/partnerEsimPurchasePaymentApply";
 import { browserReturnMustNotFundPartnerEsimPurchase } from "@/app/lib/partner/partnerEsimPurchasePaymentConstants";
 import {
   partnerEsimPurchasePaymentOrdersHref,
@@ -17,9 +19,17 @@ import { PartnerEsimPurchasePaymentReturnView } from "@/app/partner/(portal)/cat
 
 export const dynamic = "force-dynamic";
 
+const OPEN_ATTEMPT_STATUSES = new Set<string>([
+  EsimPurchasePaymentAttemptStatus.DRAFT,
+  EsimPurchasePaymentAttemptStatus.AWAITING_PAYMENT,
+  EsimPurchasePaymentAttemptStatus.PAYMENT_PENDING,
+]);
+
 /**
- * Partner eSIM payment return — display only from durable DB statuses.
- * Never marks paid, never credits wallet, never calls VeSIM (webhook funds).
+ * Partner eSIM payment return — durable DB statuses only for UX.
+ * Never marks paid / never funds from browser return / never calls VeSIM.
+ * Releases still-pending wallet holds when checkout is cancelled/failed/expired
+ * (customer return parity) so holds do not wait on the daily stale cron.
  */
 export default async function PartnerCatalogPaymentReturnPage({
   params,
@@ -72,13 +82,53 @@ export default async function PartnerCatalogPaymentReturnPage({
     );
   }
 
-  const kind = resolvePartnerPaymentReturnKind({
+  let kind = resolvePartnerPaymentReturnKind({
     purchaseStatus: attempt.purchaseStatus,
     attemptStatus: attempt.status,
   });
 
   if (kind === "completed") {
     redirect(partnerEsimPurchasePaymentOrdersHref());
+  }
+
+  const attemptExpired =
+    attempt.expiresAt instanceof Date &&
+    Number.isFinite(attempt.expiresAt.getTime()) &&
+    attempt.expiresAt.getTime() <= Date.now();
+  const shouldReleaseHold =
+    kind === "not_completed" ||
+    (kind === "pending" &&
+      attemptExpired &&
+      OPEN_ATTEMPT_STATUSES.has(attempt.status));
+
+  if (shouldReleaseHold) {
+    const attemptStillOpen = OPEN_ATTEMPT_STATUSES.has(attempt.status);
+    const terminal = attemptStillOpen
+      ? attemptExpired
+        ? "EXPIRED"
+        : "CANCELLED"
+      : undefined;
+    await maybeReleasePendingPartnerGatewayReservation({
+      partnerUserId: user.id,
+      purchaseId: attempt.purchaseId,
+      attemptId: attempt.attemptId,
+      ...(terminal ? { attemptTerminalStatus: terminal } : {}),
+    }).catch(() => undefined);
+
+    // Re-read so UX reflects restored READY after release.
+    const refreshed = await getOwnedPartnerEsimPurchasePaymentAttempt(
+      user.id,
+      attemptId
+    );
+    if (refreshed) {
+      kind = resolvePartnerPaymentReturnKind({
+        purchaseStatus: refreshed.purchaseStatus,
+        attemptStatus: refreshed.status,
+      });
+      if (kind === "completed") {
+        redirect(partnerEsimPurchasePaymentOrdersHref());
+      }
+    }
   }
 
   const refreshHref = partnerEsimPurchasePaymentReturnPath(attempt.attemptId);
