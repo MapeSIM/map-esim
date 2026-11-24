@@ -9,6 +9,7 @@ import {
   RETAIL_SITE_ORIGIN,
   type AppDomain,
   isLocalDevHost,
+  partnerPathToSandboxPath,
   publicUrlForRequest,
   resolveAppDomain,
 } from "@/app/lib/domain/appDomain";
@@ -148,6 +149,29 @@ export default auth((req) => {
       pathname === "/signup"
     ) {
       const dest = publicUrlForRequest(req, "/sandbox");
+      return attachDomainCookie(
+        NextResponse.redirect(dest),
+        domain,
+        persistDomainCookie
+      );
+    }
+    // Never serve live /partner/* chrome on sandbox — mirror partner UX via /sandbox/*.
+    if (pathname === "/partner" || pathname.startsWith("/partner/")) {
+      const mapped = partnerPathToSandboxPath(pathname) ?? "/sandbox";
+      const [mappedPath, mappedQuery] = mapped.split("?");
+      const dest = publicUrlForRequest(
+        req,
+        mappedPath || "/sandbox",
+        mappedQuery
+          ? `?${mappedQuery}`
+          : req.nextUrl.search || undefined
+      );
+      if (mappedQuery && req.nextUrl.search) {
+        const existing = new URLSearchParams(req.nextUrl.search);
+        existing.forEach((value, key) => {
+          if (!dest.searchParams.has(key)) dest.searchParams.set(key, value);
+        });
+      }
       return attachDomainCookie(
         NextResponse.redirect(dest),
         domain,

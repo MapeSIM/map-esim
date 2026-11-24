@@ -161,7 +161,7 @@ export default function SandboxStorefrontBuy({
               href="/sandbox/orders"
               className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)]"
             >
-              My eSIMs
+              Orders
             </Link>
           </div>
         </div>

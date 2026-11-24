@@ -107,13 +107,13 @@ export default function SandboxOrdersClient({
       <header className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-xl font-bold text-slate-50 sm:text-2xl">
-            My eSIMs
+            Orders
           </h1>
           <p className="mt-1 text-sm text-slate-400">
             <span className="sm:hidden">Orders, QR, and share.</span>
             <span className="hidden sm:inline">
-              Search, filter, and manage Partner orders — QR, LPA, usage, and
-              share.
+              Simulated Partner orders — QR, LPA, install, and share (no live
+              provisioning).
             </span>
           </p>
         </div>

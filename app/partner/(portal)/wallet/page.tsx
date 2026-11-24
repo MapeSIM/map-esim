@@ -20,7 +20,7 @@ const PORTAL_UNAVAILABLE =
 export default async function PartnerWalletPage() {
   const user = await requireRole("PARTNER");
   const domain = await readAppDomain();
-  const isRetail = domain !== "partner";
+  const isRetail = domain === "retail";
 
   // partneresim.com + sandbox only — never touch mapesim.com retail behavior.
   if (domain === "partner" || domain === "sandbox") {

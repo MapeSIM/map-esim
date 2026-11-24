@@ -61,6 +61,12 @@ export default async function PartnerLayout({
   const retailHref = isLocalDevHost(host)
     ? `/?${MAP_DOMAIN_QUERY}=mapesim.com`
     : RETAIL_SITE_ORIGIN;
+
+  // mapesim.store never serves live /partner chrome (middleware redirects too).
+  if (domain === "sandbox") {
+    redirect("/sandbox");
+  }
+
   const sessionUser = await getSessionUser();
   const isPartnerSession = sessionUser?.role === "PARTNER";
   const denied =

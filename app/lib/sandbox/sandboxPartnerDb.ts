@@ -498,19 +498,32 @@ export function verifySandboxSession(
   return partnerId;
 }
 
+/**
+ * Realistic simulated eSIM install payload for sandbox only.
+ * Never contacts VeSIM / live SM-DP+. ICCID + matchingId are random per call
+ * (seed mixes in entropy so concurrent sandbox buys stay unique).
+ */
 export function mintDemoActivationCode(seed: string): {
   iccid: string;
   matchingId: string;
   smdpAddress: string;
   activationCode: string;
 } {
+  const entropy = randomBytes(12).toString("hex");
+  const material = `${seed}:${Date.now().toString(36)}:${entropy}`;
   let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  const mid = String(h).padStart(10, "0").slice(0, 10);
-  const iccid = `8944${mid}000000`.slice(0, 19);
-  let h2 = 0;
-  for (let i = 0; i < seed.length; i++) h2 = (h2 * 17 + seed.charCodeAt(i)) >>> 0;
-  const matchingId = `SNDBOX${h2.toString(16).toUpperCase().padStart(8, "0")}`;
+  for (let i = 0; i < material.length; i++) {
+    h = (h * 31 + material.charCodeAt(i)) >>> 0;
+  }
+  // 19-digit ICCID-like value (ITU-T E.118 style prefix 89 + country 44).
+  const body = `${h.toString().padStart(10, "0")}${randomBytes(4)
+    .toString("hex")
+    .replace(/\D/g, "")
+    .padStart(8, "0")}`.replace(/\D/g, "");
+  const digits = `8944${body}`.replace(/\D/g, "").slice(0, 18);
+  const iccid = `${digits}${luhnCheckDigit(digits)}`;
+
+  const matchingId = `SNDBOX${randomBytes(6).toString("hex").toUpperCase()}`;
   const smdpAddress = "smdp.sandbox.mapesim.store";
   return {
     iccid,
@@ -520,6 +533,23 @@ export function mintDemoActivationCode(seed: string): {
   };
 }
 
+/** Luhn check digit for a numeric string (ICCID-style). */
+function luhnCheckDigit(digits: string): string {
+  let sum = 0;
+  let alt = true;
+  for (let i = digits.length - 1; i >= 0; i -= 1) {
+    let n = Number(digits[i]);
+    if (!Number.isFinite(n)) n = 0;
+    if (alt) {
+      n *= 2;
+      if (n > 9) n -= 9;
+    }
+    sum += n;
+    alt = !alt;
+  }
+  return String((10 - (sum % 10)) % 10);
+}
+
 export function newSandboxOrderId(): string {
-  return `sandbox_ord_${Date.now().toString(36)}_${randomBytes(3).toString("hex")}`;
+  return `sandbox_ord_${Date.now().toString(36)}_${randomBytes(4).toString("hex")}`;
 }

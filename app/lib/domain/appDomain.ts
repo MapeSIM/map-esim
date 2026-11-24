@@ -103,6 +103,49 @@ export function resolveAppDomainFromHost(
   return "retail";
 }
 
+/** partneresim.com + mapesim.store share B2B chrome (not mapesim.com retail). */
+export function isB2bPortalDomain(domain: AppDomain): boolean {
+  return domain === "partner" || domain === "sandbox";
+}
+
+/**
+ * Map a live `/partner/*` path to the sandbox portal equivalent.
+ * Used so mapesim.store never serves retail-looking `/partner` chrome.
+ */
+export function partnerPathToSandboxPath(pathname: string): string | null {
+  const path = (pathname || "").split("?")[0] || "";
+  if (path === "/partner" || path === "/partner/") return "/sandbox";
+  if (path === "/partner/orders" || path.startsWith("/partner/orders/")) {
+    return `/sandbox/orders${path.slice("/partner/orders".length)}`;
+  }
+  if (path === "/partner/wallet" || path.startsWith("/partner/wallet/")) {
+    return `/sandbox/wallet${path.slice("/partner/wallet".length)}`;
+  }
+  if (path === "/partner/countries" || path.startsWith("/partner/countries/")) {
+    return `/sandbox/catalog${path.slice("/partner/countries".length)}`;
+  }
+  if (path === "/partner/docs" || path.startsWith("/partner/docs/")) {
+    return `/sandbox/docs${path.slice("/partner/docs".length)}`;
+  }
+  if (path === "/partner/account" || path.startsWith("/partner/account/")) {
+    return `/sandbox/account${path.slice("/partner/account".length)}`;
+  }
+  if (path === "/partner/buy" || path.startsWith("/partner/buy/")) {
+    return "/sandbox/catalog";
+  }
+  if (path === "/partner/profile" || path.startsWith("/partner/profile/")) {
+    return "/sandbox/account";
+  }
+  if (path === "/partner/security" || path.startsWith("/partner/security/")) {
+    return "/sandbox/account";
+  }
+  if (path === "/partner/sales" || path.startsWith("/partner/sales/")) {
+    return "/sandbox/orders?tab=performance";
+  }
+  if (path.startsWith("/partner/")) return "/sandbox";
+  return null;
+}
+
 /**
  * Resolve domain for a request: query override → cookie → host.
  * Used by middleware (and mirrored for server reads via header).

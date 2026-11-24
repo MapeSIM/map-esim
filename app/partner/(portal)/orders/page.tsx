@@ -44,7 +44,7 @@ export default async function PartnerOrdersPage({
 }) {
   const user = await requireRole("PARTNER");
   const domain = await readAppDomain();
-  const isRetail = domain !== "partner";
+  const isRetail = domain === "retail";
   const params = await searchParams;
 
   // partneresim.com + sandbox only — never touch mapesim.com retail behavior.

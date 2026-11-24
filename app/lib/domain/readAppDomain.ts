@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import {
   MAP_DOMAIN_HEADER,
   type AppDomain,
+  isB2bPortalDomain,
   parseAppDomainToken,
   resolveAppDomainFromHost,
 } from "@/app/lib/domain/appDomain";
@@ -23,4 +24,9 @@ export async function isPartnerPortalDomain(): Promise<boolean> {
 
 export async function isRetailDomain(): Promise<boolean> {
   return (await readAppDomain()) === "retail";
+}
+
+/** partneresim.com or mapesim.store — B2B chrome, not retail storefront. */
+export async function isB2bPortalHost(): Promise<boolean> {
+  return isB2bPortalDomain(await readAppDomain());
 }
