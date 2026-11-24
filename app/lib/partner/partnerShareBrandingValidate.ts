@@ -5,6 +5,10 @@
 
 import { BRAND_NAME } from "@/app/lib/brand";
 import { isPublicPartnerLogoBlobUrl } from "@/app/lib/partner/partnerShareLogoBlob";
+import {
+  buildWhatsAppClickToChatUrl,
+  parseWhatsAppPhoneDigits,
+} from "@/app/lib/support/whatsappSupportShared";
 
 export const SHARE_COMPANY_NAME_MAX = 30;
 export const SHARE_COMPANY_NAME_TOO_LONG =
@@ -21,6 +25,8 @@ export type PartnerShareBrandingFields = {
   logoUrl: string | null;
   buttonBackground: string | null;
   buttonTextColor: string | null;
+  /** Digits-only international WhatsApp number, or null when unset. */
+  whatsappNumber: string | null;
 };
 
 export type PartnerShareBrandingInput = {
@@ -30,6 +36,7 @@ export type PartnerShareBrandingInput = {
   logoUrl?: string | null;
   buttonBackground?: string | null;
   buttonTextColor?: string | null;
+  whatsappNumber?: string | null;
 };
 
 export class PartnerShareBrandingError extends Error {
@@ -39,6 +46,7 @@ export class PartnerShareBrandingError extends Error {
     | "INVALID_WEBSITE"
     | "INVALID_LOGO"
     | "INVALID_COLOR"
+    | "INVALID_WHATSAPP"
     | "LOW_CONTRAST";
 
   constructor(code: PartnerShareBrandingError["code"], message: string) {
@@ -213,6 +221,30 @@ export function normalizeShareCompanyName(
   return cleaned;
 }
 
+/**
+ * Empty → null (FAB hidden). Non-empty must parse to digits-only wa.me form.
+ * Accepts already-sanitized digits or formatted international input.
+ */
+export function normalizeShareWhatsAppNumber(
+  value: string | null | undefined
+): string | null {
+  const raw = blankToNull(value);
+  if (!raw) return null;
+  if (/^[1-9]\d{7,14}$/.test(raw)) return raw;
+  const parsed = parseWhatsAppPhoneDigits(raw);
+  if (!parsed.ok) return null;
+  return parsed.digits;
+}
+
+/** Public share-page WhatsApp FAB href, or null when unset/invalid. */
+export function partnerShareWhatsAppHref(
+  whatsappNumber: string | null | undefined
+): string | null {
+  const digits = normalizeShareWhatsAppNumber(whatsappNumber);
+  if (!digits) return null;
+  return buildWhatsAppClickToChatUrl(digits, "");
+}
+
 /** Public share footer. Sanitized company name only — never Partner IDs. */
 export function sharePoweredByLabel(
   companyName: string | null | undefined
@@ -294,6 +326,15 @@ export function parsePartnerShareBrandingInput(
     );
   }
 
+  const whatsappRaw = blankToNull(input.whatsappNumber);
+  const whatsappNumber = normalizeShareWhatsAppNumber(input.whatsappNumber);
+  if (whatsappRaw && !whatsappNumber) {
+    throw new PartnerShareBrandingError(
+      "INVALID_WHATSAPP",
+      "Enter a valid international WhatsApp number (digits only), or leave it blank."
+    );
+  }
+
   return {
     companyName,
     supportEmail,
@@ -301,6 +342,7 @@ export function parsePartnerShareBrandingInput(
     logoUrl,
     buttonBackground,
     buttonTextColor,
+    whatsappNumber,
   };
 }
 
@@ -324,5 +366,6 @@ export function publicShareBrandingDto(
       hasUsableButtonContrast(fields.buttonBackground, fields.buttonTextColor)
         ? fields.buttonTextColor
         : null,
+    whatsappNumber: normalizeShareWhatsAppNumber(fields.whatsappNumber),
   };
 }

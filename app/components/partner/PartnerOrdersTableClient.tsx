@@ -7,6 +7,10 @@ import type { PartnerRefundRequestCardState } from "@/app/components/partner/Par
 import type { PartnerOrderListRow } from "@/app/lib/partner/partnerOrders";
 import type { OrderSupportTicketSummary } from "@/app/lib/support/orderSupportTicket";
 import {
+  isOrderSupportTicketOpenStatus,
+  orderSupportStatusLabel,
+} from "@/app/lib/support/orderSupportTicketConstants";
+import {
   partnerCardClass,
   partnerFieldClass,
   partnerStatusBadgeClass,
@@ -178,11 +182,24 @@ export default function PartnerOrdersTableClient({
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${partnerStatusBadgeClass(row.statusBadge)}`}
-                      >
-                        {row.statusBadge}
-                      </span>
+                      <div className="inline-flex max-w-[11rem] flex-wrap items-center gap-1">
+                        <span
+                          className={`inline-flex max-w-full truncate rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-4 ${partnerStatusBadgeClass(row.statusBadge)}`}
+                        >
+                          {row.statusBadge}
+                        </span>
+                        {supportByOrder[row.orderId] &&
+                        isOrderSupportTicketOpenStatus(
+                          supportByOrder[row.orderId]?.status
+                        ) ? (
+                          <span
+                            className="inline-flex shrink-0 rounded-full border border-sky-400/35 bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-sky-200"
+                            title={`Ticket: ${orderSupportStatusLabel(supportByOrder[row.orderId]?.status)}`}
+                          >
+                            Ticket
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-4 py-3 tabular-nums text-slate-200">
                       {row.partnerDebitLabel}

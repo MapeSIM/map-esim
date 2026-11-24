@@ -82,6 +82,7 @@ export async function updatePartnerShareBrandingAction(
       websiteUrl: formString(formData, "websiteUrl"),
       buttonBackground: formString(formData, "buttonBackground"),
       buttonTextColor: formString(formData, "buttonTextColor"),
+      whatsappNumber: formString(formData, "whatsappNumber"),
     });
     if (!result.ok) return { ok: false, error: result.error };
     return { ok: true, branding: result.branding, saved: true };

@@ -35,6 +35,7 @@ export default async function PartnerProfilePage() {
         logoUrl: null,
         buttonBackground: null,
         buttonTextColor: null,
+        whatsappNumber: null,
       };
 
   return (

@@ -36,6 +36,7 @@ const EMPTY_BRANDING: PartnerShareBrandingFields = {
   logoUrl: null,
   buttonBackground: null,
   buttonTextColor: null,
+  whatsappNumber: null,
 };
 
 function rowToFields(row: {
@@ -45,6 +46,7 @@ function rowToFields(row: {
   shareLogoUrl: string | null;
   shareButtonBackground: string | null;
   shareButtonTextColor: string | null;
+  shareWhatsAppNumber: string | null;
 }): PartnerShareBrandingFields {
   return {
     companyName: row.shareCompanyName,
@@ -53,6 +55,7 @@ function rowToFields(row: {
     logoUrl: row.shareLogoUrl,
     buttonBackground: row.shareButtonBackground,
     buttonTextColor: row.shareButtonTextColor,
+    whatsappNumber: row.shareWhatsAppNumber,
   };
 }
 
@@ -67,6 +70,7 @@ function changedFieldNames(
     "logoUrl",
     "buttonBackground",
     "buttonTextColor",
+    "whatsappNumber",
   ];
   return keys.filter((key) => before[key] !== after[key]);
 }
@@ -88,6 +92,7 @@ export async function getPartnerShareBranding(
       shareLogoUrl: true,
       shareButtonBackground: true,
       shareButtonTextColor: true,
+      shareWhatsAppNumber: true,
     },
   });
   if (!row) {
@@ -115,6 +120,7 @@ export async function updatePartnerShareBranding(
       shareLogoUrl: true,
       shareButtonBackground: true,
       shareButtonTextColor: true,
+      shareWhatsAppNumber: true,
     },
   });
   if (!current) {
@@ -148,6 +154,7 @@ export async function updatePartnerShareBranding(
         shareLogoUrl: next.logoUrl,
         shareButtonBackground: next.buttonBackground,
         shareButtonTextColor: next.buttonTextColor,
+        shareWhatsAppNumber: next.whatsappNumber,
         // Keep Partner Public API / white-label brand* aliases in sync.
         brandCompanyName: next.companyName,
         brandSupportEmail: next.supportEmail,
@@ -204,6 +211,7 @@ export async function loadPublicShareBrandingForPartner(
       shareLogoUrl: true,
       shareButtonBackground: true,
       shareButtonTextColor: true,
+      shareWhatsAppNumber: true,
       brandCompanyName: true,
       brandSupportEmail: true,
       brandButtonBg: true,
@@ -219,6 +227,7 @@ export async function loadPublicShareBrandingForPartner(
       shareLogoUrl: row.shareLogoUrl,
       shareButtonBackground: row.brandButtonBg ?? row.shareButtonBackground,
       shareButtonTextColor: row.brandButtonText ?? row.shareButtonTextColor,
+      shareWhatsAppNumber: row.shareWhatsAppNumber,
     })
   );
 }

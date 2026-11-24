@@ -774,6 +774,7 @@ async function main() {
       "logoUrl",
       "supportEmail",
       "websiteUrl",
+      "whatsappNumber",
     ]);
     console.log("PASS H_V_branded_allowlist_dto");
 

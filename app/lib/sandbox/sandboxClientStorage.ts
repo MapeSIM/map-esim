@@ -36,6 +36,8 @@ export type SandboxShareBranding = {
   logoUrl: string | null;
   buttonBackground: string;
   buttonTextColor: string;
+  /** Digits-only WhatsApp number, or empty string when unset. */
+  whatsappNumber: string;
 };
 
 export const SANDBOX_DEFAULT_BRANDING: SandboxShareBranding = {
@@ -44,6 +46,7 @@ export const SANDBOX_DEFAULT_BRANDING: SandboxShareBranding = {
   logoUrl: null,
   buttonBackground: SANDBOX_DEFAULT_BUTTON_BG,
   buttonTextColor: SANDBOX_DEFAULT_BUTTON_FG,
+  whatsappNumber: "",
 };
 
 /** Match live Partner logo cap (1 MB raw file). */
@@ -89,12 +92,18 @@ export function normalizeSandboxShareBranding(
     typeof src.buttonTextColor === "string" && HEX6.test(src.buttonTextColor)
       ? src.buttonTextColor.toLowerCase()
       : SANDBOX_DEFAULT_BUTTON_FG;
+  let whatsappNumber = "";
+  if (typeof src.whatsappNumber === "string") {
+    const digits = src.whatsappNumber.replace(/\D/g, "");
+    if (/^[1-9]\d{7,14}$/.test(digits)) whatsappNumber = digits;
+  }
   return {
     companyName,
     supportEmail,
     logoUrl: normalizeSandboxLogoUrl(src.logoUrl),
     buttonBackground,
     buttonTextColor,
+    whatsappNumber,
   };
 }
 

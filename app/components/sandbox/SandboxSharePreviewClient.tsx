@@ -18,6 +18,7 @@ import {
   SANDBOX_DEFAULT_BRANDING,
   type SandboxStoredOrder,
 } from "@/app/lib/sandbox/sandboxClientStorage";
+import PartnerShareWhatsAppFab from "@/app/components/partner/PartnerShareWhatsAppFab";
 import {
   partnerCardClass,
   partnerPrimaryCtaClass,
@@ -279,6 +280,8 @@ function SharePreviewInner() {
           Edit branding
         </Link>
       </p>
+
+      <PartnerShareWhatsAppFab whatsappNumber={branding.whatsappNumber} />
     </div>
   );
 }

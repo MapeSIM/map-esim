@@ -508,6 +508,8 @@ model PartnerProfile {
   shareLogoUrl            String?
   shareButtonBackground   String?
   shareButtonTextColor    String?
+  /// Digits-only WhatsApp support number for public /share/[token] FAB (null = hidden).
+  shareWhatsAppNumber     String?
   /// Optional Partner Public API / white-label Share QR branding aliases.
   /// Prefer these for `/api/v1/partner/*` responses; fall back to share* when null.
   brandCompanyName        String?

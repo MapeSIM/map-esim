@@ -55,6 +55,7 @@ function rowToFields(row: {
   shareLogoUrl: string | null;
   shareButtonBackground: string | null;
   shareButtonTextColor: string | null;
+  shareWhatsAppNumber?: string | null;
 }): PartnerShareBrandingFields {
   return {
     companyName: row.shareCompanyName,
@@ -63,6 +64,7 @@ function rowToFields(row: {
     logoUrl: row.shareLogoUrl,
     buttonBackground: row.shareButtonBackground,
     buttonTextColor: row.shareButtonTextColor,
+    whatsappNumber: row.shareWhatsAppNumber ?? null,
   };
 }
 
@@ -118,6 +120,7 @@ async function loadBrandingRow(partnerId: string) {
       shareLogoUrl: true,
       shareButtonBackground: true,
       shareButtonTextColor: true,
+      shareWhatsAppNumber: true,
     },
   });
 }
@@ -291,6 +294,7 @@ export async function uploadPartnerShareLogo(options: {
         shareLogoUrl: true,
         shareButtonBackground: true,
         shareButtonTextColor: true,
+        shareWhatsAppNumber: true,
       },
     });
 
@@ -394,6 +398,7 @@ export async function removePartnerShareLogo(options: {
       shareLogoUrl: true,
       shareButtonBackground: true,
       shareButtonTextColor: true,
+      shareWhatsAppNumber: true,
     },
   });
 

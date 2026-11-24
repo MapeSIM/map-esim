@@ -241,11 +241,12 @@ async function main() {
   assert.match(viewSrc, /Share this page/);
   assert.match(viewSrc, /Contact support|supportEmail/);
   assert.match(viewSrc, /Scan on eSIM device/);
+  assert.match(viewSrc, /SmartInstallEsimButton/);
   assert.doesNotMatch(viewSrc, /ManualInstallSheet/);
-  assert.doesNotMatch(viewSrc, /SmartInstallEsimButton/);
   assert.doesNotMatch(viewSrc, /Start installation/);
   assert.doesNotMatch(viewSrc, /NEED ANOTHER OPTION|Need another option/i);
   assert.doesNotMatch(viewSrc, /SHARE & SUPPORT|Share & support/i);
+  assert.doesNotMatch(viewSrc, /Tap Install eSIM on this phone|ONE_TAP_FALLBACK/);
   assert.doesNotMatch(viewSrc, /wa\.me/i);
   assert.doesNotMatch(viewSrc, /partnerCharge|discountBps|providerCost|wallet/);
   assert.doesNotMatch(viewSrc, /Confirmation PIN|confirmationPin/);
@@ -380,6 +381,7 @@ async function main() {
       "logoUrl",
       "supportEmail",
       "websiteUrl",
+      "whatsappNumber",
     ]);
     assert.equal(page.branding.companyName, null);
     assert.equal(page.branding.logoUrl, null);

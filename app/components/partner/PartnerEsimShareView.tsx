@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, type CSSProperties } from "react";
 import { Copy, RefreshCw, Share2 } from "lucide-react";
 import EsimActionSheet from "@/app/components/install/EsimActionSheet";
+import SmartInstallEsimButton from "@/app/components/install/SmartInstallEsimButton";
 import type { PartnerEsimSharePageData } from "@/app/lib/partner/partnerEsimShareRead";
 import Link from "next/link";
 
@@ -28,8 +29,20 @@ function formatGb(value: number | null): string {
   return `${value.toFixed(2)} GB`;
 }
 
+function brandInstallStyle(
+  data: PartnerEsimSharePageData
+): CSSProperties | undefined {
+  const bg = data.branding.buttonBackground;
+  const fg = data.branding.buttonTextColor;
+  if (!bg || !fg) return undefined;
+  return { backgroundColor: bg, color: fg };
+}
+
+const installBtnClass =
+  "inline-flex h-11 w-full min-w-0 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--accent-ink)] outline-none transition hover:brightness-105 focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60";
+
 const actionBtnClass =
-  "inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 text-sm font-semibold text-[var(--heading)] outline-none transition hover:bg-[var(--surface)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60";
+  "inline-flex h-10 w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 text-sm font-semibold text-[var(--heading)] outline-none transition hover:bg-[var(--surface)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60";
 
 export default function PartnerEsimShareView({ token, data }: Props) {
   const [usage, setUsage] = useState<UsagePayload | null>(null);
@@ -158,6 +171,19 @@ export default function PartnerEsimShareView({ token, data }: Props) {
           Installation details are not available yet.
         </p>
       )}
+
+      {data.installDetailsAvailable ? (
+        <div className="min-w-0 w-full">
+          <SmartInstallEsimButton
+            activationLpa={data.lpa}
+            qrViewHref={data.qrDataUrl}
+            smdpAddress={data.smdpAddress}
+            activationCode={data.activationCode}
+            className={installBtnClass}
+            style={brandInstallStyle(data)}
+          />
+        </div>
+      ) : null}
 
       <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5">
         {data.fullIccid ? (

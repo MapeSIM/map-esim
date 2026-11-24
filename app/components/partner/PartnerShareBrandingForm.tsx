@@ -40,6 +40,9 @@ export default function PartnerShareBrandingForm({
   const [companyName, setCompanyName] = useState(saved.companyName ?? "");
   const [supportEmail, setSupportEmail] = useState(saved.supportEmail ?? "");
   const [websiteUrl, setWebsiteUrl] = useState(saved.websiteUrl ?? "");
+  const [whatsappNumber, setWhatsappNumber] = useState(
+    saved.whatsappNumber ?? ""
+  );
   const [logoUrl, setLogoUrl] = useState(saved.logoUrl ?? "");
   const [logoBusy, setLogoBusy] = useState(false);
   const [logoMessage, setLogoMessage] = useState<string | null>(null);
@@ -133,7 +136,7 @@ export default function PartnerShareBrandingForm({
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0D1526]">
+    <div className="min-w-0 max-w-full overflow-x-hidden rounded-2xl border border-white/[0.08] bg-[#0D1526]">
       <form
         id={COLOR_SCRATCH_FORM_ID}
         method="dialog"
@@ -270,6 +273,33 @@ export default function PartnerShareBrandingForm({
                 autoComplete="url"
                 className={fieldClass}
               />
+            </label>
+            <label className={`${labelClass} sm:col-span-2`}>
+              WhatsApp Support Number
+              <input
+                name="whatsappNumber"
+                type="tel"
+                inputMode="tel"
+                value={whatsappNumber}
+                onChange={(e) => setWhatsappNumber(e.target.value)}
+                maxLength={24}
+                placeholder="+923001234567"
+                autoComplete="tel"
+                className={fieldClass}
+              />
+              <span className="mt-0.5 block text-[10px] font-normal text-slate-500">
+                International format. Leave blank or clear to hide the share-page
+                WhatsApp button.
+              </span>
+              {whatsappNumber.trim() ? (
+                <button
+                  type="button"
+                  onClick={() => setWhatsappNumber("")}
+                  className="mt-1.5 inline-flex h-7 items-center rounded-md border border-rose-500/30 px-2.5 text-[11px] font-semibold text-rose-300 hover:bg-rose-500/10"
+                >
+                  Remove WhatsApp number
+                </button>
+              ) : null}
             </label>
           </div>
 

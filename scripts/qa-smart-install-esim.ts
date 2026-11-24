@@ -224,7 +224,8 @@ function main() {
   assert.doesNotMatch(partnerPanel, /AppleOneTapInstallButton/);
   assert.doesNotMatch(partnerPanel, /useAppleOneTapInstallState/);
   assert.doesNotMatch(partnerPanel, /isIphoneSafariBrowser/);
-  assert.doesNotMatch(shareView, /SmartInstallEsimButton/);
+  assert.match(shareView, /SmartInstallEsimButton/);
+  assert.doesNotMatch(shareView, /Start installation|ONE_TAP_FALLBACK/);
   assert.doesNotMatch(shareView, /One-Tap Install eSIM/);
 
   assert.match(installApi, /authorizeCustomerOwnedOrderInstall/);

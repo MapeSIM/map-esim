@@ -45,6 +45,7 @@ export default function SandboxShareBrandingForm() {
   const [hydrated, setHydrated] = useState(false);
   const [companyName, setCompanyName] = useState("");
   const [supportEmail, setSupportEmail] = useState("");
+  const [whatsappNumber, setWhatsappNumber] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [buttonBackground, setButtonBackground] = useState(
     SANDBOX_DEFAULT_BUTTON_BG
@@ -63,6 +64,7 @@ export default function SandboxShareBrandingForm() {
     const saved = readSandboxShareBranding();
     setCompanyName(saved.companyName);
     setSupportEmail(saved.supportEmail);
+    setWhatsappNumber(saved.whatsappNumber);
     setLogoUrl(saved.logoUrl);
     setButtonBackground(saved.buttonBackground);
     setButtonTextColor(saved.buttonTextColor);
@@ -89,6 +91,7 @@ export default function SandboxShareBrandingForm() {
         patch.logoUrl !== undefined ? patch.logoUrl : current.logoUrl,
       buttonBackground: patch.buttonBackground ?? current.buttonBackground,
       buttonTextColor: patch.buttonTextColor ?? current.buttonTextColor,
+      whatsappNumber: patch.whatsappNumber ?? current.whatsappNumber,
     });
   }
 
@@ -168,9 +171,11 @@ export default function SandboxShareBrandingForm() {
       logoUrl,
       buttonBackground: buttonBackground.toLowerCase(),
       buttonTextColor: buttonTextColor.toLowerCase(),
+      whatsappNumber,
     });
     setCompanyName(next.companyName);
     setSupportEmail(next.supportEmail);
+    setWhatsappNumber(next.whatsappNumber);
     setLogoUrl(next.logoUrl);
     setButtonBackground(next.buttonBackground);
     setButtonTextColor(next.buttonTextColor);
@@ -305,6 +310,36 @@ export default function SandboxShareBrandingForm() {
                 autoComplete="email"
                 className={fieldClass}
               />
+            </label>
+            <label className={`${labelClass} sm:col-span-2`}>
+              WhatsApp Support Number
+              <input
+                name="whatsappNumber"
+                type="tel"
+                inputMode="tel"
+                value={whatsappNumber}
+                onChange={(e) => setWhatsappNumber(e.target.value)}
+                maxLength={24}
+                placeholder="+923001234567"
+                autoComplete="tel"
+                className={fieldClass}
+              />
+              <span className="mt-0.5 block text-[10px] font-normal text-slate-500">
+                Leave blank to hide the floating WhatsApp button on share
+                preview.
+              </span>
+              {whatsappNumber.trim() ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWhatsappNumber("");
+                    persistPartial({ whatsappNumber: "" });
+                  }}
+                  className="mt-1.5 inline-flex h-7 items-center rounded-md border border-rose-500/30 px-2.5 text-[11px] font-semibold text-rose-300 hover:bg-rose-500/10"
+                >
+                  Remove WhatsApp number
+                </button>
+              ) : null}
             </label>
           </div>
 
