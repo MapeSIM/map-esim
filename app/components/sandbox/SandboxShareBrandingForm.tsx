@@ -10,6 +10,7 @@ import {
 import {
   readSandboxShareBranding,
   writeSandboxShareBranding,
+  SANDBOX_DEFAULT_BRANDING,
   SANDBOX_DEFAULT_BUTTON_BG,
   SANDBOX_DEFAULT_BUTTON_FG,
   SANDBOX_LOGO_MAX_BYTES,
@@ -163,7 +164,7 @@ export default function SandboxShareBrandingForm() {
 
     const next = writeSandboxShareBranding({
       companyName: name,
-      supportEmail: email || "support@example.com",
+      supportEmail: email || SANDBOX_DEFAULT_BRANDING.supportEmail,
       logoUrl,
       buttonBackground: buttonBackground.toLowerCase(),
       buttonTextColor: buttonTextColor.toLowerCase(),

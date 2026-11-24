@@ -1,19 +1,20 @@
 "use client";
 
+/**
+ * Legacy destination buy grid — unused by current /sandbox/catalog/[slug]
+ * (PlansListing + /sandbox/buy). Kept safe: never invents API keys or local
+ * wallet credits/debits; refreshes Neon balance after POST orders only.
+ */
+
 import { useEffect, useState } from "react";
+import { SANDBOX_DEFAULT_BALANCE_CENTS } from "@/app/lib/sandbox/sandboxShared";
 import {
-  generateSandboxTestKey,
-  SANDBOX_CATALOG,
-  SANDBOX_DEFAULT_BALANCE_CENTS,
-} from "@/app/lib/sandbox/sandboxShared";
-import {
-  SANDBOX_API_KEY_KEY,
-  SANDBOX_ORDERS_KEY,
-  SANDBOX_TX_KEY,
-  SANDBOX_WALLET_KEY,
-  type SandboxStoredOrder,
-  type SandboxWalletTx,
-} from "@/app/lib/sandbox/sandboxClientStorage";
+  pickSandboxSku,
+  readSandboxApiKey,
+  refreshSandboxWalletCache,
+  rememberSandboxOrder,
+} from "@/app/lib/sandbox/sandboxPurchaseClient";
+import type { SandboxStoredOrder } from "@/app/lib/sandbox/sandboxClientStorage";
 import { partnerCardClass } from "@/app/components/partner/partnerPortalUi";
 
 type OfferRow = {
@@ -30,15 +31,6 @@ function formatUsd(cents: number): string {
   }).format(cents / 100);
 }
 
-/** Map a listed retail plan onto the closest sandbox catalog SKU for issuance. */
-function pickSandboxSku(priceCents: number): string {
-  const sorted = [...SANDBOX_CATALOG].sort(
-    (a, b) =>
-      Math.abs(a.priceCents - priceCents) - Math.abs(b.priceCents - priceCents)
-  );
-  return sorted[0]?.id ?? SANDBOX_CATALOG[0]!.id;
-}
-
 export default function SandboxDestinationBuyClient({
   destinationName,
   region,
@@ -49,35 +41,31 @@ export default function SandboxDestinationBuyClient({
   offers: OfferRow[];
 }) {
   const [balanceCents, setBalanceCents] = useState(SANDBOX_DEFAULT_BALANCE_CENTS);
-  const [apiKey, setApiKey] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const bal = localStorage.getItem(SANDBOX_WALLET_KEY);
-      setBalanceCents(
-        bal != null && Number.isFinite(Number(bal))
-          ? Number(bal)
-          : SANDBOX_DEFAULT_BALANCE_CENTS
-      );
-      let key = localStorage.getItem(SANDBOX_API_KEY_KEY);
-      if (!key?.startsWith("sb_test_")) {
-        key = generateSandboxTestKey();
-        localStorage.setItem(SANDBOX_API_KEY_KEY, key);
-      }
-      setApiKey(key);
-    } catch {
-      setApiKey(generateSandboxTestKey());
+    let cancelled = false;
+    async function load() {
+      const cents = await refreshSandboxWalletCache();
+      if (!cancelled && typeof cents === "number") setBalanceCents(cents);
     }
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function buy(row: OfferRow) {
     setError(null);
     setMessage(null);
-    const charge =
-      row.priceCents > 0 ? row.priceCents : SANDBOX_CATALOG[0]!.priceCents;
+    const key = readSandboxApiKey();
+    if (!key) {
+      setError("Sandbox session API key missing.");
+      return;
+    }
+    const charge = row.priceCents > 0 ? row.priceCents : 450;
     if (balanceCents < charge) {
       setError("Insufficient wallet balance. Add funds on Wallet.");
       return;
@@ -88,7 +76,7 @@ export default function SandboxDestinationBuyClient({
       const res = await fetch("/api/sandbox/v1/orders", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ offerId: sku, quantity: 1 }),
@@ -108,45 +96,19 @@ export default function SandboxDestinationBuyClient({
         setError(data.message || "Purchase failed.");
         return;
       }
-      const total = charge;
-      const nextBal = balanceCents - total;
       const order: SandboxStoredOrder = {
         orderId: data.order.orderId,
         planName: `${destinationName} · ${row.name}`,
         region,
-        totalCents: total,
+        totalCents: data.order.totalCents ?? charge,
         iccid: data.order.iccid,
         activationCode: data.order.activationCode,
         createdAt: data.order.createdAt,
         status: "COMPLETED",
       };
-      const tx: SandboxWalletTx = {
-        id: `tx_${order.orderId}`,
-        label: `Purchase · ${order.planName}`,
-        amountCents: -total,
-        createdAt: order.createdAt,
-        kind: "debit",
-      };
-      setBalanceCents(nextBal);
-      try {
-        localStorage.setItem(SANDBOX_WALLET_KEY, String(nextBal));
-        const prev = JSON.parse(
-          localStorage.getItem(SANDBOX_ORDERS_KEY) || "[]"
-        ) as SandboxStoredOrder[];
-        localStorage.setItem(
-          SANDBOX_ORDERS_KEY,
-          JSON.stringify([order, ...(Array.isArray(prev) ? prev : [])].slice(0, 40))
-        );
-        const txs = JSON.parse(
-          localStorage.getItem(SANDBOX_TX_KEY) || "[]"
-        ) as SandboxWalletTx[];
-        localStorage.setItem(
-          SANDBOX_TX_KEY,
-          JSON.stringify([tx, ...(Array.isArray(txs) ? txs : [])].slice(0, 50))
-        );
-      } catch {
-        /* ignore */
-      }
+      rememberSandboxOrder(order);
+      const nextBal = await refreshSandboxWalletCache();
+      if (typeof nextBal === "number") setBalanceCents(nextBal);
       setMessage(`Order ${order.orderId} completed · ICCID ${order.iccid}`);
     } catch {
       setError("Network error.");

@@ -2,15 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import {
-  CustomerEsimOrderCard,
-  type CustomerEsimOrderCardOrder,
-} from "@/app/components/orders/CustomerEsimOrderCard";
+import PartnerEsimOrderCard from "@/app/components/partner/PartnerEsimOrderCard";
 import {
   SANDBOX_ORDERS_KEY,
   type SandboxStoredOrder,
 } from "@/app/lib/sandbox/sandboxClientStorage";
 import { readSandboxApiKey } from "@/app/lib/sandbox/sandboxPurchaseClient";
+import { sandboxOrderToPartnerRow } from "@/app/lib/sandbox/sandboxOrderPresentation";
 import { partnerCardClass } from "@/app/components/partner/partnerPortalUi";
 
 function formatUsd(cents: number): string {
@@ -18,32 +16,6 @@ function formatUsd(cents: number): string {
     style: "currency",
     currency: "USD",
   }).format(cents / 100);
-}
-
-function toCardOrder(row: SandboxStoredOrder): CustomerEsimOrderCardOrder {
-  const short =
-    row.orderId.length > 10
-      ? `${row.orderId.slice(0, 4)}…${row.orderId.slice(-4)}`
-      : row.orderId;
-  return {
-    id: row.orderId,
-    shortReference: short,
-    destination: row.region || "Destination",
-    flagUrl: null,
-    planName: row.planName,
-    dataAllowance: "View details",
-    validity: "—",
-    statusBadge: "Completed",
-    amountLabel: formatUsd(row.totalCents),
-    createdAtLabel: new Date(row.createdAt).toLocaleString(),
-    iccidMasked: row.iccid || "Pending",
-    iccid: row.iccid || null,
-    emailDeliveryLabel: null,
-    addDataEligible: false,
-    isAddDataPurchase: false,
-    lifecycle: null,
-    remainingDataLabel: null,
-  };
 }
 
 export default function SandboxOrdersClient({
@@ -138,9 +110,10 @@ export default function SandboxOrdersClient({
             My eSIMs
           </h1>
           <p className="mt-1 text-sm text-slate-400">
-            <span className="sm:hidden">Orders, QR codes, and usage.</span>
+            <span className="sm:hidden">Orders, QR, and share.</span>
             <span className="hidden sm:inline">
-              Search, filter, and manage sandbox orders — QR, LPA, and share.
+              Search, filter, and manage Partner orders — QR, LPA, usage, and
+              share.
             </span>
           </p>
         </div>
@@ -212,9 +185,12 @@ export default function SandboxOrdersClient({
         <ul className="space-y-3">
           {orders.map((row) => (
             <li key={row.orderId}>
-              <CustomerEsimOrderCard
-                order={toCardOrder(row)}
-                detailHref={`/sandbox/orders/${encodeURIComponent(row.orderId)}`}
+              <PartnerEsimOrderCard
+                row={sandboxOrderToPartnerRow(row)}
+                refundRequest={null}
+                variant="list"
+                ordersBasePath="/sandbox/orders"
+                enablePartnerSupport={false}
               />
             </li>
           ))}

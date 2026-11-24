@@ -1,32 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import CopyInstallField from "@/app/components/install/CopyInstallField";
+import ManualInstallSheet from "@/app/components/install/ManualInstallSheet";
+import SmartInstallEsimButton from "@/app/components/install/SmartInstallEsimButton";
+import EsimOrderDetailCard from "@/app/components/orders/EsimOrderDetailCard";
 import {
   findCachedSandboxOrder,
   readSandboxApiKey,
 } from "@/app/lib/sandbox/sandboxPurchaseClient";
+import {
+  parseSandboxLpa,
+  sandboxOrderToPartnerRow,
+} from "@/app/lib/sandbox/sandboxOrderPresentation";
 import type { SandboxStoredOrder } from "@/app/lib/sandbox/sandboxClientStorage";
-import { partnerCardClass } from "@/app/components/partner/partnerPortalUi";
-
-function formatUsd(cents: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(cents / 100);
-}
-
-function parseLpaParts(activationCode: string): {
-  smdp: string;
-  matchingId: string;
-} {
-  const parts = activationCode.split("$");
-  if (parts.length >= 3 && parts[0]?.startsWith("LPA:")) {
-    return { smdp: parts[1] || "—", matchingId: parts[2] || "—" };
-  }
-  return { smdp: "—", matchingId: activationCode || "—" };
-}
+import {
+  partnerCardClass,
+  partnerPrimaryCtaClass,
+  partnerSecondaryCtaClass,
+  partnerSectionLabelClass,
+} from "@/app/components/partner/partnerPortalUi";
+import { ONE_TAP_FALLBACK } from "@/app/lib/install/progressiveInstallCopy";
 
 export default function SandboxOrderDetailClient({
   orderId,
@@ -115,6 +110,15 @@ export default function SandboxOrderDetailClient({
     };
   }, [order]);
 
+  const row = useMemo(
+    () => (order ? sandboxOrderToPartnerRow(order) : null),
+    [order]
+  );
+  const lpaParts = useMemo(
+    () => parseSandboxLpa(order?.activationCode ?? ""),
+    [order]
+  );
+
   if (!ready) {
     return (
       <div className={partnerCardClass}>
@@ -123,7 +127,7 @@ export default function SandboxOrderDetailClient({
     );
   }
 
-  if (!order) {
+  if (!order || !row) {
     return (
       <div className={partnerCardClass + " space-y-3"}>
         <p className="text-sm text-slate-300">Order not found.</p>
@@ -137,75 +141,114 @@ export default function SandboxOrderDetailClient({
     );
   }
 
-  const lpa = parseLpaParts(order.activationCode);
+  const shareHref = `/sandbox/share/preview?orderId=${encodeURIComponent(order.orderId)}`;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Link
-          href="/sandbox/orders"
-          className="text-sm font-semibold text-emerald-400 hover:text-emerald-300"
-        >
-          ← My eSIMs
-        </Link>
-        <h1 className="mt-3 text-2xl font-bold text-slate-50">
-          {order.region}
-        </h1>
-        <p className="mt-1 text-sm text-slate-400">{order.planName}</p>
-      </div>
+    <div className="mx-auto w-full max-w-lg space-y-4 [--heading:#f8fafc] [--surface:#0D1526] [--surface-2:#111827] [--text:#e2e8f0] [--text-muted:#94a3b8] [--text-soft:#64748b] [--border:rgba(255,255,255,0.08)] [--accent-strong:#84cc16] [--accent:#84cc16] [--accent-ink:#052e16]">
+      <Link
+        href="/sandbox/orders"
+        className="inline-flex text-sm font-semibold text-emerald-400 hover:text-emerald-300"
+      >
+        ← My eSIMs
+      </Link>
 
-      <div className={partnerCardClass + " space-y-4"}>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">
-            Completed
-          </span>
-          <span className="text-sm tabular-nums text-slate-400">
-            {formatUsd(order.totalCents)} ·{" "}
-            {new Date(order.createdAt).toLocaleString()}
-          </span>
-        </div>
+      <EsimOrderDetailCard
+        orderId={row.orderId}
+        dataPlan={row.planName}
+        validityPeriod={row.validity}
+        amountPaid={row.partnerDebitLabel}
+        purchasedAt={row.purchasedAtLabel}
+        dataAllowance={row.dataAllowance}
+        orderStatusLabel="Completed"
+        isRefunded={false}
+        lifecycle={row.lifecycle}
+        usagePath={null}
+        usageEligible={false}
+        viewQrHref={null}
+        onViewQr={undefined}
+        enableShare
+        shareUrl={shareHref}
+        shareTitle={row.planName}
+        addDataHref={null}
+        footer={
+          <p className="border-t border-white/8 pt-3 text-xs text-white/45">
+            {row.shortReference} · Simulated sandbox order
+          </p>
+        }
+      />
 
-        <div className="mx-auto h-48 w-48 overflow-hidden rounded-2xl border border-white/[0.08] bg-white p-2">
-          {qrDataUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={qrDataUrl}
-              alt="eSIM install QR"
-              width={192}
-              height={192}
-              className="h-full w-full object-contain"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center text-xs text-slate-500">
-              QR unavailable
+      {order.activationCode ? (
+        <>
+          <section className={partnerCardClass}>
+            <p className={partnerSectionLabelClass}>QR code</p>
+            <p className="mt-2 text-sm text-[var(--text-muted)]">
+              Scan this code with another phone if you are not installing on
+              this device.
+            </p>
+            <div className="mt-4 rounded-2xl border border-[var(--border)] bg-white p-4">
+              {qrDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={qrDataUrl}
+                  alt="eSIM installation QR code"
+                  width={200}
+                  height={200}
+                  className="mx-auto h-auto w-full max-w-[180px] sm:max-w-[200px]"
+                />
+              ) : (
+                <p className="py-10 text-center text-sm text-slate-500">
+                  Generating QR…
+                </p>
+              )}
             </div>
-          )}
-        </div>
+          </section>
 
-        <CopyInstallField label="LPA / activation code" value={order.activationCode} />
-        <CopyInstallField label="SM-DP+ address" value={lpa.smdp} />
-        <CopyInstallField label="Activation code" value={lpa.matchingId} />
-        {order.iccid ? (
-          <CopyInstallField label="ICCID" value={order.iccid} />
-        ) : null}
+          <section className={partnerCardClass}>
+            <p className={partnerSectionLabelClass}>Install</p>
+            <h2 className="mt-2 text-base font-semibold tracking-tight text-[var(--heading)]">
+              Start installation
+            </h2>
+            <div className="mt-4">
+              <SmartInstallEsimButton
+                activationLpa={lpaParts.lpa}
+                qrViewHref={qrDataUrl}
+                smdpAddress={lpaParts.smdpAddress}
+                activationCode={lpaParts.matchingId}
+                className={partnerPrimaryCtaClass}
+              />
+            </div>
+            <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
+              {ONE_TAP_FALLBACK}
+            </p>
+            <ol className="mt-3 space-y-1.5 text-sm leading-relaxed text-[var(--text)]">
+              <li>1. Tap Install eSIM on this phone.</li>
+              <li>2. If nothing opens, scan the QR code with another device.</li>
+              <li>3. Still stuck? Use Manual Install.</li>
+            </ol>
+          </section>
 
-        <div className="flex flex-wrap gap-2 border-t border-white/[0.06] pt-4">
-          <Link
-            href={`/sandbox/share/preview?orderId=${encodeURIComponent(order.orderId)}`}
-            className="inline-flex h-11 items-center rounded-xl bg-emerald-500 px-4 text-sm font-bold text-slate-950"
-          >
-            Share QR
-          </Link>
-          <a
-            href={`https://esimsetup.apple.com/esim_qrcode_provisioning?carddata=${encodeURIComponent(order.activationCode)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex h-11 items-center rounded-xl border border-white/[0.12] px-4 text-sm font-semibold text-slate-100"
-          >
-            Install eSIM
-          </a>
-        </div>
-      </div>
+          {order.iccid ? (
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-3">
+              <CopyInstallField label="ICCID" value={order.iccid} />
+            </div>
+          ) : null}
+
+          <section className={partnerCardClass}>
+            <p className={partnerSectionLabelClass}>Need another option?</p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <ManualInstallSheet
+                smdpAddress={lpaParts.smdpAddress}
+                activationCode={lpaParts.matchingId}
+                lpa={lpaParts.lpa}
+                buttonClassName={partnerSecondaryCtaClass}
+              />
+              <Link href={shareHref} className={partnerSecondaryCtaClass}>
+                White-label share page
+              </Link>
+            </div>
+          </section>
+        </>
+      ) : null}
     </div>
   );
 }

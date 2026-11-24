@@ -57,6 +57,13 @@ type Props = {
   variant?: "list" | "detail";
   /** Partner share-settings company name for outbound share messages. */
   partnerDisplayName?: string | null;
+  /**
+   * Orders route root — partner `/partner/orders` or sandbox `/sandbox/orders`.
+   * List cards and detail links stay on this base.
+   */
+  ordersBasePath?: string;
+  /** When false, hide raise-issue / partner-only refund chrome (sandbox). */
+  enablePartnerSupport?: boolean;
 };
 
 export default function PartnerEsimOrderCard({
@@ -65,23 +72,31 @@ export default function PartnerEsimOrderCard({
   supportTicket = null,
   variant = "detail",
   partnerDisplayName = null,
+  ordersBasePath = "/partner/orders",
+  enablePartnerSupport = true,
 }: Props) {
   const [showInstall, setShowInstall] = useState(false);
   const [raiseIssueOpen, setRaiseIssueOpen] = useState(false);
   const [viewTicketOpen, setViewTicketOpen] = useState(false);
+  const ordersRoot = (ordersBasePath || "/partner/orders").replace(/\/$/, "");
   const canRaiseIssue =
-    !supportTicket || isOrderSupportTicketTerminalStatus(supportTicket.status);
+    enablePartnerSupport &&
+    (!supportTicket || isOrderSupportTicketTerminalStatus(supportTicket.status));
   const refunded = partnerOrderIsRefunded(row.statusBadge);
   const expired = row.statusBadge === "eSIM Expired";
   const lineReady = partnerOrderLineReady(row.statusBadge) && !refunded;
   const installAllowed =
     partnerOrderInstallAllowed(row.statusBadge) && !refunded;
-  const addDataHref = row.addDataEligible
-    ? `/partner/orders/${encodeURIComponent(row.orderId)}/add-data`
-    : null;
-  const detailHref = `/partner/orders/${encodeURIComponent(row.orderId)}`;
+  const addDataHref =
+    enablePartnerSupport && row.addDataEligible
+      ? `${ordersRoot}/${encodeURIComponent(row.orderId)}/add-data`
+      : null;
+  const detailHref = `${ordersRoot}/${encodeURIComponent(row.orderId)}`;
   const dataSummary = quickDataSummary(row);
-  const qrBase = `/api/partner/orders/${encodeURIComponent(row.orderId)}/qr`;
+  const qrBase =
+    ordersRoot === "/sandbox/orders"
+      ? null
+      : `/api/partner/orders/${encodeURIComponent(row.orderId)}/qr`;
 
   if (variant === "list") {
     return (
@@ -157,21 +172,28 @@ export default function PartnerEsimOrderCard({
         isRefunded={refunded}
         lifecycle={row.lifecycle}
         usagePath={
-          lineReady
+          lineReady && enablePartnerSupport && qrBase
             ? `/api/partner/orders/${encodeURIComponent(row.orderId)}/usage`
             : null
         }
-        usageEligible={lineReady}
-        viewQrHref={installAllowed ? qrBase : null}
-        qrDownloadHref={installAllowed ? `${qrBase}?download=1` : null}
+        usageEligible={lineReady && enablePartnerSupport}
+        viewQrHref={installAllowed && qrBase ? qrBase : null}
+        qrDownloadHref={
+          installAllowed && qrBase ? `${qrBase}?download=1` : null
+        }
         enableShare
-        shareUrl={`/partner/orders/${encodeURIComponent(row.orderId)}`}
+        shareUrl={
+          ordersRoot === "/sandbox/orders"
+            ? `/sandbox/share/preview?orderId=${encodeURIComponent(row.orderId)}`
+            : detailHref
+        }
         shareTitle={row.planName}
         addDataHref={addDataHref}
         onRaiseIssue={
           canRaiseIssue ? () => setRaiseIssueOpen(true) : undefined
         }
         raiseIssueExtra={
+          enablePartnerSupport ? (
           <>
             {supportTicket ? (
               <button
@@ -204,6 +226,7 @@ export default function PartnerEsimOrderCard({
               showTrigger={false}
             />
           </>
+          ) : null
         }
         footer={
           <div className="space-y-3 border-t border-white/8 pt-3">
@@ -227,7 +250,7 @@ export default function PartnerEsimOrderCard({
                 Add More Data
               </Link>
             ) : null}
-            {showInstall && installAllowed ? (
+            {showInstall && installAllowed && enablePartnerSupport ? (
               <div id="partner-install">
                 <PartnerEsimInstallPanel
                   orderId={row.orderId}
@@ -243,6 +266,19 @@ export default function PartnerEsimOrderCard({
                   addDataHref={addDataHref}
                   defaultExpanded
                 />
+              </div>
+            ) : null}
+            {showInstall && installAllowed && !enablePartnerSupport ? (
+              <div className="space-y-2">
+                <Link
+                  href={`/sandbox/share/preview?orderId=${encodeURIComponent(row.orderId)}`}
+                  className={partnerSecondaryCtaClass}
+                >
+                  Open share / install page
+                </Link>
+                <Link href={detailHref} className={partnerSecondaryCtaClass}>
+                  View QR &amp; LPA details
+                </Link>
               </div>
             ) : null}
           </div>

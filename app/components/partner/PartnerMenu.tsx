@@ -94,6 +94,7 @@ export default function PartnerMenu({
       localStorage.removeItem("mapesim_sandbox_api_key");
       localStorage.removeItem("mapesim_sandbox_session");
       localStorage.removeItem("mapesim_sandbox_wallet_tx");
+      localStorage.removeItem("mapesim_sandbox_share_branding");
     } catch {
       /* ignore */
     }
@@ -197,11 +198,9 @@ export default function PartnerMenu({
               </span>
             </span>
           </Link>
-          {!isSandbox ? (
-            <span className="hidden max-w-[10rem] truncate rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[11px] font-semibold text-slate-300 md:inline-flex lg:max-w-[14rem]">
-              {badge}
-            </span>
-          ) : null}
+          <span className="hidden max-w-[10rem] truncate rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[11px] font-semibold text-slate-300 md:inline-flex lg:max-w-[14rem]">
+            {badge}
+          </span>
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">

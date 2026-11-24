@@ -11,7 +11,7 @@ import {
   rememberSandboxOrder,
 } from "@/app/lib/sandbox/sandboxPurchaseClient";
 import type { SandboxStoredOrder } from "@/app/lib/sandbox/sandboxClientStorage";
-import { partnerCardClass } from "@/app/components/partner/partnerPortalUi";
+import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 
 type Props = {
   offerId: string;
@@ -27,6 +27,10 @@ function formatUsd(cents: number): string {
   }).format(cents / 100);
 }
 
+/**
+ * Partner-styled confirm purchase for mapesim.store.
+ * Completes a simulated sandbox order only (POST /api/sandbox/v1/orders).
+ */
 export default function SandboxStorefrontBuy({
   offerId,
   country,
@@ -50,8 +54,16 @@ export default function SandboxStorefrontBuy({
   const catalogItem = SANDBOX_CATALOG.find((item) => item.id === sku);
   const chargeCents = catalogItem?.priceCents ?? priceCents;
   const displayName =
-    planName.trim() || catalogItem?.name || "Sandbox eSIM plan";
+    planName.trim() || catalogItem?.name || "Partner eSIM plan";
   const destinationLabel = country.trim() || catalogItem?.region || "Destination";
+  const dataLabel = catalogItem
+    ? `${catalogItem.dataGb} GB`
+    : "Sandbox data";
+  const validityLabel = catalogItem
+    ? `${catalogItem.days} days`
+    : "Sandbox validity";
+  const retailLabel = formatUsd(priceCents);
+  const partnerLabel = formatUsd(chargeCents);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,12 +82,12 @@ export default function SandboxStorefrontBuy({
     const key = readSandboxApiKey();
     if (!key) {
       setError(
-        "Sandbox session API key missing. Sign in again from the sandbox admin invite or home gate."
+        "Sandbox session API key missing. Open the sandbox portal from your provisioned session and try again."
       );
       return;
     }
     if (balanceCents != null && balanceCents < chargeCents) {
-      setError("Insufficient sandbox wallet balance. Add funds on Wallet first.");
+      setError("Insufficient Partner balance. Add funds on Wallet first.");
       return;
     }
     setBusy(true);
@@ -101,7 +113,7 @@ export default function SandboxStorefrontBuy({
         };
       };
       if (!res.ok || !data.order) {
-        setError(data.message || "Purchase failed.");
+        setError(data.message || "Unable to purchase.");
         return;
       }
 
@@ -116,7 +128,6 @@ export default function SandboxStorefrontBuy({
         status: "COMPLETED",
       };
       rememberSandboxOrder(order);
-      // Always re-sync Neon balance after debit — never invent a local credit/debit.
       const nextBal = await refreshSandboxWalletCache();
       if (nextBal != null) setBalanceCents(nextBal);
       setDoneOrderId(order.orderId);
@@ -130,100 +141,127 @@ export default function SandboxStorefrontBuy({
 
   if (doneOrderId) {
     return (
-      <div className={partnerCardClass + " space-y-4"}>
-        <h1 className="text-xl font-bold text-slate-50">Purchase complete</h1>
-        <p className="text-sm text-slate-400">
-          Your sandbox eSIM is ready. Open the order for QR, LPA, and share.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href={`/sandbox/orders/${encodeURIComponent(doneOrderId)}`}
-            className="inline-flex h-11 items-center rounded-xl bg-emerald-500 px-4 text-sm font-bold text-slate-950"
-          >
-            View order
-          </Link>
-          <Link
-            href="/sandbox/orders"
-            className="inline-flex h-11 items-center rounded-xl border border-white/[0.12] px-4 text-sm font-semibold text-slate-100"
-          >
-            My eSIMs
-          </Link>
+      <div className="space-y-6">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4">
+          <p className="text-sm font-semibold text-[var(--heading)]">
+            Purchase complete
+          </p>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">
+            Your simulated Partner eSIM is ready — open the order for QR, LPA,
+            and share. No live supplier order was placed.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link
+              href={`/sandbox/orders/${encodeURIComponent(doneOrderId)}`}
+              className="inline-flex h-10 items-center rounded-xl bg-emerald-500 px-4 text-sm font-bold text-slate-950"
+            >
+              View eSIM
+            </Link>
+            <Link
+              href="/sandbox/orders"
+              className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)]"
+            >
+              My eSIMs
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-lg space-y-6">
-      <div>
-        <Link
-          href="/sandbox/catalog"
-          className="text-sm font-semibold text-emerald-400 hover:text-emerald-300"
-        >
-          ← Back to catalog
-        </Link>
-        <h1 className="mt-3 text-2xl font-bold text-slate-50">Confirm purchase</h1>
-        <p className="mt-1 text-sm text-slate-400">
-          Charged to your sandbox wallet. This is demo data only.
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--heading)]">
+        <p>
+          Purchases are charged from your MAP eSIM Partner balance (
+          <span className="font-semibold tabular-nums">
+            {balanceCents == null ? "…" : formatUsd(balanceCents)} USD
+          </span>
+          ).
         </p>
-      </div>
-
-      <div className={partnerCardClass + " space-y-3"}>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
-            Destination
-          </p>
-          <p className="mt-1 text-base font-semibold text-slate-50">
-            {destinationLabel}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
-            Plan
-          </p>
-          <p className="mt-1 text-base font-semibold text-slate-50">{displayName}</p>
-        </div>
-        <div className="flex flex-wrap items-end justify-between gap-3 border-t border-white/[0.06] pt-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
-              Charge
-            </p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-emerald-300">
-              {formatUsd(chargeCents)}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
-              Wallet
-            </p>
-            <p className="mt-1 text-sm font-semibold tabular-nums text-slate-200">
-              {balanceCents == null ? "…" : formatUsd(balanceCents)}
-            </p>
-          </div>
-        </div>
+        <p className="mt-1 text-[var(--text-muted)]">
+          This is a sandbox simulation on mapesim.store — the flow matches
+          partneresim.com, but no real supplier or production order is created.
+        </p>
       </div>
 
       {error ? (
-        <p
-          className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100"
-          role="alert"
+        <div
+          className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 py-4"
+          role="status"
+          aria-live="polite"
         >
-          {error}
-        </p>
+          <p className="text-sm font-semibold text-[var(--heading)]">
+            Unable to purchase
+          </p>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">{error}</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link
+              href="/sandbox/wallet"
+              className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)]"
+            >
+              Wallet
+            </Link>
+            <Link
+              href="/sandbox/catalog"
+              className="inline-flex h-10 items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--heading)]"
+            >
+              Browse catalog again
+            </Link>
+          </div>
+        </div>
       ) : null}
 
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => void confirmPurchase()}
-        className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-60"
-      >
-        {busy ? "Processing…" : `Confirm · Pay ${formatUsd(chargeCents)}`}
-      </button>
-      <p className="text-center text-xs text-slate-500">
-        Offer ref {offerId.slice(0, 12)}
-        {offerId.length > 12 ? "…" : ""} · SKU {sku}
-      </p>
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-5">
+        <p className="text-base font-semibold text-[var(--heading)]">
+          {displayName}
+        </p>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">
+          {destinationLabel} · {dataLabel} · {validityLabel}
+        </p>
+
+        <dl className="mt-4 space-y-2 text-sm">
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-[var(--text-muted)]">Retail price</dt>
+            <dd className="font-semibold tabular-nums text-[var(--heading)]">
+              {retailLabel}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-[var(--text-muted)]">Partner discount</dt>
+            <dd className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-300">
+              Sandbox rate
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] pt-2">
+            <dt className="font-semibold text-[var(--heading)]">
+              You pay (Partner price)
+            </dt>
+            <dd className="text-lg font-bold tabular-nums text-emerald-600 dark:text-emerald-300">
+              {partnerLabel}
+            </dd>
+          </div>
+        </dl>
+
+        <div className="mt-5">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void confirmPurchase()}
+            className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-60"
+          >
+            {busy ? (
+              <BrandPendingLabel label="Issuing eSIM…" />
+            ) : (
+              `Issue eSIM · ${partnerLabel}`
+            )}
+          </button>
+          <p className="mt-2 text-center text-xs text-[var(--text-muted)]">
+            Offer {offerId.slice(0, 16)}
+            {offerId.length > 16 ? "…" : ""}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
