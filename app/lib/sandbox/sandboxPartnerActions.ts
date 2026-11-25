@@ -12,9 +12,11 @@ import {
   getSandboxPartnerById,
   listSandboxPartners,
   resetSandboxPartnerDemoData,
+  rotateSandboxApiKey,
   setSandboxPartnerBalance,
   signSandboxSession,
   topUpSandboxPartner,
+  verifySandboxSession,
 } from "@/app/lib/sandbox/sandboxPartnerDb";
 import type { SandboxPartnerPublic } from "@/app/lib/sandbox/sandboxPartnerTypes";
 
@@ -70,10 +72,37 @@ export async function sandboxPartnerLogoutAction(): Promise<void> {
 export async function getCurrentSandboxPartnerAction(): Promise<SandboxPartnerPublic | null> {
   const jar = await cookies();
   const token = jar.get(SANDBOX_SESSION_COOKIE)?.value;
-  const { verifySandboxSession } = await import("@/app/lib/sandbox/sandboxPartnerDb");
   const partnerId = verifySandboxSession(token);
   if (!partnerId) return null;
   return getSandboxPartnerById(partnerId);
+}
+
+/**
+ * Explicit Rotate API Key for the signed-in sandbox partner.
+ * Does not rotate on login — only when this action is invoked.
+ */
+export async function rotateSandboxApiKeyAction(
+  _prev: SandboxActionState,
+  _formData: FormData
+): Promise<SandboxActionState> {
+  void _formData;
+  const jar = await cookies();
+  const token = jar.get(SANDBOX_SESSION_COOKIE)?.value;
+  const partnerId = verifySandboxSession(token);
+  if (!partnerId) {
+    return { ok: false, error: "Sign in to rotate your sandbox API key." };
+  }
+  const result = await rotateSandboxApiKey(partnerId);
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidatePath("/sandbox/account");
+  revalidatePath("/sandbox/docs");
+  return {
+    ok: true,
+    message:
+      "API key rotated. Copy the new key now — it is shown once. Prior keys stop working immediately.",
+    partnerId: result.partner.id,
+    rawApiKey: result.rawApiKey,
+  };
 }
 
 export async function createSandboxPartnerAction(

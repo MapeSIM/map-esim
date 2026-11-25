@@ -12,11 +12,7 @@ import {
 import {
   createSandboxOrderForPartner,
   findSandboxPartnerByApiKey,
-  getSandboxOrderByIccid,
-  getSandboxPartnerById,
   isSandboxApiKeyFormat,
-  listSandboxOrdersForPartner,
-  listSandboxWalletTxForPartner,
   mintDemoActivationCode,
   newSandboxOrderId,
   topUpSandboxPartner,
@@ -58,21 +54,29 @@ export type SandboxAuthOk = {
   partnerId: string | null;
 };
 
-/** Resolve Bearer sb_test_* against Neon SandboxApiKey (preferred). */
-export async function authenticateSandboxRequest(
-  req: NextRequest
-): Promise<SandboxAuthOk | { ok: false; response: NextResponse }> {
+function extractSandboxApiToken(req: NextRequest): string | null {
   const header =
     req.headers.get("authorization") ?? req.headers.get("Authorization");
   const match = /^Bearer\s+(.+)$/i.exec((header ?? "").trim());
-  const token = (match?.[1] ?? "").trim();
+  if (match?.[1]) return match[1].trim();
+  const headerKey =
+    req.headers.get("x-api-key") ?? req.headers.get("X-Api-Key");
+  const token = (headerKey ?? "").trim();
+  return token || null;
+}
+
+/** Resolve Bearer or x-api-key sb_test_* against Neon SandboxApiKey. */
+export async function authenticateSandboxRequest(
+  req: NextRequest
+): Promise<SandboxAuthOk | { ok: false; response: NextResponse }> {
+  const token = extractSandboxApiToken(req);
   if (!token) {
     return {
       ok: false,
       response: sandboxError(
         401,
         "Unauthorized",
-        "Missing or invalid Authorization Bearer token. Use a sandbox key like sb_test_…"
+        "Missing or invalid API key. Send Authorization: Bearer sb_test_… or x-api-key: sb_test_…"
       ),
     };
   }
@@ -236,32 +240,15 @@ export async function persistSandboxOrderFromApi(input: {
   return { ok: true, order: built.order };
 }
 
-export async function sandboxWalletResponse(partnerId: string) {
-  const partner = await getSandboxPartnerById(partnerId);
-  if (!partner) {
+export async function sandboxWalletResponse(partnerId: string, limit = 20) {
+  const { buildSandboxWalletPayload } = await import(
+    "@/app/lib/sandbox/sandboxPartnerApiParity"
+  );
+  const payload = await buildSandboxWalletPayload(partnerId, limit);
+  if (!payload) {
     return sandboxError(404, "Not found", "Sandbox partner not found.");
   }
-  const txs = await listSandboxWalletTxForPartner(partnerId);
-  return sandboxJson({
-    success: true,
-    sandbox: true,
-    wallet: {
-      balanceCents: partner.balanceCents,
-      currency: "USD",
-      balanceLabel: new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-      }).format(partner.balanceCents / 100),
-      note: "Neon SandboxPartner balance — shared by portal UI and API.",
-    },
-    transactions: txs.map((tx) => ({
-      id: tx.id,
-      label: tx.label,
-      amountCents: tx.amountCents,
-      kind: tx.kind === "debit" ? "debit" : "credit",
-      createdAt: tx.createdAt.toISOString(),
-    })),
-  });
+  return sandboxJson(payload);
 }
 
 export async function sandboxWalletTopUpResponse(
@@ -285,57 +272,55 @@ export async function sandboxWalletTopUpResponse(
   return sandboxWalletResponse(partnerId);
 }
 
-export async function sandboxOrdersListResponse(partnerId: string) {
-  const orders = await listSandboxOrdersForPartner(partnerId);
-  return sandboxJson({
-    success: true,
-    sandbox: true,
-    orders: orders.map((o) => ({
-      orderId: o.orderId,
-      status: o.status,
-      offerId: o.offerId,
-      region: o.region,
-      planName: o.planName,
-      totalCents: o.totalCents,
-      iccid: o.iccid,
-      activationCode: o.activationCode,
-      createdAt: o.createdAt.toISOString(),
-    })),
-    note: "Orders from Neon SandboxOrder for this API key's partner.",
-  });
+export async function sandboxOrdersListResponse(
+  partnerId: string,
+  options?: { page?: number; limit?: number }
+) {
+  const { buildSandboxOrdersListPayload } = await import(
+    "@/app/lib/sandbox/sandboxPartnerApiParity"
+  );
+  const payload = await buildSandboxOrdersListPayload(partnerId, options);
+  return sandboxJson(payload);
 }
 
 export async function sandboxEsimResponse(partnerId: string, iccid: string) {
-  const row = await getSandboxOrderByIccid(partnerId, iccid);
-  if (row) {
-    return sandboxJson({
-      success: true,
-      sandbox: true,
-      esim: {
-        iccid: row.iccid,
-        status: "ACTIVE",
-        smdpAddress: row.smdpAddress,
-        matchingId: row.matchingId,
-        activationCode: row.activationCode,
-        usage: {
-          dataUsedMb: 128,
-          dataTotalMb: 1024,
-          percentUsed: 12.5,
-        },
-        qr: { format: "LPA", data: row.activationCode },
-      },
-    });
-  }
+  const { buildSandboxEsimUsageByIccidPayload } = await import(
+    "@/app/lib/sandbox/sandboxPartnerApiParity"
+  );
+  const payload = await buildSandboxEsimUsageByIccidPayload(partnerId, iccid);
+  if (payload) return sandboxJson(payload);
+
   const demo = mintDemoActivationCode(iccid);
   return sandboxJson({
     success: true,
     sandbox: true,
+    environment: "sandbox",
+    orderId: null,
+    iccid: demo.iccid,
+    usage: {
+      status: "ACTIVE",
+      statusLabel: "Active",
+      initialDataGB: 1,
+      remainingDataGB: 0.88,
+      usedDataGB: 0.12,
+      usagePercent: 12,
+      isUnlimited: false,
+      activatedAt: null,
+      expiresAt: null,
+      daysRemaining: 30,
+      isActivated: true,
+      isExpired: false,
+      dataUsedMb: 128,
+      dataTotalMb: 1024,
+      percentUsed: 12.5,
+    },
     esim: {
       iccid: demo.iccid,
       status: "ACTIVE",
       smdpAddress: demo.smdpAddress,
       matchingId: demo.matchingId,
       activationCode: demo.activationCode,
+      lpa: demo.activationCode,
       usage: {
         dataUsedMb: 128,
         dataTotalMb: 1024,

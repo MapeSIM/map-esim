@@ -8,17 +8,26 @@ import {
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/sandbox/v1/wallet — Neon SandboxPartner balance. */
+/** GET /api/sandbox/v1/wallet — balance + ledger (production-compatible fields). */
 export async function GET(req: NextRequest) {
   const auth = await authenticateSandboxRequest(req);
   if (!auth.ok) return auth.response;
   if (!auth.partnerId) {
     return sandboxError(401, "Unauthorized", "Sandbox partner required.");
   }
-  return sandboxWalletResponse(auth.partnerId);
+  const limitRaw = req.nextUrl.searchParams.get("limit");
+  const limit = limitRaw ? Number(limitRaw) : 20;
+  if (limitRaw && (!Number.isInteger(limit) || limit < 1 || limit > 50)) {
+    return sandboxError(
+      400,
+      "Validation error",
+      "limit must be an integer between 1 and 50."
+    );
+  }
+  return sandboxWalletResponse(auth.partnerId, limit);
 }
 
-/** POST /api/sandbox/v1/wallet — confirm sandbox top-up ({ amountUsd }). */
+/** POST /api/sandbox/v1/wallet — sandbox-only demo top-up ({ amountUsd }). */
 export async function POST(req: NextRequest) {
   const auth = await authenticateSandboxRequest(req);
   if (!auth.ok) return auth.response;

@@ -79,6 +79,9 @@ export type PartnerCatalogOffer = {
   destinationLabel: string;
   /** Present when split payment UI is enabled. */
   fundingDisplay: PartnerCatalogFundingDisplay | null;
+  /** Read-only VeSIM capability — portal Add More Data / API catalog signal. */
+  supportTopUp: boolean;
+  supportTopUpType: string | null;
 };
 
 export type PartnerCatalogOfferPricingContext = {
@@ -189,6 +192,8 @@ function buildPartnerCatalogOfferDisplay(input: {
   durationDays?: number | null;
   networkLabel?: string | null;
   isUnlimited?: boolean;
+  supportTopUp?: boolean;
+  supportTopUpType?: string | null;
   pricing?: PartnerCatalogOfferPricingContext;
 }): PartnerCatalogOffer | null {
   const discountBps = input.pricing?.discountBps ?? 0;
@@ -216,6 +221,13 @@ function buildPartnerCatalogOfferDisplay(input: {
     };
   }
 
+  const supportTopUp = input.supportTopUp === true;
+  const rawType = input.supportTopUpType;
+  const supportTopUpType =
+    supportTopUp && typeof rawType === "string" && rawType.trim()
+      ? rawType.trim()
+      : null;
+
   return {
     offerId: input.offerId,
     name: input.name,
@@ -230,6 +242,8 @@ function buildPartnerCatalogOfferDisplay(input: {
     partnerPriceCents: partnerChargeCents,
     destinationLabel: input.destinationLabel,
     fundingDisplay,
+    supportTopUp,
+    supportTopUpType,
   };
 }
 
@@ -280,6 +294,8 @@ export async function listPartnerCatalogOffers(
           offer.dataUnlimited === true ||
           /unlimited/i.test(verified.dataFormatted || "") ||
           /unlimited/i.test(offer.dataFormatted || ""),
+        supportTopUp: offer.supportTopUp === true,
+        supportTopUpType: offer.supportTopUpType ?? null,
         pricing,
       });
       if (row) out.push(row);

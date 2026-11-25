@@ -97,8 +97,10 @@ Current USD balance + recent ledger transactions.
 ## Offer fields (Partner-safe)
 
 - \`offerId\`, \`name\`, \`dataLabel\`, \`validityLabel\`
-- \`destinationCode\`, \`destinationLabel\`, \`region\`
+- \`destinationCode\`, \`destinationLabel\`, \`region\`, \`kind\`
 - \`partnerPriceUsd\`, \`partnerPriceCents\`, \`partnerPriceLabel\`, \`currency\`
+- \`retailPriceUsd\`, \`retailPriceCents\`, \`retailPriceLabel\` (when known)
+- \`supportTopUp\`, \`supportTopUpType\` — read-only capability flags. Add More Data / \`rechargeOrderId\` checkout remains **portal-only** (no public API top-up endpoint yet).
 - Never includes supplier names, provider cost, or discount internals.
 
 ## Cancel reason codes
@@ -269,13 +271,11 @@ export function buildPartnerPostmanEnvironment(): Record<string, unknown> {
 
 export const PARTNER_DOCS_TOC = [
   { id: "overview", label: "Overview" },
-  { id: "wallet-credit", label: "Wallet credit" },
-  { id: "base-url", label: "Base URL" },
-  { id: "downloads", label: "Downloads" },
+  { id: "quick-start", label: "Quick Start & Environments" },
   { id: "authentication", label: "Authentication" },
-  { id: "purchase-flow", label: "Purchase flow" },
-  { id: "offer-fields", label: "Offer fields" },
   { id: "all-endpoints", label: "All endpoints" },
-  { id: "cancel-reason-codes", label: "Cancel reason codes" },
-  { id: "errors-limits", label: "Errors & limits" },
+  { id: "environment-routes", label: "Environment-specific routes" },
+  { id: "errors", label: "Error codes" },
+  { id: "go-live", label: "Go-Live Checklist" },
+  { id: "downloads", label: "Downloads" },
 ] as const;

@@ -43,11 +43,13 @@ export async function POST(req: NextRequest) {
       countryHint: body.countryHint ?? body.country,
     });
     if (!result.ok) {
+      if (result.code === "INSUFFICIENT_FUNDS") {
+        return partnerApiError(402, "Insufficient funds", result.error);
+      }
       const status =
         result.code === "NOT_FOUND"
           ? 404
-          : result.code === "INSUFFICIENT_FUNDS" ||
-              result.code === "INVALID" ||
+          : result.code === "INVALID" ||
               result.code === "IDEMPOTENCY_REQUIRED"
             ? 400
             : 503;
@@ -55,6 +57,7 @@ export async function POST(req: NextRequest) {
     }
     return partnerApiJson({
       success: true,
+      environment: "production",
       order: {
         orderId: result.orderId,
         purchaseId: result.purchaseId,
@@ -66,6 +69,8 @@ export async function POST(req: NextRequest) {
         iccid: result.iccid,
         lpa: result.lpa,
         qrUrl: result.qrUrl,
+        qrCodeUrl: result.qrUrl,
+        status: "COMPLETED",
         duplicate: result.duplicate,
       },
     });

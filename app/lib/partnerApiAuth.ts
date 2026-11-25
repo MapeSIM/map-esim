@@ -107,6 +107,17 @@ function extractBearerToken(req: NextRequest): string | null {
   return token;
 }
 
+/** Prefer Authorization Bearer; also accept `x-api-key` for developer tooling. */
+export function extractPartnerApiToken(req: NextRequest): string | null {
+  const bearer = extractBearerToken(req);
+  if (bearer) return bearer;
+  const headerKey =
+    req.headers.get("x-api-key") ?? req.headers.get("X-Api-Key");
+  const token = (headerKey ?? "").trim();
+  if (!token || token.length < 16 || token.length > 256) return null;
+  return token;
+}
+
 export type PartnerApiActor = {
   partnerId: string;
   userId: string;
@@ -173,13 +184,14 @@ export async function authenticatePartnerApiRequest(
     };
   }
 
-  const token = extractBearerToken(req);
+  const token = extractPartnerApiToken(req);
   if (!token) {
     return {
       ok: false,
       status: 401,
       error: "Unauthorized",
-      message: "Missing or invalid Authorization Bearer token.",
+      message:
+        "Missing or invalid API key. Send Authorization: Bearer <KEY> or x-api-key: <KEY>.",
     };
   }
 

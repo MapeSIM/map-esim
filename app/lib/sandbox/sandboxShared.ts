@@ -14,6 +14,9 @@ export type SandboxCatalogItem = {
   days: number;
   priceCents: number;
   currency: "USD";
+  /** Demo capability flag — mirrors production catalog supportTopUp. */
+  supportTopUp: boolean;
+  supportTopUpType: string | null;
 };
 
 export const SANDBOX_CATALOG: SandboxCatalogItem[] = [
@@ -25,6 +28,8 @@ export const SANDBOX_CATALOG: SandboxCatalogItem[] = [
     days: 7,
     priceCents: 450,
     currency: "USD",
+    supportTopUp: true,
+    supportTopUpType: "recharge",
   },
   {
     id: "sandbox_us_3gb_15d",
@@ -34,6 +39,8 @@ export const SANDBOX_CATALOG: SandboxCatalogItem[] = [
     days: 15,
     priceCents: 900,
     currency: "USD",
+    supportTopUp: true,
+    supportTopUpType: "recharge",
   },
   {
     id: "sandbox_asia_10gb_30d",
@@ -43,6 +50,8 @@ export const SANDBOX_CATALOG: SandboxCatalogItem[] = [
     days: 30,
     priceCents: 1800,
     currency: "USD",
+    supportTopUp: true,
+    supportTopUpType: "recharge",
   },
   {
     id: "sandbox_global_5gb_30d",
@@ -52,6 +61,8 @@ export const SANDBOX_CATALOG: SandboxCatalogItem[] = [
     days: 30,
     priceCents: 2200,
     currency: "USD",
+    supportTopUp: false,
+    supportTopUpType: null,
   },
 ];
 

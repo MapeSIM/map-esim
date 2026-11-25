@@ -49,7 +49,26 @@ export type PartnerApiOfferRow = {
   retailPriceCents: number | null;
   retailPriceLabel: string | null;
   currency: "USD";
+  /**
+   * Read-only capability: plan supports VeSIM Add More Data / top-up.
+   * Public API does not yet expose recharge checkout — portal only.
+   */
+  supportTopUp: boolean;
+  supportTopUpType: string | null;
 };
+
+function topUpCapabilityFromOffer(offer: {
+  supportTopUp?: boolean;
+  supportTopUpType?: string | null;
+}): { supportTopUp: boolean; supportTopUpType: string | null } {
+  const supportTopUp = offer.supportTopUp === true;
+  const raw = offer.supportTopUpType;
+  const supportTopUpType =
+    supportTopUp && typeof raw === "string" && raw.trim()
+      ? raw.trim()
+      : null;
+  return { supportTopUp, supportTopUpType };
+}
 
 function offerToApiRow(
   offer: PartnerCatalogOffer,
@@ -57,6 +76,7 @@ function offerToApiRow(
   region: string | null,
   kind: string | null = null
 ): PartnerApiOfferRow {
+  const topUp = topUpCapabilityFromOffer(offer);
   return {
     offerId: offer.offerId,
     name: offer.name,
@@ -69,10 +89,16 @@ function offerToApiRow(
     partnerPriceUsd: Number((offer.partnerPriceCents / 100).toFixed(2)),
     partnerPriceCents: offer.partnerPriceCents,
     partnerPriceLabel: offer.partnerPriceLabel,
-    retailPriceUsd: null,
-    retailPriceCents: null,
-    retailPriceLabel: null,
+    retailPriceUsd: Number.isFinite(offer.retailPriceUsd)
+      ? offer.retailPriceUsd
+      : null,
+    retailPriceCents: Number.isFinite(offer.retailPriceUsd)
+      ? Math.round(offer.retailPriceUsd * 100)
+      : null,
+    retailPriceLabel: offer.retailPriceLabel || null,
     currency: "USD",
+    supportTopUp: topUp.supportTopUp,
+    supportTopUpType: topUp.supportTopUpType,
   };
 }
 
@@ -104,6 +130,7 @@ function mapSnapshotOffer(input: {
     : input.destinationCode === "global"
       ? "global"
       : "country";
+  const topUp = topUpCapabilityFromOffer(input.offer);
   return {
     offerId: verified.offerId,
     name: verified.name,
@@ -124,6 +151,8 @@ function mapSnapshotOffer(input: {
     retailPriceCents: retailCents,
     retailPriceLabel: `${formatUsdCents(retailCents)} USD`,
     currency: "USD",
+    supportTopUp: topUp.supportTopUp,
+    supportTopUpType: topUp.supportTopUpType,
   };
 }
 

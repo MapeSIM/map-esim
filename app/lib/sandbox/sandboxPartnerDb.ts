@@ -203,25 +203,75 @@ export async function authenticateSandboxPartner(input: {
     return { ok: false, error: "Invalid email or password." };
   }
 
-  // Return existing key only if we can re-mint for portal cache — we only have hash.
-  // Ensure an active key exists; mint a fresh one on login so the portal can call APIs.
+  // Persistent keys: never rotate on sign-in. Mint only when none exist.
+  // Full raw token is only returned for a newly minted first key (shown once).
+  const active = row.apiKeys?.[0];
+  if (active) {
+    const partner = toPublic({
+      ...row,
+      apiKeys: [{ prefix: active.prefix, revokedAt: null }],
+    });
+    return { ok: true, partner, rawApiKey: null };
+  }
+
+  const minted = mintSandboxApiToken();
+  await prisma.sandboxApiKey.create({
+    data: {
+      partnerId: row.id,
+      name: "Default",
+      prefix: minted.prefix,
+      keyHash: minted.keyHash,
+    },
+  });
+  const partner = toPublic({
+    ...row,
+    apiKeys: [{ prefix: minted.prefix, revokedAt: null }],
+  });
+  return { ok: true, partner, rawApiKey: minted.raw };
+}
+
+/**
+ * Explicit rotate — revokes active keys and mints one new sb_test_* token.
+ * Raw token is returned once; only the hash is stored.
+ */
+export async function rotateSandboxApiKey(
+  partnerId: string
+): Promise<
+  | { ok: true; partner: SandboxPartnerPublic; rawApiKey: string }
+  | { ok: false; error: string }
+> {
+  const id = (partnerId ?? "").trim();
+  if (!id || id.length > 64) {
+    return { ok: false, error: "Sandbox partner not found." };
+  }
+  const row = await prisma.sandboxPartner.findUnique({
+    where: { id },
+    select: partnerSelect,
+  });
+  if (!row || row.disabledAt) {
+    return { ok: false, error: "Sandbox partner not found." };
+  }
+
   const minted = mintSandboxApiToken();
   await prisma.$transaction([
     prisma.sandboxApiKey.updateMany({
-      where: { partnerId: row.id, revokedAt: null },
+      where: { partnerId: id, revokedAt: null },
       data: { revokedAt: new Date() },
     }),
     prisma.sandboxApiKey.create({
       data: {
-        partnerId: row.id,
-        name: "Portal",
+        partnerId: id,
+        name: "Rotated",
         prefix: minted.prefix,
         keyHash: minted.keyHash,
       },
     }),
   ]);
 
-  const partner = toPublic({ ...row, apiKeys: [{ prefix: minted.prefix, revokedAt: null }] });
+  const partner = toPublic({
+    ...row,
+    apiKeys: [{ prefix: minted.prefix, revokedAt: null }],
+  });
   return { ok: true, partner, rawApiKey: minted.raw };
 }
 
