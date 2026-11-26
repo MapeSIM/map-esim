@@ -17,10 +17,17 @@ type MeResponse = {
   };
 };
 
+type AuthSession = {
+  user?: { role?: string | null } | null;
+};
+
 export default function SandboxSessionGate({
   children,
+  allowAdminWithoutPartner = false,
 }: {
   children: React.ReactNode;
+  /** When true, Auth.js ADMIN can view hub without Neon partner cookie. */
+  allowAdminWithoutPartner?: boolean;
 }) {
   const [ready, setReady] = useState(false);
   const [authed, setAuthed] = useState(false);
@@ -29,12 +36,28 @@ export default function SandboxSessionGate({
     let cancelled = false;
     async function check() {
       try {
-        const res = await fetch("/api/sandbox/session", {
-          credentials: "same-origin",
-          cache: "no-store",
-        });
-        const data = (await res.json()) as MeResponse;
+        const [sessionRes, partnerRes] = await Promise.all([
+          allowAdminWithoutPartner
+            ? fetch("/api/auth/session", {
+                credentials: "same-origin",
+                cache: "no-store",
+              }).catch(() => null)
+            : Promise.resolve(null),
+          fetch("/api/sandbox/session", {
+            credentials: "same-origin",
+            cache: "no-store",
+          }),
+        ]);
+
+        let admin = false;
+        if (sessionRes?.ok) {
+          const session = (await sessionRes.json()) as AuthSession;
+          admin = session?.user?.role === "ADMIN";
+        }
+
+        const data = (await partnerRes.json()) as MeResponse;
         if (cancelled) return;
+
         if (data.ok && data.partner) {
           try {
             localStorage.setItem(
@@ -54,6 +77,8 @@ export default function SandboxSessionGate({
             /* ignore */
           }
           setAuthed(true);
+        } else if (admin && allowAdminWithoutPartner) {
+          setAuthed(true);
         } else {
           setAuthed(false);
         }
@@ -67,9 +92,17 @@ export default function SandboxSessionGate({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [allowAdminWithoutPartner]);
 
-  if (!ready || !authed) {
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#070D19] px-4 text-sm text-slate-400">
+        Loading sandbox…
+      </div>
+    );
+  }
+
+  if (!authed) {
     return (
       <PartnerPortalLogin
         mode="sandbox"

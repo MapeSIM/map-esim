@@ -3,6 +3,7 @@ import {
   BookOpen,
   KeyRound,
   Package,
+  Shield,
   ShoppingBag,
   Wallet,
 } from "lucide-react";
@@ -12,7 +13,7 @@ export type PartnerPortalHomeCard = {
   href: string;
   title: string;
   description: string;
-  icon: "docs" | "catalog" | "orders" | "wallet" | "account";
+  icon: "docs" | "catalog" | "orders" | "wallet" | "account" | "admin";
 };
 
 const ICONS = {
@@ -21,6 +22,7 @@ const ICONS = {
   orders: Package,
   wallet: Wallet,
   account: KeyRound,
+  admin: Shield,
 } as const;
 
 export const B2B_HOME_CARDS: PartnerPortalHomeCard[] = [
@@ -67,7 +69,7 @@ export const SANDBOX_HOME_CARDS: PartnerPortalHomeCard[] = [
     href: "/sandbox/docs",
     title: "API documentation",
     description:
-      "Endpoint reference, Postman collection, and environment downloads for /api/v1/partner.",
+      "Endpoint reference, authentication headers, and sandbox/production environment switcher.",
     icon: "docs",
   },
   {
@@ -100,6 +102,14 @@ export const SANDBOX_HOME_CARDS: PartnerPortalHomeCard[] = [
   },
 ];
 
+export const SANDBOX_ADMIN_CONSOLE_CARD: PartnerPortalHomeCard = {
+  href: "/sandbox/admin",
+  title: "Admin Console",
+  description:
+    "Create sandbox partners, set demo balances, and control global / per-partner API access.",
+  icon: "admin",
+};
+
 export default function PartnerPortalHomeCards({
   cards,
   eyebrow,
@@ -125,31 +135,49 @@ export default function PartnerPortalHomeCards({
         </p>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {cards.map((card) => {
-          const Icon = ICONS[card.icon];
-          return (
-            <Link
-              key={card.href}
-              href={card.href}
-              className={`${partnerCardClass} group block transition hover:border-emerald-500/30 hover:bg-white/[0.04]`}
-            >
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 transition group-hover:bg-emerald-500/20 group-hover:text-emerald-300">
-                <Icon className="h-5 w-5" aria-hidden />
-              </span>
-              <h2 className="mt-3 text-lg font-semibold text-slate-50">
-                {card.title}
-              </h2>
-              <p className="mt-1.5 text-sm leading-relaxed text-slate-400">
-                {card.description}
-              </p>
-              <span className="mt-4 inline-flex text-sm font-semibold text-emerald-400 group-hover:text-emerald-300">
-                Open →
-              </span>
-            </Link>
-          );
-        })}
-      </div>
+      {cards.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-white/[0.12] px-4 py-10 text-center text-sm text-slate-400">
+          No portal sections available right now.
+        </p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {cards.map((card) => {
+            const Icon = ICONS[card.icon];
+            return (
+              <Link
+                key={card.href}
+                href={card.href}
+                className={`${partnerCardClass} group block transition hover:border-emerald-500/30 hover:bg-white/[0.04]`}
+              >
+                <span
+                  className={
+                    card.icon === "admin"
+                      ? "inline-flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-300 transition group-hover:bg-amber-500/20"
+                      : "inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 transition group-hover:bg-emerald-500/20 group-hover:text-emerald-300"
+                  }
+                >
+                  <Icon className="h-5 w-5" aria-hidden />
+                </span>
+                <h2 className="mt-3 text-lg font-semibold text-slate-50">
+                  {card.title}
+                </h2>
+                <p className="mt-1.5 text-sm leading-relaxed text-slate-400">
+                  {card.description}
+                </p>
+                <span
+                  className={
+                    card.icon === "admin"
+                      ? "mt-4 inline-flex text-sm font-semibold text-amber-300"
+                      : "mt-4 inline-flex text-sm font-semibold text-emerald-400 group-hover:text-emerald-300"
+                  }
+                >
+                  Open →
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

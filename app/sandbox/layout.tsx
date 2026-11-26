@@ -21,8 +21,10 @@ export default async function SandboxLayout({
     return <>{children}</>;
   }
 
+  const isHub = pathname === "/sandbox" || pathname === "/";
+
   return (
-    <SandboxSessionGate>
+    <SandboxSessionGate allowAdminWithoutPartner={isHub}>
       <div className="min-h-screen w-full bg-[#070D19] text-slate-100">
         <header
           className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#070D19]/90 backdrop-blur-md"

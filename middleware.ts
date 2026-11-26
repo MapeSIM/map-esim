@@ -80,11 +80,28 @@ export default auth((req) => {
   const pathname = req.nextUrl.pathname;
   const requestHeaders = withDomainHeaders(req, domain);
 
-  // Canonical admin host is mapesim.com — avoid ambiguous /admin on B2B/sandbox hosts.
+  // Canonical admin host is mapesim.com for partner B2B.
+  // Sandbox (mapesim.store): /admin → /sandbox/admin (Auth.js ADMIN console).
   // Localhost keeps /admin on the current origin for DX (?__domain= overrides still work).
   if (
     !isLocalDevHost(host) &&
-    (domain === "partner" || domain === "sandbox") &&
+    domain === "sandbox" &&
+    (pathname === "/admin" || pathname.startsWith("/admin/"))
+  ) {
+    const dest = publicUrlForRequest(
+      req,
+      `/sandbox/admin${pathname === "/admin" ? "" : pathname.slice("/admin".length)}`,
+      req.nextUrl.search || undefined
+    );
+    return attachDomainCookie(
+      NextResponse.redirect(dest),
+      domain,
+      persistDomainCookie
+    );
+  }
+  if (
+    !isLocalDevHost(host) &&
+    domain === "partner" &&
     (pathname === "/admin" || pathname.startsWith("/admin/"))
   ) {
     const dest = new URL(

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Eye, EyeOff } from "lucide-react";
 import { useActionState, useEffect, useState } from "react";
 import {
   signinAction,
@@ -41,6 +42,7 @@ export default function PartnerPortalLogin({
     sandboxPartnerLoginAction,
     initialSandboxState
   );
+  const [showPassword, setShowPassword] = useState(false);
 
   const error =
     mode === "sandbox"
@@ -53,6 +55,10 @@ export default function PartnerPortalLogin({
 
   useEffect(() => {
     if (mode !== "sandbox" || !sandboxState.ok) return;
+    if (sandboxState.role === "admin") {
+      window.location.href = sandboxState.redirectTo || "/sandbox/admin";
+      return;
+    }
     try {
       if (sandboxState.rawApiKey) {
         localStorage.setItem(SANDBOX_API_KEY_KEY, sandboxState.rawApiKey);
@@ -68,7 +74,7 @@ export default function PartnerPortalLogin({
       /* ignore */
     }
     onSandboxAuthenticated?.();
-    window.location.href = "/sandbox";
+    window.location.href = sandboxState.redirectTo || "/sandbox";
   }, [mode, sandboxState, onSandboxAuthenticated]);
 
   const busy = mode === "sandbox" ? sandboxPending : partnerPending;
@@ -77,21 +83,23 @@ export default function PartnerPortalLogin({
     <div className="min-h-screen w-full bg-[#070D19] text-slate-100">
       <header className="border-b border-white/[0.06]">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-xs font-black text-slate-950">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500 text-xs font-black text-slate-950">
               M
             </span>
-            <span className="text-sm font-semibold tracking-tight text-slate-50">
+            <span className="truncate text-sm font-semibold tracking-tight text-slate-50">
               MAP eSIM{" "}
               <span className="font-medium text-slate-400">Partner</span>
             </span>
           </div>
-          <span className="text-sm font-semibold text-emerald-400">Sign in</span>
+          <span className="shrink-0 text-sm font-semibold text-emerald-400">
+            Sign in
+          </span>
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-md flex-col px-4 py-12 sm:px-6 sm:py-16">
-        <div className="rounded-2xl border border-white/[0.08] bg-[#0D1526] p-6 shadow-2xl shadow-black/40 sm:p-8">
+      <main className="mx-auto flex w-full max-w-md flex-col px-4 py-10 sm:px-6 sm:py-16">
+        <div className="rounded-2xl border border-white/[0.08] bg-[#0D1526] p-5 shadow-2xl shadow-black/40 sm:p-8">
           <h1 className="text-2xl font-bold tracking-tight text-slate-50">
             Welcome Back
           </h1>
@@ -107,19 +115,9 @@ export default function PartnerPortalLogin({
               role="alert"
             >
               <p>{error}</p>
-              {mode === "sandbox" ? (
-                <p className="mt-2 text-xs text-slate-400">
-                  Need an account? Ask an admin to create one at{" "}
-                  <Link
-                    href="/sandbox/admin"
-                    className="font-semibold text-emerald-300 underline-offset-2 hover:underline"
-                  >
-                    /sandbox/admin
-                  </Link>
-                  .
-                </p>
-              ) : error.toLowerCase().includes("mapesim.com") ||
-                error.toLowerCase().includes("partner account") ? (
+              {mode === "partner" &&
+              (error.toLowerCase().includes("mapesim.com") ||
+                error.toLowerCase().includes("partner account")) ? (
                 <p className="mt-2 space-x-3 text-xs">
                   <a
                     href={retailHref}
@@ -174,13 +172,27 @@ export default function PartnerPortalLogin({
                   </Link>
                 ) : null}
               </div>
-              <input
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                className="h-11 w-full rounded-xl border border-white/[0.1] bg-[#070D19] px-3 text-sm text-slate-100 outline-none focus:border-emerald-500/50"
-              />
+              <div className="relative">
+                <input
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                  className="h-11 w-full rounded-xl border border-white/[0.1] bg-[#070D19] px-3 pr-11 text-sm text-slate-100 outline-none focus:border-emerald-500/50"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" aria-hidden />
+                  ) : (
+                    <Eye className="h-4 w-4" aria-hidden />
+                  )}
+                </button>
+              </div>
             </label>
 
             <button

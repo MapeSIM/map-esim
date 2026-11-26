@@ -17,6 +17,7 @@ import {
   newSandboxOrderId,
   topUpSandboxPartner,
 } from "@/app/lib/sandbox/sandboxPartnerDb";
+import { getGlobalSandboxApiEnabled } from "@/app/lib/sandbox/sandboxApiControls";
 import { prisma } from "@/app/lib/db";
 
 export {
@@ -69,6 +70,19 @@ function extractSandboxApiToken(req: NextRequest): string | null {
 export async function authenticateSandboxRequest(
   req: NextRequest
 ): Promise<SandboxAuthOk | { ok: false; response: NextResponse }> {
+  // Global master switch — before key parsing so disabled sandbox returns 503 uniformly.
+  const globalOn = await getGlobalSandboxApiEnabled();
+  if (!globalOn) {
+    return {
+      ok: false,
+      response: sandboxError(
+        503,
+        "Service Unavailable",
+        "Sandbox Partner API is temporarily disabled by an administrator."
+      ),
+    };
+  }
+
   const token = extractSandboxApiToken(req);
   if (!token) {
     return {
@@ -93,6 +107,16 @@ export async function authenticateSandboxRequest(
 
   const found = await findSandboxPartnerByApiKey(token);
   if (found) {
+    if (!found.apiEnabled) {
+      return {
+        ok: false,
+        response: sandboxError(
+          403,
+          "Forbidden",
+          "Sandbox API access is disabled for this partner account."
+        ),
+      };
+    }
     return { ok: true, apiKey: token, partnerId: found.partnerId };
   }
 
@@ -102,7 +126,7 @@ export async function authenticateSandboxRequest(
     response: sandboxError(
       401,
       "Unauthorized",
-      "Unknown sandbox API key. Create a sandbox partner on mapesim.store/sandbox/admin and use the issued sb_test_ key."
+      "Unknown sandbox API key. Ask an administrator to provision a sandbox partner and API key."
     ),
   };
 }

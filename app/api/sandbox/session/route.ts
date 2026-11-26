@@ -1,6 +1,10 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import {
+  canSandboxPartnerUseApiUi,
+  getGlobalSandboxApiEnabled,
+} from "@/app/lib/sandbox/sandboxApiControls";
+import {
   SANDBOX_SESSION_COOKIE,
   getSandboxPartnerById,
   verifySandboxSession,
@@ -15,7 +19,7 @@ export async function GET() {
   const partnerId = verifySandboxSession(token);
   if (!partnerId) {
     return NextResponse.json(
-      { ok: false },
+      { ok: false, globalSandboxApiEnabled: await getGlobalSandboxApiEnabled() },
       {
         status: 401,
         headers: {
@@ -29,6 +33,7 @@ export async function GET() {
   if (!partner || partner.disabledAt) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
+  const apiUi = await canSandboxPartnerUseApiUi(partnerId);
   return NextResponse.json(
     {
       ok: true,
@@ -38,7 +43,10 @@ export async function GET() {
         email: partner.email,
         balanceCents: partner.balanceCents,
         apiKeyPrefix: partner.apiKeyPrefix,
+        apiEnabled: partner.apiEnabled,
       },
+      globalSandboxApiEnabled: apiUi.globalSandboxApiEnabled,
+      showApiUi: apiUi.showApiUi,
     },
     {
       headers: {

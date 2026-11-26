@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { SANDBOX_API_KEY_KEY } from "@/app/lib/sandbox/sandboxClientStorage";
 import { partnerCardClass } from "@/app/components/partner/partnerPortalUi";
+import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 import { BRAND_SUPPORT_EMAIL } from "@/app/lib/brand";
 import SandboxShareBrandingForm from "@/app/components/sandbox/SandboxShareBrandingForm";
 import {
@@ -19,6 +20,7 @@ export default function SandboxAccountClient() {
   const [email, setEmail] = useState("—");
   const [name, setName] = useState("Sandbox Partner");
   const [keyPrefix, setKeyPrefix] = useState<string | null>(null);
+  const [showApiUi, setShowApiUi] = useState(false);
   const [confirmRotate, setConfirmRotate] = useState(false);
   const [rotateState, rotateAction, rotatePending] = useActionState(
     rotateSandboxApiKeyAction,
@@ -34,6 +36,7 @@ export default function SandboxAccountClient() {
         });
         const data = (await res.json()) as {
           ok?: boolean;
+          showApiUi?: boolean;
           partner?: {
             name: string;
             email: string;
@@ -44,6 +47,7 @@ export default function SandboxAccountClient() {
           setName(data.partner.name);
           setEmail(data.partner.email);
           setKeyPrefix(data.partner.apiKeyPrefix ?? null);
+          setShowApiUi(data.showApiUi === true);
           try {
             localStorage.setItem(
               "mapesim_sandbox_session",
@@ -153,14 +157,16 @@ export default function SandboxAccountClient() {
               Quick Actions
             </h2>
             <ul className="mt-3 space-y-2 text-sm">
-              <li>
-                <Link
-                  href="/sandbox/docs"
-                  className="font-semibold text-emerald-400 hover:text-emerald-300"
-                >
-                  Open API docs →
-                </Link>
-              </li>
+              {showApiUi ? (
+                <li>
+                  <Link
+                    href="/sandbox/docs"
+                    className="font-semibold text-emerald-400 hover:text-emerald-300"
+                  >
+                    Open API docs →
+                  </Link>
+                </li>
+              ) : null}
               <li>
                 <Link
                   href="/sandbox/wallet"
@@ -187,98 +193,132 @@ export default function SandboxAccountClient() {
             <dl className="mt-4 space-y-3 text-sm">
               <div className="flex justify-between gap-3">
                 <dt className="text-slate-500">API access</dt>
-                <dd className="font-semibold text-emerald-300">Sandbox</dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-slate-500">Key prefix</dt>
-                <dd className="font-mono text-xs text-slate-300">
-                  {keyPrefix ?? "—"}
+                <dd
+                  className={
+                    showApiUi
+                      ? "font-semibold text-emerald-300"
+                      : "font-semibold text-rose-300"
+                  }
+                >
+                  {showApiUi ? "Enabled" : "Disabled"}
                 </dd>
               </div>
+              {showApiUi ? (
+                <div className="flex justify-between gap-3">
+                  <dt className="text-slate-500">Key prefix</dt>
+                  <dd className="font-mono text-xs text-slate-300">
+                    {keyPrefix ?? "—"}
+                  </dd>
+                </div>
+              ) : null}
             </dl>
           </section>
 
-          <section className={partnerCardClass + " space-y-4"}>
-            <h2 className="text-lg font-semibold text-slate-50">API Keys</h2>
-            <p className="text-xs text-slate-500">
-              Your <code className="text-slate-300">sb_test_…</code> key stays
-              the same across sign-out and sign-in. Use{" "}
-              <strong className="font-semibold text-slate-300">
-                Rotate API Key
-              </strong>{" "}
-              only when you need to invalidate the previous key. The full token
-              is shown once after create/rotate — MAP stores a hash only.
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <code className="min-w-0 flex-1 overflow-x-auto rounded-xl border border-white/[0.1] bg-slate-950 px-3 py-2.5 font-mono text-xs text-emerald-300">
-                {apiKey ||
-                  (keyPrefix
-                    ? `${keyPrefix}… (full key shown only after create/rotate)`
-                    : "No active key yet — rotate to mint one")}
-              </code>
-              <button
-                type="button"
-                onClick={() => void copy()}
-                disabled={!apiKey}
-                className="inline-flex h-10 items-center rounded-xl border border-white/[0.12] px-3 text-sm font-semibold text-slate-100 hover:bg-white/[0.05] disabled:opacity-40"
-              >
-                {copied ? "Copied" : "Copy"}
-              </button>
-            </div>
-
-            {!confirmRotate ? (
-              <button
-                type="button"
-                onClick={() => setConfirmRotate(true)}
-                className="inline-flex h-10 items-center rounded-xl border border-amber-500/40 px-4 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/10"
-              >
-                Rotate API Key
-              </button>
-            ) : (
-              <form action={rotateAction} className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
-                <p className="text-sm text-amber-100">
-                  Rotate now? The current key stops working immediately. Copy
-                  the new key when it appears.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="submit"
-                    disabled={rotatePending}
-                    className="inline-flex h-10 items-center rounded-xl bg-amber-400 px-4 text-sm font-bold text-slate-950 disabled:opacity-60"
-                  >
-                    {rotatePending ? "Rotating…" : "Confirm rotate"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={rotatePending}
-                    onClick={() => setConfirmRotate(false)}
-                    className="inline-flex h-10 items-center rounded-xl border border-white/[0.12] px-4 text-sm font-semibold text-slate-100"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {rotateState.ok && rotateState.rawApiKey ? (
-              <div
-                className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3"
-                role="status"
-              >
-                <p className="text-sm font-semibold text-emerald-200">
-                  {rotateState.message}
-                </p>
-                <p className="mt-2 break-all font-mono text-xs text-slate-100">
-                  {rotateState.rawApiKey}
-                </p>
-              </div>
-            ) : null}
-            {rotateState.ok === false && rotateState.error ? (
-              <p className="text-sm text-rose-300" role="alert">
-                {rotateState.error}
+          {showApiUi ? (
+            <section className={partnerCardClass + " space-y-4"}>
+              <h2 className="text-lg font-semibold text-slate-50">API Keys</h2>
+              <p className="text-xs text-slate-500">
+                Your <code className="text-slate-300">sb_test_…</code> key stays
+                the same across sign-out and sign-in. Use{" "}
+                <strong className="font-semibold text-slate-300">
+                  Rotate API Key
+                </strong>{" "}
+                only when you need to invalidate the previous key. The full token
+                is shown once after create/rotate — MAP stores a hash only.
               </p>
-            ) : null}
-          </section>
+              <div className="flex flex-wrap items-center gap-2">
+                <code className="min-w-0 flex-1 overflow-x-auto rounded-xl border border-white/[0.1] bg-slate-950 px-3 py-2.5 font-mono text-xs text-emerald-300">
+                  {apiKey ||
+                    (keyPrefix
+                      ? `${keyPrefix}… (full key shown only after create/rotate)`
+                      : "No active key yet — rotate to mint one")}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => void copy()}
+                  disabled={!apiKey}
+                  className="inline-flex h-10 items-center rounded-xl border border-white/[0.12] px-3 text-sm font-semibold text-slate-100 hover:bg-white/[0.05] disabled:opacity-40"
+                >
+                  {copied ? "Copied" : "Copy"}
+                </button>
+              </div>
+
+              {!confirmRotate ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmRotate(true)}
+                  className="inline-flex h-10 items-center rounded-xl border border-amber-500/40 px-4 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/10"
+                >
+                  Rotate API Key
+                </button>
+              ) : (
+                <form
+                  action={rotateAction}
+                  className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4"
+                >
+                  <p className="text-sm text-amber-100">
+                    Rotate now? The current key stops working immediately. Copy
+                    the new key when it appears.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="submit"
+                      disabled={rotatePending}
+                      className="inline-flex h-10 items-center rounded-xl bg-amber-400 px-4 text-sm font-bold text-slate-950 disabled:opacity-60"
+                    >
+                      {rotatePending ? (
+                        <BrandPendingLabel label="Rotating…" />
+                      ) : (
+                        "Confirm rotate"
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={rotatePending}
+                      onClick={() => setConfirmRotate(false)}
+                      className="inline-flex h-10 items-center rounded-xl border border-white/[0.12] px-4 text-sm font-semibold text-slate-100"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {rotateState.ok && rotateState.rawApiKey ? (
+                <div
+                  className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3"
+                  role="status"
+                >
+                  <p className="text-sm font-semibold text-emerald-200">
+                    {rotateState.message}
+                  </p>
+                  <p className="mt-2 break-all font-mono text-xs text-slate-100">
+                    {rotateState.rawApiKey}
+                  </p>
+                </div>
+              ) : null}
+              {rotateState.ok === false && rotateState.error ? (
+                <p className="text-sm text-rose-300" role="alert">
+                  {rotateState.error}
+                </p>
+              ) : null}
+            </section>
+          ) : (
+            <section className={partnerCardClass}>
+              <h2 className="text-lg font-semibold text-slate-50">API Keys</h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Partner API keys are hidden because sandbox API access is
+                disabled. Contact{" "}
+                <a
+                  href="mailto:partners@mapesim.com"
+                  className="font-semibold text-emerald-400"
+                >
+                  partners@mapesim.com
+                </a>{" "}
+                if you need access.
+              </p>
+            </section>
+          )}
 
           <section className={partnerCardClass}>
             <h2 className="text-lg font-semibold text-slate-50">Need Help?</h2>

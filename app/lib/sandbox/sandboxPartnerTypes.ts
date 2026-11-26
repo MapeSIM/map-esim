@@ -6,6 +6,8 @@ export type SandboxPartnerPublic = {
   email: string;
   balanceCents: number;
   initialBalanceCents: number;
+  /** Per-partner Sandbox API access (AND with globalSandboxApiEnabled). */
+  apiEnabled: boolean;
   shareCompanyName: string | null;
   shareSupportEmail: string | null;
   shareLogoUrl: string | null;

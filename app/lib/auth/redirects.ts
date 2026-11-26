@@ -3,7 +3,10 @@
  * Only same-site/internal paths are allowed.
  */
 
-import { multiDomainAllowedOrigins } from "@/app/lib/domain/appDomain";
+import {
+  SANDBOX_SITE_ORIGIN,
+  multiDomainAllowedOrigins,
+} from "@/app/lib/domain/appDomain";
 
 export type SafeCallbackOptions = {
   /** Current request origin (e.g. from Host / x-forwarded-*). */
@@ -102,10 +105,33 @@ export function safeCallbackPath(
   return path;
 }
 
-export function postSignInPath(role: "CUSTOMER" | "ADMIN" | "PARTNER"): string {
+function isSandboxRequestOrigin(origin: string | null | undefined): boolean {
+  const value = (origin ?? "").trim().toLowerCase();
+  if (!value) return false;
+  try {
+    const u = new URL(value.includes("://") ? value : `https://${value}`);
+    return (
+      u.origin === SANDBOX_SITE_ORIGIN ||
+      u.hostname === "mapesim.store" ||
+      u.hostname.endsWith(".mapesim.store")
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function postSignInPath(
+  role: "CUSTOMER" | "ADMIN" | "PARTNER",
+  options?: SafeCallbackOptions
+): string {
   // Normal customer sign-in lands on public home. Protected flows still
   // honor a safe internal callbackUrl via resolvePostSignInPath.
-  if (role === "ADMIN") return "/admin";
+  // mapesim.store ADMIN → sandbox admin console (not retail /admin).
+  if (role === "ADMIN") {
+    return isSandboxRequestOrigin(options?.requestOrigin)
+      ? "/sandbox/admin"
+      : "/admin";
+  }
   if (role === "PARTNER") return "/partner";
   return "/";
 }
@@ -119,12 +145,25 @@ export function resolvePostSignInPath(
   callbackUrl?: string | null,
   options?: SafeCallbackOptions
 ): string {
-  const fallback = postSignInPath(role);
+  const fallback = postSignInPath(role, options);
   const safe = safeCallbackPath(callbackUrl, "", options);
   if (!safe) return fallback;
 
   if (safe === "/admin" || safe.startsWith("/admin/")) {
+    if (role !== "ADMIN") return fallback;
+    // On sandbox host, never leave for retail /admin — stay on /sandbox/admin.
+    if (isSandboxRequestOrigin(options?.requestOrigin)) {
+      return "/sandbox/admin";
+    }
+    return safe;
+  }
+  if (safe === "/sandbox/admin" || safe.startsWith("/sandbox/admin/")) {
     return role === "ADMIN" ? safe : fallback;
+  }
+  if (safe === "/sandbox" || safe.startsWith("/sandbox/")) {
+    // Sandbox portal paths: ADMIN → admin console; others may use hub.
+    if (role === "ADMIN") return "/sandbox/admin";
+    return safe;
   }
   if (safe === "/partner" || safe.startsWith("/partner/")) {
     return role === "PARTNER" ? safe : fallback;

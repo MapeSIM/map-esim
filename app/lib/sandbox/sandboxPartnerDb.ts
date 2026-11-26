@@ -31,6 +31,7 @@ function toPublic(
     email: string;
     balanceCents: number;
     initialBalanceCents: number;
+    apiEnabled?: boolean;
     shareCompanyName: string | null;
     shareSupportEmail: string | null;
     shareLogoUrl: string | null;
@@ -48,6 +49,7 @@ function toPublic(
     email: row.email,
     balanceCents: row.balanceCents,
     initialBalanceCents: row.initialBalanceCents,
+    apiEnabled: row.apiEnabled !== false,
     shareCompanyName: row.shareCompanyName,
     shareSupportEmail: row.shareSupportEmail,
     shareLogoUrl: row.shareLogoUrl,
@@ -65,6 +67,7 @@ const partnerSelect = {
   email: true,
   balanceCents: true,
   initialBalanceCents: true,
+  apiEnabled: true,
   shareCompanyName: true,
   shareSupportEmail: true,
   shareLogoUrl: true,
@@ -196,11 +199,19 @@ export async function authenticateSandboxPartner(input: {
     },
   });
   if (!row || row.disabledAt) {
-    return { ok: false, error: "Invalid email or password." };
+    return {
+      ok: false,
+      error:
+        "Invalid email or password. Need sandbox partner access? Contact partners@mapesim.com.",
+    };
   }
   const valid = await verifyPassword(input.password, row.passwordHash);
   if (!valid) {
-    return { ok: false, error: "Invalid email or password." };
+    return {
+      ok: false,
+      error:
+        "Invalid email or password. Need sandbox partner access? Contact partners@mapesim.com.",
+    };
   }
 
   // Persistent keys: never rotate on sign-in. Mint only when none exist.
@@ -277,7 +288,7 @@ export async function rotateSandboxApiKey(
 
 export async function findSandboxPartnerByApiKey(
   rawToken: string
-): Promise<{ partnerId: string; keyId: string } | null> {
+): Promise<{ partnerId: string; keyId: string; apiEnabled: boolean } | null> {
   const token = rawToken.trim();
   if (!token.startsWith(SANDBOX_TEST_KEY_PREFIX)) return null;
   const keyHash = hashSandboxApiToken(token);
@@ -286,7 +297,7 @@ export async function findSandboxPartnerByApiKey(
     select: {
       id: true,
       partnerId: true,
-      partner: { select: { disabledAt: true } },
+      partner: { select: { disabledAt: true, apiEnabled: true } },
     },
   });
   if (!key || key.partner.disabledAt) return null;
@@ -297,7 +308,11 @@ export async function findSandboxPartnerByApiKey(
       data: { lastUsedAt: new Date() },
     })
     .catch(() => undefined);
-  return { partnerId: key.partnerId, keyId: key.id };
+  return {
+    partnerId: key.partnerId,
+    keyId: key.id,
+    apiEnabled: key.partner.apiEnabled !== false,
+  };
 }
 
 /** Legacy fixture keys (no Neon row): accept format-only for empty-DB demos. */

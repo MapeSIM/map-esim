@@ -2102,6 +2102,8 @@ model SandboxPartner {
   balanceCents        Int                 @default(125000)
   /// Opening balance restored by "Reset Demo Data".
   initialBalanceCents Int                 @default(125000)
+  /// Per-partner Sandbox Public API access (AND with SandboxSettings.globalSandboxApiEnabled).
+  apiEnabled          Boolean             @default(true)
   shareCompanyName    String?
   shareSupportEmail   String?
   shareLogoUrl        String?             @db.Text
@@ -2116,6 +2118,18 @@ model SandboxPartner {
 
   @@index([disabledAt])
   @@index([createdAt])
+  @@index([apiEnabled])
+}
+
+/// Singleton sandbox portal settings (id always "default").
+model SandboxSettings {
+  /// Fixed singleton id — always "default".
+  id                       String   @id
+  /// Master switch for all /api/sandbox/v1/* Partner API traffic.
+  globalSandboxApiEnabled  Boolean  @default(true)
+  updatedByAdminId         String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 }
 
 /// Sandbox-only API key (sb_test_*). Hash only — never store plaintext after mint.

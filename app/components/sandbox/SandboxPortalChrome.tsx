@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PartnerMenu, {
   type PartnerNavLink,
 } from "@/app/components/partner/PartnerMenu";
 import { SANDBOX_DEFAULT_BALANCE_CENTS } from "@/app/lib/sandbox/sandboxShared";
 import { SANDBOX_WALLET_KEY } from "@/app/lib/sandbox/sandboxClientStorage";
 
-const links: PartnerNavLink[] = [
+const baseLinks: PartnerNavLink[] = [
   { href: "/sandbox", label: "Home", exact: true },
   { href: "/sandbox/docs", label: "API docs" },
   { href: "/sandbox/catalog", label: "Catalog" },
@@ -30,6 +30,15 @@ export default function SandboxPortalChrome() {
   const [userName, setUserName] = useState("Sandbox Partner");
   const [userEmail, setUserEmail] = useState("sandbox@mapesim.store");
   const [companyBadge, setCompanyBadge] = useState("Sandbox Demo Co");
+  const [showApiDocs, setShowApiDocs] = useState(true);
+
+  const links = useMemo(
+    () =>
+      baseLinks.filter((link) =>
+        link.href === "/sandbox/docs" ? showApiDocs : true
+      ),
+    [showApiDocs]
+  );
 
   useEffect(() => {
     function syncLocal() {
@@ -53,6 +62,7 @@ export default function SandboxPortalChrome() {
         });
         const data = (await res.json()) as {
           ok?: boolean;
+          showApiUi?: boolean;
           partner?: {
             name: string;
             email: string;
@@ -64,6 +74,7 @@ export default function SandboxPortalChrome() {
           setUserEmail(data.partner.email);
           setCompanyBadge(data.partner.name);
           setBalanceLabel(formatUsd(data.partner.balanceCents));
+          setShowApiDocs(data.showApiUi === true);
           try {
             localStorage.setItem(
               SANDBOX_WALLET_KEY,
@@ -74,6 +85,8 @@ export default function SandboxPortalChrome() {
           }
           return;
         }
+        // Auth.js ADMIN on hub may have no partner session.
+        setShowApiDocs(false);
       } catch {
         /* fall through to local cache */
       }
