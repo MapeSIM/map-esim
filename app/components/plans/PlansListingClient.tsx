@@ -64,6 +64,8 @@ export type PlansListingClientProps = {
   forcePartnerCheckout?: boolean;
   /** Sandbox portal: always route Buy Now to `/sandbox/buy`. */
   forceSandboxCheckout?: boolean;
+  /** Partner discount % used on sandbox catalog cards. */
+  sandboxDiscountPercent?: number;
 };
 
 export default function PlansListingClient({
@@ -76,6 +78,7 @@ export default function PlansListingClient({
   guestCheckoutEnabled = false,
   forcePartnerCheckout = false,
   forceSandboxCheckout = false,
+  sandboxDiscountPercent,
 }: PlansListingClientProps) {
   const [planType, setPlanType] = useState<PlanTypeFilter>(DEFAULT_PLAN_TYPE);
   const [category, setCategory] = useState<CategoryFilter>(DEFAULT_CATEGORY);
@@ -90,7 +93,11 @@ export default function PlansListingClient({
   const partnerCheckout =
     !forceSandboxCheckout && (forcePartnerCheckout || shellPartner);
   const purchaseTrustLine = forceSandboxCheckout
-    ? "Charged to your sandbox wallet (demo)."
+    ? `Partner price includes ${
+        typeof sandboxDiscountPercent === "number"
+          ? sandboxDiscountPercent
+          : 3
+      }% off · charged to your sandbox wallet.`
     : forcePartnerCheckout
       ? "Partner discount is applied at checkout."
       : planPurchaseTrustLine(signedIn);
@@ -302,6 +309,8 @@ export default function PlansListingClient({
                 totalOffersCount={offers.length}
                 showPackageTabs={model.showPackageTabs}
                 emptyHint={emptyHint}
+                forceSandboxCheckout={forceSandboxCheckout}
+                sandboxDiscountPercent={sandboxDiscountPercent}
               />
             )}
           </>

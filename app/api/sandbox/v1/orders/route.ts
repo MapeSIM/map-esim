@@ -61,11 +61,30 @@ export async function POST(req: NextRequest) {
       ? 1
       : Number(quantityRaw);
 
+  const retailRaw = body.retailPriceCents ?? body.retailPriceUsd;
+  let retailPriceCents: number | null = null;
+  if (typeof body.retailPriceCents === "number") {
+    retailPriceCents = Math.round(body.retailPriceCents);
+  } else if (typeof body.retailPriceUsd === "number") {
+    retailPriceCents = Math.round(body.retailPriceUsd * 100);
+  } else if (typeof retailRaw === "string" && retailRaw.trim()) {
+    const n = Number(retailRaw);
+    if (Number.isFinite(n)) {
+      retailPriceCents =
+        typeof body.retailPriceCents !== "undefined"
+          ? Math.round(n)
+          : Math.round(n * 100);
+    }
+  }
+
   const result = await persistSandboxOrderFromApi({
     partnerId: auth.partnerId,
     offerId,
     quantity: Number.isFinite(quantity) ? quantity : 1,
     apiKey: auth.apiKey,
+    retailPriceCents,
+    planName: typeof body.planName === "string" ? body.planName : null,
+    region: typeof body.region === "string" ? body.region : null,
   });
   if (!result.ok) return result.response;
 

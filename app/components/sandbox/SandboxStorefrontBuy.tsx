@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { SANDBOX_CATALOG } from "@/app/lib/sandbox/sandboxShared";
 import {
-  pickSandboxSku,
+  SANDBOX_DEFAULT_DISCOUNT_PERCENT,
+  sandboxDiscountLabel,
+  sandboxPartnerPriceCents,
+} from "@/app/lib/sandbox/sandboxPricing";
+import {
   readSandboxApiKey,
   refreshSandboxWalletCache,
   rememberSandboxOrder,
@@ -39,37 +43,66 @@ export default function SandboxStorefrontBuy({
 }: Props) {
   const router = useRouter();
   const [balanceCents, setBalanceCents] = useState<number | null>(null);
+  const [discountPercent, setDiscountPercent] = useState(
+    SANDBOX_DEFAULT_DISCOUNT_PERCENT
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [doneOrderId, setDoneOrderId] = useState<string | null>(null);
 
-  const priceCents = useMemo(() => {
+  const retailCents = useMemo(() => {
     if (typeof priceUsd === "number" && Number.isFinite(priceUsd) && priceUsd > 0) {
       return Math.round(priceUsd * 100);
     }
-    return SANDBOX_CATALOG[0]!.priceCents;
-  }, [priceUsd]);
+    const fixture = SANDBOX_CATALOG.find((item) => item.id === offerId);
+    return fixture?.priceCents ?? SANDBOX_CATALOG[0]!.priceCents;
+  }, [priceUsd, offerId]);
 
-  const sku = useMemo(() => pickSandboxSku(priceCents), [priceCents]);
-  const catalogItem = SANDBOX_CATALOG.find((item) => item.id === sku);
-  const chargeCents = catalogItem?.priceCents ?? priceCents;
+  const chargeCents = useMemo(() => {
+    return (
+      sandboxPartnerPriceCents(retailCents, discountPercent) ??
+      Math.round(retailCents * 0.97)
+    );
+  }, [retailCents, discountPercent]);
+
+  const fixture = SANDBOX_CATALOG.find((item) => item.id === offerId);
   const displayName =
-    planName.trim() || catalogItem?.name || "Partner eSIM plan";
-  const destinationLabel = country.trim() || catalogItem?.region || "Destination";
-  const dataLabel = catalogItem
-    ? `${catalogItem.dataGb} GB`
-    : "Sandbox data";
-  const validityLabel = catalogItem
-    ? `${catalogItem.days} days`
-    : "Sandbox validity";
-  const retailLabel = formatUsd(priceCents);
+    planName.trim() || fixture?.name || "Partner eSIM plan";
+  const destinationLabel = country.trim() || fixture?.region || "Destination";
+  const dataLabel = fixture ? `${fixture.dataGb} GB` : "Plan data";
+  const validityLabel = fixture ? `${fixture.days} days` : "Plan validity";
+  const retailLabel = formatUsd(retailCents);
   const partnerLabel = formatUsd(chargeCents);
+  const discountLabel = sandboxDiscountLabel(discountPercent);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      try {
+        const res = await fetch("/api/sandbox/session", {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        const data = (await res.json()) as {
+          ok?: boolean;
+          discountPercent?: number;
+          partner?: { discountPercent?: number; balanceCents?: number };
+        };
+        if (!cancelled && data.ok) {
+          const pct =
+            data.discountPercent ??
+            data.partner?.discountPercent ??
+            SANDBOX_DEFAULT_DISCOUNT_PERCENT;
+          setDiscountPercent(pct);
+          if (typeof data.partner?.balanceCents === "number") {
+            setBalanceCents(data.partner.balanceCents);
+          }
+        }
+      } catch {
+        /* ignore */
+      }
       const cents = await refreshSandboxWalletCache();
-      if (!cancelled) setBalanceCents(cents);
+      if (!cancelled && cents != null) setBalanceCents(cents);
     }
     void load();
     return () => {
@@ -98,7 +131,13 @@ export default function SandboxStorefrontBuy({
           Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ offerId: sku, quantity: 1 }),
+        body: JSON.stringify({
+          offerId,
+          quantity: 1,
+          retailPriceCents: retailCents,
+          planName: displayName,
+          region: destinationLabel,
+        }),
       });
       const data = (await res.json()) as {
         message?: string;
@@ -148,7 +187,7 @@ export default function SandboxStorefrontBuy({
           </p>
           <p className="mt-2 text-sm text-[var(--text-muted)]">
             Your simulated Partner eSIM is ready — open the order for QR, LPA,
-            and share. No live supplier order was placed.
+            and share. Charged {partnerLabel} ({discountLabel}).
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <Link
@@ -230,7 +269,7 @@ export default function SandboxStorefrontBuy({
           <div className="flex items-center justify-between gap-3">
             <dt className="text-[var(--text-muted)]">Partner discount</dt>
             <dd className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-300">
-              Sandbox rate
+              {discountLabel}
             </dd>
           </div>
           <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] pt-2">

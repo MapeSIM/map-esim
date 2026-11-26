@@ -6,6 +6,12 @@ import "server-only";
 
 import { SANDBOX_CATALOG } from "@/app/lib/sandbox/sandboxShared";
 import {
+  SANDBOX_DEFAULT_DISCOUNT_PERCENT,
+  clampSandboxDiscountPercent,
+  sandboxDiscountLabel,
+  sandboxPartnerPriceCents,
+} from "@/app/lib/sandbox/sandboxPricing";
+import {
   getSandboxOrderByIccid,
   getSandboxPartnerById,
   listSandboxOrdersForPartner,
@@ -102,7 +108,10 @@ export async function buildSandboxWalletPayload(
   };
 }
 
-export function buildSandboxCatalogPayload() {
+export function buildSandboxCatalogPayload(
+  discountPercent: number = SANDBOX_DEFAULT_DISCOUNT_PERCENT
+) {
+  const pct = clampSandboxDiscountPercent(discountPercent);
   const items = SANDBOX_CATALOG.map((item) => {
     const kind =
       item.region === "Global"
@@ -110,6 +119,8 @@ export function buildSandboxCatalogPayload() {
         : item.region === "Europe" || item.region === "Asia"
           ? "regional"
           : "country";
+    const partnerCents =
+      sandboxPartnerPriceCents(item.priceCents, pct) ?? item.priceCents;
     return {
       offerId: item.id,
       name: item.name,
@@ -122,26 +133,29 @@ export function buildSandboxCatalogPayload() {
       dataLabel: `${item.dataGb} GB`,
       validityDays: item.days,
       validityLabel: `${item.days} days`,
-      partnerPriceCents: item.priceCents,
-      partnerPriceUsd: Number((item.priceCents / 100).toFixed(2)),
-      partnerPriceLabel: formatUsd(item.priceCents),
+      partnerPriceCents: partnerCents,
+      partnerPriceUsd: Number((partnerCents / 100).toFixed(2)),
+      partnerPriceLabel: formatUsd(partnerCents),
       retailPriceUsd: Number((item.priceCents / 100).toFixed(2)),
       retailPriceCents: item.priceCents,
       retailPriceLabel: formatUsd(item.priceCents),
+      discountPercent: pct,
+      discountLabel: sandboxDiscountLabel(pct),
       currency: "USD" as const,
       supportTopUp: item.supportTopUp === true,
       supportTopUpType: item.supportTopUp
         ? item.supportTopUpType
         : null,
-      // Legacy sandbox fields
+      // Legacy sandbox fields — partner charge after discount
       id: item.id,
-      priceCents: item.priceCents,
+      priceCents: partnerCents,
     };
   });
   return {
     success: true as const,
     environment: "sandbox" as const,
     sandbox: true as const,
+    discountPercent: pct,
     catalog: items,
     // Production-compatible alias
     offers: items,

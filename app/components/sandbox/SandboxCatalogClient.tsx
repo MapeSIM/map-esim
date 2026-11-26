@@ -8,6 +8,11 @@ import {
   type SandboxCatalogItem,
 } from "@/app/lib/sandbox/sandboxShared";
 import {
+  SANDBOX_DEFAULT_DISCOUNT_PERCENT,
+  sandboxDiscountLabel,
+  sandboxPartnerPriceCents,
+} from "@/app/lib/sandbox/sandboxPricing";
+import {
   SANDBOX_API_KEY_KEY,
   SANDBOX_ORDERS_KEY,
   SANDBOX_TX_KEY,
@@ -26,6 +31,9 @@ function formatUsd(cents: number): string {
 
 export default function SandboxCatalogClient() {
   const [balanceCents, setBalanceCents] = useState(SANDBOX_DEFAULT_BALANCE_CENTS);
+  const [discountPercent, setDiscountPercent] = useState(
+    SANDBOX_DEFAULT_DISCOUNT_PERCENT
+  );
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastOrder, setLastOrder] = useState<SandboxStoredOrder | null>(null);
@@ -50,6 +58,34 @@ export default function SandboxCatalogClient() {
       setApiKey(generateSandboxTestKey());
     }
     setReady(true);
+
+    let cancelled = false;
+    async function loadDiscount() {
+      try {
+        const res = await fetch("/api/sandbox/session", {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        const data = (await res.json()) as {
+          ok?: boolean;
+          discountPercent?: number;
+          partner?: { discountPercent?: number };
+        };
+        if (!cancelled && data.ok) {
+          setDiscountPercent(
+            data.discountPercent ??
+              data.partner?.discountPercent ??
+              SANDBOX_DEFAULT_DISCOUNT_PERCENT
+          );
+        }
+      } catch {
+        /* keep default */
+      }
+    }
+    void loadDiscount();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const persistBuy = useCallback(
@@ -89,7 +125,10 @@ export default function SandboxCatalogClient() {
 
   async function buy(item: SandboxCatalogItem) {
     setError(null);
-    if (balanceCents < item.priceCents) {
+    const partnerCents =
+      sandboxPartnerPriceCents(item.priceCents, discountPercent) ??
+      Math.round(item.priceCents * 0.97);
+    if (balanceCents < partnerCents) {
       setError("Insufficient mock balance. Top up on Wallet (sandbox).");
       return;
     }
@@ -101,7 +140,11 @@ export default function SandboxCatalogClient() {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ offerId: item.id, quantity: 1 }),
+        body: JSON.stringify({
+          offerId: item.id,
+          quantity: 1,
+          retailPriceCents: item.priceCents,
+        }),
       });
       const data = (await res.json()) as {
         message?: string;
@@ -137,13 +180,15 @@ export default function SandboxCatalogClient() {
     }
   }
 
+  const discountLabel = sandboxDiscountLabel(discountPercent);
+
   return (
     <div className="space-y-8">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-50">Catalog</h1>
           <p className="mt-1 text-sm text-slate-400">
-            Mock destinations — buy debits localStorage only via{" "}
+            Mock destinations — partner price is retail with {discountLabel} via{" "}
             <code className="text-emerald-300">POST /api/sandbox/v1/orders</code>
             .
           </p>
@@ -160,27 +205,40 @@ export default function SandboxCatalogClient() {
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {SANDBOX_CATALOG.map((plan) => (
-          <article key={plan.id} className={partnerCardClass + " flex flex-col"}>
-            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
-              {plan.region}
-            </p>
-            <h2 className="mt-2 text-lg font-semibold text-slate-50">
-              {plan.name}
-            </h2>
-            <p className="mt-1 text-xl font-bold tabular-nums text-emerald-300">
-              {formatUsd(plan.priceCents)}
-            </p>
-            <button
-              type="button"
-              disabled={!ready || busyId === plan.id}
-              onClick={() => void buy(plan)}
-              className="mt-4 inline-flex h-10 items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-60"
-            >
-              {busyId === plan.id ? "Issuing…" : "Buy (sandbox)"}
-            </button>
-          </article>
-        ))}
+        {SANDBOX_CATALOG.map((plan) => {
+          const partnerCents =
+            sandboxPartnerPriceCents(plan.priceCents, discountPercent) ??
+            Math.round(plan.priceCents * 0.97);
+          return (
+            <article key={plan.id} className={partnerCardClass + " flex flex-col"}>
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
+                {plan.region}
+              </p>
+              <h2 className="mt-2 text-lg font-semibold text-slate-50">
+                {plan.name}
+              </h2>
+              <p className="mt-1 text-xl font-bold tabular-nums text-emerald-300">
+                {formatUsd(partnerCents)}
+                <span className="ml-2 text-xs font-semibold text-emerald-400/80">
+                  {discountLabel}
+                </span>
+              </p>
+              <p className="text-xs text-slate-500 line-through">
+                Retail {formatUsd(plan.priceCents)}
+              </p>
+              <button
+                type="button"
+                disabled={!ready || busyId === plan.id}
+                onClick={() => void buy(plan)}
+                className="mt-4 inline-flex h-10 items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-60"
+              >
+                {busyId === plan.id
+                  ? "Issuing…"
+                  : `Buy · ${formatUsd(partnerCents)}`}
+              </button>
+            </article>
+          );
+        })}
       </div>
 
       {lastOrder ? (

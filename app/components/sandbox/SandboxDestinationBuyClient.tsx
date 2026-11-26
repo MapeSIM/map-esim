@@ -9,7 +9,11 @@
 import { useEffect, useState } from "react";
 import { SANDBOX_DEFAULT_BALANCE_CENTS } from "@/app/lib/sandbox/sandboxShared";
 import {
-  pickSandboxSku,
+  SANDBOX_DEFAULT_DISCOUNT_PERCENT,
+  sandboxDiscountLabel,
+  sandboxPartnerPriceCents,
+} from "@/app/lib/sandbox/sandboxPricing";
+import {
   readSandboxApiKey,
   refreshSandboxWalletCache,
   rememberSandboxOrder,
@@ -41,6 +45,9 @@ export default function SandboxDestinationBuyClient({
   offers: OfferRow[];
 }) {
   const [balanceCents, setBalanceCents] = useState(SANDBOX_DEFAULT_BALANCE_CENTS);
+  const [discountPercent, setDiscountPercent] = useState(
+    SANDBOX_DEFAULT_DISCOUNT_PERCENT
+  );
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +55,26 @@ export default function SandboxDestinationBuyClient({
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      try {
+        const res = await fetch("/api/sandbox/session", {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        const data = (await res.json()) as {
+          ok?: boolean;
+          discountPercent?: number;
+          partner?: { discountPercent?: number };
+        };
+        if (!cancelled && data.ok) {
+          setDiscountPercent(
+            data.discountPercent ??
+              data.partner?.discountPercent ??
+              SANDBOX_DEFAULT_DISCOUNT_PERCENT
+          );
+        }
+      } catch {
+        /* ignore */
+      }
       const cents = await refreshSandboxWalletCache();
       if (!cancelled && typeof cents === "number") setBalanceCents(cents);
     }
@@ -65,21 +92,29 @@ export default function SandboxDestinationBuyClient({
       setError("Sandbox session API key missing.");
       return;
     }
-    const charge = row.priceCents > 0 ? row.priceCents : 450;
+    const retailCents = row.priceCents > 0 ? row.priceCents : 519;
+    const charge =
+      sandboxPartnerPriceCents(retailCents, discountPercent) ??
+      Math.round(retailCents * 0.97);
     if (balanceCents < charge) {
       setError("Insufficient wallet balance. Add funds on Wallet.");
       return;
     }
     setBusyId(row.offerId);
     try {
-      const sku = pickSandboxSku(charge);
       const res = await fetch("/api/sandbox/v1/orders", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ offerId: sku, quantity: 1 }),
+        body: JSON.stringify({
+          offerId: row.offerId,
+          quantity: 1,
+          retailPriceCents: retailCents,
+          planName: row.name,
+          region,
+        }),
       });
       const data = (await res.json()) as {
         message?: string;
@@ -117,10 +152,12 @@ export default function SandboxDestinationBuyClient({
     }
   }
 
+  const discountLabel = sandboxDiscountLabel(discountPercent);
+
   return (
     <div className="space-y-4">
       <p className="text-sm font-semibold tabular-nums text-emerald-300">
-        Wallet {formatUsd(balanceCents)}
+        Wallet {formatUsd(balanceCents)} · {discountLabel}
       </p>
       {error ? (
         <p className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
@@ -140,22 +177,36 @@ export default function SandboxDestinationBuyClient({
         </div>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
-          {offers.map((row) => (
-            <li key={row.offerId} className={partnerCardClass}>
-              <p className="font-semibold text-slate-50">{row.name}</p>
-              <p className="mt-1 text-lg font-bold tabular-nums text-emerald-300">
-                {row.priceLabel}
-              </p>
-              <button
-                type="button"
-                disabled={busyId === row.offerId}
-                onClick={() => void buy(row)}
-                className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-60"
-              >
-                {busyId === row.offerId ? "Processing…" : "Buy with wallet"}
-              </button>
-            </li>
-          ))}
+          {offers.map((row) => {
+            const retailCents = row.priceCents > 0 ? row.priceCents : 519;
+            const partnerCents =
+              sandboxPartnerPriceCents(retailCents, discountPercent) ??
+              Math.round(retailCents * 0.97);
+            return (
+              <li key={row.offerId} className={partnerCardClass}>
+                <p className="font-semibold text-slate-50">{row.name}</p>
+                <p className="mt-1 text-lg font-bold tabular-nums text-emerald-300">
+                  {formatUsd(partnerCents)}
+                  <span className="ml-2 text-xs font-semibold text-emerald-400/80">
+                    {discountLabel}
+                  </span>
+                </p>
+                <p className="text-xs text-slate-500 line-through">
+                  Retail {row.priceLabel || formatUsd(retailCents)}
+                </p>
+                <button
+                  type="button"
+                  disabled={busyId === row.offerId}
+                  onClick={() => void buy(row)}
+                  className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-60"
+                >
+                  {busyId === row.offerId
+                    ? "Processing…"
+                    : `Buy · ${formatUsd(partnerCents)}`}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

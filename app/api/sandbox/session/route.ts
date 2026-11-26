@@ -44,9 +44,11 @@ export async function GET() {
         balanceCents: partner.balanceCents,
         apiKeyPrefix: partner.apiKeyPrefix,
         apiEnabled: partner.apiEnabled,
+        discountPercent: partner.discountPercent,
       },
       globalSandboxApiEnabled: apiUi.globalSandboxApiEnabled,
       showApiUi: apiUi.showApiUi,
+      discountPercent: partner.discountPercent,
     },
     {
       headers: {

@@ -1,8 +1,15 @@
 import { Suspense } from "react";
+import { cookies } from "next/headers";
 import { notFound, permanentRedirect } from "next/navigation";
 import DestinationPlansSkeleton from "@/app/components/plans/DestinationPlansSkeleton";
 import PlansListing from "@/app/components/plans/PlansListing";
 import { countries as staticCountries } from "@/app/data/countries";
+import { SANDBOX_DEFAULT_DISCOUNT_PERCENT } from "@/app/lib/sandbox/sandboxPricing";
+import {
+  SANDBOX_SESSION_COOKIE,
+  getSandboxPartnerById,
+  verifySandboxSession,
+} from "@/app/lib/sandbox/sandboxPartnerDb";
 import { SANDBOX_CATALOG_BASE_PATH } from "@/app/lib/vesim/countriesListingReturn";
 import { toPublicVesimOffers, type VesimOffer } from "@/app/lib/vesim/offers";
 import type { VesimDestination } from "@/app/lib/vesim/destinations";
@@ -138,6 +145,14 @@ async function SandboxCatalogPlansContent({ slug }: { slug: string }) {
     ? toPublicPlanDestination(relatedRegional)
     : null;
 
+  const jar = await cookies();
+  const partnerId = verifySandboxSession(
+    jar.get(SANDBOX_SESSION_COOKIE)?.value
+  );
+  const partner = partnerId ? await getSandboxPartnerById(partnerId) : null;
+  const sandboxDiscountPercent =
+    partner?.discountPercent ?? SANDBOX_DEFAULT_DISCOUNT_PERCENT;
+
   return (
     <div className="[--accent-soft:#6ee7b7] [--heading:#f8fafc] [--page-bg:transparent] [--surface:#0D1526] [--surface-2:#111827] [--text:#e2e8f0] [--text-muted:#94a3b8] [--text-soft:#64748b] [--border:rgba(255,255,255,0.08)] [--border-strong:rgba(255,255,255,0.12)] [--border-hover:rgba(255,255,255,0.18)] [--accent-strong:#84cc16] [--accent-ink:#052e16]">
       <PlansListing
@@ -149,6 +164,7 @@ async function SandboxCatalogPlansContent({ slug }: { slug: string }) {
         relatedRegional={publicRelatedRegional}
         listingBasePath={SANDBOX_CATALOG_BASE_PATH}
         forceSandboxCheckout
+        sandboxDiscountPercent={sandboxDiscountPercent}
       />
     </div>
   );

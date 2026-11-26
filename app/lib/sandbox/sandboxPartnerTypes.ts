@@ -8,6 +8,8 @@ export type SandboxPartnerPublic = {
   initialBalanceCents: number;
   /** Per-partner Sandbox API access (AND with globalSandboxApiEnabled). */
   apiEnabled: boolean;
+  /** Partner discount percent on retail (default 3). */
+  discountPercent: number;
   shareCompanyName: string | null;
   shareSupportEmail: string | null;
   shareLogoUrl: string | null;

@@ -1,6 +1,7 @@
 import type { DurationGroup } from "@/app/lib/plans/plan-utils";
 import type { VesimDestination } from "@/app/lib/vesim/destinations";
 import CurrencyPrice from "@/app/components/plans/CurrencyPrice";
+import SandboxPartnerPrice from "@/app/components/sandbox/SandboxPartnerPrice";
 import PlanOfferCard from "@/app/components/plans/PlanOfferCard";
 import {
   PlanBuyNowLink,
@@ -18,6 +19,9 @@ type PlansOfferGroupsProps = {
   totalOffersCount: number;
   showPackageTabs: boolean;
   emptyHint?: string;
+  /** Sandbox portal: show partner price (retail × discount) on cards. */
+  forceSandboxCheckout?: boolean;
+  sandboxDiscountPercent?: number;
 };
 
 /**
@@ -35,6 +39,8 @@ export default function PlansOfferGroups({
   totalOffersCount,
   showPackageTabs,
   emptyHint = "Try clearing one or more filters to see more results.",
+  forceSandboxCheckout = false,
+  sandboxDiscountPercent,
 }: PlansOfferGroupsProps) {
   return (
     <>
@@ -72,7 +78,16 @@ export default function PlansOfferGroups({
                     key={offer.id}
                     offer={offer}
                     isRegionalOrGlobal={isRegionalOrGlobal}
-                    price={<CurrencyPrice amountUsd={offer.priceUSD} />}
+                    price={
+                      forceSandboxCheckout ? (
+                        <SandboxPartnerPrice
+                          retailUsd={offer.priceUSD}
+                          discountPercent={sandboxDiscountPercent}
+                        />
+                      ) : (
+                        <CurrencyPrice amountUsd={offer.priceUSD} />
+                      )
+                    }
                     buyControl={
                       <PlanBuyNowLink
                         offerId={offer.id}

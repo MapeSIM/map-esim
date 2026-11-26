@@ -2104,6 +2104,8 @@ model SandboxPartner {
   initialBalanceCents Int                 @default(125000)
   /// Per-partner Sandbox Public API access (AND with SandboxSettings.globalSandboxApiEnabled).
   apiEnabled          Boolean             @default(true)
+  /// Partner discount percent applied to retail (default 3 → partner pays 97%).
+  discountPercent     Int                 @default(3)
   shareCompanyName    String?
   shareSupportEmail   String?
   shareLogoUrl        String?             @db.Text

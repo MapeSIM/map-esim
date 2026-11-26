@@ -23,13 +23,19 @@ import {
   deleteSandboxPartner,
   getSandboxPartnerById,
   listSandboxPartners,
+  resetAllSandboxPartnerDiscountsToDefault,
   resetSandboxPartnerDemoData,
   rotateSandboxApiKey,
   setSandboxPartnerBalance,
+  setSandboxPartnerDiscountPercent,
   signSandboxSession,
   topUpSandboxPartner,
   verifySandboxSession,
 } from "@/app/lib/sandbox/sandboxPartnerDb";
+import {
+  SANDBOX_DEFAULT_DISCOUNT_PERCENT,
+  clampSandboxDiscountPercent,
+} from "@/app/lib/sandbox/sandboxPricing";
 import type { SandboxPartnerPublic } from "@/app/lib/sandbox/sandboxPartnerTypes";
 
 export type SandboxActionState = {
@@ -331,5 +337,44 @@ export async function setSandboxPartnerApiEnabledAction(
     message: result.apiEnabled
       ? "Partner API access enabled."
       : "Partner API access disabled (403 on API calls).",
+  };
+}
+
+export async function setSandboxPartnerDiscountAction(
+  _prev: SandboxActionState,
+  formData: FormData
+): Promise<SandboxActionState> {
+  await requireSandboxAdmin();
+  const partnerId = String(formData.get("partnerId") ?? "").trim();
+  const raw = String(formData.get("discountPercent") ?? "").trim();
+  const parsed = Number(raw);
+  if (!partnerId || !Number.isFinite(parsed)) {
+    return { ok: false, error: "Enter a valid partner and discount %." };
+  }
+  const pct = clampSandboxDiscountPercent(parsed);
+  const result = await setSandboxPartnerDiscountPercent(partnerId, pct);
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidatePath("/sandbox/admin");
+  revalidatePath("/sandbox/catalog");
+  revalidatePath("/sandbox/buy");
+  return {
+    ok: true,
+    message: `Discount set to ${result.discountPercent}% off.`,
+  };
+}
+
+export async function resetAllSandboxDiscountsAction(
+  _prev: SandboxActionState,
+  _formData: FormData
+): Promise<SandboxActionState> {
+  void _formData;
+  await requireSandboxAdmin();
+  const result = await resetAllSandboxPartnerDiscountsToDefault();
+  revalidatePath("/sandbox/admin");
+  revalidatePath("/sandbox/catalog");
+  revalidatePath("/sandbox/buy");
+  return {
+    ok: true,
+    message: `Reset ${result.updated} partner(s) to ${SANDBOX_DEFAULT_DISCOUNT_PERCENT}% off.`,
   };
 }

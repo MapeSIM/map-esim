@@ -8,11 +8,13 @@ import {
 } from "@/app/lib/vesim/destinations";
 import { destinationDisplayName } from "@/app/lib/vesim/destinationPresentation";
 import CurrencyPrice from "@/app/components/plans/CurrencyPrice";
+import SandboxPartnerPrice from "@/app/components/sandbox/SandboxPartnerPrice";
 import PlansListingBackLink from "@/app/components/plans/PlansListingBackLink";
 import PlansListingClient from "@/app/components/plans/PlansListingClient";
 import PlansListingFlag from "@/app/components/plans/PlansListingFlag";
 import PlansOfferGroups from "@/app/components/plans/PlansOfferGroups";
 import { buildDefaultPlansListingModel } from "@/app/lib/plans/planListingModel";
+import { SANDBOX_DEFAULT_DISCOUNT_PERCENT } from "@/app/lib/sandbox/sandboxPricing";
 import { isGuestVesimCheckoutEnabled } from "@/app/lib/vesim/guestCheckoutGate";
 
 export type PlansListingProps = {
@@ -32,6 +34,8 @@ export type PlansListingProps = {
   forcePartnerCheckout?: boolean;
   /** Force Buy Now → `/sandbox/buy` (demo wallet; never live account checkout). */
   forceSandboxCheckout?: boolean;
+  /** Partner discount % for sandbox catalog cards (default 3). */
+  sandboxDiscountPercent?: number;
 };
 
 /**
@@ -50,6 +54,7 @@ export default async function PlansListing({
   listingBasePath = "/countries",
   forcePartnerCheckout = false,
   forceSandboxCheckout = false,
+  sandboxDiscountPercent = SANDBOX_DEFAULT_DISCOUNT_PERCENT,
 }: PlansListingProps) {
   const guestCheckoutEnabled =
     forcePartnerCheckout || forceSandboxCheckout
@@ -93,6 +98,8 @@ export default async function PlansListing({
         activeCategoryLabel={defaultModel.activeCategory}
         totalOffersCount={offers.length}
         showPackageTabs={defaultModel.showPackageTabs}
+        forceSandboxCheckout={forceSandboxCheckout}
+        sandboxDiscountPercent={sandboxDiscountPercent}
       />
     ) : null;
 
@@ -131,8 +138,17 @@ export default async function PlansListing({
                   "Loading available plans..."
                 ) : hasHeroFromPrice ? (
                   <>
-                    From <CurrencyPrice amountUsd={destination.minPrice} /> ·{" "}
-                    {planCountLabel}
+                    From{" "}
+                    {forceSandboxCheckout ? (
+                      <SandboxPartnerPrice
+                        retailUsd={destination.minPrice}
+                        discountPercent={sandboxDiscountPercent}
+                        showDiscountLabel={false}
+                      />
+                    ) : (
+                      <CurrencyPrice amountUsd={destination.minPrice} />
+                    )}{" "}
+                    · {planCountLabel}
                   </>
                 ) : (
                   planCountLabel
@@ -153,6 +169,7 @@ export default async function PlansListing({
         guestCheckoutEnabled={guestCheckoutEnabled}
         forcePartnerCheckout={forcePartnerCheckout}
         forceSandboxCheckout={forceSandboxCheckout}
+        sandboxDiscountPercent={sandboxDiscountPercent}
       />
 
       {relatedRegional && relatedRegionalHref && relatedRegionalName ? (

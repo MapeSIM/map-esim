@@ -18,6 +18,12 @@ import {
   topUpSandboxPartner,
 } from "@/app/lib/sandbox/sandboxPartnerDb";
 import { getGlobalSandboxApiEnabled } from "@/app/lib/sandbox/sandboxApiControls";
+import {
+  SANDBOX_DEFAULT_DISCOUNT_PERCENT,
+  clampSandboxDiscountPercent,
+  sandboxPartnerPriceCents,
+} from "@/app/lib/sandbox/sandboxPricing";
+import { getSandboxPartnerById } from "@/app/lib/sandbox/sandboxPartnerDb";
 import { prisma } from "@/app/lib/db";
 
 export {
@@ -135,11 +141,17 @@ export function buildSandboxOrderPayload(input: {
   offerId: string;
   quantity?: number;
   seed: string;
+  /** Retail list price in USD cents (authoritative when provided). */
+  retailPriceCents?: number | null;
+  /** Partner discount percent (default 3). */
+  discountPercent?: number;
+  planName?: string | null;
+  region?: string | null;
 }):
   | {
       ok: true;
       order: Record<string, unknown>;
-      item: SandboxCatalogItem;
+      item: SandboxCatalogItem | null;
       persist: {
         orderId: string;
         region: string;
@@ -152,17 +164,7 @@ export function buildSandboxOrderPayload(input: {
       };
     }
   | { ok: false; response: NextResponse } {
-  const item = SANDBOX_CATALOG.find((c) => c.id === input.offerId);
-  if (!item) {
-    return {
-      ok: false,
-      response: sandboxError(
-        400,
-        "Validation error",
-        `Unknown offerId. Use one of: ${SANDBOX_CATALOG.map((c) => c.id).join(", ")}`
-      ),
-    };
-  }
+  const item = SANDBOX_CATALOG.find((c) => c.id === input.offerId) ?? null;
   const qty = input.quantity ?? 1;
   if (!Number.isInteger(qty) || qty < 1 || qty > 5) {
     return {
@@ -175,14 +177,52 @@ export function buildSandboxOrderPayload(input: {
     };
   }
 
+  const retailFromBody =
+    typeof input.retailPriceCents === "number" &&
+    Number.isInteger(input.retailPriceCents) &&
+    input.retailPriceCents > 0
+      ? input.retailPriceCents
+      : null;
+  const retailCents = retailFromBody ?? item?.priceCents ?? null;
+  if (retailCents == null) {
+    return {
+      ok: false,
+      response: sandboxError(
+        400,
+        "Validation error",
+        item
+          ? "Invalid retail price."
+          : `Unknown offerId. Pass retailPriceCents, or use one of: ${SANDBOX_CATALOG.map((c) => c.id).join(", ")}`
+      ),
+    };
+  }
+
+  const discountPercent = clampSandboxDiscountPercent(
+    input.discountPercent ?? SANDBOX_DEFAULT_DISCOUNT_PERCENT
+  );
+  const unitPartnerCents = sandboxPartnerPriceCents(
+    retailCents,
+    discountPercent
+  );
+  if (unitPartnerCents == null || unitPartnerCents <= 0) {
+    return {
+      ok: false,
+      response: sandboxError(400, "Validation error", "Unable to price this offer."),
+    };
+  }
+
   const orderId = newSandboxOrderId();
   const demo = mintDemoActivationCode(`${orderId}:${input.seed}`);
-  const totalCents = item.priceCents * qty;
+  const totalCents = unitPartnerCents * qty;
+  const region =
+    (input.region ?? "").trim() || item?.region || "Sandbox";
+  const planName =
+    (input.planName ?? "").trim() || item?.name || "Sandbox eSIM";
 
   const persist = {
     orderId,
-    region: item.region,
-    planName: item.name,
+    region,
+    planName,
     totalCents,
     iccid: demo.iccid,
     activationCode: demo.activationCode,
@@ -197,9 +237,12 @@ export function buildSandboxOrderPayload(input: {
     order: {
       ...persist,
       status: "COMPLETED",
-      offerId: item.id,
+      offerId: input.offerId,
       quantity: qty,
-      priceCents: item.priceCents,
+      retailPriceCents: retailCents,
+      partnerPriceCents: unitPartnerCents,
+      discountPercent,
+      priceCents: unitPartnerCents,
       currency: "USD",
       qr: {
         format: "LPA",
@@ -221,7 +264,7 @@ export function buildSandboxOrder(input: {
   | {
       ok: true;
       order: Record<string, unknown>;
-      item: SandboxCatalogItem;
+      item: SandboxCatalogItem | null;
     }
   | { ok: false; response: NextResponse } {
   const built = buildSandboxOrderPayload({
@@ -238,14 +281,25 @@ export async function persistSandboxOrderFromApi(input: {
   offerId: string;
   quantity?: number;
   apiKey: string;
+  retailPriceCents?: number | null;
+  planName?: string | null;
+  region?: string | null;
 }): Promise<
   | { ok: true; order: Record<string, unknown> }
   | { ok: false; response: NextResponse }
 > {
+  const partner = await getSandboxPartnerById(input.partnerId);
+  const discountPercent =
+    partner?.discountPercent ?? SANDBOX_DEFAULT_DISCOUNT_PERCENT;
+
   const built = buildSandboxOrderPayload({
     offerId: input.offerId,
     quantity: input.quantity,
     seed: input.apiKey,
+    retailPriceCents: input.retailPriceCents,
+    discountPercent,
+    planName: input.planName,
+    region: input.region,
   });
   if (!built.ok) return built;
 

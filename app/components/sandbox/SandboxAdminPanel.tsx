@@ -6,13 +6,16 @@ import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
 import {
   createSandboxPartnerAction,
   deleteSandboxPartnerAction,
+  resetAllSandboxDiscountsAction,
   resetSandboxDemoAction,
   setGlobalSandboxApiEnabledAction,
   setSandboxBalanceAction,
   setSandboxPartnerApiEnabledAction,
+  setSandboxPartnerDiscountAction,
   topUpSandboxBalanceAction,
   type SandboxActionState,
 } from "@/app/lib/sandbox/sandboxPartnerActions";
+import { SANDBOX_DEFAULT_DISCOUNT_PERCENT } from "@/app/lib/sandbox/sandboxPricing";
 import type { SandboxPartnerPublic } from "@/app/lib/sandbox/sandboxPartnerTypes";
 
 const empty: SandboxActionState = { ok: false };
@@ -86,6 +89,12 @@ export default function SandboxAdminPanel({
     setSandboxPartnerApiEnabledAction,
     empty
   );
+  const [discountState, discountAction, discountPending] = useActionState(
+    setSandboxPartnerDiscountAction,
+    empty
+  );
+  const [resetDiscountState, resetDiscountAction, resetDiscountPending] =
+    useActionState(resetAllSandboxDiscountsAction, empty);
 
   useEffect(() => {
     setPartners(initialPartners);
@@ -103,7 +112,9 @@ export default function SandboxAdminPanel({
       resetState.ok ||
       deleteState.ok ||
       globalState.ok ||
-      partnerApiState.ok
+      partnerApiState.ok ||
+      discountState.ok ||
+      resetDiscountState.ok
     ) {
       window.location.reload();
     }
@@ -115,6 +126,8 @@ export default function SandboxAdminPanel({
     deleteState,
     globalState,
     partnerApiState,
+    discountState,
+    resetDiscountState,
   ]);
 
   return (
@@ -255,9 +268,32 @@ export default function SandboxAdminPanel({
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-slate-50">
-          Sandbox partners ({partners.length})
-        </h2>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-lg font-semibold text-slate-50">
+            Sandbox partners ({partners.length})
+          </h2>
+          <form action={resetDiscountAction}>
+            <button
+              type="submit"
+              disabled={resetDiscountPending || partners.length === 0}
+              className="inline-flex h-9 items-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/20 disabled:opacity-60"
+              onClick={(e) => {
+                if (
+                  !window.confirm(
+                    `Reset all sandbox partners to ${SANDBOX_DEFAULT_DISCOUNT_PERCENT}% off?`
+                  )
+                ) {
+                  e.preventDefault();
+                }
+              }}
+            >
+              {resetDiscountPending
+                ? "…"
+                : `Reset all to ${SANDBOX_DEFAULT_DISCOUNT_PERCENT}%`}
+            </button>
+          </form>
+        </div>
+        <Message state={resetDiscountState} />
         {partners.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-white/[0.12] px-4 py-8 text-center text-sm text-slate-400">
             No sandbox partners yet. Create one above to enable portal login and
@@ -276,8 +312,12 @@ export default function SandboxAdminPanel({
                   </p>
                   <p className="truncate text-sm text-slate-400">{p.email}</p>
                   <p className="mt-1 text-xs text-slate-500">
-                    Balance {formatUsd(p.balanceCents)} · key{" "}
-                    {p.apiKeyPrefix ?? "—"}… · API{" "}
+                    Balance {formatUsd(p.balanceCents)} · discount{" "}
+                    <span className="text-emerald-300">
+                      {p.discountPercent ?? SANDBOX_DEFAULT_DISCOUNT_PERCENT}%
+                      off
+                    </span>{" "}
+                    · key {p.apiKeyPrefix ?? "—"}… · API{" "}
                     <span
                       className={
                         p.apiEnabled && globalOn
@@ -332,7 +372,30 @@ export default function SandboxAdminPanel({
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <form action={discountAction} className="flex gap-2">
+                  <input type="hidden" name="partnerId" value={p.id} />
+                  <input
+                    name="discountPercent"
+                    type="number"
+                    min={0}
+                    max={50}
+                    step={1}
+                    defaultValue={
+                      p.discountPercent ?? SANDBOX_DEFAULT_DISCOUNT_PERCENT
+                    }
+                    title="Partner discount %"
+                    className="h-9 min-w-0 flex-1 rounded-lg border border-white/[0.1] bg-[#070D19] px-2 text-sm"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    disabled={discountPending}
+                    className="h-9 shrink-0 rounded-lg border border-emerald-500/30 px-2 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/10 disabled:opacity-60"
+                  >
+                    {discountPending ? "…" : "Set %"}
+                  </button>
+                </form>
                 <form action={balanceAction} className="flex gap-2">
                   <input type="hidden" name="partnerId" value={p.id} />
                   <input
@@ -382,6 +445,7 @@ export default function SandboxAdminPanel({
                   </button>
                 </form>
               </div>
+              <Message state={discountState} />
               <Message state={balanceState} />
               <Message state={topUpState} />
               <Message state={resetState} />

@@ -10,6 +10,10 @@ import {
   SANDBOX_TEST_KEY_PREFIX,
   generateSandboxTestKey,
 } from "@/app/lib/sandbox/sandboxShared";
+import {
+  SANDBOX_DEFAULT_DISCOUNT_PERCENT,
+  clampSandboxDiscountPercent,
+} from "@/app/lib/sandbox/sandboxPricing";
 import type { SandboxPartnerPublic } from "@/app/lib/sandbox/sandboxPartnerTypes";
 
 export type { SandboxPartnerPublic } from "@/app/lib/sandbox/sandboxPartnerTypes";
@@ -32,6 +36,7 @@ function toPublic(
     balanceCents: number;
     initialBalanceCents: number;
     apiEnabled?: boolean;
+    discountPercent?: number;
     shareCompanyName: string | null;
     shareSupportEmail: string | null;
     shareLogoUrl: string | null;
@@ -50,6 +55,9 @@ function toPublic(
     balanceCents: row.balanceCents,
     initialBalanceCents: row.initialBalanceCents,
     apiEnabled: row.apiEnabled !== false,
+    discountPercent: clampSandboxDiscountPercent(
+      row.discountPercent ?? SANDBOX_DEFAULT_DISCOUNT_PERCENT
+    ),
     shareCompanyName: row.shareCompanyName,
     shareSupportEmail: row.shareSupportEmail,
     shareLogoUrl: row.shareLogoUrl,
@@ -68,6 +76,7 @@ const partnerSelect = {
   balanceCents: true,
   initialBalanceCents: true,
   apiEnabled: true,
+  discountPercent: true,
   shareCompanyName: true,
   shareSupportEmail: true,
   shareLogoUrl: true,
@@ -148,6 +157,8 @@ export async function createSandboxPartner(input: {
         passwordHash,
         balanceCents: balance,
         initialBalanceCents: balance,
+        discountPercent: SANDBOX_DEFAULT_DISCOUNT_PERCENT,
+        apiEnabled: true,
         shareCompanyName: name,
         shareSupportEmail: email,
         apiKeys: {
@@ -419,6 +430,42 @@ export async function deleteSandboxPartner(
   } catch {
     return { ok: false, error: "Sandbox partner not found." };
   }
+}
+
+export async function setSandboxPartnerDiscountPercent(
+  partnerId: string,
+  discountPercent: number
+): Promise<
+  | { ok: true; discountPercent: number }
+  | { ok: false; error: string }
+> {
+  const id = partnerId.trim();
+  if (!id) return { ok: false, error: "Missing partner." };
+  const pct = clampSandboxDiscountPercent(discountPercent);
+  try {
+    const updated = await prisma.sandboxPartner.update({
+      where: { id },
+      data: { discountPercent: pct },
+      select: { discountPercent: true },
+    });
+    return {
+      ok: true,
+      discountPercent: clampSandboxDiscountPercent(updated.discountPercent),
+    };
+  } catch {
+    return { ok: false, error: "Sandbox partner not found." };
+  }
+}
+
+/** Admin quick action — set every sandbox partner to the 3% platform default. */
+export async function resetAllSandboxPartnerDiscountsToDefault(): Promise<{
+  ok: true;
+  updated: number;
+}> {
+  const result = await prisma.sandboxPartner.updateMany({
+    data: { discountPercent: SANDBOX_DEFAULT_DISCOUNT_PERCENT },
+  });
+  return { ok: true, updated: result.count };
 }
 
 export async function debitSandboxPartnerWallet(
