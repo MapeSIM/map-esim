@@ -10,9 +10,10 @@ import {
   sandboxPartnerPriceCents,
 } from "@/app/lib/sandbox/sandboxPricing";
 import {
-  readSandboxApiKey,
+  cacheSandboxApiKeyIfPresent,
   refreshSandboxWalletCache,
   rememberSandboxOrder,
+  sandboxAuthHeaders,
 } from "@/app/lib/sandbox/sandboxPurchaseClient";
 import type { SandboxStoredOrder } from "@/app/lib/sandbox/sandboxClientStorage";
 import BrandPendingLabel from "@/app/components/loading/BrandPendingLabel";
@@ -85,10 +86,12 @@ export default function SandboxStorefrontBuy({
         });
         const data = (await res.json()) as {
           ok?: boolean;
+          apiKey?: string | null;
           discountPercent?: number;
           partner?: { discountPercent?: number; balanceCents?: number };
         };
         if (!cancelled && data.ok) {
+          cacheSandboxApiKeyIfPresent(data.apiKey);
           const pct =
             data.discountPercent ??
             data.partner?.discountPercent ??
@@ -112,23 +115,18 @@ export default function SandboxStorefrontBuy({
 
   async function confirmPurchase() {
     setError(null);
-    const key = readSandboxApiKey();
-    if (!key) {
-      setError(
-        "Sandbox session API key missing. Open the sandbox portal from your provisioned session and try again."
-      );
-      return;
-    }
     if (balanceCents != null && balanceCents < chargeCents) {
       setError("Insufficient Partner balance. Add funds on Wallet first.");
       return;
     }
     setBusy(true);
     try {
+      // Auth via httpOnly sandbox session cookie (Bearer key optional).
       const res = await fetch("/api/sandbox/v1/orders", {
         method: "POST",
+        credentials: "same-origin",
         headers: {
-          Authorization: `Bearer ${key}`,
+          ...sandboxAuthHeaders(),
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -152,7 +150,12 @@ export default function SandboxStorefrontBuy({
         };
       };
       if (!res.ok || !data.order) {
-        setError(data.message || "Unable to purchase.");
+        setError(
+          data.message ||
+            (res.status === 401
+              ? "Sign in to the sandbox portal and try again."
+              : "Unable to purchase.")
+        );
         return;
       }
 

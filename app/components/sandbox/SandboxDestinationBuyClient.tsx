@@ -14,9 +14,10 @@ import {
   sandboxPartnerPriceCents,
 } from "@/app/lib/sandbox/sandboxPricing";
 import {
-  readSandboxApiKey,
+  cacheSandboxApiKeyIfPresent,
   refreshSandboxWalletCache,
   rememberSandboxOrder,
+  sandboxAuthHeaders,
 } from "@/app/lib/sandbox/sandboxPurchaseClient";
 import type { SandboxStoredOrder } from "@/app/lib/sandbox/sandboxClientStorage";
 import { partnerCardClass } from "@/app/components/partner/partnerPortalUi";
@@ -62,10 +63,12 @@ export default function SandboxDestinationBuyClient({
         });
         const data = (await res.json()) as {
           ok?: boolean;
+          apiKey?: string | null;
           discountPercent?: number;
           partner?: { discountPercent?: number };
         };
         if (!cancelled && data.ok) {
+          cacheSandboxApiKeyIfPresent(data.apiKey);
           setDiscountPercent(
             data.discountPercent ??
               data.partner?.discountPercent ??
@@ -87,11 +90,6 @@ export default function SandboxDestinationBuyClient({
   async function buy(row: OfferRow) {
     setError(null);
     setMessage(null);
-    const key = readSandboxApiKey();
-    if (!key) {
-      setError("Sandbox session API key missing.");
-      return;
-    }
     const retailCents = row.priceCents > 0 ? row.priceCents : 519;
     const charge =
       sandboxPartnerPriceCents(retailCents, discountPercent) ??
@@ -104,8 +102,9 @@ export default function SandboxDestinationBuyClient({
     try {
       const res = await fetch("/api/sandbox/v1/orders", {
         method: "POST",
+        credentials: "same-origin",
         headers: {
-          Authorization: `Bearer ${key}`,
+          ...sandboxAuthHeaders(),
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -128,7 +127,12 @@ export default function SandboxDestinationBuyClient({
         };
       };
       if (!res.ok || !data.order) {
-        setError(data.message || "Purchase failed.");
+        setError(
+          data.message ||
+            (res.status === 401
+              ? "Sign in to the sandbox portal and try again."
+              : "Purchase failed.")
+        );
         return;
       }
       const order: SandboxStoredOrder = {

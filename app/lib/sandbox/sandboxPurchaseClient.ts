@@ -1,6 +1,6 @@
 /**
  * Client helpers for sandbox catalog purchases and wallet sync.
- * Never invents API keys — uses the session-provisioned sb_test_ key only.
+ * Portal UI prefers session-cookie auth; Bearer key is optional when present.
  */
 
 import { SANDBOX_CATALOG } from "@/app/lib/sandbox/sandboxShared";
@@ -22,6 +22,23 @@ export function readSandboxApiKey(): string | null {
   }
 }
 
+export function cacheSandboxApiKeyIfPresent(
+  rawKey: string | null | undefined
+): void {
+  if (!rawKey || !rawKey.startsWith("sb_test_")) return;
+  try {
+    localStorage.setItem(SANDBOX_API_KEY_KEY, rawKey);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Auth headers for sandbox API — Bearer only when a cached key exists. */
+export function sandboxAuthHeaders(): HeadersInit {
+  const key = readSandboxApiKey();
+  return key ? { Authorization: `Bearer ${key}` } : {};
+}
+
 /** Map a listed retail plan price onto the closest sandbox catalog SKU. */
 export function pickSandboxSku(priceCents: number): string {
   const sorted = [...SANDBOX_CATALOG].sort(
@@ -32,14 +49,36 @@ export function pickSandboxSku(priceCents: number): string {
 }
 
 export async function refreshSandboxWalletCache(): Promise<number | null> {
-  const key = readSandboxApiKey();
-  if (!key) return null;
   try {
     const res = await fetch("/api/sandbox/v1/wallet", {
-      headers: { Authorization: `Bearer ${key}` },
+      headers: sandboxAuthHeaders(),
+      credentials: "same-origin",
       cache: "no-store",
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // Fall back to session balance when Public API wallet is unavailable.
+      const sessionRes = await fetch("/api/sandbox/session", {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!sessionRes.ok) return null;
+      const session = (await sessionRes.json()) as {
+        ok?: boolean;
+        apiKey?: string | null;
+        partner?: { balanceCents?: number };
+      };
+      if (session.apiKey) cacheSandboxApiKeyIfPresent(session.apiKey);
+      const cents = session.partner?.balanceCents;
+      if (typeof cents === "number" && Number.isFinite(cents)) {
+        try {
+          localStorage.setItem(SANDBOX_WALLET_KEY, String(cents));
+        } catch {
+          /* ignore */
+        }
+        return cents;
+      }
+      return null;
+    }
     const data = (await res.json()) as {
       wallet?: { balanceCents?: number };
       transactions?: SandboxWalletTx[];

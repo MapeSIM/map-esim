@@ -9,7 +9,7 @@ import SmartInstallEsimButton from "@/app/components/install/SmartInstallEsimBut
 import {
   loadCachedSandboxOrders,
   findCachedSandboxOrder,
-  readSandboxApiKey,
+  sandboxAuthHeaders,
 } from "@/app/lib/sandbox/sandboxPurchaseClient";
 import { parseSandboxLpa } from "@/app/lib/sandbox/sandboxOrderPresentation";
 import {
@@ -50,41 +50,39 @@ function SharePreviewInner() {
         : null;
 
       try {
-        const key = readSandboxApiKey();
-        if (key) {
-          const res = await fetch("/api/sandbox/v1/orders", {
-            headers: { Authorization: `Bearer ${key}` },
-            cache: "no-store",
-          });
-          if (res.ok) {
-            const data = (await res.json()) as {
-              orders?: Array<{
-                orderId: string;
-                planName: string;
-                region: string;
-                totalCents: number;
-                iccid?: string;
-                activationCode?: string;
-                createdAt: string;
-              }>;
-            };
-            const list = (data.orders ?? []).map(
-              (o): SandboxStoredOrder => ({
-                orderId: o.orderId,
-                planName: o.planName,
-                region: o.region,
-                totalCents: o.totalCents,
-                iccid: o.iccid ?? "",
-                activationCode: o.activationCode ?? "",
-                createdAt: o.createdAt,
-                status: "COMPLETED",
-              })
-            );
-            if (orderIdParam) {
-              found = list.find((o) => o.orderId === orderIdParam) ?? found;
-            } else if (list[0]) {
-              found = list[0];
-            }
+        const res = await fetch("/api/sandbox/v1/orders", {
+          headers: sandboxAuthHeaders(),
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        if (res.ok) {
+          const data = (await res.json()) as {
+            orders?: Array<{
+              orderId: string;
+              planName: string;
+              region: string;
+              totalCents: number;
+              iccid?: string;
+              activationCode?: string;
+              createdAt: string;
+            }>;
+          };
+          const list = (data.orders ?? []).map(
+            (o): SandboxStoredOrder => ({
+              orderId: o.orderId,
+              planName: o.planName,
+              region: o.region,
+              totalCents: o.totalCents,
+              iccid: o.iccid ?? "",
+              activationCode: o.activationCode ?? "",
+              createdAt: o.createdAt,
+              status: "COMPLETED",
+            })
+          );
+          if (orderIdParam) {
+            found = list.find((o) => o.orderId === orderIdParam) ?? found;
+          } else if (list[0]) {
+            found = list[0];
           }
         }
       } catch {

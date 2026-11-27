@@ -22,8 +22,8 @@ import {
   type SandboxWalletTx,
 } from "@/app/lib/sandbox/sandboxClientStorage";
 import {
-  readSandboxApiKey,
   refreshSandboxWalletCache,
+  sandboxAuthHeaders,
 } from "@/app/lib/sandbox/sandboxPurchaseClient";
 import { SANDBOX_DEFAULT_BALANCE_CENTS } from "@/app/lib/sandbox/sandboxShared";
 import { SIMPAISA_WALLET_OPERATORS } from "@/app/lib/payments/simpaisaPolicy";
@@ -72,13 +72,10 @@ export default function SandboxWalletClient() {
   const maxLabel = (PARTNER_TOPUP_MAX_CENTS / 100).toFixed(2);
 
   async function reloadWallet() {
-    const key = readSandboxApiKey();
-    setHasApiKey(Boolean(key));
-    if (key) {
-      const cents = await refreshSandboxWalletCache();
-      if (typeof cents === "number") {
-        setBalanceCents(cents);
-      }
+    const cents = await refreshSandboxWalletCache();
+    setHasApiKey(typeof cents === "number");
+    if (typeof cents === "number") {
+      setBalanceCents(cents);
       try {
         const rawTx = localStorage.getItem(SANDBOX_TX_KEY);
         const parsed = rawTx ? (JSON.parse(rawTx) as SandboxWalletTx[]) : [];
@@ -166,22 +163,15 @@ export default function SandboxWalletClient() {
     }
     const usd = Number(selectedPreset);
     if (!Number.isFinite(usd) || usd <= 0) return;
-    const key = readSandboxApiKey();
-    if (!key) {
-      setError(
-        "Sandbox API key required. Use a provisioned sandbox session — local preview top-ups are disabled."
-      );
-      return;
-    }
-
     setSimBusy(true);
     setError(null);
     setMessage(null);
     try {
       const res = await fetch("/api/sandbox/v1/wallet", {
         method: "POST",
+        credentials: "same-origin",
         headers: {
-          Authorization: `Bearer ${key}`,
+          ...sandboxAuthHeaders(),
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ amountUsd: usd }),

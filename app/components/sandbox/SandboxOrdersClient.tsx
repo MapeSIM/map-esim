@@ -7,7 +7,7 @@ import {
   SANDBOX_ORDERS_KEY,
   type SandboxStoredOrder,
 } from "@/app/lib/sandbox/sandboxClientStorage";
-import { readSandboxApiKey } from "@/app/lib/sandbox/sandboxPurchaseClient";
+import { sandboxAuthHeaders } from "@/app/lib/sandbox/sandboxPurchaseClient";
 import { sandboxOrderToPartnerRow } from "@/app/lib/sandbox/sandboxOrderPresentation";
 import { partnerCardClass } from "@/app/components/partner/partnerPortalUi";
 
@@ -29,46 +29,44 @@ export default function SandboxOrdersClient({
     let cancelled = false;
     async function load() {
       try {
-        const key = readSandboxApiKey();
-        if (key) {
-          const res = await fetch("/api/sandbox/v1/orders", {
-            headers: { Authorization: `Bearer ${key}` },
-            cache: "no-store",
-          });
-          if (res.ok) {
-            const data = (await res.json()) as {
-              orders?: Array<{
-                orderId: string;
-                planName: string;
-                region: string;
-                totalCents: number;
-                iccid?: string;
-                activationCode?: string;
-                createdAt: string;
-              }>;
-            };
-            const mapped: SandboxStoredOrder[] = (data.orders ?? []).map(
-              (o) => ({
-                orderId: o.orderId,
-                planName: o.planName,
-                region: o.region,
-                totalCents: o.totalCents,
-                iccid: o.iccid ?? "",
-                activationCode: o.activationCode ?? "",
-                createdAt: o.createdAt,
-                status: "COMPLETED",
-              })
-            );
-            if (!cancelled) {
-              setOrders(mapped);
-              try {
-                localStorage.setItem(SANDBOX_ORDERS_KEY, JSON.stringify(mapped));
-              } catch {
-                /* ignore */
-              }
+        const res = await fetch("/api/sandbox/v1/orders", {
+          headers: sandboxAuthHeaders(),
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        if (res.ok) {
+          const data = (await res.json()) as {
+            orders?: Array<{
+              orderId: string;
+              planName: string;
+              region: string;
+              totalCents: number;
+              iccid?: string;
+              activationCode?: string;
+              createdAt: string;
+            }>;
+          };
+          const mapped: SandboxStoredOrder[] = (data.orders ?? []).map(
+            (o) => ({
+              orderId: o.orderId,
+              planName: o.planName,
+              region: o.region,
+              totalCents: o.totalCents,
+              iccid: o.iccid ?? "",
+              activationCode: o.activationCode ?? "",
+              createdAt: o.createdAt,
+              status: "COMPLETED",
+            })
+          );
+          if (!cancelled) {
+            setOrders(mapped);
+            try {
+              localStorage.setItem(SANDBOX_ORDERS_KEY, JSON.stringify(mapped));
+            } catch {
+              /* ignore */
             }
-            return;
           }
+          return;
         }
       } catch {
         /* fall back */

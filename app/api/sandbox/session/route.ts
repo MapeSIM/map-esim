@@ -6,6 +6,7 @@ import {
 } from "@/app/lib/sandbox/sandboxApiControls";
 import {
   SANDBOX_SESSION_COOKIE,
+  ensureSandboxPartnerHasApiKey,
   getSandboxPartnerById,
   verifySandboxSession,
 } from "@/app/lib/sandbox/sandboxPartnerDb";
@@ -33,22 +34,32 @@ export async function GET() {
   if (!partner || partner.disabledAt) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
+
+  // Mint a key if the partner has none (raw returned once for optional client cache).
+  const ensured = await ensureSandboxPartnerHasApiKey(partnerId);
+  const resolvedPartner =
+    ensured.ok && ensured.partner ? ensured.partner : partner;
+  const rawApiKey =
+    ensured.ok && ensured.rawApiKey ? ensured.rawApiKey : null;
+
   const apiUi = await canSandboxPartnerUseApiUi(partnerId);
   return NextResponse.json(
     {
       ok: true,
       partner: {
-        id: partner.id,
-        name: partner.name,
-        email: partner.email,
-        balanceCents: partner.balanceCents,
-        apiKeyPrefix: partner.apiKeyPrefix,
-        apiEnabled: partner.apiEnabled,
-        discountPercent: partner.discountPercent,
+        id: resolvedPartner.id,
+        name: resolvedPartner.name,
+        email: resolvedPartner.email,
+        balanceCents: resolvedPartner.balanceCents,
+        apiKeyPrefix: resolvedPartner.apiKeyPrefix,
+        apiEnabled: resolvedPartner.apiEnabled,
+        discountPercent: resolvedPartner.discountPercent,
       },
+      /** Present only when a new key was just minted — never for existing hashed keys. */
+      apiKey: rawApiKey,
       globalSandboxApiEnabled: apiUi.globalSandboxApiEnabled,
       showApiUi: apiUi.showApiUi,
-      discountPercent: partner.discountPercent,
+      discountPercent: resolvedPartner.discountPercent,
     },
     {
       headers: {

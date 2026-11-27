@@ -253,6 +253,54 @@ export async function authenticateSandboxPartner(input: {
 }
 
 /**
+ * Ensure the partner has at least one active sb_test_* key.
+ * Returns the raw token only when a new key is minted (shown once).
+ */
+export async function ensureSandboxPartnerHasApiKey(
+  partnerId: string
+): Promise<
+  | { ok: true; partner: SandboxPartnerPublic; rawApiKey: string | null }
+  | { ok: false; error: string }
+> {
+  const id = (partnerId ?? "").trim();
+  if (!id || id.length > 64) {
+    return { ok: false, error: "Sandbox partner not found." };
+  }
+  const row = await prisma.sandboxPartner.findUnique({
+    where: { id },
+    select: partnerSelect,
+  });
+  if (!row || row.disabledAt) {
+    return { ok: false, error: "Sandbox partner not found." };
+  }
+  const active = row.apiKeys?.[0];
+  if (active) {
+    return {
+      ok: true,
+      partner: toPublic(row),
+      rawApiKey: null,
+    };
+  }
+  const minted = mintSandboxApiToken();
+  await prisma.sandboxApiKey.create({
+    data: {
+      partnerId: id,
+      name: "Default",
+      prefix: minted.prefix,
+      keyHash: minted.keyHash,
+    },
+  });
+  return {
+    ok: true,
+    partner: toPublic({
+      ...row,
+      apiKeys: [{ prefix: minted.prefix, revokedAt: null }],
+    }),
+    rawApiKey: minted.raw,
+  };
+}
+
+/**
  * Explicit rotate — revokes active keys and mints one new sb_test_* token.
  * Raw token is returned once; only the hash is stored.
  */

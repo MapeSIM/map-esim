@@ -55,7 +55,9 @@ export default function SandboxSessionGate({
           admin = session?.user?.role === "ADMIN";
         }
 
-        const data = (await partnerRes.json()) as MeResponse;
+        const data = (await partnerRes.json()) as MeResponse & {
+          apiKey?: string | null;
+        };
         if (cancelled) return;
 
         if (data.ok && data.partner) {
@@ -73,6 +75,9 @@ export default function SandboxSessionGate({
                 at: Date.now(),
               })
             );
+            if (data.apiKey?.startsWith("sb_test_")) {
+              localStorage.setItem(SANDBOX_API_KEY_KEY, data.apiKey);
+            }
           } catch {
             /* ignore */
           }

@@ -8,7 +8,7 @@ import SmartInstallEsimButton from "@/app/components/install/SmartInstallEsimBut
 import EsimOrderDetailCard from "@/app/components/orders/EsimOrderDetailCard";
 import {
   findCachedSandboxOrder,
-  readSandboxApiKey,
+  sandboxAuthHeaders,
 } from "@/app/lib/sandbox/sandboxPurchaseClient";
 import {
   parseSandboxLpa,
@@ -37,37 +37,35 @@ export default function SandboxOrderDetailClient({
     async function load() {
       let found = findCachedSandboxOrder(orderId);
       try {
-        const key = readSandboxApiKey();
-        if (key) {
-          const res = await fetch("/api/sandbox/v1/orders", {
-            headers: { Authorization: `Bearer ${key}` },
-            cache: "no-store",
-          });
-          if (res.ok) {
-            const data = (await res.json()) as {
-              orders?: Array<{
-                orderId: string;
-                planName: string;
-                region: string;
-                totalCents: number;
-                iccid?: string;
-                activationCode?: string;
-                createdAt: string;
-              }>;
+        const res = await fetch("/api/sandbox/v1/orders", {
+          headers: sandboxAuthHeaders(),
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        if (res.ok) {
+          const data = (await res.json()) as {
+            orders?: Array<{
+              orderId: string;
+              planName: string;
+              region: string;
+              totalCents: number;
+              iccid?: string;
+              activationCode?: string;
+              createdAt: string;
+            }>;
+          };
+          const match = (data.orders ?? []).find((o) => o.orderId === orderId);
+          if (match) {
+            found = {
+              orderId: match.orderId,
+              planName: match.planName,
+              region: match.region,
+              totalCents: match.totalCents,
+              iccid: match.iccid ?? "",
+              activationCode: match.activationCode ?? "",
+              createdAt: match.createdAt,
+              status: "COMPLETED",
             };
-            const match = (data.orders ?? []).find((o) => o.orderId === orderId);
-            if (match) {
-              found = {
-                orderId: match.orderId,
-                planName: match.planName,
-                region: match.region,
-                totalCents: match.totalCents,
-                iccid: match.iccid ?? "",
-                activationCode: match.activationCode ?? "",
-                createdAt: match.createdAt,
-                status: "COMPLETED",
-              };
-            }
           }
         }
       } catch {

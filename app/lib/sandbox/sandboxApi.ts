@@ -10,12 +10,15 @@ import {
   type SandboxCatalogItem,
 } from "@/app/lib/sandbox/sandboxShared";
 import {
+  SANDBOX_SESSION_COOKIE,
   createSandboxOrderForPartner,
   findSandboxPartnerByApiKey,
+  getSandboxPartnerById,
   isSandboxApiKeyFormat,
   mintDemoActivationCode,
   newSandboxOrderId,
   topUpSandboxPartner,
+  verifySandboxSession,
 } from "@/app/lib/sandbox/sandboxPartnerDb";
 import { getGlobalSandboxApiEnabled } from "@/app/lib/sandbox/sandboxApiControls";
 import {
@@ -23,7 +26,6 @@ import {
   clampSandboxDiscountPercent,
   sandboxPartnerPriceCents,
 } from "@/app/lib/sandbox/sandboxPricing";
-import { getSandboxPartnerById } from "@/app/lib/sandbox/sandboxPartnerDb";
 import { prisma } from "@/app/lib/db";
 
 export {
@@ -59,6 +61,8 @@ export type SandboxAuthOk = {
   ok: true;
   apiKey: string;
   partnerId: string | null;
+  /** Authenticated via httpOnly portal cookie (UI checkout / wallet). */
+  viaSession?: boolean;
 };
 
 function extractSandboxApiToken(req: NextRequest): string | null {
@@ -72,67 +76,96 @@ function extractSandboxApiToken(req: NextRequest): string | null {
   return token || null;
 }
 
-/** Resolve Bearer or x-api-key sb_test_* against Neon SandboxApiKey. */
+function resolveSandboxPartnerIdFromRequest(
+  req: NextRequest
+): string | null {
+  const token =
+    req.cookies.get(SANDBOX_SESSION_COOKIE)?.value ??
+    req.cookies.get("map_sandbox_sid")?.value ??
+    null;
+  return verifySandboxSession(token);
+}
+
+/**
+ * Resolve Bearer / x-api-key sb_test_* against Neon SandboxApiKey.
+ * If no API key header is present, fall back to the logged-in sandbox
+ * portal session cookie so storefront UI checkout never depends on
+ * localStorage keys or Public API toggle state.
+ */
 export async function authenticateSandboxRequest(
   req: NextRequest
 ): Promise<SandboxAuthOk | { ok: false; response: NextResponse }> {
-  // Global master switch — before key parsing so disabled sandbox returns 503 uniformly.
-  const globalOn = await getGlobalSandboxApiEnabled();
-  if (!globalOn) {
-    return {
-      ok: false,
-      response: sandboxError(
-        503,
-        "Service Unavailable",
-        "Sandbox Partner API is temporarily disabled by an administrator."
-      ),
-    };
-  }
-
   const token = extractSandboxApiToken(req);
-  if (!token) {
-    return {
-      ok: false,
-      response: sandboxError(
-        401,
-        "Unauthorized",
-        "Missing or invalid API key. Send Authorization: Bearer sb_test_… or x-api-key: sb_test_…"
-      ),
-    };
-  }
-  if (!isSandboxApiKeyFormat(token)) {
-    return {
-      ok: false,
-      response: sandboxError(
-        401,
-        "Unauthorized",
-        "Sandbox keys must match sb_test_<8+ chars>. No live Partner keys are accepted here."
-      ),
-    };
-  }
 
-  const found = await findSandboxPartnerByApiKey(token);
-  if (found) {
-    if (!found.apiEnabled) {
+  if (token) {
+    // Public API path — honor global + per-partner API toggles.
+    const globalOn = await getGlobalSandboxApiEnabled();
+    if (!globalOn) {
       return {
         ok: false,
         response: sandboxError(
-          403,
-          "Forbidden",
-          "Sandbox API access is disabled for this partner account."
+          503,
+          "Service Unavailable",
+          "Sandbox Partner API is temporarily disabled by an administrator."
         ),
       };
     }
-    return { ok: true, apiKey: token, partnerId: found.partnerId };
+    if (!isSandboxApiKeyFormat(token)) {
+      return {
+        ok: false,
+        response: sandboxError(
+          401,
+          "Unauthorized",
+          "Sandbox keys must match sb_test_<8+ chars>. No live Partner keys are accepted here."
+        ),
+      };
+    }
+
+    const found = await findSandboxPartnerByApiKey(token);
+    if (found) {
+      if (!found.apiEnabled) {
+        return {
+          ok: false,
+          response: sandboxError(
+            403,
+            "Forbidden",
+            "Sandbox API access is disabled for this partner account."
+          ),
+        };
+      }
+      return { ok: true, apiKey: token, partnerId: found.partnerId };
+    }
+
+    return {
+      ok: false,
+      response: sandboxError(
+        401,
+        "Unauthorized",
+        "Unknown sandbox API key. Ask an administrator to provision a sandbox partner and API key."
+      ),
+    };
   }
 
-  // No Neon key: reject so UI/API stay consistent with provisioned partners.
+  // Portal UI path — session cookie; independent of Public API toggles.
+  const sessionPartnerId = resolveSandboxPartnerIdFromRequest(req);
+  if (sessionPartnerId) {
+    const partner = await getSandboxPartnerById(sessionPartnerId);
+    if (partner && !partner.disabledAt) {
+      return {
+        ok: true,
+        apiKey: `session:${sessionPartnerId}`,
+        partnerId: sessionPartnerId,
+        viaSession: true,
+      };
+    }
+  }
+
   return {
     ok: false,
     response: sandboxError(
       401,
       "Unauthorized",
-      "Unknown sandbox API key. Ask an administrator to provision a sandbox partner and API key."
+      "Missing or invalid API key. Send Authorization: Bearer sb_test_…, or sign in to the sandbox portal."
     ),
   };
 }
