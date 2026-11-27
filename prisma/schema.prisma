@@ -2099,9 +2099,9 @@ model SandboxPartner {
   email               String              @unique
   passwordHash        String
   /// Current demo wallet balance (USD cents).
-  balanceCents        Int                 @default(125000)
+  balanceCents        Int                 @default(5000)
   /// Opening balance restored by "Reset Demo Data".
-  initialBalanceCents Int                 @default(125000)
+  initialBalanceCents Int                 @default(5000)
   /// Per-partner Sandbox Public API access (AND with SandboxSettings.globalSandboxApiEnabled).
   apiEnabled          Boolean             @default(true)
   /// Partner discount percent applied to retail (default 3 → partner pays 97%).

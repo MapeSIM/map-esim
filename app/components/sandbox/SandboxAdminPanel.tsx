@@ -19,6 +19,21 @@ import { SANDBOX_DEFAULT_DISCOUNT_PERCENT } from "@/app/lib/sandbox/sandboxPrici
 import type { SandboxPartnerPublic } from "@/app/lib/sandbox/sandboxPartnerTypes";
 
 const empty: SandboxActionState = { ok: false };
+const CREATE_DEFAULT_BALANCE_USD = "50";
+
+type CreatePartnerDraft = {
+  name: string;
+  email: string;
+  password: string;
+  balanceUsd: string;
+};
+
+const emptyCreateDraft = (): CreatePartnerDraft => ({
+  name: "",
+  email: "",
+  password: "",
+  balanceUsd: CREATE_DEFAULT_BALANCE_USD,
+});
 
 function formatUsd(cents: number) {
   return new Intl.NumberFormat("en-US", {
@@ -61,6 +76,8 @@ export default function SandboxAdminPanel({
   const [partners, setPartners] = useState(initialPartners);
   const [globalOn, setGlobalOn] = useState(globalSandboxApiEnabled);
   const [showCreatePassword, setShowCreatePassword] = useState(false);
+  const [createFormKey, setCreateFormKey] = useState(0);
+  const [createDraft, setCreateDraft] = useState<CreatePartnerDraft>(emptyCreateDraft);
   const [createState, createAction, createPending] = useActionState(
     createSandboxPartnerAction,
     empty
@@ -105,6 +122,11 @@ export default function SandboxAdminPanel({
   }, [globalSandboxApiEnabled]);
 
   useEffect(() => {
+    if (createState.ok) {
+      setCreateDraft(emptyCreateDraft());
+      setShowCreatePassword(false);
+      setCreateFormKey((k) => k + 1);
+    }
     if (
       createState.ok ||
       balanceState.ok ||
@@ -186,7 +208,31 @@ export default function SandboxAdminPanel({
           Hashed password, opening demo balance, and an{" "}
           <code className="text-slate-300">sb_test_*</code> API key (shown once).
         </p>
-        <form action={createAction} className="mt-4 grid gap-3 sm:grid-cols-2">
+        <form
+          key={createFormKey}
+          action={createAction}
+          autoComplete="off"
+          className="mt-4 grid gap-3 sm:grid-cols-2"
+        >
+          {/* Soak up browser/password-manager login autofill away from partner fields. */}
+          <input
+            type="text"
+            name="sandbox_admin_username_trap"
+            autoComplete="username"
+            tabIndex={-1}
+            aria-hidden="true"
+            defaultValue=""
+            className="pointer-events-none absolute h-0 w-0 opacity-0"
+          />
+          <input
+            type="password"
+            name="sandbox_admin_password_trap"
+            autoComplete="current-password"
+            tabIndex={-1}
+            aria-hidden="true"
+            defaultValue=""
+            className="pointer-events-none absolute h-0 w-0 opacity-0"
+          />
           <label className="block text-sm sm:col-span-1">
             <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
               Name
@@ -195,6 +241,15 @@ export default function SandboxAdminPanel({
               name="name"
               required
               maxLength={120}
+              value={createDraft.name}
+              onChange={(e) =>
+                setCreateDraft((d) => ({ ...d, name: e.target.value }))
+              }
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              data-1p-ignore="true"
+              data-lpignore="true"
               className="h-10 w-full rounded-xl border border-white/[0.1] bg-[#070D19] px-3 text-sm text-slate-100 outline-none focus:border-emerald-500/40"
             />
           </label>
@@ -206,6 +261,15 @@ export default function SandboxAdminPanel({
               name="email"
               type="email"
               required
+              value={createDraft.email}
+              onChange={(e) =>
+                setCreateDraft((d) => ({ ...d, email: e.target.value }))
+              }
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              data-1p-ignore="true"
+              data-lpignore="true"
               className="h-10 w-full rounded-xl border border-white/[0.1] bg-[#070D19] px-3 text-sm text-slate-100 outline-none focus:border-emerald-500/40"
             />
           </label>
@@ -219,6 +283,13 @@ export default function SandboxAdminPanel({
                 type={showCreatePassword ? "text" : "password"}
                 required
                 minLength={8}
+                value={createDraft.password}
+                onChange={(e) =>
+                  setCreateDraft((d) => ({ ...d, password: e.target.value }))
+                }
+                autoComplete="new-password"
+                data-1p-ignore="true"
+                data-lpignore="true"
                 className="h-10 w-full rounded-xl border border-white/[0.1] bg-[#070D19] px-3 pr-10 text-sm text-slate-100 outline-none focus:border-emerald-500/40"
               />
               <button
@@ -246,7 +317,16 @@ export default function SandboxAdminPanel({
               type="number"
               min={0}
               step={1}
-              defaultValue={1250}
+              value={createDraft.balanceUsd}
+              onChange={(e) =>
+                setCreateDraft((d) => ({
+                  ...d,
+                  balanceUsd: e.target.value,
+                }))
+              }
+              autoComplete="off"
+              data-1p-ignore="true"
+              data-lpignore="true"
               className="h-10 w-full rounded-xl border border-white/[0.1] bg-[#070D19] px-3 text-sm text-slate-100 outline-none focus:border-emerald-500/40"
             />
           </label>

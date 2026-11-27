@@ -4,7 +4,8 @@
  */
 
 export const SANDBOX_TEST_KEY_PREFIX = "sb_test_";
-export const SANDBOX_DEFAULT_BALANCE_CENTS = 125_000;
+/** Opening demo wallet for new sandbox partners ($50 USD). */
+export const SANDBOX_DEFAULT_BALANCE_CENTS = 5_000;
 
 export type SandboxCatalogItem = {
   id: string;

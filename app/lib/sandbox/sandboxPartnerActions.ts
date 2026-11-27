@@ -200,7 +200,7 @@ export async function createSandboxPartnerAction(
   formData: FormData
 ): Promise<SandboxActionState> {
   await requireSandboxAdmin();
-  const balanceRaw = String(formData.get("initialBalanceUsd") ?? "1250").trim();
+  const balanceRaw = String(formData.get("initialBalanceUsd") ?? "50").trim();
   const balanceUsd = Number(balanceRaw);
   const initialBalanceCents = Number.isFinite(balanceUsd)
     ? Math.round(balanceUsd * 100)
